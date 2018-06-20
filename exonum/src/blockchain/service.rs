@@ -323,7 +323,9 @@ pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
+    is_validator: bool,
     majority_count: usize,
+    validators: Vec<ValidatorKeys>,
 }
 
 impl ApiNodeState {
@@ -400,19 +402,36 @@ impl SharedNodeState {
 
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
+        lock.is_validator = state.is_validator();
+        lock.validators = state.validators().to_vec();
 
-        for (p, c) in state.peers().iter() {
+        for (p, c) in state.peers() {
             lock.peers_info.insert(c.addr(), *p);
         }
     }
 
-    /// Returns the majority count from the current "State"
-    /// of a blockchain node.
-    pub fn majority_count(&self) -> usize {
-        self.state
-            .read()
-            .expect("Expected read lock.")
-            .majority_count
+    /// Returns a boolean value which indicates whether the consensus is achieved.
+    pub fn consensus_status(&self) -> bool {
+        let lock = self.state.read().expect("Expected read lock.");
+
+        let mut active_validators = lock.peers_info
+            .values()
+            .filter(|peer_key| {
+                lock.validators
+                    .iter()
+                    .any(|validator| validator.consensus_key == **peer_key)
+            })
+            .count();
+
+        if lock.is_validator {
+            // Peers list doesn't include current node address, so we have to increment its length.
+            // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
+            active_validators += 1;
+        }
+
+        // Just after Node is started (node status isn't updated) majority_count = 0,
+        // so we have to check that majority count is greater than 0.
+        active_validators >= lock.majority_count && lock.majority_count > 0
     }
 
     /// Returns a boolean value which indicates whether the node is enabled
