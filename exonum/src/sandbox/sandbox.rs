@@ -637,11 +637,30 @@ impl Sandbox {
     }
 
     fn add_peer_to_whitelist(&self, addr: SocketAddr, public_key: PublicKey) {
+        let config = {
+            let inner = &self.inner.borrow_mut();
+            let state = &inner.handler.state;
+            let mut config = state.config().clone();
+            config.validator_keys.push(ValidatorKeys {
+                consensus_key: public_key.clone(),
+                service_key: public_key,
+            });
+            config
+        };
+
+        self.update_config(config);
         self.inner
             .borrow_mut()
             .handler
             .state
-            .add_peer_to_whitelist(ConnectInfo { addr, public_key });
+            .add_peer_to_whitelist(ConnectInfo {
+                address: addr,
+                public_key,
+            });
+    }
+
+    fn update_config(&self, config: StoredConfiguration) {
+        self.inner.borrow_mut().handler.state.update_config(config);
     }
 }
 
@@ -867,7 +886,7 @@ mod tests {
     #[test]
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
-        // As far as all validators has connected to each other during
+        // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
         let (public, secret) = gen_keypair();

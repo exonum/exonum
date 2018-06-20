@@ -69,8 +69,6 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         })
         .collect::<Vec<_>>();
 
-    let whitelist = Whitelist::from_validator_keys(&genesis.validator_keys, &peers);
-
     validators
         .into_iter()
         .zip(services.into_iter())
@@ -85,7 +83,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
             service_public_key: service.0,
             service_secret_key: service.1,
             genesis: genesis.clone(),
-            whitelist: whitelist.clone(),
+            whitelist: Whitelist::from_validator_keys(&genesis.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),

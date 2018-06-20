@@ -520,7 +520,7 @@ impl State {
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
-        //TODO: update Whitelist also.
+        self.refresh_whitelist(&config.validator_keys);
 
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
@@ -1128,8 +1128,19 @@ impl State {
         self.our_connect_message = msg;
     }
 
-    /// Returns node's connect list.
-    pub fn add_peer_to_whitelist(&mut self, peer: ConnectInfo) {
-        self.whitelist.add(peer);
+    /// Add peer to node's `whitelist`.
+    pub fn add_peer_to_whitelist(&mut self, peer: ConnectInfo) -> bool {
+        match self.find_validator(peer.public_key) {
+            Some(_) => {
+                self.whitelist.add(peer);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Refresh `whitelist` if validators has changed.
+    pub fn refresh_whitelist(&mut self, validator_keys: &[ValidatorKeys]) {
+        self.whitelist.refresh(validator_keys);
     }
 }

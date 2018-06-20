@@ -575,7 +575,7 @@ impl NodeHandler {
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
 
-        if self.state.whitelist().allow_address(&address) {
+        if self.state.whitelist().address_allowed(&address) {
             self.send_to_addr(address, connect.raw());
         } else {
             warn!("Peer {:?} is not in the whitelist!", address);
@@ -733,18 +733,18 @@ impl fmt::Debug for ApiSender {
     }
 }
 
+/// Data needed to add peer into `whitelist`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-/// Connect Info
 pub struct ConnectInfo {
-    /// Peer addr
-    pub addr: SocketAddr,
-    /// Peer public key
+    /// Peer address.
+    pub address: SocketAddr,
+    /// Peer public key.
     pub public_key: PublicKey,
 }
 
 impl fmt::Display for ConnectInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.addr)
+        write!(f, "{}", self.address)
     }
 }
 

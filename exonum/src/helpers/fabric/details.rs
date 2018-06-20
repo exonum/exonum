@@ -583,8 +583,6 @@ impl Command for Finalize {
 
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
-        let whitelist = Whitelist::from_node_config(&list);
-
         let validators_count = common
             .general_config
             .get("validators_count")
@@ -609,7 +607,7 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_addr,
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
-                whitelist: whitelist.clone(),
+                whitelist: Whitelist::from_node_config(&list),
                 peers,
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,

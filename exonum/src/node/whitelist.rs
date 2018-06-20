@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::SocketAddr;
 
 use blockchain::ValidatorKeys;
@@ -24,7 +23,7 @@ use node::ConnectInfo;
 
 // TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
 
-/// `Whitelist` is special set to keep peers that can connect to us.
+/// `Whitelist` is mapping between IP addresses and public keys.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Whitelist {
     whitelist_enabled: bool,
@@ -41,7 +40,7 @@ impl Whitelist {
 
     /// Adds peer to the whitelist.
     pub fn add(&mut self, peer: ConnectInfo) {
-        self.peers.insert(peer.public_key, peer.addr);
+        self.peers.insert(peer.public_key, peer.address);
     }
 
     /// Returns `true` if whitelist is enabled, otherwise everyone can connect.
@@ -49,7 +48,7 @@ impl Whitelist {
         self.whitelist_enabled
     }
 
-    /// Create whitelist from validators_keys and peers.
+    /// Creates `Whitelist` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = peers
             .iter()
@@ -63,7 +62,7 @@ impl Whitelist {
         }
     }
 
-    /// Create whitelist from NodePublicConfigs.
+    /// Creates `Whitelist` from validators public configs.
     pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = list.iter()
             .map(|config| (config.validator_keys.consensus_key, config.addr))
@@ -76,11 +75,25 @@ impl Whitelist {
     }
 
     /// Check if we allow to connect to `address`.
-    pub fn allow_address(&self, address: &SocketAddr) -> bool {
+    pub fn address_allowed(&self, address: &SocketAddr) -> bool {
         !self.whitelist_enabled || self.peers.values().any(|a| a == address)
     }
 
-    /// Create from state::peers needed only for testing.
+    /// Refresh whitelist peers if validators has changed.
+    pub fn refresh(&mut self, validators_keys: &[ValidatorKeys]) {
+        let keys: BTreeSet<_> = validators_keys
+            .iter()
+            .map(|key| key.consensus_key)
+            .collect();
+        self.peers = self.peers
+            .clone()
+            .into_iter()
+            .filter(|(k, _)| keys.contains(k))
+            .collect();
+    }
+
+    // Creates from state::peers, needed only for testing.
+    #[doc(hidden)]
     pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
         let whitelist = Whitelist::default();
         let peers: BTreeMap<PublicKey, SocketAddr> =

@@ -73,9 +73,15 @@ impl NodeHandler {
                     );
                     return;
                 }
-                info!("Send Connect message to {}", info);
-                self.state.add_peer_to_whitelist(info);
-                self.connect(&info.addr);
+                if self.state.add_peer_to_whitelist(info) {
+                    info!("Send Connect message to {}", info);
+                    self.connect(&info.address);
+                } else {
+                    warn!(
+                        "Received peer add request from peer with unknown public key {}",
+                        info
+                    )
+                }
             }
             ExternalMessage::Enable(value) => {
                 let s = if value { "enabled" } else { "disabled" };
