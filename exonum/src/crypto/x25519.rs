@@ -71,10 +71,7 @@ pub fn into_x25519_keypair(
 
 /// Converts an arbitrary array of data to the Curve25519-compatible private key.
 pub fn convert_to_private_key(key: &mut [u8; 32]) {
-    let mut secret_key_base = [0; 64];
-    secret_key_base[0..32].copy_from_slice(key);
-    let secret_key = SecretKeySodium(secret_key_base);
-    let converted = convert_ed_sk_to_curve25519(secret_key);
+    let converted = convert_ed_sk_to_curve25519(key);
 
     key.copy_from_slice(&converted);
 }

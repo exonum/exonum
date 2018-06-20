@@ -54,7 +54,7 @@ snow = "=0.1.12"
 rust_decimal = "=0.9.0"
 
 exonum_rocksdb = "0.7.4"
-exonum_sodiumoxide = "0.0.19"
+exonum_sodiumoxide = "0.0.20"
 exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
 exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
 
