@@ -135,6 +135,7 @@
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate actix_web;
+#[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate failure;
 extern crate futures;
@@ -174,9 +175,9 @@ use poll_events::poll_events;
 mod macros;
 mod api;
 mod checkpoint_db;
-// mod handler;
 mod network;
 mod poll_events;
+mod server;
 
 /// Builder for `TestKit`.
 ///

@@ -72,13 +72,17 @@ impl fmt::Debug for TestKitApi {
 impl TestKitApi {
     /// Creates a new instance of API.
     pub fn new(testkit: &TestKit) -> Self {
-        let aggregator =
-            ApiAggregator::new(testkit.blockchain().clone(), SharedNodeState::new(10_000));
+        Self::from_raw_parts(
+            ApiAggregator::new(testkit.blockchain().clone(), SharedNodeState::new(10_000)),
+            testkit.api_sender.clone(),
+        )
+    }
 
+    pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
         TestKitApi {
             test_server: create_test_server(aggregator),
             test_client: Client::new(),
-            api_sender: testkit.api_sender.clone(),
+            api_sender: api_sender,
         }
     }
 
@@ -93,22 +97,22 @@ impl TestKitApi {
     }
 
     /// TODO
-    pub fn public(&self, kind: ApiKind) -> RequestBuilder {
+    pub fn public<K: ToString>(&self, kind: K) -> RequestBuilder {
         RequestBuilder::new(
             self.test_server.url(""),
             &self.test_client,
             ApiAccess::Public,
-            kind,
+            kind.to_string(),
         )
     }
 
     /// TODO
-    pub fn private(&self, kind: ApiKind) -> RequestBuilder {
+    pub fn private<K: ToString>(&self, kind: K) -> RequestBuilder {
         RequestBuilder::new(
             self.test_server.url(""),
             &self.test_client,
             ApiAccess::Private,
-            kind,
+            kind.to_string(),
         )
     }
 }
@@ -121,7 +125,7 @@ where
     test_server_url: String,
     test_client: &'a Client,
     access: ApiAccess,
-    kind: ApiKind,
+    prefix: String,
     query: Option<&'b Q>,
 }
 
@@ -132,7 +136,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("RequestBuilder")
             .field("access", &self.access)
-            .field("kind", &self.kind)
+            .field("prefix", &self.prefix)
             .field("query", &self.query)
             .finish()
     }
@@ -146,13 +150,13 @@ where
         test_server_url: String,
         test_client: &'a Client,
         access: ApiAccess,
-        kind: ApiKind,
+        prefix: String,
     ) -> Self {
         RequestBuilder {
             test_server_url,
             test_client,
             access,
-            kind,
+            prefix,
             query: None,
         }
     }
@@ -163,7 +167,7 @@ where
             test_server_url: self.test_server_url.clone(),
             test_client: self.test_client,
             access: self.access,
-            kind: self.kind,
+            prefix: self.prefix.clone(),
             query: Some(query),
         }
     }
@@ -173,9 +177,6 @@ where
     where
         R: DeserializeOwned + fmt::Debug + 'static,
     {
-        let kind = self.kind;
-        let access = self.access;
-
         let params = self.query
             .as_ref()
             .map(|query| {
@@ -187,7 +188,7 @@ where
             .unwrap_or_default();
         let url = format!(
             "{}{}/{}/{}{}",
-            self.test_server_url, access, kind, endpoint, params
+            self.test_server_url, self.access, self.prefix, endpoint, params
         );
 
         trace!("GET: {}", url);
@@ -204,9 +205,10 @@ where
     where
         R: DeserializeOwned + fmt::Debug + 'static,
     {
-        let kind = self.kind;
-        let access = self.access;
-        let url = format!("{}{}/{}/{}", self.test_server_url, access, kind, endpoint);
+        let url = format!(
+            "{}{}/{}/{}",
+            self.test_server_url, self.access, self.prefix, endpoint
+        );
 
         trace!("POST: {}", url);
 
@@ -264,15 +266,17 @@ where
     }
 }
 
-/// Creates test server.
+/// Creates a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = TestServer::with_factory(move || {
         let state = ServiceApiState::new(aggregator.blockchain());
         App::with_state(state.clone())
             .scope("public/api", |scope| {
+                debug!("Create public/api");
                 aggregator.extend_api(ApiAccess::Public, scope)
             })
             .scope("private/api", |scope| {
+                debug!("Create private/api");
                 aggregator.extend_api(ApiAccess::Private, scope)
             })
             .middleware(Logger::default())

@@ -99,6 +99,7 @@ impl ServiceApiBackend for ApiBuilder {
     fn wire(&self, mut output: Self::Scope) -> Self::Scope {
         for handler in self.handlers.clone() {
             let inner = handler.inner;
+            debug!("\t\tCreate {} request handler: {}", handler.method, handler.name);
             output = output.route(&handler.name, handler.method.clone(), move |request| {
                 inner(request)
             });
@@ -113,6 +114,7 @@ impl IntoApiBackend for actix_web::Scope<ServiceApiState> {
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>,
     {
         for mut item in items {
+            debug!("\tExtend api: {}", item.0);
             self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
         }
         self

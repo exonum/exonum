@@ -229,6 +229,11 @@ impl ApiAggregator {
         }
     }
 
+    /// TODO
+    pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
+        self.inner.insert(prefix.into(), builder);
+    }
+
     fn explorer_api() -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
         self::node::public::ExplorerApi::wire(builder.public_scope());
