@@ -96,7 +96,7 @@ function getWallet(publicKey) {
       return validator.consensus_key
     })
 
-    return axios.get(`/api/services/cryptocurrency/v1/wallets/info/${publicKey}`)
+    return axios.get(`/api/services/cryptocurrency/v1/wallets/info?pub_key=${publicKey}`)
       .then(response => response.data)
       .then(data => {
         if (!Exonum.verifyBlock(data.block_proof, validators)) {
@@ -281,11 +281,11 @@ module.exports = {
       },
 
       getBlock(height) {
-        return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
       },
 
       getTransaction(hash) {
-        return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
       }
     }
   }
