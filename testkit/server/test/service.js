@@ -110,7 +110,7 @@ exports.service = {
   },
 
   async getWallet (pubkey) {
-    const response = await fetch(`${SERVICE_URL}/v1/wallet/${pubkey}`)
+    const response = await fetch(`${SERVICE_URL}/v1/wallet?pub_key=${pubkey}`)
     return response.json()
   }
 }
