@@ -733,18 +733,19 @@ impl fmt::Debug for ApiSender {
     }
 }
 
-/// Data needed to add peer into `whitelist`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+//TODO: add doc
+/// Connect Info
 pub struct ConnectInfo {
-    /// Peer address.
-    pub address: SocketAddr,
-    /// Peer public key.
+    /// Peer addr
+    pub addr: SocketAddr,
+    /// Peer public key
     pub public_key: PublicKey,
 }
 
 impl fmt::Display for ConnectInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.address)
+        write!(f, "{}", self.addr)
     }
 }
 

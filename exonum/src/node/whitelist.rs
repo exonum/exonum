@@ -102,6 +102,40 @@ impl Whitelist {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::Whitelist;
+    use std::collections::BTreeMap;
+    use std::net::SocketAddr;
+    use blockchain::ValidatorKeys;
+    use crypto::{PublicKey, gen_keypair};
+
+    #[test]
+    fn test_whitelist_refresh() {
+        let mut peers = BTreeMap::new();
+
+        let (pk, sk) = gen_keypair();
+        let addr : SocketAddr = "127.0.0.1:80".parse().unwrap();
+        peers.insert(pk, addr.clone());
+
+        let mut whitelist = Whitelist {
+            peers, whitelist_enabled: true
+        };
+
+        assert!(whitelist.allow(&pk));
+
+        let mut validator_keys = Vec::new();
+        validator_keys.push(ValidatorKeys { consensus_key: pk.clone(), service_key: pk.clone()});
+        whitelist.refresh(&validator_keys);
+        assert!(whitelist.allow(&pk));
+
+        let (pk, sk) = gen_keypair();
+        validator_keys.push(ValidatorKeys { consensus_key: pk, service_key: pk});
+        whitelist.refresh(&validator_keys);
+        assert!(!whitelist.allow(&pk));
+    }
+}
+
 // TODO: rewrite tests
 #[cfg(whitelist_tests)]
 mod test {
