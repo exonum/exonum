@@ -125,9 +125,15 @@ impl Dh for SodiumDh25519 {
 
         let pubkey = x25519::PublicKey::from_slice(&pubkey[..x25519::PUBLIC_KEY_LENGTH])
             .expect("Can't construct public key for Dh25519");
-        let result = x25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
+        let result = x25519::scalarmult(&self.privkey, &pubkey);
 
-        out[..self.pub_len()].copy_from_slice(&result[..self.pub_len()]);
+        // FIXME: `snow` is able to pass incorrect public key, so this is a temporary workaround. (ECR-1726)
+        if result.is_err() {
+        	error!("Can't calculate dh, public key {:?}", &pubkey[..]);
+        	return;
+        }
+
+        out[..self.pub_len()].copy_from_slice(&result.unwrap()[..self.pub_len()]);
     }
 }
 
