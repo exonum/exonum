@@ -330,7 +330,10 @@ pub struct ApiNodeState {
 
 impl ApiNodeState {
     fn new() -> ApiNodeState {
-        Self::default()
+        Self {
+            is_enabled: true,
+            ..Default::default()
+        }
     }
 }
 
