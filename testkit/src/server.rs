@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{api::{self, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-             blockchain::Transaction,
+use exonum::{api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
+             blockchain::{SharedNodeState, Transaction},
              crypto,
              explorer::{BlockWithTransactions, BlockchainExplorer},
              helpers::Height};
@@ -21,23 +21,6 @@ use exonum::{api::{self, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use super::{TestKit, TestNetworkConfiguration};
-
-#[derive(Debug, Clone)]
-struct TestkitServerApi(Arc<RwLock<TestKit>>);
-
-impl TestkitServerApi {
-    fn new(inner: TestKit) -> TestkitServerApi {
-        TestkitServerApi(Arc::new(RwLock::new(inner)))
-    }
-
-    fn read(&self) -> RwLockReadGuard<TestKit> {
-        self.0.read().unwrap()
-    }
-
-    fn write(&self) -> RwLockWriteGuard<TestKit> {
-        self.0.write().unwrap()
-    }
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CreateBlockQuery {
@@ -51,7 +34,18 @@ struct TestKitStatus {
     next_configuration: Option<TestNetworkConfiguration>,
 }
 
+#[derive(Debug, Clone)]
+struct TestkitServerApi(Arc<RwLock<TestKit>>);
+
 impl TestkitServerApi {
+    fn read(&self) -> RwLockReadGuard<TestKit> {
+        self.0.read().unwrap()
+    }
+
+    fn write(&self) -> RwLockWriteGuard<TestKit> {
+        self.0.write().unwrap()
+    }
+
     fn status(&self) -> api::Result<TestKitStatus> {
         let testkit = self.read();
         Ok(TestKitStatus {
@@ -150,12 +144,22 @@ pub fn create_testkit_handlers(inner: &Arc<RwLock<TestKit>>) -> ServiceApiBuilde
     builder
 }
 
+/// Creates an ApiAggregator with the testkit server specific handlers.
+pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggregator {
+    let mut aggregator = ApiAggregator::new(
+        testkit.read().unwrap().blockchain().clone(),
+        SharedNodeState::new(10_000),
+    );
+    aggregator.insert("testkit", create_testkit_handlers(testkit));
+    aggregator
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json;
 
-    use exonum::api::{self, ApiAggregator};
-    use exonum::blockchain::{ExecutionResult, Service, SharedNodeState, Transaction};
+    use exonum::api;
+    use exonum::blockchain::{ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
@@ -225,12 +229,9 @@ mod tests {
             .with_service(SampleService)
             .create();
 
-        let mut aggregator =
-            ApiAggregator::new(testkit.blockchain().clone(), SharedNodeState::new(10_000));
         let api_sender = testkit.api_sender.clone();
-
         let testkit = Arc::new(RwLock::new(testkit));
-        aggregator.insert("testkit", create_testkit_handlers(&testkit));
+        let aggregator = create_testkit_api_aggregator(&testkit);
         let (testkit, api) = (
             Arc::clone(&testkit),
             TestKitApi::from_raw_parts(aggregator, api_sender),
@@ -337,6 +338,7 @@ mod tests {
     #[test]
     fn test_create_block_with_bogus_transaction() {
         let (_, api) = init_handler(Height(0));
+
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![Hash::zero()]),
         };
@@ -354,6 +356,7 @@ mod tests {
     #[test]
     fn test_rollback_normal() {
         let (testkit, api) = init_handler(Height(0));
+
         for _ in 0..4 {
             api.private("api/testkit")
                 .query(&CreateBlockQuery { tx_hashes: None })

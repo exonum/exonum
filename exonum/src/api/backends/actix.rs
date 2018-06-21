@@ -252,9 +252,7 @@ pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeC
     let app_config = runtime_config.app_config;
     let access = runtime_config.access;
     let state = ServiceApiState::new(aggregator.blockchain.clone());
-    let mut app = App::with_state(state).scope("api", |scope| {
-        aggregator.extend_api(access, scope)
-        });
+    let mut app = App::with_state(state).scope("api", |scope| aggregator.extend_api(access, scope));
     if let Some(app_config) = app_config {
         app = app_config(app);
     }
@@ -263,7 +261,7 @@ pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeC
 
 /// Configuration parameters for the `App` runtime.
 #[derive(Clone)]
-pub(crate) struct ApiRuntimeConfig {
+pub struct ApiRuntimeConfig {
     /// The socket address to bind.
     pub listen_address: SocketAddr,
     /// Api access level.
@@ -273,6 +271,7 @@ pub(crate) struct ApiRuntimeConfig {
 }
 
 impl ApiRuntimeConfig {
+    /// Creates api runtime configuration for the given address and access level.
     pub fn new(listen_address: SocketAddr, access: ApiAccess) -> ApiRuntimeConfig {
         ApiRuntimeConfig {
             listen_address,
@@ -292,20 +291,24 @@ impl fmt::Debug for ApiRuntimeConfig {
     }
 }
 
-/// Configuration parameters for the actix runtime.
-pub(crate) struct SystemRuntimeConfig {
+/// Configuration parameters for the actix system runtime.
+#[derive(Debug)]
+pub struct SystemRuntimeConfig {
+    /// Active API runtimes.
     pub api_runtimes: Vec<ApiRuntimeConfig>,
+    /// API aggregator.
     pub api_aggregator: ApiAggregator,
 }
 
 /// Actix system runtime handle.
-pub(crate) struct SystemRuntime {
+pub struct SystemRuntime {
     system_thread: JoinHandle<result::Result<(), failure::Error>>,
     api_runtime_addresses: Vec<HttpServerAddr>,
     system_address: SystemAddr,
 }
 
 impl SystemRuntimeConfig {
+    /// Starts actix system runtime along with all web runtimes.
     pub fn start(self) -> result::Result<SystemRuntime, failure::Error> {
         SystemRuntime::new(self)
     }
@@ -321,7 +324,10 @@ impl SystemRuntime {
             let system = System::new("http-server");
 
             let aggregator = config.api_aggregator.clone();
-            trace!("Create actix system runtime with api: {:#?}", aggregator.inner);
+            trace!(
+                "Create actix system runtime with api: {:#?}",
+                aggregator.inner
+            );
             let api_handlers = config.api_runtimes.into_iter().map(|runtime_config| {
                 let access = runtime_config.access;
                 let listen_address = runtime_config.listen_address;
@@ -375,6 +381,7 @@ impl SystemRuntime {
         })
     }
 
+    /// Stops the actix system runtime along with all web runtimes.
     pub fn stop(self) -> result::Result<(), failure::Error> {
         // Stop all actix web servers.
         for api_runtime_address in self.api_runtime_addresses {
@@ -393,5 +400,11 @@ impl SystemRuntime {
                 e
             )
         })?
+    }
+}
+
+impl fmt::Debug for SystemRuntime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("SystemRuntime").finish()
     }
 }

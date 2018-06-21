@@ -159,10 +159,14 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 pub mod compare;
 
 use futures::{sync::mpsc, Future, Stream};
+use tokio_core::reactor::Core;
 
+use std::sync::{Arc, RwLock};
 use std::{fmt, net::SocketAddr};
 
-use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
+use exonum::{api::{backends::actix::{ApiRuntimeConfig, App, SystemRuntimeConfig},
+                   ApiAccess},
+             blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                           Transaction},
              crypto::{self, Hash},
              explorer::{BlockWithTransactions, BlockchainExplorer},
@@ -219,7 +223,7 @@ mod server;
 ///
 /// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
 /// at the specified in JSON body `height` value (a positive integer), so that after the request
-/// the blockchain height is equal to `height - 1`. If the specified height is greater than the 
+/// the blockchain height is equal to `height - 1`. If the specified height is greater than the
 /// blockchain height, the request performs no action.
 ///
 /// Returns the latest block from the blockchain on success.
@@ -933,32 +937,35 @@ impl TestKit {
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
 
-    fn run(self, _public_api_address: SocketAddr, _private_api_address: SocketAddr) {
-        unimplemented!();
+    fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let events_stream = self.remove_events_stream();
+        // Creates complete actix web server with the testkit extensions.
+        let testkit_ref = Arc::new(RwLock::new(self));
+        let app_config =
+            Arc::new(|app: App| app.middleware(actix_web::middleware::Logger::default()));
+        let system_runtime_config = SystemRuntimeConfig {
+            api_runtimes: vec![
+                ApiRuntimeConfig {
+                    listen_address: public_api_address,
+                    access: ApiAccess::Public,
+                    app_config: Some(app_config.clone()),
+                },
+                ApiRuntimeConfig {
+                    listen_address: private_api_address,
+                    access: ApiAccess::Private,
+                    app_config: Some(app_config.clone()),
+                },
+            ],
+            api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
+        };
+        let system_runtime = system_runtime_config.start().unwrap();
+        // Run the event stream in a separate thread in order to put transactions to mempool
+        // when they are received. Otherwise, a client would need to call a `poll_events` analogue
+        // each time after a transaction is posted.
+        let mut core = Core::new().unwrap();
+        core.run(events_stream).unwrap();
 
-        // let api = self.api();
-        // let events_stream = self.remove_events_stream();
-        // let testkit_ref = Arc::new(RwLock::new(self));
-        // let (public_handler, private_handler) =
-        //     api.into_handlers(create_testkit_handler(&testkit_ref));
-
-        // let public_api_thread = thread::spawn(move || {
-        //     Iron::new(public_handler).http(public_api_address).unwrap();
-        // });
-        // let private_api_thread = thread::spawn(move || {
-        //     Iron::new(private_handler)
-        //         .http(private_api_address)
-        //         .unwrap();
-        // });
-
-        // // Run the event stream in a separate thread in order to put transactions to mempool
-        // // when they are received. Otherwise, a client would need to call a `poll_events` analogue
-        // // each time after a transaction is posted.
-        // let mut core = Core::new().unwrap();
-        // core.run(events_stream).unwrap();
-
-        // public_api_thread.join().unwrap();
-        // private_api_thread.join().unwrap();
+        system_runtime.stop().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -969,7 +976,7 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    pub fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
+    fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
         let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
         Box::new(stream.for_each(|_| Ok(())))
     }
