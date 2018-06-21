@@ -446,7 +446,7 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            is_enabled: true,
+            is_enabled: api_state.is_enabled(),
         }
     }
 
