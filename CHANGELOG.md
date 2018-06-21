@@ -17,14 +17,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Method `name` has been removed from `Run`, `GenerateCommonConfig`,
   `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
   (`helpers/fabric` module). (#731)
-  
-- `ConnectList` as `Whitelist` replacement has been added. Now connection between
-nodes can only be established if nodes exist in each other connect lists.
+
+- `Whitelist` has been replaced by `ConnectList`. Now connection between
+  nodes can only be established if nodes exist in each other connect lists.
 
   Migration path:
-  
+
   - Replace `[whitelist]` section in config to `[connect_list.peers]` section and
-  specify here all validator consensus public keys with corresponding ip-addresses. 
+  specify here all validator consensus public keys with corresponding ip-addresses.
   For example `16ef83ca...da72 = "127.0.0.1:6333"`.
 
 ### New features
