@@ -3412,7 +3412,7 @@ fn handle_block_response_with_invalid_precommits() {
 }
 
 #[test]
-fn handle_block_request_with_known_transaction() {
+fn handle_block_response_with_known_transaction() {
     let sandbox = timestamping_sandbox();
 
     let tx1 = gen_timestamping_tx();
@@ -3513,7 +3513,7 @@ fn handle_block_request_with_known_transaction() {
 }
 
 #[test]
-fn handle_block_request_with_all_known_transactions() {
+fn handle_block_response_with_all_known_transactions() {
     let sandbox = timestamping_sandbox();
 
     let tx1 = gen_timestamping_tx();
