@@ -16,17 +16,18 @@
 
 pub use exonum::api::ApiAccess;
 
-use actix_web::{middleware::Logger, test::TestServer, App};
+use actix_web::{test::TestServer, App};
 use reqwest::{Client, Response, StatusCode};
 use serde_json;
 use serde_urlencoded;
 
-use std::fmt;
+use std::fmt::{self};
 
-use exonum::{api::{self, ApiAggregator, ServiceApiState},
-             blockchain::{SharedNodeState, Transaction},
-             encoding::serialize::reexport::{DeserializeOwned, Serialize},
-             node::{ApiSender, TransactionSend}};
+use exonum::{
+    api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
+    encoding::serialize::reexport::{DeserializeOwned, Serialize},
+    node::{ApiSender, TransactionSend},
+};
 
 use TestKit;
 
@@ -177,9 +178,10 @@ where
     /// TODO
     pub fn get<R>(&self, endpoint: &str) -> api::Result<R>
     where
-        R: DeserializeOwned + fmt::Debug + 'static,
+        R: DeserializeOwned + 'static,
     {
-        let params = self.query
+        let params = self
+            .query
             .as_ref()
             .map(|query| {
                 format!(
@@ -193,9 +195,10 @@ where
             self.test_server_url, self.access, self.prefix, endpoint, params
         );
 
-        trace!("GET: {}", url);
+        trace!("GET {}", url);
 
-        let response = self.test_client
+        let response = self
+            .test_client
             .get(&url)
             .send()
             .expect("Unable to send request");
@@ -205,18 +208,18 @@ where
     /// TODO
     pub fn post<R>(&self, endpoint: &str) -> api::Result<R>
     where
-        R: DeserializeOwned + fmt::Debug + 'static,
+        R: DeserializeOwned + 'static,
     {
         let url = format!(
             "{}{}/{}/{}",
             self.test_server_url, self.access, self.prefix, endpoint
         );
 
-        trace!("POST: {}", url);
+        trace!("POST {}", url);
 
         let mut builder = self.test_client.post(&url);
         if let Some(ref query) = self.query.as_ref() {
-            trace!("Body: {}", serde_json::to_string_pretty(query).unwrap());
+            trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
             builder.json(query)
         } else {
             builder.json(&serde_json::Value::Null)
@@ -233,11 +236,12 @@ where
     /// - Panics if the response has a non-error response status.
     fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
     where
-        R: DeserializeOwned + fmt::Debug + 'static,
+        R: DeserializeOwned + 'static,
     {
-        debug!("Response: {:?}", response);
+        trace!("Response status: {}", response.status());
 
         fn extract_description(body: &str) -> Option<String> {
+            trace!("Error: {}", body);
             match serde_json::from_str::<serde_json::Value>(body).ok()? {
                 serde_json::Value::Object(ref object) if object.contains_key("description") => {
                     Some(object["description"].as_str()?.to_owned())
@@ -249,14 +253,13 @@ where
 
         fn error(mut response: Response) -> String {
             let body = response.text().expect("Unable to get response text");
-            trace!("Error body: {}", body);
             extract_description(&body).unwrap_or(body)
         }
 
         match response.status() {
             StatusCode::Ok => Ok({
                 let body = response.text().expect("Unable to get response text");
-                debug!("Ok body: {}", body);
+                trace!("Body: {}", body);
                 serde_json::from_str(&body).expect("Unable to deserialize body")
             }),
             StatusCode::Forbidden => Err(api::Error::Unauthorized),
@@ -281,7 +284,6 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
                 trace!("Create private/api");
                 aggregator.extend_api(ApiAccess::Private, scope)
             })
-            .middleware(Logger::default())
     });
 
     info!("Test server created on {}", server.addr());

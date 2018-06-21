@@ -164,7 +164,7 @@ use tokio_core::reactor::Core;
 use std::sync::{Arc, RwLock};
 use std::{fmt, net::SocketAddr};
 
-use exonum::{api::{backends::actix::{ApiRuntimeConfig, App, SystemRuntimeConfig},
+use exonum::{api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
                    ApiAccess},
              blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                           Transaction},
@@ -941,20 +941,10 @@ impl TestKit {
         let events_stream = self.remove_events_stream();
         // Creates complete actix web server with the testkit extensions.
         let testkit_ref = Arc::new(RwLock::new(self));
-        let app_config =
-            Arc::new(|app: App| app.middleware(actix_web::middleware::Logger::default()));
         let system_runtime_config = SystemRuntimeConfig {
             api_runtimes: vec![
-                ApiRuntimeConfig {
-                    listen_address: public_api_address,
-                    access: ApiAccess::Public,
-                    app_config: Some(app_config.clone()),
-                },
-                ApiRuntimeConfig {
-                    listen_address: private_api_address,
-                    access: ApiAccess::Private,
-                    app_config: Some(app_config.clone()),
-                },
+                ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
+                ApiRuntimeConfig::new(private_api_address, ApiAccess::Private)
             ],
             api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
         };
