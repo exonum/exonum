@@ -53,10 +53,7 @@ tcp_connect_max_retries = 10
 [database]
 create_if_missing = true
 
-[whitelist]
-whitelist_enabled = true
-
-[whitelist.peers]
+[connect_list.peers]
 16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72 = "127.0.0.1:6333"
 648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3 = "127.0.0.1:6333"
 924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e = "127.0.0.1:6333"

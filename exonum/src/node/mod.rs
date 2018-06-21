@@ -348,6 +348,7 @@ pub struct NodeConfig {
     /// Service secret key.
     pub service_secret_key: SecretKey,
     /// Node's ConnectList.
+    #[serde(default)]
     pub connect_list: ConnectList,
     /// Api configuration.
     pub api: NodeApiConfig,
