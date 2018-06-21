@@ -27,7 +27,7 @@ use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
                RawMessage};
-use node::whitelist::Whitelist;
+use node::connect_list::ConnectList;
 use node::ConnectInfo;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
@@ -54,7 +54,7 @@ pub struct State {
     service_secret_key: SecretKey,
 
     config: StoredConfiguration,
-    whitelist: Whitelist,
+    connect_list: ConnectList,
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
@@ -389,7 +389,7 @@ impl State {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         tx_pool_capacity: usize,
-        whitelist: Whitelist,
+        connect_list: ConnectList,
         stored: StoredConfiguration,
         connect: Connect,
         peers: HashMap<PublicKey, Connect>,
@@ -404,7 +404,7 @@ impl State {
             service_public_key,
             service_secret_key,
             tx_pool_capacity,
-            whitelist,
+            connect_list,
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -473,9 +473,9 @@ impl State {
             .unwrap_or(false)
     }
 
-    /// Returns node's whitelist.
-    pub fn whitelist(&self) -> &Whitelist {
-        &self.whitelist
+    /// Returns node's ConnectList.
+    pub fn connect_list(&self) -> &ConnectList {
+        &self.connect_list
     }
 
     /// Returns public (consensus and service) keys of known validators.
@@ -520,7 +520,7 @@ impl State {
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
-        self.refresh_whitelist(&config.validator_keys);
+        self.refresh_connect_list(&config.validator_keys);
 
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
@@ -1128,19 +1128,19 @@ impl State {
         self.our_connect_message = msg;
     }
 
-    /// Add peer to node's `whitelist`.
-    pub fn add_peer_to_whitelist(&mut self, peer: ConnectInfo) -> bool {
+    /// Add peer to node's `ConnectList`.
+    pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) -> bool {
         match self.find_validator(peer.public_key) {
             Some(_) => {
-                self.whitelist.add(peer);
+                self.connect_list.add(peer);
                 true
             }
             _ => false,
         }
     }
 
-    /// Refresh `whitelist` if validators has changed.
-    pub fn refresh_whitelist(&mut self, validator_keys: &[ValidatorKeys]) {
-        self.whitelist.refresh(validator_keys);
+    /// Refresh `ConnectList` if validators has changed.
+    pub fn refresh_connect_list(&mut self, validator_keys: &[ValidatorKeys]) {
+        self.connect_list.refresh(validator_keys);
     }
 }

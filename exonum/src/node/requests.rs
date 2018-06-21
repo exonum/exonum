@@ -29,9 +29,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().allow(msg.from()) {
             error!(
-                "Received request message from peer = {:?} which not in whitelist.",
+                "Received request message from peer = {:?} which not in ConnectList.",
                 msg.from()
             );
             return;

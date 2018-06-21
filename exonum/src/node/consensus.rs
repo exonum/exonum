@@ -166,9 +166,9 @@ impl NodeHandler {
             ));
         }
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().allow(msg.from()) {
             return Err(format!(
-                "Received request message from peer = {} which not in whitelist.",
+                "Received request message from peer = {} which not in ConnectList.",
                 msg.from().to_hex()
             ));
         }
@@ -610,9 +610,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().allow(msg.from()) {
             error!(
-                "Received response message from peer = {} which not in whitelist.",
+                "Received response message from peer = {} which not in ConnectList.",
                 msg.from().to_hex()
             );
             return;

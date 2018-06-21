@@ -23,32 +23,25 @@ use node::ConnectInfo;
 
 // TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
 
-/// `Whitelist` is mapping between IP addresses and public keys.
+/// `ConnectList` is mapping between IP addresses and public keys.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Whitelist {
-    whitelist_enabled: bool,
-
+pub struct ConnectList {
     #[serde(default)]
     peers: BTreeMap<PublicKey, SocketAddr>,
 }
 
-impl Whitelist {
+impl ConnectList {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_enabled || self.peers.contains_key(peer)
+        self.peers.contains_key(peer)
     }
 
-    /// Adds peer to the whitelist.
+    /// Adds peer to the ConnectList.
     pub fn add(&mut self, peer: ConnectInfo) {
         self.peers.insert(peer.public_key, peer.address);
     }
 
-    /// Returns `true` if whitelist is enabled, otherwise everyone can connect.
-    pub fn is_enabled(&self) -> bool {
-        self.whitelist_enabled
-    }
-
-    /// Creates `Whitelist` from validators keys and corresponding IP addresses.
+    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = peers
             .iter()
@@ -56,30 +49,28 @@ impl Whitelist {
             .map(|(p, v)| (v.consensus_key, *p))
             .collect();
 
-        Whitelist {
+        ConnectList {
             peers,
-            whitelist_enabled: true,
         }
     }
 
-    /// Creates `Whitelist` from validators public configs.
+    /// Creates `ConnectList` from validators public configs.
     pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = list.iter()
             .map(|config| (config.validator_keys.consensus_key, config.addr))
             .collect();
 
-        Whitelist {
+        ConnectList {
             peers,
-            whitelist_enabled: true,
         }
     }
 
     /// Check if we allow to connect to `address`.
     pub fn address_allowed(&self, address: &SocketAddr) -> bool {
-        !self.whitelist_enabled || self.peers.values().any(|a| a == address)
+        self.peers.values().any(|a| a == address)
     }
 
-    /// Refresh whitelist peers if validators has changed.
+    /// Refresh `ConnectList` peers if validators has changed.
     pub fn refresh(&mut self, validators_keys: &[ValidatorKeys]) {
         let keys: BTreeSet<_> = validators_keys
             .iter()
@@ -103,58 +94,57 @@ impl Whitelist {
     // Creates from state::peers, needed only for testing.
     #[doc(hidden)]
     pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
-        let whitelist = Whitelist::default();
+        let connect_list = ConnectList::default();
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
-        Whitelist { peers, ..whitelist }
+        ConnectList { peers, ..connect_list }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::Whitelist;
+    use super::ConnectList;
     use blockchain::ValidatorKeys;
     use crypto::gen_keypair;
     use std::collections::BTreeMap;
     use std::net::SocketAddr;
 
     #[test]
-    fn test_whitelist_refresh() {
+    fn test_connect_list_refresh() {
         let mut peers = BTreeMap::new();
 
         let (pk, _) = gen_keypair();
         let addr: SocketAddr = "127.0.0.1:80".parse().unwrap();
         peers.insert(pk, addr.clone());
 
-        let mut whitelist = Whitelist {
+        let mut connect_list = ConnectList {
             peers,
-            whitelist_enabled: true,
         };
 
-        assert!(whitelist.allow(&pk));
+        assert!(connect_list.allow(&pk));
 
         let mut validator_keys = Vec::new();
         validator_keys.push(ValidatorKeys {
             consensus_key: pk.clone(),
             service_key: pk.clone(),
         });
-        whitelist.refresh(&validator_keys);
-        assert!(whitelist.allow(&pk));
+        connect_list.refresh(&validator_keys);
+        assert!(connect_list.allow(&pk));
 
         let (pk, _) = gen_keypair();
         validator_keys.push(ValidatorKeys {
             consensus_key: pk,
             service_key: pk,
         });
-        whitelist.refresh(&validator_keys);
-        assert!(!whitelist.allow(&pk));
+        connect_list.refresh(&validator_keys);
+        assert!(!connect_list.allow(&pk));
     }
 }
 
 // TODO: rewrite tests
 #[cfg(whitelist_tests)]
 mod test {
-    use super::Whitelist;
+    use super::ConnectList;
     use crypto::PublicKey;
     use rand::{Rand, SeedableRng, XorShiftRng};
 
@@ -170,7 +160,7 @@ mod test {
     }
 
     fn check_in_whitelist(
-        whitelist: &Whitelist,
+        whitelist: &ConnectList,
         keys: &[PublicKey],
         in_whitelist: &[usize],
         not_in_whitelist: &[usize],
@@ -187,7 +177,7 @@ mod test {
     fn test_whitelist() {
         let regular = make_keys(REGULAR_PEERS, 4);
 
-        let mut whitelist = Whitelist::default();
+        let mut whitelist = ConnectList::default();
         whitelist.whitelist_enabled = true;
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         whitelist.add(regular[0]);
@@ -201,7 +191,7 @@ mod test {
     fn test_wildcard() {
         let regular = make_keys(REGULAR_PEERS, 4);
 
-        let mut whitelist = Whitelist::default();
+        let mut whitelist = ConnectList::default();
         assert_eq!(whitelist.is_enabled(), false);
         check_in_whitelist(&whitelist, &regular, &[0, 1, 2, 3], &[]);
         whitelist.whitelist_enabled = true;
@@ -214,7 +204,7 @@ mod test {
     fn test_validators_in_whitelist() {
         let regular = make_keys(REGULAR_PEERS, 4);
         let validators = make_keys(VALIDATORS[0], 2);
-        let mut whitelist = Whitelist::default();
+        let mut whitelist = ConnectList::default();
         whitelist.whitelist_enabled = true;
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         check_in_whitelist(&whitelist, &validators, &[], &[0, 1]);
@@ -229,7 +219,7 @@ mod test {
     fn test_update_validators() {
         let validators0 = make_keys(VALIDATORS[0], 2);
         let validators1 = make_keys(VALIDATORS[1], 2);
-        let mut whitelist = Whitelist::default();
+        let mut whitelist = ConnectList::default();
         whitelist.whitelist_enabled = true;
         assert_eq!(whitelist.collect_allowed().len(), 0);
         whitelist.set_validators(validators0.clone());

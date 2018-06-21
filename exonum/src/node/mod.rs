@@ -18,7 +18,7 @@
 // spell-checker:ignore cors
 
 pub use self::{state::{RequestData, State, ValidatorState},
-               whitelist::Whitelist};
+               connect_list::ConnectList};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
@@ -65,7 +65,7 @@ mod basic;
 mod consensus;
 mod events;
 mod requests;
-mod whitelist;
+mod connect_list;
 
 /// External messages.
 #[derive(Debug)]
@@ -144,8 +144,8 @@ pub struct ListenerConfig {
     pub consensus_public_key: PublicKey,
     /// Secret key.
     pub consensus_secret_key: SecretKey,
-    /// Whitelist.
-    pub whitelist: Whitelist,
+    /// ConnectList.
+    pub connect_list: ConnectList,
     /// Socket address.
     pub address: SocketAddr,
 }
@@ -347,8 +347,8 @@ pub struct NodeConfig {
     pub service_public_key: PublicKey,
     /// Service secret key.
     pub service_secret_key: SecretKey,
-    /// Node's whitelist.
-    pub whitelist: Whitelist,
+    /// Node's ConnectList.
+    pub connect_list: ConnectList,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -421,7 +421,7 @@ impl NodeHandler {
             &config.listener.consensus_secret_key,
         );
 
-        let whitelist = config.listener.whitelist;
+        let connect_list = config.listener.connect_list;
         let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
@@ -429,7 +429,7 @@ impl NodeHandler {
             config.service.service_public_key,
             config.service.service_secret_key,
             config.mempool.tx_pool_capacity,
-            whitelist,
+            connect_list,
             stored,
             connect,
             blockchain.get_saved_peers(),
@@ -546,7 +546,7 @@ impl NodeHandler {
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             let address = conn.addr();
-            let public_key = self.state.whitelist().find_key_by_address(&address);
+            let public_key = self.state.connect_list().find_key_by_address(&address);
             match public_key {
                 Some(public_key) => {
                     trace!("Send to address: {}", address);
@@ -555,7 +555,7 @@ impl NodeHandler {
                     self.channel.network_requests.send(request).log_error();
                 }
                 _ => {
-                    warn!("Peer is not in the whitelist {:?}", public_key);
+                    warn!("Peer is not in the ConnectList {:?}", public_key);
                 }
             }
         } else {
@@ -565,7 +565,7 @@ impl NodeHandler {
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        let public_key = self.state.whitelist().find_key_by_address(&address);
+        let public_key = self.state.connect_list().find_key_by_address(&address);
 
         match public_key {
             Some(public_key) => {
@@ -574,7 +574,7 @@ impl NodeHandler {
                 self.channel.network_requests.send(request).log_error();
             }
             _ => {
-                warn!("Peer is not in the whitelist {:?}", public_key);
+                warn!("Peer is not in the ConnectList {:?}", public_key);
             }
         }
     }
@@ -583,7 +583,7 @@ impl NodeHandler {
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             let address = conn.addr();
-            let public_key = self.state.whitelist().find_key_by_address(&address);
+            let public_key = self.state.connect_list().find_key_by_address(&address);
             match public_key {
                 Some(public_key) => {
                     trace!("Send to address: {}", address);
@@ -592,7 +592,7 @@ impl NodeHandler {
                     self.channel.network_requests.send(request).log_error();
                 }
                 _ => {
-                    warn!("Peer is not in the whitelist {:?}", public_key);
+                    warn!("Peer is not in the ConnectList {:?}", public_key);
                 }
             }
         }
@@ -602,10 +602,10 @@ impl NodeHandler {
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
 
-        if self.state.whitelist().address_allowed(&address) {
+        if self.state.connect_list().address_allowed(&address) {
             self.send_to_addr(address, connect.raw());
         } else {
-            warn!("Peer {:?} is not in the whitelist!", address);
+            warn!("Peer {:?} is not in the ConnectList!", address);
         }
     }
 
@@ -760,7 +760,7 @@ impl fmt::Debug for ApiSender {
     }
 }
 
-/// Data needed to add peer into `whitelist`.
+/// Data needed to add peer into `ConnectList`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConnectInfo {
     /// Peer address.
@@ -876,7 +876,7 @@ impl Node {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
                 consensus_secret_key: node_cfg.consensus_secret_key,
-                whitelist: node_cfg.whitelist,
+                connect_list: node_cfg.connect_list,
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {

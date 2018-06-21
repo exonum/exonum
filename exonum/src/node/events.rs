@@ -73,7 +73,7 @@ impl NodeHandler {
                     );
                     return;
                 }
-                if self.state.add_peer_to_whitelist(info) {
+                if self.state.add_peer_to_connect_list(info) {
                     info!("Send Connect message to {}", info);
                     self.connect(&info.address);
                 } else {

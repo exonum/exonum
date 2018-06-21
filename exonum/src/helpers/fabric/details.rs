@@ -35,8 +35,7 @@ use super::{internal::{CollectedCommand, Command, Feedback},
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::Whitelist;
-use node::{AllowOrigin, NodeApiConfig, NodeConfig};
+use node::{ConnectList, AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -607,7 +606,7 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_addr,
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
-                whitelist: Whitelist::from_node_config(&list),
+                connect_list: ConnectList::from_node_config(&list),
                 peers,
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,

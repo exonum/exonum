@@ -49,7 +49,7 @@ fn node_config() -> NodeConfig {
         genesis,
         external_address: None,
         network: Default::default(),
-        whitelist: Default::default(),
+        connect_list: Default::default(),
         api: api_cfg,
         mempool: Default::default(),
         services_configs: Default::default(),

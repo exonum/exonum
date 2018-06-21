@@ -37,7 +37,7 @@ use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-           ServiceConfig, State, SystemStateProvider, Whitelist};
+           ServiceConfig, State, SystemStateProvider, ConnectList};
 use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
@@ -574,14 +574,14 @@ impl Sandbox {
             api_requests: api_channel.0.clone().wait(),
         };
 
-        let whitelist = Whitelist::from_peers_for_testing(inner.handler.state.peers());
+        let connect_list = ConnectList::from_peers_for_testing(inner.handler.state.peers());
 
         let config = Configuration {
             listener: ListenerConfig {
                 address,
                 consensus_public_key: *inner.handler.state.consensus_public_key(),
                 consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
-                whitelist,
+                connect_list,
             },
             service: ServiceConfig {
                 service_public_key: *inner.handler.state.service_public_key(),
@@ -636,7 +636,7 @@ impl Sandbox {
         self.node_state().consensus_secret_key().clone()
     }
 
-    fn add_peer_to_whitelist(&self, addr: SocketAddr, public_key: PublicKey) {
+    fn add_peer_to_connect_list(&self, addr: SocketAddr, public_key: PublicKey) {
         let config = {
             let inner = &self.inner.borrow_mut();
             let state = &inner.handler.state;
@@ -653,7 +653,7 @@ impl Sandbox {
             .borrow_mut()
             .handler
             .state
-            .add_peer_to_whitelist(ConnectInfo {
+            .add_peer_to_connect_list(ConnectInfo {
                 address: addr,
                 public_key,
             });
@@ -734,7 +734,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             }),
     );
 
-    let whitelist = Whitelist::from_validator_keys(&genesis.validator_keys, &addresses);
+    let connect_list = ConnectList::from_validator_keys(&genesis.validator_keys, &addresses);
 
     blockchain.initialize(genesis).unwrap();
 
@@ -743,7 +743,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             address: addresses[0],
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
-            whitelist: whitelist.clone(),
+            connect_list: connect_list.clone(),
         },
         service: ServiceConfig {
             service_public_key: service_keys[0].0,
@@ -890,9 +890,9 @@ mod tests {
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
         let (public, secret) = gen_keypair();
-        // We also need to add public key from this keypair to the whitelist.
+        // We also need to add public key from this keypair to the ConnectList.
         // Socket address doesn't matter in this case.
-        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
 
         s.recv(&Connect::new(
             &public,
@@ -971,7 +971,7 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -987,7 +987,7 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -1011,7 +1011,7 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
