@@ -439,6 +439,8 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
+        api_state.set_enabled(true);
+
         NodeHandler {
             blockchain,
             api_state,
