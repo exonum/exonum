@@ -99,7 +99,6 @@ impl ServiceApiBackend for ApiBuilder {
     fn wire(&self, mut output: Self::Scope) -> Self::Scope {
         for handler in self.handlers.clone() {
             let inner = handler.inner;
-            debug!("\t\tCreate {} request handler: {}", handler.method, handler.name);
             output = output.route(&handler.name, handler.method.clone(), move |request| {
                 inner(request)
             });
@@ -114,7 +113,6 @@ impl IntoApiBackend for actix_web::Scope<ServiceApiState> {
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>,
     {
         for mut item in items {
-            debug!("\tExtend api: {}", item.0);
             self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
         }
         self
@@ -254,7 +252,9 @@ pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeC
     let app_config = runtime_config.app_config;
     let access = runtime_config.access;
     let state = ServiceApiState::new(aggregator.blockchain.clone());
-    let mut app = App::with_state(state).scope("api", |scope| aggregator.extend_api(access, scope));
+    let mut app = App::with_state(state).scope("api", |scope| {
+        aggregator.extend_api(access, scope)
+        });
     if let Some(app_config) = app_config {
         app = app_config(app);
     }
@@ -321,6 +321,7 @@ impl SystemRuntime {
             let system = System::new("http-server");
 
             let aggregator = config.api_aggregator.clone();
+            trace!("Create actix system runtime with api: {:#?}", aggregator.inner);
             let api_handlers = config.api_runtimes.into_iter().map(|runtime_config| {
                 let access = runtime_config.access;
                 let listen_address = runtime_config.listen_address;

@@ -136,6 +136,9 @@
 
 extern crate actix_web;
 #[cfg_attr(test, macro_use)]
+#[cfg(test)]
+extern crate assert_matches;
+#[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate failure;
 extern crate futures;
@@ -200,7 +203,7 @@ mod server;
 ///
 /// ## Create block
 ///
-/// POST `{baseURL}/v1/blocks`
+/// POST `{baseURL}/v1/blocks/create`
 ///
 /// Creates a new block in the testkit blockchain. If the
 /// JSON body of the request is an empty object, the call is functionally equivalent
@@ -212,12 +215,12 @@ mod server;
 ///
 /// ## Roll back
 ///
-/// DELETE `{baseURL}/v1/blocks/:height`
+/// POST `{baseURL}/v1/blocks/rollback`
 ///
 /// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
-/// at the specified `height` (a positive integer), so that after the request the blockchain height
-/// is equal to `height - 1`. If the specified height is greater than the blockchain height,
-/// the request performs no action.
+/// at the specified in JSON body `height` value (a positive integer), so that after the request
+/// the blockchain height is equal to `height - 1`. If the specified height is greater than the 
+/// blockchain height, the request performs no action.
 ///
 /// Returns the latest block from the blockchain on success.
 ///

@@ -79,6 +79,8 @@ impl TestKitApi {
     }
 
     pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
+        trace!("Created testkit api: {:#?}", aggregator);
+
         TestKitApi {
             test_server: create_test_server(aggregator),
             test_client: Client::new(),
@@ -272,11 +274,11 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
         let state = ServiceApiState::new(aggregator.blockchain());
         App::with_state(state.clone())
             .scope("public/api", |scope| {
-                debug!("Create public/api");
+                trace!("Create public/api");
                 aggregator.extend_api(ApiAccess::Public, scope)
             })
             .scope("private/api", |scope| {
-                debug!("Create private/api");
+                trace!("Create private/api");
                 aggregator.extend_api(ApiAccess::Private, scope)
             })
             .middleware(Logger::default())
