@@ -95,6 +95,7 @@ jobs:
   - env: FEATURE=clippy
     rust: nightly-2018-06-18
     install:
+    - rustup update
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
     - cargo clippy --all -- -D warnings
