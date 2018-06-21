@@ -42,7 +42,7 @@ function Transfer ($jsonFilename) {
 # Checks that a `CreateWallet` transaction is committed to the blockchain.
 function Check-CreateTx ($tx) {
   $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$($tx.hash)";
-  $error = false;
+  $error = $False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
     if (($respJson.type -ne 'Committed') -or ($respJson.content.body.name -ne $tx.name)) {
