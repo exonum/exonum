@@ -3825,7 +3825,7 @@ fn received_block_while_there_is_pending_block() {
 }
 
 // TODO: Rewrite sandbox methods so that you can receive/send messages in batches.
-// Now the same messages are sent to the validators in a random order.
+// Now the same messages are sent to the validators in a random order. (ECR-376)
 #[test]
 #[ignore]
 fn transactions_request_to_multiple_nodes() {
