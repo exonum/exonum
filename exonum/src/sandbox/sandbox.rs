@@ -36,8 +36,8 @@ use events::{network::NetworkConfiguration, Event, EventHandler, InternalEvent, 
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
-use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-           ServiceConfig, State, SystemStateProvider, ConnectList};
+use node::{ApiSender, Configuration, ConnectList, ExternalMessage, ListenerConfig, NodeHandler,
+           NodeSender, ServiceConfig, State, SystemStateProvider};
 use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;

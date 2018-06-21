@@ -17,8 +17,8 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{state::{RequestData, State, ValidatorState},
-               connect_list::ConnectList};
+pub use self::{connect_list::ConnectList,
+               state::{RequestData, State, ValidatorState}};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
@@ -62,10 +62,10 @@ use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
+mod connect_list;
 mod consensus;
 mod events;
 mod requests;
-mod connect_list;
 
 /// External messages.
 #[derive(Debug)]
@@ -336,9 +336,6 @@ pub struct NodeConfig {
     pub external_address: Option<SocketAddr>,
     /// Network configuration.
     pub network: NetworkConfiguration,
-    /// Peer addresses.
-    #[serde(default)]
-    pub peers: Vec<SocketAddr>,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.
@@ -348,7 +345,6 @@ pub struct NodeConfig {
     /// Service secret key.
     pub service_secret_key: SecretKey,
     /// Node's ConnectList.
-    #[serde(default)]
     pub connect_list: ConnectList,
     /// Api configuration.
     pub api: NodeApiConfig,
@@ -873,6 +869,8 @@ impl Node {
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
+        let peers = node_cfg.connect_list.collect_addresses();
+
         let config = Configuration {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
@@ -886,7 +884,7 @@ impl Node {
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
-            peer_discovery: node_cfg.peers,
+            peer_discovery: peers,
         };
 
         let external_address = if let Some(v) = node_cfg.external_address {

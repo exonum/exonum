@@ -49,9 +49,7 @@ impl ConnectList {
             .map(|(p, v)| (v.consensus_key, *p))
             .collect();
 
-        ConnectList {
-            peers,
-        }
+        ConnectList { peers }
     }
 
     /// Creates `ConnectList` from validators public configs.
@@ -60,9 +58,7 @@ impl ConnectList {
             .map(|config| (config.validator_keys.consensus_key, config.addr))
             .collect();
 
-        ConnectList {
-            peers,
-        }
+        ConnectList { peers }
     }
 
     /// Check if we allow to connect to `address`.
@@ -91,13 +87,18 @@ impl ConnectList {
             .map(|(p, _)| p)
     }
 
+    /// `ConnectList` peers addresses.
+    pub fn collect_addresses(&self) -> Vec<SocketAddr> {
+        self.peers.values().cloned().collect()
+    }
+
     // Creates from state::peers, needed only for testing.
     #[doc(hidden)]
     pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
         let connect_list = ConnectList::default();
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
-        ConnectList { peers, ..connect_list }
+        ConnectList { peers }
     }
 }
 
@@ -117,9 +118,7 @@ mod test {
         let addr: SocketAddr = "127.0.0.1:80".parse().unwrap();
         peers.insert(pk, addr.clone());
 
-        let mut connect_list = ConnectList {
-            peers,
-        };
+        let mut connect_list = ConnectList { peers };
 
         assert!(connect_list.allow(&pk));
 
