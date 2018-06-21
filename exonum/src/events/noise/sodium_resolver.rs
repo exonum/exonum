@@ -129,8 +129,8 @@ impl Dh for SodiumDh25519 {
 
         // FIXME: `snow` is able to pass incorrect public key, so this is a temporary workaround. (ECR-1726)
         if result.is_err() {
-        	error!("Can't calculate dh, public key {:?}", &pubkey[..]);
-        	return;
+            error!("Can't calculate dh, public key {:?}", &pubkey[..]);
+            return;
         }
 
         out[..self.pub_len()].copy_from_slice(&result.unwrap()[..self.pub_len()]);
