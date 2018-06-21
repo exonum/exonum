@@ -3157,6 +3157,15 @@ fn handle_block_response_tx_in_pool() {
     ));
 }
 
+/// HANDLE block response
+
+/// - should process block if tx is unknown
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with unknown tx A
+/// - send TransactionsRequest with unknown tx A
+/// - receive TransactionsResponse with tx A
+/// - Block should be executed and committed
 #[test]
 fn handle_block_response_with_unknown_tx() {
     let sandbox = timestamping_sandbox();
@@ -3255,6 +3264,13 @@ fn handle_block_response_with_unknown_tx() {
     ));
 }
 
+/// HANDLE block response
+
+/// - A block with an incorrect transactions order should not be processed
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with unknown txs A and B in invalid order
+/// - the processing of the block must be interrupted
 #[test]
 fn handle_block_response_with_invalid_txs_order() {
     let sandbox = timestamping_sandbox();
@@ -3331,6 +3347,13 @@ fn handle_block_response_with_invalid_txs_order() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 }
 
+/// HANDLE block response
+
+/// - A block with an invalid precommit should not be processed
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with one invalid precommit
+/// - the processing of the block must be interrupted
 #[test]
 fn handle_block_response_with_invalid_precommits() {
     let sandbox = timestamping_sandbox();
@@ -3411,6 +3434,16 @@ fn handle_block_response_with_invalid_precommits() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 }
 
+/// HANDLE block response
+
+/// - the block with some already known transactions should be processed
+/// idea of test is:
+/// - receive some tx A
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with one known tx A and unknown tx B
+/// - send TransactionsRequest with txs A and B
+/// - receive TransactionsResponse with txs A and B
+/// - Block should be executed and committed
 #[test]
 fn handle_block_response_with_known_transaction() {
     let sandbox = timestamping_sandbox();
@@ -3512,6 +3545,14 @@ fn handle_block_response_with_known_transaction() {
     ));
 }
 
+/// HANDLE block response
+
+/// - the block with already known transactions should be processed
+/// idea of test is:
+/// - receive some txs A and B
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with known txs A and B
+/// - Block should be executed and committed
 #[test]
 fn handle_block_response_with_all_known_transactions() {
     let sandbox = timestamping_sandbox();
@@ -3596,6 +3637,17 @@ fn handle_block_response_with_all_known_transactions() {
     ));
 }
 
+/// HANDLE block response
+
+/// - the block should be processed even if there is a pending full propose
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with unknown tx A
+/// - receive Propose with unknown tx A
+/// - send TransactionsRequest with unknown tx A for Propose
+/// - send TransactionsRequest with unknown tx A for Block
+/// - receive TransactionsResponse with tx A
+/// - Block should be executed and committed
 #[test]
 fn received_block_while_there_is_full_propose() {
     let sandbox = timestamping_sandbox();
@@ -3712,6 +3764,16 @@ fn received_block_while_there_is_full_propose() {
     ));
 }
 
+/// HANDLE block response
+
+/// - the block should be processed even if there is a pending incomplete block
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with unknown tx A
+/// - receive one more BlockResponse with unknown tx A
+/// - send TransactionsRequest with unknown tx A
+/// - receive TransactionsResponse with tx A
+/// - Block should be executed and committed
 #[test]
 fn received_block_while_there_is_pending_block() {
     let sandbox = timestamping_sandbox();
@@ -3826,6 +3888,19 @@ fn received_block_while_there_is_pending_block() {
 
 // TODO: Rewrite sandbox methods so that you can receive/send messages in batches.
 // Now the same messages are sent to the validators in a random order. (ECR-376)
+
+/// HANDLE block response
+
+/// - the block should be processed by requesting unknown transactions in several validators
+/// idea of test is:
+/// - getting Status from second node with later height
+/// - getting Status from third node with later height
+/// - send BlockResponse to second node
+/// - receive BlockResponse with unknown tx A from third node
+/// - send TransactionsRequest with unknown tx A to second node
+/// - send TransactionsRequest with unknown tx A to third node
+/// - receive TransactionsResponse with tx A from second node
+/// - Block should be executed and committed
 #[test]
 #[ignore]
 fn transactions_request_to_multiple_nodes() {
