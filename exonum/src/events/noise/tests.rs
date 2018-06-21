@@ -24,7 +24,7 @@ use std::net::SocketAddr;
 use std::thread;
 use std::time::Duration;
 
-use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
+use crypto::{gen_keypair, x25519::into_x25519_keypair,
              PUBLIC_KEY_LENGTH};
 use events::error::into_other;
 use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};

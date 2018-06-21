@@ -105,7 +105,6 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, Seed};
     use events::noise::wrapper::NoiseWrapper;
     use events::noise::HandshakeParams;
     use messages::{MessageBuffer, RawMessage};

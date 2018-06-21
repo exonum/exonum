@@ -21,7 +21,6 @@ use std::{net::SocketAddr,
           time::{self, Duration}};
 
 use blockchain::ConsensusConfig;
-use crypto;
 use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
 use events::{error::log_error,
              network::{NetworkConfiguration, NetworkPart},
@@ -63,7 +62,7 @@ impl TestHandler {
 
     pub fn connect_with(&self, addr: SocketAddr) {
         let connect = connect_message(self.listen_address);
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+        let (public_key, _) = gen_keypair_from_seed(&Seed::new([1; 32]));
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(

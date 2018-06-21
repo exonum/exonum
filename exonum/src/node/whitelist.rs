@@ -96,7 +96,7 @@ impl Whitelist {
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
         self.peers
             .iter()
-            .find(|(p, a)| a == &address)
+            .find(|(_, a)| a == &address)
             .map(|(p, _)| p)
     }
 
@@ -114,7 +114,7 @@ impl Whitelist {
 mod test {
     use super::Whitelist;
     use blockchain::ValidatorKeys;
-    use crypto::{gen_keypair, PublicKey};
+    use crypto::gen_keypair;
     use std::collections::BTreeMap;
     use std::net::SocketAddr;
 
@@ -122,7 +122,7 @@ mod test {
     fn test_whitelist_refresh() {
         let mut peers = BTreeMap::new();
 
-        let (pk, sk) = gen_keypair();
+        let (pk, _) = gen_keypair();
         let addr: SocketAddr = "127.0.0.1:80".parse().unwrap();
         peers.insert(pk, addr.clone());
 
@@ -141,7 +141,7 @@ mod test {
         whitelist.refresh(&validator_keys);
         assert!(whitelist.allow(&pk));
 
-        let (pk, sk) = gen_keypair();
+        let (pk, _) = gen_keypair();
         validator_keys.push(ValidatorKeys {
             consensus_key: pk,
             service_key: pk,

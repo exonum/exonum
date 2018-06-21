@@ -20,10 +20,7 @@ use snow::{NoiseBuilder, Session};
 use std::{fmt::{self, Error, Formatter},
           io};
 
-use crypto::{x25519::{into_x25519_keypair, into_x25519_public_key},
-             PUBLIC_KEY_LENGTH};
 use events::noise::HandshakeParams;
-use sodiumoxide::crypto::sign::{convert_ed_pk_to_curve25519, PublicKey as PublicKeySodium};
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
