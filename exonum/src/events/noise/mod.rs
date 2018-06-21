@@ -20,7 +20,10 @@ use tokio_io::{codec::Framed,
 
 use std::io;
 
-use crypto::{PublicKey, SecretKey};
+use crypto::{gen_keypair_from_seed, Seed};
+use crypto::{x25519::{self, into_x25519_keypair, into_x25519_public_key},
+             PublicKey,
+             SecretKey};
 use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{codec::MessagesCodec,
              noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
@@ -35,9 +38,35 @@ type HandshakeResult<S> = Box<Future<Item = Framed<S, MessagesCodec>, Error = io
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
 pub struct HandshakeParams {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    pub public_key: x25519::PublicKey,
+    pub secret_key: x25519::SecretKey,
     pub max_message_len: u32,
+    pub remote_key: Option<x25519::PublicKey>,
+}
+
+impl HandshakeParams {
+    pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
+        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+
+        HandshakeParams {
+            public_key,
+            secret_key,
+            max_message_len,
+            remote_key: None,
+        }
+    }
+
+    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
+        self.remote_key = into_x25519_public_key(remote_key);
+    }
+
+    #[doc(hidden)]
+    pub fn default_test_params() -> Self {
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+        let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+        params.set_remote_key(public_key);
+        params
+    }
 }
 
 pub trait Handshake {
@@ -52,20 +81,20 @@ pub struct NoiseHandshake {
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams) -> Self {
-        let noise = NoiseWrapper::initiator(params);
-        NoiseHandshake {
+    pub fn initiator(params: &HandshakeParams) -> Result<Self, io::Error> {
+        let noise = NoiseWrapper::initiator(params)?;
+        Ok(NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
-        }
+        })
     }
 
-    pub fn responder(params: &HandshakeParams) -> Self {
-        let noise = NoiseWrapper::responder(params);
-        NoiseHandshake {
+    pub fn responder(params: &HandshakeParams) -> Result<Self, io::Error> {
+        let noise = NoiseWrapper::responder(params)?;
+        Ok(NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
-        }
+        })
     }
 
     fn read_handshake_msg<S: AsyncRead + 'static>(

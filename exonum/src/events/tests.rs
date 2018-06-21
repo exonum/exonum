@@ -21,6 +21,7 @@ use std::{net::SocketAddr,
           time::{self, Duration}};
 
 use blockchain::ConsensusConfig;
+use crypto;
 use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
 use events::{error::log_error,
              network::{NetworkConfiguration, NetworkPart},
@@ -62,9 +63,14 @@ impl TestHandler {
 
     pub fn connect_with(&self, addr: SocketAddr) {
         let connect = connect_message(self.listen_address);
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
+            .send(NetworkRequest::SendMessage(
+                addr,
+                connect.raw().clone(),
+                public_key,
+            ))
             .wait()
             .unwrap();
     }
@@ -78,9 +84,10 @@ impl TestHandler {
     }
 
     pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
+        let (pk, _) = gen_keypair_from_seed(&Seed::new([1; 32]));
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(addr, raw))
+            .send(NetworkRequest::SendMessage(addr, raw, pk))
             .wait()
             .unwrap();
     }
@@ -148,11 +155,8 @@ impl TestEvents {
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
             let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-            let handshake_params = HandshakeParams {
-                public_key,
-                secret_key,
-                max_message_len: network_part.max_message_len,
-            };
+            let handshake_params =
+                HandshakeParams::new(public_key, secret_key, network_part.max_message_len);
             let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });

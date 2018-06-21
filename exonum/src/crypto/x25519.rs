@@ -15,6 +15,7 @@
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
 use sodiumoxide::crypto::sign::ed25519::{convert_ed_keypair_to_curve25519,
+                                         convert_ed_pk_to_curve25519,
                                          PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium};
 
@@ -56,6 +57,16 @@ pub fn into_x25519_keypair(
     secret_key.clone_from_slice(&sk.0[..SECRET_KEY_LENGTH]);
 
     Some((PublicKey(pk.0), SecretKey(secret_key)))
+}
+
+/// Converts Ed25519 public key to Curve25519 public key.
+///
+/// See: [`into_x25519_keypair()`][1]
+/// [1]: fn.into_x25519_public_key.html
+pub fn into_x25519_public_key(pk: crypto::PublicKey) -> Option<PublicKey> {
+    let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
+    let pk = convert_ed_pk_to_curve25519(pk_sod);
+    Some(PublicKey(pk))
 }
 
 macro_rules! implement_x25519_type {

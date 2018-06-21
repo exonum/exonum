@@ -132,17 +132,6 @@ const MAX_MESSAGE_LEN: usize = 128;
 const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
-impl HandshakeParams {
-    fn default_test_params() -> Self {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
-        HandshakeParams {
-            max_message_len: MAX_MESSAGE_LEN as u32,
-            public_key,
-            secret_key,
-        }
-    }
-}
-
 #[test]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
@@ -274,7 +263,9 @@ fn run_handshake_listener(
                         Some(message) => Either::A(
                             NoiseErrorHandshake::responder(&params, message).listen(stream),
                         ),
-                        None => Either::B(NoiseHandshake::responder(&params).listen(stream)),
+                        None => {
+                            Either::B(NoiseHandshake::responder(&params).unwrap().listen(stream))
+                        }
                     };
 
                     handshake
@@ -295,7 +286,7 @@ fn send_handshake(addr: &SocketAddr, bogus_message: Option<BogusMessage>) -> Res
 
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params).send(sock),
+            None => NoiseHandshake::initiator(&params).unwrap().send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
@@ -317,7 +308,7 @@ impl NoiseErrorHandshake {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::initiator(params)),
+            inner: Some(NoiseHandshake::initiator(params).expect("Noise initiator is not created")),
         }
     }
 
@@ -325,7 +316,7 @@ impl NoiseErrorHandshake {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::responder(params)),
+            inner: Some(NoiseHandshake::responder(params).expect("Noise responder is not created")),
         }
     }
 

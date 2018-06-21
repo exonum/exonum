@@ -546,9 +546,18 @@ impl NodeHandler {
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             let address = conn.addr();
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.clone());
-            self.channel.network_requests.send(request).log_error();
+            let public_key = self.state.whitelist().find_key_by_address(&address);
+            match public_key {
+                Some(public_key) => {
+                    trace!("Send to address: {}", address);
+                    let request =
+                        NetworkRequest::SendMessage(address, message.clone(), *public_key);
+                    self.channel.network_requests.send(request).log_error();
+                }
+                _ => {
+                    warn!("Peer is not in the whitelist {:?}", public_key);
+                }
+            }
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
@@ -556,18 +565,36 @@ impl NodeHandler {
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        trace!("Send to address: {}", address);
-        let request = NetworkRequest::SendMessage(*address, message.clone());
-        self.channel.network_requests.send(request).log_error();
+        let public_key = self.state.whitelist().find_key_by_address(&address);
+
+        match public_key {
+            Some(public_key) => {
+                trace!("Send to address: {}", address);
+                let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+                self.channel.network_requests.send(request).log_error();
+            }
+            _ => {
+                warn!("Peer is not in the whitelist {:?}", public_key);
+            }
+        }
     }
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             let address = conn.addr();
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.clone());
-            self.channel.network_requests.send(request).log_error();
+            let public_key = self.state.whitelist().find_key_by_address(&address);
+            match public_key {
+                Some(public_key) => {
+                    trace!("Send to address: {}", address);
+                    let request =
+                        NetworkRequest::SendMessage(address, message.clone(), *public_key);
+                    self.channel.network_requests.send(request).log_error();
+                }
+                _ => {
+                    warn!("Peer is not in the whitelist {:?}", public_key);
+                }
+            }
         }
     }
 
@@ -733,19 +760,18 @@ impl fmt::Debug for ApiSender {
     }
 }
 
+/// Data needed to add peer into `whitelist`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-//TODO: add doc
-/// Connect Info
 pub struct ConnectInfo {
-    /// Peer addr
-    pub addr: SocketAddr,
-    /// Peer public key
+    /// Peer address.
+    pub address: SocketAddr,
+    /// Peer public key.
     pub public_key: PublicKey,
 }
 
 impl fmt::Display for ConnectInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.addr)
+        write!(f, "{}", self.address)
     }
 }
 
@@ -947,11 +973,12 @@ impl Node {
             info!("Public exonum api started on {}", listen_address);
         };
 
-        let handshake_params = HandshakeParams {
-            public_key: *self.state().consensus_public_key(),
-            secret_key: self.state().consensus_secret_key().clone(),
-            max_message_len: self.max_message_len,
-        };
+        let handshake_params = HandshakeParams::new(
+            *self.state().consensus_public_key(),
+            self.state().consensus_secret_key().clone(),
+            self.max_message_len,
+        );
+
         self.run_handler(&handshake_params)?;
 
         // Stop all api handlers.

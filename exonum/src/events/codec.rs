@@ -148,16 +148,10 @@ mod test {
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+        let params = HandshakeParams::default_test_params();
 
-        let params = HandshakeParams {
-            public_key,
-            secret_key,
-            max_message_len: 1024,
-        };
-
-        let mut initiator = NoiseWrapper::initiator(&params).session;
-        let mut responder = NoiseWrapper::responder(&params).session;
+        let mut initiator = NoiseWrapper::initiator(&params).unwrap().session;
+        let mut responder = NoiseWrapper::responder(&params).unwrap().session;
 
         let mut buffer_msg = vec![0u8; 1024];
         let mut buffer_out = [0u8; 1024];
