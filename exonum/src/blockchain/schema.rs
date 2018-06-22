@@ -222,7 +222,7 @@ where
     pub fn last_block(&self) -> Block {
         let hash = self.block_hashes_by_height()
             .last()
-            .expect("An attempt to get the `last_block` during creating the genesis block.");
+            .unwrap_or_else(|| panic!("An attempt to get the `last_block` during creating the genesis block."));
         self.blocks().get(&hash).unwrap()
     }
 
@@ -260,7 +260,7 @@ where
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
+                let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| panic!(
                     "Config with hash {:?} is absent in configs table",
                     cfg_hash
                 ));
@@ -277,9 +277,9 @@ where
         if idx > 0 {
             let cfg_ref = self.configs_actual_from()
                 .get(idx - 1)
-                .expect(&format!("Configuration at index {} not found", idx));
+                .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
             let cfg_hash = cfg_ref.cfg_hash();
-            let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
+            let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| panic!(
                 "Config with hash {:?} is absent in configs table",
                 cfg_hash
             ));
@@ -294,9 +294,9 @@ where
         let idx = self.find_configurations_index_by_height(height);
         let cfg_ref = self.configs_actual_from()
             .get(idx)
-            .expect(&format!("Configuration at index {} not found", idx));
+            .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
-        self.configuration_by_hash(cfg_hash).expect(&format!(
+        self.configuration_by_hash(cfg_hash).unwrap_or_else(|| panic!(
             "Config with hash {:?} is absent in configs table",
             cfg_hash
         ))

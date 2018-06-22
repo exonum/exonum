@@ -88,15 +88,15 @@ impl ThreadFrame {
         let new_time = INTERRUPTED_TICKS.load(Ordering::SeqCst);
         if self.dumped_time < new_time {
             let name: String = SETTED_NAME.lock().unwrap().clone()
-                                .expect("Profiler: received interrupt without setted name.");
+                                .unwrap_or_else(|| panic!("Profiler: received interrupt without setted name."));
             File::create(&name)
                     .and_then(|ref mut  file| dump_html(file, &self) )
-                    .expect("could not write profiler data");
+                    .unwrap_or_else(|| panic!("could not write profiler data"));
             self.dumped_time = new_time;
         };
 
         let timestamp = ns_since_epoch(self.epoch);
-        let event = self.events.pop().expect("ThreadFrame::end_span() called events.pop() without a currently running span!");
+        let event = self.events.pop().unwrap_or_else(|| panic!("ThreadFrame::end_span() called events.pop() without a currently running span!"));
         let current = event.span;
         // dump self span
         {
@@ -235,7 +235,7 @@ pub fn init_handler(file: String) {
                             .duration_since(UNIX_EPOCH)
                             .unwrap().as_secs() as usize;
         r.store(secs, Ordering::SeqCst);
-    }).expect("Error setting Ctrl-C handler");
+    }).unwrap_or_else(|| panic!("Error setting Ctrl-C handler"));
 }
 
 pub use html::dump_html;

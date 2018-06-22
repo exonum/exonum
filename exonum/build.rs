@@ -8,11 +8,11 @@ fn main() {
     let rust_version = rust_version().unwrap_or("rust ?".to_string());
     let user_agent = format!("{} {}/{}\n", package_name, package_version, rust_version);
 
-    let out_dir = env::var("OUT_DIR").expect("Unable to get OUT_DIR");
+    let out_dir = env::var("OUT_DIR").unwrap_or_else(|| panic!("Unable to get OUT_DIR"));
     let dest_path = Path::new(&out_dir).join(USER_AGENT_FILE_NAME);
-    let mut file = File::create(dest_path).expect("Unable to create output file");
+    let mut file = File::create(dest_path).unwrap_or_else(|| panic!("Unable to create output file"));
     file.write_all(user_agent.as_bytes())
-        .expect("Unable to data to file");
+        .unwrap_or_else(|| panic!("Unable to data to file"));
 }
 
 fn rust_version() -> Option<String> {

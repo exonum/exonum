@@ -47,7 +47,7 @@ impl F32 {
     /// assert_eq!(val.get(), 1.0);
     /// ```
     pub fn new(value: f32) -> Self {
-        Self::try_from(value).expect("Unexpected non-finite value")
+        Self::try_from(value).unwrap_or_else(|| panic!("Unexpected non-finite value"))
     }
 
     /// Creates a new `F32` instance with the given `value`. Returns `None` if the given value

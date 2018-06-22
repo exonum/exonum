@@ -268,5 +268,5 @@ fn try_get_wallet(testkit: &TestKit, pubkey: &PublicKey) -> Option<Wallet> {
 
 /// Returns the wallet identified by the given public key.
 fn get_wallet(testkit: &TestKit, pubkey: &PublicKey) -> Wallet {
-    try_get_wallet(testkit, pubkey).expect("No wallet persisted")
+    try_get_wallet(testkit, pubkey).unwrap_or_else(|| panic!("No wallet persisted"))
 }

@@ -360,7 +360,7 @@ impl SharedNodeState {
     pub fn incoming_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
-            .expect("Expected read lock.")
+            .unwrap_or_else(|| panic!("Expected read lock."))
             .incoming_connections
             .iter()
             .cloned()
@@ -370,7 +370,7 @@ impl SharedNodeState {
     pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
-            .expect("Expected read lock.")
+            .unwrap_or_else(|| panic!("Expected read lock."))
             .outgoing_connections
             .iter()
             .cloned()
@@ -382,7 +382,7 @@ impl SharedNodeState {
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
             .read()
-            .expect("Expected read lock.")
+            .unwrap_or_else(|| panic!("Expected read lock."))
             .reconnects_timeout
             .iter()
             .map(|(c, e)| (*c, *e))
@@ -393,7 +393,7 @@ impl SharedNodeState {
     pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
         self.state
             .read()
-            .expect("Expected read lock.")
+            .unwrap_or_else(|| panic!("Expected read lock."))
             .peers_info
             .iter()
             .map(|(c, e)| (*c, *e))
@@ -401,7 +401,7 @@ impl SharedNodeState {
     }
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
-        let mut lock = self.state.write().expect("Expected write lock.");
+        let mut lock = self.state.write().unwrap_or_else(|| panic!(("Expected write lock."));
 
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
@@ -415,7 +415,7 @@ impl SharedNodeState {
 
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
-        let lock = self.state.read().expect("Expected read lock.");
+        let lock = self.state.read().unwrap_or_else(|| panic!("Expected read lock."));
 
         let mut active_validators = lock.peers_info
             .values()
@@ -440,14 +440,14 @@ impl SharedNodeState {
     /// Returns a boolean value which indicates whether the node is enabled
     /// or not.
     pub fn is_enabled(&self) -> bool {
-        let state = self.state.read().expect("Expected read lock.");
+        let state = self.state.read().unwrap_or_else(|| panic!("Expected read lock."));
         state.is_enabled
     }
 
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
-        let mut state = self.state.write().expect("Expected read lock.");
+        let mut state = self.state.write().unwrap_or_else(|| panic!("Expected read lock."));
         state.is_enabled = is_enabled;
     }
 
@@ -460,7 +460,7 @@ impl SharedNodeState {
     pub fn add_incoming_connection(&self, addr: SocketAddr) {
         self.state
             .write()
-            .expect("Expected write lock")
+            .unwrap_or_else(|| panic!("Expected write lock"))
             .incoming_connections
             .insert(addr);
     }
@@ -468,7 +468,7 @@ impl SharedNodeState {
     pub fn add_outgoing_connection(&self, addr: SocketAddr) {
         self.state
             .write()
-            .expect("Expected write lock")
+            .unwrap_or_else(|| panic!("Expected write lock"))
             .outgoing_connections
             .insert(addr);
     }
@@ -477,7 +477,7 @@ impl SharedNodeState {
     pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()
-            .expect("Expected write lock")
+            .unwrap_or_else(|| panic!("Expected write lock"))
             .incoming_connections
             .remove(addr)
     }
@@ -486,7 +486,7 @@ impl SharedNodeState {
     pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()
-            .expect("Expected write lock")
+            .unwrap_or_else(|| panic!("Expected write lock"))
             .outgoing_connections
             .remove(addr)
     }
@@ -499,7 +499,7 @@ impl SharedNodeState {
     ) -> Option<Milliseconds> {
         self.state
             .write()
-            .expect("Expected write lock")
+            .unwrap_or_else(|| panic!("Expected write lock"))
             .reconnects_timeout
             .insert(addr, timeout)
     }
@@ -508,7 +508,7 @@ impl SharedNodeState {
     pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
         self.state
             .write()
-            .expect("Expected write lock")
+            .unwrap_or_else(|| panic!("Expected write lock"))
             .reconnects_timeout
             .remove(addr)
     }
