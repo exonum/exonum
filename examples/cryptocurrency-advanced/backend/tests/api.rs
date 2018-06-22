@@ -31,8 +31,8 @@ use exonum::{api::ApiError,
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::api::WalletInfo;
-use cryptocurrency::{transactions::{CreateWallet, Transfer},
+use cryptocurrency::{api::WalletInfo,
+                     transactions::{CreateWallet, Transfer},
                      wallet::Wallet,
                      CurrencyService};
 
