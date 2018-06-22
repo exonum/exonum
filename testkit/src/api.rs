@@ -275,11 +275,11 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
         App::with_state(state.clone())
             .scope("public/api", |scope| {
                 trace!("Create public/api");
-                aggregator.extend_api(ApiAccess::Public, scope)
+                aggregator.extend_backend(ApiAccess::Public, scope)
             })
             .scope("private/api", |scope| {
                 trace!("Create private/api");
-                aggregator.extend_api(ApiAccess::Private, scope)
+                aggregator.extend_backend(ApiAccess::Private, scope)
             })
     });
 
