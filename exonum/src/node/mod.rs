@@ -340,6 +340,8 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
+        let is_enabled = api_state.clone().is_enabled();
+
         NodeHandler {
             blockchain,
             api_state,
@@ -347,7 +349,7 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            is_enabled: true,
+            is_enabled,
         }
     }
 

@@ -88,10 +88,7 @@ impl SystemApi {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(ConsensusStatusInfo {
-                // Peers list doesn't include current node address, so we have to increment its length.
-                // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
-                status: self.shared_api_state.peers_info().len().saturating_add(1)
-                    >= self.shared_api_state.majority_count(),
+                status: self.shared_api_state.consensus_status(),
             })
         });
         self_

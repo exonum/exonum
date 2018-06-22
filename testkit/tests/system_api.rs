@@ -57,14 +57,14 @@ fn test_network() {
 }
 
 #[test]
-fn test_consensus_status() {
+fn test_consensus_status_false() {
     let testkit = TestKitBuilder::validator().create();
     let api = testkit.api();
 
     let info: ConsensusStatusInfo = api.public(ApiKind::System)
         .get("v1/consensus_status")
         .unwrap();
-    let expected = ConsensusStatusInfo { status: true };
+    let expected = ConsensusStatusInfo { status: false };
     assert_eq!(info, expected);
 }
 
