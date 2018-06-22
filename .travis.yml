@@ -138,7 +138,8 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
     after_success: |
-      if [[ "$TRAVIS_BRANCH" = master ]]; then
+      #if [[ "$TRAVIS_BRANCH" = master ]]; then
+      if true; then
         bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
         # coveralls.io
         cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
