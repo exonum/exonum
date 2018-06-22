@@ -28,6 +28,7 @@ use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{codec::MessagesCodec,
              noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
 
+pub mod sodium_resolver;
 pub mod wrapper;
 
 #[cfg(test)]

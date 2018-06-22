@@ -311,8 +311,9 @@ impl StorageKey for Decimal {
 mod tests {
     use super::*;
 
+    use std::{fmt::Debug, str::FromStr};
+
     use chrono::{Duration, TimeZone};
-    use std::str::FromStr;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -488,11 +489,7 @@ mod tests {
             Utc.timestamp(0, 1_500_000_000), // leap second
         ];
 
-        let mut buffer = [0u8; 12];
-        for time in times.iter() {
-            time.write(&mut buffer);
-            assert_eq!(*time, DateTime::read(&buffer));
-        }
+        assert_round_trip_eq(&times);
     }
 
     #[test]
@@ -583,31 +580,27 @@ mod tests {
         }
     }
 
-    macro_rules! storage_key_for_crypto_types_tests {
-        ($type:ident, $size:expr, $collection:expr => $test_name:ident) => {
-            #[test]
-            fn $test_name() {
-                let items = $collection;
-
-                let mut buffer = [0u8; $size];
-                for item in items.iter() {
-                    let instance = $type::from_str(item).unwrap();
-                    instance.write(&mut buffer);
-                    assert_eq!(instance, $type::read(&buffer));
-                }
-            }
-        };
+    #[test]
+    fn hash_round_trip() {
+        let hashes = [Hash::from_str(
+            "326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78",
+        ).unwrap()];
+        assert_round_trip_eq(&hashes);
     }
 
-    storage_key_for_crypto_types_tests!{Hash, HASH_SIZE,
-    ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78"]
-    => hash_round_trip}
-    storage_key_for_crypto_types_tests!{PublicKey, PUBLIC_KEY_LENGTH,
-    ["1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
-    => public_key_round_trip}
-    storage_key_for_crypto_types_tests!{Signature, SIGNATURE_LENGTH,
-    ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
-    => signature_round_trip}
+    #[test]
+    fn public_key_round_trip() {
+        let hashes = [PublicKey::from_str(
+            "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
+        ).unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
+    fn signature_round_trip() {
+        let hashes = [Signature::from_str("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
 
     #[test]
     fn uuid_round_trip() {
@@ -617,16 +610,12 @@ mod tests {
             Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
         ];
 
-        let mut buffer = [0u8; 16];
-        for uuid in uuids.iter() {
-            uuid.write(&mut buffer);
-            assert_eq!(*uuid, Uuid::read(&buffer));
-        }
+        assert_round_trip_eq(&uuids);
     }
 
     #[test]
     fn decimal_round_trip() {
-        let values = [
+        let decimals = [
             Decimal::from_str("3.14").unwrap(),
             Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
             Decimal::new(9497628354687268, 12),
@@ -634,10 +623,19 @@ mod tests {
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
 
-        let mut buffer = [0u8; 16];
-        for value in values.iter() {
-            value.write(&mut buffer);
-            assert_eq!(*value, Decimal::read(&buffer));
+        assert_round_trip_eq(&decimals);
+    }
+
+    fn assert_round_trip_eq<T>(values: &[T])
+    where
+        T: StorageKey + PartialEq<<T as ToOwned>::Owned> + Debug,
+        <T as ToOwned>::Owned: Debug,
+    {
+        for original_value in values.iter() {
+            let mut buffer = get_buffer(original_value);
+            original_value.write(&mut buffer);
+            let new_value = <T as StorageKey>::read(&buffer);
+            assert_eq!(*original_value, new_value);
         }
     }
 

@@ -14,17 +14,27 @@
 
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
+use sodiumoxide::crypto::scalarmult::curve25519::{scalarmult as sodium_scalarmult,
+                                                  scalarmult_base as sodium_scalarmult_base,
+                                                  GroupElement as Curve25519GroupElement,
+                                                  Scalar as Curve25519Scalar};
 use sodiumoxide::crypto::sign::ed25519::{convert_ed_keypair_to_curve25519,
                                          convert_ed_pk_to_curve25519,
+                                         convert_ed_sk_to_curve25519,
                                          PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium};
 
 use std::fmt;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
-use crypto::{self, PUBLIC_KEY_LENGTH};
+use crypto;
 
-const SECRET_KEY_LENGTH: usize = 32;
-const BYTES_IN_DEBUG: usize = 4;
+/// Length of the public Curve25519 key.
+pub const PUBLIC_KEY_LENGTH: usize = 32;
+/// Length of the secret Curve25519 key.
+pub const SECRET_KEY_LENGTH: usize = 32;
+/// The size to crop the string in debug messages.
+pub const BYTES_IN_DEBUG: usize = 4;
 
 /// Converts Ed25519 keys to Curve25519.
 ///
@@ -56,7 +66,24 @@ pub fn into_x25519_keypair(
     let mut secret_key = [0; SECRET_KEY_LENGTH];
     secret_key.clone_from_slice(&sk.0[..SECRET_KEY_LENGTH]);
 
-    Some((PublicKey(pk.0), SecretKey(secret_key)))
+    Some((PublicKey::new(pk.0), SecretKey::new(secret_key)))
+}
+
+/// Converts an arbitrary array of data to the Curve25519-compatible private key.
+pub fn convert_to_private_key(key: &mut [u8; 32]) {
+    let converted = convert_ed_sk_to_curve25519(key);
+
+    key.copy_from_slice(&converted);
+}
+
+/// Calculates the scalar multiplication for X25519.
+pub fn scalarmult(sc: &SecretKey, pk: &PublicKey) -> Result<PublicKey, ()> {
+    sodium_scalarmult(sc.as_ref(), pk.as_ref()).map(PublicKey)
+}
+
+/// Calculates the public key based on private key for X25519.
+pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
+    sodium_scalarmult_base(sc.as_ref()).into()
 }
 
 /// Converts Ed25519 public key to Curve25519 public key.
@@ -70,14 +97,39 @@ pub fn into_x25519_public_key(pk: crypto::PublicKey) -> Option<PublicKey> {
 }
 
 macro_rules! implement_x25519_type {
-    ($(#[$attr:meta])* struct $name:ident, $size:expr) => (
-    #[derive(Clone, Copy)]
+    ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
+    #[derive(PartialEq, Eq, Clone)]
     $(#[$attr])*
-    pub struct $name([u8; $size]);
+    pub struct $name($name_from);
+
+    impl $name {
+        /// Creates a new instance filled with zeros.
+        pub fn zero() -> Self {
+            $name::new([0; $size])
+        }
+    }
+
+    impl $name {
+        /// Creates a new instance from bytes array.
+        pub fn new(bytes_array: [u8; $size]) -> Self {
+            $name($name_from(bytes_array))
+        }
+
+        /// Creates a new instance from bytes slice.
+        pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
+            $name_from::from_slice(bytes_slice).map($name)
+        }
+    }
 
     impl AsRef<[u8]> for $name {
         fn as_ref(&self) -> &[u8] {
-            self.0.as_ref()
+            &self.0[..]
+        }
+    }
+
+    impl AsRef<$name_from> for $name {
+        fn as_ref(&self) -> &$name_from {
+            &self.0
         }
     }
 
@@ -85,10 +137,16 @@ macro_rules! implement_x25519_type {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            for i in &self.as_ref()[0..BYTES_IN_DEBUG] {
+            for i in &self.0[0..BYTES_IN_DEBUG] {
                 write!(f, "{:02X}", i)?
             }
             write!(f, ")")
+        }
+    }
+
+    impl Into<$name> for $name_from {
+        fn into(self) -> $name {
+            $name(self)
         }
     }
     )
@@ -102,7 +160,7 @@ implement_x25519_type! {
     /// See: [`into_x25519_keypair()`][1]
     ///
     /// [1]: fn.into_x25519_keypair.html
-    struct PublicKey, PUBLIC_KEY_LENGTH
+    struct PublicKey, Curve25519GroupElement, PUBLIC_KEY_LENGTH
 }
 
 implement_x25519_type! {
@@ -113,5 +171,8 @@ implement_x25519_type! {
     /// See: [`into_x25519_keypair()`][1]
     ///
     /// [1]: fn.into_x25519_keypair.html
-    struct SecretKey, SECRET_KEY_LENGTH
+    struct SecretKey, Curve25519Scalar, SECRET_KEY_LENGTH
 }
+
+implement_index_traits!{ PublicKey }
+implement_index_traits!{ SecretKey }
