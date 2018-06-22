@@ -15,6 +15,9 @@ addons:
     - libiberty-dev
     - libsnappy-dev
     - librocksdb
+    - pkg-config
+    - cmake
+    - zlib1g-dev
 
 rust:
   # Feel free to bump this version if you need features of newer Rust.
@@ -37,6 +40,7 @@ env:
   - CLIPPY_VERS=0.0.205
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
+  - TARPAULIN_VERS=0.6.2
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
@@ -122,6 +126,7 @@ jobs:
     install:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
+    - cargo tarpaulin -V | RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -132,6 +137,15 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+    after_success: |
+      if [[ "$TRAVIS_BRANCH" = master ]]; then
+        bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
+        # coveralls.io
+        cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        # codecov.io
+        cargo tarpaulin --out Xml
+        bash <(curl -s https://codecov.io/bash)
+      fi
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
