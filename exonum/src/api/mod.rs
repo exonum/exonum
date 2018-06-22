@@ -36,8 +36,8 @@ mod with;
 pub trait ServiceApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
-    /// Concrete output API scope.
-    type Scope;
+    /// Concrete backend API builder.
+    type Backend;
 
     /// Adds the given endpoint handler to the backend.
     fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
@@ -76,8 +76,8 @@ pub trait ServiceApiBackend: Sized {
     /// Adds the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 
-    /// TODO
-    fn wire(&self, output: Self::Scope) -> Self::Scope;
+    /// Binds API handlers with to given backend.
+    fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
 /// TODO
@@ -148,12 +148,12 @@ impl ServiceApiBuilder {
     }
 }
 
-/// TODO
+/// Exonum API access level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiAccess {
-    /// TODO
+    /// Public API for end users.
     Public,
-    /// TODO
+    /// Private API for maintainers.
     Private,
 }
 
@@ -208,9 +208,9 @@ impl ApiAggregator {
         }
     }
 
-    /// TODO
-    pub fn blockchain(&self) -> Blockchain {
-        self.blockchain.clone()
+    /// Returns a reference to the blockchain of this node.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
     }
 
     /// TODO

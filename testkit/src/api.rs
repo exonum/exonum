@@ -274,7 +274,7 @@ where
 /// Creates a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = TestServer::with_factory(move || {
-        let state = ServiceApiState::new(aggregator.blockchain());
+        let state = ServiceApiState::new(aggregator.blockchain().clone());
         App::with_state(state.clone())
             .scope("public/api", |scope| {
                 trace!("Create public/api");
