@@ -41,7 +41,6 @@ fn node_config() -> NodeConfig {
 
     NodeConfig {
         listen_address: peer_address,
-        peers: vec![],
         service_public_key,
         service_secret_key,
         consensus_public_key,
