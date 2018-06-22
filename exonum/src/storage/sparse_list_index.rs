@@ -13,6 +13,12 @@
 // limitations under the License.
 
 //! An implementation of an array list of items with spaces.
+//!
+//! `SparseListIndex` implements an array list, storing an element as a value and
+//! using `u64` as an index. `SparseListIndex` requires that elements implement the
+//! [`StorageValue`] trait. 
+//! The given section contains methods related to `SparseListIndex` and iterators
+//! over the items of this index.
 
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
 #![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
@@ -491,7 +497,7 @@ where
     /// the current capacity, the capacity of the list is considered index + 1 and all further elements
     /// without specific index values will be appended after this index.
     ///
-    /// Returns the value of an old element at the indicated position or `None` if it was empty.
+    /// Returns the value of a previous element at the indicated position or `None` if it was empty.
     ///
     /// # Examples
     ///

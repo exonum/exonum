@@ -14,7 +14,7 @@
 
 //! An implementation of an array list of items.
 //!
-//! `ListIndex` requires that the elements implement the `StorageValue` trait.
+//! `ListIndex` requires that elements implement the `StorageValue` trait.
 //! The given section contains methods related to `ListIndex` and the iterator
 //! over the items of this list.
 
@@ -28,7 +28,7 @@ use super::indexes_metadata::IndexType;
 /// removed starting from the back of the list. Access to the elements
 /// is obtained using the indices of the list items.
 ///
-/// `ListIndex` implements an array list, storing the element as values and using `u64` as an index.
+/// `ListIndex` implements an array list, storing the elements as values and using `u64` as an index.
 /// `ListIndex` requires that elements implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html

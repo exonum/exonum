@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A module that provides interfaces to work with the persisted blockchain data.
+//! A module that provides interfaces to work with persisted blockchain data.
 //!
 //! See also [the documentation page on storage][doc:storage].
 //!

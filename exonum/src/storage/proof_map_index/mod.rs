@@ -36,7 +36,7 @@ mod proof;
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
 ///
-/// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
+/// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
 /// `ProofMapIndex` requires that keys implement the [`ProofMapKey`] trait and
 /// values implement the [`StorageValue`] trait.
 ///
@@ -492,7 +492,7 @@ where
     }
 
     // Inserts a new node as child of current branch and returns updated hash
-    // or if a new node has more short key returns a new key length
+    // or if a new node has a shorter key, returns a new key length
     fn insert_branch(
         &mut self,
         parent: &BranchNode,

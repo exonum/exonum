@@ -25,7 +25,7 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since keys are sorted in the serialized form, the big-endian encoding should be used
-/// with unsigned integer types. Note however that the big-endian encoding
+/// with unsigned integer types. Note, however, that the big-endian encoding
 /// will not sort signed integer types in the natural order; therefore, they are
 /// mapped to the corresponding unsigned type by adding a constant to the source value.
 ///

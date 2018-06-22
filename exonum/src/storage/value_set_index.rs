@@ -13,6 +13,10 @@
 // limitations under the License.
 
 //! An implementation of a set of items that utilize the `StorageValue` trait.
+//!
+//! `ValueSetIndex` implements a set, storing an element as a value and using
+//! its hash as a key. The given section contains methods related to `ValueSetIndex`
+//! and iterators over the items of this set.
 
 use std::marker::PhantomData;
 
@@ -22,8 +26,8 @@ use super::indexes_metadata::IndexType;
 
 /// A set of value items.
 ///
-/// `ValueSetIndex` implements a set, storing an element as a value using its hash as a key.
-/// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.
+/// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
+/// `ValueSetIndex` requires that elements implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]

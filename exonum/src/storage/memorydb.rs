@@ -23,9 +23,10 @@ use super::db::Change;
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
-/// Database implementation that stores all the data in memory.
+/// Database implementation that stores all the data in RAM.
 ///
-/// It's mainly used for testing and not designed to be efficient.
+/// This database only used for testing and experimenting; it is not designed to be
+/// efficient.
 #[derive(Default, Debug)]
 pub struct MemoryDB {
     map: RwLock<DB>,

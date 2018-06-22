@@ -163,17 +163,17 @@ pub enum Change {
 ///
 /// A `Fork` provides both immutable and mutable operations over the database. Like [`Snapshot`],
 /// `Fork` provides read isolation. When mutable operations ([`put`], [`remove`] and
-/// [`remove_by_prefix`]) are performed to a fork, the subsequent reads act as if the changes
+/// [`remove_by_prefix`]) are applied to a fork, the subsequent reads act as if the changes
 /// are applied to the database; in reality, these changes are accumulated in memory.
 ///
 /// To apply changes to the database, you need to convert a `Fork` into a [`Patch`] using
 /// [`into_patch`] and then atomically [`merge`] it into the database. If two
 /// conflicting forks are merged into a database, this can lead to an inconsistent state. If you
-/// need to consistently apply several sets of changes for the same data, the next fork should be
+/// need to consistently apply several sets of changes to the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
 /// `Fork` also supports checkpoints ([`checkpoint`], [`commit`] and
-/// [`rollback`] methods), which allows to rollback some of the latest changes (e.g., after
+/// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
 /// a runtime error).
 ///
 /// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
@@ -265,7 +265,7 @@ pub trait Database: Send + Sync + 'static {
     /// # Errors
     ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
-    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge(&self, patch: Patch) -> Result<()>;
 
@@ -277,7 +277,7 @@ pub trait Database: Send + Sync + 'static {
     /// # Errors
     ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
-    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
@@ -307,12 +307,14 @@ pub trait Snapshot: 'static {
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
 }
 
-/// A trait that defines streaming iterator over storage view entries.
+/// A trait that defines a streaming iterator over storage view entries. Unlike
+/// the standard 'Iterator' trait, `Iterator` in Exonum is low-level and,
+/// therefore, operates with bytes.
 pub trait Iterator {
     /// Advances the iterator and returns the next key and value.
     fn next(&mut self) -> Option<(&[u8], &[u8])>;
 
-    /// Returns references to the current key and value of the iterator.
+    /// Returns the current key and value of the iterator.
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
@@ -356,7 +358,8 @@ impl Snapshot for Fork {
 }
 
 impl Fork {
-    /// Creates a new checkpoint.
+    /// Creates a new checkpoint. In Exonum checkpoints are created before
+    /// applying each transaction to the database.
     ///
     /// # Panics
     ///
@@ -419,7 +422,7 @@ impl Fork {
         }
     }
 
-    /// Removes the key from the fork.
+    /// Removes a key from the fork.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
         let changes = self.patch
             .changes_entry(name.to_string())
@@ -466,24 +469,24 @@ impl Fork {
         }
     }
 
-    /// Converts the fork into `Patch`.
+    /// Converts the fork into `Patch` consuming the fork instance.
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 
-    /// Returns reference to the inner `Patch`.
+    /// Returns a reference to the list of changes made in this fork.
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Merges patch from another fork to this fork.
+    /// Merges a patch from another fork to this fork.
     ///
     /// If both forks have changed the same data, this can lead to an inconsistent state. Hence,
     /// this method is useful only if you are sure that forks interacted with different indices.
     ///
     /// # Panics
     ///
-    /// Panics if checkpoint was created before and it was not committed or rolled back yet.
+    /// Panics if a checkpoint has been created before and was not committed or rolled back yet.
     pub fn merge(&mut self, patch: Patch) {
         if self.logged {
             panic!("call merge before commit or rollback");

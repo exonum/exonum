@@ -13,6 +13,10 @@
 // limitations under the License.
 
 //! An implementation of a key-value map.
+//!
+//! `MapIndex` requires that keys implement the [`StorageKey`] trait and values implement
+//! the [`StorageValue`] trait. The given section contains methods related to
+//! `MapIndex` and iterators over the items of this map.
 
 use std::marker::PhantomData;
 use std::borrow::Borrow;
@@ -310,7 +314,7 @@ where
         }
     }
 
-    /// Returns an iterator over the values of a map in the ascending order of keys starting from the
+    /// Returns an iterator over the values of a map in ascending order of keys starting from the
     /// specified key. The iterator element type is V.
     ///
     /// # Examples

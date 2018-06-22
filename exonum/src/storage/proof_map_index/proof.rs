@@ -179,7 +179,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 }
 
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
-/// which jointly allow to restore the `merkle_root()` of the index. Besides existing elements,
+/// which jointly allow restoring the `merkle_root()` of the index. Besides existing elements,
 /// `MapProof` can assert absence of certain keys from the underlying index.
 ///
 /// # Workflow
@@ -366,7 +366,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
 /// Builder for [`MapProof`]s.
 ///
-/// This struct is rarely needs to be used explicitly (except for testing purposes). Instead,
+/// This struct rarely needs to be used explicitly (except for testing purposes). Instead,
 /// `MapProof`s can be created using [`get_proof()`] and [`get_multiproof()`] methods, or
 /// deserialized using `serde`.
 ///

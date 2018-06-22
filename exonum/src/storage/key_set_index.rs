@@ -14,7 +14,7 @@
 
 //! An implementation of a set for items that utilize the `StorageKey` trait.
 //!
-//! `KeySetIndex` implements a set that stores the elements as keys with empty values.
+//! `KeySetIndex` implements a set that stores elements as keys with empty values.
 //! The given section contains information on the methods related to `KeySetIndex`
 //! and the iterator over the items of this set.
 
