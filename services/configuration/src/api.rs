@@ -132,7 +132,7 @@ impl PublicApi {
         let proposes = index
             .iter()
             .map(|cfg_hash| {
-                let propose_data = proposes_by_hash.get(&cfg_hash).expect(&format!(
+                let propose_data = proposes_by_hash.get(&cfg_hash).unwrap_or_else(|| panic!(
                     "Not found propose for following cfg_hash: {:?}",
                     cfg_hash
                 ));
@@ -160,7 +160,7 @@ impl PublicApi {
             .iter()
             .map(|config_ref| {
                 let config_hash = config_ref.cfg_hash();
-                configs.get(config_hash).expect(&format!(
+                configs.get(config_hash).unwrap_or_else(|| panic!(
                     "Config with hash {:?} is absent in configs table",
                     config_hash
                 ))
