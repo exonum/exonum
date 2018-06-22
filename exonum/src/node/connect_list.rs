@@ -12,22 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+//! Module that provides methods for managing the mapping between peers
+//! public keys and IP-addresses.
+
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 
 use blockchain::ValidatorKeys;
 use crypto::PublicKey;
 use helpers::fabric::NodePublicConfig;
-use messages::Connect;
 use node::ConnectInfo;
 
 // TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
 
-/// `ConnectList` is mapping between IP addresses and public keys.
+/// `ConnectList` stores mapping between IP-addresses and public keys.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConnectList {
+    /// Peers to which we can connect.
     #[serde(default)]
-    peers: BTreeMap<PublicKey, SocketAddr>,
+    pub peers: BTreeMap<PublicKey, SocketAddr>,
 }
 
 impl ConnectList {
@@ -90,14 +93,6 @@ impl ConnectList {
     /// `ConnectList` peers addresses.
     pub fn collect_addresses(&self) -> Vec<SocketAddr> {
         self.peers.values().cloned().collect()
-    }
-
-    // Creates from state::peers, needed only for testing.
-    #[doc(hidden)]
-    pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
-        let peers: BTreeMap<PublicKey, SocketAddr> =
-            peers.iter().map(|(p, c)| (*p, c.addr())).collect();
-        ConnectList { peers }
     }
 }
 

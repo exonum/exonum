@@ -19,7 +19,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   (`helpers/fabric` module). (#731)
 
 - `Whitelist` has been replaced by `ConnectList`. Now connection between
-  nodes can only be established if nodes exist in each other connect lists.
+  nodes can only be established if nodes exist in each other connect lists. (#739)
 
   Migration path:
 

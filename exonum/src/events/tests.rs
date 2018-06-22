@@ -31,7 +31,7 @@ use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use node::{EventsPoolCapacity, NodeChannel};
 
-static SEED: [u8; 32] = [1; 32];
+static FAKE_SEED: [u8; 32] = [1; 32];
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -64,7 +64,7 @@ impl TestHandler {
 
     pub fn connect_with(&self, addr: SocketAddr) {
         let connect = connect_message(self.listen_address);
-        let (public_key, _) = gen_keypair_from_seed(&Seed::new(SEED));
+        let (public_key, _) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(
@@ -85,7 +85,7 @@ impl TestHandler {
     }
 
     pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
-        let (public_key, _) = gen_keypair_from_seed(&Seed::new(SEED));
+        let (public_key, _) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(addr, raw, public_key))
@@ -155,7 +155,7 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new(SEED));
+            let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
             let handshake_params =
                 HandshakeParams::new(public_key, secret_key, network_part.max_message_len);
             let fut = network_part.run(&core.handle(), &handshake_params);

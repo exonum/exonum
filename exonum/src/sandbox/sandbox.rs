@@ -18,7 +18,7 @@
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{cell::{Ref, RefCell, RefMut},
-          collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+          collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
           iter::FromIterator,
           net::{IpAddr, Ipv4Addr, SocketAddr},
           ops::{AddAssign, Deref},
@@ -669,6 +669,16 @@ impl Drop for Sandbox {
         if !::std::thread::panicking() {
             self.check_unexpected_message();
         }
+    }
+}
+
+impl ConnectList {
+    // Creates from state::peers, needed only for testing.
+    #[doc(hidden)]
+    pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
+        let peers: BTreeMap<PublicKey, SocketAddr> =
+            peers.iter().map(|(p, c)| (*p, c.addr())).collect();
+        ConnectList { peers }
     }
 }
 

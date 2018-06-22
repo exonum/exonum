@@ -545,16 +545,17 @@ impl NodeHandler {
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         let address = {
             if let Some(conn) = self.state.peers().get(&public_key) {
-                Some(conn.addr())
+                conn.addr()
             } else {
-                warn!("Hasn't connection with peer {:?}", public_key);
-                None
+                warn!(
+                    "Attempt to send message to peer with key {:?} without connection",
+                    public_key
+                );
+                return;
             }
         };
 
-        if let Some(address) = address {
-            self.send_to_addr(&address, message);
-        }
+        self.send_to_addr(&address, message);
     }
 
     /// Sends `RawMessage` to the specified address.
@@ -568,7 +569,11 @@ impl NodeHandler {
                 self.channel.network_requests.send(request).log_error();
             }
             _ => {
-                warn!("Peer is not in the ConnectList {:?}", public_key);
+                warn!(
+                    "Attempt to connect to the peer with public key {:?} which \
+                     is not in the ConnectList",
+                    public_key
+                );
             }
         }
     }
