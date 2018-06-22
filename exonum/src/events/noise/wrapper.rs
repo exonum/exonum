@@ -20,6 +20,7 @@ use snow::{NoiseBuilder, Session};
 use std::{fmt::{self, Error, Formatter},
           io};
 
+use events::noise::sodium_resolver::SodiumResolver;
 use events::noise::HandshakeParams;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
@@ -32,7 +33,7 @@ pub const NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
-static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_SHA256";
 
 /// Wrapper around noise session to provide latter convenient interface.
 pub struct NoiseWrapper {
@@ -150,7 +151,8 @@ impl NoiseWrapper {
 
     fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
         let public_key = params.public_key.as_ref();
-        NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
+        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
+            .remote_public_key(public_key)
     }
 }
 
