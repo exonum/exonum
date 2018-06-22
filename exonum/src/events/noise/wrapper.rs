@@ -42,7 +42,7 @@ pub struct NoiseWrapper {
 
 impl NoiseWrapper {
     pub fn initiator(params: &HandshakeParams) -> Result<Self, NoiseError> {
-        if let Some(remote_key) = params.remote_key {
+        if let Some(ref remote_key) = params.remote_key {
             let mut builder: NoiseBuilder = Self::noise_builder()
                 .local_private_key(params.secret_key.as_ref())
                 .remote_public_key(remote_key.as_ref());

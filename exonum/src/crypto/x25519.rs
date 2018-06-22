@@ -19,8 +19,7 @@ use sodiumoxide::crypto::scalarmult::curve25519::{scalarmult as sodium_scalarmul
                                                   GroupElement as Curve25519GroupElement,
                                                   Scalar as Curve25519Scalar};
 use sodiumoxide::crypto::sign::ed25519::{convert_ed_keypair_to_curve25519,
-                                         convert_ed_pk_to_curve25519,
-                                         convert_ed_sk_to_curve25519,
+                                         convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
                                          PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium};
 
@@ -91,9 +90,10 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 /// See: [`into_x25519_keypair()`][1]
 /// [1]: fn.into_x25519_public_key.html
 pub fn into_x25519_public_key(pk: crypto::PublicKey) -> Option<PublicKey> {
-    let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
-    let pk = convert_ed_pk_to_curve25519(pk_sod);
-    Some(PublicKey(pk))
+    let mut public_key = [0; PUBLIC_KEY_LENGTH];
+    public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
+    let public_key = convert_ed_pk_to_curve25519(&public_key);
+    Some(PublicKey(Curve25519GroupElement(public_key)))
 }
 
 macro_rules! implement_x25519_type {
