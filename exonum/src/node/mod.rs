@@ -23,12 +23,12 @@ pub use self::{state::{RequestData, State, ValidatorState},
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
+use api::{backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors,
+                            SystemRuntimeConfig},
           ApiAccess,
           ApiAggregator};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
-use serde::{de, ser};
 use tokio_core::reactor::Core;
 use toml::Value;
 
@@ -36,7 +36,6 @@ use std::{collections::{BTreeMap, HashSet},
           fmt,
           io,
           net::SocketAddr,
-          str::FromStr,
           sync::Arc,
           thread,
           time::{Duration, SystemTime}};
@@ -181,91 +180,6 @@ impl Default for NodeApiConfig {
             public_allow_origin: None,
             private_allow_origin: None,
         }
-    }
-}
-
-/// CORS header specification
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AllowOrigin {
-    /// Allow access from any host.
-    Any,
-    /// Allow access only from the following hosts.
-    Whitelist(Vec<String>),
-}
-
-impl ser::Serialize for AllowOrigin {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        match *self {
-            AllowOrigin::Any => "*".serialize(serializer),
-            AllowOrigin::Whitelist(ref hosts) => {
-                if hosts.len() == 1 {
-                    hosts[0].serialize(serializer)
-                } else {
-                    hosts.serialize(serializer)
-                }
-            }
-        }
-    }
-}
-
-impl<'de> de::Deserialize<'de> for AllowOrigin {
-    fn deserialize<D>(d: D) -> Result<AllowOrigin, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = AllowOrigin;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a list of hosts or \"*\"")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<AllowOrigin, E>
-            where
-                E: de::Error,
-            {
-                match value {
-                    "*" => Ok(AllowOrigin::Any),
-                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
-                }
-            }
-
-            fn visit_seq<A>(self, seq: A) -> Result<AllowOrigin, A::Error>
-            where
-                A: de::SeqAccess<'de>,
-            {
-                let hosts =
-                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
-                Ok(AllowOrigin::Whitelist(hosts))
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
-}
-
-impl FromStr for AllowOrigin {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "*" {
-            return Ok(AllowOrigin::Any);
-        }
-
-        let v: Vec<_> = s.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if v.is_empty() {
-            bail!("Invalid AllowOrigin::Whitelist value");
-        }
-
-        Ok(AllowOrigin::Whitelist(v))
     }
 }
 
@@ -889,14 +803,37 @@ impl Node {
         // Runs actix-web api.
         let actix_api_runtime = SystemRuntimeConfig {
             api_runtimes: {
+                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
+                    let app_config = move |app: App| -> App {
+                        let cors = Cors::from(allow_origin.clone());
+                        app.middleware(cors)
+                    };
+                    Arc::new(app_config)
+                };
+
                 let public_api_handler = self.api_options
                     .public_api_address
-                    .map(|address| ApiRuntimeConfig::new(address, ApiAccess::Public))
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Public,
+                        app_config: self.api_options
+                            .public_allow_origin
+                            .clone()
+                            .map(into_app_config),
+                    })
                     .into_iter();
                 let private_api_handler = self.api_options
                     .private_api_address
-                    .map(|address| ApiRuntimeConfig::new(address, ApiAccess::Private))
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Private,
+                        app_config: self.api_options
+                            .private_allow_origin
+                            .clone()
+                            .map(into_app_config),
+                    })
                     .into_iter();
+                // Collects API handlers.
                 public_api_handler
                     .chain(private_api_handler)
                     .collect::<Vec<_>>()
@@ -1030,55 +967,5 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 1);
-    }
-
-    #[test]
-    fn allow_origin_toml() {
-        fn check(text: &str, allow_origin: AllowOrigin) {
-            #[derive(Serialize, Deserialize)]
-            struct Config {
-                allow_origin: AllowOrigin,
-            }
-            let config_toml = format!("allow_origin = {}\n", text);
-            let config: Config = ::toml::from_str(&config_toml).unwrap();
-            assert_eq!(config.allow_origin, allow_origin);
-            assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
-        }
-
-        check(r#""*""#, AllowOrigin::Any);
-        check(
-            r#""http://example.com""#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"["http://a.org", "http://b.org"]"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-    }
-
-    #[test]
-    fn allow_origin_from_str() {
-        fn check(text: &str, expected: AllowOrigin) {
-            let from_str = AllowOrigin::from_str(text).unwrap();
-            assert_eq!(from_str, expected);
-        }
-
-        check(r#"*"#, AllowOrigin::Any);
-        check(
-            r#"http://example.com"#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org, "#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org,http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
     }
 }

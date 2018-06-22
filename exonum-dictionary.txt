@@ -20,6 +20,9 @@ clippy
 clonned
 compat
 concat
+Cors
+cors
+CORS
 counterintuitive
 cryptocurrency
 cryptographically

@@ -14,6 +14,8 @@
 
 //! Actix-web API backend.
 
+pub use actix_web::middleware::cors::Cors;
+
 use actix::{msgs::SystemExit, Addr, Arbiter, Syn, System};
 use actix_web::{self,
                 error::ResponseError,
@@ -25,18 +27,20 @@ use actix_web::{self,
                 Query};
 use failure;
 use futures::{Future, IntoFuture};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::{self, DeserializeOwned},
+            ser,
+            Serialize};
 
-use std::fmt;
-use std::net::SocketAddr;
-use std::result;
-use std::sync::{mpsc, Arc};
-use std::thread::{self, JoinHandle};
+use std::{fmt,
+          net::SocketAddr,
+          result,
+          str::FromStr,
+          sync::{mpsc, Arc},
+          thread::{self, JoinHandle}};
 
-use api::error::Error as ApiError;
-use api::{ApiAccess, ApiAggregator, FutureResult, Immutable, IntoApiBackend, Mutable, NamedWith,
-          Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
+use api::{error::Error as ApiError, ApiAccess, ApiAggregator, FutureResult, Immutable,
+          IntoApiBackend, Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
+          ServiceApiState};
 
 /// Type alias for the concrete API http response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
@@ -407,4 +411,136 @@ impl fmt::Debug for SystemRuntime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("SystemRuntime").finish()
     }
+}
+
+/// CORS header specification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AllowOrigin {
+    /// Allow access from any host.
+    Any,
+    /// Allow access only from the following hosts.
+    Whitelist(Vec<String>),
+}
+
+impl ser::Serialize for AllowOrigin {
+    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match *self {
+            AllowOrigin::Any => "*".serialize(serializer),
+            AllowOrigin::Whitelist(ref hosts) => {
+                if hosts.len() == 1 {
+                    hosts[0].serialize(serializer)
+                } else {
+                    hosts.serialize(serializer)
+                }
+            }
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for AllowOrigin {
+    fn deserialize<D>(d: D) -> result::Result<AllowOrigin, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AllowOrigin;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of hosts or \"*\"")
+            }
+
+            fn visit_str<E>(self, value: &str) -> result::Result<AllowOrigin, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "*" => Ok(AllowOrigin::Any),
+                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
+                }
+            }
+
+            fn visit_seq<A>(self, seq: A) -> result::Result<AllowOrigin, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let hosts =
+                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+                Ok(AllowOrigin::Whitelist(hosts))
+            }
+        }
+
+        d.deserialize_any(Visitor)
+    }
+}
+
+impl FromStr for AllowOrigin {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        if s == "*" {
+            return Ok(AllowOrigin::Any);
+        }
+
+        let v: Vec<_> = s.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if v.is_empty() {
+            bail!("Invalid AllowOrigin::Whitelist value");
+        }
+
+        Ok(AllowOrigin::Whitelist(v))
+    }
+}
+
+impl<'a> From<&'a AllowOrigin> for Cors {
+    fn from(origin: &'a AllowOrigin) -> Cors {
+        match origin {
+            &AllowOrigin::Any => Cors::build().finish(),
+            &AllowOrigin::Whitelist(ref hosts) => {
+                let mut builder = Cors::build();
+                for host in hosts {
+                    builder.allowed_origin(host);
+                }
+                builder.finish()
+            }
+        }
+    }
+}
+
+impl From<AllowOrigin> for Cors {
+    fn from(origin: AllowOrigin) -> Cors {
+        Cors::from(&origin)
+    }
+}
+
+#[test]
+fn allow_origin_from_str() {
+    fn check(text: &str, expected: AllowOrigin) {
+        let from_str = AllowOrigin::from_str(text).unwrap();
+        assert_eq!(from_str, expected);
+    }
+
+    check(r#"*"#, AllowOrigin::Any);
+    check(
+        r#"http://example.com"#,
+        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+    );
+    check(
+        r#"http://a.org, http://b.org"#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
+    check(
+        r#"http://a.org, http://b.org, "#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
+    check(
+        r#"http://a.org,http://b.org"#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
 }
