@@ -595,7 +595,11 @@ impl NodeHandler {
         if self.state.connect_list().address_allowed(&address) {
             self.send_to_addr(address, connect.raw());
         } else {
-            warn!("Peer {:?} is not in the ConnectList!", address);
+            warn!(
+                "Attempt to connect to the peer {:?} which \
+                 is not in the ConnectList",
+                address
+            );
         }
     }
 
