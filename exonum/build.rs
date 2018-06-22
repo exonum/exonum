@@ -10,7 +10,8 @@ fn main() {
 
     let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| panic!("Unable to get OUT_DIR"));
     let dest_path = Path::new(&out_dir).join(USER_AGENT_FILE_NAME);
-    let mut file = File::create(dest_path).unwrap_or_else(|_| panic!("Unable to create output file"));
+    let mut file =
+        File::create(dest_path).unwrap_or_else(|_| panic!("Unable to create output file"));
     file.write_all(user_agent.as_bytes())
         .unwrap_or_else(|_| panic!("Unable to data to file"));
 }

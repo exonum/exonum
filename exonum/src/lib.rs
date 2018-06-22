@@ -23,7 +23,6 @@
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 // #![cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
 
-
 extern crate atty;
 extern crate bit_vec;
 extern crate bodyparser;

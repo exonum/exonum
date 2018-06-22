@@ -810,11 +810,14 @@ impl Node {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).unwrap_or_else(|_| panic!(
-                    "You compiled exonum with profiling support, but {}",
-                    PROFILE_ENV_VARIABLE_NAME
-                ),
-            ))
+            ::exonum_profiler::init_handler(
+                ::std::env::var(PROFILE_ENV_VARIABLE_NAME).unwrap_or_else(|_| {
+                    panic!(
+                        "You compiled exonum with profiling support, but {}",
+                        PROFILE_ENV_VARIABLE_NAME
+                    )
+                }),
+            )
         };
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);

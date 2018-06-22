@@ -401,8 +401,9 @@ impl SharedNodeState {
     }
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
-        let mut lock = self.state.write().unwrap_or_else(|_| panic!("Expected write lock."));
-
+        let mut lock = self.state
+            .write()
+            .unwrap_or_else(|_| panic!("Expected write lock."));
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
         lock.is_validator = state.is_validator();
@@ -415,7 +416,9 @@ impl SharedNodeState {
 
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
-        let lock = self.state.read().unwrap_or_else(|_| panic!("Expected read lock."));
+        let lock = self.state
+            .read()
+            .unwrap_or_else(|_| panic!("Expected read lock."));
 
         let mut active_validators = lock.peers_info
             .values()
@@ -440,14 +443,18 @@ impl SharedNodeState {
     /// Returns a boolean value which indicates whether the node is enabled
     /// or not.
     pub fn is_enabled(&self) -> bool {
-        let state = self.state.read().unwrap_or_else(|_| panic!("Expected read lock."));
+        let state = self.state
+            .read()
+            .unwrap_or_else(|_| panic!("Expected read lock."));
         state.is_enabled
     }
 
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
-        let mut state = self.state.write().unwrap_or_else(|_| panic!("Expected read lock."));
+        let mut state = self.state
+            .write()
+            .unwrap_or_else(|_| panic!("Expected read lock."));
         state.is_enabled = is_enabled;
     }
 

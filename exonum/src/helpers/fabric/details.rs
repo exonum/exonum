@@ -325,14 +325,14 @@ impl Command for GenerateCommonConfig {
 
 /// Command for the node configuration generation.
 pub struct GenerateNodeConfig;
-#[cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
+
 impl GenerateNodeConfig {
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
         let error_msg = &format!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str);
 
         let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-
+            #[cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
             let ip = addr_str.parse::<IpAddr>().expect(error_msg);
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });

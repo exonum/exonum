@@ -160,10 +160,12 @@ impl PublicApi {
             .iter()
             .map(|config_ref| {
                 let config_hash = config_ref.cfg_hash();
-                configs.get(config_hash).unwrap_or_else(|| panic!(
-                    "Config with hash {:?} is absent in configs table",
-                    config_hash
-                ))
+                configs.get(config_hash).unwrap_or_else(|| {
+                    panic!(
+                        "Config with hash {:?} is absent in configs table",
+                        config_hash
+                    )
+                })
             })
             .filter(|config| filter.matches(config))
             .map(|config| self.config_with_proofs(config))

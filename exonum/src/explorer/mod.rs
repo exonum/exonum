@@ -314,10 +314,12 @@ impl<T> Index<usize> for BlockWithTransactions<T> {
     type Output = CommittedTransaction<T>;
 
     fn index(&self, index: usize) -> &CommittedTransaction<T> {
-        self.transactions.get(index).unwrap_or_else(|| panic!(
-            "Index exceeds number of transactions in block {}",
-            self.len()
-        ))
+        self.transactions.get(index).unwrap_or_else(|| {
+            panic!(
+                "Index exceeds number of transactions in block {}",
+                self.len()
+            )
+        })
     }
 }
 
@@ -773,10 +775,7 @@ impl<'a> BlockchainExplorer<'a> {
         let location = schema
             .transactions_locations()
             .get(tx_hash)
-            .unwrap_or_else(|| panic!(
-                "Location not found for transaction hash {:?}",
-                tx_hash
-            ));
+            .unwrap_or_else(|| panic!("Location not found for transaction hash {:?}", tx_hash));
 
         let location_proof = schema
             .block_transactions(location.block_height())
