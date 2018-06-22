@@ -162,8 +162,8 @@ macro_rules! __ex_message {
                                                                 from,
                                                                 count,
                                                                 latest_segment)?;
-                // TODO: remove this allocation,
-                // by allowing creating message from borrowed data (ECR-156)
+                // TODO: Remove this allocation,
+                // by allowing creating message from borrowed data. (ECR-156)
                 let raw_message: $crate::messages::RawMessage =
                                     unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
@@ -377,7 +377,7 @@ macro_rules! __ex_message {
             }
         }
 
-        // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
+        // TODO: Rewrite Deserialize and Serialize implementation. (ECR-156)
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             #[allow(unused_mut)]
             fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
@@ -439,10 +439,14 @@ macro_rules! __ex_message_mk_field {
 macro_rules! __ex_message_write_field {
     (
         ($writer:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
         $writer.write($field_name, $from, $to);
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -450,12 +454,13 @@ macro_rules! __ex_message_write_field {
 macro_rules! __ex_message_check_field {
     (
         ($latest_segment:ident, $raw_message:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
-        let $latest_segment = $raw_message.check::<$field_type>(
-            $from.into(),
-            $to.into(),
-            $latest_segment
-        )?;
-    }
+        let $latest_segment =
+            $raw_message.check::<$field_type>($from.into(), $to.into(), $latest_segment)?;
+    };
 }

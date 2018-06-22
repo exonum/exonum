@@ -18,11 +18,14 @@
 //! The given section contains methods related to `ListIndex` and the iterator
 //! over the items of this list.
 
-use std::cell::Cell;
-use std::marker::PhantomData;
+use std::{cell::Cell, marker::PhantomData};
 
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
-use super::indexes_metadata::IndexType;
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
 
 /// A list of items where elements are added to the back of the list and are
 /// removed starting from the back of the list. Access to the elements
@@ -368,7 +371,7 @@ where
     /// assert_eq!(3, index.len());
     /// ```
     pub fn truncate(&mut self, len: u64) {
-        // TODO: optimize this (ECR-175)
+        // TODO: Optimize this. (ECR-175)
         while self.len() > len {
             self.pop();
         }
@@ -465,8 +468,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
     use super::{Fork, ListIndex};
+    use rand::{thread_rng, Rng};
 
     fn gen_tempdir_name() -> String {
         thread_rng().gen_ascii_chars().take(10).collect()
@@ -526,8 +529,8 @@ mod tests {
 
     mod memorydb_tests {
         use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, ListIndex, MemoryDB};
+        use tempdir::TempDir;
 
         const IDX_NAME: &'static str = "idx_name";
 
@@ -578,8 +581,8 @@ mod tests {
 
     mod rocksdb_tests {
         use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, DbOptions, ListIndex, RocksDB};
+        use tempdir::TempDir;
 
         const IDX_NAME: &'static str = "idx_name";
 

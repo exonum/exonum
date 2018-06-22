@@ -51,11 +51,13 @@ extern crate os_info;
 extern crate params;
 extern crate rand;
 extern crate router;
+extern crate rust_decimal;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate snow;
 extern crate term;
 extern crate tokio_core;
 extern crate tokio_io;
@@ -86,8 +88,8 @@ pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
-pub mod explorer;
 pub mod api;
+pub mod explorer;
 
 mod events;
 #[cfg(test)]

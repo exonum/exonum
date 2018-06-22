@@ -18,11 +18,13 @@
 //! The given section contains information on the methods related to `KeySetIndex`
 //! and the iterator over the items of this set.
 
-use std::marker::PhantomData;
-use std::borrow::Borrow;
+use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey};
-use super::indexes_metadata::IndexType;
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey};
 
 /// A set of key items.
 ///
@@ -286,8 +288,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::{Database, MemoryDB};
+    use super::*;
 
     const INDEX_NAME: &str = "test_index_name";
 

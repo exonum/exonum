@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::marker::PhantomData;
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
 /// `ContextKey` provides strongly typed access to data inside `Context`.
 /// See `exonum::fabric::keys` for keys used by the exonum itself.
@@ -57,7 +56,14 @@ impl<T> ContextKey<T> {
 
 /// Constructs a `ContextKey` from a given name.
 ///
+/// For additional information refer to
+/// [`exonum:helpers:fabric:ContextKey`].
+///
+/// [`exonum:helpers:fabric:ContextKey`]: ./helpers/fabric/struct.ContextKey.html
+///
 /// # Examples
+///
+/// The example below creates a constant using the `ContextKey` macro.
 ///
 /// ```
 /// #[macro_use]
@@ -72,9 +78,9 @@ macro_rules! context_key {
     ($name:expr) => {{
         $crate::helpers::fabric::ContextKey {
             __name: $name,
-            __phantom: ::std::marker::PhantomData
+            __phantom: ::std::marker::PhantomData,
         }
-    }}
+    }};
 }
 
 #[test]

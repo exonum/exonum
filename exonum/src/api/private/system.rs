@@ -12,29 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_json;
-use router::Router;
 use iron::prelude::*;
+use router::Router;
+use serde_json;
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use crypto::PublicKey;
-use node::{ApiSender, ExternalMessage};
-use blockchain::{Blockchain, Service, SharedNodeState};
 use api::{Api, ApiError};
+use blockchain::{Blockchain, Service, SharedNodeState};
+use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;
+use node::{ApiSender, ExternalMessage};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct ServiceInfo {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ServiceInfo {
     name: String,
     id: u16,
 }
 
 /// `DTO` is used to transfer information about node.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[doc(hidden)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct NodeInfo {
-    protocol_version: u8,
-    services: Vec<ServiceInfo>,
+    pub core_version: Option<String>,
+    pub protocol_version: u8,
+    pub services: Vec<ServiceInfo>,
 }
 
 impl NodeInfo {
@@ -43,7 +45,9 @@ impl NodeInfo {
     where
         I: IntoIterator<Item = &'a Box<Service>>,
     {
+        let core_version = option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned());
         NodeInfo {
+            core_version,
             protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
                 .into_iter()

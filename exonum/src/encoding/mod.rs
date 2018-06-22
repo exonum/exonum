@@ -105,17 +105,15 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-pub use self::fields::Field;
-pub use self::segments::SegmentField;
-pub use self::error::Error;
 #[cfg(feature = "float_serialize")]
 pub use self::float::{F32, F64};
+pub use self::{error::Error, fields::Field, segments::SegmentField};
 
 #[macro_use]
 pub mod serialize;
 
-use std::convert::From;
-use std::ops::{Add, Div, Mul, Sub};
+use std::{convert::From,
+          ops::{Add, Div, Mul, Sub}};
 
 mod error;
 #[macro_use]
@@ -135,7 +133,7 @@ pub type Offset = u32;
 /// Type alias that should be returned in `check` method of `Field`
 pub type Result = ::std::result::Result<CheckedOffset, Error>;
 
-// TODO replace by more generic type (ECR-156).
+// TODO: Replace by more generic type. (ECR-156)
 /// `CheckedOffset` is a type that take control over overflow,
 /// so you can't panic without `unwrap`,
 /// and work with this value without overflow checks.
@@ -157,24 +155,26 @@ impl CheckedOffset {
 }
 
 macro_rules! implement_default_ops_checked {
-    ($trait_name: ident $function:ident $checked_function:ident) => (
+    ($trait_name:ident $function:ident $checked_function:ident) => {
         impl $trait_name<CheckedOffset> for CheckedOffset {
             type Output = ::std::result::Result<CheckedOffset, Error>;
             fn $function(self, rhs: CheckedOffset) -> Self::Output {
-                self.offset.$checked_function(rhs.offset)
-                        .map(CheckedOffset::new)
-                        .ok_or(Error::OffsetOverflow)
+                self.offset
+                    .$checked_function(rhs.offset)
+                    .map(CheckedOffset::new)
+                    .ok_or(Error::OffsetOverflow)
             }
         }
         impl $trait_name<Offset> for CheckedOffset {
             type Output = ::std::result::Result<CheckedOffset, Error>;
             fn $function(self, rhs: Offset) -> Self::Output {
-                self.offset.$checked_function(rhs)
-                        .map(CheckedOffset::new)
-                        .ok_or(Error::OffsetOverflow)
+                self.offset
+                    .$checked_function(rhs)
+                    .map(CheckedOffset::new)
+                    .ok_or(Error::OffsetOverflow)
             }
         }
-    )
+    };
 }
 
 implement_default_ops_checked!{Add add checked_add }

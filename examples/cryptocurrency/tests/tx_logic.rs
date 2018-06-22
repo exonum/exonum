@@ -29,9 +29,9 @@ use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::schema::{CurrencySchema, Wallet};
-use cryptocurrency::transactions::{TxCreateWallet, TxTransfer};
-use cryptocurrency::service::CurrencyService;
+use cryptocurrency::{schema::{CurrencySchema, Wallet},
+                     service::CurrencyService,
+                     transactions::{TxCreateWallet, TxTransfer}};
 
 // Imports shared test constants.
 use constants::{ALICE_NAME, BOB_NAME};
@@ -198,9 +198,9 @@ fn test_transfers_in_single_block() {
 /// [fuzz]: https://en.wikipedia.org/wiki/Fuzzing
 #[test]
 fn test_fuzz_transfers() {
+    use rand::Rng;
     use std::collections::BTreeSet;
     use std::iter::FromIterator;
-    use rand::Rng;
 
     const BLOCKS: usize = 50; // number of blocks to create
     const MAX_TRANSACTIONS: usize = 20; // maximum number of transactions in a block

@@ -14,24 +14,27 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-pub use self::key::{HashedKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, ProofPath};
-pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
+pub use self::{key::{HashedKey, ProofMapKey, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
+               proof::{CheckedMapProof, MapProof, MapProofError}};
 
-use std::marker::PhantomData;
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
+use self::{key::{BitsRange, ChildKind, LEAF_KEY_PREFIX},
+           node::{BranchNode, Node},
+           proof::{create_multiproof, create_proof}};
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
 use crypto::{CryptoHash, Hash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
-use super::indexes_metadata::IndexType;
-use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
-use self::node::{BranchNode, Node};
-use self::proof::{create_multiproof, create_proof};
 
-#[cfg(test)]
-mod tests;
 mod key;
 mod node;
 mod proof;
+#[cfg(test)]
+mod tests;
 
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
@@ -199,7 +202,7 @@ where
     }
 
     fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
-        // TODO: unwraps (ECR-84)?
+        // TODO: Unwraps? (ECR-84)
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
         } else {

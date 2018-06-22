@@ -72,22 +72,25 @@ extern crate serde_derive;
 
 #[cfg(test)]
 #[macro_use]
+extern crate assert_matches;
+#[cfg(test)]
+#[macro_use]
 extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
 
 pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema};
-pub use transactions::{ConfigurationTransactions, Propose, Vote};
+pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use exonum::api::Api;
-use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
-use exonum::crypto::Hash;
-use exonum::encoding::Error as EncodingError;
-use exonum::helpers::fabric::{self, Context};
-use exonum::messages::RawTransaction;
-use exonum::storage::Snapshot;
+use exonum::{api::Api,
+             blockchain::{self, ApiContext, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::Error as EncodingError,
+             helpers::fabric::{self, Context},
+             messages::RawTransaction,
+             storage::Snapshot};
 use iron::Handler;
 use router::Router;
 
@@ -100,6 +103,8 @@ mod transactions;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
+/// Configuration service name.
+pub const SERVICE_NAME: &str = "configuration";
 
 /// Configuration service.
 #[derive(Debug, Default)]
@@ -107,7 +112,7 @@ pub struct Service {}
 
 impl blockchain::Service for Service {
     fn service_name(&self) -> &'static str {
-        "configuration"
+        SERVICE_NAME
     }
 
     fn service_id(&self) -> u16 {
@@ -143,6 +148,10 @@ impl blockchain::Service for Service {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &Context) -> Box<blockchain::Service> {
         Box::new(Service {})
     }

@@ -26,15 +26,18 @@ extern crate exonum;
 #[macro_use]
 extern crate proptest;
 
-use exonum::storage::{Database, MapProof, MemoryDB, ProofMapIndex, Snapshot, StorageValue};
-use exonum::storage::proof_map_index::{ProofMapKey, ProofPath};
-use proptest::prelude::*;
-use proptest::num::u8::BinarySearch as U8BinarySearch;
-use proptest::test_runner::Config;
+use exonum::storage::{proof_map_index::{ProofMapKey, ProofPath},
+                      Database,
+                      MapProof,
+                      MemoryDB,
+                      ProofMapIndex,
+                      Snapshot,
+                      StorageValue};
+use proptest::{num::u8::BinarySearch as U8BinarySearch, prelude::*, test_runner::Config};
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::Debug;
-use std::ops::Range;
+use std::{collections::{BTreeMap, BTreeSet},
+          fmt::Debug,
+          ops::Range};
 
 const INDEX_NAME: &str = "index";
 
@@ -143,7 +146,7 @@ fn data_to_db(data: BTreeMap<[u8; 32], u64>) -> MemoryDB {
 }
 
 macro_rules! proof_map_tests {
-    (cases = $cases:expr, sizes = $sizes:expr, bytes = $bytes:expr) => {
+    (cases = $cases:expr,sizes = $sizes:expr,bytes = $bytes:expr) => {
         proptest! {
             #![proptest_config(Config::with_cases($cases))]
 
@@ -241,7 +244,7 @@ macro_rules! proof_map_tests {
                 check_map_multiproof(proof, unique_keys, &table);
             }
         }
-    }
+    };
 }
 
 mod small_index {

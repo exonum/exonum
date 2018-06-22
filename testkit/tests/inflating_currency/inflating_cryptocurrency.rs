@@ -18,21 +18,18 @@ extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::blockchain::{ApiContext, Blockchain, ExecutionResult, Schema as CoreSchema, Service,
-                         Transaction, TransactionSet};
-use exonum::node::{ApiSender, TransactionSend};
-use exonum::messages::{Message, RawTransaction};
-use exonum::storage::{Fork, MapIndex, Snapshot};
-use exonum::crypto::{Hash, PublicKey};
-use exonum::encoding;
-use exonum::encoding::serialize::FromHex;
-use exonum::api::{Api, ApiError};
-use exonum::helpers::Height;
-use self::iron::prelude::*;
-use self::iron::headers::ContentType;
-use self::iron::{Handler, IronError};
-use self::iron::status::Status;
-use self::router::Router;
+use exonum::{api::{Api, ApiError},
+             blockchain::{ApiContext, Blockchain, ExecutionResult, Schema as CoreSchema, Service,
+                          Transaction, TransactionSet},
+             crypto::{Hash, PublicKey},
+             encoding::{self, serialize::FromHex},
+             helpers::Height,
+             messages::{Message, RawTransaction},
+             node::{ApiSender, TransactionSend},
+             storage::{Fork, MapIndex, Snapshot}};
+
+use self::{iron::{headers::ContentType, prelude::*, status::Status, Handler, IronError},
+           router::Router};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 

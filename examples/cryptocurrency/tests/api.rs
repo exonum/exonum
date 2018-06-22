@@ -26,14 +26,14 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::api::ApiError;
-use exonum::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use exonum::{api::ApiError,
+             crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::transactions::{TxCreateWallet, TxTransfer};
 use cryptocurrency::schema::Wallet;
 use cryptocurrency::service::CurrencyService;
+use cryptocurrency::transactions::{TxCreateWallet, TxTransfer};
 
 // Imports shared test constants.
 use constants::{ALICE_NAME, BOB_NAME};

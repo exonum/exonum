@@ -39,24 +39,22 @@ extern crate serde_json;
 pub mod api;
 /// Database schema.
 pub mod schema;
-/// Node transactions.
-pub mod transactions;
 /// System time provider.
 pub mod time_provider;
+/// Node transactions.
+pub mod transactions;
 
-use exonum::api::Api;
-use exonum::blockchain::{ApiContext, ExecutionError, Service, ServiceContext, Transaction,
-                         TransactionSet};
-use exonum::crypto::Hash;
-use exonum::encoding;
-use exonum::encoding::serialize::json::reexport::Value;
-use exonum::helpers::fabric::{Context, ServiceFactory};
-use exonum::messages::RawTransaction;
-use exonum::storage::{Fork, Snapshot};
-
+use exonum::{api::Api,
+             blockchain::{ApiContext, Service, ServiceContext, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::{self, serialize::json::reexport::Value},
+             helpers::fabric::{Context, ServiceFactory},
+             messages::RawTransaction,
+             storage::{Fork, Snapshot}};
 use iron::Handler;
 use router::Router;
 use schema::TimeSchema;
+
 use time_provider::{SystemTimeProvider, TimeProvider};
 use transactions::*;
 
@@ -64,12 +62,6 @@ use transactions::*;
 pub const SERVICE_ID: u16 = 4;
 /// Time service name.
 pub const SERVICE_NAME: &str = "exonum_time";
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        ExecutionError::new(value as u8)
-    }
-}
 
 /// Define the service.
 #[derive(Debug)]
@@ -123,7 +115,7 @@ impl Service for TimeService {
     }
 
     /// Creates transaction after commit of the block.
-    fn handle_commit(&self, context: &ServiceContext) {
+    fn after_commit(&self, context: &ServiceContext) {
         // The transaction must be created by the validator.
         if context.validator_id().is_none() {
             return;
@@ -163,6 +155,10 @@ impl Service for TimeService {
 pub struct TimeServiceFactory;
 
 impl ServiceFactory for TimeServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(TimeService::new())
     }

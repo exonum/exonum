@@ -20,9 +20,13 @@
 
 use std::marker::PhantomData;
 
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
 use crypto::Hash;
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
-use super::indexes_metadata::IndexType;
 
 /// A set of value items.
 ///

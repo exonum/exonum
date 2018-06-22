@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::crypto::Hash;
-use exonum::storage::{Fork, ProofMapIndex, Snapshot};
 use chrono::{DateTime, Utc};
+use exonum::{crypto::Hash,
+             storage::{Fork, ProofMapIndex, Snapshot}};
 
 encoding_struct! {
     /// Stores content's hash and some metadata about it.

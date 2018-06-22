@@ -14,14 +14,14 @@
 
 // spell-checker:ignore postpropose, postvote
 
-use exonum::blockchain::{Schema, StoredConfiguration};
-use exonum::helpers::{Height, ValidatorId};
-use exonum::crypto::{CryptoHash, Hash};
+use exonum::{blockchain::{Schema, StoredConfiguration},
+             crypto::{CryptoHash, Hash},
+             helpers::{Height, ValidatorId}};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
+use super::{new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
+            ConfigurationSchema, ConfigurationTestKit};
 use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposeResponse, VoteResponse, VotesInfo};
-use super::{new_tx_config_propose, new_tx_config_vote, to_boxed, ConfigurationSchema,
-            ConfigurationTestKit};
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;
@@ -47,6 +47,8 @@ trait ConfigurationApiTest {
     fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse;
 
     fn post_config_vote(&self, cfg_hash: &Hash) -> VoteResponse;
+
+    fn post_config_vote_against(&self, cfg_hash: &Hash) -> VoteResponse;
 }
 
 fn params_to_query(
@@ -128,6 +130,11 @@ impl ConfigurationApiTest for TestKitApi {
 
     fn post_config_vote(&self, cfg_hash: &Hash) -> VoteResponse {
         let endpoint = format!("/v1/configs/{}/postvote", cfg_hash.to_string());
+        self.post_private(ApiKind::Service("configuration"), &endpoint, &())
+    }
+
+    fn post_config_vote_against(&self, cfg_hash: &Hash) -> VoteResponse {
+        let endpoint = format!("/v1/configs/{}/postagainst", cfg_hash.to_string());
         self.post_private(ApiKind::Service("configuration"), &endpoint, &())
     }
 }
@@ -281,6 +288,49 @@ fn test_votes_for_propose() {
                 .transactions()
                 .contains(&tx.hash(),),
             "Transaction is absent in blockchain: {:?}",
+            tx
+        );
+    }
+}
+
+#[test]
+fn test_dissenting_votes_for_propose() {
+    use schema::VotingDecision;
+
+    let mut testkit: TestKit = TestKit::configuration_default();
+    let api = testkit.api();
+    // Apply a new configuration.
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("message", "First config change");
+        cfg.set_actual_from(Height(5));
+        cfg.stored_configuration().clone()
+    };
+    let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
+    let cfg_proposal_hash = new_cfg.hash();
+    assert_eq!(None, api.votes_for_propose(&new_cfg.hash()));
+    testkit.create_block_with_transaction(tx_propose);
+    assert_eq!(
+        Some(vec![None; testkit.network().validators().len()]),
+        api.votes_for_propose(&new_cfg.hash())
+    );
+    // Push dissenting votes
+    let tx_dissenting_votes = testkit
+        .network()
+        .validators()
+        .iter()
+        .map(|validator| new_tx_config_vote_against(validator, cfg_proposal_hash))
+        .map(to_boxed)
+        .collect::<Vec<_>>();
+    testkit.create_block_with_transactions(tx_dissenting_votes);
+    let response = api.votes_for_propose(&new_cfg.hash())
+        .expect("Dissenting votes for config is absent");
+    for entry in response.into_iter().take(testkit.majority_count()) {
+        let tx = entry.expect("VoteAgainst for config is absent");
+        assert_matches!(
+            tx,
+            VotingDecision::Nay(_),
+            "Transaction {:?} is not VoteAgainst variant",
             tx
         );
     }
@@ -460,6 +510,28 @@ fn test_post_vote_tx() {
     testkit.poll_events();
     // Check results
     let tx = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
+    assert_eq!(tx.hash(), info.tx_hash);
+    assert!(testkit.is_tx_in_pool(&info.tx_hash));
+}
+
+#[test]
+fn test_post_vote_against_tx() {
+    let mut testkit: TestKit = TestKit::configuration_default();
+    let api = testkit.api();
+    // Commits the following configuration.
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(Height(10));
+        cfg.set_service_config("message", "First config change");
+        cfg.stored_configuration().clone()
+    };
+    let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
+    testkit.create_block_with_transaction(tx);
+
+    let info = api.post_config_vote_against(&new_cfg.hash());
+    testkit.poll_events();
+    // Check results
+    let tx = new_tx_config_vote_against(&testkit.network().validators()[0], new_cfg.hash());
     assert_eq!(tx.hash(), info.tx_hash);
     assert!(testkit.is_tx_in_pool(&info.tx_hash));
 }

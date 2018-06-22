@@ -13,19 +13,24 @@
 // limitations under the License.
 
 use bodyparser;
-use exonum::blockchain::{SharedNodeState, Transaction};
-use exonum::node::{create_private_api_handler, create_public_api_handler, ApiSender,
-                   TransactionSend};
-use exonum::api::ApiError;
-use iron::{Chain, Handler, IronError, IronResult, Plugin, Request, Response};
-use iron::headers::{ContentType, Headers};
-use iron::status::{self, StatusClass};
+use exonum::{api::ApiError,
+             blockchain::{SharedNodeState, Transaction},
+             node::{create_private_api_handler, create_public_api_handler, ApiSender,
+                    TransactionSend}};
+use iron::{headers::{ContentType, Headers},
+           status::{self, StatusClass},
+           Chain,
+           Handler,
+           IronError,
+           IronResult,
+           Plugin,
+           Request,
+           Response};
 use iron_test::{request, response};
 use log::Level;
 use mount::{Mount, OriginalUrl};
 use serde::{Deserialize, Serialize};
-use serde_json;
-use serde_json::Value as JsonValue;
+use serde_json::{self, Value as JsonValue};
 
 use std::fmt;
 
@@ -94,6 +99,7 @@ impl TestKitApi {
                     blockchain.clone(),
                     api_state,
                     testkit.api_sender.clone(),
+                    &testkit.api_config,
                 );
                 handler.link_after(|req: &mut Request, resp| {
                     log_request(&ApiAccess::Private, req, resp)

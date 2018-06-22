@@ -16,12 +16,10 @@
 
 use toml;
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr};
 
+use blockchain::config::{ConsensusConfig, ValidatorKeys};
 use crypto::{PublicKey, SecretKey};
-use blockchain::config::ConsensusConfig;
-use blockchain::config::ValidatorKeys;
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;

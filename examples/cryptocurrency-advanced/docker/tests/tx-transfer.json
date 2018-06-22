@@ -1,0 +1,12 @@
+{
+  "body": {
+    "from": "654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f",
+    "to": "ef687046e09962bb608d80f31188f1a385d17e9892a33c0396dc8c9ad11e6aa9",
+    "amount": "120",
+    "seed": "14260153850110072977"
+  },
+  "protocol_version": 0,
+  "service_id": 128,
+  "message_id": 0,
+  "signature":"d81f82d8a96de188fdf1de252f5ea6ed4be5907b3830b9d5e17c2bfdf01bca3239aa2f6993bdfa598e66eb78e04962bced3e516a49944728d7b0b895958c790b"
+}
