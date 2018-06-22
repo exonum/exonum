@@ -95,7 +95,6 @@ impl ConnectList {
     // Creates from state::peers, needed only for testing.
     #[doc(hidden)]
     pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
-        let connect_list = ConnectList::default();
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
         ConnectList { peers }
@@ -106,9 +105,36 @@ impl ConnectList {
 mod test {
     use super::ConnectList;
     use blockchain::ValidatorKeys;
-    use crypto::gen_keypair;
+    use crypto::{gen_keypair, PublicKey};
+    use node::ConnectInfo;
+    use rand::{Rand, SeedableRng, XorShiftRng};
     use std::collections::BTreeMap;
     use std::net::SocketAddr;
+
+    static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
+    static REGULAR_PEERS: [u32; 4] = [5, 6, 7, 9];
+
+    fn make_keys(source: [u32; 4], count: usize) -> Vec<PublicKey> {
+        let mut rng = XorShiftRng::from_seed(source);
+        (0..count)
+            .into_iter()
+            .map(|_| PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap())
+            .collect()
+    }
+
+    fn check_in_connect_list(
+        connect_list: &ConnectList,
+        keys: &[PublicKey],
+        in_connect_list: &[usize],
+        not_in_connect_list: &[usize],
+    ) {
+        for i in in_connect_list {
+            assert_eq!(connect_list.allow(&keys[*i]), true);
+        }
+        for i in not_in_connect_list {
+            assert_eq!(connect_list.allow(&keys[*i]), false);
+        }
+    }
 
     #[test]
     fn test_connect_list_refresh() {
@@ -138,96 +164,81 @@ mod test {
         connect_list.refresh(&validator_keys);
         assert!(!connect_list.allow(&pk));
     }
-}
-
-// TODO: rewrite tests
-#[cfg(whitelist_tests)]
-mod test {
-    use super::ConnectList;
-    use crypto::PublicKey;
-    use rand::{Rand, SeedableRng, XorShiftRng};
-
-    static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
-    static REGULAR_PEERS: [u32; 4] = [5, 6, 7, 9];
-
-    fn make_keys(source: [u32; 4], count: usize) -> Vec<PublicKey> {
-        let mut rng = XorShiftRng::from_seed(source);
-        (0..count)
-            .into_iter()
-            .map(|_| PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap())
-            .collect()
-    }
-
-    fn check_in_whitelist(
-        whitelist: &ConnectList,
-        keys: &[PublicKey],
-        in_whitelist: &[usize],
-        not_in_whitelist: &[usize],
-    ) {
-        for i in in_whitelist {
-            assert_eq!(whitelist.allow(&keys[*i]), true);
-        }
-        for i in not_in_whitelist {
-            assert_eq!(whitelist.allow(&keys[*i]), false);
-        }
-    }
 
     #[test]
     fn test_whitelist() {
         let regular = make_keys(REGULAR_PEERS, 4);
+        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
 
-        let mut whitelist = ConnectList::default();
-        whitelist.whitelist_enabled = true;
-        check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
-        whitelist.add(regular[0]);
-        check_in_whitelist(&whitelist, &regular, &[0], &[1, 2, 3]);
-        whitelist.add(regular[2]);
-        check_in_whitelist(&whitelist, &regular, &[0, 2], &[1, 3]);
-        assert_eq!(whitelist.collect_allowed().len(), 2);
-    }
+        let mut connect_list = ConnectList::default();
+        check_in_connect_list(&connect_list, &regular, &[], &[0, 1, 2, 3]);
+        connect_list.add(ConnectInfo {
+            public_key: regular[0],
+            address: address.clone(),
+        });
+        check_in_connect_list(&connect_list, &regular, &[0], &[1, 2, 3]);
+        connect_list.add(ConnectInfo {
+            public_key: regular[2],
+            address: address.clone(),
+        });
+        check_in_connect_list(&connect_list, &regular, &[0, 2], &[1, 3]);
 
-    #[test]
-    fn test_wildcard() {
-        let regular = make_keys(REGULAR_PEERS, 4);
-
-        let mut whitelist = ConnectList::default();
-        assert_eq!(whitelist.is_enabled(), false);
-        check_in_whitelist(&whitelist, &regular, &[0, 1, 2, 3], &[]);
-        whitelist.whitelist_enabled = true;
-        assert_eq!(whitelist.is_enabled(), true);
-        check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
-        assert_eq!(whitelist.collect_allowed().len(), 0);
+        assert_eq!(connect_list.peers.len(), 2);
     }
 
     #[test]
     fn test_validators_in_whitelist() {
         let regular = make_keys(REGULAR_PEERS, 4);
         let validators = make_keys(VALIDATORS[0], 2);
-        let mut whitelist = ConnectList::default();
-        whitelist.whitelist_enabled = true;
-        check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
-        check_in_whitelist(&whitelist, &validators, &[], &[0, 1]);
-        assert_eq!(whitelist.collect_allowed().len(), 0);
-        whitelist.set_validators(validators.clone());
-        assert_eq!(whitelist.collect_allowed().len(), 2);
-        check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
-        check_in_whitelist(&whitelist, &validators, &[0, 1], &[]);
+        let mut connect_list = ConnectList::default();
+        check_in_connect_list(&connect_list, &regular, &[], &[0, 1, 2, 3]);
+        check_in_connect_list(&connect_list, &validators, &[], &[0, 1]);
+        assert_eq!(connect_list.peers.len(), 0);
+
+        add_to_connect_list(&mut connect_list, &validators);
+        assert_eq!(connect_list.peers.len(), 2);
+        check_in_connect_list(&connect_list, &regular, &[], &[0, 1, 2, 3]);
+        check_in_connect_list(&connect_list, &validators, &[0, 1], &[]);
+    }
+
+    fn add_to_connect_list(connect_list: &mut ConnectList, peers: &[PublicKey]) {
+        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
+        for peer in peers {
+            connect_list.add(ConnectInfo {
+                public_key: *peer,
+                address: address.clone(),
+            })
+        }
     }
 
     #[test]
     fn test_update_validators() {
         let validators0 = make_keys(VALIDATORS[0], 2);
         let validators1 = make_keys(VALIDATORS[1], 2);
-        let mut whitelist = ConnectList::default();
-        whitelist.whitelist_enabled = true;
-        assert_eq!(whitelist.collect_allowed().len(), 0);
-        whitelist.set_validators(validators0.clone());
-        assert_eq!(whitelist.collect_allowed().len(), 2);
-        check_in_whitelist(&whitelist, &validators0, &[0, 1], &[]);
-        check_in_whitelist(&whitelist, &validators1, &[], &[0, 1]);
-        whitelist.set_validators(validators1.clone());
-        assert_eq!(whitelist.collect_allowed().len(), 2);
-        check_in_whitelist(&whitelist, &validators0, &[], &[0, 1]);
-        check_in_whitelist(&whitelist, &validators1, &[0, 1], &[]);
+        let mut connect_list = ConnectList::default();
+        assert_eq!(connect_list.peers.len(), 0);
+        add_to_connect_list(&mut connect_list, &validators0);
+        assert_eq!(connect_list.peers.len(), 2);
+        check_in_connect_list(&connect_list, &validators0, &[0, 1], &[]);
+        check_in_connect_list(&connect_list, &validators1, &[], &[0, 1]);
+        add_to_connect_list(&mut connect_list, &validators1);
+        assert_eq!(connect_list.peers.len(), 4);
+        check_in_connect_list(&connect_list, &validators0, &[0, 1], &[]);
+        check_in_connect_list(&connect_list, &validators1, &[0, 1], &[]);
+    }
+
+    #[test]
+    fn test_address_allowed() {
+        let (public_key, _) = gen_keypair();
+        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
+
+        let mut connect_list = ConnectList::default();
+        assert!(!connect_list.address_allowed(&address));
+
+        connect_list.add(ConnectInfo {
+            public_key,
+            address: address.clone(),
+        });
+        assert!(connect_list.address_allowed(&address));
     }
 }

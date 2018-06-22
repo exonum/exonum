@@ -541,22 +541,17 @@ impl NodeHandler {
 
     /// Sends the given message to a peer by its public key.
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
-        if let Some(conn) = self.state.peers().get(&public_key) {
-            let address = conn.addr();
-            let public_key = self.state.connect_list().find_key_by_address(&address);
-            match public_key {
-                Some(public_key) => {
-                    trace!("Send to address: {}", address);
-                    let request =
-                        NetworkRequest::SendMessage(address, message.clone(), *public_key);
-                    self.channel.network_requests.send(request).log_error();
-                }
-                _ => {
-                    warn!("Peer is not in the ConnectList {:?}", public_key);
-                }
+        let address = {
+            if let Some(conn) = self.state.peers().get(&public_key) {
+                Some(conn.addr())
+            } else {
+                warn!("Hasn't connection with peer {:?}", public_key);
+                None
             }
-        } else {
-            warn!("Hasn't connection with peer {:?}", public_key);
+        };
+
+        if let Some(address) = address {
+            self.send_to_addr(&address, message);
         }
     }
 
@@ -578,20 +573,11 @@ impl NodeHandler {
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &RawMessage) {
-        for conn in self.state.peers().values() {
+        let peers: Vec<Connect> = { self.state.peers().values().cloned().collect() };
+
+        for conn in peers {
             let address = conn.addr();
-            let public_key = self.state.connect_list().find_key_by_address(&address);
-            match public_key {
-                Some(public_key) => {
-                    trace!("Send to address: {}", address);
-                    let request =
-                        NetworkRequest::SendMessage(address, message.clone(), *public_key);
-                    self.channel.network_requests.send(request).log_error();
-                }
-                _ => {
-                    warn!("Peer is not in the ConnectList {:?}", public_key);
-                }
-            }
+            self.send_to_addr(&address, message);
         }
     }
 

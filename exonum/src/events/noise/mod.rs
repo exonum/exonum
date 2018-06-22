@@ -62,7 +62,7 @@ impl HandshakeParams {
 
     #[doc(hidden)]
     pub fn default_test_params() -> Self {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
         let mut params = HandshakeParams::new(public_key, secret_key, 1024);
         params.set_remote_key(public_key);
         params
