@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![allow(unsafe_code)]
+#![cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
 
 use bit_vec::BitVec;
 use byteorder::{ByteOrder, LittleEndian};
@@ -68,8 +69,7 @@ fn test_zero_size_segment() {
         0,
     ]; // but with zero size
 
-    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into())
-        .unwrap_or_else(|_| panic!("Found error in check"));
+    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }
 
 #[test]
@@ -87,8 +87,7 @@ fn test_incorrect_pointer() {
         0,
     ]; // but with zero size
 
-    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into())
-        .unwrap_or_else(|_| panic!("Found error in check"));
+    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }
 
 #[test]
@@ -98,7 +97,7 @@ fn test_read_overflow_arithmetic() {
     let buf = vec![255; 0];
 
     <Vec<u8> as Field>::check(&buf, pos.into(), 8.into(), pos.into())
-        .unwrap_or_else(|_| panic!("Found error in check"));
+        .expect("Found error in check");
 }
 
 #[test]
