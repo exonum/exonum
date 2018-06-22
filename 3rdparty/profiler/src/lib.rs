@@ -91,7 +91,7 @@ impl ThreadFrame {
                                 .unwrap_or_else(|| panic!("Profiler: received interrupt without setted name."));
             File::create(&name)
                     .and_then(|ref mut  file| dump_html(file, &self) )
-                    .unwrap_or_else(|| panic!("could not write profiler data"));
+                    .unwrap_or_else(|_| panic!("could not write profiler data"));
             self.dumped_time = new_time;
         };
 
@@ -235,7 +235,7 @@ pub fn init_handler(file: String) {
                             .duration_since(UNIX_EPOCH)
                             .unwrap().as_secs() as usize;
         r.store(secs, Ordering::SeqCst);
-    }).unwrap_or_else(|| panic!("Error setting Ctrl-C handler"));
+    }).unwrap_or_else(|_| panic!("Error setting Ctrl-C handler"));
 }
 
 pub use html::dump_html;

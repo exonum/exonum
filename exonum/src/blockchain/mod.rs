@@ -274,7 +274,7 @@ impl Blockchain {
                 self.execute_transaction(*hash, height, index, &mut fork)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
-                    .unwrap_or_else(|| panic!("Transaction not found in the database."));
+                    .unwrap_or_else(|_| panic!("Transaction not found in the database."));
             }
 
             // Invoke execute method for all services.
@@ -517,7 +517,7 @@ impl Blockchain {
         }
 
         self.merge(fork.into_patch())
-            .unwrap_or_else(|| panic!("Unable to save peer to the peers cache"));
+            .unwrap_or_else(|_| panic!("Unable to save peer to the peers cache"));
     }
 
     /// Removes from the cache the `Connect` message from a peer.
@@ -534,7 +534,7 @@ impl Blockchain {
         }
 
         self.merge(fork.into_patch())
-            .unwrap_or_else(|| panic!("Unable to remove peer from the peers cache"));
+            .unwrap_or_else(|_| panic!("Unable to remove peer from the peers cache"));
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
@@ -565,7 +565,7 @@ impl Blockchain {
         }
 
         self.merge(fork.into_patch())
-            .unwrap_or_else(|| panic!("Unable to save messages to the consensus cache"));
+            .unwrap_or_else(|_| panic!("Unable to save messages to the consensus cache"));
     }
 }
 
