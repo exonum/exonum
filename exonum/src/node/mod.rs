@@ -810,8 +810,7 @@ impl Node {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(
-                &format!(
+            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).unwrap_or_else(|_| panic!(
                     "You compiled exonum with profiling support, but {}",
                     PROFILE_ENV_VARIABLE_NAME
                 ),

@@ -54,13 +54,13 @@ impl Run {
     /// Returns created database instance.
     pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
-            .expect(&format!("{} not found.", DATABASE_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>(NODE_CONFIG_PATH)
-            .expect(&format!("{} not found.", NODE_CONFIG_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));
         ConfigFile::load(path).expect("Can't load node config file")
     }
 

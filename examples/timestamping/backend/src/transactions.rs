@@ -64,7 +64,7 @@ impl Transaction for TxTimestamp {
         let time = TimeSchema::new(&fork)
             .time()
             .get()
-            .unwrap_or_else(|_| panic!("Can't get the time"));
+            .unwrap_or_else(|| panic!("Can't get the time"));
 
         let content = self.content();
         let hash = content.content_hash();

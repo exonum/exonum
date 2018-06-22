@@ -119,10 +119,10 @@ impl<'a> BlockInfo<'a> {
 
             let block_hash = hashes
                 .get(height.0)
-                .expect(&format!("Block not found, height: {:?}", height));
+                .unwrap_or_else(|| panic!("Block not found, height: {:?}", height));
             blocks
                 .get(&block_hash)
-                .expect(&format!("Block not found, hash: {:?}", block_hash))
+                .unwrap_or_else(|| panic!("Block not found, hash: {:?}", block_hash))
         };
 
         BlockInfo {
@@ -314,7 +314,7 @@ impl<T> Index<usize> for BlockWithTransactions<T> {
     type Output = CommittedTransaction<T>;
 
     fn index(&self, index: usize) -> &CommittedTransaction<T> {
-        self.transactions.get(index).expect(&format!(
+        self.transactions.get(index).unwrap_or_else(|| panic!(
             "Index exceeds number of transactions in block {}",
             self.len()
         ))
@@ -773,7 +773,7 @@ impl<'a> BlockchainExplorer<'a> {
         let location = schema
             .transactions_locations()
             .get(tx_hash)
-            .expect(&format!(
+            .unwrap_or_else(|| panic!(
                 "Location not found for transaction hash {:?}",
                 tx_hash
             ));
