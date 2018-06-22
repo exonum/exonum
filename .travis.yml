@@ -34,7 +34,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.207
+  - CLIPPY_VERS=0.0.209
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
