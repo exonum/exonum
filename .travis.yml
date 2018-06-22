@@ -97,7 +97,7 @@ jobs:
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
-    - cargo clippy --all -- -W warnings
+    - cargo clippy --all -- -D warnings
 
   # Tests
   - env: FEATURE=test
