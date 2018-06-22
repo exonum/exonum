@@ -65,7 +65,7 @@
 1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/following> -
    format same as for `actual`
 
-1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/b5273e3b5180db238f51d8317b27daac29d1bc162e0b75294e5e0b27677d3242>
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs?hash=b5273e3b5180db238f51d8317b27daac29d1bc162e0b75294e5e0b27677d3242>
 
     ```json
     {
@@ -115,7 +115,7 @@
     }
     ```
 
-1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/b5273e3b5180db238f51d8317b27daac29d1bc162e0b75294e5e0b27677d3242/votes>
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs?hash=b5273e3b5180db238f51d8317b27daac29d1bc162e0b75294e5e0b27677d3242/votes>
 
     ```json
     [
@@ -271,7 +271,7 @@
 1. <http://127.0.0.1:8010/api/services/configuration/v1/configs/postpropose>
 
     ```bash
-    curl -X POST -d '{
+    curl -H "Content-type: application/json" -d '{
           "actual_from": 5500,
           "consensus": {
             "peers_timeout": 10000,
@@ -307,10 +307,10 @@
     }
     ```
 
-1. <http://127.0.0.1:8011/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote>
+1. <http://127.0.0.1:8011/api/services/configuration/v1/configs/postvote>
 
     ```bash
-    curl -X POST -d '{}' http://127.0.0.1:8011/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote
+    curl -H "Content-type: application/json" -d '{ "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a" }' http://127.0.0.1:8011/api/services/configuration/v1/configs/postvote
     ```
     ```javascript
     {
@@ -318,10 +318,10 @@
     }
     ```
 
-1. <http://127.0.0.1:8012/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postagainst>
+1. <http://127.0.0.1:8012/api/services/configuration/v1/configs/postagainst>
 
     ```bash
-    curl -X POST -d '{}' http://127.0.0.1:8012/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postagainst
+    curl -H "Content-type: application/json" -d '{ "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a" }' http://127.0.0.1:8012/api/services/configuration/v1/configs/postagainst
     ```
     ```javascript
     {

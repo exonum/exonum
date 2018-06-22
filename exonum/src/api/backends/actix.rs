@@ -38,8 +38,8 @@ use std::{fmt,
           sync::{mpsc, Arc},
           thread::{self, JoinHandle}};
 
-use api::{error::Error as ApiError, ApiAccess, ApiAggregator, FutureResult, Immutable,
-          IntoApiBackend, Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
+use api::{error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult,
+          Immutable, Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
           ServiceApiState};
 
 /// Type alias for the concrete API http response.
@@ -111,7 +111,7 @@ impl ServiceApiBackend for ApiBuilder {
     }
 }
 
-impl IntoApiBackend for actix_web::Scope<ServiceApiState> {
+impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
     fn extend<'a, I>(mut self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>,
@@ -256,7 +256,8 @@ pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeC
     let app_config = runtime_config.app_config;
     let access = runtime_config.access;
     let state = ServiceApiState::new(aggregator.blockchain.clone());
-    let mut app = App::with_state(state).scope("api", |scope| aggregator.extend_api(access, scope));
+    let mut app = App::with_state(state);
+    app = app.scope("api", |scope| aggregator.extend_backend(access, scope));
     if let Some(app_config) = app_config {
         app = app_config(app);
     }

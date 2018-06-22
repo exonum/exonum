@@ -944,7 +944,7 @@ impl TestKit {
         let system_runtime_config = SystemRuntimeConfig {
             api_runtimes: vec![
                 ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
-                ApiRuntimeConfig::new(private_api_address, ApiAccess::Private)
+                ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
             ],
             api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
         };

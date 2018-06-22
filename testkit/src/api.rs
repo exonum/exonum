@@ -21,13 +21,12 @@ use reqwest::{Client, Response, StatusCode};
 use serde_json;
 use serde_urlencoded;
 
-use std::fmt::{self};
+use std::fmt::{self, Display};
 
-use exonum::{
-    api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
-    encoding::serialize::reexport::{DeserializeOwned, Serialize},
-    node::{ApiSender, TransactionSend},
-};
+use exonum::{api::{self, ApiAggregator, ServiceApiState},
+             blockchain::{SharedNodeState, Transaction},
+             encoding::serialize::reexport::{DeserializeOwned, Serialize},
+             node::{ApiSender, TransactionSend}};
 
 use TestKit;
 
@@ -85,7 +84,7 @@ impl TestKitApi {
         TestKitApi {
             test_server: create_test_server(aggregator),
             test_client: Client::new(),
-            api_sender: api_sender,
+            api_sender,
         }
     }
 
@@ -100,7 +99,7 @@ impl TestKitApi {
     }
 
     /// TODO
-    pub fn public<K: ToString>(&self, kind: K) -> RequestBuilder {
+    pub fn public(&self, kind: impl Display) -> RequestBuilder {
         RequestBuilder::new(
             self.test_server.url(""),
             &self.test_client,
@@ -110,7 +109,7 @@ impl TestKitApi {
     }
 
     /// TODO
-    pub fn private<K: ToString>(&self, kind: K) -> RequestBuilder {
+    pub fn private(&self, kind: impl Display) -> RequestBuilder {
         RequestBuilder::new(
             self.test_server.url(""),
             &self.test_client,
@@ -180,8 +179,7 @@ where
     where
         R: DeserializeOwned + 'static,
     {
-        let params = self
-            .query
+        let params = self.query
             .as_ref()
             .map(|query| {
                 format!(
@@ -197,8 +195,7 @@ where
 
         trace!("GET {}", url);
 
-        let response = self
-            .test_client
+        let response = self.test_client
             .get(&url)
             .send()
             .expect("Unable to send request");

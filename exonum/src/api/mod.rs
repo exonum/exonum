@@ -80,7 +80,7 @@ pub trait ServiceApiBackend: Sized {
     fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
-/// TODO
+/// Service API builder for the concrete scope.
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiScope {
     pub(crate) actix_backend: actix::ApiBuilder,
@@ -167,7 +167,7 @@ impl ::std::fmt::Display for ApiAccess {
 }
 
 /// API backend extender.
-pub trait IntoApiBackend {
+pub trait ExtendApiBackend {
     /// Extend API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
     where
@@ -213,8 +213,12 @@ impl ApiAggregator {
         &self.blockchain
     }
 
-    /// TODO
-    pub fn extend_api<B: IntoApiBackend>(&self, access: ApiAccess, backend: B) -> B {
+    /// Extends given API backend by the handlers with the given access level.
+    pub fn extend_backend<B: ExtendApiBackend>(
+        &self,
+        access: ApiAccess,
+        backend: B,
+    ) -> B {
         match access {
             ApiAccess::Public => backend.extend(
                 self.inner
@@ -229,7 +233,7 @@ impl ApiAggregator {
         }
     }
 
-    /// TODO
+    /// Adds to aggregator API factory for the given prefix.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
         self.inner.insert(prefix.into(), builder);
     }
