@@ -132,10 +132,9 @@ impl PublicApi {
         let proposes = index
             .iter()
             .map(|cfg_hash| {
-                let propose_data = proposes_by_hash.get(&cfg_hash).unwrap_or_else(|| panic!(
-                    "Not found propose for following cfg_hash: {:?}",
-                    cfg_hash
-                ));
+                let propose_data = proposes_by_hash.get(&cfg_hash).unwrap_or_else(|| {
+                    panic!("Not found propose for following cfg_hash: {:?}", cfg_hash)
+                });
 
                 (cfg_hash, propose_data)
             })
