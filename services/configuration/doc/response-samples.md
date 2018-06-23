@@ -310,7 +310,9 @@
 1. <http://127.0.0.1:8011/api/services/configuration/v1/configs/postvote>
 
     ```bash
-    curl -H "Content-type: application/json" -d '{ "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a" }' http://127.0.0.1:8011/api/services/configuration/v1/configs/postvote
+    curl -H "Content-type: application/json" -d '{
+        "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a"
+      }' http://127.0.0.1:8011/api/services/configuration/v1/configs/postvote
     ```
     ```javascript
     {
@@ -321,7 +323,9 @@
 1. <http://127.0.0.1:8012/api/services/configuration/v1/configs/postagainst>
 
     ```bash
-    curl -H "Content-type: application/json" -d '{ "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a" }' http://127.0.0.1:8012/api/services/configuration/v1/configs/postagainst
+    curl -H "Content-type: application/json" -d '{
+        "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a"
+      }' http://127.0.0.1:8012/api/services/configuration/v1/configs/postagainst
     ```
     ```javascript
     {

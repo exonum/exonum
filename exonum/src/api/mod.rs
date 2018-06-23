@@ -214,11 +214,7 @@ impl ApiAggregator {
     }
 
     /// Extends given API backend by the handlers with the given access level.
-    pub fn extend_backend<B: ExtendApiBackend>(
-        &self,
-        access: ApiAccess,
-        backend: B,
-    ) -> B {
+    pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         match access {
             ApiAccess::Public => backend.extend(
                 self.inner
