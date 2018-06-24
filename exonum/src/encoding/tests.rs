@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #![allow(unsafe_code)]
-#![cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
+//#![cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
 
 use bit_vec::BitVec;
 use byteorder::{ByteOrder, LittleEndian};

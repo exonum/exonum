@@ -332,7 +332,7 @@ impl GenerateNodeConfig {
         let error_msg = &format!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str);
 
         let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            #[cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
+            //#[cfg_attr(feature = "cargo-clippy", allow(expect_fun_call))]
             let ip = addr_str.parse::<IpAddr>().expect(error_msg);
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
