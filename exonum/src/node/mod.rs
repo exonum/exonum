@@ -126,7 +126,7 @@ pub struct NodeHandler {
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
-    /// Is this node validator?
+    /// Node role.
     node_role: NodeRole,
 }
 
@@ -389,12 +389,12 @@ pub struct NodeSender {
     pub api_requests: SyncSender<ExternalMessage>,
 }
 
-///
+/// Node role.
 #[derive(Debug, Clone)]
 pub enum NodeRole {
-    ///
+    /// Validator node.
     Validator(ValidatorId),
-    ///
+    /// Auditor node.
     Auditor,
 }
 
@@ -405,7 +405,7 @@ impl Default for NodeRole {
 }
 
 impl NodeRole {
-    /// Checks if node is validator
+    /// Checks if node is validator.
     pub fn is_validator(&self) -> bool {
         match self {
             NodeRole::Validator(_) => true,
@@ -413,7 +413,7 @@ impl NodeRole {
         }
     }
 
-    /// Checks if node is auditor
+    /// Checks if node is auditor.
     pub fn is_auditor(&self) -> bool {
         match self {
             NodeRole::Auditor => true,
