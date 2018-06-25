@@ -521,7 +521,7 @@ impl State {
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
 
-        self.refresh_connect_list(&config.validator_keys);
+        // TODO: update connect list (ECR-1745)
 
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
@@ -1130,17 +1130,7 @@ impl State {
     }
 
     /// Add peer to node's `ConnectList`.
-    pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) -> bool {
-        if self.find_validator(peer.public_key).is_some() {
-            self.connect_list.add(peer);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Refresh `ConnectList` if validators has changed.
-    pub fn refresh_connect_list(&mut self, validator_keys: &[ValidatorKeys]) {
-        self.connect_list.refresh(validator_keys);
+    pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
+        self.connect_list.add(peer);
     }
 }

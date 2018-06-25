@@ -15,7 +15,7 @@
 //! Module that provides methods for managing the mapping between peers
 //! public keys and IP-addresses.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 
 use blockchain::ValidatorKeys;
@@ -69,19 +69,6 @@ impl ConnectList {
         self.peers.values().any(|a| a == address)
     }
 
-    /// Refresh `ConnectList` peers if validators has changed.
-    pub fn refresh(&mut self, validators_keys: &[ValidatorKeys]) {
-        let keys: BTreeSet<_> = validators_keys
-            .iter()
-            .map(|key| key.consensus_key)
-            .collect();
-        self.peers = self.peers
-            .clone()
-            .into_iter()
-            .filter(|(k, _)| keys.contains(k))
-            .collect();
-    }
-
     /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
         self.peers
@@ -98,13 +85,13 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
+    use rand::{Rand, SeedableRng, XorShiftRng};
+
+    use std::net::SocketAddr;
+
     use super::ConnectList;
-    use blockchain::ValidatorKeys;
     use crypto::{gen_keypair, PublicKey};
     use node::ConnectInfo;
-    use rand::{Rand, SeedableRng, XorShiftRng};
-    use std::collections::BTreeMap;
-    use std::net::SocketAddr;
 
     static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
     static REGULAR_PEERS: [u32; 4] = [5, 6, 7, 9];
@@ -129,35 +116,6 @@ mod test {
         for i in not_in_connect_list {
             assert_eq!(connect_list.allow(&keys[*i]), false);
         }
-    }
-
-    #[test]
-    fn test_connect_list_refresh() {
-        let mut peers = BTreeMap::new();
-
-        let (pk, _) = gen_keypair();
-        let addr: SocketAddr = "127.0.0.1:80".parse().unwrap();
-        peers.insert(pk, addr.clone());
-
-        let mut connect_list = ConnectList { peers };
-
-        assert!(connect_list.allow(&pk));
-
-        let mut validator_keys = Vec::new();
-        validator_keys.push(ValidatorKeys {
-            consensus_key: pk.clone(),
-            service_key: pk.clone(),
-        });
-        connect_list.refresh(&validator_keys);
-        assert!(connect_list.allow(&pk));
-
-        let (pk, _) = gen_keypair();
-        validator_keys.push(ValidatorKeys {
-            consensus_key: pk,
-            service_key: pk,
-        });
-        connect_list.refresh(&validator_keys);
-        assert!(!connect_list.allow(&pk));
     }
 
     #[test]
