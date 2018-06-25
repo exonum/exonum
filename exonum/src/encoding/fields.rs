@@ -412,7 +412,7 @@ impl<'a> Field<'a> for SocketAddr {
                     .copy_from_slice(&addr.ip().octets());
                 // Padding.
                 buffer[to as usize - SIZE_DIFF - PORT_SIZE..to as usize - PORT_SIZE]
-                    .copy_from_slice(&[0u8; SIZE_DIFF]);
+                    .copy_from_slice(&[0_u8; SIZE_DIFF]);
             }
             SocketAddr::V6(ref addr) => {
                 buffer[from as usize] = IPV6_HEADER;
@@ -446,7 +446,7 @@ impl<'a> Field<'a> for SocketAddr {
 
         if buffer[from_unchecked] == IPV4_HEADER
             && buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
-                != [0u8; SIZE_DIFF]
+                != [0_u8; SIZE_DIFF]
         {
             let mut value: [u8; SIZE_DIFF] = unsafe { mem::uninitialized() };
             value.copy_from_slice(&buffer[to_unchecked - SIZE_DIFF..to_unchecked]);

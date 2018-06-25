@@ -31,8 +31,8 @@ pub struct HealthCheckInfo {
     pub connectivity: bool,
 }
 
-/// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
-/// in current state.
+/// Contains information about the possibility to achieve the consensus between
+/// validators in current state.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct ConsensusStatusInfo {
     /// Consensus status: true - if consensus achieved, else - false.

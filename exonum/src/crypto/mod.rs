@@ -802,7 +802,7 @@ impl CryptoHash for SystemTime {
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
-        let mut buffer = [0u8; 12];
+        let mut buffer = [0_u8; 12];
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         hash(&buffer)

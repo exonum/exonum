@@ -427,7 +427,7 @@ fn proof_illegal_lower_bound(db: Box<Database>) {
 fn proof_illegal_bound_empty(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    for i in 0u8..8 {
+    for i in 0_u8..8 {
         index.push(vec![i]);
     }
     index.get_range_proof(8, 9);
@@ -436,7 +436,7 @@ fn proof_illegal_bound_empty(db: Box<Database>) {
 fn proof_illegal_range(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    for i in 0u8..4 {
+    for i in 0_u8..4 {
         index.push(vec![i]);
     }
     index.get_range_proof(2, 2);
@@ -461,7 +461,7 @@ fn proof_structure(db: Box<Database>) {
     let h5upup = hash(h5up.as_ref());
     let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-    for i in 0u8..5 {
+    for i in 0_u8..5 {
         index.push(vec![i, i + 1, i + 2]);
     }
 

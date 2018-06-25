@@ -72,7 +72,7 @@ impl<'de> Deserialize<'de> for ProofPath {
                     return Err(de::Error::invalid_value(Unexpected::Str(value), &self));
                 }
 
-                let mut bytes = [0u8; KEY_SIZE];
+                let mut bytes = [0_u8; KEY_SIZE];
                 for (i, ch) in value.chars().enumerate() {
                     match ch {
                         '0' => {}

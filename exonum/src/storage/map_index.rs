@@ -563,7 +563,7 @@ mod tests {
 
         map_index.remove(&1u8);
         assert_eq!(
-            map_index.iter_from(&0u8).collect::<Vec<(u8, u8)>>(),
+            map_index.iter_from(&0_u8).collect::<Vec<(u8, u8)>>(),
             vec![(2, 2), (3, 3)]
         );
         assert_eq!(
