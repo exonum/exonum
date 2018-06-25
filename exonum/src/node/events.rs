@@ -77,7 +77,7 @@ impl NodeHandler {
                 self.connect(&address);
             }
             ExternalMessage::Enable(value) => {
-                if !self.is_validator {
+                if self.node_role.is_auditor() {
                     error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
                     return;
                 }

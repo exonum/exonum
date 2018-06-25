@@ -127,7 +127,7 @@ pub struct NodeHandler {
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Is this node validator?
-    is_validator: bool,
+    node_role: NodeRole,
 }
 
 /// Service configuration.
@@ -389,6 +389,39 @@ pub struct NodeSender {
     pub api_requests: SyncSender<ExternalMessage>,
 }
 
+///
+#[derive(Debug, Clone)]
+pub enum NodeRole {
+    ///
+    Validator(ValidatorId),
+    ///
+    Auditor,
+}
+
+impl Default for NodeRole {
+    fn default() -> Self {
+        NodeRole::Auditor
+    }
+}
+
+impl NodeRole {
+    /// Checks if node is validator
+    pub fn is_validator(&self) -> bool {
+        match self {
+            NodeRole::Validator(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Checks if node is auditor
+    pub fn is_auditor(&self) -> bool {
+        match self {
+            NodeRole::Auditor => true,
+            _ => false,
+        }
+    }
+}
+
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
@@ -442,9 +475,12 @@ impl NodeHandler {
         );
 
         let mut is_enabled = api_state.clone().is_enabled();
-        let is_validator = validator_id.is_some();
+        let node_role = match validator_id {
+            Some(validator_id) => NodeRole::Validator(validator_id),
+            None => NodeRole::Auditor,
+        };
 
-        if !is_validator {
+        if node_role.is_auditor() {
             if is_enabled {
                 error!("Consensus is enabled but current node is auditor")
             }
@@ -452,7 +488,7 @@ impl NodeHandler {
             api_state.set_enabled(false);
         }
 
-        api_state.set_validator(is_validator);
+        api_state.set_node_role(node_role.clone());
 
         NodeHandler {
             blockchain,
@@ -462,7 +498,7 @@ impl NodeHandler {
             channel: sender,
             peer_discovery: config.peer_discovery,
             is_enabled,
-            is_validator,
+            node_role,
         }
     }
 
