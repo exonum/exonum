@@ -136,10 +136,7 @@ impl SystemApi {
                 .public_key = Some(p);
         }
 
-        let incoming_connections = outgoing_connections
-            .keys()
-            .cloned()
-            .collect();
+        let incoming_connections = outgoing_connections.keys().cloned().collect();
 
         PeersInfo {
             incoming_connections,
