@@ -119,8 +119,8 @@ impl TestKitApi {
     }
 }
 
-/// An HTTP requests builder. This type can be used to send requests to 
-/// the appropriate `TestKitApi` handlers. 
+/// An HTTP requests builder. This type can be used to send requests to
+/// the appropriate `TestKitApi` handlers.
 pub struct RequestBuilder<'a, 'b, Q = ()>
 where
     Q: 'b,
@@ -175,7 +175,7 @@ where
         }
     }
 
-    /// Sends a get request to the testing API endpoint and decodes response as 
+    /// Sends a get request to the testing API endpoint and decodes response as
     /// the corresponding type.
     pub fn get<R>(&self, endpoint: &str) -> api::Result<R>
     where
@@ -204,7 +204,7 @@ where
         Self::response_to_api_result(response)
     }
 
-    /// Sends a post request to the testing API endpoint and decodes response as 
+    /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
     pub fn post<R>(&self, endpoint: &str) -> api::Result<R>
     where

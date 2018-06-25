@@ -125,33 +125,33 @@ impl ServiceApiScope {
 }
 
 /// Service API builder, which is used to add service-specific endpoints to the node API.
-/// 
+///
 /// # Examples
-/// 
+///
 /// The example below provides a common practice of API implementation.
-/// 
+///
 /// ```
 /// #[macro_use] extern crate exonum;
 /// #[macro_use] extern crate serde_derive;
 /// extern crate futures;
-/// 
+///
 /// use futures::Future;
-/// 
+///
 /// use std::net::SocketAddr;
-/// 
+///
 /// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
 /// use exonum::blockchain::{Schema};
 /// use exonum::crypto::Hash;
-/// 
+///
 /// // Declares type which describes an API specification and implementation.
 /// pub struct MyApi;
-/// 
+///
 /// // Declares structures for requests and responses.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
 ///     block_height: u64
 /// }
-/// 
+///
 /// // Creates API handlers.
 /// impl MyApi {
 ///     /// Immutable handler, which returns the hash for block with the given height.
@@ -159,18 +159,18 @@ impl ServiceApiScope {
 ///         let schema = Schema::new(state.snapshot());
 ///         Ok(schema.block_hashes_by_height().get(query.block_height))
 ///     }
-/// 
+///
 ///     /// Mutable handler which removes peer with the given address from the cache.
 ///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
 ///         let mut blockchain = state.blockchain().clone();
 ///         Ok(blockchain.remove_peer_with_addr(&query))
 ///     }
-/// 
+///
 ///     /// Simple handler without any params.
 ///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
-/// 
+///
 ///     /// You may also creates an asynchronous handlers for the long requests.
 ///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
 ///      -> api::FutureResult<Option<Hash>> {
@@ -181,7 +181,7 @@ impl ServiceApiScope {
 ///         }))
 ///     }
 /// }
-/// 
+///
 /// # let mut builder = ServiceApiBuilder::default();
 /// // Adds `MyApi` handlers to the corresponding builder.
 /// builder.public_scope()
