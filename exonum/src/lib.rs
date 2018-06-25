@@ -31,6 +31,7 @@ extern crate clap;
 extern crate colored;
 extern crate env_logger;
 extern crate exonum_rocksdb as rocksdb;
+#[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
 extern crate failure;

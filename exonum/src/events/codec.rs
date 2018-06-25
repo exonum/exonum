@@ -19,7 +19,7 @@ use tokio_io::codec::{Decoder, Encoder};
 use std::io;
 
 use super::error::other_error;
-use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
+use events::noise::{NoiseWrapper, NOISE_HEADER_LENGTH};
 use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 #[derive(Debug)]
@@ -106,8 +106,7 @@ mod test {
 
     use bytes::BytesMut;
     use crypto::{gen_keypair_from_seed, Seed};
-    use events::noise::wrapper::NoiseWrapper;
-    use events::noise::HandshakeParams;
+    use events::noise::{HandshakeParams, NoiseWrapper};
     use messages::{MessageBuffer, RawMessage};
     use tokio_io::codec::{Decoder, Encoder};
 
