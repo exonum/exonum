@@ -217,7 +217,7 @@ impl NodeHandler {
         self.add_peer_exchange_timeout();
     }
     /// Handles `NodeTimeout::UpdateApiState`.
-    /// Node update internal `ApiState`.
+    /// Node update internal `ApiState` and `NodeRole`.
     pub fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
         self.node_role = match self.state.validator_id() {
