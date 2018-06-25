@@ -488,7 +488,7 @@ impl NodeHandler {
             api_state.set_enabled(false);
         }
 
-        api_state.set_node_role(node_role   );
+        api_state.set_node_role(node_role);
 
         NodeHandler {
             blockchain,
