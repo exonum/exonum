@@ -98,7 +98,7 @@ impl TestKitApi {
             .expect("Cannot send transaction");
     }
 
-    /// TODO
+    /// Creates a requests builder for the public API scope.
     pub fn public(&self, kind: impl Display) -> RequestBuilder {
         RequestBuilder::new(
             self.test_server.url(""),
@@ -108,7 +108,7 @@ impl TestKitApi {
         )
     }
 
-    /// TODO
+    /// Creates a requests builder for the private API scope.
     pub fn private(&self, kind: impl Display) -> RequestBuilder {
         RequestBuilder::new(
             self.test_server.url(""),
@@ -119,7 +119,8 @@ impl TestKitApi {
     }
 }
 
-/// TODO
+/// An HTTP requests builder. This type can be used to send requests to 
+/// the appropriate `TestKitApi` handlers. 
 pub struct RequestBuilder<'a, 'b, Q = ()>
 where
     Q: 'b,
@@ -163,7 +164,7 @@ where
         }
     }
 
-    ///TODO
+    /// Sets a query data of the current request.
     pub fn query<T>(&'a self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
         RequestBuilder {
             test_server_url: self.test_server_url.clone(),
@@ -174,7 +175,8 @@ where
         }
     }
 
-    /// TODO
+    /// Sends a get request to the testing API endpoint and decodes response as 
+    /// the corresponding type.
     pub fn get<R>(&self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
@@ -202,7 +204,8 @@ where
         Self::response_to_api_result(response)
     }
 
-    /// TODO
+    /// Sends a post request to the testing API endpoint and decodes response as 
+    /// the corresponding type.
     pub fn post<R>(&self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
@@ -227,10 +230,6 @@ where
     }
 
     /// Converts reqwest Response to api::Result.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if the response has a non-error response status.
     fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,

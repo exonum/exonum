@@ -147,27 +147,33 @@ impl ServiceApiScope {
 /// pub struct MyApi;
 /// 
 /// // Declares structures for requests and responses.
-/// 
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
 ///     block_height: u64
 /// }
 /// 
+/// // Creates API handlers.
 /// impl MyApi {
-///     /// First immutable handler, which returns the hash for block with the given height.
+///     /// Immutable handler, which returns the hash for block with the given height.
 ///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<Hash>> {
 ///         let schema = Schema::new(state.snapshot());
 ///         Ok(schema.block_hashes_by_height().get(query.block_height))
 ///     }
 /// 
-///     /// Second mutable handler which removes peer with the given address from the cache.
+///     /// Mutable handler which removes peer with the given address from the cache.
 ///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
 ///         let mut blockchain = state.blockchain().clone();
 ///         Ok(blockchain.remove_peer_with_addr(&query))
 ///     }
 /// 
+///     /// Simple handler without any params.
+///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///         Ok(())
+///     }
+/// 
 ///     /// You may also creates an asynchronous handlers for the long requests.
-///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery) -> api::FutureResult<Option<Hash>> {
+///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
+///      -> api::FutureResult<Option<Hash>> {
 ///         let blockchain = state.blockchain().clone();
 ///         Box::new(futures::lazy(move || {
 ///             let schema = Schema::new(blockchain.snapshot());
@@ -179,6 +185,7 @@ impl ServiceApiScope {
 /// # let mut builder = ServiceApiBuilder::default();
 /// // Adds `MyApi` handlers to the corresponding builder.
 /// builder.public_scope()
+///     .endpoint("v1/ping", MyApi::ping)
 ///     .endpoint("v1/block_hash", MyApi::block_hash)
 ///     .endpoint("v1/block_hash_async", MyApi::block_hash_async);
 /// // Adds a mutable endpoint for to the private API.
