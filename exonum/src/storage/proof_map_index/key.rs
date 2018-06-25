@@ -407,7 +407,7 @@ impl StorageKey for ProofPath {
         if !self.is_leaf() {
             let right = (self.end() as usize + 7) / 8;
             if self.end() % 8 != 0 {
-                buffer[right] &= !(255u8 << (self.end() % 8));
+                buffer[right] &= !(255_u8 << (self.end() % 8));
             }
             for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
                 *i = 0
@@ -587,7 +587,7 @@ fn test_proof_path_storage_key_leaf() {
 
 #[test]
 fn test_proof_path_storage_key_branch() {
-    let mut key = ProofPath::new(&[255u8; 32]);
+    let mut key = ProofPath::new(&[255_u8; 32]);
     key = key.prefix(11);
     key = key.suffix(5);
 

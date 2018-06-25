@@ -225,7 +225,7 @@ where
     /// ```
     pub fn iter(&self) -> ListIndexIter<V> {
         ListIndexIter {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 

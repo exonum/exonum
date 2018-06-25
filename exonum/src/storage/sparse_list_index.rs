@@ -307,7 +307,7 @@ where
     /// ```
     pub fn iter(&self) -> SparseListIndexIter<V> {
         SparseListIndexIter {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 
@@ -330,7 +330,7 @@ where
     /// ```
     pub fn indices(&self) -> SparseListIndexKeys {
         SparseListIndexKeys {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 
@@ -354,7 +354,7 @@ where
     /// ```
     pub fn values(&self) -> SparseListIndexValues<V> {
         SparseListIndexValues {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 
@@ -702,7 +702,7 @@ mod tests {
         list_index.extend(vec![1u8, 15, 25, 2, 3]);
         assert_eq!(
             list_index.indices().collect::<Vec<u64>>(),
-            vec![0u64, 1, 2, 3, 4]
+            vec![0_u64, 1, 2, 3, 4]
         );
         assert_eq!(
             list_index.values().collect::<Vec<u8>>(),
@@ -714,12 +714,12 @@ mod tests {
 
         assert_eq!(
             list_index.iter().collect::<Vec<(u64, u8)>>(),
-            vec![(0u64, 1u8), (3u64, 2u8), (4u64, 3u8)]
+            vec![(0_u64, 1u8), (3u64, 2u8), (4u64, 3u8)]
         );
 
         assert_eq!(
             list_index.iter_from(0).collect::<Vec<(u64, u8)>>(),
-            vec![(0u64, 1u8), (3u64, 2u8), (4u64, 3u8)]
+            vec![(0_u64, 1u8), (3u64, 2u8), (4u64, 3u8)]
         );
         assert_eq!(
             list_index.iter_from(1).collect::<Vec<(u64, u8)>>(),
@@ -730,7 +730,7 @@ mod tests {
             Vec::<(u64, u8)>::new()
         );
 
-        assert_eq!(list_index.indices().collect::<Vec<u64>>(), vec![0u64, 3, 4]);
+        assert_eq!(list_index.indices().collect::<Vec<u64>>(), vec![0_u64, 3, 4]);
         assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1u8, 2, 3]);
     }
 

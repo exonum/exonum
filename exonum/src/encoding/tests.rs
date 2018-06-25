@@ -330,7 +330,7 @@ where
 
 #[test]
 fn test_segments_of_raw_buffers() {
-    let buf = vec![255u8; 1];
+    let buf = vec![255_u8; 1];
 
     let input = vec![buf.clone(), buf.clone(), buf.clone()];
     assert_write_check_read(input, 8);
