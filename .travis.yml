@@ -123,7 +123,6 @@ jobs:
     install:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
-    - cargo tarpaulin -V | RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -154,20 +153,19 @@ jobs:
         - libssl-dev
         - libsnappy-dev
         - librocksdb
+    install:
+    - cargo tarpaulin -V | RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin
     script:
     - cargo clean
     - cargo build
     - cargo test
     after_success: |
-      #if [[ "$TRAVIS_BRANCH" = master ]]; then
-      if true; then
-        bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
-        # coveralls.io
-        cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-        # codecov.io
-        cargo tarpaulin --out Xml
-        bash <(curl -s https://codecov.io/bash)
-      fi
+      bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
+      # coveralls.io
+      cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      # codecov.io
+      cargo tarpaulin --out Xml
+      bash <(curl -s https://codecov.io/bash)
 
 notifications:
   slack:
