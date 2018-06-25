@@ -446,7 +446,7 @@ impl NodeHandler {
 
         if !is_validator {
             if is_enabled {
-                error!("Provided enabled consensus for auditor node")
+                error!("Consensus is enabled but current node is auditor")
             }
             is_enabled = false;
             api_state.set_enabled(false);

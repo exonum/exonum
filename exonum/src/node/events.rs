@@ -78,7 +78,7 @@ impl NodeHandler {
             }
             ExternalMessage::Enable(value) => {
                 if !self.is_validator {
-                    error!("Trying to enable auditor node");
+                    error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
                     return;
                 }
                 let s = if value { "enabled" } else { "disabled" };
