@@ -26,7 +26,7 @@ use wallet::Wallet;
 use {CurrencySchema, CRYPTOCURRENCY_SERVICE_ID};
 
 /// The structure describes the query parameters for the `get_wallet` endpoint.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct WalletQuery {
     /// Public key of the queried wallet.
     pub pub_key: PublicKey,

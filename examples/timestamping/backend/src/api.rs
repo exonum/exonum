@@ -22,7 +22,7 @@ use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
 use TIMESTAMPING_SERVICE;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TimestampQuery {
     pub hash: Hash,
 }

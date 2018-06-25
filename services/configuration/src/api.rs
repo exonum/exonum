@@ -54,13 +54,13 @@ pub struct VoteResponse {
     pub tx_hash: Hash,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct HashQuery {
     pub hash: Hash,
 }
 
 /// Filter for stored configurations.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct FilterQuery {
     pub previous_cfg_hash: Option<Hash>,
     pub actual_from: Option<Height>,

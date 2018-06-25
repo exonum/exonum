@@ -501,9 +501,9 @@ impl FromStr for AllowOrigin {
 
 impl<'a> From<&'a AllowOrigin> for Cors {
     fn from(origin: &'a AllowOrigin) -> Cors {
-        match origin {
-            &AllowOrigin::Any => Cors::build().finish(),
-            &AllowOrigin::Whitelist(ref hosts) => {
+        match *origin {
+            AllowOrigin::Any => Cors::build().finish(),
+            AllowOrigin::Whitelist(ref hosts) => {
                 let mut builder = Cors::build();
                 for host in hosts {
                     builder.allowed_origin(host);
