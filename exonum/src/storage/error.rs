@@ -14,9 +14,11 @@
 
 //! An implementation of `Error` type.
 
-/// The error type for I/O operations with storage. These errors result in a
-/// panic. Storage errors are fatal as in the case of database issues, the system
-/// cannot recover. These errors are defined by the Exonum team.
+/// The error type for I/O operations with storage.
+///
+/// These errors result in a panic. Storage errors are fatal as in the case of
+/// database issues, the system cannot recover. These errors are defined by the
+/// Exonum team.
 #[derive(Fail, Debug, Clone)]
 #[fail(display = "{}", message)]
 pub struct Error {

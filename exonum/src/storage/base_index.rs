@@ -96,7 +96,7 @@ where
         }
     }
 
-    /// Creates a new index representation based on the family name, index id inside family
+    /// Creates a new index representation based on the family name, index ID inside family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only

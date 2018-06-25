@@ -41,7 +41,7 @@ impl From<rocksdb::Error> for storage::Error {
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
 /// backend.
 ///
-/// RocksDB is an embedded database for key-value data, which is optimized for fast srorage.
+/// RocksDB is an embedded database for key-value data, which is optimized for fast storage.
 /// This structure is required to potentially adapt the interface to
 /// use different databases.
 pub struct RocksDB {

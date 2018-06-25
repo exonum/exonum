@@ -68,6 +68,7 @@ impl IntoIterator for Changes {
 }
 
 /// A set of serial changes that should be applied to a storage atomically.
+///
 /// This set can contain changes from multiple tables. When a block is added to
 /// the blockchain, changes are first collected into a patch and then applied to
 /// the storage.
@@ -311,10 +312,10 @@ pub trait Snapshot: 'static {
 /// the standard 'Iterator' trait, `Iterator` in Exonum is low-level and,
 /// therefore, operates with bytes.
 pub trait Iterator {
-    /// Advances the iterator and returns the next key and value.
+    /// Advances the iterator and returns a reference to the next key and value.
     fn next(&mut self) -> Option<(&[u8], &[u8])>;
 
-    /// Returns the current key and value of the iterator.
+    /// Returns a reference to the current key and value without advancing the iterator.
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
@@ -358,8 +359,10 @@ impl Snapshot for Fork {
 }
 
 impl Fork {
-    /// Creates a new checkpoint. In Exonum checkpoints are created before
-    /// applying each transaction to the database.
+    /// Creates a new checkpoint.
+    ///
+    /// In Exonum checkpoints are created before applying each transaction to
+    /// the database.
     ///
     /// # Panics
     ///

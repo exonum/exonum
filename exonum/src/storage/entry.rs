@@ -20,10 +20,10 @@ use crypto::Hash;
 use super::{BaseIndex, Fork, Snapshot, StorageValue};
 use super::indexes_metadata::IndexType;
 
-/// An index that may only contain one element. You can add an element to this
-/// index an check whether it exists.
+/// An index that may only contain one element.
 ///
-/// A value should implement [`StorageValue`] trait.
+/// You can add an element to this index an check whether it exists. A value
+/// should implement [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: trait.StorageValue.html
 #[derive(Debug)]
