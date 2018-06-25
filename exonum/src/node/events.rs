@@ -77,6 +77,10 @@ impl NodeHandler {
                 self.connect(&address);
             }
             ExternalMessage::Enable(value) => {
+                if !self.is_validator {
+                    error!("Trying to enable auditor node");
+                    return;
+                }
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
                     info!("Node is already {}", s);

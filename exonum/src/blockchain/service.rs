@@ -451,6 +451,11 @@ impl SharedNodeState {
         state.is_enabled = is_enabled;
     }
 
+    pub(crate) fn set_validator(&self, is_validator: bool) {
+        let mut state = self.state.write().expect("Expected read lock.");
+        state.is_validator = is_validator;
+    }
+
     /// Returns the value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout

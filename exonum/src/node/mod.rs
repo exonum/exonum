@@ -126,6 +126,8 @@ pub struct NodeHandler {
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
+    /// Is this node validator?
+    is_validator: bool,
 }
 
 /// Service configuration.
@@ -439,7 +441,18 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
-        let is_enabled = api_state.clone().is_enabled();
+        let mut is_enabled = api_state.clone().is_enabled();
+        let is_validator = validator_id.is_some();
+
+        if !is_validator {
+            if is_enabled {
+                error!("Provided enabled consensus for auditor node")
+            }
+            is_enabled = false;
+            api_state.set_enabled(false);
+        }
+
+        api_state.set_validator(is_validator);
 
         NodeHandler {
             blockchain,
@@ -449,6 +462,7 @@ impl NodeHandler {
             channel: sender,
             peer_discovery: config.peer_discovery,
             is_enabled,
+            is_validator,
         }
     }
 
