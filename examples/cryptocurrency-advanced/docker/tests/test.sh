@@ -117,28 +117,28 @@ echo "Waiting until transactions are committed..."
 sleep 5
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallets?pub_key=654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f 2>/dev/null`
+RESP=`curl $BASE_URL/wallets/654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f 2>/dev/null`
 check-request "Alice" 30 "$RESP"
 
 echo "Retrieving info on Bob's wallet..."
-RESP=`curl $BASE_URL/wallets?pub_key=ef687046e09962bb608d80f31188f1a385d17e9892a33c0396dc8c9ad11e6aa9 2>/dev/null`
+RESP=`curl $BASE_URL/wallets/ef687046e09962bb608d80f31188f1a385d17e9892a33c0396dc8c9ad11e6aa9 2>/dev/null`
 check-request "Bob" 220 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
 TXID=57826186c1c3983ba77433790cc378e9e39bad78b8471494ee990568c5c1cc62
-RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
+RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat tx-create-wallet-1.json`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving Bob's transaction info..."
 TXID=988b9861bc2758c2dfb3ab69f44557972cec85e13d55bef20fea8fb4e748ba7e
-RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
+RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat tx-create-wallet-2.json`
 check-create-tx "Bob" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
 TXID=5f4a5e852743b37d46dffe5af3145519938784f2106374c5ed68597d3dce57aa
-RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
+RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat tx-transfer.json`
 check-transfer-tx "$EXP" "$RESP"
 
