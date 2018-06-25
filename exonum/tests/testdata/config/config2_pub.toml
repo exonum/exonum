@@ -4,10 +4,9 @@ peers_timeout = 10000
 round_timeout = 3000
 status_timeout = 5000
 txs_block_limit = 1000
-
-[common.consensus_config.timeout_adjuster]
-timeout = 500
-type = "Constant"
+min_propose_timeout = 10
+max_propose_timeout = 200
+propose_timeout_threshold = 500
 
 [common.general_config]
 validators_count = 1

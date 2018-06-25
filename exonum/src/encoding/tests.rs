@@ -15,18 +15,19 @@
 #![allow(unsafe_code)]
 
 use bit_vec::BitVec;
-use chrono::{Duration, Utc};
 use byteorder::{ByteOrder, LittleEndian};
+use chrono::{Duration, Utc};
+use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, str::FromStr};
 
-use crypto::{gen_keypair, hash};
+use super::{CheckedOffset, Field, Offset};
 use blockchain::{self, Block, BlockProof};
+use crypto::{gen_keypair, hash, CryptoHash};
+use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
                RawMessage, Status};
-use helpers::{user_agent, Height, Round, ValidatorId};
-use super::{CheckedOffset, Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);
@@ -55,8 +56,17 @@ use self::ignore_new::*;
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
 fn test_zero_size_segment() {
-    let buf = vec![8,0,0,0, // not overlap
-                   0,0,0,0,0]; // but with zero size
+    let buf = vec![
+        8,
+        0,
+        0,
+        0, // not overlap
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]; // but with zero size
 
     <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }
@@ -64,8 +74,17 @@ fn test_zero_size_segment() {
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
 fn test_incorrect_pointer() {
-    let buf = vec![8,0,0,0, // not overlap
-                   0,0,0,0,0]; // but with zero size
+    let buf = vec![
+        8,
+        0,
+        0,
+        0, // not overlap
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]; // but with zero size
 
     <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }
@@ -154,6 +173,14 @@ fn test_uuid_segment() {
 
     let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
     assert_write_check_read(uuid, 16);
+}
+
+#[test]
+fn test_decimal() {
+    let decimal = Decimal::new(202, 2);
+    assert_write_check_read(decimal, 16);
+    let pi = Decimal::from_str("3.1415926535897932384626433832").unwrap();
+    assert_write_check_read(pi, 16);
 }
 
 #[test]
@@ -507,22 +534,16 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Status::new(&pub_key, Height(2), &hash(&[]), &secret_key)
-            .raw()
-            .clone(),
-        Status::new(&pub_key, Height(4), &hash(&[2]), &secret_key)
-            .raw()
-            .clone(),
-        Status::new(&pub_key, Height(7), &hash(&[3]), &secret_key)
-            .raw()
-            .clone(),
+        Status::new(&pub_key, Height(2), &hash(&[]), &secret_key).hash(),
+        Status::new(&pub_key, Height(4), &hash(&[2]), &secret_key).hash(),
+        Status::new(&pub_key, Height(7), &hash(&[3]), &secret_key).hash(),
     ];
     let block = BlockResponse::new(
         &pub_key,
         &pub_key,
         content.clone(),
         precommits.clone(),
-        transactions.clone(),
+        &transactions,
         &secret_key,
     );
 
@@ -530,14 +551,14 @@ fn test_block() {
     assert_eq!(block.to(), &pub_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
-    assert_eq!(block.transactions(), transactions);
+    assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
-    assert_eq!(block2.transactions(), transactions);
+    assert_eq!(block2.transactions().to_vec(), transactions);
     let block_proof = BlockProof {
         block: content.clone(),
         precommits: precommits.clone(),
@@ -568,7 +589,7 @@ fn test_empty_block() {
         &pub_key,
         content.clone(),
         precommits.clone(),
-        transactions.clone(),
+        &transactions,
         &secret_key,
     );
 
@@ -576,14 +597,14 @@ fn test_empty_block() {
     assert_eq!(block.to(), &pub_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
-    assert_eq!(block.transactions(), transactions);
+    assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
-    assert_eq!(block2.transactions(), transactions);
+    assert_eq!(block2.transactions().to_vec(), transactions);
 }
 
 #[test]

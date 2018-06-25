@@ -14,8 +14,7 @@
 
 // spell-checker:ignore exts
 
-use std::fmt;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use super::{Argument, CommandExtension, CommandName, Context};
 
@@ -88,7 +87,7 @@ impl CollectedCommand {
         context: Context,
     ) -> Feedback {
         self.command.execute(commands, context, &|context| {
-            // TODO: check duplicates, in services context keys (ECR-164)
+            // TODO: Check duplicates, in services context keys. (ECR-164)
             let mut new_context = context.clone();
             for ext in &self.exts {
                 new_context = ext.execute(new_context)

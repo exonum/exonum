@@ -16,20 +16,23 @@
 
 pub use self::proof::{ListProof, ListProofError};
 
-use std::cell::Cell;
-use std::marker::PhantomData;
+use std::{cell::Cell, marker::PhantomData};
 
-use crypto::{hash, Hash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
-use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
+use crypto::{hash, Hash, HashStream};
 
-#[cfg(test)]
-mod tests;
 mod key;
 mod proof;
+#[cfg(test)]
+mod tests;
 
-// TODO: implement pop and truncate methods for Merkle tree (ECR-173)
+// TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
 /// A Merkelized version of an array list that provides proofs of existence for the list items.
 ///

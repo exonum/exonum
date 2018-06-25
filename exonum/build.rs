@@ -1,8 +1,4 @@
-use std::path::Path;
-use std::fs::File;
-use std::io::Write;
-use std::env;
-use std::process::Command;
+use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 static USER_AGENT_FILE_NAME: &str = "user_agent";
 

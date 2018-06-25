@@ -28,12 +28,12 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::api::ApiError;
-use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
-use exonum::crypto::{self, CryptoHash, PublicKey};
-use exonum::helpers::Height;
-use exonum::messages::Message;
-use exonum::encoding::serialize::{FromHex, json::ExonumJson};
+use exonum::{api::ApiError,
+             blockchain::{Transaction, TransactionErrorType as ErrorType},
+             crypto::{self, CryptoHash, PublicKey},
+             encoding::serialize::{json::ExonumJson, FromHex},
+             helpers::Height,
+             messages::Message};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
 
@@ -490,9 +490,9 @@ fn test_explorer_blocks() {
 
 #[test]
 fn test_explorer_single_block() {
-    use std::collections::HashSet;
     use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
+    use std::collections::HashSet;
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)

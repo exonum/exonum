@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::collections::btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range};
-use std::collections::hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter};
-use std::collections::Bound::*;
-use std::cmp::Ordering::*;
-use std::iter::{Iterator as StdIterator, Peekable};
+use std::{cmp::Ordering::{Equal, Greater, Less},
+          collections::{btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range},
+                        hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter},
+                        Bound::{Included, Unbounded},
+                        HashMap},
+          iter::{Iterator as StdIterator, Peekable}};
 
-use super::Result;
 use self::NextIterValue::*;
+use super::Result;
 
 /// Map containing changes with a corresponding key.
 #[derive(Debug, Clone)]
@@ -194,7 +194,8 @@ pub enum Change {
 /// [`checkpoint`]: #method.checkpoint
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
-// FIXME: make &mut Fork "unwind safe" (ECR-176)
+
+// FIXME: make &mut Fork "unwind safe". (ECR-176)
 pub struct Fork {
     snapshot: Box<Snapshot>,
     patch: Patch,

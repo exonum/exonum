@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use router::Router;
 use iron::prelude::*;
+use router::Router;
 use serde_json;
 
-use blockchain::{Blockchain, Schema, SharedNodeState};
 use api::Api;
+use blockchain::{Blockchain, Schema, SharedNodeState};
 use helpers::user_agent;
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -29,6 +29,14 @@ struct MemPoolInfo {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct HealthCheckInfo {
     pub connectivity: bool,
+}
+
+/// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
+/// in current state.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct ConsensusStatusInfo {
+    /// Consensus status: true - if consensus achieved, else - false.
+    pub status: bool,
 }
 
 /// Public system API.
@@ -76,6 +84,16 @@ impl SystemApi {
         };
         router.get("/v1/user_agent", user_agent, "user_agent");
     }
+
+    fn consensus_status_info(self, router: &mut Router) {
+        let consensus_status = move |_: &mut Request| -> IronResult<Response> {
+            let info = ConsensusStatusInfo {
+                status: self.shared_api_state.consensus_status(),
+            };
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/consensus_status", consensus_status, "consensus_status");
+    }
 }
 
 impl Api for SystemApi {
@@ -83,5 +101,6 @@ impl Api for SystemApi {
         self.clone().mempool_info(router);
         self.clone().healthcheck_info(router);
         self.clone().user_agent_info(router);
+        self.clone().consensus_status_info(router);
     }
 }

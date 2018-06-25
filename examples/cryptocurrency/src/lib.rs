@@ -39,8 +39,8 @@ extern crate serde_json;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::storage::{Fork, MapIndex, Snapshot};
-    use exonum::crypto::PublicKey;
+    use exonum::{crypto::PublicKey,
+                 storage::{Fork, MapIndex, Snapshot}};
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
@@ -197,12 +197,13 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::blockchain::{ExecutionResult, Transaction};
-    use exonum::{messages::Message, storage::Fork};
+    use exonum::{blockchain::{ExecutionResult, Transaction},
+                 messages::Message,
+                 storage::Fork};
 
+    use errors::Error;
     use schema::{CurrencySchema, Wallet};
     use transactions::{TxCreateWallet, TxTransfer};
-    use errors::Error;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -274,17 +275,16 @@ pub mod contracts {
 
 /// REST API.
 pub mod api {
-    use exonum::blockchain::{Blockchain, Transaction};
-    use exonum::encoding::serialize::FromHex;
-    use exonum::node::{ApiSender, TransactionSend};
-    use exonum::crypto::{Hash, PublicKey};
-    use exonum::api::{Api, ApiError};
-    use iron::prelude::*;
-    use iron::{headers::ContentType, modifiers::Header, status::Status};
-    use router::Router;
-
     use bodyparser;
+    use exonum::{api::{Api, ApiError},
+                 blockchain::{Blockchain, Transaction},
+                 crypto::{Hash, PublicKey},
+                 encoding::serialize::FromHex,
+                 node::{ApiSender, TransactionSend}};
+    use iron::{headers::ContentType, modifiers::Header, prelude::*, status::Status};
+    use router::Router;
     use serde_json;
+
     use schema::{CurrencySchema, Wallet};
     use transactions::CurrencyTransactions;
 
@@ -391,13 +391,17 @@ pub mod api {
 
 /// Service declaration.
 pub mod service {
-    use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
-    use exonum::{encoding, api::Api, crypto::Hash, messages::RawTransaction, storage::Snapshot};
+    use exonum::{api::Api,
+                 blockchain::{ApiContext, Service, Transaction, TransactionSet},
+                 crypto::Hash,
+                 encoding,
+                 messages::RawTransaction,
+                 storage::Snapshot};
     use iron::Handler;
     use router::Router;
 
-    use transactions::CurrencyTransactions;
     use api::CryptocurrencyApi;
+    use transactions::CurrencyTransactions;
 
     /// Service ID for the `Service` trait.
     pub const SERVICE_ID: u16 = 1;

@@ -30,25 +30,25 @@ extern crate serde_derive;
 extern crate serde_json;
 
 pub mod api;
-pub mod transactions;
 pub mod schema;
+pub mod transactions;
 
-use exonum::api::Api;
-use exonum::helpers::fabric;
-use exonum::crypto::Hash;
-use exonum::storage::Snapshot;
-use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
-use exonum::messages::RawTransaction;
-use exonum::encoding::Error as StreamStructError;
-
+use exonum::{api::Api,
+             blockchain::{self, ApiContext, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::Error as StreamStructError,
+             helpers::fabric,
+             messages::RawTransaction,
+             storage::Snapshot};
 use iron::Handler;
 use router::Router;
 
-use transactions::TimeTransactions;
-use schema::Schema;
 use api::PublicApi;
+use schema::Schema;
+use transactions::TimeTransactions;
 
 const TIMESTAMPING_SERVICE: u16 = 130;
+pub const SERVICE_NAME: &str = "timestamping";
 
 #[derive(Debug, Default)]
 pub struct Service;
@@ -65,7 +65,7 @@ impl blockchain::Service for Service {
     }
 
     fn service_name(&self) -> &'static str {
-        "timestamping"
+        SERVICE_NAME
     }
 
     fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
@@ -91,6 +91,10 @@ impl blockchain::Service for Service {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &fabric::Context) -> Box<blockchain::Service> {
         Box::new(Service::new())
     }

@@ -18,11 +18,14 @@
 //! the [`StorageValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use std::marker::PhantomData;
-use std::borrow::Borrow;
+use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
-use super::indexes_metadata::IndexType;
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -466,9 +469,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
-    use super::*;
     use super::super::{Database, MemoryDB};
+    use super::*;
+    use rand::{thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
 

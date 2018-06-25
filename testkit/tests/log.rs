@@ -29,15 +29,14 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate thread_local;
 
-use exonum::crypto::{self, CryptoHash, Hash};
-use exonum::api::public::BlocksRange;
-use exonum::helpers::Height;
+use exonum::{api::public::BlocksRange,
+             crypto::{self, CryptoHash, Hash},
+             helpers::Height};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use log::{set_boxed_logger, set_max_level, Level, Log, Metadata, Record};
 use thread_local::ThreadLocal;
 
-use std::cell::RefCell;
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 
 use counter::{CounterService, TransactionResponse, TxIncrement, TxReset};
 

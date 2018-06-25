@@ -175,10 +175,11 @@ endpoint.
 [Examples](response-samples.md#private-endpoints-response-samples)
 
 <!-- markdownlint-disable MD013 MD033 -->
-| Endpoint                                                                 | HTTP method   | Description                                   | Response template                                                                                 |
-| -------------                                                            | ------------- | ------------                                  | ------------------                                                                                |
-| `/api/services/configuration/v1/configs/postpropose`                     | POST          | Post proposed config body                     | {<br> &emsp;"cfg\_hash": **configuration-hash**,<br> &emsp;"tx\_hash": **transaction-hash**<br> } |
-| `/api/services/configuration/v1/configs/<config-hash-vote-for>/postvote` | POST          | Vote for a configuration having specific hash | {<br> &emsp;"tx\_hash": **transaction-hash**<br> }                                                |
+| Endpoint                                                                        | HTTP method   | Description                                       | Response template                                                                                 |
+| -------------                                                                   | ------------- | ------------                                      | ------------------                                                                                |
+| `/api/services/configuration/v1/configs/postpropose`                            | POST          | Post proposed config body                         | {<br> &emsp;"cfg\_hash": **configuration-hash**,<br> &emsp;"tx\_hash": **transaction-hash**<br> } |
+| `/api/services/configuration/v1/configs/<config-hash-vote-for>/postvote`        | POST          | Vote for a configuration having specific hash     | {<br> &emsp;"tx\_hash": **transaction-hash**<br> }                                                |
+| `/api/services/configuration/v1/configs/<config-hash-vote-against>/postagainst` | POST          | Vote against a configuration having specific hash | {<br> &emsp;"tx\_hash": **transaction-hash**<br> }                                                |
 <!-- markdownlint-enable MD013 MD033 -->
 
 [exonum config]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html

@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use bodyparser;
-use exonum::api::{Api, ApiError};
-use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration};
-use exonum::encoding::serialize::json::reexport as serde_json;
-use exonum::helpers::Height;
-use exonum::node::{ApiSender, TransactionSend};
-use exonum::storage::StorageValue;
+use exonum::{api::{Api, ApiError},
+             blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration},
+             crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+             encoding::serialize::json::reexport as serde_json,
+             helpers::Height,
+             node::{ApiSender, TransactionSend},
+             storage::StorageValue};
 use iron::prelude::*;
 use router::Router;
 
-use super::{Propose, ProposeData, Schema, Vote};
+use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};
 
-pub type VotesInfo = Option<Vec<Option<Vote>>>;
+pub type VotesInfo = Option<Vec<Option<VotingDecision>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConfigHashInfo {
@@ -277,7 +277,7 @@ impl PrivateApi {
                 Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
             };
 
-            config.consensus.validate_configuration();
+            config.consensus.warn_if_nonoptimal();
 
             let cfg_hash = config.hash();
             let propose = Propose::new(
@@ -311,6 +311,29 @@ impl PrivateApi {
 
         router.post("/v1/configs/:hash/postvote", post_vote, "post_vote");
     }
+
+    fn handle_vote_against(self, router: &mut Router) {
+        let post_vote_against = move |req: &mut Request| -> IronResult<Response> {
+            let cfg_hash: Hash = self.url_fragment(req, "hash")?;
+
+            let vote_against =
+                VoteAgainst::new(&self.service_keys.0, &cfg_hash, &self.service_keys.1);
+            let tx_hash = vote_against.hash();
+
+            self.channel
+                .send(vote_against.into())
+                .map_err(ApiError::from)?;
+
+            let response = VoteResponse { tx_hash };
+            self.ok_response(&serde_json::to_value(response).unwrap())
+        };
+
+        router.post(
+            "/v1/configs/:hash/postagainst",
+            post_vote_against,
+            "post_vote_against",
+        );
+    }
 }
 
 impl Api for PublicApi {
@@ -328,5 +351,6 @@ impl Api for PrivateApi {
     fn wire(&self, router: &mut Router) {
         self.clone().handle_propose(router);
         self.clone().handle_vote(router);
+        self.clone().handle_vote_against(router);
     }
 }

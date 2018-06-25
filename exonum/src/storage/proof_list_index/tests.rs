@@ -14,12 +14,12 @@
 
 use rand::{thread_rng, Rng};
 
-use crypto::{hash, CryptoHash, Hash};
-use storage::Database;
-use encoding::serialize::json::reexport::{from_str, to_string};
-use encoding::serialize::reexport::Serialize;
-use super::{pair_hash, ListProof, ProofListIndex};
 use self::ListProof::*;
+use super::{pair_hash, ListProof, ProofListIndex};
+use crypto::{hash, CryptoHash, Hash};
+use encoding::serialize::{json::reexport::{from_str, to_string},
+                          reexport::Serialize};
+use storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -473,6 +473,10 @@ fn proof_structure(db: Box<Database>) {
         *(range_proof.validate(h12345, 5).unwrap()[0].1)
     );
 
+    let serialized_proof = to_string(&range_proof).unwrap();
+    let deserialized_proof: ListProof<Vec<u8>> = from_str(&serialized_proof).unwrap();
+    assert_eq!(deserialized_proof, range_proof);
+
     if let ListProof::Right(left_hash1, right_proof1) = range_proof {
         assert_eq!(left_hash1, h1234);
         let unboxed_proof = *right_proof1;
@@ -542,8 +546,8 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 
 mod memorydb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, MemoryDB};
+    use tempdir::TempDir;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
@@ -654,8 +658,8 @@ mod memorydb_tests {
 
 mod rocksdb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();

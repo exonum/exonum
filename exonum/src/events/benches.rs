@@ -14,12 +14,11 @@
 
 use test::Bencher;
 
-use std::net::SocketAddr;
-use std::thread;
+use std::{net::SocketAddr, thread};
 
+use events::{network::NetworkConfiguration,
+             tests::{connect_message, raw_message, TestEvents}};
 use node::EventsPoolCapacity;
-use events::network::NetworkConfiguration;
-use events::tests::{connect_message, raw_message, TestEvents};
 
 struct BenchConfig {
     times: usize,

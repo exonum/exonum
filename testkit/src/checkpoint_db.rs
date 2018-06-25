@@ -171,8 +171,8 @@ impl<T: Database> CheckpointDbInner<T> {
 
 #[cfg(test)]
 mod tests {
-    use exonum::storage::{Change, MemoryDB};
     use super::*;
+    use exonum::storage::{Change, MemoryDB};
 
     // Same as `Change`, but with trait implementations required for `Patch` comparison.
     #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]

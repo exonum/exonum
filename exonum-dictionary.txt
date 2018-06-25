@@ -31,6 +31,7 @@ deserializer
 deserializes
 deserializing
 DESTDIR
+diffie
 doctests
 emsp
 Exonum
@@ -63,6 +64,7 @@ multiproofs
 mutex
 nanos
 nodelay
+nonoptimal
 oneshot
 openssl
 peekable
@@ -70,6 +72,7 @@ permissioned
 postcondition
 postpropose
 postvote
+postagainst
 precheck
 precommit
 precommits
@@ -90,6 +93,7 @@ roughtime
 roundtrip
 rustfmt
 rustup
+scalarmult
 seedable
 serde
 serializable

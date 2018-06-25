@@ -17,43 +17,53 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::state::{RequestData, State, ValidatorState};
-pub use self::whitelist::Whitelist;
+pub use self::{state::{RequestData, State, ValidatorState},
+               whitelist::Whitelist};
 
-pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
-pub mod timeout_adjuster;
+// TODO: Temporary solution to get access to WAIT constants. (ECR-167)
+pub mod state;
 
 use failure;
-use toml::Value;
-use router::Router;
-use mount::Mount;
-use iron::{Chain, Iron};
+use futures::{sync::mpsc, Future, Sink};
+use iron::{Chain, Iron, Listening};
 use iron_cors::CorsMiddleware;
+use mount::Mount;
+use router::Router;
 use serde::{de, ser};
-use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
+use toml::Value;
 
-use std::{fmt, io};
-use std::str::FromStr;
-use std::sync::Arc;
-use std::thread;
-use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
-use std::collections::{BTreeMap, HashSet};
+use std::{collections::{BTreeMap, HashSet},
+          fmt,
+          io,
+          net::SocketAddr,
+          str::FromStr,
+          sync::Arc,
+          thread,
+          time::{Duration, SystemTime}};
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use api::{private, public, Api};
-use messages::{Connect, Message, RawMessage};
-use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
-use events::error::{into_other, log_error, other_error, LogError};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use events::{error::{into_other, log_error, other_error, LogError},
+             noise::HandshakeParams,
+             HandlerPart,
+             InternalEvent,
+             InternalPart,
+             InternalRequest,
+             NetworkConfiguration,
+             NetworkEvent,
+             NetworkPart,
+             NetworkRequest,
+             SyncSender,
+             TimeoutRequest};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
-mod events;
 mod basic;
 mod consensus;
+mod events;
 mod requests;
 mod whitelist;
 
@@ -113,7 +123,6 @@ pub struct NodeHandler {
     /// Blockchain.
     pub blockchain: Blockchain,
     /// Known peer addresses.
-    // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
@@ -153,10 +162,15 @@ pub struct NodeApiConfig {
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
     /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
-    /// by API handlers.
+    /// by public API handlers.
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-    pub allow_origin: Option<AllowOrigin>,
+    pub public_allow_origin: Option<AllowOrigin>,
+    /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
+    /// by private API handlers.
+    ///
+    /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    pub private_allow_origin: Option<AllowOrigin>,
 }
 
 impl Default for NodeApiConfig {
@@ -166,7 +180,8 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
-            allow_origin: None,
+            public_allow_origin: None,
+            private_allow_origin: None,
         }
     }
 }
@@ -382,7 +397,6 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
     ) -> Self {
-        // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
             (block.hash(), block.height().next())
@@ -409,7 +423,7 @@ impl NodeHandler {
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(
+        let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -425,8 +439,7 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
-        // Adjust propose timeout for the first time.
-        state.adjust_timeout(&*snapshot);
+        let is_enabled = api_state.clone().is_enabled();
 
         NodeHandler {
             blockchain,
@@ -435,7 +448,7 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            is_enabled: true,
+            is_enabled,
         }
     }
 
@@ -462,6 +475,21 @@ impl NodeHandler {
     /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
     pub fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
+    }
+
+    /// Returns value of the minimal propose timeout.
+    pub fn min_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().min_propose_timeout
+    }
+
+    /// Returns value of the maximal propose timeout.
+    pub fn max_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().max_propose_timeout
+    }
+
+    /// Returns threshold starting from which the minimal propose timeout value is used.
+    pub fn propose_timeout_threshold(&self) -> u32 {
+        self.state().consensus_config().propose_timeout_threshold
     }
 
     /// Returns `State` of the node.
@@ -584,9 +612,16 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_timeout = self.state.propose_timeout();
-        let time =
-            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
+        let snapshot = self.blockchain.snapshot();
+        let timeout = if Schema::new(&snapshot).transactions_pool_len()
+            >= self.propose_timeout_threshold() as usize
+        {
+            self.min_propose_timeout()
+        } else {
+            self.max_propose_timeout()
+        };
+
+        let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -837,17 +872,18 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self) -> io::Result<()> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
-            let network_handler = network_part.run(&core.handle());
+            let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
@@ -865,47 +901,44 @@ impl Node {
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> io::Result<()> {
-        let blockchain = self.handler().blockchain.clone();
-        let api_sender = self.channel();
+        let api_state = self.handler.api_state.clone();
+        let blockchain = self.handler.blockchain.clone();
+        let mut api_handlers: Vec<Listening> = Vec::new();
 
-        let private_config_api_thread = match self.api_options.private_api_address {
-            Some(listen_address) => {
-                let handler = create_private_api_handler(
-                    blockchain.clone(),
-                    self.handler().api_state().clone(),
-                    api_sender,
-                );
-                let thread = thread::spawn(move || {
-                    info!("Private exonum api started on {}", listen_address);
-                    Iron::new(handler).http(listen_address).unwrap();
-                });
-                Some(thread)
-            }
-            None => None,
-        };
-        let public_config_api_thread = match self.api_options.public_api_address {
-            Some(listen_address) => {
-                let handler = create_public_api_handler(
-                    blockchain,
-                    self.handler.api_state().clone(),
-                    &self.api_options,
-                );
-                let thread = thread::spawn(move || {
-                    info!("Public exonum api started on {}", listen_address);
-                    Iron::new(handler).http(listen_address).unwrap();
-                });
-                Some(thread)
-            }
-            None => None,
+        // Start private api.
+        if let Some(listen_address) = self.api_options.private_api_address {
+            let api_sender = self.channel();
+            let handler = create_private_api_handler(
+                blockchain.clone(),
+                api_state.clone(),
+                api_sender,
+                &self.api_options,
+            );
+            let listener = Iron::new(handler).http(listen_address).unwrap();
+            api_handlers.push(listener);
+
+            info!("Private exonum api started on {}", listen_address);
         };
 
-        self.run_handler()?;
+        // Start public api.
+        if let Some(listen_address) = self.api_options.public_api_address {
+            let handler = create_public_api_handler(blockchain, api_state, &self.api_options);
+            let listener = Iron::new(handler).http(listen_address).unwrap();
+            api_handlers.push(listener);
 
-        if let Some(private_config_api_thread) = private_config_api_thread {
-            private_config_api_thread.join().unwrap();
-        }
-        if let Some(public_config_api_thread) = public_config_api_thread {
-            public_config_api_thread.join().unwrap();
+            info!("Public exonum api started on {}", listen_address);
+        };
+
+        let handshake_params = HandshakeParams {
+            public_key: *self.handler().state().consensus_public_key(),
+            secret_key: self.handler().state().consensus_secret_key().clone(),
+            max_message_len: self.max_message_len,
+        };
+        self.run_handler(&handshake_params)?;
+
+        // Stop all api handlers.
+        for mut handler in api_handlers {
+            handler.close().unwrap();
         }
 
         Ok(())
@@ -983,7 +1016,7 @@ pub fn create_public_api_handler(
     mount.mount("api/system", router);
 
     let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.allow_origin {
+    if let Some(ref allow_origin) = config.public_allow_origin {
         chain.link_around(CorsMiddleware::from(allow_origin.clone()));
     }
     chain
@@ -995,6 +1028,7 @@ pub fn create_private_api_handler(
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
     api_sender: ApiSender,
+    config: &NodeApiConfig,
 ) -> Chain {
     let mut mount = Mount::new();
     mount.mount("api/services", blockchain.mount_private_api());
@@ -1005,12 +1039,73 @@ pub fn create_private_api_handler(
     system_api.wire(&mut router);
     mount.mount("api/system", router);
 
-    Chain::new(mount)
+    let mut chain = Chain::new(mount);
+    if let Some(ref allow_origin) = config.private_allow_origin {
+        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
+    }
+    chain
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use blockchain::{ExecutionResult, Schema, Transaction};
+    use crypto::gen_keypair;
+    use events::EventHandler;
+    use helpers;
+    use storage::{Database, Fork, MemoryDB};
+
+    messages! {
+        const SERVICE_ID = 0;
+
+        struct TxSimple {
+            public_key: &PublicKey,
+            msg: &str,
+        }
+    }
+
+    impl Transaction for TxSimple {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _view: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_duplicated_transaction() {
+        let (p_key, s_key) = gen_keypair();
+
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
+        let services = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+
+        let mut node = Node::new(db, services, node_cfg);
+
+        let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+
+        // Create original transaction.
+        let tx_orig = Box::new(tx.clone());
+        let event = ExternalMessage::Transaction(tx_orig);
+        node.handler.handle_event(event.into());
+
+        // Initial transaction should be added to the pool.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 1);
+
+        // Create duplicated transaction.
+        let tx_copy = Box::new(tx.clone());
+        let event = ExternalMessage::Transaction(tx_copy);
+        node.handler.handle_event(event.into());
+
+        // Duplicated transaction shouldn't be added to the pool.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 1);
+    }
 
     #[test]
     fn allow_origin_toml() {

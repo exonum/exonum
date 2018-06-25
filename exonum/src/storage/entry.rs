@@ -16,9 +16,8 @@
 
 use std::marker::PhantomData;
 
+use super::{base_index::BaseIndex, indexes_metadata::IndexType, Fork, Snapshot, StorageValue};
 use crypto::Hash;
-use super::{BaseIndex, Fork, Snapshot, StorageValue};
-use super::indexes_metadata::IndexType;
 
 /// An index that may only contain one element.
 ///

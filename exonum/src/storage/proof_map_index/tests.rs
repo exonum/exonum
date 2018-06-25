@@ -12,22 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use rand::{self, seq::sample_iter, Rng, XorShiftRng};
 use serde_json;
-use rand::{self, Rng, XorShiftRng};
-use rand::seq::sample_iter;
 
-use std::cmp;
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::hash::Hash as StdHash;
+use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
+use super::{key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
+            node::BranchNode,
+            proof::MapProofBuilder,
+            HashedKey,
+            MapProof,
+            MapProofError,
+            ProofMapIndex,
+            ProofMapKey,
+            ProofPath};
 use crypto::{hash, CryptoHash, Hash, HashStream};
+use encoding::serialize::reexport::{DeserializeOwned, Serialize};
 use storage::{Database, Fork, StorageValue};
-use encoding::serialize::reexport::Serialize;
-use super::{HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath};
-use super::key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX};
-use super::node::BranchNode;
-use super::proof::MapProofBuilder;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -293,9 +294,12 @@ fn check_map_proof<K, V>(
     key: Option<K>,
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
-    K: ProofMapKey + PartialEq + Debug,
-    V: StorageValue + PartialEq + Debug,
+    K: ProofMapKey + PartialEq + Debug + Serialize + DeserializeOwned,
+    V: StorageValue + PartialEq + Debug + Serialize + DeserializeOwned,
 {
+    let serialized_proof = serde_json::to_value(&proof).unwrap();
+    let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
+
     let entries = match key {
         Some(key) => {
             let value = table.get(&key).unwrap();
@@ -313,6 +317,10 @@ fn check_map_proof<K, V>(
             .collect::<Vec<_>>()
     );
     assert_eq!(proof.merkle_root(), table.merkle_root());
+
+    let deserialized_proof = deserialized_proof.check().unwrap();
+    assert_eq!(deserialized_proof.entries(), proof.entries());
+    assert_eq!(deserialized_proof.merkle_root(), proof.merkle_root());
 }
 
 fn check_map_multiproof<K, V>(
@@ -374,8 +382,8 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
 fn check_proofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: ProofMapKey + Copy + PartialEq + Debug + Serialize,
-    V: StorageValue + Clone + PartialEq + Debug + Serialize,
+    K: ProofMapKey + Copy + PartialEq + Debug + Serialize + DeserializeOwned,
+    V: StorageValue + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
@@ -1332,8 +1340,8 @@ macro_rules! common_tests {
 
 mod memorydb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, MemoryDB};
+    use tempdir::TempDir;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
@@ -1344,8 +1352,8 @@ mod memorydb_tests {
 
 mod rocksdb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();

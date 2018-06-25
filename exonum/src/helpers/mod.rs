@@ -16,24 +16,24 @@
 
 pub use self::types::{Height, Milliseconds, Round, ValidatorId};
 
-pub mod fabric;
 pub mod config;
+pub mod fabric;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
-use log::{Level, Record, SetLoggerError};
-use env_logger::{Builder, Formatter};
-use colored::*;
 use chrono::{DateTime, Local};
+use colored::*;
+use env_logger::{Builder, Formatter};
+use log::{Level, Record, SetLoggerError};
 
-use std::env;
-use std::io::{self, Write};
-use std::time::SystemTime;
+use std::{env,
+          io::{self, Write},
+          time::SystemTime};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
-use node::NodeConfig;
 use crypto::gen_keypair;
+use node::NodeConfig;
 
 mod types;
 
@@ -92,10 +92,10 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
 }
 
 fn has_colors() -> bool {
+    use atty;
+    use std::io;
     use term::terminfo::TerminfoTerminal;
     use term::Terminal;
-    use std::io;
-    use atty;
 
     let out = io::stderr();
     match TerminfoTerminal::new(out) {

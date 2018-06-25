@@ -1,7 +1,6 @@
-use exonum::crypto::{Hash, PublicKey};
-use exonum::storage::{Entry, Fork, ProofMapIndex, Snapshot};
-
 use chrono::{DateTime, Utc};
+use exonum::{crypto::{Hash, PublicKey},
+             storage::{Entry, Fork, ProofMapIndex, Snapshot}};
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
