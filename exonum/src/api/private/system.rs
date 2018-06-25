@@ -136,8 +136,10 @@ impl SystemApi {
                 .public_key = Some(p);
         }
 
+        let incoming_connections = outgoing_connections.keys().cloned().collect();
+
         PeersInfo {
-            incoming_connections: self.shared_api_state.incoming_connections(),
+            incoming_connections,
             outgoing_connections,
         }
     }
