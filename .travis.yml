@@ -15,9 +15,6 @@ addons:
     - libiberty-dev
     - libsnappy-dev
     - librocksdb
-    - pkg-config
-    - cmake
-    - zlib1g-dev
 
 rust:
   # Feel free to bump this version if you need features of newer Rust.
@@ -66,7 +63,7 @@ before_install:
 
 jobs:
   include:
-  # Formatting & other lints that do not require compilation
+  # Formatting & other lints that do not require compilation.
   - env: FEATURE=lints
     install:
     - cargo-audit -V || cargo install cargo-audit --force
@@ -95,7 +92,7 @@ jobs:
     - touch target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds/index.html
     - cargo deadlinks --dir target/doc
 
-  # Clippy linting
+  # Clippy linting.
   - env: FEATURE=clippy
     rust: nightly-2018-05-26
     install:
@@ -103,7 +100,7 @@ jobs:
     script:
     - cargo clippy --all -- -D warnings
 
-  # Tests
+  # Tests.
   - env: FEATURE=test
     addons:
       apt:
@@ -137,6 +134,24 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+
+  # Benchmarks (compilation only).
+  - env: FEATURE=benchmarks
+    rust: nightly-2018-05-26
+    script:
+    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Coverage.
+  - # if: branch = master
+    env: FEATURE=coverage
+    addons:
+      apt:
+        packages:
+        - libssl-dev
+    script:
+    - cargo clean
+    - cargo build
+    - cargo test
     after_success: |
       #if [[ "$TRAVIS_BRANCH" = master ]]; then
       if true; then
@@ -147,12 +162,6 @@ jobs:
         cargo tarpaulin --out Xml
         bash <(curl -s https://codecov.io/bash)
       fi
-
-  # Benchmarks (compilation only)
-  - env: FEATURE=benchmarks
-    rust: nightly-2018-05-26
-    script:
-    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
 
 notifications:
   slack:
