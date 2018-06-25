@@ -5,6 +5,8 @@ install:
   - rustup-init -yv --default-toolchain stable --default-host x86_64-pc-windows-msvc
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
   - set RUST_BACKTRACE=1
+# Workaround for the issue https://github.com/briansmith/ring/issues/648
+  - set CL='/wd5045'
   - rustc -vV
   - cargo -vV
 
