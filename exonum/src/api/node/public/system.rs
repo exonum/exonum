@@ -19,16 +19,16 @@ use blockchain::{Schema, SharedNodeState};
 use helpers::user_agent;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-/// TODO
+/// Information about the current state of the Node memory pool.
 pub struct MemPoolInfo {
-    /// TODO
+    /// Information about the current state of the Node memory pool.
     pub size: usize,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-/// TODO
+/// Information about the node is healthy.
 pub struct HealthCheckInfo {
-    /// TODO
+    /// Indicates whether the node is connected to the other peers.
     pub connectivity: bool,
 }
 

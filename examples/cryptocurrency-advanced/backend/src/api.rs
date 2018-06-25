@@ -63,7 +63,7 @@ pub struct WalletInfo {
     wallet_history: Option<WalletHistory>,
 }
 
-/// TODO: Add documentation. (ECR-1638)
+// TODO: Add documentation. (ECR-1638)
 /// Public service API description.
 #[derive(Debug, Clone, Copy)]
 pub struct CryptocurrencyApi;

@@ -124,7 +124,67 @@ impl ServiceApiScope {
     }
 }
 
-/// Service API builder.
+/// Service API builder, which is used to add service-specific endpoints to the node API.
+/// 
+/// # Examples
+/// 
+/// The example below provides a common practice of API implementation.
+/// 
+/// ```
+/// #[macro_use] extern crate exonum;
+/// #[macro_use] extern crate serde_derive;
+/// extern crate futures;
+/// 
+/// use futures::Future;
+/// 
+/// use std::net::SocketAddr;
+/// 
+/// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
+/// use exonum::blockchain::{Schema};
+/// use exonum::crypto::Hash;
+/// 
+/// // Declares type which describes an API specification and implementation.
+/// pub struct MyApi;
+/// 
+/// // Declares structures for requests and responses.
+/// 
+/// #[derive(Deserialize, Clone, Copy)]
+/// pub struct MyQuery {
+///     block_height: u64
+/// }
+/// 
+/// impl MyApi {
+///     /// First immutable handler, which returns the hash for block with the given height.
+///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<Hash>> {
+///         let schema = Schema::new(state.snapshot());
+///         Ok(schema.block_hashes_by_height().get(query.block_height))
+///     }
+/// 
+///     /// Second mutable handler which removes peer with the given address from the cache.
+///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
+///         let mut blockchain = state.blockchain().clone();
+///         Ok(blockchain.remove_peer_with_addr(&query))
+///     }
+/// 
+///     /// You may also creates an asynchronous handlers for the long requests.
+///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery) -> api::FutureResult<Option<Hash>> {
+///         let blockchain = state.blockchain().clone();
+///         Box::new(futures::lazy(move || {
+///             let schema = Schema::new(blockchain.snapshot());
+///             Ok(schema.block_hashes_by_height().get(query.block_height))
+///         }))
+///     }
+/// }
+/// 
+/// # let mut builder = ServiceApiBuilder::default();
+/// // Adds `MyApi` handlers to the corresponding builder.
+/// builder.public_scope()
+///     .endpoint("v1/block_hash", MyApi::block_hash)
+///     .endpoint("v1/block_hash_async", MyApi::block_hash_async);
+/// // Adds a mutable endpoint for to the private API.
+/// builder.private_scope()
+///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiBuilder {
     public_scope: ServiceApiScope,
@@ -174,7 +234,7 @@ pub trait ExtendApiBackend {
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
 }
 
-/// Exonum node API aggregator.
+/// Exonum node API aggregator. Currently only HTTP v1 backend is available.
 #[derive(Debug, Clone)]
 pub struct ApiAggregator {
     blockchain: Blockchain,
