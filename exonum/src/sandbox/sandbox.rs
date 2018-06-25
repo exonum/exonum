@@ -636,15 +636,13 @@ impl Sandbox {
         self.node_state().consensus_secret_key().clone()
     }
 
-    fn add_peer_to_connect_list(&self, addr: SocketAddr, public_key: PublicKey) {
+    fn add_peer_to_connect_list(&self, addr: SocketAddr, validator_keys: ValidatorKeys) {
+        let public_key = validator_keys.consensus_key;
         let config = {
             let inner = &self.inner.borrow_mut();
             let state = &inner.handler.state;
             let mut config = state.config().clone();
-            config.validator_keys.push(ValidatorKeys {
-                consensus_key: public_key.clone(),
-                service_key: public_key,
-            });
+            config.validator_keys.push(validator_keys);
             config
         };
 
@@ -900,9 +898,14 @@ mod tests {
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
         let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
         // We also need to add public key from this keypair to the ConnectList.
         // Socket address doesn't matter in this case.
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
 
         s.recv(&Connect::new(
             &public,
@@ -956,6 +959,12 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -981,7 +990,12 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -997,7 +1011,12 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -1021,7 +1040,12 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), public);
+        let (service, _) = gen_keypair();
+        let validator_keys = ValidatorKeys {
+            consensus_key: public,
+            service_key: service,
+        };
+        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),

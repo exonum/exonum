@@ -89,11 +89,11 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 ///
 /// See: [`into_x25519_keypair()`][1]
 /// [1]: fn.into_x25519_public_key.html
-pub fn into_x25519_public_key(pk: crypto::PublicKey) -> Option<PublicKey> {
+pub fn into_x25519_public_key(pk: crypto::PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
     let public_key = convert_ed_pk_to_curve25519(&public_key);
-    Some(PublicKey(Curve25519GroupElement(public_key)))
+    PublicKey(Curve25519GroupElement(public_key))
 }
 
 macro_rules! implement_x25519_type {

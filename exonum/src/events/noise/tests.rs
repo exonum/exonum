@@ -24,7 +24,8 @@ use std::net::SocketAddr;
 use std::thread;
 use std::time::Duration;
 
-use crypto::{gen_keypair, x25519::into_x25519_keypair, PUBLIC_KEY_LENGTH};
+use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
+             PUBLIC_KEY_LENGTH};
 use events::error::into_other;
 use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -131,10 +132,17 @@ const MAX_MESSAGE_LEN: usize = 128;
 const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
+pub fn default_test_params() -> HandshakeParams {
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+    let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+    params.set_remote_key(public_key);
+    params
+}
+
 #[test]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
-    let params = HandshakeParams::default_test_params();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
@@ -152,7 +160,7 @@ fn test_noise_handshake_errors_ee_empty() {
 #[test]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
-    let params = HandshakeParams::default_test_params();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::StaticKeyExchange,
         EMPTY_MESSAGE,
@@ -170,7 +178,7 @@ fn test_noise_handshake_errors_es_empty() {
 #[test]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
-    let params = HandshakeParams::default_test_params();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
@@ -183,7 +191,7 @@ fn test_noise_handshake_errors_ee_standard() {
 #[test]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
-    let params = HandshakeParams::default_test_params();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::StaticKeyExchange,
         STANDARD_MESSAGE,
@@ -196,7 +204,7 @@ fn test_noise_handshake_errors_es_standard() {
 #[test]
 fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
-    let params = HandshakeParams::default_test_params();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
@@ -214,7 +222,7 @@ fn test_noise_handshake_errors_ee_empty_listen() {
 #[test]
 fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
-    let params = HandshakeParams::default_test_params();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
@@ -227,7 +235,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
 #[test]
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
-    let mut params = HandshakeParams::default_test_params();
+    let mut params = default_test_params();
     let (remote_key, _) = gen_keypair();
     params.set_remote_key(remote_key);
 
@@ -282,9 +290,7 @@ fn run_handshake_listener(
                         Some(message) => Either::A(
                             NoiseErrorHandshake::responder(&params, message).listen(stream),
                         ),
-                        None => {
-                            Either::B(NoiseHandshake::responder(&params).unwrap().listen(stream))
-                        }
+                        None => Either::B(NoiseHandshake::responder(&params).listen(stream)),
                     };
 
                     handshake
@@ -308,7 +314,7 @@ fn send_handshake(
 
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params).unwrap().send(sock),
+            None => NoiseHandshake::initiator(&params).send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
@@ -330,7 +336,7 @@ impl NoiseErrorHandshake {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::initiator(params).expect("Noise initiator is not created")),
+            inner: Some(NoiseHandshake::initiator(params)),
         }
     }
 
@@ -338,7 +344,7 @@ impl NoiseErrorHandshake {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::responder(params).expect("Noise responder is not created")),
+            inner: Some(NoiseHandshake::responder(params)),
         }
     }
 

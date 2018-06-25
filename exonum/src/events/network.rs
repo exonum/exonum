@@ -24,7 +24,6 @@ use super::{error::{into_other, log_error, other_error, result_ok},
             to_box};
 use crypto::PublicKey;
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
-use futures::future::err;
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
 
@@ -149,10 +148,7 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                match NoiseHandshake::initiator(&handshake_params) {
-                    Ok(handshake) => Either::A(handshake.send(sock)),
-                    Err(e) => Either::B(err(e))
-                }
+                NoiseHandshake::initiator(&handshake_params).send(sock)
             })
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
@@ -369,48 +365,44 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
 
-            match NoiseHandshake::responder(&handshake_params) {
-                Ok(handshake) => {
-                    let stream = handshake.listen(sock).flatten_stream();
+            let handshake = NoiseHandshake::responder(&handshake_params);
+            let stream = handshake.listen(sock).flatten_stream();
 
-                    let connection_handler = stream
-                        .into_future()
-                        .and_then(Ok)
-                        .map_err(|e| e.0)
-                        .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
-                            Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                            Some(Ok(other)) => Err(other_error(&format!(
-                                "First message is not Connect, got={:?}",
-                                other
-                            ))),
-                            Some(Err(e)) => Err(into_other(e)),
-                            None => Err(other_error("Incoming socket closed")),
-                        })
-                        .and_then(move |(connect, stream)| {
-                            trace!("Received handshake message={:?}", connect);
-                            let event = NetworkEvent::PeerConnected(addr, connect);
-                            let stream = network_tx
-                                .clone()
-                                .send(event)
-                                .map_err(into_other)
-                                .and_then(move |_| Ok(stream))
-                                .flatten_stream();
+            let connection_handler = stream
+                .into_future()
+                .and_then(Ok)
+                .map_err(|e| e.0)
+                .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
+                    Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
+                    Some(Ok(other)) => Err(other_error(&format!(
+                        "First message is not Connect, got={:?}",
+                        other
+                    ))),
+                    Some(Err(e)) => Err(into_other(e)),
+                    None => Err(other_error("Incoming socket closed")),
+                })
+                .and_then(move |(connect, stream)| {
+                    trace!("Received handshake message={:?}", connect);
+                    let event = NetworkEvent::PeerConnected(addr, connect);
+                    let stream = network_tx
+                        .clone()
+                        .send(event)
+                        .map_err(into_other)
+                        .and_then(move |_| Ok(stream))
+                        .flatten_stream();
 
-                            stream.for_each(move |raw| {
-                                let event = NetworkEvent::MessageReceived(addr, raw);
-                                network_tx.clone().send(event).map_err(into_other).map(drop)
-                            })
-                        })
-                        .map(|_| {
-                            // Ensure that holder lives until the stream ends.
-                            let _holder = holder;
-                        })
-                        .map_err(log_error);
-                    handle.spawn(to_box(connection_handler));
-                    to_box(future::ok(()))
-                }
-                Err(e) => to_box(future::err::<(), io::Error>(e)),
-            }
+                    stream.for_each(move |raw| {
+                        let event = NetworkEvent::MessageReceived(addr, raw);
+                        network_tx.clone().send(event).map_err(into_other).map(drop)
+                    })
+                })
+                .map(|_| {
+                    // Ensure that holder lives until the stream ends.
+                    let _holder = holder;
+                })
+                .map_err(log_error);
+            handle.spawn(to_box(connection_handler));
+            to_box(future::ok(()))
         });
 
         Ok(Listener(to_box(server)))

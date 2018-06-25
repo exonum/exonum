@@ -57,7 +57,8 @@ pub struct State {
     connect_list: ConnectList,
     tx_pool_capacity: usize,
 
-    peers: HashMap<PublicKey, Connect>,
+    /// daa
+    pub peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
     height_start_time: SystemTime,
     height: Height,
@@ -1130,12 +1131,11 @@ impl State {
 
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) -> bool {
-        match self.find_validator(peer.public_key) {
-            Some(_) => {
-                self.connect_list.add(peer);
-                true
-            }
-            _ => false,
+        if self.find_validator(peer.public_key).is_some() {
+            self.connect_list.add(peer);
+            true
+        } else {
+            false
         }
     }
 

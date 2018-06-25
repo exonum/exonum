@@ -20,7 +20,6 @@ use tokio_io::{codec::Framed,
 
 use std::io;
 
-use crypto::{gen_keypair_from_seed, Seed};
 use crypto::{x25519::{self, into_x25519_keypair, into_x25519_public_key},
              PublicKey,
              SecretKey};
@@ -58,15 +57,7 @@ impl HandshakeParams {
     }
 
     pub fn set_remote_key(&mut self, remote_key: PublicKey) {
-        self.remote_key = into_x25519_public_key(remote_key);
-    }
-
-    #[doc(hidden)]
-    pub fn default_test_params() -> Self {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-        let mut params = HandshakeParams::new(public_key, secret_key, 1024);
-        params.set_remote_key(public_key);
-        params
+        self.remote_key = Some(into_x25519_public_key(remote_key));
     }
 }
 
@@ -82,20 +73,20 @@ pub struct NoiseHandshake {
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams) -> Result<Self, io::Error> {
-        let noise = NoiseWrapper::initiator(params)?;
-        Ok(NoiseHandshake {
+    pub fn initiator(params: &HandshakeParams) -> Self {
+        let noise = NoiseWrapper::initiator(params);
+        NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
-        })
+        }
     }
 
-    pub fn responder(params: &HandshakeParams) -> Result<Self, io::Error> {
-        let noise = NoiseWrapper::responder(params)?;
-        Ok(NoiseHandshake {
+    pub fn responder(params: &HandshakeParams) -> Self {
+        let noise = NoiseWrapper::responder(params);
+        NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
-        })
+        }
     }
 
     fn read_handshake_msg<S: AsyncRead + 'static>(

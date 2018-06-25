@@ -41,26 +41,29 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-    pub fn initiator(params: &HandshakeParams) -> Result<Self, NoiseError> {
+    pub fn initiator(params: &HandshakeParams) -> Self {
         if let Some(ref remote_key) = params.remote_key {
-            let mut builder: NoiseBuilder = Self::noise_builder()
+            let builder: NoiseBuilder = Self::noise_builder()
                 .local_private_key(params.secret_key.as_ref())
                 .remote_public_key(remote_key.as_ref());
-            let session = builder.build_initiator()?;
-            return Ok(NoiseWrapper { session });
+            let session = builder
+                .build_initiator()
+                .expect("Noise session initiator failed to initialize");
+            return NoiseWrapper { session };
         } else {
-            return Err(NoiseError::MissingRemotePublicKey);
+            panic!("Remote public key is not specified")
         }
     }
 
-    pub fn responder(params: &HandshakeParams) -> Result<Self, NoiseError> {
+    pub fn responder(params: &HandshakeParams) -> Self {
         let builder: NoiseBuilder = Self::noise_builder();
 
         let session = builder
             .local_private_key(params.secret_key.as_ref())
-            .build_responder()?;
+            .build_responder()
+            .expect("Noise session responder failed to initialize");
 
-        Ok(NoiseWrapper { session })
+        NoiseWrapper { session }
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {

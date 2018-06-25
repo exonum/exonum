@@ -91,7 +91,7 @@ impl ConnectList {
     }
 
     /// `ConnectList` peers addresses.
-    pub fn collect_addresses(&self) -> Vec<SocketAddr> {
+    pub fn addresses(&self) -> Vec<SocketAddr> {
         self.peers.values().cloned().collect()
     }
 }

@@ -570,9 +570,9 @@ impl NodeHandler {
             }
             _ => {
                 warn!(
-                    "Attempt to connect to the peer with public key {:?} which \
+                    "Attempt to connect to the peer with address {:?} which \
                      is not in the ConnectList",
-                    public_key
+                    address
                 );
             }
         }
@@ -580,10 +580,13 @@ impl NodeHandler {
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &RawMessage) {
-        let peers: Vec<Connect> = { self.state.peers().values().cloned().collect() };
+        let peers: Vec<SocketAddr> = self.state
+            .peers()
+            .values()
+            .map(|conn| conn.addr())
+            .collect();
 
-        for conn in peers {
-            let address = conn.addr();
+        for address in peers {
             self.send_to_addr(&address, message);
         }
     }
@@ -866,7 +869,7 @@ impl Node {
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
-        let peers = node_cfg.connect_list.collect_addresses();
+        let peers = node_cfg.connect_list.addresses();
 
         let config = Configuration {
             listener: ListenerConfig {
