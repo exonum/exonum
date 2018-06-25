@@ -37,6 +37,7 @@ env:
   - CLIPPY_VERS=0.0.205
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
+  - TARPAULIN_VERS=0.6.2
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
@@ -62,7 +63,7 @@ before_install:
 
 jobs:
   include:
-  # Formatting & other lints that do not require compilation
+  # Formatting & other lints that do not require compilation.
   - env: FEATURE=lints
     install:
     - cargo-audit -V || cargo install cargo-audit --force
@@ -91,7 +92,7 @@ jobs:
     - touch target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds/index.html
     - cargo deadlinks --dir target/doc
 
-  # Clippy linting
+  # Clippy linting.
   - env: FEATURE=clippy
     rust: nightly-2018-05-26
     install:
@@ -99,7 +100,7 @@ jobs:
     script:
     - cargo clippy --all -- -D warnings
 
-  # Tests
+  # Tests.
   - env: FEATURE=test
     addons:
       apt:
@@ -133,11 +134,38 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
 
-  # Benchmarks (compilation only)
+  # Benchmarks (compilation only).
   - env: FEATURE=benchmarks
     rust: nightly-2018-05-26
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Coverage.
+  - # if: branch = master
+    env: FEATURE=coverage
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - libssl-dev
+        - libsnappy-dev
+        - librocksdb
+    install:
+    - cargo tarpaulin -V | RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin
+    script:
+    - cargo clean
+    - cargo build
+    - cargo test --tests
+    after_success: |
+      bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh)
+      # coveralls.io
+      cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      # codecov.io
+      cargo tarpaulin --out Xml
+      bash <(curl -s https://codecov.io/bash)
 
 notifications:
   slack:
