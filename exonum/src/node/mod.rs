@@ -390,7 +390,7 @@ pub struct NodeSender {
 }
 
 /// Node role.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum NodeRole {
     /// Validator node.
     Validator(ValidatorId),
@@ -488,7 +488,7 @@ impl NodeHandler {
             api_state.set_enabled(false);
         }
 
-        api_state.set_node_role(node_role.clone());
+        api_state.set_node_role(node_role   );
 
         NodeHandler {
             blockchain,
