@@ -93,6 +93,7 @@ roughtime
 roundtrip
 rustfmt
 rustup
+scalarmult
 seedable
 serde
 serializable
