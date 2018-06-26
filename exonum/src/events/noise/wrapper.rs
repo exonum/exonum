@@ -63,7 +63,7 @@ impl NoiseWrapper {
         NoiseWrapper { session }
     }
 
-    pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
+    pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<Vec<u8>, NoiseError> {
         if input.len() < NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH
             || input.len() > NOISE_MAX_MESSAGE_LENGTH
         {
@@ -73,9 +73,9 @@ impl NoiseWrapper {
         self.read(input, NOISE_MAX_MESSAGE_LENGTH)
     }
 
-    pub fn write_handshake_msg(&mut self) -> Result<(usize, Vec<u8>), NoiseError> {
+    pub fn write_handshake_msg(&mut self) -> Result<Vec<u8>, NoiseError> {
         // Payload in handshake messages can be empty.
-        self.write(&[0u8])
+        self.write(&[])
     }
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
@@ -102,7 +102,7 @@ impl NoiseWrapper {
                 msg.len()
             };
 
-            let (_, read_to) = self.read(msg, len_to_read).unwrap();
+            let read_to = self.read(msg, len_to_read).unwrap();
             decoded_message.extend_from_slice(&read_to);
         });
 
@@ -123,9 +123,9 @@ impl NoiseWrapper {
 
         msg.chunks(NOISE_MAX_MESSAGE_LENGTH - TAG_LENGTH)
             .for_each(|msg| {
-                let (written_bytes, written) = self.write(msg).unwrap();
+                let written = self.write(msg).unwrap();
                 encoded_message.extend_from_slice(&written);
-                len += written_bytes;
+                len += written.len();
             });
 
         let mut msg_len_buf = vec![0u8; NOISE_HEADER_LENGTH];
@@ -137,16 +137,16 @@ impl NoiseWrapper {
         Ok(None)
     }
 
-    fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
+    fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0u8; len];
-        let len = self.session.read_message(input, &mut buf)?;
-        Ok((len, buf))
+        self.session.read_message(input, &mut buf)?;
+        Ok(buf)
     }
 
-    fn write(&mut self, msg: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
+    fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
-        Ok((len, buf))
+        Ok(buf[..len].to_vec())
     }
 
     fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {

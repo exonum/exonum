@@ -85,7 +85,7 @@ impl NoiseHandshake {
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
         done(self.noise.write_handshake_msg())
             .map_err(|e| e.into())
-            .and_then(|(len, buf)| write(stream, &buf, len))
+            .and_then(|buf| write(stream, &buf, buf.len()))
             .map(move |(stream, _)| (stream, self))
     }
 
@@ -138,7 +138,10 @@ fn write<S: AsyncWrite + 'static>(
 ) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
     debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
 
-    let mut message = vec![len as u8; HANDSHAKE_HEADER_LENGTH];
+    let mut message = vec![0; len];
     message.extend_from_slice(&buf[0..len]);
-    write_all(sock, message)
+
+    write_all(sock, vec![len as u8; HANDSHAKE_HEADER_LENGTH]).and_then(|(sock, _)|{
+        write_all(sock, message)
+    })
 }
