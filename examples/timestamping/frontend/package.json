@@ -18,6 +18,7 @@
     ]
   },
   "dependencies": {
+    "axios-mock-adapter": "^1.15.0",
     "axios": "^0.18.0",
     "big-integer": "^1.6.28",
     "bootstrap": "^4.1.0",
