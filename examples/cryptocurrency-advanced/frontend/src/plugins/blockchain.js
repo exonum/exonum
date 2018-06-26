@@ -225,7 +225,10 @@ module.exports = {
         TxCreateWallet.signature = signature
         const hash = TxCreateWallet.hash(data)
 
-        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions/', data, signature).then(response => { return { data: { tx_hash : hash } } })
+        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => { 
+            return { data: { tx_hash : hash } }
+          })
       },
 
       addFunds(keyPair, amountToAdd, seed) {
