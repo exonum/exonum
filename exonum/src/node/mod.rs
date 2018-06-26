@@ -411,7 +411,7 @@ impl NodeRole {
     }
 
     /// Checks if node is validator.
-    pub fn is_validator(&self) -> bool {
+    pub fn is_validator(self) -> bool {
         match self {
             NodeRole::Validator(_) => true,
             _ => false,
@@ -419,7 +419,7 @@ impl NodeRole {
     }
 
     /// Checks if node is auditor.
-    pub fn is_auditor(&self) -> bool {
+    pub fn is_auditor(self) -> bool {
         match self {
             NodeRole::Auditor => true,
             _ => false,
