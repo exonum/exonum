@@ -126,6 +126,8 @@ pub struct NodeHandler {
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
+    /// Node role.
+    node_role: NodeRole,
 }
 
 /// Service configuration.
@@ -387,6 +389,47 @@ pub struct NodeSender {
     pub api_requests: SyncSender<ExternalMessage>,
 }
 
+/// Node role.
+#[derive(Debug, Clone, Copy)]
+pub enum NodeRole {
+    /// Validator node.
+    Validator(ValidatorId),
+    /// Auditor node.
+    Auditor,
+}
+
+impl Default for NodeRole {
+    fn default() -> Self {
+        NodeRole::Auditor
+    }
+}
+
+impl NodeRole {
+    /// Constructs new NodeRole from `validator_id`.
+    pub fn new(validator_id: Option<ValidatorId>) -> Self {
+        match validator_id {
+            Some(validator_id) => NodeRole::Validator(validator_id),
+            None => NodeRole::Auditor,
+        }
+    }
+
+    /// Checks if node is validator.
+    pub fn is_validator(&self) -> bool {
+        match self {
+            NodeRole::Validator(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Checks if node is auditor.
+    pub fn is_auditor(&self) -> bool {
+        match self {
+            NodeRole::Auditor => true,
+            _ => false,
+        }
+    }
+}
+
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
@@ -439,7 +482,16 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
-        let is_enabled = api_state.clone().is_enabled();
+        let node_role = NodeRole::new(validator_id);
+
+        if node_role.is_auditor() && api_state.is_enabled() {
+            error!("Consensus is enabled but current node is auditor");
+            api_state.set_enabled(false);
+        }
+
+        let is_enabled = api_state.is_enabled();
+
+        api_state.set_node_role(node_role);
 
         NodeHandler {
             blockchain,
@@ -449,6 +501,7 @@ impl NodeHandler {
             channel: sender,
             peer_discovery: config.peer_discovery,
             is_enabled,
+            node_role,
         }
     }
 
@@ -766,8 +819,6 @@ pub struct NodeChannel {
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
-const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
-
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
@@ -808,17 +859,6 @@ impl Node {
         node_cfg: NodeConfig,
     ) -> Self {
         crypto::init();
-
-        if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(
-                ::std::env::var(PROFILE_ENV_VARIABLE_NAME).unwrap_or_else(|_| {
-                    panic!(
-                        "You compiled exonum with profiling support, but {}",
-                        PROFILE_ENV_VARIABLE_NAME
-                    )
-                }),
-            )
-        };
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
