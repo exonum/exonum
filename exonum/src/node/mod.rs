@@ -405,7 +405,7 @@ impl Default for NodeRole {
 }
 
 impl NodeRole {
-    /// Constructs new NodeRole by `validator_id`
+    /// Constructs new NodeRole from `validator_id`.
     pub fn new(validator_id: Option<ValidatorId>) -> Self {
         match validator_id {
             Some(validator_id) => NodeRole::Validator(validator_id),
