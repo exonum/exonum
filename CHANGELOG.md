@@ -9,6 +9,34 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `Iron` based web API has been replaced by the new implementation based
+  on `actix-web`. (#727)
+
+  Migration path:
+
+  For backend:
+  - Remove old dependencies on `iron` and its companions `bodyparser`, `router` and other.
+  - Simplify the API handlers as follows:
+    `fn my_handler(state: &ServiceApiState, query: MyQueryType) -> Result<MyResponse, ApiError>`
+    where `MyQueryType` type implements `Serialize` trait and `MyResponse`
+    implements `Deserialize` trait.
+  - Replace old methods `public_api_handler` and `private_api_handler` in
+    `Service` trait implementation by the single `wire_api` implementation
+    which provides a `ServiceApiBuilder` object that is a factory for your
+    service API.
+  - `get`, `get_err` and `post` methods in `TestKitApi` have been replaced
+    by the more convenient `RequestBuilder`.
+    Don't forget to update your testkit based API tests.
+
+  For frontend:
+  - New API implementation supports only query parameters in `GET` requests.
+    In this way requests like `GET api/my_method/:my_first_path_param/:my_second_path_param`
+    should be replaced by the `GET api/my_method?my_first_param=value1&my_second_param=value2`.
+  - Json parser for `POST` requests became more strict.
+    In this way you should send `null` in request body even for handlers without query parameters.
+
+  See our [examples](examples) for more details.
+
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
