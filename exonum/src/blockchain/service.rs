@@ -416,7 +416,6 @@ impl SharedNodeState {
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
         let lock = self.state.read().expect("Expected read lock.");
-
         let mut active_validators = lock.peers_info
             .values()
             .filter(|peer_key| {
