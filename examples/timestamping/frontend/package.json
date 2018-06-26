@@ -8,7 +8,7 @@
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
-    "build": "npm run lint && npm run compile",
+    "build": "npm run lint && npm run test && npm run compile",
     "start": "node server.js"
   },
   "jest": {
