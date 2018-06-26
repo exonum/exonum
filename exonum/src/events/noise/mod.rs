@@ -60,7 +60,7 @@ fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Err
     // remaining payload.
     read_exact(sock, buf)
         .and_then(|(stream, msg)| {
-            let len = LittleEndian::read_uint(&*msg, HANDSHAKE_HEADER_LENGTH);
+            let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
             read_exact(stream, vec![0u8; len as usize])
         })
 }
@@ -75,7 +75,7 @@ fn write<S: AsyncWrite + 'static>(
     // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message
     // is the payload length in little-endian.
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
-    LittleEndian::write_uint(&mut *message, len as u64, HANDSHAKE_HEADER_LENGTH);
+    LittleEndian::write_uint(&mut message, len as u64, HANDSHAKE_HEADER_LENGTH);
     message.extend_from_slice(&buf[0..len]);
     write_all(sock, message)
 }
