@@ -819,8 +819,6 @@ pub struct NodeChannel {
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
-const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
-
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
@@ -861,15 +859,6 @@ impl Node {
         node_cfg: NodeConfig,
     ) -> Self {
         crypto::init();
-
-        if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(
-                &format!(
-                    "You compiled exonum with profiling support, but {}",
-                    PROFILE_ENV_VARIABLE_NAME
-                ),
-            ))
-        };
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
