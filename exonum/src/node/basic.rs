@@ -108,11 +108,11 @@ impl NodeHandler {
                 return;
             } else if saved_message.time() < message.time() {
                 need_connect = saved_message.addr() != message.addr();
-            } else if saved_message.addr() != message.addr() {
+            } else if saved_message.addr() == message.addr() {
+                need_connect = false;
+            } else {
                 error!("Received weird Connect message from {}", address);
                 return;
-            } else {
-                need_connect = false;
             }
         }
         self.state.add_peer(public_key, message.clone());

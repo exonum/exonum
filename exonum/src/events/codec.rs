@@ -163,15 +163,21 @@ mod test {
         let mut buffer_out = [0_u8; 1024];
 
         // Simple handshake for testing.
-        let len = initiator.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
+        let len = initiator
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = responder.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
+        let len = responder
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         initiator
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = initiator.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
+        let len = initiator
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();

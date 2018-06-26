@@ -278,13 +278,13 @@ impl RequestHandler {
                                     )
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
-                                        if &msg != connect_message.raw() {
+                                        if &msg == connect_message.raw() {
+                                            conn_fut(Ok(conn_tx).into_future())
+                                        } else {
                                             conn_fut(conn_tx.send(connect_message.raw().clone())
                                                 .map_err(|_| {
                                                     other_error("can't send message to a connection")
                                                 }))
-                                        } else {
-                                            conn_fut(Ok(conn_tx).into_future())
                                         })
                             });
                         if let Some(conn_tx) = conn_tx {

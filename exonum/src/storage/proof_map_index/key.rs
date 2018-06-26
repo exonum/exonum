@@ -257,10 +257,10 @@ pub(crate) trait BitsRange {
         let chunk = self.raw_key()[(pos / 8) as usize];
         let bit = pos % 8;
         let value = (1 << bit) & chunk;
-        if value != 0 {
-            ChildKind::Right
-        } else {
+        if value == 0 {
             ChildKind::Left
+        } else {
+            ChildKind::Right
         }
     }
 
@@ -316,10 +316,10 @@ pub(crate) trait BitsRange {
     /// provided that they start from the same position.
     /// If start positions differ, returns 0.
     fn common_prefix_len(&self, other: &Self) -> u16 {
-        if self.start() != other.start() {
-            0
-        } else {
+        if self.start() == other.start() {
             self.match_len(other, self.start())
+        } else {
+            0
         }
     }
 }
