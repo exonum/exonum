@@ -93,6 +93,12 @@ impl ServiceApiScope {
     }
 
     /// Adds the given endpoint handler to the api scope.
+    ///
+    /// For now there is only web backend and it has the following requirements:
+    ///
+    /// - Query parameters should be decodable via `serde_urlencoded`, i.e. from the
+    ///   "first_param=value1&second_param=value2" form.
+    /// - Response items should be encodable via `serde_json` crate.
     pub fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -106,6 +112,11 @@ impl ServiceApiScope {
     }
 
     /// Adds the given mutable endpoint handler to the api scope.
+    ///
+    /// For now there is only web backend and it has the following requirements:
+    ///
+    /// - Query parameters should be decodable via `serde_json`.
+    /// - Response items also should be encodable via `serde_json` crate.
     pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -147,17 +158,28 @@ impl ServiceApiScope {
 /// pub struct MyApi;
 ///
 /// // Declares structures for requests and responses.
+///
+/// // For web backend `MyQuery` will be deserialized from the `block_height={number}` string.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
-///     block_height: u64
+///     pub block_height: u64
+/// }
+///
+/// // For web backend `BlockInfo` will be serialized into the json string.
+/// #[derive(Serialize, Clone, Copy)]
+/// pub struct BlockInfo {
+///     pub hash: Hash,
 /// }
 ///
 /// // Creates API handlers.
 /// impl MyApi {
 ///     /// Immutable handler, which returns the hash for block with the given height.
-///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<Hash>> {
+///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
 ///         let schema = Schema::new(state.snapshot());
-///         Ok(schema.block_hashes_by_height().get(query.block_height))
+///         Ok(schema.block_hashes_by_height()
+///             .get(query.block_height)
+///             .map(|hash| BlockInfo { hash })
+///         )
 ///     }
 ///
 ///     /// Mutable handler which removes peer with the given address from the cache.

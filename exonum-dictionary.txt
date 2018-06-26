@@ -30,6 +30,8 @@ deadlinks
 deque
 deref
 deserialization
+decodable
+encodable
 deserialize
 deserialized
 deserializer
