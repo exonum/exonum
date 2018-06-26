@@ -450,12 +450,12 @@ impl SharedNodeState {
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
-        let mut state = self.state.write().expect("Expected read lock.");
+        let mut state = self.state.write().expect("Expected write lock.");
         state.is_enabled = is_enabled;
     }
 
     pub(crate) fn set_node_role(&self, role: NodeRole) {
-        let mut state = self.state.write().expect("Expected read lock.");
+        let mut state = self.state.write().expect("Expected write lock.");
         state.node_role = role;
     }
 
