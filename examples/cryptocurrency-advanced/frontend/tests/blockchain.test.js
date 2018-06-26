@@ -28,10 +28,10 @@ mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
   'body': {
     'pub_key': '814bca90d29c116b62e6d97a11a7178ac43920b6169654a79ed457a863b0f53e',
     'name': 'John Doe'
-    }
-  }).replyOnce(200, {
-    'tx_hash': '8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596'
-  })
+  }
+}).replyOnce(200, {
+  'tx_hash': '8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596'
+})
 
 mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
   'protocol_version': 0,
@@ -42,10 +42,26 @@ mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
     'amount': '50',
     'pub_key': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39',
     'seed': '10731967336872248664'
-    }
-  }).replyOnce(200, {
-    'tx_hash': '1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127'
-  })
+  }
+}).replyOnce(200, {
+  'tx_hash': '1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127'
+})
+
+mock.onGet('/api/explorer/v1/transactions/1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127').replyOnce(200, {
+  'type': 'in-pool'
+})
+
+mock.onGet('/api/explorer/v1/transactions/1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127').replyOnce(200, {
+  'type': 'committed'
+})
+
+mock.onGet('/api/explorer/v1/transactions/8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596').replyOnce(200, {
+  'type': 'in-pool'
+})
+
+mock.onGet('/api/explorer/v1/transactions/8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596').replyOnce(200, {
+  'type': 'committed'
+})
 
 mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxNotAccepted)
 
@@ -61,10 +77,10 @@ mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
     'from': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39',
     'to': '814bca90d29c116b62e6d97a11a7178ac43920b6169654a79ed457a863b0f53e',
     'seed': '11266655484997490378'
-    }
-  }).replyOnce(200, {
-    'tx_hash': '0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc'
-  })
+  }
+}).replyOnce(200, {
+  'tx_hash': '0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc'
+})
 
 mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, transferTxNotAccepted)
 
@@ -97,9 +113,9 @@ describe('Interaction with blockchain', () => {
       'height': '48417',
       'prev_hash': '35f0f88be280a45f4df84d195117a1e238e8ace60a4e3a6cbbf76a41d6e35372',
       'proposer_id': 2,
-      'schema_version':0,
+      'schema_version': 0,
       'state_hash': 'f3065e4a3d260e3a6002357a214e184ded8f1c40428728f63eefff213302f4f5',
-      'tx_count':0,
+      'tx_count': 0,
       'tx_hash': '0000000000000000000000000000000000000000000000000000000000000000'
     })
     expect(data.wallet).toEqual({
@@ -109,19 +125,17 @@ describe('Interaction with blockchain', () => {
       'name': 'Rembo',
       'pub_key': '3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93'
     })
-    expect(data.transactions).toEqual(expect.arrayContaining([
-      {
-        'body': {
-          'name': 'Rembo',
-          'pub_key': '3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93'
-        },
-        'hash': 'deb6cc887d84a0973fe60cd23958d94af64fda8e768283c52d44e2864d3c4585',
-        'message_id': 2,
-        'protocol_version':0,
-        'service_id': 128,
-        'signature': '0235995ce5ae5ddc40b7b924b33a768d671d6d702724ba4b144ecaf56c124ea2912dd34a048af3ffcb60193e0ebeeb2998f6b563fec31cf19ba584d4a6ecc30e'
-      }
-    ]))
+    expect(data.transactions).toEqual(expect.arrayContaining([{
+      'body': {
+        'name': 'Rembo',
+        'pub_key': '3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93'
+      },
+      'hash': 'deb6cc887d84a0973fe60cd23958d94af64fda8e768283c52d44e2864d3c4585',
+      'message_id': 2,
+      'protocol_version': 0,
+      'service_id': 128,
+      'signature': '0235995ce5ae5ddc40b7b924b33a768d671d6d702724ba4b144ecaf56c124ea2912dd34a048af3ffcb60193e0ebeeb2998f6b563fec31cf19ba584d4a6ecc30e'
+    }]))
   })
 
   it('should create new wallet', async () => {
@@ -132,7 +146,6 @@ describe('Interaction with blockchain', () => {
     const name = 'John Doe'
     const data = await Vue.prototype.$blockchain.createWallet(keyPair, name)
 
-    expect(data.status).toBe(200)
     expect(data.data).toEqual({
       'tx_hash': '8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596'
     })
@@ -163,8 +176,7 @@ describe('Interaction with blockchain', () => {
       'name': 'Alexa',
       'pub_key': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39'
     })
-    expect(data.transactions).toEqual(expect.arrayContaining([
-      {
+    expect(data.transactions).toEqual(expect.arrayContaining([{
         'body': {
           'name': 'Alexa',
           'pub_key': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39'
@@ -216,8 +228,7 @@ describe('Interaction with blockchain', () => {
       'name': 'Alexa',
       'pub_key': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39'
     })
-    expect(data.transactions).toEqual(expect.arrayContaining([
-      {
+    expect(data.transactions).toEqual(expect.arrayContaining([{
         'body': {
           'name': 'Alexa',
           'pub_key': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39'
@@ -241,7 +252,7 @@ describe('Interaction with blockchain', () => {
         'signature': '30e4140172a927f009868cfd9f8706409bf31335266a7172de68ee1addd7cf8212acd577536de8bcdf3cf4c26fc60425211c0337011c76cc0020c6b494abaf07'
       },
       {
-        'body':{
+        'body': {
           'amount': '25',
           'from': '8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39',
           'seed': '11266655484997490378',
