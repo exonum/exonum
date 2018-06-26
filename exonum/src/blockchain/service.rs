@@ -29,7 +29,7 @@ use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
-use node::{ApiSender, Node, State, TransactionSend};
+use node::{ApiSender, Node, NodeRole, State, TransactionSend};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
@@ -323,7 +323,7 @@ pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
-    is_validator: bool,
+    node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
 }
@@ -405,7 +405,7 @@ impl SharedNodeState {
 
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
-        lock.is_validator = state.is_validator();
+        lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
@@ -426,7 +426,7 @@ impl SharedNodeState {
             })
             .count();
 
-        if lock.is_validator {
+        if lock.node_role.is_validator() {
             // Peers list doesn't include current node address, so we have to increment its length.
             // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
             active_validators += 1;
@@ -447,8 +447,13 @@ impl SharedNodeState {
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
-        let mut state = self.state.write().expect("Expected read lock.");
+        let mut state = self.state.write().expect("Expected write lock.");
         state.is_enabled = is_enabled;
+    }
+
+    pub(crate) fn set_node_role(&self, role: NodeRole) {
+        let mut state = self.state.write().expect("Expected write lock.");
+        state.node_role = role;
     }
 
     /// Returns the value of the `state_update_timeout`.

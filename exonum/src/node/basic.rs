@@ -16,7 +16,7 @@ use rand::{self, Rng};
 
 use std::{error::Error, net::SocketAddr};
 
-use super::{NodeHandler, RequestData};
+use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
@@ -217,9 +217,10 @@ impl NodeHandler {
         self.add_peer_exchange_timeout();
     }
     /// Handles `NodeTimeout::UpdateApiState`.
-    /// Node update internal `ApiState`.
+    /// Node update internal `ApiState` and `NodeRole`.
     pub fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
+        self.node_role = NodeRole::new(self.state.validator_id());
         self.add_update_api_state_timeout();
     }
 
