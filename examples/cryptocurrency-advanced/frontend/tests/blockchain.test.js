@@ -63,6 +63,14 @@ mock.onGet('/api/explorer/v1/transactions/8055cd33cf11106f16321feb37777c3a92cbea
   'type': 'committed'
 })
 
+mock.onGet('/api/explorer/v1/transactions/0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc').replyOnce(200, {
+  'type': 'in-pool'
+})
+
+mock.onGet('/api/explorer/v1/transactions/0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc').replyOnce(200, {
+  'type': 'committed'
+})
+
 mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxNotAccepted)
 
 mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxAccepted)
