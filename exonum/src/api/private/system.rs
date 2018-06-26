@@ -190,6 +190,10 @@ impl SystemApi {
 
     fn handle_set_consensus_enabled(self, router: &mut Router) {
         let consensus_enabled_set = move |request: &mut Request| -> IronResult<Response> {
+            if self.shared_api_state.node_role().is_auditor() {
+                return Err(ApiError::BadRequest("Trying to enable consensus, but the current node is auditor and cannot affect consensus process".to_string()).into())
+            }
+
             #[derive(Serialize, Deserialize, Clone, Debug)]
             struct EnabledInfo {
                 enabled: bool,
