@@ -223,7 +223,7 @@ where
         let hash = self.block_hashes_by_height()
             .last()
             .expect("An attempt to get the `last_block` during creating the genesis block.");
-          self.blocks().get(&hash).unwrap()
+        self.blocks().get(&hash).unwrap()
     }
 
     /// Returns the height of the latest committed block.
