@@ -549,6 +549,11 @@ impl State {
         &self.peers
     }
 
+    /// Returns the addresses of known connections with their public keys.
+    pub fn connections(&self) -> &HashMap<SocketAddr, PublicKey> {
+        &self.connections
+    }
+
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         let id: usize = id.into();
