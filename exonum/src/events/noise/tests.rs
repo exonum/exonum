@@ -14,7 +14,7 @@
 
 use futures::sync::{mpsc, mpsc::Sender};
 use futures::{future::Either, Future, Sink, Stream};
-use snow::{types::Dh, wrappers::crypto_wrapper::Dh25519, NoiseBuilder};
+use snow::{types::Dh, NoiseBuilder};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
 
@@ -27,7 +27,8 @@ use std::time::Duration;
 use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
              PUBLIC_KEY_LENGTH};
 use events::error::into_other;
-use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
+use events::noise::{sodium_resolver::SodiumDh25519, write, Handshake, HandshakeParams,
+                    HandshakeResult, NoiseHandshake};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 #[test]
@@ -41,12 +42,12 @@ fn test_convert_ed_to_curve_dh() {
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
     // Do DH.
-    let mut keypair_i: Dh25519 = Default::default();
+    let mut keypair_i: SodiumDh25519 = Default::default();
     keypair_i.set(secret_key_i.as_ref());
     let mut output_i = [0u8; PUBLIC_KEY_LENGTH];
     keypair_i.dh(public_key_r.as_ref(), &mut output_i);
 
-    let mut keypair_r: Dh25519 = Default::default();
+    let mut keypair_r: SodiumDh25519 = Default::default();
     keypair_r.set(secret_key_r.as_ref());
     let mut output_r = [0u8; PUBLIC_KEY_LENGTH];
     keypair_r.dh(public_key_i.as_ref(), &mut output_r);
