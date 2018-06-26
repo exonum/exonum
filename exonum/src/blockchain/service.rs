@@ -415,7 +415,7 @@ impl SharedNodeState {
             lock.outgoing_connections.insert(c.addr());
         }
 
-        for (addr, _) in state.connections() {
+        for addr in state.connections().keys() {
             lock.incoming_connections.insert(*addr);
         }
     }
