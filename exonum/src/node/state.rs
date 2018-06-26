@@ -27,7 +27,8 @@ use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
                RawMessage};
-use node::whitelist::Whitelist;
+use node::connect_list::ConnectList;
+use node::ConnectInfo;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -53,7 +54,7 @@ pub struct State {
     service_secret_key: SecretKey,
 
     config: StoredConfiguration,
-    whitelist: Whitelist,
+    connect_list: ConnectList,
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
@@ -388,7 +389,7 @@ impl State {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         tx_pool_capacity: usize,
-        whitelist: Whitelist,
+        connect_list: ConnectList,
         stored: StoredConfiguration,
         connect: Connect,
         peers: HashMap<PublicKey, Connect>,
@@ -403,7 +404,7 @@ impl State {
             service_public_key,
             service_secret_key,
             tx_pool_capacity,
-            whitelist,
+            connect_list,
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -472,9 +473,9 @@ impl State {
             .unwrap_or(false)
     }
 
-    /// Returns node's whitelist.
-    pub fn whitelist(&self) -> &Whitelist {
-        &self.whitelist
+    /// Returns node's ConnectList.
+    pub fn connect_list(&self) -> &ConnectList {
+        &self.connect_list
     }
 
     /// Returns public (consensus and service) keys of known validators.
@@ -518,8 +519,9 @@ impl State {
             .iter()
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
-        self.whitelist
-            .set_validators(config.validator_keys.iter().map(|x| x.consensus_key));
+
+        // TODO: update connect list (ECR-1745)
+
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
@@ -604,7 +606,6 @@ impl State {
         }
 
         // Find highest non-byzantine round.
-
         // At max we can have (N - 1) / 3 byzantine nodes.
         // It is calculated via rounded up integer division.
         let max_byzantine_count = (self.validators().len() + 2) / 3 - 1;
@@ -1125,5 +1126,10 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
+    }
+
+    /// Add peer to node's `ConnectList`.
+    pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
+        self.connect_list.add(peer);
     }
 }

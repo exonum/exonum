@@ -83,9 +83,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(message.pub_key()) {
+        if !self.state.connect_list().is_peer_allowed(message.pub_key()) {
             error!(
-                "Received connect message from {:?} peer which not in whitelist.",
+                "Received connect message from {:?} peer which not in ConnectList.",
                 message.pub_key()
             );
             return;
@@ -137,9 +137,9 @@ impl NodeHandler {
             msg.height()
         );
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
-                "Received status message from peer = {:?} which not in whitelist.",
+                "Received status message from peer = {:?} which not in ConnectList.",
                 msg.from()
             );
             return;
