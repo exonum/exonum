@@ -41,10 +41,10 @@ use helpers::Round;
 #[macro_use]
 mod macros;
 
-pub(crate) mod backend;
+pub(crate) mod crypto_lib;
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
-use self::backend::sodiumoxide as crypto_impl;
+use self::crypto_lib::sodiumoxide as crypto_impl;
 
 #[cfg(feature = "sodiumoxide-crypto")]
 pub mod x25519;
