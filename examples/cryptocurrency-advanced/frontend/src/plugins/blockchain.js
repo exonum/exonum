@@ -245,7 +245,7 @@ module.exports = {
         const hash = TxIssue.hash(data)
 
         return TxIssue.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
-          .then(response => waitForAcceptance(keyPair.publicKey, hash)
+          .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
         
       },
@@ -265,7 +265,7 @@ module.exports = {
         const hash = TxTransfer.hash(data)
 
         return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
-          .then(response => waitForAcceptance(keyPair.publicKey, hash)
+          .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
       },
 
