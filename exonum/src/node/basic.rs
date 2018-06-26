@@ -220,10 +220,7 @@ impl NodeHandler {
     /// Node update internal `ApiState` and `NodeRole`.
     pub fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
-        self.node_role = match self.state.validator_id() {
-            Some(validator_id) => NodeRole::Validator(validator_id),
-            None => NodeRole::Auditor,
-        };
+        self.node_role = NodeRole::new(self.state.validator_id());
         self.add_update_api_state_timeout();
     }
 

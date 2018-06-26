@@ -405,10 +405,7 @@ impl SharedNodeState {
 
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
-        lock.node_role = match state.validator_id() {
-            Some(validator_id) => NodeRole::Validator(validator_id),
-            None => NodeRole::Auditor,
-        };
+        lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
