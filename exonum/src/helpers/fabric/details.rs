@@ -331,8 +331,9 @@ impl GenerateNodeConfig {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
 
         let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            let ip = addr_str.parse::<IpAddr>()
-                .unwrap_or_else(|_| panic!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str));
+            let ip = addr_str.parse::<IpAddr>().unwrap_or_else(|_| {
+                panic!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str)
+            });
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
 
