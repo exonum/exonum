@@ -549,7 +549,7 @@ impl State {
         &self.peers
     }
 
-    /// Returns the addresses of known connections with their public keys.
+    /// Returns the addresses of known connections with public keys of its' validators.
     pub fn connections(&self) -> &HashMap<SocketAddr, PublicKey> {
         &self.connections
     }
