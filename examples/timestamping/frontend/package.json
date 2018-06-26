@@ -8,7 +8,7 @@
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
-    "build": "npm run lint && npm run test && npm run compile",
+    "build": "npm run lint && npm run compile",
     "start": "node server.js"
   },
   "jest": {
@@ -22,7 +22,7 @@
     "big-integer": "^1.6.28",
     "bootstrap": "^4.1.0",
     "crypto-js": "^3.1.9-1",
-    "exonum-client": "^0.7.3",
+    "exonum-client": "^0.10.1",
     "jquery": "^3.3.1",
     "moment": "^2.22.0",
     "noty": "^3.2.0-beta",
@@ -33,7 +33,6 @@
   "devDependencies": {
     "@babel/core": "^7.0.0-beta.51",
     "@babel/preset-env": "^7.0.0-beta.51",
-    "axios-mock-adapter": "^1.15.0",
     "babel-core": "^7.0.0-bridge.0",
     "babel-jest": "^23.0.1",
     "babel-loader": "^7.1.4",

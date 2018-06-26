@@ -34,30 +34,6 @@ const TimestampEntry = Exonum.newType({
   ]
 })
 
-function waitForAcceptance(response) {
-  let attempt = ATTEMPTS
-
-  if (response.data.debug) {
-    throw new Error(response.data.description)
-  }
-
-  return (function makeAttempt() {
-    return axios.get(`/api/explorer/v1/transactions/${response.data}`).then(response => {
-      if (response.data.type === 'committed') {
-        return response.data
-      } else {
-        if (--attempt > 0) {
-          return new Promise((resolve) => {
-            setTimeout(resolve, ATTEMPT_TIMEOUT)
-          }).then(makeAttempt)
-        } else {
-          throw new Error('Transaction has not been found')
-        }
-      }
-    })
-  })()
-}
-
 module.exports = {
   install(Vue) {
     Vue.prototype.$blockchain = {
@@ -88,15 +64,9 @@ module.exports = {
 
         // Sign transaction
         const signature = TxTimestamp.sign(keyPair.secretKey, data)
-
+       
         // Send transaction into blockchain
-        return axios.post('/api/services/timestamping/v1/timestamps', {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_ID,
-          body: data,
-          signature: signature
-        }).then(waitForAcceptance)
+        return TxTimestamp.send('/api/services/timestamping/v1/timestamps', 'api/explorer/v1/transactions/', data, signature)
       },
 
       getTimestamp: hash => {
