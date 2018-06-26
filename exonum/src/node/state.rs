@@ -57,8 +57,7 @@ pub struct State {
     connect_list: ConnectList,
     tx_pool_capacity: usize,
 
-    /// daa
-    pub peers: HashMap<PublicKey, Connect>,
+    peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
     height_start_time: SystemTime,
     height: Height,

@@ -574,7 +574,7 @@ impl Sandbox {
             api_requests: api_channel.0.clone().wait(),
         };
 
-        let connect_list = ConnectList::from_peers_for_testing(inner.handler.state.peers());
+        let connect_list = ConnectList::from_peers(inner.handler.state.peers());
 
         let config = Configuration {
             listener: ListenerConfig {
@@ -673,7 +673,7 @@ impl Drop for Sandbox {
 impl ConnectList {
     // Creates from state::peers, needed only for testing.
     #[doc(hidden)]
-    pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
+    pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
         ConnectList { peers }
