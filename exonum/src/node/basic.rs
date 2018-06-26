@@ -83,7 +83,7 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.connect_list().allow(message.pub_key()) {
+        if !self.state.connect_list().is_peer_allowed(message.pub_key()) {
             error!(
                 "Received connect message from {:?} peer which not in ConnectList.",
                 message.pub_key()
@@ -137,7 +137,7 @@ impl NodeHandler {
             msg.height()
         );
 
-        if !self.state.connect_list().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
                 "Received status message from peer = {:?} which not in ConnectList.",
                 msg.from()

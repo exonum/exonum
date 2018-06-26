@@ -671,7 +671,8 @@ impl Drop for Sandbox {
 }
 
 impl ConnectList {
-    // Creates from state::peers, needed only for testing.
+    /// Helper method to populate ConnectList after sandbox node restarts and
+    /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
     pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =

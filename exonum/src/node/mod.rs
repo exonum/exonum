@@ -595,7 +595,7 @@ impl NodeHandler {
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
 
-        if self.state.connect_list().address_allowed(&address) {
+        if self.state.connect_list().is_address_allowed(&address) {
             self.send_to_addr(address, connect.raw());
         } else {
             warn!(

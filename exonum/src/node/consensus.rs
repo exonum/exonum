@@ -166,7 +166,7 @@ impl NodeHandler {
             ));
         }
 
-        if !self.state.connect_list().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             return Err(format!(
                 "Received request message from peer = {} which not in ConnectList.",
                 msg.from().to_hex()
@@ -610,7 +610,7 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.connect_list().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
                 "Received response message from peer = {} which not in ConnectList.",
                 msg.from().to_hex()

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module that provides methods for managing the mapping between peers
-//! public keys and IP-addresses.
+//! Mapping between peers public keys and IP-addresses.
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -22,8 +21,6 @@ use blockchain::ValidatorKeys;
 use crypto::PublicKey;
 use helpers::fabric::NodePublicConfig;
 use node::ConnectInfo;
-
-// TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
 
 /// `ConnectList` stores mapping between IP-addresses and public keys.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -35,8 +32,13 @@ pub struct ConnectList {
 
 impl ConnectList {
     /// Returns `true` if a peer with the given public key can connect.
-    pub fn allow(&self, peer: &PublicKey) -> bool {
+    pub fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
         self.peers.contains_key(peer)
+    }
+
+    /// Check if we allow to connect to `address`.
+    pub fn is_address_allowed(&self, address: &SocketAddr) -> bool {
+        self.peers.values().any(|a| a == address)
     }
 
     /// Adds peer to the ConnectList.
@@ -62,11 +64,6 @@ impl ConnectList {
             .collect();
 
         ConnectList { peers }
-    }
-
-    /// Check if we allow to connect to `address`.
-    pub fn address_allowed(&self, address: &SocketAddr) -> bool {
-        self.peers.values().any(|a| a == address)
     }
 
     /// Get public key corresponding to validator with `address`.
@@ -111,10 +108,10 @@ mod test {
         not_in_connect_list: &[usize],
     ) {
         for i in in_connect_list {
-            assert_eq!(connect_list.allow(&keys[*i]), true);
+            assert_eq!(connect_list.is_peer_allowed(&keys[*i]), true);
         }
         for i in not_in_connect_list {
-            assert_eq!(connect_list.allow(&keys[*i]), false);
+            assert_eq!(connect_list.is_peer_allowed(&keys[*i]), false);
         }
     }
 
@@ -186,12 +183,12 @@ mod test {
         let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
 
         let mut connect_list = ConnectList::default();
-        assert!(!connect_list.address_allowed(&address));
+        assert!(!connect_list.is_address_allowed(&address));
 
         connect_list.add(ConnectInfo {
             public_key,
             address: address.clone(),
         });
-        assert!(connect_list.address_allowed(&address));
+        assert!(connect_list.is_address_allowed(&address));
     }
 }
