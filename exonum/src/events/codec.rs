@@ -105,7 +105,7 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, SEED_LENGTH, Seed};
     use events::noise::{HandshakeParams, NoiseWrapper};
     use messages::{MessageBuffer, RawMessage};
     use tokio_io::codec::{Decoder, Encoder};
@@ -147,7 +147,7 @@ mod test {
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let mut params = HandshakeParams::new(public_key, secret_key, 1024);
         params.set_remote_key(public_key);
 

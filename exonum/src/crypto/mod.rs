@@ -95,10 +95,10 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// Indicating the same seed value always results in the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, Seed};
+/// use exonum::crypto::{self, SEED_LENGTH, Seed};
 ///
 /// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
+/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (impl_pub_key, impl_secret_key) = crypto_impl::gen_keypair_from_seed(&seed.0);
@@ -461,10 +461,10 @@ implement_private_crypto_wrapper! {
 /// generation of the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, Seed};
+/// use exonum::crypto::{self, SEED_LENGTH, Seed};
 ///
 /// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
+/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
     struct Seed, SEED_LENGTH
 }
@@ -651,7 +651,7 @@ mod tests {
     #[test]
     fn zero_hash() {
         let hash = Hash::zero();
-        assert_eq!(hash.as_ref(), [0; 32]);
+        assert_eq!(hash.as_ref(), [0; HASH_SIZE]);
     }
 
     #[test]
@@ -667,48 +667,48 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_hash() {
-        assert_serialize_deserialize(&Hash::new([207; 32]));
+        assert_serialize_deserialize(&Hash::new([207; HASH_SIZE]));
     }
 
     #[test]
     fn serialize_deserialize_public_key() {
-        assert_serialize_deserialize(&PublicKey::new([208; 32]));
+        assert_serialize_deserialize(&PublicKey::new([208; PUBLIC_KEY_LENGTH]));
     }
 
     #[test]
     fn serialize_deserialize_signature() {
-        assert_serialize_deserialize(&Signature::new([209; 64]));
+        assert_serialize_deserialize(&Signature::new([209; SIGNATURE_LENGTH]));
     }
 
     #[test]
     fn serialize_deserialize_seed() {
-        assert_serialize_deserialize(&Seed::new([210; 32]));
+        assert_serialize_deserialize(&Seed::new([210; SEED_LENGTH]));
     }
 
     #[test]
     fn serialize_deserialize_secret_key() {
-        assert_serialize_deserialize(&SecretKey::new([211; 64]));
+        assert_serialize_deserialize(&SecretKey::new([211; SECRET_KEY_LENGTH]));
     }
 
     #[test]
     fn debug_format() {
         // Check zero padding
-        let hash = Hash::new([1; 32]);
+        let hash = Hash::new([1; HASH_SIZE]);
         assert_eq!(format!("{:?}", &hash), "Hash(01010101)");
 
-        let pk = PublicKey::new([15; 32]);
+        let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &pk), "PublicKey(0F0F0F0F)");
-        let sk = SecretKey::new([8; 64]);
+        let sk = SecretKey::new([8; SECRET_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &sk), "SecretKey(08080808...)");
-        let signature = Signature::new([10; 64]);
+        let signature = Signature::new([10; SIGNATURE_LENGTH]);
         assert_eq!(format!("{:?}", &signature), "Signature(0A0A0A0A)");
-        let seed = Seed::new([4; 32]);
+        let seed = Seed::new([4; SEED_LENGTH]);
         assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
 
         // Check no padding
-        let hash = Hash::new([128; 32]);
+        let hash = Hash::new([128; HASH_SIZE]);
         assert_eq!(format!("{:?}", &hash), "Hash(80808080)");
-        let sk = SecretKey::new([255; 64]);
+        let sk = SecretKey::new([255; SECRET_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &sk), "SecretKey(FFFFFFFF...)");
     }
 
@@ -717,7 +717,7 @@ mod tests {
         let h = hash(&[]);
         let sub_range = &h[10..20];
         assert_eq!(
-            &[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
+            &crypto_impl::EMPTY_SLICE_HASH[10..20],
             sub_range
         );
     }

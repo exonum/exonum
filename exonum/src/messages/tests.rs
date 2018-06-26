@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{gen_keypair, PublicKey, SecretKey, Signature};
+use crypto::{SECRET_KEY_LENGTH, gen_keypair, PublicKey, SecretKey, Signature};
 use encoding::serialize::FromHex;
 use messages::{raw::MessageBuffer, Message, RawMessage, RawTransaction};
 
@@ -53,7 +53,7 @@ fn test_message_without_fields() {
         struct NoFields {
         }
     }
-    drop(NoFields::new(&SecretKey::new([1; 64])));
+    drop(NoFields::new(&SecretKey::new([1; SECRET_KEY_LENGTH])));
 }
 
 #[test]
