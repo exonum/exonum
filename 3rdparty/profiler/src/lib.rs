@@ -88,7 +88,7 @@ impl ThreadFrame {
         let new_time = INTERRUPTED_TICKS.load(Ordering::SeqCst);
         if self.dumped_time < new_time {
             let name: String = SETTED_NAME.lock().unwrap().clone()
-                                .unwrap_or_else(|| panic!("Profiler: received interrupt without setted name."));
+                                .expect("Profiler: received interrupt without setted name.");
             File::create(&name)
                     .and_then(|ref mut  file| dump_html(file, &self) )
                     .unwrap_or_else(|_| panic!("could not write profiler data"));
@@ -96,7 +96,7 @@ impl ThreadFrame {
         };
 
         let timestamp = ns_since_epoch(self.epoch);
-        let event = self.events.pop().unwrap_or_else(|| panic!("ThreadFrame::end_span() called events.pop() without a currently running span!"));
+        let event = self.events.pop().expect("ThreadFrame::end_span() called events.pop() without a currently running span!");
         let current = event.span;
         // dump self span
         {
