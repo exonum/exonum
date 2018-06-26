@@ -220,10 +220,10 @@ where
     ///
     /// Panics if the "genesis block" was not created.
     pub fn last_block(&self) -> Block {
-        let hash = self.block_hashes_by_height().last().unwrap_or_else(|| {
-            panic!("An attempt to get the `last_block` during creating the genesis block.")
-        });
-        self.blocks().get(&hash).unwrap()
+        let hash = self.block_hashes_by_height()
+            .last()
+            .expect("An attempt to get the `last_block` during creating the genesis block.");
+          self.blocks().get(&hash).unwrap()
     }
 
     /// Returns the height of the latest committed block.

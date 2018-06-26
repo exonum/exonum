@@ -798,7 +798,7 @@ impl CryptoHash for String {
 impl CryptoHash for SystemTime {
     fn hash(&self) -> Hash {
         let duration = self.duration_since(UNIX_EPOCH)
-            .unwrap_or_else(|_| panic!("time value is later than 1970-01-01 00:00:00 UTC."));
+            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
