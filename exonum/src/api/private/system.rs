@@ -22,6 +22,7 @@ use api::{Api, ApiError};
 use blockchain::{Blockchain, Service, SharedNodeState};
 use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;
+use node::ConnectInfo;
 use node::{ApiSender, ExternalMessage};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -153,13 +154,10 @@ impl SystemApi {
 
     fn handle_peer_add(self, router: &mut Router) {
         let peer_add = move |request: &mut Request| -> IronResult<Response> {
-            #[derive(Serialize, Deserialize, Clone, Debug)]
-            struct PeerAddInfo {
-                ip: SocketAddr,
-            }
-
-            let PeerAddInfo { ip } = self.parse_body(request)?;
-            self.node_channel.peer_add(ip).map_err(ApiError::from)?;
+            let connect_info = self.parse_body::<ConnectInfo>(request)?;
+            self.node_channel
+                .peer_add(connect_info)
+                .map_err(ApiError::from)?;
             self.ok_response(&serde_json::to_value("Ok").unwrap())
         };
 
