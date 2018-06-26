@@ -351,7 +351,7 @@ impl NoiseErrorHandshake {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 
-            Either::A(write(stream, msg, msg.len()).map(move |(stream, _)| {
+            Either::A(write(stream, msg.to_vec(), msg.len()).map(move |(stream, _)| {
                 self.current_step = self.current_step
                     .next()
                     .expect("Extra handshake step taken");
