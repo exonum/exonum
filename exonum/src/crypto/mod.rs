@@ -716,10 +716,7 @@ mod tests {
     fn range_sodium() {
         let h = hash(&[]);
         let sub_range = &h[10..20];
-        assert_eq!(
-            &crypto_impl::EMPTY_SLICE_HASH[10..20],
-            sub_range
-        );
+        assert_eq!(&crypto_impl::EMPTY_SLICE_HASH[10..20], sub_range);
     }
 
     #[test]

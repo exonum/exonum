@@ -16,12 +16,10 @@ use byteorder::{ByteOrder, LittleEndian};
 use events::codec::MessagesCodec;
 use futures::future::Future;
 use std::io;
-use tokio_io::{
-    AsyncRead,
-    AsyncWrite,
-    codec::Framed,
-    io::{read_exact, write_all},
-};
+use tokio_io::{codec::Framed,
+               io::{read_exact, write_all},
+               AsyncRead,
+               AsyncWrite};
 
 pub mod error;
 pub mod wrappers;
@@ -31,15 +29,10 @@ mod tests;
 
 #[cfg(feature = "sodiumoxide-crypto")]
 #[doc(inline)]
-pub use self::wrappers::sodium_wrapper::{
-    wrapper::{
-        HANDSHAKE_HEADER_LENGTH,
-        NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
-        NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH,
-        NoiseWrapper,
-    },
-    handshake::{HandshakeParams, NoiseHandshake},
-};
+pub use self::wrappers::sodium_wrapper::{handshake::{HandshakeParams, NoiseHandshake},
+                                         wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH,
+                                                   NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
+                                                   NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH}};
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
@@ -58,11 +51,10 @@ fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Err
     // in little-endian, remaining bytes is the handshake payload. Therefore, we need to read
     // `HANDSHAKE_HEADER_LENGTH` bytes as a little-endian integer and than we need to read
     // remaining payload.
-    read_exact(sock, buf)
-        .and_then(|(stream, msg)| {
-            let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
-            read_exact(stream, vec![0u8; len as usize])
-        })
+    read_exact(sock, buf).and_then(|(stream, msg)| {
+        let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
+        read_exact(stream, vec![0u8; len as usize])
+    })
 }
 
 fn write<S: AsyncWrite + 'static>(

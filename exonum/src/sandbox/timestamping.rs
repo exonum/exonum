@@ -15,7 +15,7 @@
 use rand::{Rng, SeedableRng, XorShiftRng};
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
-use crypto::{HASH_SIZE, gen_keypair, Hash, PublicKey, SecretKey};
+use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use encoding::Error as MessageError;
 use messages::{Message, RawTransaction};
 use storage::{Fork, Snapshot};

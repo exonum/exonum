@@ -22,11 +22,7 @@ use events::{
 use futures::future::{done, Future};
 use std::io;
 use super::wrapper::NoiseWrapper;
-use tokio_io::{
-    AsyncRead,
-    AsyncWrite,
-    codec::Framed,
-};
+use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.

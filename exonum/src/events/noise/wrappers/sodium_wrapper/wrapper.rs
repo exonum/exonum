@@ -18,12 +18,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use events::noise::{
-    TAG_LENGTH,
-    NOISE_HEADER_LENGTH,
-    NOISE_MAX_MESSAGE_LENGTH,
-    error::NoiseError
-};
+use events::noise::{error::NoiseError, NOISE_HEADER_LENGTH, NOISE_MAX_MESSAGE_LENGTH, TAG_LENGTH};
 use snow::{NoiseBuilder, Session};
 
 use std::{

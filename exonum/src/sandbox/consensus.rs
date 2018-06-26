@@ -25,7 +25,7 @@ use super::{
     timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE},
 };
 use blockchain::{Blockchain, Schema};
-use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, SEED_LENGTH, HASH_SIZE, Hash, Seed};
+use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{user_agent, Height, Round};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,

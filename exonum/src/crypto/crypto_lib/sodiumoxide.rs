@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 //! This module implements cryptograpic backend based
 //! on [Sodium library](https://github.com/jedisct1/libsodium)
 //! through [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
@@ -38,16 +37,16 @@ use self::sodiumoxide::crypto::sign::ed25519;
 pub use self::sha256::Digest as Hash;
 
 /// Signature type for sodiumoxide-based implementation.
-pub use self::ed25519::Signature as Signature;
+pub use self::ed25519::Signature;
 
 /// Secret key type for sodiumoxide-based implementation.
-pub use self::ed25519::SecretKey as SecretKey;
+pub use self::ed25519::SecretKey;
 
 /// Public key type for sodiumoxide-based implementation.
-pub use self::ed25519::PublicKey as PublicKey;
+pub use self::ed25519::PublicKey;
 
 /// Seed type for sodiumoxide-based implementation.
-pub use self::ed25519::Seed as Seed;
+pub use self::ed25519::Seed;
 
 /// State for multi-part (streaming) computation of signature for sodiumoxide-based
 /// implementation.

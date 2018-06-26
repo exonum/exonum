@@ -105,7 +105,7 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, SEED_LENGTH, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use events::noise::{HandshakeParams, NoiseWrapper};
     use messages::{MessageBuffer, RawMessage};
     use tokio_io::codec::{Decoder, Encoder};

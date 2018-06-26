@@ -832,7 +832,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 mod tests {
     use super::*;
     use blockchain::{ExecutionResult, ServiceContext, TransactionSet};
-    use crypto::{SEED_LENGTH, gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use encoding;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{

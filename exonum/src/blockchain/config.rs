@@ -246,7 +246,7 @@ mod tests {
     use toml;
 
     use super::*;
-    use crypto::{gen_keypair_from_seed, SEED_LENGTH, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
