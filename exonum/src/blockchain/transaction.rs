@@ -274,7 +274,7 @@ impl TransactionError {
     }
 }
 
-impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
+impl<'a, T: Transaction> From<T> for Box<dyn Transaction + 'a> {
     fn from(tx: T) -> Self {
         Box::new(tx) as Box<dyn Transaction>
     }

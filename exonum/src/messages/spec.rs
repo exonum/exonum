@@ -292,7 +292,7 @@ macro_rules! __ex_message {
                 buffer: & mut B,
                 from: $crate::encoding::Offset,
                 to: $crate::encoding::Offset,
-            ) -> ::std::result::Result<(), Box<dyn  (::std::error::Error)>>
+            ) -> ::std::result::Result<(), Box<dyn (::std::error::Error)>>
             where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::ExonumJsonDeserialize;

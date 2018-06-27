@@ -247,7 +247,7 @@ impl Command for RunDev {
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: dyn Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Contex,
     ) -> Feedback {
         let db_path = Self::artifacts_path("db", &context);
         context.set_arg(DATABASE_PATH, db_path);
@@ -294,7 +294,7 @@ impl Command for GenerateCommonConfig {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: dyn Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Contex,
     ) -> Feedback {
         let template_path = context
             .arg::<String>("COMMON_CONFIG")
@@ -375,7 +375,7 @@ impl Command for GenerateNodeConfig {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: dyn Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Contex,
     ) -> Feedback {
         let common_config_path = context
             .arg::<String>("COMMON_CONFIG")
@@ -556,7 +556,7 @@ impl Command for Finalize {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: dyn Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Contex,
     ) -> Feedback {
         let public_configs_path = context
             .arg_multiple::<String>("PUBLIC_CONFIGS")
@@ -680,7 +680,7 @@ impl Command for GenerateTestnet {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: dyn Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Contex,
     ) -> Feedback {
         let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");

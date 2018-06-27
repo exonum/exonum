@@ -503,7 +503,7 @@ impl Fork {
 }
 
 impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
-    fn as_ref(&self) -> dyn Snapshot {
+    fn as_ref(&self) -> &dyn Snapshot {
         self
     }
 }

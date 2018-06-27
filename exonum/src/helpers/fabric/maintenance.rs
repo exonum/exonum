@@ -108,7 +108,7 @@ impl Command for Maintenance {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _: dyn Fn(Context) -> Context,
+        _: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let action = context
             .arg::<String>(MAINTENANCE_ACTION_PATH)

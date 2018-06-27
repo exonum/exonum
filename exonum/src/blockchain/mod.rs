@@ -142,7 +142,7 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -533,7 +533,7 @@ impl Blockchain {
     }
 }
 
-fn before_commit(service: dyn Service, fork: &mut Fork) {
+fn before_commit(service: &dyn Service, fork: &mut Fork) {
     fork.checkpoint();
     match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
         Ok(..) => fork.commit(),

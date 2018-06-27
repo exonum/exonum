@@ -147,7 +147,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, snapshot: dyn Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
     ///
@@ -257,7 +257,7 @@ impl ServiceContext {
 
     /// Returns the current database snapshot. This snapshot is used to
     /// retrieve schema information from the database.
-    pub fn snapshot(&self) -> dyn Snapshot {
+    pub fn snapshot(&self) -> &dyn Snapshot {
         self.fork.as_ref()
     }
 
@@ -287,13 +287,13 @@ impl ServiceContext {
     }
 
     /// Returns service specific global variables as a JSON value.
-    pub fn actual_service_config(&self, service: dyn Service) -> &Value {
+    pub fn actual_service_config(&self, service: &dyn Service) -> &Value {
         &self.stored_configuration.services[service.service_name()]
     }
 
     /// Returns a reference to the transaction sender, which can then be used
     /// to broadcast a transaction to other nodes in the network.
-    pub fn transaction_sender(&self) -> dyn TransactionSend {
+    pub fn transaction_sender(&self) -> &dyn TransactionSend {
         &self.api_sender
     }
 

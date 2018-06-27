@@ -14,7 +14,7 @@
 
 //! Error module.
 
-use std::io;
+use std::{io, error};
 
 use storage;
 
@@ -27,7 +27,7 @@ pub enum Error {
 
     /// Input/output error.
     #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] ::std::io::Error),
+    Io(#[cause] io::Error),
 
     /// Bad request.
     #[fail(display = "Bad request: {}", _0)]
@@ -39,7 +39,7 @@ pub enum Error {
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<::std::error::Error + Send + Sync>),
+    InternalError(Box<dyn error::Error + Send + Sync>),
 
     /// Unauthorized error.
     #[fail(display = "Unauthorized")]

@@ -25,25 +25,25 @@ impl SodiumResolver {
 }
 
 impl CryptoResolver for SodiumResolver {
-    fn resolve_rng(&self) -> Option<Box<Random + Send>> {
+    fn resolve_rng(&self) -> Option<Box<dyn Random + Send>> {
         Some(Box::new(SodiumRandom::default()))
     }
 
-    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<Dh + Send>> {
+    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh + Send>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
             _ => self.parent.resolve_dh(choice),
         }
     }
 
-    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<Hash + Send>> {
+    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash + Send>> {
         match *choice {
             HashChoice::SHA256 => Some(Box::new(SodiumSha256::default())),
             _ => self.parent.resolve_hash(choice),
         }
     }
 
-    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<Cipher + Send>> {
+    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher + Send>> {
         match *choice {
             CipherChoice::ChaChaPoly => Some(Box::new(SodiumChaChaPoly::default())),
             _ => self.parent.resolve_cipher(choice),
