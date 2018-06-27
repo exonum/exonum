@@ -191,8 +191,12 @@ where
             })
             .unwrap_or_default();
         let url = format!(
-            "{}{}/{}/{}{}",
-            self.test_server_url, self.access, self.prefix, endpoint, params
+            "{url}{access}/{prefix}/{endpoint}{query}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint,
+            query = params
         );
 
         trace!("GET {}", url);
@@ -211,8 +215,11 @@ where
         R: DeserializeOwned + 'static,
     {
         let url = format!(
-            "{}{}/{}/{}",
-            self.test_server_url, self.access, self.prefix, endpoint
+            "{url}{access}/{prefix}/{endpoint}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint
         );
 
         trace!("POST {}", url);
@@ -224,7 +231,6 @@ where
         } else {
             builder.json(&serde_json::Value::Null)
         };
-        // TODO Error handling
         let response = builder.send().expect("Unable to send request");
         Self::response_to_api_result(response)
     }

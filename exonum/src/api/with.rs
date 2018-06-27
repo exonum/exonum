@@ -28,9 +28,9 @@ pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 /// thus, it becomes possible to distinguish different types of closures in compile time.
 ///
 /// For example for handler with signature:
-/// 
+///
 /// `Fn(state: &ServiceApiState, query: MyQuery) -> Result<MyResponse, api::Error>`
-/// 
+///
 /// Extracted types are:
 ///
 /// - `Q` is `MyQuery`, i.e. type of query.

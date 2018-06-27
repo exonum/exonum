@@ -196,7 +196,7 @@ pub trait Service: Send + Sync + 'static {
     /// Extends API by handlers of this service. The request handlers are mounted on the
     /// the `/api/services/{service_name}` path at the listen address of all
     /// full nodes in the blockchain network.
-    /// 
+    ///
     /// *Default implementation does nothing*
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
 }
