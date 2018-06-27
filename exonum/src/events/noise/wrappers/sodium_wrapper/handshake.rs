@@ -19,13 +19,13 @@ use events::{
     codec::MessagesCodec,
     noise::{Handshake, HandshakeResult, read, write},
 };
+use super::wrapper::NoiseWrapper;
 use futures::future::{done, Future};
 use std::io;
-use super::wrapper::NoiseWrapper;
 use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
 
-#[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
+#[derive(Debug, Clone)]
 pub struct HandshakeParams {
     pub public_key: x25519::PublicKey,
     pub secret_key: x25519::SecretKey,
