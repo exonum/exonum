@@ -54,7 +54,7 @@ where
         self.wallets().get(pub_key)
     }
 
-    /// Returns database state hash.
+    /// Returns state hash of service database.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.wallets().merkle_root()]
     }

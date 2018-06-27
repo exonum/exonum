@@ -18,6 +18,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
   (`helpers/fabric` module). (#731)
 
+- `Whitelist` has been replaced by `ConnectList`. Now connection between
+  nodes can only be established if nodes exist in each other connect lists. (#739)
+
+  Migration path:
+
+  - Replace `[whitelist]` section in config to `[connect_list.peers]` section and
+  specify here all validator consensus public keys with corresponding ip-addresses.
+  For example `16ef83ca...da72 = "127.0.0.1:6333"`.
+
 ### New features
 
 #### exonum

@@ -16,7 +16,7 @@ use rand::{self, Rng};
 
 use std::{error::Error, net::SocketAddr};
 
-use super::{NodeHandler, RequestData};
+use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
@@ -83,9 +83,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(message.pub_key()) {
+        if !self.state.connect_list().is_peer_allowed(message.pub_key()) {
             error!(
-                "Received connect message from {:?} peer which not in whitelist.",
+                "Received connect message from {:?} peer which not in ConnectList.",
                 message.pub_key()
             );
             return;
@@ -137,9 +137,9 @@ impl NodeHandler {
             msg.height()
         );
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
-                "Received status message from peer = {:?} which not in whitelist.",
+                "Received status message from peer = {:?} which not in ConnectList.",
                 msg.from()
             );
             return;
@@ -217,9 +217,10 @@ impl NodeHandler {
         self.add_peer_exchange_timeout();
     }
     /// Handles `NodeTimeout::UpdateApiState`.
-    /// Node update internal `ApiState`.
+    /// Node update internal `ApiState` and `NodeRole`.
     pub fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
+        self.node_role = NodeRole::new(self.state.validator_id());
         self.add_update_api_state_timeout();
     }
 

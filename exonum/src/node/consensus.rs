@@ -166,9 +166,9 @@ impl NodeHandler {
             ));
         }
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             return Err(format!(
-                "Received request message from peer = {} which not in whitelist.",
+                "Received request message from peer = {} which not in ConnectList.",
                 msg.from().to_hex()
             ));
         }
@@ -541,13 +541,11 @@ impl NodeHandler {
     fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
-        profiler_span!("Make sure that it is new transaction", {
-            let snapshot = self.blockchain.snapshot();
-            if Schema::new(&snapshot).transactions().contains(&hash) {
-                let err = format!("Received already processed transaction, hash {:?}", hash);
-                return Err(err);
-            }
-        });
+        let snapshot = self.blockchain.snapshot();
+        if Schema::new(&snapshot).transactions().contains(&hash) {
+            let err = format!("Received already processed transaction, hash {:?}", hash);
+            return Err(err);
+        }
 
         let mut fork = self.blockchain.fork();
         {
@@ -587,11 +585,9 @@ impl NodeHandler {
             }
         };
 
-        profiler_span!("tx.verify()", {
-            if !tx.verify() {
-                return;
-            }
-        });
+        if !tx.verify() {
+            return;
+        }
 
         // We don't care about result, because situation when transaction received twice
         // is normal for internal messages (transaction may be received from 2+ nodes).
@@ -610,9 +606,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
-                "Received response message from peer = {} which not in whitelist.",
+                "Received response message from peer = {} which not in ConnectList.",
                 msg.from().to_hex()
             );
             return;
