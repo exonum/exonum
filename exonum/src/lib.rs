@@ -15,9 +15,8 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
-// spell-checker:ignore cors
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_object)]
 #![cfg_attr(feature = "flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature = "flame_profile", plugin(exonum_flamer))]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]

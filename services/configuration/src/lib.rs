@@ -53,7 +53,7 @@
 //! }
 //! ```
 
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_object)]
 
 #[macro_use]
 extern crate exonum;
