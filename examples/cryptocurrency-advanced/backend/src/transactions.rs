@@ -85,7 +85,7 @@ transactions! {
 
 impl Transaction for Transfer {
     fn verify(&self) -> bool {
-        self.verify_signature(self.from())
+        (self.from() != self.to()) && self.verify_signature(self.from())
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
