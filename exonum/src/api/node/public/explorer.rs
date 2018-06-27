@@ -25,7 +25,9 @@ use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
 use messages::Precommit;
 
-const MAX_BLOCKS_PER_REQUEST: usize = 1000;
+/// The maximum number of blocks to return per blocks request, in this way
+/// the parameter limits the maximum execution time for such requests.
+pub const MAX_BLOCKS_PER_REQUEST: usize = 1000;
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

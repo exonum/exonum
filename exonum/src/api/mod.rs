@@ -285,7 +285,7 @@ impl ApiAggregator {
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
             let mut builder = ServiceApiBuilder::new();
             service.wire_api(&mut builder);
-            // TODO think about prefixes for non web backends.
+            // TODO think about prefixes for non web backends. (ECR-1758)
             let prefix = format!("services/{}", service.service_name());
             (prefix, builder)
         }));

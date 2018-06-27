@@ -23,14 +23,6 @@ pub type Result<I> = ::std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will appear in future.
 pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 
-/// Immutable endpoint marker.
-#[derive(Debug)]
-pub struct Immutable;
-
-/// Mutable endpoint marker.
-#[derive(Debug)]
-pub struct Mutable;
-
 /// API endpoint handler extractor which can extract handler from various entities.
 #[derive(Debug)]
 pub struct With<Q, I, R, F, K> {
@@ -41,6 +33,14 @@ pub struct With<Q, I, R, F, K> {
     _result_type: PhantomData<R>,
     _kind: PhantomData<K>,
 }
+
+/// Immutable endpoint marker. With it possible to create immutable kind of `With`.
+#[derive(Debug)]
+pub struct Immutable;
+
+/// Mutable endpoint marker. With it possible to create mutable kind of `With`.
+#[derive(Debug)]
+pub struct Mutable;
 
 /// API Endpoint extractor that also contains endpoint name.
 #[derive(Debug)]
