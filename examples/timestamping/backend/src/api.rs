@@ -28,7 +28,7 @@ pub struct TimestampQuery {
 }
 
 impl TimestampQuery {
-    pub fn new(hash: Hash) -> TimestampQuery {
+    pub fn new(hash: Hash) -> Self {
         TimestampQuery { hash }
     }
 }

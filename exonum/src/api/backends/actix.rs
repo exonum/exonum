@@ -320,7 +320,7 @@ impl SystemRuntimeConfig {
 }
 
 impl SystemRuntime {
-    fn new(config: SystemRuntimeConfig) -> result::Result<SystemRuntime, failure::Error> {
+    fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
         // Creates system thread.
         let (system_address_tx, system_address_rx) = mpsc::channel();
         let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
@@ -334,9 +334,10 @@ impl SystemRuntime {
                 aggregator.inner
             );
             let api_handlers = config.api_runtimes.into_iter().map(|runtime_config| {
+                debug!("Runtime: {:?}", runtime_config);
                 let access = runtime_config.access;
                 let listen_address = runtime_config.listen_address;
-                info!("Starting web {} api on {}", access, listen_address);
+                info!("Starting {} web api on {}", access, listen_address);
 
                 let aggregator = aggregator.clone();
                 HttpServer::new(move || create_app(&aggregator, runtime_config.clone()))

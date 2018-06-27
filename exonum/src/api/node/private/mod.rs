@@ -22,25 +22,29 @@ use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;
 use node::ExternalMessage;
 
-#[doc(hidden)]
+/// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ServiceInfo {
-    name: String,
-    id: u16,
+    /// Service name.
+    pub name: String,
+    /// Service identifier for database schema and service messages.
+    pub id: u16,
 }
 
-/// `DTO` is used to transfer information about node.
-#[doc(hidden)]
+/// Short information about the current node.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct NodeInfo {
+    /// Version of the `exonum` crate.
     pub core_version: Option<String>,
+    /// Version of the Exonum protocol.
     pub protocol_version: u8,
+    /// List of services.
     pub services: Vec<ServiceInfo>,
 }
 
 impl NodeInfo {
-    /// Creates new `NodeInfo`, from services list.
-    pub fn new<'a, I>(services: I) -> NodeInfo
+    /// Creates new `NodeInfo` from services list.
+    pub fn new<'a, I>(services: I) -> Self
     where
         I: IntoIterator<Item = &'a Box<Service>>,
     {
@@ -108,7 +112,7 @@ pub struct SystemApi {
 
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
-    pub fn new(info: NodeInfo, shared_api_state: SharedNodeState) -> SystemApi {
+    pub fn new(info: NodeInfo, shared_api_state: SharedNodeState) -> Self {
         SystemApi {
             info,
             shared_api_state,

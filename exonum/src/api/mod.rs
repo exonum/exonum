@@ -18,10 +18,9 @@ pub use self::error::Error;
 pub use self::state::ServiceApiState;
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Serialize, de::DeserializeOwned};
 
-use std::collections::BTreeMap;
+use std::{fmt, collections::BTreeMap};
 
 use self::backends::actix;
 use blockchain::{Blockchain, SharedNodeState};
@@ -32,7 +31,7 @@ pub mod node;
 mod state;
 mod with;
 
-/// Trait defines object that could be used as an API backend.
+/// Defines object that could be used as an API backend.
 pub trait ServiceApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
@@ -70,23 +69,24 @@ pub trait ServiceApiBackend: Sized {
     /// Adds the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 
-    /// Binds API handlers with to given backend.
+    /// Binds API handlers to the given backend.
     fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
-/// Service API builder for the concrete scope.
+/// Service API builder for the concrete API scope or in other words
+/// access level (public or private).
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiScope {
     pub(crate) actix_backend: actix::ApiBuilder,
 }
 
 impl ServiceApiScope {
-    /// Creates a new service api scope.
-    pub fn new() -> ServiceApiScope {
+    /// Creates a new instance.
+    pub fn new() -> Self {
         ServiceApiScope::default()
     }
 
-    /// Adds the given endpoint handler to the api scope.
+    /// Adds the given endpoint handler to the API scope.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
@@ -105,7 +105,7 @@ impl ServiceApiScope {
         self
     }
 
-    /// Adds the given mutable endpoint handler to the api scope.
+    /// Adds the given mutable endpoint handler to the API scope.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
@@ -123,7 +123,7 @@ impl ServiceApiScope {
         self
     }
 
-    /// Returns reference to the underlying web backend.
+    /// Returns a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         &mut self.actix_backend
     }
@@ -133,9 +133,9 @@ impl ServiceApiScope {
 ///
 /// # Examples
 ///
-/// The example below provides a common practice of API implementation.
+/// The example below shows a common practice of API implementation.
 ///
-/// ```
+/// ```rust
 /// #[macro_use] extern crate exonum;
 /// #[macro_use] extern crate serde_derive;
 /// extern crate futures;
@@ -148,18 +148,18 @@ impl ServiceApiScope {
 /// use exonum::blockchain::{Schema};
 /// use exonum::crypto::Hash;
 ///
-/// // Declares type which describes an API specification and implementation.
+/// // Declares a type which describes an API specification and implementation.
 /// pub struct MyApi;
 ///
 /// // Declares structures for requests and responses.
 ///
-/// // For web backend `MyQuery` will be deserialized from the `block_height={number}` string.
+/// // For the web backend `MyQuery` will be deserialized from the `block_height={number}` string.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
 ///     pub block_height: u64
 /// }
 ///
-/// // For web backend `BlockInfo` will be serialized into the json string.
+/// // For the web backend `BlockInfo` will be serialized into the JSON string.
 /// #[derive(Serialize, Clone, Copy)]
 /// pub struct BlockInfo {
 ///     pub hash: Hash,
@@ -167,7 +167,7 @@ impl ServiceApiScope {
 ///
 /// // Creates API handlers.
 /// impl MyApi {
-///     /// Immutable handler, which returns the hash for block with the given height.
+///     // Immutable handler, which returns a hash of the block at the given height.
 ///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
 ///         let schema = Schema::new(state.snapshot());
 ///         Ok(schema.block_hashes_by_height()
@@ -176,18 +176,18 @@ impl ServiceApiScope {
 ///         )
 ///     }
 ///
-///     /// Mutable handler which removes peer with the given address from the cache.
+///     // Mutable handler which removes peer with the given address from the cache.
 ///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
 ///         let mut blockchain = state.blockchain().clone();
 ///         Ok(blockchain.remove_peer_with_addr(&query))
 ///     }
 ///
-///     /// Simple handler without any params.
+///     // Simple handler without any params.
 ///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
 ///
-///     /// You may also creates an asynchronous handlers for the long requests.
+///     // You may also creates an asynchronous handlers for the long requests.
 ///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
 ///      -> api::FutureResult<Option<Hash>> {
 ///         let blockchain = state.blockchain().clone();
@@ -216,16 +216,16 @@ pub struct ServiceApiBuilder {
 
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
-    pub fn new() -> ServiceApiBuilder {
+    pub fn new() -> Self {
         ServiceApiBuilder::default()
     }
 
-    /// Returns reference to the public api scope builder.
+    /// Returns a mutable reference to the public API scope builder.
     pub fn public_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.public_scope
     }
 
-    /// Returns reference to the private api scope builder.
+    /// Returns a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
     }
@@ -240,8 +240,8 @@ pub enum ApiAccess {
     Private,
 }
 
-impl ::std::fmt::Display for ApiAccess {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl fmt::Display for ApiAccess {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ApiAccess::Public => f.write_str("public"),
             ApiAccess::Private => f.write_str("private"),
@@ -251,7 +251,7 @@ impl ::std::fmt::Display for ApiAccess {
 
 /// API backend extender.
 pub trait ExtendApiBackend {
-    /// Extend API backend by the given scopes.
+    /// Extends API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
@@ -267,7 +267,7 @@ pub struct ApiAggregator {
 
 impl ApiAggregator {
     /// Aggregates API for the given blockchain and node state.
-    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> ApiAggregator {
+    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
         let mut inner = BTreeMap::new();
         // Adds built-in APIs.
         inner.insert(
@@ -291,7 +291,7 @@ impl ApiAggregator {
         }
     }
 
-    /// Returns a reference to the blockchain of this node.
+    /// Returns a reference to the blockchain used by the aggregator.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
     }
@@ -312,7 +312,7 @@ impl ApiAggregator {
         }
     }
 
-    /// Adds to aggregator API factory for the given prefix.
+    /// Adds API factory with given prefix to the aggregator.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
         self.inner.insert(prefix.into(), builder);
     }

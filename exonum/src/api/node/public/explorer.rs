@@ -72,7 +72,7 @@ pub struct BlockQuery {
 
 impl BlockQuery {
     /// Creates a new block query with the given height.
-    pub fn new(height: Height) -> BlockQuery {
+    pub fn new(height: Height) -> Self {
         BlockQuery { height }
     }
 }
@@ -86,7 +86,7 @@ pub struct TransactionQuery {
 
 impl TransactionQuery {
     /// Creates a new transaction query with the given height.
-    pub fn new(hash: Hash) -> TransactionQuery {
+    pub fn new(hash: Hash) -> Self {
         TransactionQuery { hash }
     }
 }
@@ -132,7 +132,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Searches for a transaction, either committed or uncommitted, by the hash.
+    /// Returns the content for a block of a specific height.
     pub fn block(
         state: &ServiceApiState,
         query: BlockQuery,
@@ -142,7 +142,7 @@ impl ExplorerApi {
             .map(From::from))
     }
 
-    /// Returns the content for a block of a specific height.
+    /// Searches for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
         state: &ServiceApiState,
         query: TransactionQuery,

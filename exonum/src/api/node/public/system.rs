@@ -21,22 +21,22 @@ use helpers::user_agent;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 /// Information about the current state of the Node memory pool.
 pub struct MemPoolInfo {
-    /// Information about the current state of the Node memory pool.
+    /// Total number of uncommitted transactions.
     pub size: usize,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-/// Information about the node is healthy.
+/// Information about whether the node is connected to other peers.
 pub struct HealthCheckInfo {
     /// Indicates whether the node is connected to the other peers.
     pub connectivity: bool,
 }
 
-/// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
-/// in current state.
+/// Shows the possibility to achieve the consensus between validators
+/// in the current state.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct ConsensusStatusInfo {
-    /// Consensus status: true - if consensus achieved, else - false.
+    /// Consensus status: true - if consensus is achieved, false otherwise.
     pub status: bool,
 }
 
@@ -48,7 +48,7 @@ pub struct SystemApi {
 
 impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
-    pub fn new(shared_api_state: SharedNodeState) -> SystemApi {
+    pub fn new(shared_api_state: SharedNodeState) -> Self {
         SystemApi { shared_api_state }
     }
 

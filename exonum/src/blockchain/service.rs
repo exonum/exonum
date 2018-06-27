@@ -193,9 +193,9 @@ pub trait Service: Send + Sync + 'static {
     /// *Try not to perform long operations in this handler*.
     fn after_commit(&self, context: &ServiceContext) {}
 
-    /// Extends API by handlers of this service. The request handlers are mounted on the
-    /// the `/api/services/{service_name}` path at the listen address of all
-    /// full nodes in the blockchain network.
+    /// Extends API by handlers of this service. The request handlers are mounted on
+    /// the `/api/services/{service_name}` path at the listen address of every
+    /// full node in the blockchain network.
     ///
     /// *Default implementation does nothing*
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
