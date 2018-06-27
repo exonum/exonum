@@ -9,4 +9,4 @@ members = [
     "examples/cryptocurrency-advanced/backend",
     "examples/timestamping/backend",
 ]
-exclude = [ "3rdparty", "exonum/fuzz" ]
+exclude = [ "exonum/fuzz" ]

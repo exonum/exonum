@@ -40,27 +40,27 @@ pub struct TransactionResponse {
 }
 
 /// Proof of existence for specific wallet.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
     /// Proof to the whole database table.
-    to_table: MapProof<Hash, Hash>,
+    pub to_table: MapProof<Hash, Hash>,
     /// Proof to the specific wallet in this table.
-    to_wallet: MapProof<PublicKey, Wallet>,
+    pub to_wallet: MapProof<PublicKey, Wallet>,
 }
 
 /// Wallet history.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WalletHistory {
-    proof: ListProof<Hash>,
-    transactions: Vec<WalletTransactions>,
+    pub proof: ListProof<Hash>,
+    pub transactions: Vec<WalletTransactions>,
 }
 
 /// Wallet information.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WalletInfo {
-    block_proof: BlockProof,
-    wallet_proof: WalletProof,
-    wallet_history: Option<WalletHistory>,
+    pub block_proof: BlockProof,
+    pub wallet_proof: WalletProof,
+    pub wallet_history: Option<WalletHistory>,
 }
 
 // TODO: Add documentation. (ECR-1638)
@@ -69,14 +69,6 @@ pub struct WalletInfo {
 pub struct CryptocurrencyApi;
 
 impl CryptocurrencyApi {
-    pub fn wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
-        let snapshot = state.snapshot();
-        let schema = CurrencySchema::new(snapshot);
-        schema
-            .wallet(&query.pub_key)
-            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
-    }
-
     pub fn wallet_info(state: &ServiceApiState, query: WalletQuery) -> api::Result<WalletInfo> {
         let snapshot = state.snapshot();
         let general_schema = blockchain::Schema::new(&snapshot);
@@ -137,7 +129,6 @@ impl CryptocurrencyApi {
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("v1/wallets", Self::wallet)
             .endpoint("v1/wallets/info", Self::wallet_info)
             .endpoint_mut("v1/wallets/transaction", Self::post_transaction);
     }

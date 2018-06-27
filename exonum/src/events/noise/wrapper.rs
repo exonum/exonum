@@ -20,6 +20,7 @@ use snow::{NoiseBuilder, Session};
 use std::{fmt::{self, Error, Formatter},
           io};
 
+use events::noise::sodium_resolver::SodiumResolver;
 use events::noise::HandshakeParams;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
@@ -32,7 +33,7 @@ pub const NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
-static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+static PARAMS: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
 /// Wrapper around noise session to provide latter convenient interface.
 pub struct NoiseWrapper {
@@ -40,24 +41,27 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-    pub fn responder(params: &HandshakeParams) -> Self {
-        let builder: NoiseBuilder = Self::noise_builder(params);
-        let private_key = builder.generate_private_key().unwrap();
-        let session = builder
-            .local_private_key(&private_key)
-            .build_responder()
-            .unwrap();
-
-        NoiseWrapper { session }
+    pub fn initiator(params: &HandshakeParams) -> Self {
+        if let Some(ref remote_key) = params.remote_key {
+            let builder: NoiseBuilder = Self::noise_builder()
+                .local_private_key(params.secret_key.as_ref())
+                .remote_public_key(remote_key.as_ref());
+            let session = builder
+                .build_initiator()
+                .expect("Noise session initiator failed to initialize");
+            return NoiseWrapper { session };
+        } else {
+            panic!("Remote public key is not specified")
+        }
     }
 
-    pub fn initiator(params: &HandshakeParams) -> Self {
-        let builder: NoiseBuilder = Self::noise_builder(params);
-        let private_key = builder.generate_private_key().unwrap();
+    pub fn responder(params: &HandshakeParams) -> Self {
+        let builder: NoiseBuilder = Self::noise_builder();
+
         let session = builder
-            .local_private_key(&private_key)
-            .build_initiator()
-            .unwrap();
+            .local_private_key(params.secret_key.as_ref())
+            .build_responder()
+            .expect("Noise session responder failed to initialize");
 
         NoiseWrapper { session }
     }
@@ -148,9 +152,8 @@ impl NoiseWrapper {
         Ok((len, buf))
     }
 
-    fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
-        let public_key = params.public_key.as_ref();
-        NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
+    fn noise_builder<'a>() -> NoiseBuilder<'a> {
+        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
     }
 }
 
@@ -168,6 +171,9 @@ impl fmt::Debug for NoiseWrapper {
 pub enum NoiseError {
     #[fail(display = "Wrong handshake message length {}", _0)]
     WrongMessageLength(usize),
+
+    #[fail(display = "Remote public key is not specified")]
+    MissingRemotePublicKey,
 
     #[fail(display = "{}", _0)]
     Other(String),

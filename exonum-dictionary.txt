@@ -104,6 +104,7 @@ roundtrip
 runtimes
 rustfmt
 rustup
+scalarmult
 seedable
 serde
 serializable

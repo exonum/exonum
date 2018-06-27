@@ -41,7 +41,6 @@ fn node_config() -> NodeConfig {
 
     NodeConfig {
         listen_address: peer_address,
-        peers: vec![],
         service_public_key,
         service_secret_key,
         consensus_public_key,
@@ -49,7 +48,7 @@ fn node_config() -> NodeConfig {
         genesis,
         external_address: None,
         network: Default::default(),
-        whitelist: Default::default(),
+        connect_list: Default::default(),
         api: api_cfg,
         mempool: Default::default(),
         services_configs: Default::default(),

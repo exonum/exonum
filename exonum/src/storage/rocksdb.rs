@@ -18,7 +18,6 @@
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use exonum_profiler::ProfilerSpan;
 use rocksdb::{self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch};
 
 use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
@@ -73,7 +72,6 @@ impl RocksDB {
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
-        let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
@@ -95,7 +93,6 @@ impl RocksDB {
 
 impl Database for RocksDB {
     fn snapshot(&self) -> Box<Snapshot> {
-        let _p = ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: Arc::clone(&self.db),
@@ -116,7 +113,6 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        let _p = ProfilerSpan::new("RocksDBSnapshot::get");
         if let Some(cf) = self._db.cf_handle(name) {
             match self.snapshot.get_cf(cf, key) {
                 Ok(value) => value.map(|v| v.to_vec()),
@@ -129,7 +125,6 @@ impl Snapshot for RocksDBSnapshot {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
-        let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
         let iter = match self._db.cf_handle(name) {
             Some(cf) => self.snapshot
                 .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
@@ -146,7 +141,6 @@ impl Snapshot for RocksDBSnapshot {
 
 impl Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = ProfilerSpan::new("RocksDBIterator::next");
         if let Some((key, value)) = self.iter.next() {
             self.key = Some(key);
             self.value = Some(value);
@@ -157,7 +151,6 @@ impl Iterator for RocksDBIterator {
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = ProfilerSpan::new("RocksDBIterator::peek");
         if let Some(&(ref key, ref value)) = self.iter.peek() {
             Some((key, value))
         } else {

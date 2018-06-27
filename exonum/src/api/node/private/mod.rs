@@ -20,7 +20,7 @@ use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
 use blockchain::{Service, SharedNodeState};
 use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;
-use node::ExternalMessage;
+use node::{ConnectInfo, ExternalMessage};
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -94,11 +94,6 @@ struct PeersInfo {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct PeerAddQuery {
-    ip: SocketAddr,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ConsensusEnabledQuery {
     enabled: bool,
 }
@@ -162,9 +157,15 @@ impl SystemApi {
     }
 
     fn handle_peer_add(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint_mut(name, move |state: &ServiceApiState, query: PeerAddQuery| {
-            state.sender().peer_add(query.ip).map_err(ApiError::from)
-        });
+        api_scope.endpoint_mut(
+            name,
+            move |state: &ServiceApiState, connect_info: ConnectInfo| {
+                state
+                    .sender()
+                    .peer_add(connect_info)
+                    .map_err(ApiError::from)
+            },
+        );
         self
     }
 
@@ -193,16 +194,23 @@ impl SystemApi {
         name: &'static str,
         api_scope: &mut ServiceApiScope,
     ) -> Self {
+        let self_ = self.clone();
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, query: ConsensusEnabledQuery| {
+                if self.shared_api_state.node_role().is_auditor() {
+                    let message = "Trying to enable consensus, but the current node is auditor\
+                                   and cannot affect consensus process";
+                    return Err(ApiError::BadRequest(message.to_owned()));
+                }
+
                 state
                     .sender()
                     .send_external_message(ExternalMessage::Enable(query.enabled))
                     .map_err(ApiError::from)
             },
         );
-        self
+        self_
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {

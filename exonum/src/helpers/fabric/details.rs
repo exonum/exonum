@@ -36,7 +36,7 @@ use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::{NodeApiConfig, NodeConfig};
+use node::{ConnectList, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -55,13 +55,13 @@ impl Run {
     /// Returns created database instance.
     pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
-            .expect(&format!("{} not found.", DATABASE_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>(NODE_CONFIG_PATH)
-            .expect(&format!("{} not found.", NODE_CONFIG_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
@@ -330,10 +330,11 @@ pub struct GenerateNodeConfig;
 impl GenerateNodeConfig {
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
-        let error_msg = &format!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str);
 
         let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            let ip = addr_str.parse::<IpAddr>().expect(error_msg);
+            let ip = addr_str.parse::<IpAddr>().unwrap_or_else(|_| {
+                panic!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str)
+            });
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
 
@@ -598,8 +599,6 @@ impl Command for Finalize {
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 
-        let peers = list.iter().map(|c| c.addr).collect();
-
         let genesis = Self::genesis_from_template(common.clone(), &list);
 
         let config = {
@@ -607,8 +606,7 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_addr,
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
-                whitelist: Default::default(),
-                peers,
+                connect_list: ConnectList::from_node_config(&list),
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,

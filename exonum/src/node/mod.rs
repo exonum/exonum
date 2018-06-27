@@ -17,8 +17,8 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{state::{RequestData, State, ValidatorState},
-               whitelist::Whitelist};
+pub use self::{connect_list::ConnectList,
+               state::{RequestData, State, ValidatorState}};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
@@ -59,16 +59,16 @@ use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
+mod connect_list;
 mod consensus;
 mod events;
 mod requests;
-mod whitelist;
 
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
     /// Add a new connection.
-    PeerAdd(SocketAddr),
+    PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
     /// Enable or disable the node.
@@ -123,6 +123,8 @@ pub struct NodeHandler {
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
+    /// Node role.
+    node_role: NodeRole,
 }
 
 /// Service configuration.
@@ -141,8 +143,8 @@ pub struct ListenerConfig {
     pub consensus_public_key: PublicKey,
     /// Secret key.
     pub consensus_secret_key: SecretKey,
-    /// Whitelist.
-    pub whitelist: Whitelist,
+    /// ConnectList.
+    pub connect_list: ConnectList,
     /// Socket address.
     pub address: SocketAddr,
 }
@@ -237,9 +239,6 @@ pub struct NodeConfig {
     pub external_address: Option<SocketAddr>,
     /// Network configuration.
     pub network: NetworkConfiguration,
-    /// Peer addresses.
-    #[serde(default)]
-    pub peers: Vec<SocketAddr>,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.
@@ -248,8 +247,8 @@ pub struct NodeConfig {
     pub service_public_key: PublicKey,
     /// Service secret key.
     pub service_secret_key: SecretKey,
-    /// Node's whitelist.
-    pub whitelist: Whitelist,
+    /// Node's ConnectList.
+    pub connect_list: ConnectList,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -288,6 +287,47 @@ pub struct NodeSender {
     pub api_requests: SyncSender<ExternalMessage>,
 }
 
+/// Node role.
+#[derive(Debug, Clone, Copy)]
+pub enum NodeRole {
+    /// Validator node.
+    Validator(ValidatorId),
+    /// Auditor node.
+    Auditor,
+}
+
+impl Default for NodeRole {
+    fn default() -> Self {
+        NodeRole::Auditor
+    }
+}
+
+impl NodeRole {
+    /// Constructs new NodeRole from `validator_id`.
+    pub fn new(validator_id: Option<ValidatorId>) -> Self {
+        match validator_id {
+            Some(validator_id) => NodeRole::Validator(validator_id),
+            None => NodeRole::Auditor,
+        }
+    }
+
+    /// Checks if node is validator.
+    pub fn is_validator(self) -> bool {
+        match self {
+            NodeRole::Validator(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Checks if node is auditor.
+    pub fn is_auditor(self) -> bool {
+        match self {
+            NodeRole::Auditor => true,
+            _ => false,
+        }
+    }
+}
+
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
@@ -322,8 +362,7 @@ impl NodeHandler {
             &config.listener.consensus_secret_key,
         );
 
-        let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
+        let connect_list = config.listener.connect_list;
         let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
@@ -331,7 +370,7 @@ impl NodeHandler {
             config.service.service_public_key,
             config.service.service_secret_key,
             config.mempool.tx_pool_capacity,
-            whitelist,
+            connect_list,
             stored,
             connect,
             blockchain.get_saved_peers(),
@@ -340,7 +379,16 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
-        let is_enabled = api_state.clone().is_enabled();
+        let node_role = NodeRole::new(validator_id);
+
+        if node_role.is_auditor() && api_state.is_enabled() {
+            error!("Consensus is enabled but current node is auditor");
+            api_state.set_enabled(false);
+        }
+
+        let is_enabled = api_state.is_enabled();
+
+        api_state.set_node_role(node_role);
 
         NodeHandler {
             blockchain,
@@ -350,6 +398,7 @@ impl NodeHandler {
             channel: sender,
             peer_discovery: config.peer_discovery,
             is_enabled,
+            node_role,
         }
     }
 
@@ -448,37 +497,67 @@ impl NodeHandler {
 
     /// Sends the given message to a peer by its public key.
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
-        if let Some(conn) = self.state.peers().get(&public_key) {
-            let address = conn.addr();
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.clone());
-            self.channel.network_requests.send(request).log_error();
-        } else {
-            warn!("Hasn't connection with peer {:?}", public_key);
-        }
+        let address = {
+            if let Some(conn) = self.state.peers().get(&public_key) {
+                conn.addr()
+            } else {
+                warn!(
+                    "Attempt to send message to peer with key {:?} without connection",
+                    public_key
+                );
+                return;
+            }
+        };
+
+        self.send_to_addr(&address, message);
     }
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        trace!("Send to address: {}", address);
-        let request = NetworkRequest::SendMessage(*address, message.clone());
-        self.channel.network_requests.send(request).log_error();
+        let public_key = self.state.connect_list().find_key_by_address(&address);
+
+        match public_key {
+            Some(public_key) => {
+                trace!("Send to address: {}", address);
+                let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+                self.channel.network_requests.send(request).log_error();
+            }
+            _ => {
+                warn!(
+                    "Attempt to connect to the peer with address {:?} which \
+                     is not in the ConnectList",
+                    address
+                );
+            }
+        }
     }
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &RawMessage) {
-        for conn in self.state.peers().values() {
-            let address = conn.addr();
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.clone());
-            self.channel.network_requests.send(request).log_error();
+        let peers: Vec<SocketAddr> = self.state
+            .peers()
+            .values()
+            .map(|conn| conn.addr())
+            .collect();
+
+        for address in peers {
+            self.send_to_addr(&address, message);
         }
     }
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-        self.send_to_addr(address, connect.raw());
+
+        if self.state.connect_list().is_address_allowed(&address) {
+            self.send_to_addr(address, connect.raw());
+        } else {
+            warn!(
+                "Attempt to connect to the peer {:?} which \
+                 is not in the ConnectList",
+                address
+            );
+        }
     }
 
     /// Add timeout request.
@@ -599,7 +678,7 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn peer_add(&self, addr: ConnectInfo) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
@@ -629,6 +708,21 @@ impl TransactionSend for ApiSender {
 impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
+    }
+}
+
+/// Data needed to add peer into `ConnectList`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ConnectInfo {
+    /// Peer address.
+    pub address: SocketAddr,
+    /// Peer public key.
+    pub public_key: PublicKey,
+}
+
+impl fmt::Display for ConnectInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.address)
     }
 }
 
@@ -666,8 +760,6 @@ pub struct NodeChannel {
     /// Channel for internal events.
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
-
-const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
 
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
@@ -710,15 +802,6 @@ impl Node {
     ) -> Self {
         crypto::init();
 
-        if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(
-                &format!(
-                    "You compiled exonum with profiling support, but {}",
-                    PROFILE_ENV_VARIABLE_NAME
-                ),
-            ))
-        };
-
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
             db,
@@ -729,11 +812,13 @@ impl Node {
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
+        let peers = node_cfg.connect_list.addresses();
+
         let config = Configuration {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
                 consensus_secret_key: node_cfg.consensus_secret_key,
-                whitelist: node_cfg.whitelist,
+                connect_list: node_cfg.connect_list,
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {
@@ -742,7 +827,7 @@ impl Node {
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
-            peer_discovery: node_cfg.peers,
+            peer_discovery: peers,
         };
 
         let external_address = if let Some(v) = node_cfg.external_address {
@@ -847,11 +932,11 @@ impl Node {
         }.start()?;
 
         // Runs NodeHandler.
-        let handshake_params = HandshakeParams {
-            public_key: *self.handler().state().consensus_public_key(),
-            secret_key: self.handler().state().consensus_secret_key().clone(),
-            max_message_len: self.max_message_len,
-        };
+        let handshake_params = HandshakeParams::new(
+            *self.state().consensus_public_key(),
+            self.state().consensus_secret_key().clone(),
+            self.max_message_len,
+        );
         self.run_handler(&handshake_params)?;
 
         // Stops actix web runtime.

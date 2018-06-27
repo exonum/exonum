@@ -123,10 +123,9 @@ impl PublicApi {
         let proposes = index
             .iter()
             .map(|cfg_hash| {
-                let propose_data = proposes_by_hash.get(&cfg_hash).expect(&format!(
-                    "Not found propose for following cfg_hash: {:?}",
-                    cfg_hash
-                ));
+                let propose_data = proposes_by_hash.get(&cfg_hash).unwrap_or_else(|| {
+                    panic!("Not found propose for following cfg_hash: {:?}", cfg_hash)
+                });
 
                 (cfg_hash, propose_data)
             })
@@ -151,10 +150,12 @@ impl PublicApi {
             .iter()
             .map(|config_ref| {
                 let config_hash = config_ref.cfg_hash();
-                configs.get(config_hash).expect(&format!(
-                    "Config with hash {:?} is absent in configs table",
-                    config_hash
-                ))
+                configs.get(config_hash).unwrap_or_else(|| {
+                    panic!(
+                        "Config with hash {:?} is absent in configs table",
+                        config_hash
+                    )
+                })
             })
             .filter(|config| filter.matches(config))
             .map(|config| Self::config_with_proofs(state, config))

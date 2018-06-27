@@ -78,7 +78,7 @@ impl Command for Info {
     ) -> Feedback {
         let request = context
             .arg::<String>(INFO_REQUEST)
-            .expect(&format!("{} not found.", INFO_REQUEST));
+            .unwrap_or_else(|_| panic!("{} not found.", INFO_REQUEST));
 
         match request.as_ref() {
             "core-version" => Self::core_version(),

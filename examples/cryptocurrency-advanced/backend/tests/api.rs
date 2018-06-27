@@ -18,20 +18,18 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-#[macro_use]
-extern crate assert_matches;
 extern crate exonum;
 extern crate exonum_cryptocurrency_advanced as cryptocurrency;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::{api::{self, node::public::explorer::TransactionQuery},
+use exonum::{api::node::public::explorer::TransactionQuery,
              crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::{api::WalletQuery,
+use cryptocurrency::{api::{WalletInfo, WalletQuery},
                      transactions::{CreateWallet, Transfer},
                      wallet::Wallet,
                      CurrencyService};
@@ -51,7 +49,7 @@ fn test_create_wallet() {
     api.assert_tx_status(tx.hash(), &json!({ "type": "success" }));
 
     // Check that the user indeed is persisted by the service.
-    let wallet = api.get_wallet(*tx.pub_key());
+    let wallet = api.get_wallet(*tx.pub_key()).unwrap();
     assert_eq!(wallet.pub_key(), tx.pub_key());
     assert_eq!(wallet.name(), tx.name());
     assert_eq!(wallet.balance(), 100);
@@ -69,9 +67,9 @@ fn test_transfer() {
     api.assert_tx_status(tx_bob.hash(), &json!({ "type": "success" }));
 
     // Check that the initial Alice's and Bob's balances persisted by the service.
-    let wallet = api.get_wallet(*tx_alice.pub_key());
+    let wallet = api.get_wallet(*tx_alice.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
-    let wallet = api.get_wallet(*tx_bob.pub_key());
+    let wallet = api.get_wallet(*tx_bob.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
 
     // Transfer funds by invoking the corresponding API method.
@@ -88,9 +86,9 @@ fn test_transfer() {
 
     // After the transfer transaction is included into a block, we may check new wallet
     // balances.
-    let wallet = api.get_wallet(*tx_alice.pub_key());
+    let wallet = api.get_wallet(*tx_alice.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 90);
-    let wallet = api.get_wallet(*tx_bob.pub_key());
+    let wallet = api.get_wallet(*tx_bob.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 110);
 }
 
@@ -106,7 +104,7 @@ fn test_transfer_from_nonexisting_wallet() {
     testkit.create_block_with_tx_hashes(&[tx_bob.hash()]);
 
     api.assert_no_wallet(*tx_alice.pub_key());
-    let wallet = api.get_wallet(*tx_bob.pub_key());
+    let wallet = api.get_wallet(*tx_bob.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
 
     let tx = Transfer::new(
@@ -124,7 +122,7 @@ fn test_transfer_from_nonexisting_wallet() {
     );
 
     // Check that Bob's balance doesn't change.
-    let wallet = api.get_wallet(*tx_bob.pub_key());
+    let wallet = api.get_wallet(*tx_bob.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
 }
 
@@ -139,7 +137,7 @@ fn test_transfer_to_nonexisting_wallet() {
     // when a transfer occurs.
     testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
 
-    let wallet = api.get_wallet(*tx_alice.pub_key());
+    let wallet = api.get_wallet(*tx_alice.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
     api.assert_no_wallet(*tx_bob.pub_key());
 
@@ -158,7 +156,7 @@ fn test_transfer_to_nonexisting_wallet() {
     );
 
     // Check that Alice's balance doesn't change.
-    let wallet = api.get_wallet(*tx_alice.pub_key());
+    let wallet = api.get_wallet(*tx_alice.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
 }
 
@@ -186,9 +184,9 @@ fn test_transfer_overcharge() {
         &json!({ "type": "error", "code": 3, "description": "Insufficient currency amount" }),
     );
 
-    let wallet = api.get_wallet(*tx_alice.pub_key());
+    let wallet = api.get_wallet(*tx_alice.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
-    let wallet = api.get_wallet(*tx_bob.pub_key());
+    let wallet = api.get_wallet(*tx_bob.pub_key()).unwrap();
     assert_eq!(wallet.balance(), 100);
 }
 
@@ -228,12 +226,20 @@ impl CryptocurrencyApi {
         (tx, key)
     }
 
-    fn get_wallet(&self, pub_key: PublicKey) -> Wallet {
-        self.inner
+    fn get_wallet(&self, pub_key: PublicKey) -> Option<Wallet> {
+        let wallet_info = self.inner
             .public(ApiKind::Service("cryptocurrency"))
             .query(&WalletQuery { pub_key })
-            .get("v1/wallets")
-            .unwrap()
+            .get::<WalletInfo>("v1/wallets/info")
+            .unwrap();
+
+        let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
+        to_wallet
+            .all_entries()
+            .iter()
+            .find(|(ref k, _)| **k == pub_key)
+            .and_then(|tuple| tuple.1)
+            .cloned()
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
@@ -245,18 +251,23 @@ impl CryptocurrencyApi {
             .unwrap();
         assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
     }
+
     /// Asserts that a wallet with the specified public key is not known to the blockchain.
     fn assert_no_wallet(&self, pub_key: PublicKey) {
-        let err = self.inner
+        let wallet_info: WalletInfo = self.inner
             .public(ApiKind::Service("cryptocurrency"))
             .query(&WalletQuery { pub_key })
-            .get::<Wallet>("v1/wallets")
-            .unwrap_err();
+            .get("v1/wallets/info")
+            .unwrap();
 
-        assert_matches!(
-            err,
-            api::Error::NotFound(ref body) if body == "Wallet not found"
-        );
+        let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
+        assert!(
+            to_wallet
+                .missing_keys()
+                .iter()
+                .find(|v| ***v == pub_key)
+                .is_some()
+        )
     }
 
     /// Asserts that the transaction with the given hash has a specified status.

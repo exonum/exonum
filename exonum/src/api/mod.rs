@@ -18,9 +18,9 @@ pub use self::error::Error;
 pub use self::state::ServiceApiState;
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
-use std::{fmt, collections::BTreeMap};
+use std::{collections::BTreeMap, fmt};
 
 use self::backends::actix;
 use blockchain::{Blockchain, SharedNodeState};
