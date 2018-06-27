@@ -41,8 +41,8 @@ function Transfer ($jsonFilename) {
 
 # Checks that a `CreateWallet` transaction is committed to the blockchain.
 function Check-CreateTx ($tx) {
-  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions/$($tx.hash)";
-  $error = false;
+  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$($tx.hash)";
+  $error = $False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
     if (($respJson.type -ne 'Committed') -or ($respJson.content.body.name -ne $tx.name)) {
@@ -129,7 +129,7 @@ function Main () {
 
   echo "Retrieving info on Alice's wallet...";
   $pubkey = '6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85';
-  $resp = (Invoke-WebRequest "$BASE_URL/wallet/$pubkey").Content | ConvertFrom-Json;
+  $resp = (Invoke-WebRequest "$BASE_URL/wallet?pub_key=$pubkey").Content | ConvertFrom-Json;
   Check-Wallet $resp 'Alice' '85';
 }
 

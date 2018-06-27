@@ -17,8 +17,8 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::{private::NodeInfo,
-                   public::{ConsensusStatusInfo, HealthCheckInfo}},
+use exonum::{api::node::{private::NodeInfo,
+                         public::system::{ConsensusStatusInfo, HealthCheckInfo}},
              helpers::user_agent,
              messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
@@ -27,7 +27,8 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 fn test_healthcheck_connectivity_false() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
+
+    let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
     let expected = HealthCheckInfo {
         connectivity: false,
     };
@@ -38,7 +39,8 @@ fn test_healthcheck_connectivity_false() {
 fn test_user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: String = api.get(ApiKind::System, "v1/user_agent");
+
+    let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent::get();
     assert_eq!(info, expected);
 }
@@ -47,8 +49,8 @@ fn test_user_agent_info() {
 fn test_network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: NodeInfo = api.get_private(ApiKind::System, "/v1/network");
 
+    let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
@@ -58,7 +60,23 @@ fn test_network() {
 fn test_consensus_status_false() {
     let testkit = TestKitBuilder::validator().create();
     let api = testkit.api();
-    let info: ConsensusStatusInfo = api.get(ApiKind::System, "v1/consensus_status");
+
+    let info: ConsensusStatusInfo = api.public(ApiKind::System)
+        .get("v1/consensus_status")
+        .unwrap();
     let expected = ConsensusStatusInfo { status: false };
     assert_eq!(info, expected);
+}
+
+#[test]
+fn test_shutdown() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    assert_eq!(
+        api.private(ApiKind::System)
+            .post::<()>("v1/shutdown")
+            .unwrap(),
+        ()
+    );
 }

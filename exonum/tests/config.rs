@@ -16,9 +16,11 @@
 extern crate exonum;
 #[macro_use]
 extern crate pretty_assertions;
+#[macro_use]
+extern crate serde_derive;
 extern crate toml;
 
-use exonum::helpers::fabric::NodeBuilder;
+use exonum::{api::backends::actix::AllowOrigin, helpers::fabric::NodeBuilder};
 use toml::Value;
 
 use std::{ffi::OsString,
@@ -295,4 +297,28 @@ fn test_run_dev() {
     if let Err(err) = result {
         panic::resume_unwind(err);
     }
+}
+
+#[test]
+fn allow_origin_toml() {
+    fn check(text: &str, allow_origin: AllowOrigin) {
+        #[derive(Serialize, Deserialize)]
+        struct Config {
+            allow_origin: AllowOrigin,
+        }
+        let config_toml = format!("allow_origin = {}\n", text);
+        let config: Config = ::toml::from_str(&config_toml).unwrap();
+        assert_eq!(config.allow_origin, allow_origin);
+        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+    }
+
+    check(r#""*""#, AllowOrigin::Any);
+    check(
+        r#""http://example.com""#,
+        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+    );
+    check(
+        r#"["http://a.org", "http://b.org"]"#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
 }

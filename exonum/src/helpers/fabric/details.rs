@@ -32,10 +32,11 @@ use super::{internal::{CollectedCommand, Command, Feedback},
             CommandName,
             Context,
             DEFAULT_EXONUM_LISTEN_PORT};
+use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::{AllowOrigin, ConnectList, NodeApiConfig, NodeConfig};
+use node::{ConnectList, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";

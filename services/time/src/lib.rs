@@ -21,18 +21,14 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
-extern crate bodyparser;
 extern crate chrono;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate iron;
-extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
 extern crate serde_json;
 
 /// Node API.
@@ -44,15 +40,13 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum::{api::Api,
-             blockchain::{ApiContext, Service, ServiceContext, Transaction, TransactionSet},
+use exonum::{api::ServiceApiBuilder,
+             blockchain::{Service, ServiceContext, Transaction, TransactionSet},
              crypto::Hash,
              encoding::{self, serialize::json::reexport::Value},
              helpers::fabric::{Context, ServiceFactory},
              messages::RawTransaction,
              storage::{Fork, Snapshot}};
-use iron::Handler;
-use router::Router;
 use schema::TimeSchema;
 
 use time_provider::{SystemTimeProvider, TimeProvider};
@@ -131,22 +125,9 @@ impl Service for TimeService {
             .unwrap();
     }
 
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = api::PrivateApi {
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
-        Some(Box::new(router))
-    }
-
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = api::PublicApi {
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
-        Some(Box::new(router))
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi::wire(builder);
+        api::PrivateApi::wire(builder);
     }
 }
 

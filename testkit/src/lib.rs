@@ -23,10 +23,13 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::api::public::BlocksRange;
+//! use serde_json::Value;
+//!
+//! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::encoding;
+//! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
@@ -109,41 +112,45 @@
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
-//!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let explorer_api = api.public(ApiKind::Explorer);
+//!     let response: BlocksRange = explorer_api
+//!         .query(&BlocksQuery {
+//!             count: 10,
+//!             ..Default::default()
+//!         })
+//!         .get("v1/blocks")
+//!         .unwrap();
 //!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
 //!     assert_eq!(range.start, Height(0));
 //!     assert_eq!(range.end, Height(3));
 //!
-//!     api.get::<serde_json::Value>(
-//!         ApiKind::Explorer,
-//!         &format!("v1/transactions/{}", tx1.hash().to_string()),
-//!     );
+//!     let info = explorer_api
+//!         .query(&TransactionQuery::new(tx1.hash()))
+//!         .get::<TransactionInfo<Value>>("v1/transactions")
+//!         .unwrap();
 //! }
 //! ```
 
 #![deny(missing_debug_implementations, missing_docs)]
 
-extern crate bodyparser;
+extern crate actix_web;
+#[cfg_attr(test, macro_use)]
+#[cfg(test)]
+extern crate assert_matches;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
+extern crate failure;
 extern crate futures;
-extern crate iron;
-extern crate iron_test;
 #[macro_use]
 extern crate log;
-extern crate mount;
-extern crate router;
+extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-#[cfg_attr(test, macro_use)]
 extern crate serde_json;
+extern crate serde_urlencoded;
 extern crate tokio_core;
-
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
 
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
@@ -152,34 +159,32 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 pub mod compare;
 
 use futures::{sync::mpsc, Future, Stream};
-use iron::Iron;
 use tokio_core::reactor::Core;
 
-use std::{fmt,
-          net::SocketAddr,
-          sync::{Arc, RwLock},
-          thread};
+use std::sync::{Arc, RwLock};
+use std::{fmt, net::SocketAddr};
 
-use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
+use exonum::{api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
+                   ApiAccess},
+             blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                           Transaction},
              crypto::{self, Hash},
              explorer::{BlockWithTransactions, BlockchainExplorer},
              helpers::{Height, ValidatorId},
              messages::RawMessage,
-             node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState},
+             node::{ApiSender, ExternalMessage, State as NodeState},
              storage::{MemoryDB, Patch, Snapshot}};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use handler::create_testkit_handler;
 use poll_events::poll_events;
 
 #[macro_use]
 mod macros;
 mod api;
 mod checkpoint_db;
-mod handler;
 mod network;
 mod poll_events;
+mod server;
 
 /// Builder for `TestKit`.
 ///
@@ -202,7 +207,7 @@ mod poll_events;
 ///
 /// ## Create block
 ///
-/// POST `{baseURL}/v1/blocks`
+/// POST `{baseURL}/v1/blocks/create`
 ///
 /// Creates a new block in the testkit blockchain. If the
 /// JSON body of the request is an empty object, the call is functionally equivalent
@@ -214,12 +219,12 @@ mod poll_events;
 ///
 /// ## Roll back
 ///
-/// DELETE `{baseURL}/v1/blocks/:height`
+/// POST `{baseURL}/v1/blocks/rollback`
 ///
 /// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
-/// at the specified `height` (a positive integer), so that after the request the blockchain height
-/// is equal to `height - 1`. If the specified height is greater than the blockchain height,
-/// the request performs no action.
+/// at the specified in JSON body `height` value (a positive integer), so that after the request
+/// the blockchain height is equal to `height - 1`. If the specified height is greater than the
+/// blockchain height, the request performs no action.
 ///
 /// Returns the latest block from the blockchain on success.
 ///
@@ -371,7 +376,6 @@ pub struct TestKit {
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
-    api_config: NodeApiConfig,
 }
 
 impl fmt::Debug for TestKit {
@@ -441,7 +445,6 @@ impl TestKit {
             events_stream,
             network,
             cfg_proposal: None,
-            api_config: Default::default(),
         }
     }
 
@@ -935,29 +938,24 @@ impl TestKit {
     }
 
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let api = self.api();
         let events_stream = self.remove_events_stream();
+        // Creates complete actix web server with the testkit extensions.
         let testkit_ref = Arc::new(RwLock::new(self));
-        let (public_handler, private_handler) =
-            api.into_handlers(create_testkit_handler(&testkit_ref));
-
-        let public_api_thread = thread::spawn(move || {
-            Iron::new(public_handler).http(public_api_address).unwrap();
-        });
-        let private_api_thread = thread::spawn(move || {
-            Iron::new(private_handler)
-                .http(private_api_address)
-                .unwrap();
-        });
-
+        let system_runtime_config = SystemRuntimeConfig {
+            api_runtimes: vec![
+                ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
+                ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
+            ],
+            api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
+        };
+        let system_runtime = system_runtime_config.start().unwrap();
         // Run the event stream in a separate thread in order to put transactions to mempool
         // when they are received. Otherwise, a client would need to call a `poll_events` analogue
         // each time after a transaction is posted.
         let mut core = Core::new().unwrap();
         core.run(events_stream).unwrap();
 
-        public_api_thread.join().unwrap();
-        private_api_thread.join().unwrap();
+        system_runtime.stop().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.

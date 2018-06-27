@@ -70,7 +70,7 @@ module.exports = {
       },
 
       getTimestamp: hash => {
-        return axios.get(`/api/services/timestamping/v1/timestamps/value/${hash}`).then(response => response.data)
+        return axios.get(`/api/services/timestamping/v1/timestamps/value?hash=${hash}`).then(response => response.data)
       },
 
       getTimestampProof: hash => {
@@ -78,7 +78,7 @@ module.exports = {
           // actual list of public keys of validators
           const validators = response.data.config.validator_keys.map(validator => validator.consensus_key)
 
-          return axios.get(`/api/services/timestamping/v1/timestamps/proof/${hash}`)
+          return axios.get(`/api/services/timestamping/v1/timestamps/proof?hash=${hash}`)
             .then(response => response.data)
             .then(data => {
               if (!Exonum.verifyBlock(data.block_info, validators)) {
@@ -120,11 +120,11 @@ module.exports = {
       },
 
       getBlock(height) {
-        return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
       },
 
       getTransaction(hash) {
-        return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
       }
     }
   }

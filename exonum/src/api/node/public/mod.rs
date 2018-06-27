@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
-extern crate exonum_testkit;
+//! Public part of the Exonum rest api.
 
-use cryptocurrency::service::CurrencyService;
-use exonum_testkit::TestKitBuilder;
+pub use self::{explorer::ExplorerApi, system::SystemApi};
 
-fn main() {
-    exonum::helpers::init_logger().unwrap();
-
-    TestKitBuilder::validator()
-        .with_service(CurrencyService)
-        .serve(
-            "0.0.0.0:8000".parse().unwrap(),
-            "0.0.0.0:9000".parse().unwrap(),
-        );
-}
+pub mod explorer;
+pub mod system;

@@ -18,7 +18,7 @@ Vue.use(Blockchain)
 
 mock.onGet('/api/services/configuration/v1/configs/actual').reply(200, actual)
 
-mock.onGet('/api/services/cryptocurrency/v1/wallets/info/3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93').replyOnce(200, walletProof)
+mock.onGet('/api/services/cryptocurrency/v1/wallets/info?pub_key=3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93').replyOnce(200, walletProof)
 
 mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
   'protocol_version': 0,
@@ -71,9 +71,9 @@ mock.onGet('/api/explorer/v1/transactions/0728ebfd50515a572deed796b7e2ab55f879fe
   'type': 'committed'
 })
 
-mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxNotAccepted)
+mock.onGet('/api/services/cryptocurrency/v1/wallets/info?pub_key=8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxNotAccepted)
 
-mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxAccepted)
+mock.onGet('/api/services/cryptocurrency/v1/wallets/info?pub_key=8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, addFundsTxAccepted)
 
 mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
   'protocol_version': 0,
@@ -90,9 +90,9 @@ mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
   'tx_hash': '0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc'
 })
 
-mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, transferTxNotAccepted)
+mock.onGet('/api/services/cryptocurrency/v1/wallets/info?pub_key=8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, transferTxNotAccepted)
 
-mock.onGet('/api/services/cryptocurrency/v1/wallets/info/8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, transferTxAccepted)
+mock.onGet('/api/services/cryptocurrency/v1/wallets/info?pub_key=8a2f2eb5302deeb8376fd347f2704a066cddfc92b3073f3668511b4ebc8fda39').replyOnce(200, transferTxAccepted)
 
 describe('Interaction with blockchain', () => {
   it('should generate new signing key pair', () => {
