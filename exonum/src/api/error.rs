@@ -14,7 +14,7 @@
 
 //! Error module.
 
-use std::{io, error};
+use std::{error, io};
 
 use storage;
 

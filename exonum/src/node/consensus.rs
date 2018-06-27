@@ -28,7 +28,6 @@ use storage::Patch;
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         if !self.is_enabled {
             info!(
@@ -220,7 +219,6 @@ impl NodeHandler {
 
     /// Handles the `Block` message. For details see the message documentation.
     // TODO: Write helper function which returns Result. (ECR-123)
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
         if let Err(err) = self.validate_block_response(msg) {
             error!("{}", err);
@@ -575,7 +573,6 @@ impl NodeHandler {
 
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         let tx = match self.blockchain.tx_from_raw(msg.clone()) {
             Ok(tx) => tx,
@@ -596,7 +593,6 @@ impl NodeHandler {
     }
 
     /// Handles raw transactions.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -830,7 +826,6 @@ impl NodeHandler {
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
         if let Some(hash) = self.state.propose_mut(propose_hash).unwrap().block_hash() {

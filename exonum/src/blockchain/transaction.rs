@@ -357,7 +357,9 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
-pub trait TransactionSet: Into<Box<dyn Transaction>> + DeserializeOwned + Serialize + Clone {
+pub trait TransactionSet:
+    Into<Box<dyn Transaction>> + DeserializeOwned + Serialize + Clone
+{
     /// Parses a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }

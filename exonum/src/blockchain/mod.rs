@@ -427,7 +427,6 @@ impl Blockchain {
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
         patch: &Patch,
