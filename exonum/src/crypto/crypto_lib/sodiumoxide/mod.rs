@@ -33,6 +33,8 @@ use self::sodiumoxide::crypto::hash::sha256;
 use self::sodiumoxide::crypto::sign::ed25519;
 // spell-checker:enable
 
+pub mod x25519;
+
 /// Digest type for sodiumoxide-based implementation.
 pub use self::sha256::Digest as Hash;
 

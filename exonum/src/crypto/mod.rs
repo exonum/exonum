@@ -47,7 +47,7 @@ pub(crate) mod crypto_lib;
 use self::crypto_lib::sodiumoxide as crypto_impl;
 
 #[cfg(feature = "sodiumoxide-crypto")]
-pub mod x25519;
+pub use self::crypto_lib::sodiumoxide::x25519;
 
 #[doc(inline)]
 pub use self::crypto_impl::HASH_SIZE;
