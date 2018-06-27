@@ -172,9 +172,6 @@ pub enum NoiseError {
     #[fail(display = "Wrong handshake message length {}", _0)]
     WrongMessageLength(usize),
 
-    #[fail(display = "Remote public key is not specified")]
-    MissingRemotePublicKey,
-
     #[fail(display = "{}", _0)]
     Other(String),
 }

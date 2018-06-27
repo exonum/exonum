@@ -93,8 +93,8 @@ impl NoiseHandshake {
         mut self,
         stream: S,
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        read(stream).and_then(move |(stream, msg)| {
-            self.noise.read_handshake_msg(&msg)?;
+        HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
+            self.noise.read_handshake_msg(&msg.0)?;
             Ok((stream, self))
         })
     }
@@ -105,10 +105,7 @@ impl NoiseHandshake {
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
         done(self.noise.write_handshake_msg())
             .map_err(|e| e.into())
-            .and_then(|buf| {
-                let len = buf.len();
-                write(stream, buf, len)
-            })
+            .and_then(|buf| HandshakeRawMessage(buf).write(stream))
             .map(move |(stream, _)| (stream, self))
     }
 
@@ -146,22 +143,29 @@ impl Handshake for NoiseHandshake {
     }
 }
 
-fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
-    // First byte of handshake message is payload length, remaining bytes [1; len] is
-    // the handshake payload. Therefore, we need to read first byte and after that
-    // remaining payload.
-    read_exact(sock, buf).and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
-}
+pub struct HandshakeRawMessage(Vec<u8>);
 
-fn write<S: AsyncWrite + 'static>(
-    sock: S,
-    buf: Vec<u8>,
-    len: usize,
-) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
+impl HandshakeRawMessage {
+    pub fn read<S: AsyncRead + 'static>(
+        sock: S,
+    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+        let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+        // First byte of handshake message is payload length, remaining bytes [1; len] is
+        // the handshake payload. Therefore, we need to read first byte and after that
+        // remaining payload.
+        read_exact(sock, buf)
+            .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
+            .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
+    }
 
-    write_all(sock, vec![len as u8; HANDSHAKE_HEADER_LENGTH]).and_then(move |(sock, _)|{
-        write_all(sock, buf)
-    })
+    pub fn write<S: AsyncWrite + 'static>(
+        self,
+        sock: S,
+    ) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
+        let len = self.0.len();
+        debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
+
+        write_all(sock, vec![len as u8; HANDSHAKE_HEADER_LENGTH])
+            .and_then(move |(sock, _)| write_all(sock, self.0))
+    }
 }

@@ -27,8 +27,8 @@ use std::time::Duration;
 use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
              PUBLIC_KEY_LENGTH};
 use events::error::into_other;
-use events::noise::{sodium_resolver::SodiumDh25519, write, Handshake, HandshakeParams,
-                    HandshakeResult, NoiseHandshake};
+use events::noise::{sodium_resolver::SodiumDh25519, Handshake, HandshakeParams,
+                    HandshakeRawMessage, HandshakeResult, NoiseHandshake};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 #[test]
@@ -370,12 +370,16 @@ impl NoiseErrorHandshake {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 
-            Either::A(write(stream, msg.to_vec(), msg.len()).map(move |(stream, _)| {
-                self.current_step = self.current_step
-                    .next()
-                    .expect("Extra handshake step taken");
-                (stream, self)
-            }))
+            Either::A(
+                HandshakeRawMessage(msg.to_vec())
+                    .write(stream)
+                    .map(move |(stream, _)| {
+                        self.current_step = self.current_step
+                            .next()
+                            .expect("Extra handshake step taken");
+                        (stream, self)
+                    }),
+            )
         } else {
             let inner = self.inner.take().unwrap();
 
