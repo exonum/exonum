@@ -193,7 +193,7 @@ macro_rules! encoding_struct {
                                         buffer: & mut B,
                                         from: $crate::encoding::Offset,
                                         to: $crate::encoding::Offset )
-                -> Result<(), Box<::std::error::Error>>
+                -> Result<(), Box<dyn (::std::error::Error)>>
                 where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::ExonumJsonDeserialize;
@@ -223,7 +223,7 @@ macro_rules! encoding_struct {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             #[allow(unused_imports, unused_mut)]
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> Result<Self, Box<::std::error::Error>> {
+                -> Result<Self, Box<dyn (::std::error::Error)>> {
                 use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
                 let mut buf = vec![0; $name::__ex_header_size() as usize];
                 let _obj = value.as_object().ok_or("Can't cast json as object.")?;

@@ -101,7 +101,7 @@ impl Dh for SodiumDh25519 {
         self.pubkey = x25519::scalarmult_base(&self.privkey);
     }
 
-    fn generate(&mut self, rng: &mut Random) {
+    fn generate(&mut self, rng: &mut dyn Random) {
         let mut privkey_bytes = [0; x25519::SECRET_KEY_LENGTH];
         rng.fill_bytes(&mut privkey_bytes);
         x25519::convert_to_private_key(&mut privkey_bytes);

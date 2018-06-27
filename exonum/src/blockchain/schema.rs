@@ -83,7 +83,7 @@ pub struct Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
 {
     /// Constructs information schema for the given `snapshot`.
     pub fn new(snapshot: T) -> Schema<T> {

@@ -44,7 +44,7 @@ impl Maintenance {
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
-    fn database(ctx: &Context, options: &DbOptions) -> Box<Database> {
+    fn database(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
@@ -108,7 +108,7 @@ impl Command for Maintenance {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _: &Fn(Context) -> Context,
+        _: dyn Fn(Context) -> Context,
     ) -> Feedback {
         let action = context
             .arg::<String>(MAINTENANCE_ACTION_PATH)

@@ -132,7 +132,7 @@
 //! }
 //! ```
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_object)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate actix_web;
 #[cfg_attr(test, macro_use)]

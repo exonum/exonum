@@ -118,7 +118,7 @@ pub struct SparseListIndexValues<'a, V> {
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -576,7 +576,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     type Item = (u64, V);

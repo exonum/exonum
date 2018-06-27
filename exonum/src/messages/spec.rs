@@ -292,7 +292,7 @@ macro_rules! __ex_message {
                 buffer: & mut B,
                 from: $crate::encoding::Offset,
                 to: $crate::encoding::Offset,
-            ) -> ::std::result::Result<(), Box<::std::error::Error>>
+            ) -> ::std::result::Result<(), Box<dyn  (::std::error::Error)>>
             where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::ExonumJsonDeserialize;
@@ -307,7 +307,7 @@ macro_rules! __ex_message {
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> ::std::result::Result<$crate::encoding::serialize::json::reexport::Value,
-                            Box<::std::error::Error + Send + Sync>>
+                            Box<dyn (::std::error::Error) + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::json::reexport::Map;
@@ -333,7 +333,7 @@ macro_rules! __ex_message {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             #[allow(unused_imports, unused_variables, unused_mut)]
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> ::std::result::Result<Self, Box<::std::error::Error>>
+                -> ::std::result::Result<Self, Box<dyn (::std::error::Error)>>
             {
                 use $crate::encoding::serialize::json::ExonumJson;
                 use $crate::encoding::serialize::json::reexport::from_value;

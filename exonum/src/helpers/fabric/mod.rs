@@ -294,10 +294,10 @@ pub trait ServiceFactory: 'static {
     fn service_name(&self) -> &str;
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
-    fn command(&mut self, command: CommandName) -> Option<Box<CommandExtension>> {
+    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
         None
     }
 
     /// Creates a new service instance from the context returned by the `Run` command.
-    fn make_service(&mut self, run_context: &Context) -> Box<Service>;
+    fn make_service(&mut self, run_context: &Context) -> Box<dyn Service>;
 }

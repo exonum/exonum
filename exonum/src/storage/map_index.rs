@@ -76,7 +76,7 @@ pub struct MapIndexValues<'a, V> {
 
 impl<T, K, V> MapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: StorageKey,
     V: StorageValue,
 {
@@ -415,7 +415,7 @@ where
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: StorageKey,
     V: StorageValue,
 {

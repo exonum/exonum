@@ -62,7 +62,7 @@ pub struct ValueSetIndexHashes<'a> {
 
 impl<T, V> ValueSetIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -363,7 +363,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     type Item = (Hash, V);

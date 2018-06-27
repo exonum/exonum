@@ -258,7 +258,7 @@ impl TransactionError {
     }
 
     /// Creates a new `TransactionError` instance from `std::thread::Result`'s `Err`.
-    pub(crate) fn from_panic(panic: &Box<Any + Send>) -> Self {
+    pub(crate) fn from_panic(panic: &Box<dyn Any + Send>) -> Self {
         Self::panic(panic_description(panic))
     }
 
@@ -276,7 +276,7 @@ impl TransactionError {
 
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
     fn from(tx: T) -> Self {
-        Box::new(tx) as Box<Transaction>
+        Box::new(tx) as Box<dyn Transaction>
     }
 }
 
@@ -357,7 +357,7 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
-pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+pub trait TransactionSet: Into<Box<dyn Transaction>> + DeserializeOwned + Serialize + Clone {
     /// Parses a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
@@ -631,12 +631,12 @@ macro_rules! transactions {
 }
 
 /// Tries to get a meaningful description from the given panic.
-fn panic_description(any: &Box<Any + Send>) -> Option<String> {
+fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
     if let Some(s) = any.downcast_ref::<&str>() {
         Some(s.to_string())
     } else if let Some(s) = any.downcast_ref::<String>() {
         Some(s.clone())
-    } else if let Some(error) = any.downcast_ref::<Box<Error + Send>>() {
+    } else if let Some(error) = any.downcast_ref::<Box<dyn Error + Send>>() {
         Some(error.description().to_string())
     } else {
         None

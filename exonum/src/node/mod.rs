@@ -61,7 +61,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Box<Transaction>),
+    Transaction(Box<dyn Transaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -105,7 +105,7 @@ pub struct NodeHandler {
     /// Shared api state.
     pub api_state: SharedNodeState,
     /// System state.
-    pub system_state: Box<SystemStateProvider>,
+    pub system_state: Box<dyn SystemStateProvider>,
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
     /// Blockchain.
@@ -325,7 +325,7 @@ impl NodeHandler {
         blockchain: Blockchain,
         external_address: SocketAddr,
         sender: NodeSender,
-        system_state: Box<SystemStateProvider>,
+        system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
     ) -> Self {
@@ -659,7 +659,7 @@ impl fmt::Debug for NodeHandler {
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
+    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()>;
 }
 
 impl ApiSender {
@@ -686,7 +686,7 @@ impl ApiSender {
 }
 
 impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()> {
+    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()> {
         if !tx.verify() {
             let msg = "Unable to verify transaction";
             return Err(io::Error::new(io::ErrorKind::Other, msg));
@@ -786,9 +786,9 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new<D: Into<Arc<Database>>>(
+    pub fn new<D: Into<Arc<dyn Database>>>(
         db: D,
-        services: Vec<Box<Service>>,
+        services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
     ) -> Self {
         crypto::init();

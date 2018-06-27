@@ -19,7 +19,7 @@
 //!
 //! [docs:time]: https://exonum.com/doc/advanced/time
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_object)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate chrono;
 #[macro_use]
