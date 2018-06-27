@@ -39,3 +39,7 @@ This is the main Exonum repository that includes
   * [Timestamping](examples/timestamping/README.md).
 
 See individual projects readme for the details.
+
+## Other languages support
+
+* [Java](https://github.com/exonum/exonum-java-binding)

@@ -51,7 +51,7 @@ impl Height {
     /// let next_height = height.next();
     /// assert_eq!(11, next_height.0);
     /// ```
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         Height(self.0 + 1)
     }
 
@@ -70,7 +70,7 @@ impl Height {
     /// let previous_height = height.previous();
     /// assert_eq!(9, previous_height.0);
     /// ```
-    pub fn previous(&self) -> Self {
+    pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
         Height(self.0 - 1)
     }
@@ -155,7 +155,7 @@ impl Round {
     /// let next_round = round.next();
     /// assert_eq!(21, next_round.0);
     /// ```
-    pub fn next(&self) -> Self {
+    pub fn next(self) -> Self {
         Round(self.0 + 1)
     }
 
@@ -174,7 +174,7 @@ impl Round {
     /// let previous_round = round.previous();
     /// assert_eq!(9, previous_round.0);
     /// ```
-    pub fn previous(&self) -> Self {
+    pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
         Round(self.0 - 1)
     }
@@ -227,9 +227,9 @@ impl Round {
     /// assert_eq!(Some(Round(1)), iter.next());
     /// assert_eq!(None, iter.next());
     /// ```
-    pub fn iter_to(&self, to: Round) -> RoundRangeIter {
+    pub fn iter_to(self, to: Round) -> RoundRangeIter {
         RoundRangeIter {
-            next: *self,
+            next: self,
             last: to,
         }
     }

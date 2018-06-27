@@ -25,8 +25,6 @@ use iron::prelude::*;
 use router::Router;
 use serde_json;
 
-use std::fmt;
-
 use transactions::WalletTransactions;
 use wallet::Wallet;
 use {CurrencySchema, CRYPTOCURRENCY_SERVICE_ID};
@@ -39,27 +37,27 @@ pub struct TransactionResponse {
 }
 
 /// Proof of existence for specific wallet.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
     /// Proof to the whole database table.
-    to_table: MapProof<Hash, Hash>,
+    pub to_table: MapProof<Hash, Hash>,
     /// Proof to the specific wallet in this table.
-    to_wallet: MapProof<PublicKey, Wallet>,
+    pub to_wallet: MapProof<PublicKey, Wallet>,
 }
 
 /// Wallet history.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WalletHistory {
-    proof: ListProof<Hash>,
-    transactions: Vec<WalletTransactions>,
+    pub proof: ListProof<Hash>,
+    pub transactions: Vec<WalletTransactions>,
 }
 
 /// Wallet information.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WalletInfo {
-    block_proof: BlockProof,
-    wallet_proof: WalletProof,
-    wallet_history: Option<WalletHistory>,
+    pub block_proof: BlockProof,
+    pub wallet_proof: WalletProof,
+    pub wallet_history: Option<WalletHistory>,
 }
 
 /// TODO: Add documentation. (ECR-1638)
@@ -76,10 +74,9 @@ where
     T: TransactionSend + Clone + 'static,
 {
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
-        let view = self.blockchain.snapshot();
-        let general_schema = blockchain::Schema::new(&view);
-        let mut view = self.blockchain.fork();
-        let currency_schema = CurrencySchema::new(&mut view);
+        let snapshot = self.blockchain.snapshot();
+        let general_schema = blockchain::Schema::new(&snapshot);
+        let currency_schema = CurrencySchema::new(&snapshot);
 
         let max_height = general_schema.block_hashes_by_height().len() - 1;
 
@@ -147,26 +144,6 @@ where
         };
         router.get("/v1/wallets/info/:pubkey", wallet_info, "wallet_info");
     }
-
-    fn wire_wallet(self, router: &mut Router) {
-        let wallet = move |req: &mut Request| -> IronResult<Response> {
-            let pub_key: PublicKey = self.url_fragment(req, "pubkey")?;
-            let view = self.blockchain.snapshot();
-            let schema = CurrencySchema::new(view);
-            if let Some(wallet) = schema.wallet(&pub_key) {
-                self.ok_response(&serde_json::to_value(&wallet).unwrap())
-            } else {
-                self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-            }
-        };
-        router.get("/v1/wallets/:pubkey", wallet, "wallet");
-    }
-}
-
-impl<T: TransactionSend + Clone> fmt::Debug for CryptocurrencyApi<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CryptocurrencyApi {{}}")
-    }
 }
 
 impl<T> Api for CryptocurrencyApi<T>
@@ -176,6 +153,5 @@ where
     fn wire(&self, router: &mut Router) {
         self.clone().wire_post_transaction(router);
         self.clone().wire_wallet_info(router);
-        self.clone().wire_wallet(router);
     }
 }

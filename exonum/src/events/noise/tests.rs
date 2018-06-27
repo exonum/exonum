@@ -133,25 +133,22 @@ const MAX_MESSAGE_LEN: usize = 128;
 const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
-impl HandshakeParams {
-    fn default_test_params() -> Self {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
-        HandshakeParams {
-            max_message_len: MAX_MESSAGE_LEN as u32,
-            public_key,
-            secret_key,
-        }
-    }
+pub fn default_test_params() -> HandshakeParams {
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+    let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+    params.set_remote_key(public_key);
+    params
 }
 
 #[test]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
+    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
     assert!(
         listener_err
@@ -164,11 +161,12 @@ fn test_noise_handshake_errors_ee_empty() {
 #[test]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::StaticKeyExchange,
         EMPTY_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
+    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
     assert!(
         listener_err
@@ -181,11 +179,12 @@ fn test_noise_handshake_errors_es_empty() {
 #[test]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
+    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
     assert!(listener_err.unwrap_err().description().contains("Decrypt"));
 }
@@ -193,11 +192,12 @@ fn test_noise_handshake_errors_ee_standard() {
 #[test]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::StaticKeyExchange,
         STANDARD_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
+    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
     assert!(listener_err.unwrap_err().description().contains("Decrypt"));
 }
@@ -205,11 +205,12 @@ fn test_noise_handshake_errors_es_standard() {
 #[test]
 fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
     ));
-    let (sender_err, _) = wait_for_handshake_result(addr, None, bogus_message);
+    let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
     assert!(
         sender_err
@@ -222,30 +223,45 @@ fn test_noise_handshake_errors_ee_empty_listen() {
 #[test]
 fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
+    let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
     ));
-    let (sender_err, _) = wait_for_handshake_result(addr, None, bogus_message);
+    let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
     assert!(sender_err.unwrap_err().description().contains("Decrypt"));
+}
+
+#[test]
+fn test_noise_handshake_wrong_remote_key() {
+    let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
+    let mut params = default_test_params();
+    let (remote_key, _) = gen_keypair();
+    params.set_remote_key(remote_key);
+
+    let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);
+
+    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
 }
 
 // We need check result from both: sender and responder.
 fn wait_for_handshake_result(
     addr: SocketAddr,
+    params: &HandshakeParams,
     sender_message: Option<BogusMessage>,
     responder_message: Option<BogusMessage>,
 ) -> (IoResult<()>, IoResult<()>) {
     let (err_tx, err_rx) = mpsc::channel::<io::Error>(0);
 
     let responder_message = responder_message.clone();
+    let remote_params = params.clone();
 
-    thread::spawn(move || run_handshake_listener(&addr, err_tx, responder_message));
+    thread::spawn(move || run_handshake_listener(&addr, &remote_params, err_tx, responder_message));
     //TODO: very likely will be removed in [ECR-1664].
     thread::sleep(Duration::from_millis(500));
 
-    let sender_err = send_handshake(&addr, sender_message);
+    let sender_err = send_handshake(&addr, &params, sender_message);
     let listener_err = err_rx
         .wait()
         .next()
@@ -256,12 +272,12 @@ fn wait_for_handshake_result(
 
 fn run_handshake_listener(
     addr: &SocketAddr,
+    params: &HandshakeParams,
     err_sender: Sender<io::Error>,
     bogus_message: Option<BogusMessage>,
 ) -> Result<(), io::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let params = HandshakeParams::default_test_params();
 
     core.run(
         TcpListener::bind(addr, &handle)
@@ -289,10 +305,13 @@ fn run_handshake_listener(
     )
 }
 
-fn send_handshake(addr: &SocketAddr, bogus_message: Option<BogusMessage>) -> Result<(), io::Error> {
+fn send_handshake(
+    addr: &SocketAddr,
+    params: &HandshakeParams,
+    bogus_message: Option<BogusMessage>,
+) -> Result<(), io::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
-    let params = HandshakeParams::default_test_params();
 
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {

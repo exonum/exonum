@@ -31,7 +31,8 @@ use exonum::{api::ApiError,
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::{transactions::{CreateWallet, Transfer},
+use cryptocurrency::{api::WalletInfo,
+                     transactions::{CreateWallet, Transfer},
                      wallet::Wallet,
                      CurrencyService};
 
@@ -242,9 +243,16 @@ impl CryptocurrencyApi {
     fn get_wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         let value: serde_json::Value = self.inner.get(
             ApiKind::Service("cryptocurrency"),
-            &format!("/v1/wallets/{}", pub_key.to_string()),
+            &format!("/v1/wallets/info/{}", pub_key.to_string()),
         );
-        serde_json::from_value(value).ok()
+        let wallet_info: WalletInfo = serde_json::from_value(value).unwrap();
+        let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
+        to_wallet
+            .all_entries()
+            .iter()
+            .find(|(ref k, _)| *k == pub_key)
+            .and_then(|tuple| tuple.1)
+            .cloned()
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
@@ -257,15 +265,20 @@ impl CryptocurrencyApi {
         assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
     }
     /// Asserts that a wallet with the specified public key is not known to the blockchain.
-    fn assert_no_wallet(&self, pubkey: &PublicKey) {
-        let err = self.inner.get_err(
+    fn assert_no_wallet(&self, pub_key: &PublicKey) {
+        let value: serde_json::Value = self.inner.get(
             ApiKind::Service("cryptocurrency"),
-            &format!("v1/wallets/{}", pubkey.to_string()),
+            &format!("/v1/wallets/info/{}", pub_key.to_string()),
         );
-        assert_matches!(
-            err,
-            ApiError::NotFound(ref body) if body == "Wallet not found"
-        );
+        let wallet_info: WalletInfo = serde_json::from_value(value).unwrap();
+        let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
+        assert!(
+            to_wallet
+                .missing_keys()
+                .iter()
+                .find(|v| **v == pub_key)
+                .is_some()
+        )
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
