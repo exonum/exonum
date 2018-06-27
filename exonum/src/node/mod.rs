@@ -17,43 +17,34 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{connect_list::ConnectList,
-               state::{RequestData, State, ValidatorState}};
+pub use self::{
+    connect_list::ConnectList, state::{RequestData, State, ValidatorState},
+};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors,
-                            SystemRuntimeConfig},
-          ApiAccess,
-          ApiAggregator};
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use toml::Value;
 
-use std::{collections::{BTreeMap, HashSet},
-          fmt,
-          io,
-          net::SocketAddr,
-          sync::Arc,
-          thread,
-          time::{Duration, SystemTime}};
+use std::{
+    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    time::{Duration, SystemTime},
+};
 
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use events::{error::{into_other, log_error, other_error, LogError},
-             noise::HandshakeParams,
-             HandlerPart,
-             InternalEvent,
-             InternalPart,
-             InternalRequest,
-             NetworkConfiguration,
-             NetworkEvent,
-             NetworkPart,
-             NetworkRequest,
-             SyncSender,
-             TimeoutRequest};
+use events::{
+    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
+    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
+    NetworkRequest, SyncSender, TimeoutRequest,
+};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};

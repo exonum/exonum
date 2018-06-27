@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use futures::future::{done, Future};
-use tokio_io::{codec::Framed,
-               io::{read_exact, write_all},
-               AsyncRead,
-               AsyncWrite};
+use tokio_io::{
+    codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
+};
 
 use std::io;
 
-use crypto::{x25519::{self, into_x25519_keypair, into_x25519_public_key},
-             PublicKey,
-             SecretKey};
+use crypto::{
+    x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
+};
 use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
-use events::{codec::MessagesCodec,
-             noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
+use events::{
+    codec::MessagesCodec, noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH},
+};
 
 pub mod sodium_resolver;
 pub mod wrapper;

@@ -15,10 +15,10 @@
 // Suppress a warning in `transactions!` macro call:
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
-use exonum::{blockchain::{ExecutionError, ExecutionResult, Transaction},
-             crypto::{CryptoHash, PublicKey},
-             messages::Message,
-             storage::Fork};
+use exonum::{
+    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
+    messages::Message, storage::Fork,
+};
 use exonum_time::schema::TimeSchema;
 
 use schema::{Schema, Timestamp, TimestampEntry};

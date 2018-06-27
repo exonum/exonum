@@ -17,15 +17,11 @@ use serde_json;
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
-use super::{key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
-            node::BranchNode,
-            proof::MapProofBuilder,
-            HashedKey,
-            MapProof,
-            MapProofError,
-            ProofMapIndex,
-            ProofMapKey,
-            ProofPath};
+use super::{
+    key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX}, node::BranchNode,
+    proof::MapProofBuilder, HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey,
+    ProofPath,
+};
 use crypto::{hash, CryptoHash, Hash, HashStream};
 use encoding::serialize::reexport::{DeserializeOwned, Serialize};
 use storage::{Database, Fork, StorageValue};

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-             blockchain::{SharedNodeState, Transaction},
-             crypto,
-             explorer::{BlockWithTransactions, BlockchainExplorer},
-             helpers::Height};
+use exonum::{
+    api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
+    blockchain::{SharedNodeState, Transaction}, crypto,
+    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
+};
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 

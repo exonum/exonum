@@ -29,13 +29,11 @@ pub mod api;
 pub mod schema;
 pub mod transactions;
 
-use exonum::{api::ServiceApiBuilder,
-             blockchain::{self, Transaction, TransactionSet},
-             crypto::Hash,
-             encoding::Error as StreamStructError,
-             helpers::fabric,
-             messages::RawTransaction,
-             storage::Snapshot};
+use exonum::{
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    encoding::Error as StreamStructError, helpers::fabric, messages::RawTransaction,
+    storage::Snapshot,
+};
 
 use api::PublicApi;
 use schema::Schema;

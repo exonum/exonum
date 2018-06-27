@@ -17,9 +17,9 @@
 
 use serde_json::Value;
 
-use std::{collections::{HashMap, HashSet},
-          net::SocketAddr,
-          sync::{Arc, RwLock}};
+use std::{
+    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
+};
 
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;

@@ -13,15 +13,18 @@
 // limitations under the License.
 
 use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
-use tokio_core::{net::{TcpListener, TcpStream},
-                 reactor::Handle};
-use tokio_retry::{strategy::{jitter, FixedInterval},
-                  Retry};
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Handle,
+};
+use tokio_retry::{
+    strategy::{jitter, FixedInterval}, Retry,
+};
 
 use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
 
-use super::{error::{into_other, log_error, other_error, result_ok},
-            to_box};
+use super::{
+    error::{into_other, log_error, other_error, result_ok}, to_box,
+};
 use crypto::PublicKey;
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;

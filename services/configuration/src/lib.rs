@@ -80,13 +80,11 @@ pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use exonum::{api::ServiceApiBuilder,
-             blockchain::{self, Transaction, TransactionSet},
-             crypto::Hash,
-             encoding::Error as EncodingError,
-             helpers::fabric::{self, Context},
-             messages::RawTransaction,
-             storage::Snapshot};
+use exonum::{
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
+    storage::Snapshot,
+};
 
 mod api;
 mod errors;

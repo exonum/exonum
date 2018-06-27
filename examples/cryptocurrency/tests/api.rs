@@ -26,8 +26,10 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::{api::{self, node::public::explorer::TransactionQuery},
-             crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}};
+use exonum::{
+    api::{self, node::public::explorer::TransactionQuery},
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.

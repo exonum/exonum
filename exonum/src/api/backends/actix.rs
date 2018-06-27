@@ -17,30 +17,24 @@
 pub use actix_web::middleware::cors::Cors;
 
 use actix::{msgs::SystemExit, Addr, Arbiter, Syn, System};
-use actix_web::{self,
-                error::ResponseError,
-                server::{HttpServer, IntoHttpHandler, StopServer},
-                AsyncResponder,
-                FromRequest,
-                HttpMessage,
-                HttpResponse,
-                Query};
+use actix_web::{
+    self, error::ResponseError, server::{HttpServer, IntoHttpHandler, StopServer}, AsyncResponder,
+    FromRequest, HttpMessage, HttpResponse, Query,
+};
 use failure;
 use futures::{Future, IntoFuture};
-use serde::{de::{self, DeserializeOwned},
-            ser,
-            Serialize};
+use serde::{
+    de::{self, DeserializeOwned}, ser, Serialize,
+};
 
-use std::{fmt,
-          net::SocketAddr,
-          result,
-          str::FromStr,
-          sync::{mpsc, Arc},
-          thread::{self, JoinHandle}};
+use std::{
+    fmt, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc}, thread::{self, JoinHandle},
+};
 
-use api::{error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult,
-          Immutable, Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
-          ServiceApiState};
+use api::{
+    error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
+    Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+};
 
 /// Type alias for the concrete `actix-web` HTTP response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;

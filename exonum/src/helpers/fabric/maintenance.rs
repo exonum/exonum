@@ -16,10 +16,9 @@
 
 use std::{collections::HashMap, path::Path};
 
-use super::{internal::{CollectedCommand, Command, Feedback},
-            Argument,
-            CommandName,
-            Context};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, Argument, CommandName, Context,
+};
 use blockchain::Schema;
 use helpers::config::ConfigFile;
 use node::NodeConfig;

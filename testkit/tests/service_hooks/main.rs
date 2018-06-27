@@ -21,9 +21,9 @@ extern crate serde_json;
 // HACK: Silent "dead_code" warning.
 pub use hooks::{AfterCommitService, TxAfterCommit};
 
-use exonum::{crypto::{CryptoHash, Signature},
-             helpers::Height,
-             messages::Message};
+use exonum::{
+    crypto::{CryptoHash, Signature}, helpers::Height, messages::Message,
+};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;

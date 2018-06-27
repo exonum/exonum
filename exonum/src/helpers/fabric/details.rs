@@ -19,19 +19,17 @@
 
 use toml;
 
-use std::{collections::{BTreeMap, HashMap},
-          fs,
-          net::{IpAddr, SocketAddr},
-          path::{Path, PathBuf}};
+use std::{
+    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
+};
 
-use super::{internal::{CollectedCommand, Command, Feedback},
-            keys,
-            shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
-                     SharedConfig},
-            Argument,
-            CommandName,
-            Context,
-            DEFAULT_EXONUM_LISTEN_PORT};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, keys,
+    shared::{
+        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
+    },
+    Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
+};
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;

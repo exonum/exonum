@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::{Hash, PublicKey},
-             storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot}};
+use exonum::{
+    crypto::{Hash, PublicKey}, storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot},
+};
 
 use wallet::Wallet;
 use INITIAL_BALANCE;

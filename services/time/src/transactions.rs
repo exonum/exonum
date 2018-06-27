@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
-use exonum::{blockchain::{ExecutionError, ExecutionResult, Schema, Transaction},
-             crypto::PublicKey,
-             messages::Message,
-             storage::{Fork, Snapshot}};
+use exonum::{
+    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction}, crypto::PublicKey,
+    messages::Message, storage::{Fork, Snapshot},
+};
 
 use schema::TimeSchema;
 

@@ -14,8 +14,9 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
-            node::{BranchNode, Node}};
+use super::{
+    key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE}, node::{BranchNode, Node},
+};
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 

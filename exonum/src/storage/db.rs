@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cmp::Ordering::{Equal, Greater, Less},
-          collections::{btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range},
-                        hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter},
-                        Bound::{Included, Unbounded},
-                        HashMap},
-          iter::{Iterator as StdIterator, Peekable}};
+use std::{
+    cmp::Ordering::{Equal, Greater, Less},
+    collections::{
+        btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range},
+        hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter},
+        Bound::{Included, Unbounded}, HashMap,
+    },
+    iter::{Iterator as StdIterator, Peekable},
+};
 
 use self::NextIterValue::*;
 use super::Result;

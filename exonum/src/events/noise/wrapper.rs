@@ -17,8 +17,9 @@ use bytes::BytesMut;
 use failure;
 use snow::{NoiseBuilder, Session};
 
-use std::{fmt::{self, Error, Formatter},
-          io};
+use std::{
+    fmt::{self, Error, Formatter}, io,
+};
 
 use events::noise::sodium_resolver::SodiumResolver;
 use events::noise::HandshakeParams;

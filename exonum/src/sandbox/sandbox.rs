@@ -17,27 +17,33 @@
 
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
-use std::{cell::{Ref, RefCell, RefMut},
-          collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
-          iter::FromIterator,
-          net::{IpAddr, Ipv4Addr, SocketAddr},
-          ops::{AddAssign, Deref},
-          sync::{Arc, Mutex},
-          time::{Duration, SystemTime, UNIX_EPOCH}};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
+    net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
-use super::{config_updater::ConfigUpdateService,
-            sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
-            timestamping::TimestampingService};
-use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-                 SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
+use super::{
+    config_updater::ConfigUpdateService, sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
+    timestamping::TimestampingService,
+};
+use blockchain::{
+    Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+    SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+};
 use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
-use events::{network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
-             NetworkEvent, NetworkRequest, TimeoutRequest};
+use events::{
+    network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
+    NetworkEvent, NetworkRequest, TimeoutRequest,
+};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
-use node::{ApiSender, Configuration, ConnectList, ExternalMessage, ListenerConfig, NodeHandler,
-           NodeSender, ServiceConfig, State, SystemStateProvider};
+use node::{
+    ApiSender, Configuration, ConnectList, ExternalMessage, ListenerConfig, NodeHandler,
+    NodeSender, ServiceConfig, State, SystemStateProvider,
+};
 use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
@@ -828,8 +834,10 @@ mod tests {
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
     use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
-                                        VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
+    use sandbox::sandbox_tests_helper::{
+        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
+        ROUND_TWO,
+    };
     use storage::{Fork, Snapshot};
 
     const SERVICE_ID: u16 = 1;
