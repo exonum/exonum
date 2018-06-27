@@ -15,24 +15,33 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Migration path:
 
   For backend:
-  - Remove old dependencies on `iron` and its companions `bodyparser`, `router` and other.
+  - Remove old dependencies on `iron` and its companions `bodyparser`, `router`
+    and other.
   - Simplify the API handlers as follows:
-    `fn my_handler(state: &ServiceApiState, query: MyQueryType) -> Result<MyResponse, ApiError>`
+    ```rust
+    fn my_handler(state: &ServiceApiState, query: MyQueryType)
+    -> Result<MyResponse, ApiError>
+    {
+      // ...
+    }
+    ```
     where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
     implements `Serialize` trait.
-  - Replace old methods `public_api_handler` and `private_api_handler` of `Service` trait by a
-    single `wire_api` method which takes `ServiceApiBuilder`.
-    You can use this builder as a factory for your service API.
+  - Replace old methods `public_api_handler` and `private_api_handler` of
+    `Service` trait by a single `wire_api` method which takes
+    `ServiceApiBuilder`. You can use this builder as a factory for your service
+    API.
   - `get`, `get_err` and `post` methods in `TestKitApi` have been replaced
     by the more convenient `RequestBuilder`.
     Don't forget to update your testkit based API tests.
 
   For frontend:
   - New API implementation supports only query parameters in `GET` requests.
-    In this way requests like `GET api/my_method/:my_first_path_param/:my_second_path_param`
-    should be replaced by the `GET api/my_method?my_first_param=value1&my_second_param=value2`.
+    In this way requests like `GET api/my_method/:first/:second`
+    should be replaced by the `GET api/my_method?first=value1&second=value2`.
   - Json parser for `POST` requests became more strict.
-    In this way you should send `null` in request body even for handlers without query parameters.
+    In this way you should send `null` in request body even for handlers
+    without query parameters.
 
   See our [examples](examples) for more details.
 
