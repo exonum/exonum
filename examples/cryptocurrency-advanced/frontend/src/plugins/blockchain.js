@@ -222,14 +222,13 @@ module.exports = {
         }
 
         const signature = TxCreateWallet.sign(keyPair.secretKey, data)
+        TxCreateWallet.signature = signature
+        const hash = TxCreateWallet.hash(data)
 
-        return axios.post(TX_URL, {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_WALLET_ID,
-          signature: signature,
-          body: data
-        })
+        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => { 
+            return { data: { tx_hash : hash } }
+          })
       },
 
       addFunds(keyPair, amountToAdd, seed) {
@@ -242,14 +241,13 @@ module.exports = {
         }
 
         const signature = TxIssue.sign(keyPair.secretKey, data)
+        TxIssue.signature = signature
+        const hash = TxIssue.hash(data)
 
-        return axios.post(TX_URL, {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_ISSUE_ID,
-          signature: signature,
-          body: data
-        }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
+        return TxIssue.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => waitForAcceptance(keyPair.publicKey, hash)
+        )
+        
       },
 
       transfer(keyPair, receiver, amountToTransfer, seed) {
@@ -263,14 +261,12 @@ module.exports = {
         }
 
         const signature = TxTransfer.sign(keyPair.secretKey, data)
+        TxTransfer.signature = signature
+        const hash = TxTransfer.hash(data)
 
-        return axios.post(TX_URL, {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_TRANSFER_ID,
-          signature: signature,
-          body: data
-        }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
+        return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => waitForAcceptance(keyPair.publicKey, hash)
+        )
       },
 
       getWallet: getWallet,

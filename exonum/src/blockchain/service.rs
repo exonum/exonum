@@ -392,12 +392,19 @@ impl SharedNodeState {
         let mut lock = self.state.write().expect("Expected write lock.");
 
         lock.peers_info.clear();
+        lock.incoming_connections.clear();
+        lock.outgoing_connections.clear();
         lock.majority_count = state.majority_count();
         lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
             lock.peers_info.insert(c.addr(), *p);
+            lock.outgoing_connections.insert(c.addr());
+        }
+
+        for addr in state.connections().keys() {
+            lock.incoming_connections.insert(*addr);
         }
     }
 
