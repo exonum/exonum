@@ -47,12 +47,6 @@ pub enum Error {
     /// Can be emitted by `Transfer`.
     #[fail(display = "Insufficient currency amount")]
     InsufficientCurrencyAmount = 3,
-
-    /// Sending funds to yourself.
-    ///
-    /// Can be emitted by `Transfer`.
-    #[fail(display = "Sending funds to yourself")]
-    SendingFundsToYourself = 4,
 }
 
 impl From<Error> for ExecutionError {
@@ -91,7 +85,7 @@ transactions! {
 
 impl Transaction for Transfer {
     fn verify(&self) -> bool {
-        self.verify_signature(self.from())
+        (*self.from() != *self.to()) && self.verify_signature(self.from())
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
@@ -101,10 +95,6 @@ impl Transaction for Transfer {
         let to = self.to();
         let hash = self.hash();
         let amount = self.amount();
-
-        if from == to {
-            Err(Error::SendingFundsToYourself)?
-        }
 
         let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
 
