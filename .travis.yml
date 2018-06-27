@@ -97,8 +97,11 @@ jobs:
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
-#    - cargo clippy --all -- -D warnings
-    - cargo clippy --all -- -D clippy_pedantic clippy_perf clippy_style clippy_complexity
+    - cargo clippy --all -- -D clippy_pedantic
+    - cargo clippy --all -- -D clippy_perf
+    - cargo clippy --all -- -D warnings
+    - cargo clippy --all -- -D clippy_style
+    - cargo clippy --all -- -D clippy_complexity
 
 
   # Tests
