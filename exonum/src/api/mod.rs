@@ -46,13 +46,10 @@ pub trait ServiceApiBackend: Sized {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F, Immutable>>,
+        E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
-        let named_with = NamedWith {
-            name: name.into(),
-            inner: endpoint.into(),
-        };
+        let named_with = NamedWith::new(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
@@ -63,13 +60,10 @@ pub trait ServiceApiBackend: Sized {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F, Mutable>>,
+        E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
-        let named_with = NamedWith {
-            name: name.into(),
-            inner: endpoint.into(),
-        };
+        let named_with = NamedWith::new(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
@@ -104,7 +98,7 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F, Immutable>>,
+        E: Into<With<Q, I, R, F>>,
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
         self.actix_backend.endpoint(name, endpoint);
@@ -122,7 +116,7 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F, Mutable>>,
+        E: Into<With<Q, I, R, F>>,
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
         self.actix_backend.endpoint_mut(name, endpoint);

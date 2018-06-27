@@ -24,36 +24,60 @@ pub type Result<I> = ::std::result::Result<I, error::Error>;
 pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract handler from various entities.
+/// The basic idea of this structure is to extract type parameters from the given handler,
+/// thus, it becomes possible to distinguish different types of closures in compile time.
+///
+/// For example for `Fn(state: &ServiceApiState, query: MyQuery) -> Result<MyResponse, api::Error>`
+/// extracted types are:
+///
+/// - 'Q' is `MyQuery`, i.e. type of query.
+/// - `I` is `MyResponse`, i.e. type of response item.
+/// - `R` is `Result<I, api::Error>`, i.e. complete type of result.
 #[derive(Debug)]
-pub struct With<Q, I, R, F, K> {
-    /// Extracted API handler.
+pub struct With<Q, I, R, F> {
+    /// Underlying API handler.
     pub handler: F,
     _query_type: PhantomData<Q>,
     _item_type: PhantomData<I>,
     _result_type: PhantomData<R>,
-    _kind: PhantomData<K>,
 }
 
-/// Immutable endpoint marker. With it possible to create immutable kind of `With`.
+/// Immutable endpoint marker. With it possible to create immutable kind of `NamedWith`.
 #[derive(Debug)]
 pub struct Immutable;
 
-/// Mutable endpoint marker. With it possible to create mutable kind of `With`.
+/// Mutable endpoint marker. With it possible to create mutable kind of `NamedWith`.
 #[derive(Debug)]
 pub struct Mutable;
 
-/// API Endpoint extractor that also contains endpoint name.
+/// API Endpoint extractor that also contains endpoint name and its kind.
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F, K> {
     /// Endpoint name.
     pub name: String,
     /// Extracted endpoint handler.
-    pub inner: With<Q, I, R, F, K>,
+    pub inner: With<Q, I, R, F>,
+    _kind: PhantomData<K>,
+}
+
+impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
+    /// Creates a new instance from the given handler.
+    pub fn new<S, W>(name: S, inner: W) -> Self
+    where
+        S: Into<String>,
+        W: Into<With<Q, I, R, F>>,
+    {
+        NamedWith {
+            name: name.into(),
+            inner: inner.into(),
+            _kind: PhantomData::default(),
+        }
+    }
 }
 
 // Implementations for Result and query params.
 
-impl<Q, I, F, K> From<F> for With<Q, I, Result<I>, F, K>
+impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I>,
 {
@@ -63,14 +87,13 @@ where
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,
-            _kind: PhantomData,
         }
     }
 }
 
 // Implementations for FutureResult and query params.
 
-impl<Q, I, F, K> From<F> for With<Q, I, FutureResult<I>, F, K>
+impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I>,
 {
@@ -80,7 +103,6 @@ where
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,
-            _kind: PhantomData,
         }
     }
 }
