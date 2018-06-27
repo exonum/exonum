@@ -167,7 +167,7 @@ impl Cipher for SodiumChaChaPoly {
             "Can't encrypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0u8; 8];
+        let mut nonce_bytes = [0_u8; 8];
         LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
         let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
 
@@ -190,7 +190,7 @@ impl Cipher for SodiumChaChaPoly {
             "Can't dectypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0u8; 8];
+        let mut nonce_bytes = [0_u8; 8];
         LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
         let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
 
@@ -270,7 +270,7 @@ mod tests {
         let public = Vec::<u8>::from_hex(
             "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
         ).unwrap();
-        let mut output = [0u8; 32];
+        let mut output = [0_u8; 32];
         keypair.dh(&public, &mut output);
 
         assert_eq!(
@@ -293,10 +293,10 @@ mod tests {
         keypair_b.generate(&mut rng);
 
         // Create shared secrets with public keys of each other.
-        let mut our_shared_secret = [0u8; 32];
+        let mut our_shared_secret = [0_u8; 32];
         keypair_a.dh(keypair_b.pubkey(), &mut our_shared_secret);
 
-        let mut remote_shared_secret = [0u8; 32];
+        let mut remote_shared_secret = [0_u8; 32];
         keypair_b.dh(keypair_a.pubkey(), &mut remote_shared_secret);
 
         // Results are expected to be the same.
