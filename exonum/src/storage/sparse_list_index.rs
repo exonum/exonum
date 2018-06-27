@@ -14,9 +14,6 @@
 
 //! An implementation of an array list of items with spaces.
 //!
-//! `SparseListIndex` implements an array list, storing an element as a value and
-//! using `u64` as an index. `SparseListIndex` requires that elements implement the
-//! [`StorageValue`] trait.
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
@@ -73,7 +70,7 @@ impl StorageValue for SparseListSize {
 
 /// A list of items similar to the [`ListIndex`], however, it may contain "spaces". For instance,
 /// a list might contain six elements with indices: "1, 2, 3, 5, 7, 8" (missing 4 and 6). And if you
-/// try to get the element for index 4 or 6, you'll get None.
+/// try to get the element for index 4 or 6, you'll get `None`.
 ///
 /// Later, elements can be added to the
 /// spaces, if required. Elements in this list are added to the back of the list and are

@@ -310,8 +310,8 @@ pub trait Snapshot: 'static {
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
-/// the standard 'Iterator' trait, `Iterator` in Exonum is low-level and,
-/// therefore, operates with bytes.
+/// the standard [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html) 
+/// trait, `Iterator` in Exonum is low-level and, therefore, operates with bytes.
 pub trait Iterator {
     /// Advances the iterator and returns a reference to the next key and value.
     fn next(&mut self) -> Option<(&[u8], &[u8])>;

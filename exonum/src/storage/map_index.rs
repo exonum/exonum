@@ -194,7 +194,7 @@ where
         self.base.contains(key)
     }
 
-    /// Returns an iterator over the entries of a map in ascending order. The iterator element
+    /// Returns an iterator over the entries of the map in ascending order. The iterator element
     /// type is (K, V).
     ///
     /// # Examples

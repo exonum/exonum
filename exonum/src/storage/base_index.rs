@@ -17,6 +17,7 @@
 //! The `BaseIndex` structure is not intended for direct use, rather it is the
 //! basis for building other types of indices. The given section contains methods
 //! related to `BaseIndex` and the iterator over the items of this index.
+
 // spell-checker:ignore subprefix
 
 use std::{borrow::Cow, marker::PhantomData};

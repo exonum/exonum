@@ -65,8 +65,9 @@ struct RocksDBIterator {
 
 impl RocksDB {
     /// Opens a database stored at the specified path with the specified options.
+    ///
     /// If the database does not exist at the indicated path and the option
-    /// 'create_if_missing' is switched on in 'DBOptions', a new database will
+    /// `create_if_missing` is switched on in `DbOptions`, a new database will
     /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
         let db = {

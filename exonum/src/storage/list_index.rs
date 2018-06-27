@@ -14,7 +14,6 @@
 
 //! An implementation of an array list of items.
 //!
-//! `ListIndex` requires that elements implement the `StorageValue` trait.
 //! The given section contains methods related to `ListIndex` and the iterator
 //! over the items of this list.
 
@@ -293,7 +292,7 @@ where
         self.set_len(len + 1)
     }
 
-    /// Removes the last element from the list and returns it, or returns None if it is empty.
+    /// Removes the last element from the list and returns it, or returns `None` if it is empty.
     ///
     /// # Examples
     ///
