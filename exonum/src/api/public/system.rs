@@ -25,18 +25,52 @@ struct MemPoolInfo {
     pub size: usize,
 }
 
-#[doc(hidden)]
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct HealthCheckInfo {
-    pub connectivity: bool,
-}
+//#[doc(hidden)]
+//#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+//pub struct HealthCheckInfo {
+//    pub connectivity: bool,
+//}
 
 /// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
 /// in current state.
+//#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+//pub struct ConsensusStatusInfo {
+//    /// Consensus status: true - if consensus achieved, else - false.
+//    pub status: bool,
+//}
+
+/// Contains amount of connected peers
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct ConsensusStatusInfo {
-    /// Consensus status: true - if consensus achieved, else - false.
-    pub status: bool,
+pub struct PeersAmount {
+    /// amount of connected peers
+    pub amount: usize,
+}
+
+/// Shows connectivity status of the node
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum ConnectivityStatus {
+    NotConnected,
+    Connected(PeersAmount),
+}
+
+/// Shows status of the consensus
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum ConsensusStatus {
+    /// Consensus disabled
+    Disabled,
+    /// Consensus enabled but not active
+    Enabled,
+    /// Consensus enabled and active
+    Active,
+}
+
+/// Information about connectivity and consensus
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct ConnectivityInfo {
+    /// Consensus status
+    pub consensus_status: ConsensusStatus,
+    /// Connectivity status
+    pub connectivity: ConnectivityStatus,
 }
 
 /// Public system API.
@@ -67,15 +101,15 @@ impl SystemApi {
         router.get("/v1/mempool", mempool, "mempool");
     }
 
-    fn healthcheck_info(self, router: &mut Router) {
-        let healthcheck = move |_: &mut Request| -> IronResult<Response> {
-            let info = HealthCheckInfo {
-                connectivity: !self.shared_api_state.peers_info().is_empty(),
-            };
-            self.ok_response(&serde_json::to_value(info).unwrap())
-        };
-        router.get("/v1/healthcheck", healthcheck, "healthcheck");
-    }
+    //fn healthcheck_info(self, router: &mut Router) {
+    //    let healthcheck = move |_: &mut Request| -> IronResult<Response> {
+    //        let info = HealthCheckInfo {
+    //            connectivity: !self.shared_api_state.peers_info().is_empty(),
+    //        };
+    //        self.ok_response(&serde_json::to_value(info).unwrap())
+    //    };
+    //    router.get("/v1/healthcheck", healthcheck, "healthcheck");
+    //}
 
     fn user_agent_info(self, router: &mut Router) {
         let user_agent = move |_: &mut Request| -> IronResult<Response> {
@@ -85,22 +119,46 @@ impl SystemApi {
         router.get("/v1/user_agent", user_agent, "user_agent");
     }
 
-    fn consensus_status_info(self, router: &mut Router) {
-        let consensus_status = move |_: &mut Request| -> IronResult<Response> {
-            let info = ConsensusStatusInfo {
-                status: self.shared_api_state.consensus_status(),
+    fn connectivity_status_info(self, router: &mut Router) {
+        let connectivity_status = move |_: &mut Request| -> IronResult<Response> {
+
+            let peers_info = self.shared_api_state.peers_info();
+
+            let connectivity = if peers_info.is_empty() {
+                ConnectivityStatus::NotConnected
+            } else {
+                ConnectivityStatus::Connected(PeersAmount { amount: peers_info.len(), })
             };
+
+            let consensus_status = if self.shared_api_state.is_enabled() {
+                if self.shared_api_state.consensus_status() {
+                    ConsensusStatus::Active
+                } else {
+                    ConsensusStatus::Enabled
+                }
+            } else {
+                ConsensusStatus::Disabled
+            };
+
+            let info = ConnectivityInfo {
+                consensus_status,
+                connectivity,
+            };
+
+            //let info = ConsensusStatusInfo {
+            //    status: self.shared_api_state.consensus_status(),
+            //};
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
-        router.get("/v1/consensus_status", consensus_status, "consensus_status");
+        router.get("/v1/connectivity_status", connectivity_status, "connectivity_status");
     }
 }
 
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
         self.clone().mempool_info(router);
-        self.clone().healthcheck_info(router);
+        //self.clone().healthcheck_info(router);
         self.clone().user_agent_info(router);
-        self.clone().consensus_status_info(router);
+        self.clone().connectivity_status_info(router);
     }
 }
