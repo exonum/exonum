@@ -18,12 +18,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Remove old dependencies on `iron` and its companions `bodyparser`, `router` and other.
   - Simplify the API handlers as follows:
     `fn my_handler(state: &ServiceApiState, query: MyQueryType) -> Result<MyResponse, ApiError>`
-    where `MyQueryType` type implements `Serialize` trait and `MyResponse`
-    implements `Deserialize` trait.
-  - Replace old methods `public_api_handler` and `private_api_handler` in
-    `Service` trait implementation by the single `wire_api` implementation
-    which provides a `ServiceApiBuilder` object that is a factory for your
-    service API.
+    where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
+    implements `Serialize` trait.
+  - Replace old methods `public_api_handler` and `private_api_handler` of `Service` trait by a
+    single `wire_api` method which takes `ServiceApiBuilder`.
+    You can use this builder as a factory for your service API.
   - `get`, `get_err` and `post` methods in `TestKitApi` have been replaced
     by the more convenient `RequestBuilder`.
     Don't forget to update your testkit based API tests.

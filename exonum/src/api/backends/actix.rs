@@ -42,23 +42,23 @@ use api::{error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, 
           Immutable, Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
           ServiceApiState};
 
-/// Type alias for the concrete API http response.
+/// Type alias for the concrete `actix-web` HTTP response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
-/// Type alias for the concrete API http request.
+/// Type alias for the concrete `actix-web` HTTP request.
 pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
-/// Type alias for the inner actix-web http requests handler.
+/// Type alias for the inner `actix-web` HTTP requests handler.
 pub type RawHandler = Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
-/// Type alias for the actix web App with the ServiceApiState.
+/// Type alias for the `actix-web::App` with the ServiceApiState.
 pub type App = actix_web::App<ServiceApiState>;
-/// Type alias for the actix web App configuration.
+/// Type alias for the `actix-web::App` configuration.
 pub type AppConfig = Arc<Fn(App) -> App + 'static + Send + Sync>;
 
-/// Type alias for the actix http server runtime address.
+/// Type alias for the `actix-web` HTTP server runtime address.
 type HttpServerAddr = Addr<Syn, HttpServer<<App as IntoHttpHandler>::Handler>>;
-/// Type alias for the actix system runtime address.
+/// Type alias for the `actix` system runtime address.
 type SystemAddr = Addr<Syn, System>;
 
-/// Raw actix-web backend requests handler.
+/// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
 pub struct RequestHandler {
     /// Endpoint name.
@@ -78,7 +78,7 @@ impl fmt::Debug for RequestHandler {
     }
 }
 
-/// API builder for the actix-web backend.
+/// API builder for the `actix-web` backend.
 #[derive(Debug, Clone, Default)]
 pub struct ApiBuilder {
     handlers: Vec<RequestHandler>,
@@ -86,7 +86,7 @@ pub struct ApiBuilder {
 
 impl ApiBuilder {
     /// Constructs a new backend builder instance.
-    pub fn new() -> ApiBuilder {
+    pub fn new() -> Self {
         ApiBuilder::default()
     }
 }
@@ -277,7 +277,7 @@ pub struct ApiRuntimeConfig {
 
 impl ApiRuntimeConfig {
     /// Creates api runtime configuration for the given address and access level.
-    pub fn new(listen_address: SocketAddr, access: ApiAccess) -> ApiRuntimeConfig {
+    pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
         ApiRuntimeConfig {
             listen_address,
             access,
