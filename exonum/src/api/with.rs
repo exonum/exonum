@@ -27,10 +27,13 @@ pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 /// The basic idea of this structure is to extract type parameters from the given handler,
 /// thus, it becomes possible to distinguish different types of closures in compile time.
 ///
-/// For example for `Fn(state: &ServiceApiState, query: MyQuery) -> Result<MyResponse, api::Error>`
-/// extracted types are:
+/// For example for handler with signature:
+/// 
+/// `Fn(state: &ServiceApiState, query: MyQuery) -> Result<MyResponse, api::Error>`
+/// 
+/// Extracted types are:
 ///
-/// - 'Q' is `MyQuery`, i.e. type of query.
+/// - `Q` is `MyQuery`, i.e. type of query.
 /// - `I` is `MyResponse`, i.e. type of response item.
 /// - `R` is `Result<I, api::Error>`, i.e. complete type of result.
 #[derive(Debug)]
