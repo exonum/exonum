@@ -88,7 +88,7 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 /// Converts Ed25519 public key to Curve25519 public key.
 ///
 /// See: [`into_x25519_keypair()`][1]
-/// [1]: fn.into_x25519_public_key.html
+/// [1]: `fn.into_x25519_public_key.html`
 pub fn into_x25519_public_key(pk: crypto::PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
