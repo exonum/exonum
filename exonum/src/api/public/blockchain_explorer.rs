@@ -43,7 +43,7 @@ pub struct ExplorerApi {
 impl ExplorerApi {
     /// Creates a new `ExplorerApi` instance.
     pub fn new(blockchain: Blockchain) -> Self {
-        ExplorerApi { blockchain }
+        Self { blockchain }
     }
 
     fn explorer(&self) -> BlockchainExplorer {

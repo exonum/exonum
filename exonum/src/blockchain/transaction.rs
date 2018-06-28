@@ -274,9 +274,10 @@ impl TransactionError {
     }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
     fn from(tx: T) -> Self {
-        Box::new(tx) as Box<Transaction>
+        Box::new(tx) as Self
     }
 }
 

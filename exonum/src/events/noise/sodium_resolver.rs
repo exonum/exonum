@@ -17,7 +17,7 @@ pub struct SodiumResolver {
 
 impl SodiumResolver {
     pub fn new() -> Self {
-        SodiumResolver {
+        Self {
             parent: DefaultResolver,
         }
     }
@@ -54,8 +54,8 @@ impl CryptoResolver for SodiumResolver {
 struct SodiumRandom;
 
 impl Default for SodiumRandom {
-    fn default() -> SodiumRandom {
-        SodiumRandom {}
+    fn default() -> Self {
+        Self {}
     }
 }
 
@@ -73,8 +73,8 @@ pub struct SodiumDh25519 {
 }
 
 impl Default for SodiumDh25519 {
-    fn default() -> SodiumDh25519 {
-        SodiumDh25519 {
+    fn default() -> Self {
+        Self {
             privkey: x25519::SecretKey::zero(),
             pubkey: x25519::PublicKey::zero(),
         }
@@ -143,8 +143,8 @@ pub struct SodiumChaChaPoly {
 }
 
 impl Default for SodiumChaChaPoly {
-    fn default() -> SodiumChaChaPoly {
-        SodiumChaChaPoly {
+    fn default() -> Self {
+        Self {
             key: sodium_chacha20poly1305::Key([0; 32]),
         }
     }
@@ -163,7 +163,7 @@ impl Cipher for SodiumChaChaPoly {
     fn encrypt(&self, nonce: u64, authtext: &[u8], plaintext: &[u8], out: &mut [u8]) -> usize {
         assert_ne!(
             self.key,
-            SodiumChaChaPoly::default().key,
+            Self::default().key,
             "Can't encrypt with default key in SodiumChaChaPoly"
         );
 
@@ -186,7 +186,7 @@ impl Cipher for SodiumChaChaPoly {
     ) -> Result<usize, ()> {
         assert_ne!(
             self.key,
-            SodiumChaChaPoly::default().key,
+            Self::default().key,
             "Can't dectypt with default key in SodiumChaChaPoly"
         );
 

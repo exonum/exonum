@@ -178,7 +178,7 @@ pub struct Votes<T: VoteMessage> {
 impl ValidatorState {
     /// Creates new `ValidatorState` with given validator id.
     pub fn new(id: ValidatorId) -> Self {
-        ValidatorState {
+        Self {
             id,
             our_precommits: HashMap::new(),
             our_prevotes: HashMap::new(),
@@ -212,8 +212,8 @@ where
     T: VoteMessage,
 {
     /// Creates a new `Votes` instance with a specified validators number.
-    pub fn new(validators_len: usize) -> Votes<T> {
-        Votes {
+    pub fn new(validators_len: usize) -> Self {
+        Self {
             messages: Vec::new(),
             validators: BitVec::from_elem(validators_len, false),
             count: 0,
@@ -264,7 +264,7 @@ impl RequestData {
 
 impl RequestState {
     fn new() -> Self {
-        RequestState {
+        Self {
             retries: 0,
             known_nodes: HashSet::new(),
         }
@@ -333,7 +333,7 @@ impl ProposeState {
 impl BlockState {
     /// Creates a new `BlockState` instance with the given parameters.
     pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
-        BlockState {
+        Self {
             hash,
             patch,
             txs,
@@ -397,7 +397,7 @@ impl State {
         last_height: Height,
         height_start_time: SystemTime,
     ) -> Self {
-        State {
+        Self {
             validator_state: validator_id.map(ValidatorState::new),
             consensus_public_key,
             consensus_secret_key,
@@ -647,7 +647,7 @@ impl State {
 
     /// Returns sufficient number of votes for current validators number.
     pub fn majority_count(&self) -> usize {
-        State::byzantine_majority_count(self.validators().len())
+        Self::byzantine_majority_count(self.validators().len())
     }
 
     /// Returns sufficient number of votes for the given validators number.

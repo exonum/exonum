@@ -169,7 +169,7 @@ where
                     Some(right) => right,
                 };
                 if right_value.is_string() {
-                    let left_proof: ListProof<V> = from_value(left_value.clone()).map_err(|err| {
+                    let left_proof: Self = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", left_value, &err))
                     })?;
                     let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
@@ -177,7 +177,7 @@ where
                     })?;
                     Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
-                    let right_proof: ListProof<V> = from_value(right_value.clone()).map_err(
+                    let right_proof: Self = from_value(right_value.clone()).map_err(
                         |err| D::Error::custom(format_err_string("ListProof", right_value, &err)),
                     )?;
                     let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
@@ -209,7 +209,7 @@ where
                 } else {
                     // "left" is present
                     let left_value = map_key_value.get("left").unwrap();
-                    let left_proof: ListProof<V> = from_value(left_value.clone()).map_err(|err| {
+                    let left_proof: Self = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", left_value, &err))
                     })?;
                     Left(Box::new(left_proof), None)

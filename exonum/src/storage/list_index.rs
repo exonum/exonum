@@ -74,7 +74,7 @@ where
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        ListIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
@@ -107,7 +107,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        ListIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,

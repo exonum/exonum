@@ -386,7 +386,7 @@ pub(super) struct MapProofBuilder<K, V> {
 impl<K, V> MapProofBuilder<K, V> {
     /// Creates a new builder.
     pub fn new() -> Self {
-        MapProofBuilder {
+        Self {
             entries: vec![],
             proof: vec![],
         }
@@ -718,7 +718,7 @@ struct ContourNode {
 
 impl ContourNode {
     fn new(key: ProofPath, branch: BranchNode) -> Self {
-        ContourNode {
+        Self {
             key,
             branch,
             visited_left: false,

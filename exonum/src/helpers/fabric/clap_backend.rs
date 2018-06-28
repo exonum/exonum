@@ -36,7 +36,7 @@ impl ClapBackend {
     {
         let subcommands: Vec<_> = commands
             .values()
-            .map(|command| ClapBackend::command_into_subcommand(command))
+            .map(|command| Self::command_into_subcommand(command))
             .collect();
         let matches = clap::App::new("Exonum application based on fabric configuration.")
             .setting(clap::AppSettings::ArgRequiredElseHelp)
@@ -58,7 +58,7 @@ impl ClapBackend {
     pub fn execute(commands: &HashMap<CommandName, CollectedCommand>) -> Feedback {
         let subcommands: Vec<_> = commands
             .values()
-            .map(|command| ClapBackend::command_into_subcommand(command))
+            .map(|command| Self::command_into_subcommand(command))
             .collect();
 
         let matches = clap::App::new("Exonum application based on fabric configuration.")

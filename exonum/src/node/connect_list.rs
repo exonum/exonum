@@ -54,7 +54,7 @@ impl ConnectList {
             .map(|(p, v)| (v.consensus_key, *p))
             .collect();
 
-        ConnectList { peers }
+        Self { peers }
     }
 
     /// Creates `ConnectList` from validators public configs.
@@ -63,7 +63,7 @@ impl ConnectList {
             .map(|config| (config.validator_keys.consensus_key, config.addr))
             .collect();
 
-        ConnectList { peers }
+        Self { peers }
     }
 
     /// Get public key corresponding to validator with `address`.

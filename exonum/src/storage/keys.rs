@@ -108,11 +108,11 @@ impl StorageKey for u8 {
         1
     }
 
-    fn write(&self, buffer: &mut [u8]) {
+    fn write(&self, buffer: &mut [Self]) {
         buffer[0] = *self
     }
 
-    fn read(buffer: &[u8]) -> Self::Owned {
+    fn read(buffer: &[Self]) -> Self::Owned {
         buffer[0]
     }
 }
@@ -125,11 +125,11 @@ impl StorageKey for i8 {
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        buffer[0] = self.wrapping_add(i8::min_value()) as u8;
+        buffer[0] = self.wrapping_add(Self::min_value()) as u8;
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        buffer[0].wrapping_sub(i8::min_value() as u8) as i8
+        buffer[0].wrapping_sub(Self::min_value() as u8) as Self
     }
 }
 
@@ -273,7 +273,7 @@ impl StorageKey for DateTime<Utc> {
     fn read(buffer: &[u8]) -> Self::Owned {
         let secs = i64::read(&buffer[0..8]);
         let nanos = u32::read(&buffer[8..12]);
-        DateTime::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+        Self::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
     }
 }
 
@@ -303,7 +303,7 @@ impl StorageKey for Decimal {
     fn read(buffer: &[u8]) -> Self::Owned {
         let mut bytes = [0_u8; 16];
         bytes.copy_from_slice(buffer);
-        Decimal::deserialize(bytes)
+        Self::deserialize(bytes)
     }
 }
 

@@ -102,7 +102,7 @@ where
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        MapIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
@@ -136,7 +136,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        MapIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,

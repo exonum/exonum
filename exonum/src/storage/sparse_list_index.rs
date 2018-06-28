@@ -61,7 +61,7 @@ impl StorageValue for SparseListSize {
         let buf = value.as_ref();
         let capacity = BigEndian::read_u64(&buf[0..8]);
         let length = BigEndian::read_u64(&buf[8..16]);
-        SparseListSize { capacity, length }
+        Self { capacity, length }
     }
 }
 
@@ -143,7 +143,7 @@ where
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        SparseListIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
@@ -180,7 +180,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        SparseListIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,

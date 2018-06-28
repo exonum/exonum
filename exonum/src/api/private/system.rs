@@ -42,12 +42,12 @@ pub struct NodeInfo {
 
 impl NodeInfo {
     /// Creates new `NodeInfo`, from services list.
-    pub fn new<'a, I>(services: I) -> NodeInfo
+    pub fn new<'a, I>(services: I) -> Self
     where
         I: IntoIterator<Item = &'a Box<Service>>,
     {
         let core_version = option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned());
-        NodeInfo {
+        Self {
             core_version,
             protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
@@ -74,7 +74,7 @@ enum IncomingConnectionState {
 }
 
 impl Default for IncomingConnectionState {
-    fn default() -> IncomingConnectionState {
+    fn default() -> Self {
         IncomingConnectionState::Active
     }
 }
@@ -107,8 +107,8 @@ impl SystemApi {
         blockchain: Blockchain,
         shared_api_state: SharedNodeState,
         node_channel: ApiSender,
-    ) -> SystemApi {
-        SystemApi {
+    ) -> Self {
+        Self {
             info,
             blockchain,
             node_channel,

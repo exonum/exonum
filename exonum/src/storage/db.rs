@@ -621,8 +621,9 @@ impl<'a> Iterator for ForkIter<'a> {
     }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<T: Database> From<T> for Box<Database> {
     fn from(db: T) -> Self {
-        Box::new(db) as Box<Database>
+        Box::new(db) as Self
     }
 }

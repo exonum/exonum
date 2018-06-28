@@ -81,7 +81,7 @@ where
             view.as_ref(),
         );
 
-        BaseIndex {
+        Self {
             name: index_name.as_ref().to_string(),
             is_family,
             index_id: None,
@@ -116,7 +116,7 @@ where
             view.as_ref(),
         );
 
-        BaseIndex {
+        Self {
             name: family_name.as_ref().to_string(),
             is_family,
             index_id: {
@@ -131,7 +131,7 @@ where
     }
 
     pub(crate) fn indexes_metadata(view: T) -> Self {
-        BaseIndex {
+        Self {
             name: INDEXES_METADATA_TABLE_NAME.to_string(),
             is_family: false,
             index_id: None,

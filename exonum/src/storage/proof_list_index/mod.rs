@@ -96,7 +96,7 @@ where
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &mut fork);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        ProofListIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
@@ -135,7 +135,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        ProofListIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,

@@ -215,7 +215,7 @@ impl fmt::Debug for ConsensusMessage {
 
 impl Any {
     /// Converts the `RawMessage` to the `Any` message.
-    pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
+    pub fn from_raw(raw: RawMessage) -> Result<Self, Error> {
         // TODO: check input message size (ECR-166)
         let msg = if raw.service_id() == CONSENSUS {
             match raw.message_type() {

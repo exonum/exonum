@@ -84,8 +84,8 @@ where
     T: AsRef<Snapshot>,
 {
     /// Constructs information schema for the given `snapshot`.
-    pub fn new(snapshot: T) -> Schema<T> {
-        Schema { view: snapshot }
+    pub fn new(snapshot: T) -> Self {
+        Self { view: snapshot }
     }
 
     /// Returns a table that represents a map with a key-value pair of a

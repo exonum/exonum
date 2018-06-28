@@ -31,8 +31,8 @@ pub struct MessagesCodec {
 }
 
 impl MessagesCodec {
-    pub fn new(max_message_len: u32, session: NoiseWrapper) -> MessagesCodec {
-        MessagesCodec {
+    pub fn new(max_message_len: u32, session: NoiseWrapper) -> Self {
+        Self {
             max_message_len,
             session,
         }

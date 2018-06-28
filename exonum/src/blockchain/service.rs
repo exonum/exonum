@@ -238,7 +238,7 @@ impl ServiceContext {
         service_secret_key: SecretKey,
         api_sender: ApiSender,
         fork: Fork,
-    ) -> ServiceContext {
+    ) -> Self {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
             let stored_configuration = schema.actual_configuration();
@@ -251,7 +251,7 @@ impl ServiceContext {
             .position(|validator| service_public_key == validator.service_key)
             .map(|id| ValidatorId(id as u16));
 
-        ServiceContext {
+        Self {
             validator_id,
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
@@ -329,7 +329,7 @@ pub struct ApiNodeState {
 }
 
 impl ApiNodeState {
-    fn new() -> ApiNodeState {
+    fn new() -> Self {
         Self {
             is_enabled: true,
             ..Default::default()
@@ -350,8 +350,8 @@ pub struct SharedNodeState {
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(state_update_timeout: Milliseconds) -> SharedNodeState {
-        SharedNodeState {
+    pub fn new(state_update_timeout: Milliseconds) -> Self {
+        Self {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
         }
@@ -529,9 +529,9 @@ pub struct ApiContext {
 /// Provides the current node state to API handlers.
 impl ApiContext {
     /// Constructs context for the given `Node`.
-    pub fn new(node: &Node) -> ApiContext {
+    pub fn new(node: &Node) -> Self {
         let handler = node.handler();
-        ApiContext {
+        Self {
             blockchain: handler.blockchain.clone(),
             node_channel: node.channel(),
             public_key: *node.state().service_public_key(),
@@ -545,8 +545,8 @@ impl ApiContext {
         node_channel: ApiSender,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> ApiContext {
-        ApiContext {
+    ) -> Self {
+        Self {
             blockchain: blockchain.clone(),
             node_channel,
             public_key: *public_key,
@@ -585,8 +585,9 @@ impl ::std::fmt::Debug for ApiContext {
     }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<'a, S: Service> From<S> for Box<Service + 'a> {
     fn from(s: S) -> Self {
-        Box::new(s) as Box<Service>
+        Box::new(s) as Self
     }
 }

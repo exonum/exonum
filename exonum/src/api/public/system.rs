@@ -48,8 +48,8 @@ pub struct SystemApi {
 
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
-    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> SystemApi {
-        SystemApi {
+    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> Self {
+        Self {
             blockchain,
             shared_api_state,
         }

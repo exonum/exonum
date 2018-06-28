@@ -83,10 +83,10 @@ impl MessageBuffer {
     /// let message_buffer = MessageBuffer::from_vec(vec![1, 2, 3]);
     /// assert!(!message_buffer.is_empty());
     /// ```
-    pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
+    pub fn from_vec(raw: Vec<u8>) -> Self {
         // TODO: Check that size >= HEADER_LENGTH. (ECR-166)
         // TODO: Check that payload_length == raw.len(). (ECR-166)
-        MessageBuffer { raw }
+        Self { raw }
     }
 
     /// Returns the length of the message in bytes.
@@ -190,7 +190,7 @@ impl MessageWriter {
         payload_length: usize,
     ) -> Self {
         // First byte is reserved for backward-compatibility and better alignment.
-        let mut raw = MessageWriter {
+        let mut raw = Self {
             raw: vec![0; HEADER_LENGTH + payload_length],
         };
         raw.set_version(protocol_version);
@@ -289,11 +289,11 @@ impl<T: Message> CryptoHash for T {
 }
 
 impl Message for RawMessage {
-    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error> {
+    fn from_raw(raw: Self) -> Result<Self, encoding::Error> {
         Ok(raw)
     }
 
-    fn raw(&self) -> &RawMessage {
+    fn raw(&self) -> &Self {
         self
     }
 

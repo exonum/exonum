@@ -227,7 +227,7 @@ impl Round {
     /// assert_eq!(Some(Round(1)), iter.next());
     /// assert_eq!(None, iter.next());
     /// ```
-    pub fn iter_to(self, to: Round) -> RoundRangeIter {
+    pub fn iter_to(self, to: Self) -> RoundRangeIter {
         RoundRangeIter {
             next: self,
             last: to,
@@ -281,7 +281,7 @@ impl From<Round> for u32 {
 
 impl From<Round> for u64 {
     fn from(val: Round) -> Self {
-        u64::from(val.0)
+        Self::from(val.0)
     }
 }
 
@@ -299,7 +299,7 @@ impl From<ValidatorId> for u16 {
 
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
-        val.0 as usize
+        val.0 as Self
     }
 }
 
@@ -315,7 +315,7 @@ impl Serialize for Height {
 }
 
 impl<'de> Deserialize<'de> for Height {
-    fn deserialize<D>(deserializer: D) -> Result<Height, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -326,7 +326,7 @@ impl<'de> Deserialize<'de> for Height {
 impl FromStr for Height {
     type Err = ParseIntError;
 
-    fn from_str(s: &str) -> Result<Height, ParseIntError> {
+    fn from_str(s: &str) -> Result<Self, ParseIntError> {
         u64::from_str(s).map(Height)
     }
 }

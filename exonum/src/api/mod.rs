@@ -67,19 +67,19 @@ pub enum ApiError {
 }
 
 impl From<io::Error> for ApiError {
-    fn from(e: io::Error) -> ApiError {
+    fn from(e: io::Error) -> Self {
         ApiError::Io(e)
     }
 }
 
 impl From<storage::Error> for ApiError {
-    fn from(e: storage::Error) -> ApiError {
+    fn from(e: storage::Error) -> Self {
         ApiError::Storage(e)
     }
 }
 
 impl From<ApiError> for IronError {
-    fn from(e: ApiError) -> IronError {
+    fn from(e: ApiError) -> Self {
         let code = match e {
             // Note that `status::Unauthorized` does not fit here, because
             //
@@ -102,7 +102,7 @@ impl From<ApiError> for IronError {
             map.insert("description", e.to_string());
             serde_json::to_string_pretty(&map).unwrap()
         };
-        IronError::new(e.compat(), (code, body))
+        Self::new(e.compat(), (code, body))
     }
 }
 

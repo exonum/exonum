@@ -223,11 +223,11 @@ impl<'a> Field<'a> for u8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
+    unsafe fn read(buffer: &'a [Self], from: Offset, _: Offset) -> Self {
         buffer[from as usize]
     }
 
-    fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
+    fn write(&self, buffer: &mut Vec<Self>, from: Offset, _: Offset) {
         buffer[from as usize] = *self;
     }
 }
@@ -239,7 +239,7 @@ impl<'a> Field<'a> for i8 {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
-        buffer[from as usize] as i8
+        buffer[from as usize] as Self
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
@@ -317,12 +317,12 @@ impl<'a> Field<'a> for Duration {
             LittleEndian::read_i32(&buffer[from as usize + mem::size_of::<i64>()..to as usize]);
 
         // Assuming that buffer was checked and Duration object can be constructed.
-        Duration::seconds(secs) + Duration::nanoseconds(i64::from(nanos))
+        Self::seconds(secs) + Self::nanoseconds(i64::from(nanos))
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         let secs = self.num_seconds();
-        let nanos_as_duration = *self - Duration::seconds(secs);
+        let nanos_as_duration = *self - Self::seconds(secs);
         // Since we're working with only nanos, no overflow is expected here.
         let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
 
@@ -358,8 +358,8 @@ impl<'a> Field<'a> for Duration {
         let nanos =
             LittleEndian::read_i32(&buffer[from_unchecked + mem::size_of::<i64>()..to_unchecked]);
 
-        let max_duration = Duration::max_value();
-        let min_duration = Duration::min_value();
+        let max_duration = Self::max_value();
+        let min_duration = Self::min_value();
 
         // Duration::seconds() panics if amount of seconds exceeds limits.
         if secs > max_duration.num_seconds() || secs < min_duration.num_seconds() {
@@ -371,7 +371,7 @@ impl<'a> Field<'a> for Duration {
         }
 
         // Result will be None in case of overflow.
-        let result = Duration::seconds(secs).checked_add(&Duration::nanoseconds(i64::from(nanos)));
+        let result = Self::seconds(secs).checked_add(&Self::nanoseconds(i64::from(nanos)));
         match result {
             Some(_) => Ok(latest_segment),
             None => Err(Error::DurationOverflow),
@@ -400,7 +400,7 @@ impl<'a> Field<'a> for SocketAddr {
             header => panic!("Unknown header `{:X}` for SocketAddr", header),
         };
         let port = LittleEndian::read_u16(&buffer[to as usize - PORT_SIZE..to as usize]);
-        SocketAddr::new(ip, port)
+        Self::new(ip, port)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
@@ -498,7 +498,7 @@ impl<'a> Field<'a> for Decimal {
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let mut bytes: [u8; DECIMAL_SIZE] = mem::uninitialized();
         bytes.copy_from_slice(&buffer[from as usize..to as usize]);
-        Decimal::deserialize(bytes)
+        Self::deserialize(bytes)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {

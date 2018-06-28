@@ -25,8 +25,8 @@ use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
 impl From<rocksdb::Error> for storage::Error {
-    fn from(err: rocksdb::Error) -> storage::Error {
-        storage::Error::new(err.description())
+    fn from(err: rocksdb::Error) -> Self {
+        Self::new(err.description())
     }
 }
 
@@ -59,7 +59,7 @@ struct RocksDBIterator {
 
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
-    pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<Self> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
@@ -68,7 +68,7 @@ impl RocksDB {
                 rocksdb::DB::open(&options.to_rocksdb(), path)?
             }
         };
-        Ok(RocksDB { db: Arc::new(db) })
+        Ok(Self { db: Arc::new(db) })
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
@@ -160,8 +160,8 @@ impl Iterator for RocksDBIterator {
 }
 
 impl From<RocksDB> for Arc<Database> {
-    fn from(db: RocksDB) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+    fn from(db: RocksDB) -> Self{
+        Self::from(Box::new(db) as Box<Database>)
     }
 }
 
