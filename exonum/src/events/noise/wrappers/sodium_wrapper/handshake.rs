@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{x25519::{self, into_x25519_keypair, into_x25519_public_key},
-             PublicKey,
-             SecretKey};
+use super::wrapper::NoiseWrapper;
+use crypto::{
+    x25519::{self, into_x25519_keypair, into_x25519_public_key},
+    PublicKey,
+    SecretKey
+};
 use events::{
     codec::MessagesCodec,
-    noise::{Handshake, HandshakeResult, read, write},
+    noise::{read, write, Handshake, HandshakeResult}
 };
-use super::wrapper::NoiseWrapper;
 use futures::future::{done, Future};
 use std::io;
 use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};

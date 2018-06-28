@@ -81,7 +81,9 @@ mod test {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
             .into_iter()
-            .map(|_| PublicKey::from_slice(&<[u8; PUBLIC_KEY_LENGTH] as Rand>::rand(&mut rng)).unwrap())
+            .map(|_| {
+                PublicKey::from_slice(&<[u8; PUBLIC_KEY_LENGTH] as Rand>::rand(&mut rng)).unwrap()
+            })
             .collect()
     }
 
