@@ -218,7 +218,10 @@ mod tests {
                 Vec::new()
             }
 
-            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, EncodingError> {
+            fn tx_from_raw(
+                &self,
+                raw: RawTransaction,
+            ) -> Result<Box<dyn Transaction>, EncodingError> {
                 use exonum::blockchain::TransactionSet;
 
                 Any::tx_from_raw(raw).map(Any::into)

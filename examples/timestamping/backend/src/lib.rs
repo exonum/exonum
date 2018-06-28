@@ -62,12 +62,12 @@ impl blockchain::Service for Service {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(view);
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, StreamStructError> {
         let tx = TimeTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
@@ -86,7 +86,7 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &fabric::Context) -> Box<blockchain::Service> {
+    fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
         Box::new(Service::new())
     }
 }

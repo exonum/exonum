@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(bare_trait_objects)]
 // Suppress a warning in `transactions!` macro call:
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
