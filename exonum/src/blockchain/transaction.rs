@@ -870,7 +870,10 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(
+            &self,
+            raw: RawTransactio
+        ) -> Result<Box<dyn Transaction>, encoding::Error> {
             Ok(Box::new(TxResult::from_raw(raw)?))
         }
     }

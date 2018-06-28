@@ -124,7 +124,7 @@ impl json::ExonumJson for IndexType {
     }
 }
 
-pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: dyn Snapshot) {
+pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &dyn Snapshot) {
     let metadata = BaseIndex::indexes_metadata(view);
     if let Some(value) = metadata.get::<_, IndexMetadata>(name) {
         let stored_type = value.index_type();

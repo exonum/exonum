@@ -1018,7 +1018,7 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<Database>;
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 

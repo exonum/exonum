@@ -410,8 +410,11 @@ where
     }
 }
 
-fn check_multiproofs_for_data<K, V>(db: &Box<dyn Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
-where
+fn check_multiproofs_for_data<K, V>(
+    db: &Box<dyn Database>,
+    data: Vec<(K, V)>,
+    nonexisting_keys: Vec<K>,
+) where
     K: ProofMapKey + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
     V: StorageValue + Clone + PartialEq + Debug + Serialize,
 {
