@@ -131,7 +131,10 @@ impl Propose {
     /// # Return value
     ///
     /// Configuration parsed from the transaction together with its hash.
-    fn precheck(&self, snapshot: &dyn Snapshot) -> Result<(StoredConfiguration, Hash), ServiceError> {
+    fn precheck(
+        &self,
+        snapshot: &dyn Snapshot,
+    ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
         use exonum::storage::StorageValue;
 

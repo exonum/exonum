@@ -886,7 +886,7 @@ mod tests {
 
         fn tx_from_raw(
             &self,
-            raw: RawTransaction
+            raw: RawTransaction,
         ) -> Result<Box<dyn Transaction>, encoding::Error> {
             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())

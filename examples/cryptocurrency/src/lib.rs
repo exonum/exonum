@@ -74,6 +74,7 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
+    #[derive(Debug)]
     pub struct CurrencySchema<T> {
         view: T,
     }
@@ -155,7 +156,7 @@ pub mod transactions {
 /// Contract errors.
 pub mod errors {
     #![allow(bare_trait_objects)]
-    
+
     use exonum::blockchain::ExecutionError;
 
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
@@ -284,18 +285,18 @@ pub mod api {
     use transactions::CurrencyTransactions;
 
     /// Public service API description.
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct CryptocurrencyApi;
 
     /// The structure describes the query parameters for the `get_wallet` endpoint.
-    #[derive(Serialize, Deserialize, Clone, Copy)]
+    #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
     pub struct WalletQuery {
         /// Public key of the queried wallet.
         pub pub_key: PublicKey,
     }
 
     /// The structure returned by the REST API.
-    #[derive(Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct TransactionResponse {
         /// Hash of the transaction.
         pub tx_hash: Hash,
@@ -397,6 +398,7 @@ pub mod service {
     ///
     /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
     /// [`TxTransfer`]: ../transactions/struct.TxTransfer.html
+    #[derive(Debug)]
     pub struct CurrencyService;
 
     impl Service for CurrencyService {
@@ -409,7 +411,10 @@ pub mod service {
         }
 
         // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(
+            &self,
+            raw: RawTransaction,
+        ) -> Result<Box<dyn Transaction>, encoding::Error> {
             let tx = CurrencyTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

@@ -204,7 +204,10 @@ where
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
-    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&dyn Snapshot, MaybeVote> {
+    pub fn votes_by_config_hash(
+        &self,
+        config_hash: &Hash,
+    ) -> ProofListIndex<&dyn Snapshot, MaybeVote> {
         ProofListIndex::new_in_family(VOTES, config_hash, self.view.as_ref())
     }
 

@@ -872,7 +872,7 @@ mod tests {
 
         fn tx_from_raw(
             &self,
-            raw: RawTransactio
+            raw: RawTransaction,
         ) -> Result<Box<dyn Transaction>, encoding::Error> {
             Ok(Box::new(TxResult::from_raw(raw)?))
         }
