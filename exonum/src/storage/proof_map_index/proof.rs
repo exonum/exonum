@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(bare_trait_objects)]
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{
@@ -95,7 +97,6 @@ impl<'de> Deserialize<'de> for ProofPath {
 }
 
 /// An error returned when a map proof is invalid.
-#[allow(bare_trait_objects)]
 #[derive(Debug, Fail)]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.

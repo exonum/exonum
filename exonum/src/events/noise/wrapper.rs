@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(bare_trait_objects)]
+
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use failure;
@@ -168,7 +170,6 @@ impl fmt::Debug for NoiseWrapper {
     }
 }
 
-#[allow(bare_trait_objects)]
 #[derive(Fail, Debug, Clone)]
 pub enum NoiseError {
     #[fail(display = "Wrong handshake message length {}", _0)]

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(bare_trait_objects)]
+
 //! Error module.
 
 use std::{error, io};
@@ -19,7 +21,6 @@ use std::{error, io};
 use storage;
 
 /// List of possible API errors.
-#[allow(bare_trait_objects)]
 #[derive(Fail, Debug)]
 pub enum Error {
     /// Storage error.

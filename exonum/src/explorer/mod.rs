@@ -711,7 +711,7 @@ impl<T> TransactionInfo<T> {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<dyn Snapshot>,
-    transaction_parser: Box<'a + dyn Fn(RawMessage) -> ParseResult>,
+    transaction_parser: Box<dyn dyn Fn(RawMessage) -> ParseResult + 'a>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
