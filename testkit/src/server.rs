@@ -214,11 +214,11 @@ mod tests {
                 "sample"
             }
 
-            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
                 Vec::new()
             }
 
-            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, EncodingError> {
                 use exonum::blockchain::TransactionSet;
 
                 Any::tx_from_raw(raw).map(Any::into)

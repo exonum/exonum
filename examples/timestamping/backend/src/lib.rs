@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_object)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate chrono;
 #[macro_use]
