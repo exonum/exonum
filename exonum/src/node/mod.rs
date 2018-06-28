@@ -355,9 +355,9 @@ impl ConnectListConfig {
         let peers: Vec<_> = peers
             .iter()
             .zip(validators_keys.iter())
-            .map(|(p, v)| ConnectInfo {
+            .map(|(a, v)| ConnectInfo {
+                address: *a,
                 public_key: v.consensus_key,
-                address: *p,
             })
             .collect();
 
