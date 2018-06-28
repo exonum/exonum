@@ -16,7 +16,7 @@
 //!
 //! For more information see the project readme.
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 
 extern crate actix;

@@ -19,6 +19,7 @@ use std::{error, io};
 use storage;
 
 /// List of possible API errors.
+#[allow(bare_trait_objects)]
 #[derive(Fail, Debug)]
 pub enum Error {
     /// Storage error.
@@ -39,7 +40,7 @@ pub enum Error {
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<dyn error::Error + Send + Sync>),
+    InternalError(Box<error::Error + Send + Sync>),
 
     /// Unauthorized error.
     #[fail(display = "Unauthorized")]
