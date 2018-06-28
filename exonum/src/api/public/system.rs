@@ -153,7 +153,7 @@ impl SystemApi {
         router.get(
             "/v1/connectivity_status",
             connectivity_status,
-            "connectivity_status"
+            "connectivity_status",
         );
     }
 }
