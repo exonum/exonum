@@ -60,13 +60,13 @@ pub const SERVICE_NAME: &str = "exonum_time";
 #[derive(Debug)]
 pub struct TimeService {
     /// Current time.
-    time: Box<TimeProvider>,
+    time: Box<dyn TimeProvider>,
 }
 
 impl Default for TimeService {
     fn default() -> TimeService {
         TimeService {
-            time: Box::new(SystemTimeProvider) as Box<TimeProvider>,
+            time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
         }
     }
 }
@@ -78,7 +78,7 @@ impl TimeService {
     }
 
     /// Create a new `TimeService` with time provider `T`.
-    pub fn with_provider<T: Into<Box<TimeProvider>>>(time_provider: T) -> TimeService {
+    pub fn with_provider<T: Into<Box<dyn TimeProvider>>>(time_provider: T) -> TimeService {
         TimeService {
             time: time_provider.into(),
         }
@@ -90,7 +90,7 @@ impl Service for TimeService {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = TimeSchema::new(snapshot);
         schema.state_hash()
     }
@@ -99,7 +99,7 @@ impl Service for TimeService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 
@@ -139,7 +139,7 @@ impl ServiceFactory for TimeServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<Service> {
+    fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
         Box::new(TimeService::new())
     }
 }

@@ -58,7 +58,7 @@ impl TestkitServerApi {
     fn create_block(
         &self,
         tx_hashes: Option<Vec<crypto::Hash>>,
-    ) -> api::Result<BlockWithTransactions<Box<Transaction>>> {
+    ) -> api::Result<BlockWithTransactions<Box<dyn Transaction>>> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
@@ -82,7 +82,7 @@ impl TestkitServerApi {
     fn rollback(
         &self,
         height: Height,
-    ) -> api::Result<Option<BlockWithTransactions<Box<Transaction>>>> {
+    ) -> api::Result<Option<BlockWithTransactions<Box<dyn Transaction>>>> {
         if height == Height(0) {
             Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),

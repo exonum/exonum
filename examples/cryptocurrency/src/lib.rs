@@ -83,14 +83,14 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: AsRef<Snapshot>> CurrencySchema<T> {
+    impl<T: AsRef<dyn Snapshot>> CurrencySchema<T> {
         /// Creates a new schema instance.
         pub fn new(view: T) -> Self {
             CurrencySchema { view }
         }
 
         /// Returns an immutable version of the wallets table.
-        pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+        pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
             MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
         }
 
@@ -154,6 +154,8 @@ pub mod transactions {
 
 /// Contract errors.
 pub mod errors {
+    #![allow(bare_trait_objects)]
+    
     use exonum::blockchain::ExecutionError;
 
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
@@ -323,7 +325,7 @@ pub mod api {
             state: &ServiceApiState,
             query: CurrencyTransactions,
         ) -> api::Result<TransactionResponse> {
-            let transaction: Box<Transaction> = query.into();
+            let transaction: Box<dyn Transaction> = query.into();
             let tx_hash = transaction.hash();
             state.sender().send(transaction)?;
             Ok(TransactionResponse { tx_hash })
@@ -407,7 +409,7 @@ pub mod service {
         }
 
         // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
             let tx = CurrencyTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }
@@ -417,7 +419,7 @@ pub mod service {
         // for now, so we return an empty vector.
         //
         // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
 
