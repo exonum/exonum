@@ -14,7 +14,7 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(missing_debug_implementations, unsafe_code, bare_trait_objects)]
 
 #[macro_use]
 extern crate exonum;
