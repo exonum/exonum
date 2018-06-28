@@ -73,6 +73,7 @@ impl Service for CurrencyService {
     }
 }
 
+#[derive(Debug)]
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
