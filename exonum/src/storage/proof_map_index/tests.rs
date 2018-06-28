@@ -79,7 +79,7 @@ fn gen_tempdir_name() -> String {
     rand::thread_rng().gen_ascii_chars().take(10).collect()
 }
 
-fn insert_trivial(db1: Box<Database>, db2: Box<Database>) {
+fn insert_trivial(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut storage2 = db2.fork();
 
@@ -100,7 +100,7 @@ fn insert_trivial(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
-fn insert_same_key(db: Box<Database>) {
+fn insert_same_key(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
     assert_eq!(table.merkle_root(), Hash::zero());
@@ -116,7 +116,7 @@ fn insert_same_key(db: Box<Database>) {
     assert_eq!(table.merkle_root(), hash);
 }
 
-fn insert_simple(db1: Box<Database>, db2: Box<Database>) {
+fn insert_simple(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut storage2 = db2.fork();
 
@@ -136,7 +136,7 @@ fn insert_simple(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
-fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
+fn insert_reverse(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(IDX_NAME, &mut storage1);
     index1.put(&[42; 32], vec![1]);
@@ -159,7 +159,7 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 }
 
-fn remove_trivial(db1: Box<Database>, db2: Box<Database>) {
+fn remove_trivial(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(IDX_NAME, &mut storage1);
     index1.put(&[255; 32], vec![6]);
@@ -174,7 +174,7 @@ fn remove_trivial(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index2.merkle_root(), Hash::zero());
 }
 
-fn remove_simple(db1: Box<Database>, db2: Box<Database>) {
+fn remove_simple(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(IDX_NAME, &mut storage1);
     index1.put(&[255; 32], vec![1]);
@@ -203,7 +203,7 @@ fn remove_simple(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
-fn remove_reverse(db1: Box<Database>, db2: Box<Database>) {
+fn remove_reverse(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(IDX_NAME, &mut storage1);
     index1.put(&[42; 32], vec![1]);
@@ -239,7 +239,7 @@ fn remove_reverse(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 }
 
-fn fuzz_insert(db1: Box<Database>, db2: Box<Database>) {
+fn fuzz_insert(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
     let mut storage1 = db1.fork();
@@ -376,7 +376,7 @@ fn check_map_multiproof<K, V>(
 
 const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
-fn check_proofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
+fn check_proofs_for_data<K, V>(db: &Box<dyn Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
     K: ProofMapKey + Copy + PartialEq + Debug + Serialize + DeserializeOwned,
     V: StorageValue + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
@@ -410,7 +410,7 @@ where
     }
 }
 
-fn check_multiproofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
+fn check_multiproofs_for_data<K, V>(db: &Box<dyn Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
     K: ProofMapKey + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
     V: StorageValue + Clone + PartialEq + Debug + Serialize,
@@ -514,7 +514,7 @@ fn test_invalid_map_proofs() {
     }
 }
 
-fn build_proof_in_empty_tree(db: Box<Database>) {
+fn build_proof_in_empty_tree(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -527,7 +527,7 @@ fn build_proof_in_empty_tree(db: Box<Database>) {
     check_map_proof(proof, None, &table);
 }
 
-fn build_multiproof_in_empty_tree(db: Box<Database>) {
+fn build_multiproof_in_empty_tree(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -541,7 +541,7 @@ fn build_multiproof_in_empty_tree(db: Box<Database>) {
     check_map_multiproof(proof, keys, &table);
 }
 
-fn build_proof_in_single_node_tree(db: Box<Database>) {
+fn build_proof_in_single_node_tree(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -558,7 +558,7 @@ fn build_proof_in_single_node_tree(db: Box<Database>) {
     check_map_proof(proof, None, &table);
 }
 
-fn build_multiproof_in_single_node_tree(db: Box<Database>) {
+fn build_multiproof_in_single_node_tree(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -578,7 +578,7 @@ fn build_multiproof_in_single_node_tree(db: Box<Database>) {
     check_map_multiproof(proof, keys, &table);
 }
 
-fn build_proof_in_complex_tree(db: Box<Database>) {
+fn build_proof_in_complex_tree(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -777,7 +777,7 @@ fn build_proof_in_complex_tree(db: Box<Database>) {
     check_map_proof(proof, Some([32; 32]), &table);
 }
 
-fn build_multiproof_simple(db: Box<Database>) {
+fn build_multiproof_simple(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -949,7 +949,7 @@ fn build_multiproof_simple(db: Box<Database>) {
     check_map_multiproof(proof, keys, &table);
 }
 
-fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
+fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<dyn Database>) {
     let mut rng: XorShiftRng = rand::random();
     let batch_sizes = (7..9).map(|x| 1 << x);
 
@@ -969,7 +969,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
     }
 }
 
-fn fuzz_insert_build_proofs(db: Box<Database>) {
+fn fuzz_insert_build_proofs(db: Box<dyn Database>) {
     let mut rng: XorShiftRng = rand::random();
     let batch_sizes = (7..9).map(|x| (1 << x) - 1);
 
@@ -986,7 +986,7 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
     }
 }
 
-fn fuzz_insert_build_multiproofs(db: Box<Database>) {
+fn fuzz_insert_build_multiproofs(db: Box<dyn Database>) {
     let mut rng: XorShiftRng = rand::random();
     let batch_sizes = (7..9).map(|x| 1 << x);
 
@@ -1003,7 +1003,7 @@ fn fuzz_insert_build_multiproofs(db: Box<Database>) {
     }
 }
 
-fn fuzz_delete_build_proofs(db: Box<Database>) {
+fn fuzz_delete_build_proofs(db: Box<dyn Database>) {
     const SAMPLE_SIZE: usize = 200;
 
     let mut rng: XorShiftRng = rand::random();
@@ -1043,7 +1043,7 @@ fn fuzz_delete_build_proofs(db: Box<Database>) {
     }
 }
 
-fn fuzz_delete(db1: Box<Database>, db2: Box<Database>) {
+fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
     let mut storage1 = db1.fork();
@@ -1103,7 +1103,7 @@ fn fuzz_delete(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index2.merkle_root(), saved_hash);
 }
 
-fn fuzz_insert_after_delete(db: Box<Database>) {
+fn fuzz_insert_after_delete(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut index = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -1131,7 +1131,7 @@ fn fuzz_insert_after_delete(db: Box<Database>) {
     assert_eq!(index.merkle_root(), saved_hash);
 }
 
-fn iter(db: Box<Database>) {
+fn iter(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut map_index = ProofMapIndex::new(IDX_NAME, &mut fork);
 
@@ -1206,7 +1206,7 @@ fn iter(db: Box<Database>) {
     );
 }
 
-fn tree_with_hashed_key(db: Box<Database>) {
+fn tree_with_hashed_key(db: Box<dyn Database>) {
     use std::iter::FromIterator;
 
     encoding_struct! {
@@ -1339,7 +1339,7 @@ mod memorydb_tests {
     use storage::{Database, MemoryDB};
     use tempdir::TempDir;
 
-    fn create_database(_: &Path) -> Box<Database> {
+    fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
     }
 
@@ -1351,7 +1351,7 @@ mod rocksdb_tests {
     use storage::{Database, DbOptions, RocksDB};
     use tempdir::TempDir;
 
-    fn create_database(path: &Path) -> Box<Database> {
+    fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }

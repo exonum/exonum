@@ -577,8 +577,8 @@ macro_rules! transactions {
             }
         }
 
-        impl Into<Box<$crate::blockchain::Transaction>> for $transaction_set {
-            fn into(self) -> Box<$crate::blockchain::Transaction> {
+        impl Into<Box<dyn $crate::blockchain::Transaction>> for $transaction_set {
+            fn into(self) -> Box<dyn $crate::blockchain::Transaction> {
                 match self {$(
                     $transaction_set::$name(tx) => Box::new(tx),
                 )*}
@@ -827,7 +827,7 @@ mod tests {
 
     #[test]
     fn box_error_panic() {
-        let error: Box<Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
+        let error: Box<dyn Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
         let description = error.description().to_owned();
         let error = make_panic(error);
         assert_eq!(Some(description), panic_description(&error));
@@ -839,7 +839,7 @@ mod tests {
         assert_eq!(None, panic_description(&error));
     }
 
-    fn make_panic<T: Send + 'static>(val: T) -> Box<Any + Send> {
+    fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
         panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
     }
 
@@ -848,7 +848,7 @@ mod tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
-            vec![Box::new(TxResultService) as Box<Service>],
+            vec![Box::new(TxResultService) as Box<dyn Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
@@ -866,11 +866,11 @@ mod tests {
             "test service"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
             Ok(Box::new(TxResult::from_raw(raw)?))
         }
     }

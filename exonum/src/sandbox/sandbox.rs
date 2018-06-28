@@ -693,7 +693,7 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 /// Constructs an instance of a `Sandbox` and initializes connections.
-pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
+pub fn sandbox_with_services(services: Vec<Box<dyn Service>>) -> Sandbox {
     let mut sandbox = sandbox_with_services_uninitialized(services);
     let time = sandbox.time();
     let validators_count = sandbox.validators_map.len();
@@ -702,7 +702,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 /// Constructs an uninitialized instance of a `Sandbox`.
-pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandbox {
+pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; 32])),
         gen_keypair_from_seed(&Seed::new([13; 32])),
@@ -880,11 +880,11 @@ mod tests {
             SERVICE_ID
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

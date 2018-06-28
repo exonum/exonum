@@ -122,7 +122,7 @@ impl Command for Run {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: dyn Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let config = Self::node_config(&context);
         let public_addr = Self::public_api_address(&context);

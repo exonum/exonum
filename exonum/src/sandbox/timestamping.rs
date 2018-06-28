@@ -99,11 +99,11 @@ impl Service for TimestampingService {
         TIMESTAMPING_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         vec![Hash::new([127; 32]), Hash::new([128; 32])]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         let tx = TimestampingTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

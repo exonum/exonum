@@ -523,7 +523,7 @@ mod tests {
 
         const IDX_NAME: &'static str = "idx_name";
 
-        fn create_database(_: &Path) -> Box<Database> {
+        fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
         }
 
@@ -575,7 +575,7 @@ mod tests {
 
         const IDX_NAME: &'static str = "idx_name";
 
-        fn create_database(path: &Path) -> Box<Database> {
+        fn create_database(path: &Path) -> Box<dyn Database> {
             let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
