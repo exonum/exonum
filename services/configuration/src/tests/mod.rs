@@ -28,8 +28,8 @@ use {
 
 mod api;
 
-pub fn to_boxed<T: Transaction>(tx: T) -> Box<Transaction> {
-    Box::new(tx) as Box<Transaction>
+pub fn to_boxed<T: Transaction>(tx: T) -> Box<dyn Transaction> {
+    Box::new(tx) as Box<dyn Transaction>
 }
 
 pub fn new_tx_config_propose(node: &TestNode, cfg_proposal: StoredConfiguration) -> Propose {
