@@ -36,6 +36,7 @@ use events::{network::NetworkConfiguration, Event, EventHandler, InternalEvent, 
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
+use node::ConnectListConfig;
 use node::{ApiSender, Configuration, ConnectList, ExternalMessage, ListenerConfig, NodeHandler,
            NodeSender, ServiceConfig, State, SystemStateProvider};
 use storage::{MapProof, MemoryDB};
@@ -743,7 +744,8 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             }),
     );
 
-    let connect_list = ConnectList::from_validator_keys(&genesis.validator_keys, &addresses);
+    let connect_list_config =
+        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &addresses);
 
     blockchain.initialize(genesis).unwrap();
 
@@ -752,7 +754,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             address: addresses[0],
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
-            connect_list: connect_list.clone(),
+            connect_list: ConnectList::from_config(connect_list_config),
         },
         service: ServiceConfig {
             service_public_key: service_keys[0].0,
