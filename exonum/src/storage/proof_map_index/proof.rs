@@ -95,6 +95,7 @@ impl<'de> Deserialize<'de> for ProofPath {
 }
 
 /// An error returned when a map proof is invalid.
+#[allow(bare_trait_objects)]
 #[derive(Debug, Fail)]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.

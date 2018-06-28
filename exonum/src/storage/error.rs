@@ -15,6 +15,7 @@
 //! An implementation of `Error` type.
 
 /// The error type for I/O operations with storage.
+#[allow(bare_trait_objects)]
 #[derive(Fail, Debug, Clone)]
 #[fail(display = "{}", message)]
 pub struct Error {
