@@ -15,7 +15,7 @@
 //! Public part of the Exonum rest api.
 
 pub use self::blockchain_explorer::{BlocksRange, ExplorerApi};
-pub use self::system::{ConnectivityInfo, ConsensusStatus, ConnectivityStatus, SystemApi};
+pub use self::system::{ConnectivityInfo, ConnectivityStatus, ConsensusStatus, SystemApi};
 
 mod blockchain_explorer;
 mod system;

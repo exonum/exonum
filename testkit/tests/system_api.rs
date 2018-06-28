@@ -18,30 +18,10 @@ extern crate exonum_testkit;
 extern crate pretty_assertions;
 
 use exonum::{api::{private::NodeInfo,
-                   public::{ConnectivityInfo, ConsensusStatus, ConnectivityStatus}},
+                   public::{ConnectivityInfo, ConnectivityStatus, ConsensusStatus}},
              helpers::user_agent,
              messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
-
-//#[test]
-//fn test_healthcheck_connectivity_false() {
-//    let testkit = TestKitBuilder::validator().with_validators(2).create();
-//    let api = testkit.api();
-//    let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
-//    let expected = HealthCheckInfo {
-//        connectivity: false,
-//    };
-//    assert_eq!(info, expected);
-//}
-//
-//#[test]
-//fn test_consensus_status_false() {
-//    let testkit = TestKitBuilder::validator().create();
-//    let api = testkit.api();
-//    let info: ConsensusStatusInfo = api.get(ApiKind::System, "v1/consensus_status");
-//    let expected = ConsensusStatusInfo { status: false };
-//    assert_eq!(info, expected);
-//}
 
 #[test]
 fn test_connectivity_status_false() {

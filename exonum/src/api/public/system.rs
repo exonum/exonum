@@ -49,7 +49,9 @@ pub struct PeersAmount {
 /// Shows connectivity status of the node
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum ConnectivityStatus {
+    /// The node has no peers
     NotConnected,
+    /// The node has amount of peers
     Connected(PeersAmount),
 }
 
@@ -121,13 +123,14 @@ impl SystemApi {
 
     fn connectivity_status_info(self, router: &mut Router) {
         let connectivity_status = move |_: &mut Request| -> IronResult<Response> {
-
             let peers_info = self.shared_api_state.peers_info();
 
             let connectivity = if peers_info.is_empty() {
                 ConnectivityStatus::NotConnected
             } else {
-                ConnectivityStatus::Connected(PeersAmount { amount: peers_info.len(), })
+                ConnectivityStatus::Connected(PeersAmount {
+                    amount: peers_info.len(),
+                })
             };
 
             let consensus_status = if self.shared_api_state.is_enabled() {
@@ -145,12 +148,13 @@ impl SystemApi {
                 connectivity,
             };
 
-            //let info = ConsensusStatusInfo {
-            //    status: self.shared_api_state.consensus_status(),
-            //};
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
-        router.get("/v1/connectivity_status", connectivity_status, "connectivity_status");
+        router.get(
+            "/v1/connectivity_status",
+            connectivity_status,
+            "connectivity_status"
+        );
     }
 }
 
