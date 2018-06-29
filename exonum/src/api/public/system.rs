@@ -89,16 +89,6 @@ impl SystemApi {
         router.get("/v1/mempool", mempool, "mempool");
     }
 
-    //fn healthcheck_info(self, router: &mut Router) {
-    //    let healthcheck = move |_: &mut Request| -> IronResult<Response> {
-    //        let info = HealthCheckInfo {
-    //            connectivity: !self.shared_api_state.peers_info().is_empty(),
-    //        };
-    //        self.ok_response(&serde_json::to_value(info).unwrap())
-    //    };
-    //    router.get("/v1/healthcheck", healthcheck, "healthcheck");
-    //}
-
     fn user_agent_info(self, router: &mut Router) {
         let user_agent = move |_: &mut Request| -> IronResult<Response> {
             let info = user_agent::get();
@@ -147,7 +137,6 @@ impl SystemApi {
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
         self.clone().mempool_info(router);
-        //self.clone().healthcheck_info(router);
         self.clone().user_agent_info(router);
         self.clone().connectivity_status_info(router);
     }
