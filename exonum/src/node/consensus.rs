@@ -76,6 +76,7 @@ impl NodeHandler {
             return;
         }
 
+        #[cfg_attr(feature = "cargo-clippy", allow(single_match_else))]
         let key = match self.state.consensus_public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(&public_key) {
@@ -514,8 +515,7 @@ impl NodeHandler {
             height,
             proposer,
             round
-                .map(|x| format!("{}", x))
-                .unwrap_or_else(|| "?".into()),
+                .map_or_else(|| "?".into(), |x| format!("{}", x)),
             committed_txs,
             pool_len,
             block_hash.to_hex(),

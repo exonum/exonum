@@ -27,8 +27,7 @@
     feature = "cargo-clippy",
     allow(
         use_self, cast_possible_truncation, replace_consts, enum_glob_use, cast_sign_loss,
-        used_underscore_binding, cast_possible_wrap, single_match_else, option_map_unwrap_or_else,
-        option_map_unwrap_or, filter_map
+        used_underscore_binding, cast_possible_wrap, single_match_else, filter_map
     )
 )]
 

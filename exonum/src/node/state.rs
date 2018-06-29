@@ -469,8 +469,7 @@ impl State {
     pub fn is_leader(&self) -> bool {
         self.validator_state()
             .as_ref()
-            .map(|validator| self.leader(self.round()) == validator.id)
-            .unwrap_or(false)
+            .map_or(false,|validator| self.leader(self.round()) == validator.id)
     }
 
     /// Returns node's ConnectList.
@@ -798,6 +797,7 @@ impl State {
 
     /// Returns pre-votes for the specified round and propose hash.
     pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
+        #[cfg_attr(feature = "cargo-clippy", allow(option_map_unwrap_or_else))]
         self.prevotes
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())
@@ -806,6 +806,7 @@ impl State {
 
     /// Returns pre-commits for the specified round and propose hash.
     pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
+        #[cfg_attr(feature = "cargo-clippy", allow(option_map_unwrap_or_else))]
         self.precommits
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())
@@ -991,8 +992,7 @@ impl State {
         let len = self.validators().len();
         self.prevotes
             .get(&(round, *propose_hash))
-            .map(|x| x.validators().clone())
-            .unwrap_or_else(|| BitVec::from_elem(len, false))
+            .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
     /// Returns ids of validators that that sent pre-commits for the specified propose.
@@ -1000,8 +1000,7 @@ impl State {
         let len = self.validators().len();
         self.precommits
             .get(&(round, *propose_hash))
-            .map(|x| x.validators().clone())
-            .unwrap_or_else(|| BitVec::from_elem(len, false))
+            .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
     /// Adds pre-commit. Returns `true` there are +2/3 pre-commits.
