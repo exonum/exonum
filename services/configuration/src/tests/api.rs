@@ -14,15 +14,20 @@
 
 // spell-checker:ignore postpropose, postvote
 
-use exonum::{blockchain::{Schema, StoredConfiguration},
-             crypto::{CryptoHash, Hash},
-             helpers::{Height, ValidatorId}};
+use exonum::{
+    blockchain::{Schema, StoredConfiguration}, crypto::{CryptoHash, Hash},
+    helpers::{Height, ValidatorId},
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
-use super::{new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
-            ConfigurationSchema, ConfigurationTestKit};
-use api::{ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
-          VoteResponse, VotesInfo};
+use super::{
+    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
+    ConfigurationSchema, ConfigurationTestKit,
+};
+use api::{
+    ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
+    VoteResponse, VotesInfo,
+};
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;

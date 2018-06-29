@@ -14,9 +14,9 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::{clone::Clone,
-          collections::{BTreeMap, HashMap},
-          sync::{Arc, RwLock}};
+use std::{
+    clone::Clone, collections::{BTreeMap, HashMap}, sync::{Arc, RwLock},
+};
 
 use super::{db::Change, Database, Iter, Iterator, Patch, Result, Snapshot};
 
@@ -46,7 +46,7 @@ impl MemoryDB {
 }
 
 impl Database for MemoryDB {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(MemoryDB {
             map: RwLock::new(self.map.read().unwrap().clone()),
         })
@@ -133,9 +133,9 @@ impl Iterator for MemoryDBIter {
     }
 }
 
-impl From<MemoryDB> for Arc<Database> {
-    fn from(db: MemoryDB) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+impl From<MemoryDB> for Arc<dyn Database> {
+    fn from(db: MemoryDB) -> Arc<dyn Database> {
+        Arc::from(Box::new(db) as Box<dyn Database>)
     }
 }
 

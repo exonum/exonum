@@ -28,16 +28,18 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::{api::{node::public::explorer::TransactionQuery, Error as ApiError},
-             blockchain::{Transaction, TransactionErrorType as ErrorType},
-             crypto::{self, CryptoHash, PublicKey},
-             encoding::serialize::{json::ExonumJson, FromHex},
-             helpers::Height,
-             messages::Message};
+use exonum::{
+    api::{node::public::explorer::TransactionQuery, Error as ApiError},
+    blockchain::{Transaction, TransactionErrorType as ErrorType},
+    crypto::{self, CryptoHash, PublicKey}, encoding::serialize::{json::ExonumJson, FromHex},
+    helpers::Height, messages::Message,
+};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
 
-use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
+use counter::{
+    CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
+};
 
 mod counter;
 
@@ -392,9 +394,7 @@ fn test_snapshot_comparison_panic() {
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| {
-            new == old + tx.by()
-        });
+        .assert("Counter has increased", |&old, &new| new == old + tx.by());
 }
 
 #[test]

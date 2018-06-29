@@ -14,12 +14,11 @@
 
 //! Cryptocurrency API.
 
-use exonum::{api::{self, ServiceApiBuilder, ServiceApiState},
-             blockchain::{self, BlockProof, Transaction, TransactionSet},
-             crypto::{Hash, PublicKey},
-             helpers::Height,
-             node::TransactionSend,
-             storage::{ListProof, MapProof}};
+use exonum::{
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    blockchain::{self, BlockProof, Transaction, TransactionSet}, crypto::{Hash, PublicKey},
+    helpers::Height, node::TransactionSend, storage::{ListProof, MapProof},
+};
 
 use transactions::WalletTransactions;
 use wallet::Wallet;
@@ -120,7 +119,7 @@ impl CryptocurrencyApi {
         state: &ServiceApiState,
         query: WalletTransactions,
     ) -> api::Result<TransactionResponse> {
-        let transaction: Box<Transaction> = query.into();
+        let transaction: Box<dyn Transaction> = query.into();
         let tx_hash = transaction.hash();
         state.sender().send(transaction)?;
         Ok(TransactionResponse { tx_hash })

@@ -92,7 +92,7 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: Arc::clone(&self.db),
@@ -159,9 +159,9 @@ impl Iterator for RocksDBIterator {
     }
 }
 
-impl From<RocksDB> for Arc<Database> {
-    fn from(db: RocksDB) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+impl From<RocksDB> for Arc<dyn Database> {
+    fn from(db: RocksDB) -> Arc<dyn Database> {
+        Arc::from(Box::new(db) as Box<dyn Database>)
     }
 }
 

@@ -14,11 +14,11 @@
 
 //! Transaction definitions for the configuration service.
 
-use exonum::{blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
-             crypto::{CryptoHash, Hash, PublicKey},
-             messages::Message,
-             node::State,
-             storage::{Fork, Snapshot}};
+use exonum::{
+    blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
+    crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
+    storage::{Fork, Snapshot},
+};
 
 use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
@@ -104,14 +104,14 @@ transactions! {
 ///
 /// The index of the validator authoring the transaction, or `None` if no validator matches
 /// the supplied public key.
-fn validator_index(snapshot: &Snapshot, key: &PublicKey) -> Option<usize> {
+fn validator_index(snapshot: &dyn Snapshot, key: &PublicKey) -> Option<usize> {
     let actual_config = CoreSchema::new(snapshot).actual_configuration();
     let keys = actual_config.validator_keys;
     keys.iter().position(|k| k.service_key == *key)
 }
 
 /// Checks if there is enough votes for a particular configuration hash.
-fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
+fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool {
     let actual_config = CoreSchema::new(snapshot).actual_configuration();
 
     let schema = Schema::new(snapshot);
@@ -131,7 +131,10 @@ impl Propose {
     /// # Return value
     ///
     /// Configuration parsed from the transaction together with its hash.
-    fn precheck(&self, snapshot: &Snapshot) -> Result<(StoredConfiguration, Hash), ServiceError> {
+    fn precheck(
+        &self,
+        snapshot: &dyn Snapshot,
+    ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
         use exonum::storage::StorageValue;
 
@@ -160,7 +163,7 @@ impl Propose {
     fn check_config_candidate(
         &self,
         candidate: &StoredConfiguration,
-        snapshot: &Snapshot,
+        snapshot: &dyn Snapshot,
     ) -> Result<(), ServiceError> {
         use self::ServiceError::*;
 
@@ -279,7 +282,7 @@ impl<'a> VotingDecisionRef<'a> {
     /// # Return value
     ///
     /// Returns a configuration this transaction is for on success, or an error (if any).
-    fn precheck(&self, snapshot: &Snapshot) -> Result<StoredConfiguration, ServiceError> {
+    fn precheck(&self, snapshot: &dyn Snapshot) -> Result<StoredConfiguration, ServiceError> {
         use self::ServiceError::*;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();

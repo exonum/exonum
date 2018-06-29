@@ -108,22 +108,16 @@
 
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
-pub use self::{db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
-                    PatchIterator, Snapshot},
-               entry::Entry,
-               error::Error,
-               hash::UniqueHash,
-               key_set_index::KeySetIndex,
-               keys::StorageKey,
-               list_index::ListIndex,
-               map_index::MapIndex,
-               memorydb::MemoryDB,
-               options::DbOptions,
-               proof_list_index::{ListProof, ProofListIndex},
-               rocksdb::RocksDB,
-               sparse_list_index::SparseListIndex,
-               value_set_index::ValueSetIndex,
-               values::StorageValue};
+pub use self::{
+    db::{
+        Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
+        Snapshot,
+    },
+    entry::Entry, error::Error, hash::UniqueHash, key_set_index::KeySetIndex, keys::StorageKey,
+    list_index::ListIndex, map_index::MapIndex, memorydb::MemoryDB, options::DbOptions,
+    proof_list_index::{ListProof, ProofListIndex}, rocksdb::RocksDB,
+    sparse_list_index::SparseListIndex, value_set_index::ValueSetIndex, values::StorageValue,
+};
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
