@@ -33,7 +33,7 @@ impl ConnectList {
     pub fn from_config(config: ConnectListConfig) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = config
             .peers
-            .iter()
+            .into_iter()
             .map(|peer| (peer.public_key, peer.address))
             .collect();
 
