@@ -14,14 +14,14 @@
 
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
-use sodiumoxide::crypto::scalarmult::curve25519::{scalarmult as sodium_scalarmult,
-                                                  scalarmult_base as sodium_scalarmult_base,
-                                                  GroupElement as Curve25519GroupElement,
-                                                  Scalar as Curve25519Scalar};
-use sodiumoxide::crypto::sign::ed25519::{convert_ed_keypair_to_curve25519,
-                                         convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
-                                         PublicKey as PublicKeySodium,
-                                         SecretKey as SecretKeySodium};
+use sodiumoxide::crypto::scalarmult::curve25519::{
+    scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
+    GroupElement as Curve25519GroupElement, Scalar as Curve25519Scalar,
+};
+use sodiumoxide::crypto::sign::ed25519::{
+    convert_ed_keypair_to_curve25519, convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
+    PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
+};
 
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};

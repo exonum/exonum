@@ -15,8 +15,10 @@
 use super::NodeHandler;
 use blockchain::Schema;
 use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
-               RequestMessage, TransactionsRequest, TransactionsResponse, HEADER_LENGTH};
+use messages::{
+    BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, RequestMessage,
+    TransactionsRequest, TransactionsResponse, HEADER_LENGTH,
+};
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
 // TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)

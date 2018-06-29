@@ -19,19 +19,26 @@ use rand::{thread_rng, Rng};
 
 use std::{collections::BTreeMap, time::Duration};
 
-use super::{config_updater::TxConfig,
-            sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox},
-            sandbox_tests_helper::*,
-            timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE}};
+use super::{
+    config_updater::TxConfig, sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox},
+    sandbox_tests_helper::*,
+    timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE},
+};
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
-use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
-               TransactionsResponse, CONSENSUS};
-use node::{self,
-           state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-                   TRANSACTIONS_REQUEST_TIMEOUT}};
+use messages::{
+    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+    TransactionsResponse, CONSENSUS,
+};
+use node::{
+    self,
+    state::{
+        BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+        TRANSACTIONS_REQUEST_TIMEOUT,
+    },
+};
 
 // HANDLE CONSENSUS BASIC
 

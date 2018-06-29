@@ -17,13 +17,13 @@
 extern crate futures;
 
 use self::futures::sync::mpsc;
-use exonum::{blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema, Service,
-                          Transaction, TransactionSet},
-             crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
-             encoding::Error as EncodingError,
-             messages::RawTransaction,
-             node::ApiSender,
-             storage::{Fork, MemoryDB, Snapshot}};
+use exonum::{
+    blockchain::{
+        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionSet,
+    },
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+    messages::RawTransaction, node::ApiSender, storage::{Fork, MemoryDB, Snapshot},
+};
 
 transactions! {
     Transactions {

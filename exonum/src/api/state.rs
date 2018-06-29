@@ -35,7 +35,7 @@ impl ServiceApiState {
     }
 
     /// Creates a read-only snapshot of the current blockchain state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.blockchain.snapshot()
     }
 

@@ -19,7 +19,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.26.1
+  - 1.27.0
 
 cache:
   directories:

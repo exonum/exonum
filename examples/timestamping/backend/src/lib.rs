@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![deny(missing_debug_implementations, unsafe_code, bare_trait_objects)]
+
 extern crate chrono;
 #[macro_use]
 extern crate exonum;
@@ -29,13 +31,11 @@ pub mod api;
 pub mod schema;
 pub mod transactions;
 
-use exonum::{api::ServiceApiBuilder,
-             blockchain::{self, Transaction, TransactionSet},
-             crypto::Hash,
-             encoding::Error as StreamStructError,
-             helpers::fabric,
-             messages::RawTransaction,
-             storage::Snapshot};
+use exonum::{
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    encoding::Error as StreamStructError, helpers::fabric, messages::RawTransaction,
+    storage::Snapshot,
+};
 
 use api::PublicApi;
 use schema::Schema;
@@ -62,12 +62,12 @@ impl blockchain::Service for Service {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(view);
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, StreamStructError> {
         let tx = TimeTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
@@ -86,7 +86,7 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &fabric::Context) -> Box<blockchain::Service> {
+    fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
         Box::new(Service::new())
     }
 }

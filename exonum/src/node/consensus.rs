@@ -18,16 +18,16 @@ use blockchain::{Schema, Transaction};
 use crypto::{CryptoHash, Hash, PublicKey};
 use events::InternalRequest;
 use helpers::{Height, Round, ValidatorId};
-use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
-               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
-               TransactionsResponse};
+use messages::{
+    BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
+    Propose, ProposeRequest, RawTransaction, TransactionsRequest, TransactionsResponse,
+};
 use node::{NodeHandler, RequestData};
 use storage::Patch;
 
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         if !self.is_enabled {
             info!(
@@ -219,7 +219,6 @@ impl NodeHandler {
 
     /// Handles the `Block` message. For details see the message documentation.
     // TODO: Write helper function which returns Result. (ECR-123)
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
         if let Err(err) = self.validate_block_response(msg) {
             error!("{}", err);
@@ -574,7 +573,6 @@ impl NodeHandler {
 
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         let tx = match self.blockchain.tx_from_raw(msg.clone()) {
             Ok(tx) => tx,
@@ -595,7 +593,6 @@ impl NodeHandler {
     }
 
     /// Handles raw transactions.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -627,7 +624,7 @@ impl NodeHandler {
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-    pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
+    pub fn handle_incoming_tx(&mut self, msg: Box<dyn Transaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx_inner(msg.raw().clone()) {
             Ok(_) => self.broadcast(msg.raw()),
@@ -829,7 +826,6 @@ impl NodeHandler {
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
         if let Some(hash) = self.state.propose_mut(propose_hash).unwrap().block_hash() {

@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use criterion::{Bencher, Criterion};
-use exonum::storage::{proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions,
-                      ProofListIndex, ProofMapIndex, RocksDB};
+use exonum::storage::{
+    proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, ProofListIndex,
+    ProofMapIndex, RocksDB,
+};
 use rand::{Rng, SeedableRng, XorShiftRng};
 use tempdir::TempDir;
 

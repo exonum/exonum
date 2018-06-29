@@ -17,9 +17,9 @@
 
 use serde_json::Value;
 
-use std::{collections::{HashMap, HashSet},
-          net::SocketAddr,
-          sync::{Arc, RwLock}};
+use std::{
+    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
+};
 
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;
@@ -147,7 +147,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
     ///
@@ -167,7 +167,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// `transactions!` macro generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError>;
 
     /// Initializes the information schema of the service
     /// and generates an initial service configuration.
@@ -257,7 +257,7 @@ impl ServiceContext {
 
     /// Returns the current database snapshot. This snapshot is used to
     /// retrieve schema information from the database.
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn snapshot(&self) -> &dyn Snapshot {
         self.fork.as_ref()
     }
 
@@ -287,13 +287,13 @@ impl ServiceContext {
     }
 
     /// Returns service specific global variables as a JSON value.
-    pub fn actual_service_config(&self, service: &Service) -> &Value {
+    pub fn actual_service_config(&self, service: &dyn Service) -> &Value {
         &self.stored_configuration.services[service.service_name()]
     }
 
     /// Returns a reference to the transaction sender, which can then be used
     /// to broadcast a transaction to other nodes in the network.
-    pub fn transaction_sender(&self) -> &TransactionSend {
+    pub fn transaction_sender(&self) -> &dyn TransactionSend {
         &self.api_sender
     }
 
@@ -518,8 +518,8 @@ impl SharedNodeState {
     }
 }
 
-impl<'a, S: Service> From<S> for Box<Service + 'a> {
+impl<'a, S: Service> From<S> for Box<dyn Service + 'a> {
     fn from(s: S) -> Self {
-        Box::new(s) as Box<Service>
+        Box::new(s) as Box<dyn Service>
     }
 }

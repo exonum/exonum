@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-             blockchain::{SharedNodeState, Transaction},
-             crypto,
-             explorer::{BlockWithTransactions, BlockchainExplorer},
-             helpers::Height};
+use exonum::{
+    api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
+    blockchain::{SharedNodeState, Transaction}, crypto,
+    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
+};
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -58,7 +58,7 @@ impl TestkitServerApi {
     fn create_block(
         &self,
         tx_hashes: Option<Vec<crypto::Hash>>,
-    ) -> api::Result<BlockWithTransactions<Box<Transaction>>> {
+    ) -> api::Result<BlockWithTransactions<Box<dyn Transaction>>> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
@@ -82,7 +82,7 @@ impl TestkitServerApi {
     fn rollback(
         &self,
         height: Height,
-    ) -> api::Result<Option<BlockWithTransactions<Box<Transaction>>>> {
+    ) -> api::Result<Option<BlockWithTransactions<Box<dyn Transaction>>>> {
         if height == Height(0) {
             Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
@@ -214,11 +214,14 @@ mod tests {
                 "sample"
             }
 
-            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
                 Vec::new()
             }
 
-            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+            fn tx_from_raw(
+                &self,
+                raw: RawTransaction,
+            ) -> Result<Box<dyn Transaction>, EncodingError> {
                 use exonum::blockchain::TransactionSet;
 
                 Any::tx_from_raw(raw).map(Any::into)

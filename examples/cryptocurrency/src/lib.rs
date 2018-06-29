@@ -23,7 +23,7 @@
 //! [docs]: https://exonum.com/doc/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
-#![deny(missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 #[macro_use]
 extern crate exonum;
@@ -36,8 +36,9 @@ extern crate serde_json;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::{crypto::PublicKey,
-                 storage::{Fork, MapIndex, Snapshot}};
+    use exonum::{
+        crypto::PublicKey, storage::{Fork, MapIndex, Snapshot},
+    };
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
@@ -73,6 +74,7 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
+    #[derive(Debug)]
     pub struct CurrencySchema<T> {
         view: T,
     }
@@ -82,14 +84,14 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: AsRef<Snapshot>> CurrencySchema<T> {
+    impl<T: AsRef<dyn Snapshot>> CurrencySchema<T> {
         /// Creates a new schema instance.
         pub fn new(view: T) -> Self {
             CurrencySchema { view }
         }
 
         /// Returns an immutable version of the wallets table.
-        pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+        pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
             MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
         }
 
@@ -153,6 +155,10 @@ pub mod transactions {
 
 /// Contract errors.
 pub mod errors {
+    // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+    // ECR-1771 for the details.
+    #![allow(bare_trait_objects)]
+
     use exonum::blockchain::ExecutionError;
 
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
@@ -194,9 +200,9 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::{blockchain::{ExecutionResult, Transaction},
-                 messages::Message,
-                 storage::Fork};
+    use exonum::{
+        blockchain::{ExecutionResult, Transaction}, messages::Message, storage::Fork,
+    };
 
     use errors::Error;
     use schema::{CurrencySchema, Wallet};
@@ -272,27 +278,27 @@ pub mod contracts {
 
 /// REST API.
 pub mod api {
-    use exonum::{api::{self, ServiceApiBuilder, ServiceApiState},
-                 blockchain::Transaction,
-                 crypto::{Hash, PublicKey},
-                 node::TransactionSend};
+    use exonum::{
+        api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::Transaction,
+        crypto::{Hash, PublicKey}, node::TransactionSend,
+    };
 
     use schema::{CurrencySchema, Wallet};
     use transactions::CurrencyTransactions;
 
     /// Public service API description.
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct CryptocurrencyApi;
 
     /// The structure describes the query parameters for the `get_wallet` endpoint.
-    #[derive(Serialize, Deserialize, Clone, Copy)]
+    #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
     pub struct WalletQuery {
         /// Public key of the queried wallet.
         pub pub_key: PublicKey,
     }
 
     /// The structure returned by the REST API.
-    #[derive(Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct TransactionResponse {
         /// Hash of the transaction.
         pub tx_hash: Hash,
@@ -322,7 +328,7 @@ pub mod api {
             state: &ServiceApiState,
             query: CurrencyTransactions,
         ) -> api::Result<TransactionResponse> {
-            let transaction: Box<Transaction> = query.into();
+            let transaction: Box<dyn Transaction> = query.into();
             let tx_hash = transaction.hash();
             state.sender().send(transaction)?;
             Ok(TransactionResponse { tx_hash })
@@ -345,12 +351,10 @@ pub mod api {
 
 /// Service declaration.
 pub mod service {
-    use exonum::{api::ServiceApiBuilder,
-                 blockchain::{Service, Transaction, TransactionSet},
-                 crypto::Hash,
-                 encoding,
-                 messages::RawTransaction,
-                 storage::Snapshot};
+    use exonum::{
+        api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet}, crypto::Hash,
+        encoding, messages::RawTransaction, storage::Snapshot,
+    };
 
     use api::CryptocurrencyApi;
     use transactions::CurrencyTransactions;
@@ -396,6 +400,7 @@ pub mod service {
     ///
     /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
     /// [`TxTransfer`]: ../transactions/struct.TxTransfer.html
+    #[derive(Debug)]
     pub struct CurrencyService;
 
     impl Service for CurrencyService {
@@ -408,7 +413,10 @@ pub mod service {
         }
 
         // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+        fn tx_from_raw(
+            &self,
+            raw: RawTransaction,
+        ) -> Result<Box<dyn Transaction>, encoding::Error> {
             let tx = CurrencyTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }
@@ -418,7 +426,7 @@ pub mod service {
         // for now, so we return an empty vector.
         //
         // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
 

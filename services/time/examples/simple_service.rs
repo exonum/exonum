@@ -24,12 +24,11 @@ extern crate serde;
 extern crate serde_json;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use exonum::{blockchain::{ExecutionResult, Service, Transaction, TransactionSet},
-             crypto::{gen_keypair, Hash, PublicKey},
-             encoding,
-             helpers::Height,
-             messages::{Message, RawTransaction},
-             storage::{Fork, ProofMapIndex, Snapshot}};
+use exonum::{
+    blockchain::{ExecutionResult, Service, Transaction, TransactionSet},
+    crypto::{gen_keypair, Hash, PublicKey}, encoding, helpers::Height,
+    messages::{Message, RawTransaction}, storage::{Fork, ProofMapIndex, Snapshot},
+};
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
 

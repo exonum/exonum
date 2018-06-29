@@ -17,43 +17,34 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{connect_list::ConnectList,
-               state::{RequestData, State, ValidatorState}};
+pub use self::{
+    connect_list::ConnectList, state::{RequestData, State, ValidatorState},
+};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors,
-                            SystemRuntimeConfig},
-          ApiAccess,
-          ApiAggregator};
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use toml::Value;
 
-use std::{collections::{BTreeMap, HashSet},
-          fmt,
-          io,
-          net::SocketAddr,
-          sync::Arc,
-          thread,
-          time::{Duration, SystemTime}};
+use std::{
+    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    time::{Duration, SystemTime},
+};
 
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use events::{error::{into_other, log_error, other_error, LogError},
-             noise::HandshakeParams,
-             HandlerPart,
-             InternalEvent,
-             InternalPart,
-             InternalRequest,
-             NetworkConfiguration,
-             NetworkEvent,
-             NetworkPart,
-             NetworkRequest,
-             SyncSender,
-             TimeoutRequest};
+use events::{
+    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
+    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
+    NetworkRequest, SyncSender, TimeoutRequest,
+};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
@@ -70,7 +61,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Box<Transaction>),
+    Transaction(Box<dyn Transaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -114,7 +105,7 @@ pub struct NodeHandler {
     /// Shared api state.
     pub api_state: SharedNodeState,
     /// System state.
-    pub system_state: Box<SystemStateProvider>,
+    pub system_state: Box<dyn SystemStateProvider>,
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
     /// Blockchain.
@@ -334,7 +325,7 @@ impl NodeHandler {
         blockchain: Blockchain,
         external_address: SocketAddr,
         sender: NodeSender,
-        system_state: Box<SystemStateProvider>,
+        system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
     ) -> Self {
@@ -668,7 +659,7 @@ impl fmt::Debug for NodeHandler {
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
+    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()>;
 }
 
 impl ApiSender {
@@ -695,7 +686,7 @@ impl ApiSender {
 }
 
 impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()> {
+    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()> {
         if !tx.verify() {
             let msg = "Unable to verify transaction";
             return Err(io::Error::new(io::ErrorKind::Other, msg));
@@ -795,9 +786,9 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new<D: Into<Arc<Database>>>(
+    pub fn new<D: Into<Arc<dyn Database>>>(
         db: D,
-        services: Vec<Box<Service>>,
+        services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
     ) -> Self {
         crypto::init();
@@ -1027,7 +1018,7 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
