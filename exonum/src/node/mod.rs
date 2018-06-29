@@ -46,7 +46,7 @@ use events::{
     InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
     NetworkRequest, SyncSender, TimeoutRequest,
 };
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
