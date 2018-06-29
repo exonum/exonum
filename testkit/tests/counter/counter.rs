@@ -13,23 +13,13 @@
 // limitations under the License.
 
 //! Sample counter service.
-
-extern crate bodyparser;
-extern crate iron;
-extern crate router;
-
-use exonum::{api::{Api, ApiError},
-             blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Service,
-                          Transaction, TransactionSet},
+use exonum::{api,
+             blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionSet},
              crypto::{Hash, PublicKey},
              encoding,
              messages::{Message, RawTransaction},
-             node::{ApiSender, TransactionSend},
+             node::TransactionSend,
              storage::{Entry, Fork, Snapshot}};
-use serde_json;
-
-use self::{iron::{prelude::*, Handler},
-           router::Router};
 
 pub const SERVICE_ID: u16 = 1;
 
@@ -131,80 +121,54 @@ impl Transaction for TxReset {
 
 // // // // API // // // //
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionResponse {
     pub tx_hash: Hash,
 }
 
-#[derive(Clone)]
-struct CounterApi {
-    channel: ApiSender,
-    blockchain: Blockchain,
-}
+#[derive(Debug, Clone, Copy)]
+struct CounterApi;
 
 impl CounterApi {
-    fn increment(&self, req: &mut Request) -> IronResult<Response> {
+    fn increment(
+        state: &api::ServiceApiState,
+        transaction: TxIncrement,
+    ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
-        match req.get::<bodyparser::Struct<TxIncrement>>() {
-            Ok(Some(transaction)) => {
-                let transaction: Box<Transaction> = Box::new(transaction);
-                let tx_hash = transaction.hash();
-                self.channel.send(transaction).map_err(ApiError::from)?;
-                let json = TransactionResponse { tx_hash };
-                self.ok_response(&serde_json::to_value(&json).unwrap())
-            }
-            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-        }
+
+        let transaction: Box<Transaction> = Box::new(transaction);
+        let tx_hash = transaction.hash();
+        state.sender().send(transaction)?;
+        Ok(TransactionResponse { tx_hash })
     }
 
-    fn count(&self) -> Option<u64> {
-        let view = self.blockchain.snapshot();
-        let schema = CounterSchema::new(&view);
-        schema.count()
+    fn count(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
+        let snapshot = state.snapshot();
+        let schema = CounterSchema::new(&snapshot);
+        Ok(schema.count().unwrap_or_default())
     }
 
-    fn get_count(&self, _: &mut Request) -> IronResult<Response> {
-        let count = self.count().unwrap_or(0);
-        self.ok_response(&serde_json::to_value(count).unwrap())
+    fn reset(
+        state: &api::ServiceApiState,
+        transaction: TxReset,
+    ) -> api::Result<TransactionResponse> {
+        trace!("received reset tx");
+
+        let transaction: Box<Transaction> = Box::new(transaction);
+        let tx_hash = transaction.hash();
+        state.sender().send(transaction)?;
+        Ok(TransactionResponse { tx_hash })
     }
 
-    fn reset(&self, req: &mut Request) -> IronResult<Response> {
-        match req.get::<bodyparser::Struct<TxReset>>() {
-            Ok(Some(transaction)) => {
-                let transaction: Box<Transaction> = Box::new(transaction);
-                let tx_hash = transaction.hash();
-                self.channel.send(transaction).map_err(ApiError::from)?;
-                let json = TransactionResponse { tx_hash };
-                self.ok_response(&serde_json::to_value(&json).unwrap())
-            }
-            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-        }
-    }
-
-    fn wire_private(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let reset = move |req: &mut Request| self_.reset(req);
-        router.post("/reset", reset, "reset");
-
-        // Expose `get_count` as both private and public endpoint
-        // in order to test private gets as well.
-        let self_ = self.clone();
-        let get_count = move |req: &mut Request| self_.get_count(req);
-        router.get("/count", get_count, "get_count");
-    }
-}
-
-impl Api for CounterApi {
-    fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let increment = move |req: &mut Request| self_.increment(req);
-        router.post("/count", increment, "increment");
-
-        let self_ = self.clone();
-        let get_count = move |req: &mut Request| self_.get_count(req);
-        router.get("/count", get_count, "get_count");
+    fn wire(builder: &mut api::ServiceApiBuilder) {
+        builder
+            .private_scope()
+            .endpoint("count", Self::count)
+            .endpoint_mut("reset", Self::reset);
+        builder
+            .public_scope()
+            .endpoint("count", Self::count)
+            .endpoint_mut("count", Self::increment);
     }
 }
 
@@ -231,24 +195,7 @@ impl Service for CounterService {
         Ok(tx.into())
     }
 
-    /// Create a REST `Handler` to process web requests to the node.
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = CounterApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
-        Some(Box::new(router))
-    }
-
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = CounterApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire_private(&mut router);
-        Some(Box::new(router))
+    fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
+        CounterApi::wire(builder)
     }
 }

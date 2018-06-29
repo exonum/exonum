@@ -17,18 +17,20 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::{private::NodeInfo,
-                   public::{ConnectivityInfo, ConnectivityStatus, ConsensusStatus}},
+use exonum::{api::node::{private::NodeInfo,
+                         public::system::{ConnectivityStatus, ConsensusStatus, HealthCheckInfo},
+             },
              helpers::user_agent,
              messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
-fn test_connectivity_status_false() {
-    let testkit = TestKitBuilder::validator().create();
+fn test_healthcheck_status_false() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: ConnectivityInfo = api.get(ApiKind::System, "v1/connectivity_status");
-    let expected = ConnectivityInfo {
+
+    let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
+    let expected = HealthCheckInfo {
         consensus_status: ConsensusStatus::Enabled,
         connectivity: ConnectivityStatus::NotConnected,
     };
@@ -39,7 +41,8 @@ fn test_connectivity_status_false() {
 fn test_user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: String = api.get(ApiKind::System, "v1/user_agent");
+
+    let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent::get();
     assert_eq!(info, expected);
 }
@@ -48,9 +51,22 @@ fn test_user_agent_info() {
 fn test_network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: NodeInfo = api.get_private(ApiKind::System, "/v1/network");
 
+    let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
+}
+
+#[test]
+fn test_shutdown() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    assert_eq!(
+        api.private(ApiKind::System)
+            .post::<()>("v1/shutdown")
+            .unwrap(),
+        ()
+    );
 }

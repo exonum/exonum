@@ -27,13 +27,13 @@ mock.onPost('/api/services/timestamping/v1/timestamps', {
   }
 }).reply(200, '"069020ce9a066404b8c527558146ea05b072e986d3fd586a9790d9d89829fc72"')
 
-mock.onGet('/api/explorer/v1/transactions/069020ce9a066404b8c527558146ea05b072e986d3fd586a9790d9d89829fc72').replyOnce(200, txNotAccepted)
+mock.onGet('/api/explorer/v1/transactions?hash=069020ce9a066404b8c527558146ea05b072e986d3fd586a9790d9d89829fc72').replyOnce(200, txNotAccepted)
 
-mock.onGet('/api/explorer/v1/transactions/069020ce9a066404b8c527558146ea05b072e986d3fd586a9790d9d89829fc72').replyOnce(200, txAccepted)
+mock.onGet('/api/explorer/v1/transactions?hash=069020ce9a066404b8c527558146ea05b072e986d3fd586a9790d9d89829fc72').replyOnce(200, txAccepted)
 
 mock.onGet('/api/services/configuration/v1/configs/actual').reply(200, actual)
 
-mock.onGet('/api/services/timestamping/v1/timestamps/proof/966c80fec91149a85b2a496113aca0d9fefbc0edec6e4b2f8d0b24aaea9445f8').reply(200, proof)
+mock.onGet('/api/services/timestamping/v1/timestamps/proof?hash=966c80fec91149a85b2a496113aca0d9fefbc0edec6e4b2f8d0b24aaea9445f8').reply(200, proof)
 
 describe('Interaction with blockchain', () => {
   it('should generate new signing key pair', () => {

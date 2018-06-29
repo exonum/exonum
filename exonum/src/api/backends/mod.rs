@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Public part of the Exonum rest api.
+//! API backends
 
-pub use self::blockchain_explorer::{BlocksRange, ExplorerApi};
-pub use self::system::{ConnectivityInfo, ConnectivityStatus, ConsensusStatus, SystemApi};
-
-mod blockchain_explorer;
-mod system;
+pub mod actix;

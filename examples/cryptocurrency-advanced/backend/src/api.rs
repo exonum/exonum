@@ -14,20 +14,23 @@
 
 //! Cryptocurrency API.
 
-use bodyparser;
-use exonum::{api::{Api, ApiError},
-             blockchain::{self, BlockProof, Blockchain, Transaction, TransactionSet},
+use exonum::{api::{self, ServiceApiBuilder, ServiceApiState},
+             blockchain::{self, BlockProof, Transaction, TransactionSet},
              crypto::{Hash, PublicKey},
              helpers::Height,
              node::TransactionSend,
              storage::{ListProof, MapProof}};
-use iron::prelude::*;
-use router::Router;
-use serde_json;
 
 use transactions::WalletTransactions;
 use wallet::Wallet;
 use {CurrencySchema, CRYPTOCURRENCY_SERVICE_ID};
+
+/// The structure describes the query parameters for the `get_wallet` endpoint.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct WalletQuery {
+    /// Public key of the queried wallet.
+    pub pub_key: PublicKey,
+}
 
 /// The structure returned by the REST API.
 #[derive(Debug, Serialize, Deserialize)]
@@ -60,21 +63,14 @@ pub struct WalletInfo {
     pub wallet_history: Option<WalletHistory>,
 }
 
-/// TODO: Add documentation. (ECR-1638)
-#[derive(Clone)]
-pub struct CryptocurrencyApi<T: TransactionSend + Clone> {
-    /// Exonum blockchain.
-    pub blockchain: Blockchain,
-    /// Channel for transactions.
-    pub channel: T,
-}
+// TODO: Add documentation. (ECR-1638)
+/// Public service API description.
+#[derive(Debug, Clone, Copy)]
+pub struct CryptocurrencyApi;
 
-impl<T> CryptocurrencyApi<T>
-where
-    T: TransactionSend + Clone + 'static,
-{
-    fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
-        let snapshot = self.blockchain.snapshot();
+impl CryptocurrencyApi {
+    pub fn wallet_info(state: &ServiceApiState, query: WalletQuery) -> api::Result<WalletInfo> {
+        let snapshot = state.snapshot();
         let general_schema = blockchain::Schema::new(&snapshot);
         let currency_schema = CurrencySchema::new(&snapshot);
 
@@ -87,17 +83,18 @@ where
         let to_table: MapProof<Hash, Hash> =
             general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
 
-        let to_wallet: MapProof<PublicKey, Wallet> = currency_schema.wallets().get_proof(*pub_key);
+        let to_wallet: MapProof<PublicKey, Wallet> =
+            currency_schema.wallets().get_proof(query.pub_key);
 
         let wallet_proof = WalletProof {
             to_table,
             to_wallet,
         };
 
-        let wallet = currency_schema.wallet(pub_key);
+        let wallet = currency_schema.wallet(&query.pub_key);
 
         let wallet_history = wallet.map(|_| {
-            let history = currency_schema.wallet_history(pub_key);
+            let history = currency_schema.wallet_history(&query.pub_key);
             let proof = history.get_range_proof(0, history.len());
 
             let transactions: Vec<WalletTransactions> = history
@@ -119,39 +116,20 @@ where
         })
     }
 
-    fn wire_post_transaction(self, router: &mut Router) {
-        let transaction = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<WalletTransactions>>() {
-                Ok(Some(transaction)) => {
-                    let transaction: Box<Transaction> = transaction.into();
-                    let tx_hash = transaction.hash();
-                    self.channel.send(transaction).map_err(ApiError::from)?;
-                    let json = TransactionResponse { tx_hash };
-                    self.ok_response(&serde_json::to_value(&json).unwrap())
-                }
-                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-            }
-        };
-        router.post("/v1/wallets/transaction", transaction, "post_transaction");
+    pub fn post_transaction(
+        state: &ServiceApiState,
+        query: WalletTransactions,
+    ) -> api::Result<TransactionResponse> {
+        let transaction: Box<Transaction> = query.into();
+        let tx_hash = transaction.hash();
+        state.sender().send(transaction)?;
+        Ok(TransactionResponse { tx_hash })
     }
 
-    fn wire_wallet_info(self, router: &mut Router) {
-        let wallet_info = move |req: &mut Request| -> IronResult<Response> {
-            let pub_key: PublicKey = self.url_fragment(req, "pubkey")?;
-            let info = self.wallet_info(&pub_key)?;
-            self.ok_response(&serde_json::to_value(&info).unwrap())
-        };
-        router.get("/v1/wallets/info/:pubkey", wallet_info, "wallet_info");
-    }
-}
-
-impl<T> Api for CryptocurrencyApi<T>
-where
-    T: 'static + TransactionSend + Clone,
-{
-    fn wire(&self, router: &mut Router) {
-        self.clone().wire_post_transaction(router);
-        self.clone().wire_wallet_info(router);
+    pub fn wire(builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("v1/wallets/info", Self::wallet_info)
+            .endpoint_mut("v1/wallets/transaction", Self::post_transaction);
     }
 }

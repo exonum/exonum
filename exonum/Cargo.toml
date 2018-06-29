@@ -16,6 +16,8 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
+actix = "=0.5.8"
+actix-web = "=0.6.13"
 log = "=0.4.1"
 byteorder = "1.2.3"
 hex = "=0.3.2"
@@ -30,14 +32,6 @@ clap = "2.31.2"
 term = "=0.5.1"
 colored = "1.6.0"
 env_logger = "=0.5.10"
-hyper = "=0.10.13"
-cookie = "=0.10.1"
-router = "=0.6.0"
-iron = "=0.6.0"
-iron-cors = "=0.7.0"
-headers = "=0.1.0"
-params = "=0.8.0"
-mount = "=0.4.0"
 atty = "=0.2.10"
 bytes = "=0.4.8"
 futures = "=0.1.21"
@@ -48,7 +42,6 @@ tokio-timer = "=0.1.2"
 failure = "=0.1.1"
 os_info = "1.0.1"
 chrono = { version = "=0.4.2", features = ["serde"] }
-bodyparser = "=0.8.0"
 uuid = { version = "=0.6.5", features = ["serde"] }
 snow = "=0.1.12"
 rust_decimal = "=0.9.0"

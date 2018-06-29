@@ -55,18 +55,14 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
-extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate iron;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate params;
-extern crate router;
 #[macro_use]
 extern crate serde_derive;
 
@@ -84,15 +80,13 @@ pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use exonum::{api::Api,
-             blockchain::{self, ApiContext, Transaction, TransactionSet},
+use exonum::{api::ServiceApiBuilder,
+             blockchain::{self, Transaction, TransactionSet},
              crypto::Hash,
              encoding::Error as EncodingError,
              helpers::fabric::{self, Context},
              messages::RawTransaction,
              storage::Snapshot};
-use iron::Handler;
-use router::Router;
 
 mod api;
 mod errors;
@@ -128,18 +122,9 @@ impl blockchain::Service for Service {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = api::PublicApi::new(ctx);
-        api.wire(&mut router);
-        Some(Box::new(router))
-    }
-
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = api::PrivateApi::new(ctx);
-        api.wire(&mut router);
-        Some(Box::new(router))
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi::wire(builder);
+        api::PrivateApi::wire(builder);
     }
 }
 

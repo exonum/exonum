@@ -23,13 +23,12 @@ pub use self::{connect_list::ConnectList,
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
+use api::{backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors,
+                            SystemRuntimeConfig},
+          ApiAccess,
+          ApiAggregator};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
-use iron::{Chain, Iron, Listening};
-use iron_cors::CorsMiddleware;
-use mount::Mount;
-use router::Router;
-use serde::{de, ser};
 use tokio_core::reactor::Core;
 use toml::Value;
 
@@ -37,12 +36,10 @@ use std::{collections::{BTreeMap, HashSet},
           fmt,
           io,
           net::SocketAddr,
-          str::FromStr,
           sync::Arc,
           thread,
           time::{Duration, SystemTime}};
 
-use api::{private, public, Api};
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{error::{into_other, log_error, other_error, LogError},
@@ -185,102 +182,6 @@ impl Default for NodeApiConfig {
             public_allow_origin: None,
             private_allow_origin: None,
         }
-    }
-}
-
-/// CORS header specification
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AllowOrigin {
-    /// Allow access from any host.
-    Any,
-    /// Allow access only from the following hosts.
-    Whitelist(Vec<String>),
-}
-
-impl From<AllowOrigin> for CorsMiddleware {
-    fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
-        match allow_origin {
-            AllowOrigin::Any => CorsMiddleware::with_allow_any(),
-            AllowOrigin::Whitelist(hosts) => {
-                CorsMiddleware::with_whitelist(hosts.into_iter().collect())
-            }
-        }
-    }
-}
-
-impl ser::Serialize for AllowOrigin {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        match *self {
-            AllowOrigin::Any => "*".serialize(serializer),
-            AllowOrigin::Whitelist(ref hosts) => {
-                if hosts.len() == 1 {
-                    hosts[0].serialize(serializer)
-                } else {
-                    hosts.serialize(serializer)
-                }
-            }
-        }
-    }
-}
-
-impl<'de> de::Deserialize<'de> for AllowOrigin {
-    fn deserialize<D>(d: D) -> Result<AllowOrigin, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = AllowOrigin;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a list of hosts or \"*\"")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<AllowOrigin, E>
-            where
-                E: de::Error,
-            {
-                match value {
-                    "*" => Ok(AllowOrigin::Any),
-                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
-                }
-            }
-
-            fn visit_seq<A>(self, seq: A) -> Result<AllowOrigin, A::Error>
-            where
-                A: de::SeqAccess<'de>,
-            {
-                let hosts =
-                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
-                Ok(AllowOrigin::Whitelist(hosts))
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
-}
-
-impl FromStr for AllowOrigin {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "*" {
-            return Ok(AllowOrigin::Any);
-        }
-
-        let v: Vec<_> = s.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if v.is_empty() {
-            bail!("Invalid AllowOrigin::Whitelist value");
-        }
-
-        Ok(AllowOrigin::Whitelist(v))
     }
 }
 
@@ -985,48 +886,63 @@ impl Node {
     /// Explorer api prefix is `/api/explorer`
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
-    pub fn run(self) -> io::Result<()> {
-        let api_state = self.handler.api_state.clone();
-        let blockchain = self.handler.blockchain.clone();
-        let mut api_handlers: Vec<Listening> = Vec::new();
+    pub fn run(self) -> Result<(), failure::Error> {
+        // Runs actix-web api.
+        let actix_api_runtime = SystemRuntimeConfig {
+            api_runtimes: {
+                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
+                    let app_config = move |app: App| -> App {
+                        let cors = Cors::from(allow_origin.clone());
+                        app.middleware(cors)
+                    };
+                    Arc::new(app_config)
+                };
 
-        // Start private api.
-        if let Some(listen_address) = self.api_options.private_api_address {
-            let api_sender = self.channel();
-            let handler = create_private_api_handler(
-                blockchain.clone(),
-                api_state.clone(),
-                api_sender,
-                &self.api_options,
-            );
-            let listener = Iron::new(handler).http(listen_address).unwrap();
-            api_handlers.push(listener);
+                let public_api_handler = self.api_options
+                    .public_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Public,
+                        app_config: self.api_options
+                            .public_allow_origin
+                            .clone()
+                            .map(into_app_config),
+                    })
+                    .into_iter();
+                let private_api_handler = self.api_options
+                    .private_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Private,
+                        app_config: self.api_options
+                            .private_allow_origin
+                            .clone()
+                            .map(into_app_config),
+                    })
+                    .into_iter();
+                // Collects API handlers.
+                public_api_handler
+                    .chain(private_api_handler)
+                    .collect::<Vec<_>>()
+            },
+            api_aggregator: ApiAggregator::new(
+                self.handler.blockchain.clone(),
+                self.handler.api_state.clone(),
+            ),
+        }.start()?;
 
-            info!("Private exonum api started on {}", listen_address);
-        };
-
-        // Start public api.
-        if let Some(listen_address) = self.api_options.public_api_address {
-            let handler = create_public_api_handler(blockchain, api_state, &self.api_options);
-            let listener = Iron::new(handler).http(listen_address).unwrap();
-            api_handlers.push(listener);
-
-            info!("Public exonum api started on {}", listen_address);
-        };
-
+        // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
             *self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
             self.max_message_len,
         );
-
         self.run_handler(&handshake_params)?;
 
-        // Stop all api handlers.
-        for mut handler in api_handlers {
-            handler.close().unwrap();
-        }
+        // Stops actix web runtime.
+        actix_api_runtime.stop()?;
 
+        info!("Exonum node stopped");
         Ok(())
     }
 
@@ -1077,59 +993,6 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
-}
-
-/// Public for testing
-#[doc(hidden)]
-pub fn create_public_api_handler(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-    config: &NodeApiConfig,
-) -> Chain {
-    let mut mount = Mount::new();
-    mount.mount("api/services", blockchain.mount_public_api());
-
-    if config.enable_blockchain_explorer {
-        let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(blockchain.clone());
-        explorer_api.wire(&mut router);
-        mount.mount("api/explorer", router);
-    }
-
-    let mut router = Router::new();
-    let system_api = public::SystemApi::new(blockchain, shared_api_state);
-    system_api.wire(&mut router);
-    mount.mount("api/system", router);
-
-    let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.public_allow_origin {
-        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
-    }
-    chain
-}
-
-/// Public for testing
-#[doc(hidden)]
-pub fn create_private_api_handler(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-    api_sender: ApiSender,
-    config: &NodeApiConfig,
-) -> Chain {
-    let mut mount = Mount::new();
-    mount.mount("api/services", blockchain.mount_private_api());
-
-    let mut router = Router::new();
-    let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, api_sender);
-    system_api.wire(&mut router);
-    mount.mount("api/system", router);
-
-    let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.private_allow_origin {
-        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
-    }
-    chain
 }
 
 #[cfg(test)]
@@ -1191,55 +1054,5 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 1);
-    }
-
-    #[test]
-    fn allow_origin_toml() {
-        fn check(text: &str, allow_origin: AllowOrigin) {
-            #[derive(Serialize, Deserialize)]
-            struct Config {
-                allow_origin: AllowOrigin,
-            }
-            let config_toml = format!("allow_origin = {}\n", text);
-            let config: Config = ::toml::from_str(&config_toml).unwrap();
-            assert_eq!(config.allow_origin, allow_origin);
-            assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
-        }
-
-        check(r#""*""#, AllowOrigin::Any);
-        check(
-            r#""http://example.com""#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"["http://a.org", "http://b.org"]"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-    }
-
-    #[test]
-    fn allow_origin_from_str() {
-        fn check(text: &str, expected: AllowOrigin) {
-            let from_str = AllowOrigin::from_str(text).unwrap();
-            assert_eq!(from_str, expected);
-        }
-
-        check(r#"*"#, AllowOrigin::Any);
-        check(
-            r#"http://example.com"#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org, "#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org,http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
     }
 }
