@@ -352,7 +352,7 @@ impl ConnectListConfig {
 
     /// Creates `ConnectList` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
-        let peers: Vec<_> = peers
+        let peers = peers
             .iter()
             .zip(validators_keys.iter())
             .map(|(a, v)| ConnectInfo {
