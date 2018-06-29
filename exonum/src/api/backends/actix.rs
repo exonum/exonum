@@ -26,9 +26,11 @@ use futures::{Future, IntoFuture};
 use serde::{
     de::{self, DeserializeOwned}, ser, Serialize,
 };
+use serde_json;
 
 use std::{
-    fmt, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc}, thread::{self, JoinHandle},
+    fmt::{self, Display}, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc},
+    thread::{self, JoinHandle},
 };
 
 use api::{
@@ -119,15 +121,22 @@ impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
 
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
+        fn to_json(string: impl Display) -> serde_json::Value {
+            serde_json::from_str(&string.to_string()).unwrap_or_else(|e| {
+                panic!(
+                    "Unable to convert error description to JSON, an error occurred: {}",
+                    e
+                )
+            })
+        };
+
         match self {
-            ApiError::BadRequest(err) => HttpResponse::BadRequest().json(err),
-            ApiError::InternalError(err) => {
-                HttpResponse::InternalServerError().json(err.to_string())
-            }
-            ApiError::Io(err) => HttpResponse::InternalServerError().json(err.to_string()),
-            ApiError::Storage(err) => HttpResponse::InternalServerError().json(err.to_string()),
-            ApiError::NotFound(err) => HttpResponse::NotFound().json(err),
-            ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
+            ApiError::BadRequest(err) => HttpResponse::BadRequest().json(to_json(err)),
+            ApiError::InternalError(err) => HttpResponse::InternalServerError().json(to_json(err)),
+            ApiError::Io(err) => HttpResponse::InternalServerError().json(to_json(err)),
+            ApiError::Storage(err) => HttpResponse::InternalServerError().json(to_json(err)),
+            ApiError::NotFound(err) => HttpResponse::NotFound().json(to_json(err)),
+            ApiError::Unauthorized => HttpResponse::Unauthorized().json(serde_json::Value::Null),
         }
     }
 }
