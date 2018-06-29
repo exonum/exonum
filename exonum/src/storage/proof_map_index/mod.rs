@@ -14,20 +14,21 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-pub use self::{key::{HashedKey, ProofMapKey, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
-               proof::{CheckedMapProof, MapProof, MapProofError}};
+pub use self::{
+    key::{HashedKey, ProofMapKey, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
+    proof::{CheckedMapProof, MapProof, MapProofError},
+};
 
 use std::{fmt, marker::PhantomData};
 
-use self::{key::{BitsRange, ChildKind, LEAF_KEY_PREFIX},
-           node::{BranchNode, Node},
-           proof::{create_multiproof, create_proof}};
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey,
-            StorageValue};
+use self::{
+    key::{BitsRange, ChildKind, LEAF_KEY_PREFIX}, node::{BranchNode, Node},
+    proof::{create_multiproof, create_proof},
+};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
+    StorageKey, StorageValue,
+};
 use crypto::{CryptoHash, Hash, HashStream};
 
 mod key;
@@ -106,7 +107,7 @@ enum RemoveResult {
 
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
@@ -760,7 +761,7 @@ where
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
@@ -810,7 +811,7 @@ where
 
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue + fmt::Debug,
 {
@@ -824,7 +825,7 @@ where
 
         impl<'a, T, K, V> Entry<'a, T, K, V>
         where
-            T: AsRef<Snapshot>,
+            T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
             V: StorageValue,
         {
@@ -848,7 +849,7 @@ where
 
         impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
         where
-            T: AsRef<Snapshot>,
+            T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
             V: StorageValue + fmt::Debug,
         {

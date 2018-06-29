@@ -32,7 +32,7 @@ pub struct Entry<T, V> {
 
 impl<T, V> Entry<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.

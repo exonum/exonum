@@ -46,7 +46,7 @@ impl NodeInfo {
     /// Creates new `NodeInfo` from services list.
     pub fn new<'a, I>(services: I) -> Self
     where
-        I: IntoIterator<Item = &'a Box<Service>>,
+        I: IntoIterator<Item = &'a Box<dyn Service>>,
     {
         let core_version = option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned());
         NodeInfo {

@@ -13,15 +13,18 @@
 // limitations under the License.
 
 use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
-use tokio_core::{net::{TcpListener, TcpStream},
-                 reactor::Handle};
-use tokio_retry::{strategy::{jitter, FixedInterval},
-                  Retry};
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Handle,
+};
+use tokio_retry::{
+    strategy::{jitter, FixedInterval}, Retry,
+};
 
 use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
 
-use super::{error::{into_other, log_error, other_error, result_ok},
-            to_box};
+use super::{
+    error::{into_other, log_error, other_error, result_ok}, to_box,
+};
 use crypto::PublicKey;
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
@@ -185,7 +188,7 @@ impl ConnectionsPool {
         &self,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> Box<Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let fut = self.remove(&peer)
             .into_future()
             .map_err(other_error)
@@ -204,7 +207,7 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> Box<Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -242,7 +245,7 @@ impl NetworkPart {
 
 struct RequestHandler(
     // TODO: Replace with concrete type. (ECR-1634)
-    Box<Future<Item = (), Error = io::Error>>,
+    Box<dyn Future<Item = (), Error = io::Error>>,
 );
 
 impl RequestHandler {
@@ -332,7 +335,7 @@ impl Future for RequestHandler {
     }
 }
 
-struct Listener(Box<Future<Item = (), Error = io::Error>>);
+struct Listener(Box<dyn Future<Item = (), Error = io::Error>>);
 
 impl Listener {
     fn bind(
@@ -418,7 +421,7 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
+fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
 where
     F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
 {

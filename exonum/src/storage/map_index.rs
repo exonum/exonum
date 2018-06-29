@@ -16,12 +16,10 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey,
-            StorageValue};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
+    StorageKey, StorageValue,
+};
 
 /// A map of keys and values.
 ///
@@ -78,7 +76,7 @@ pub struct MapIndexValues<'a, V> {
 
 impl<T, K, V> MapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: StorageKey,
     V: StorageValue,
 {
@@ -417,7 +415,7 @@ where
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: StorageKey,
     V: StorageValue,
 {
@@ -505,7 +503,7 @@ mod tests {
         assert_eq!(false, index.contains(KEY));
     }
 
-    fn iter(db: Box<Database>) {
+    fn iter(db: Box<dyn Database>) {
         let mut fork = db.fork();
         let mut map_index = MapIndex::new(IDX_NAME, &mut fork);
 
@@ -581,7 +579,7 @@ mod tests {
         use storage::{Database, MemoryDB};
         use tempdir::TempDir;
 
-        fn create_database(_: &Path) -> Box<Database> {
+        fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
         }
 
@@ -592,7 +590,6 @@ mod tests {
             let db = create_database(path);
             super::iter(db);
         }
-
     }
 
     mod rocksdb_tests {
@@ -600,7 +597,7 @@ mod tests {
         use storage::Database;
         use tempdir::TempDir;
 
-        fn create_database(path: &Path) -> Box<Database> {
+        fn create_database(path: &Path) -> Box<dyn Database> {
             use storage::{DbOptions, RocksDB};
             let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())

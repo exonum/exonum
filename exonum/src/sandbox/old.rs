@@ -14,9 +14,13 @@
 
 use std::time::Duration;
 
-use super::{sandbox::timestamping_sandbox,
-            sandbox_tests_helper::{gen_timestamping_tx, VALIDATOR_0, VALIDATOR_1, VALIDATOR_2,
-                                   VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_THREE}};
+use super::{
+    sandbox::timestamping_sandbox,
+    sandbox_tests_helper::{
+        gen_timestamping_tx, VALIDATOR_0, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE,
+        ROUND_ONE, ROUND_THREE,
+    },
+};
 use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::{CryptoHash, Hash};
 use helpers::{Height, Round};

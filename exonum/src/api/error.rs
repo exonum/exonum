@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
+
 //! Error module.
 
-use std::io;
+use std::{error, io};
 
 use storage;
 
@@ -27,7 +31,7 @@ pub enum Error {
 
     /// Input/output error.
     #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] ::std::io::Error),
+    Io(#[cause] io::Error),
 
     /// Bad request.
     #[fail(display = "Bad request: {}", _0)]
@@ -39,7 +43,7 @@ pub enum Error {
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<::std::error::Error + Send + Sync>),
+    InternalError(Box<error::Error + Send + Sync>),
 
     /// Unauthorized error.
     #[fail(display = "Unauthorized")]

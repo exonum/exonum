@@ -18,15 +18,17 @@ use bit_vec::BitVec;
 use failure;
 use serde_json::Value;
 
-use std::{collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
-          net::SocketAddr,
-          time::{Duration, SystemTime}};
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
+    time::{Duration, SystemTime},
+};
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
-               RawMessage};
+use messages::{
+    BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
+};
 use node::connect_list::ConnectList;
 use node::ConnectInfo;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
@@ -852,7 +854,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose<S: AsRef<Snapshot>>(
+    pub fn add_propose<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: &Propose,
         transactions: &MapIndex<S, Hash, RawMessage>,
@@ -920,7 +922,7 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
-    pub fn create_incomplete_block<S: AsRef<Snapshot>>(
+    pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: &BlockResponse,
         txs: &MapIndex<S, Hash, RawMessage>,

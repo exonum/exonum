@@ -132,7 +132,7 @@
 //! }
 //! ```
 
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate actix_web;
 #[cfg_attr(test, macro_use)]
@@ -164,16 +164,15 @@ use tokio_core::reactor::Core;
 use std::sync::{Arc, RwLock};
 use std::{fmt, net::SocketAddr};
 
-use exonum::{api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
-                   ApiAccess},
-             blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
-                          Transaction},
-             crypto::{self, Hash},
-             explorer::{BlockWithTransactions, BlockchainExplorer},
-             helpers::{Height, ValidatorId},
-             messages::RawMessage,
-             node::{ApiSender, ExternalMessage, State as NodeState},
-             storage::{MemoryDB, Patch, Snapshot}};
+use exonum::{
+    api::{
+        backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
+    },
+    blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
+    crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
+    helpers::{Height, ValidatorId}, messages::RawMessage,
+    node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
+};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use poll_events::poll_events;
@@ -271,7 +270,7 @@ mod server;
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     validator_count: Option<u16>,
-    services: Vec<Box<Service>>,
+    services: Vec<Box<dyn Service>>,
     logger: bool,
 }
 
@@ -330,7 +329,7 @@ impl TestKitBuilder {
     /// Adds a service to the testkit.
     pub fn with_service<S>(mut self, service: S) -> Self
     where
-        S: Into<Box<Service>>,
+        S: Into<Box<dyn Service>>,
     {
         self.services.push(service.into());
         self
@@ -372,7 +371,7 @@ impl TestKitBuilder {
 pub struct TestKit {
     blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
-    events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync>,
+    events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
@@ -392,12 +391,12 @@ impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given service.
     pub fn for_service<S>(service: S) -> Self
     where
-        S: Into<Box<Service>>,
+        S: Into<Box<dyn Service>>,
     {
         TestKitBuilder::validator().with_service(service).create()
     }
 
-    fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
+    fn assemble(services: Vec<Box<dyn Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
@@ -415,7 +414,7 @@ impl TestKit {
         let genesis = network.genesis_config();
         blockchain.initialize(genesis.clone()).unwrap();
 
-        let events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync> = {
+        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
             let mut blockchain = blockchain.clone();
             Box::new(api_channel.1.and_then(move |event| {
                 let mut fork = blockchain.fork();
@@ -460,7 +459,7 @@ impl TestKit {
     }
 
     /// Returns a snapshot of the current blockchain state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.blockchain.snapshot()
     }
 
@@ -559,9 +558,9 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
-    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
+    pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
-        I: IntoIterator<Item = Box<Transaction>>,
+        I: IntoIterator<Item = Box<dyn Transaction>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -583,8 +582,8 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<Snapshot> {
-        self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
+    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<dyn Snapshot> {
+        self.probe_all(vec![Box::new(transaction) as Box<dyn Transaction>])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
@@ -680,7 +679,7 @@ impl TestKit {
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
-        I: IntoIterator<Item = Box<Transaction>>,
+        I: IntoIterator<Item = Box<dyn Transaction>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
@@ -966,7 +965,7 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
+    fn remove_events_stream(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
         let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
         Box::new(stream.for_each(|_| Ok(())))
     }

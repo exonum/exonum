@@ -19,19 +19,17 @@
 
 use toml;
 
-use std::{collections::{BTreeMap, HashMap},
-          fs,
-          net::{IpAddr, SocketAddr},
-          path::{Path, PathBuf}};
+use std::{
+    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
+};
 
-use super::{internal::{CollectedCommand, Command, Feedback},
-            keys,
-            shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
-                     SharedConfig},
-            Argument,
-            CommandName,
-            Context,
-            DEFAULT_EXONUM_LISTEN_PORT};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, keys,
+    shared::{
+        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
+    },
+    Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
+};
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
@@ -53,7 +51,7 @@ pub struct Run;
 
 impl Run {
     /// Returns created database instance.
-    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
+    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
@@ -124,7 +122,7 @@ impl Command for Run {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let config = Self::node_config(&context);
         let public_addr = Self::public_api_address(&context);
@@ -249,7 +247,7 @@ impl Command for RunDev {
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let db_path = Self::artifacts_path("db", &context);
         context.set_arg(DATABASE_PATH, db_path);
@@ -296,7 +294,7 @@ impl Command for GenerateCommonConfig {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let template_path = context
             .arg::<String>("COMMON_CONFIG")
@@ -377,7 +375,7 @@ impl Command for GenerateNodeConfig {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let common_config_path = context
             .arg::<String>("COMMON_CONFIG")
@@ -558,7 +556,7 @@ impl Command for Finalize {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let public_configs_path = context
             .arg_multiple::<String>("PUBLIC_CONFIGS")
@@ -682,7 +680,7 @@ impl Command for GenerateTestnet {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");

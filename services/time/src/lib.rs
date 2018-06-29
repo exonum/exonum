@@ -19,7 +19,7 @@
 //!
 //! [docs:time]: https://exonum.com/doc/advanced/time
 
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate chrono;
 #[macro_use]
@@ -40,13 +40,12 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum::{api::ServiceApiBuilder,
-             blockchain::{Service, ServiceContext, Transaction, TransactionSet},
-             crypto::Hash,
-             encoding::{self, serialize::json::reexport::Value},
-             helpers::fabric::{Context, ServiceFactory},
-             messages::RawTransaction,
-             storage::{Fork, Snapshot}};
+use exonum::{
+    api::ServiceApiBuilder, blockchain::{Service, ServiceContext, Transaction, TransactionSet},
+    crypto::Hash, encoding::{self, serialize::json::reexport::Value},
+    helpers::fabric::{Context, ServiceFactory}, messages::RawTransaction,
+    storage::{Fork, Snapshot},
+};
 use schema::TimeSchema;
 
 use time_provider::{SystemTimeProvider, TimeProvider};
@@ -61,13 +60,13 @@ pub const SERVICE_NAME: &str = "exonum_time";
 #[derive(Debug)]
 pub struct TimeService {
     /// Current time.
-    time: Box<TimeProvider>,
+    time: Box<dyn TimeProvider>,
 }
 
 impl Default for TimeService {
     fn default() -> TimeService {
         TimeService {
-            time: Box::new(SystemTimeProvider) as Box<TimeProvider>,
+            time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
         }
     }
 }
@@ -79,7 +78,7 @@ impl TimeService {
     }
 
     /// Create a new `TimeService` with time provider `T`.
-    pub fn with_provider<T: Into<Box<TimeProvider>>>(time_provider: T) -> TimeService {
+    pub fn with_provider<T: Into<Box<dyn TimeProvider>>>(time_provider: T) -> TimeService {
         TimeService {
             time: time_provider.into(),
         }
@@ -91,7 +90,7 @@ impl Service for TimeService {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = TimeSchema::new(snapshot);
         schema.state_hash()
     }
@@ -100,7 +99,7 @@ impl Service for TimeService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 
@@ -140,7 +139,7 @@ impl ServiceFactory for TimeServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<Service> {
+    fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
         Box::new(TimeService::new())
     }
 }
