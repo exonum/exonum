@@ -38,14 +38,16 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use blockchain::{
+    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
+};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
     error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
     InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
     NetworkRequest, SyncSender, TimeoutRequest,
 };
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
@@ -238,8 +240,6 @@ pub struct NodeConfig {
     pub service_public_key: PublicKey,
     /// Service secret key.
     pub service_secret_key: SecretKey,
-    /// Node's ConnectList.
-    pub connect_list: ConnectList,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -250,6 +250,8 @@ pub struct NodeConfig {
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,
+    /// Node's ConnectList.
+    pub connect_list: ConnectListConfig,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -316,6 +318,46 @@ impl NodeRole {
             NodeRole::Auditor => true,
             _ => false,
         }
+    }
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// ConnectList representation in node's config file.
+pub struct ConnectListConfig {
+    /// Peers to which we can connect.
+    pub peers: Vec<ConnectInfo>,
+}
+
+impl ConnectListConfig {
+    /// Creates `ConnectList` from validators public configs.
+    pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
+        let peers = list.iter()
+            .map(|config| ConnectInfo {
+                public_key: config.validator_keys.consensus_key,
+                address: config.addr,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
+    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
+        let peers = peers
+            .iter()
+            .zip(validators_keys.iter())
+            .map(|(a, v)| ConnectInfo {
+                address: *a,
+                public_key: v.consensus_key,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// `ConnectListConfig` peers addresses.
+    pub fn addresses(&self) -> Vec<SocketAddr> {
+        self.peers.iter().map(|p| p.address).collect()
     }
 }
 
@@ -809,7 +851,7 @@ impl Node {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
                 consensus_secret_key: node_cfg.consensus_secret_key,
-                connect_list: node_cfg.connect_list,
+                connect_list: ConnectList::from_config(node_cfg.connect_list),
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {

@@ -34,7 +34,7 @@ use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::{ConnectList, NodeApiConfig, NodeConfig};
+use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -604,7 +604,6 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_addr,
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
-                connect_list: ConnectList::from_node_config(&list),
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,
@@ -620,6 +619,7 @@ impl Command for Finalize {
                 mempool: Default::default(),
                 services_configs: Default::default(),
                 database: Default::default(),
+                connect_list: ConnectListConfig::from_node_config(&list),
             }
         };
 
