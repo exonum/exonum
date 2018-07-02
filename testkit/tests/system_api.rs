@@ -27,8 +27,8 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
 fn healthcheck() {
-    // This test checks whether the endpoint return expected result and correctness of
-    // serialisation.
+    // This test checks whether the endpoint returns expected result and correctness of
+    // serialize.
     // Expected:
     // consensus - enabled
     // connectivity - not connected, due to testkit unable to emulate nodes properly.

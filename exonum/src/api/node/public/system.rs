@@ -37,7 +37,7 @@ pub struct PeersAmount {
 pub enum ConnectivityStatus {
     /// The node has no connected peers.
     NotConnected,
-    /// The node has connected peers and their amount.
+    /// The node has connected peers. Amount of connected peers is stored within this variant.
     Connected(PeersAmount),
 }
 
