@@ -20,11 +20,9 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot, StorageKey,
+};
 
 /// A set of key items.
 ///
@@ -53,7 +51,7 @@ pub struct KeySetIndexIter<'a, K> {
 
 impl<T, K> KeySetIndex<T, K>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: StorageKey,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -264,7 +262,7 @@ where
 
 impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: StorageKey,
 {
     type Item = K::Owned;

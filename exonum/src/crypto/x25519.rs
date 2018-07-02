@@ -14,14 +14,14 @@
 
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
-use sodiumoxide::crypto::scalarmult::curve25519::{scalarmult as sodium_scalarmult,
-                                                  scalarmult_base as sodium_scalarmult_base,
-                                                  GroupElement as Curve25519GroupElement,
-                                                  Scalar as Curve25519Scalar};
-use sodiumoxide::crypto::sign::ed25519::{convert_ed_keypair_to_curve25519,
-                                         convert_ed_sk_to_curve25519,
-                                         PublicKey as PublicKeySodium,
-                                         SecretKey as SecretKeySodium};
+use sodiumoxide::crypto::scalarmult::curve25519::{
+    scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
+    GroupElement as Curve25519GroupElement, Scalar as Curve25519Scalar,
+};
+use sodiumoxide::crypto::sign::ed25519::{
+    convert_ed_keypair_to_curve25519, convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
+    PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
+};
 
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
@@ -83,6 +83,17 @@ pub fn scalarmult(sc: &SecretKey, pk: &PublicKey) -> Result<PublicKey, ()> {
 /// Calculates the public key based on private key for X25519.
 pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
     sodium_scalarmult_base(sc.as_ref()).into()
+}
+
+/// Converts Ed25519 public key to Curve25519 public key.
+///
+/// See: [`into_x25519_keypair()`][1]
+/// [1]: fn.into_x25519_public_key.html
+pub fn into_x25519_public_key(pk: crypto::PublicKey) -> PublicKey {
+    let mut public_key = [0; PUBLIC_KEY_LENGTH];
+    public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
+    let public_key = convert_ed_pk_to_curve25519(&public_key);
+    PublicKey(Curve25519GroupElement(public_key))
 }
 
 macro_rules! implement_x25519_type {

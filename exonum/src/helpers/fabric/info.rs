@@ -18,10 +18,9 @@ use serde_json;
 
 use std::collections::HashMap;
 
-use super::{internal::{CollectedCommand, Command, Feedback},
-            Argument,
-            CommandName,
-            Context};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, Argument, CommandName, Context,
+};
 
 // Context entry for the type of the requested information.
 const INFO_REQUEST: &str = "INFO_REQUEST";
@@ -74,11 +73,11 @@ impl Command for Info {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _: &Fn(Context) -> Context,
+        _: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let request = context
             .arg::<String>(INFO_REQUEST)
-            .expect(&format!("{} not found.", INFO_REQUEST));
+            .unwrap_or_else(|_| panic!("{} not found.", INFO_REQUEST));
 
         match request.as_ref() {
             "core-version" => Self::core_version(),

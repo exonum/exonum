@@ -19,23 +19,22 @@
 
 use toml;
 
-use std::{collections::{BTreeMap, HashMap},
-          fs,
-          net::{IpAddr, SocketAddr},
-          path::{Path, PathBuf}};
+use std::{
+    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
+};
 
-use super::{internal::{CollectedCommand, Command, Feedback},
-            keys,
-            shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
-                     SharedConfig},
-            Argument,
-            CommandName,
-            Context,
-            DEFAULT_EXONUM_LISTEN_PORT};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, keys,
+    shared::{
+        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
+    },
+    Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
+};
+use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::{AllowOrigin, NodeApiConfig, NodeConfig};
+use node::{ConnectList, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -52,15 +51,15 @@ pub struct Run;
 
 impl Run {
     /// Returns created database instance.
-    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
+    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
-            .expect(&format!("{} not found.", DATABASE_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>(NODE_CONFIG_PATH)
-            .expect(&format!("{} not found.", NODE_CONFIG_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
@@ -123,7 +122,7 @@ impl Command for Run {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let config = Self::node_config(&context);
         let public_addr = Self::public_api_address(&context);
@@ -248,7 +247,7 @@ impl Command for RunDev {
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let db_path = Self::artifacts_path("db", &context);
         context.set_arg(DATABASE_PATH, db_path);
@@ -295,7 +294,7 @@ impl Command for GenerateCommonConfig {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let template_path = context
             .arg::<String>("COMMON_CONFIG")
@@ -329,10 +328,11 @@ pub struct GenerateNodeConfig;
 impl GenerateNodeConfig {
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
-        let error_msg = &format!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str);
 
         let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            let ip = addr_str.parse::<IpAddr>().expect(error_msg);
+            let ip = addr_str.parse::<IpAddr>().unwrap_or_else(|_| {
+                panic!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str)
+            });
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
 
@@ -375,7 +375,7 @@ impl Command for GenerateNodeConfig {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let common_config_path = context
             .arg::<String>("COMMON_CONFIG")
@@ -556,7 +556,7 @@ impl Command for Finalize {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let public_configs_path = context
             .arg_multiple::<String>("PUBLIC_CONFIGS")
@@ -597,8 +597,6 @@ impl Command for Finalize {
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 
-        let peers = list.iter().map(|c| c.addr).collect();
-
         let genesis = Self::genesis_from_template(common.clone(), &list);
 
         let config = {
@@ -606,8 +604,7 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_addr,
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
-                whitelist: Default::default(),
-                peers,
+                connect_list: ConnectList::from_node_config(&list),
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,
@@ -683,7 +680,7 @@ impl Command for GenerateTestnet {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         mut context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");

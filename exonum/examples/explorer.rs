@@ -19,10 +19,10 @@ extern crate exonum;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::{blockchain::{Blockchain, Schema, Transaction, TransactionError},
-             crypto,
-             explorer::*,
-             helpers::{Height, ValidatorId}};
+use exonum::{
+    blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
+    helpers::{Height, ValidatorId},
+};
 
 use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer};
 

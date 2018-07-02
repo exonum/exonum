@@ -13,17 +13,19 @@
 // limitations under the License.
 
 use futures::future::{done, Future};
-use tokio_io::{codec::Framed,
-               io::{read_exact, write_all},
-               AsyncRead,
-               AsyncWrite};
+use tokio_io::{
+    codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
+};
 
 use std::io;
 
-use crypto::{PublicKey, SecretKey};
+use crypto::{
+    x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
+};
 use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
-use events::{codec::MessagesCodec,
-             noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
+use events::{
+    codec::MessagesCodec, noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH},
+};
 
 pub mod sodium_resolver;
 pub mod wrapper;
@@ -31,14 +33,32 @@ pub mod wrapper;
 #[cfg(test)]
 mod tests;
 
-type HandshakeResult<S> = Box<Future<Item = Framed<S, MessagesCodec>, Error = io::Error>>;
+type HandshakeResult<S> = Box<dyn Future<Item = Framed<S, MessagesCodec>, Error = io::Error>>;
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
 pub struct HandshakeParams {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    pub public_key: x25519::PublicKey,
+    pub secret_key: x25519::SecretKey,
     pub max_message_len: u32,
+    pub remote_key: Option<x25519::PublicKey>,
+}
+
+impl HandshakeParams {
+    pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
+        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+
+        HandshakeParams {
+            public_key,
+            secret_key,
+            max_message_len,
+            remote_key: None,
+        }
+    }
+
+    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
+        self.remote_key = Some(into_x25519_public_key(remote_key));
+    }
 }
 
 pub trait Handshake {

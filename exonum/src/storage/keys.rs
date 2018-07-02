@@ -392,7 +392,7 @@ mod tests {
     fn signed_int_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
-        let db: Box<Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &mut fork);
@@ -442,7 +442,7 @@ mod tests {
             }
         }
 
-        let db: Box<Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &mut fork);
@@ -518,7 +518,7 @@ mod tests {
     fn system_time_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
-        let db: Box<Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let x1 = Utc.timestamp(80, 0);
         let x2 = Utc.timestamp(10, 0);
         let y1 = Utc::now();

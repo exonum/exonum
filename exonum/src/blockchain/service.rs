@@ -15,21 +15,20 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use iron::Handler;
 use serde_json::Value;
 
-use std::{collections::{HashMap, HashSet},
-          fmt,
-          net::SocketAddr,
-          sync::{Arc, RwLock}};
+use std::{
+    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
+};
 
 use super::transaction::Transaction;
-use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use api::ServiceApiBuilder;
+use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
-use node::{ApiSender, Node, State, TransactionSend};
+use node::{ApiSender, NodeRole, State, TransactionSend};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
@@ -148,7 +147,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
     ///
@@ -168,7 +167,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// `transactions!` macro generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError>;
 
     /// Initializes the information schema of the service
     /// and generates an initial service configuration.
@@ -194,23 +193,12 @@ pub trait Service: Send + Sync + 'static {
     /// *Try not to perform long operations in this handler*.
     fn after_commit(&self, context: &ServiceContext) {}
 
-    /// Returns an API handler for public requests. The handler is mounted on
-    /// the `/api/services/{service_name}` path at [the public listen address][pub-addr]
-    /// of all full nodes in the blockchain network.
+    /// Extends API by handlers of this service. The request handlers are mounted on
+    /// the `/api/services/{service_name}` path at the listen address of every
+    /// full node in the blockchain network.
     ///
-    /// [pub-addr]: ../node/struct.NodeApiConfig.html#structfield.public_api_address
-    fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
-        None
-    }
-
-    /// Returns an API handler for private requests. The handler is mounted on
-    /// the `/api/services/{service_name}` path at [the private listen address][private-addr]
-    /// of all full nodes in the blockchain network.
-    ///
-    /// [private-addr]: ../node/struct.NodeApiConfig.html#structfield.private_api_address
-    fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
-        None
-    }
+    /// *Default implementation does nothing*
+    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
 }
 
 /// The current node state on which the blockchain is running, or in other words
@@ -269,7 +257,7 @@ impl ServiceContext {
 
     /// Returns the current database snapshot. This snapshot is used to
     /// retrieve schema information from the database.
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn snapshot(&self) -> &dyn Snapshot {
         self.fork.as_ref()
     }
 
@@ -299,13 +287,13 @@ impl ServiceContext {
     }
 
     /// Returns service specific global variables as a JSON value.
-    pub fn actual_service_config(&self, service: &Service) -> &Value {
+    pub fn actual_service_config(&self, service: &dyn Service) -> &Value {
         &self.stored_configuration.services[service.service_name()]
     }
 
     /// Returns a reference to the transaction sender, which can then be used
     /// to broadcast a transaction to other nodes in the network.
-    pub fn transaction_sender(&self) -> &TransactionSend {
+    pub fn transaction_sender(&self) -> &dyn TransactionSend {
         &self.api_sender
     }
 
@@ -323,7 +311,7 @@ pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
-    is_validator: bool,
+    node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
 }
@@ -404,19 +392,25 @@ impl SharedNodeState {
         let mut lock = self.state.write().expect("Expected write lock.");
 
         lock.peers_info.clear();
+        lock.incoming_connections.clear();
+        lock.outgoing_connections.clear();
         lock.majority_count = state.majority_count();
-        lock.is_validator = state.is_validator();
+        lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
             lock.peers_info.insert(c.addr(), *p);
+            lock.outgoing_connections.insert(c.addr());
+        }
+
+        for addr in state.connections().keys() {
+            lock.incoming_connections.insert(*addr);
         }
     }
 
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
         let lock = self.state.read().expect("Expected read lock.");
-
         let mut active_validators = lock.peers_info
             .values()
             .filter(|peer_key| {
@@ -426,7 +420,7 @@ impl SharedNodeState {
             })
             .count();
 
-        if lock.is_validator {
+        if lock.node_role.is_validator() {
             // Peers list doesn't include current node address, so we have to increment its length.
             // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
             active_validators += 1;
@@ -447,8 +441,18 @@ impl SharedNodeState {
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
-        let mut state = self.state.write().expect("Expected read lock.");
+        let mut state = self.state.write().expect("Expected write lock.");
         state.is_enabled = is_enabled;
+    }
+
+    pub(crate) fn node_role(&self) -> NodeRole {
+        let state = self.state.read().expect("Expected read lock.");
+        state.node_role
+    }
+
+    pub(crate) fn set_node_role(&self, role: NodeRole) {
+        let mut state = self.state.write().expect("Expected write lock.");
+        state.node_role = role;
     }
 
     /// Returns the value of the `state_update_timeout`.
@@ -514,75 +518,8 @@ impl SharedNodeState {
     }
 }
 
-/// Provides the current node state to API handlers.
-pub struct ApiContext {
-    blockchain: Blockchain,
-    node_channel: ApiSender,
-    public_key: PublicKey,
-    secret_key: SecretKey,
-}
-
-/// Provides the current node state to API handlers.
-impl ApiContext {
-    /// Constructs context for the given `Node`.
-    pub fn new(node: &Node) -> ApiContext {
-        let handler = node.handler();
-        ApiContext {
-            blockchain: handler.blockchain.clone(),
-            node_channel: node.channel(),
-            public_key: *node.state().service_public_key(),
-            secret_key: node.state().service_secret_key().clone(),
-        }
-    }
-
-    /// Constructs context from raw parts.
-    pub fn from_parts(
-        blockchain: &Blockchain,
-        node_channel: ApiSender,
-        public_key: &PublicKey,
-        secret_key: &SecretKey,
-    ) -> ApiContext {
-        ApiContext {
-            blockchain: blockchain.clone(),
-            node_channel,
-            public_key: *public_key,
-            secret_key: secret_key.clone(),
-        }
-    }
-
-    /// Returns a reference to the blockchain of this node.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
-    }
-
-    /// Returns a reference to the transaction sender.
-    pub fn node_channel(&self) -> &ApiSender {
-        &self.node_channel
-    }
-
-    /// Returns the public key of the current node.
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public_key
-    }
-
-    /// Returns the secret key of the current node.
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.secret_key
-    }
-}
-
-impl ::std::fmt::Debug for ApiContext {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "ApiContext(blockchain: {:?}, public_key: {:?})",
-            self.blockchain, self.public_key
-        )
-    }
-}
-
-impl<'a, S: Service> From<S> for Box<Service + 'a> {
+impl<'a, S: Service> From<S> for Box<dyn Service + 'a> {
     fn from(s: S) -> Self {
-        Box::new(s) as Box<Service>
+        Box::new(s) as Box<dyn Service>
     }
 }

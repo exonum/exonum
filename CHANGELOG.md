@@ -9,6 +9,42 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `Iron` based web API has been replaced by the new implementation based
+  on `actix-web`. (#727)
+
+  Migration path:
+
+  For backend:
+  - Remove old dependencies on `iron` and its companions `bodyparser`, `router`
+    and other.
+  - Simplify the API handlers as follows:
+    ```rust
+    fn my_handler(state: &ServiceApiState, query: MyQueryType)
+    -> Result<MyResponse, ApiError>
+    {
+      // ...
+    }
+    ```
+    where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
+    implements `Serialize` trait.
+  - Replace old methods `public_api_handler` and `private_api_handler` of
+    `Service` trait by a single `wire_api` method which takes
+    `ServiceApiBuilder`. You can use this builder as a factory for your service
+    API.
+  - `get`, `get_err` and `post` methods in `TestKitApi` have been replaced
+    by the more convenient `RequestBuilder`.
+    Don't forget to update your testkit based API tests.
+
+  For frontend:
+  - New API implementation supports only query parameters in `GET` requests.
+    In this way requests like `GET api/my_method/:first/:second`
+    should be replaced by the `GET api/my_method?first=value1&second=value2`.
+  - Json parser for `POST` requests became more strict.
+    In this way you should send `null` in request body even for handlers
+    without query parameters.
+
+  See our [examples](examples) for more details.
+
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
@@ -17,6 +53,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Method `name` has been removed from `Run`, `GenerateCommonConfig`,
   `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
   (`helpers/fabric` module). (#731)
+
+- `Whitelist` has been replaced by `ConnectList`. Now connection between
+  nodes can only be established if nodes exist in each other connect lists. (#739)
+
+  Migration path:
+
+  - Replace `[whitelist]` section in config to `[connect_list.peers]` section and
+  specify here all validator consensus public keys with corresponding ip-addresses.
+  For example `16ef83ca...da72 = "127.0.0.1:6333"`.
 
 ### New features
 

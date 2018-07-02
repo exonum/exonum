@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use criterion::{Benchmark, Criterion};
-use exonum::{blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction},
-             crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey},
-             encoding::Error as EncodingError,
-             helpers::{Height, ValidatorId},
-             messages::{Message, RawTransaction},
-             node::ApiSender,
-             storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, Snapshot}};
+use exonum::{
+    blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction},
+    crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey},
+    encoding::Error as EncodingError, helpers::{Height, ValidatorId},
+    messages::{Message, RawTransaction}, node::ApiSender,
+    storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, Snapshot},
+};
 use futures::sync::mpsc;
 use tempdir::TempDir;
 

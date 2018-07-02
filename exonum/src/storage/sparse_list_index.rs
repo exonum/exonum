@@ -24,12 +24,10 @@ use byteorder::{BigEndian, ByteOrder};
 
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey,
-            StorageValue};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
+    StorageKey, StorageValue,
+};
 use crypto::{hash, CryptoHash, Hash};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -131,7 +129,7 @@ pub struct SparseListIndexValues<'a, V> {
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -591,7 +589,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     type Item = (u64, V);
@@ -644,7 +642,7 @@ mod tests {
         thread_rng().gen_ascii_chars().take(10).collect()
     }
 
-    fn list_index_methods(db: Box<Database>) {
+    fn list_index_methods(db: Box<dyn Database>) {
         let mut fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
@@ -708,7 +706,7 @@ mod tests {
         assert_eq!(43, list_index.capacity());
     }
 
-    fn list_index_iter(db: Box<Database>) {
+    fn list_index_iter(db: Box<dyn Database>) {
         let mut fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
@@ -752,7 +750,7 @@ mod tests {
         use storage::{Database, MemoryDB};
         use tempdir::TempDir;
 
-        fn create_database(_: &Path) -> Box<Database> {
+        fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
         }
 
@@ -778,7 +776,7 @@ mod tests {
         use storage::{Database, DbOptions, RocksDB};
         use tempdir::TempDir;
 
-        fn create_database(path: &Path) -> Box<Database> {
+        fn create_database(path: &Path) -> Box<dyn Database> {
             let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }

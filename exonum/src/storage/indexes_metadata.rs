@@ -17,11 +17,9 @@
 use std::{borrow::Cow, error::Error};
 
 use crypto::{CryptoHash, Hash};
-use encoding::{serialize::{json, WriteBufferWrapper},
-               CheckedOffset,
-               Error as EncodingError,
-               Field,
-               Offset};
+use encoding::{
+    serialize::{json, WriteBufferWrapper}, CheckedOffset, Error as EncodingError, Field, Offset,
+};
 use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
@@ -112,7 +110,7 @@ impl json::ExonumJson for IndexType {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>>
+    ) -> Result<(), Box<dyn Error>>
     where
         Self: Sized,
     {
@@ -121,12 +119,12 @@ impl json::ExonumJson for IndexType {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<json::reexport::Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<json::reexport::Value, Box<dyn Error + Send + Sync>> {
         Ok(json::reexport::Value::from(*self as u8))
     }
 }
 
-pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &Snapshot) {
+pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &dyn Snapshot) {
     let metadata = BaseIndex::indexes_metadata(view);
     if let Some(value) = metadata.get::<_, IndexMetadata>(name) {
         let stored_type = value.index_type();

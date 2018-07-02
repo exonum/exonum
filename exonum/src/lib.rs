@@ -15,42 +15,31 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
-// spell-checker:ignore cors
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
-#![cfg_attr(feature = "flame_profile", feature(plugin, custom_attribute))]
-#![cfg_attr(feature = "flame_profile", plugin(exonum_flamer))]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 
+extern crate actix;
+extern crate actix_web;
 extern crate atty;
 extern crate bit_vec;
-extern crate bodyparser;
 extern crate byteorder;
 extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate colored;
-extern crate cookie;
 extern crate env_logger;
-#[macro_use]
-extern crate exonum_profiler;
 extern crate exonum_rocksdb as rocksdb;
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
 extern crate failure;
 extern crate futures;
 extern crate hex;
-extern crate hyper;
-extern crate iron;
-extern crate iron_cors;
 #[macro_use]
 extern crate log;
-extern crate mount;
 extern crate os_info;
-extern crate params;
 extern crate rand;
-extern crate router;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]

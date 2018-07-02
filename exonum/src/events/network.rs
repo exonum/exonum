@@ -13,15 +13,19 @@
 // limitations under the License.
 
 use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
-use tokio_core::{net::{TcpListener, TcpStream},
-                 reactor::Handle};
-use tokio_retry::{strategy::{jitter, FixedInterval},
-                  Retry};
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Handle,
+};
+use tokio_retry::{
+    strategy::{jitter, FixedInterval}, Retry,
+};
 
 use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
 
-use super::{error::{into_other, log_error, other_error, result_ok},
-            to_box};
+use super::{
+    error::{into_other, log_error, other_error, result_ok}, to_box,
+};
+use crypto::PublicKey;
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
@@ -38,7 +42,7 @@ pub enum NetworkEvent {
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    SendMessage(SocketAddr, RawMessage),
+    SendMessage(SocketAddr, RawMessage, PublicKey),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
@@ -147,8 +151,7 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                let handshake = NoiseHandshake::initiator(&handshake_params);
-                handshake.send(sock)
+                NoiseHandshake::initiator(&handshake_params).send(sock)
             })
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
@@ -185,7 +188,7 @@ impl ConnectionsPool {
         &self,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> Box<Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let fut = self.remove(&peer)
             .into_future()
             .map_err(other_error)
@@ -204,7 +207,7 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> Box<Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -242,7 +245,7 @@ impl NetworkPart {
 
 struct RequestHandler(
     // TODO: Replace with concrete type. (ECR-1634)
-    Box<Future<Item = (), Error = io::Error>>,
+    Box<dyn Future<Item = (), Error = io::Error>>,
 );
 
 impl RequestHandler {
@@ -256,13 +259,16 @@ impl RequestHandler {
         handshake_params: &HandshakeParams,
     ) -> RequestHandler {
         let mut cancel_sender = Some(cancel_sender);
-        let handshake_params = handshake_params.clone();
         let outgoing_connections = ConnectionsPool::new();
+        let handshake_params = handshake_params.clone();
         let requests_handler = receiver
             .map_err(|_| other_error("no network requests"))
             .for_each(move |request| {
                 match request {
-                    NetworkRequest::SendMessage(peer, msg) => {
+                    NetworkRequest::SendMessage(peer, msg, remote_key) => {
+                        let mut handshake_params = handshake_params.clone();
+                        handshake_params.set_remote_key(remote_key);
+
                         let conn_tx = outgoing_connections
                             .get(peer)
                             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
@@ -329,7 +335,7 @@ impl Future for RequestHandler {
     }
 }
 
-struct Listener(Box<Future<Item = (), Error = io::Error>>);
+struct Listener(Box<dyn Future<Item = (), Error = io::Error>>);
 
 impl Listener {
     fn bind(
@@ -415,7 +421,7 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
+fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
 where
     F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
 {

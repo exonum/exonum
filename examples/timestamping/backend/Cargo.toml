@@ -19,10 +19,7 @@ exonum-btc-anchoring = { version = "0.7.0", optional = true }
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"
-router = "=0.6.0"
 failure = "=0.1.1"
-iron = "=0.6.0"
-bodyparser = "=0.8.0"
 log = "=0.4.1"
 chrono = { version = "=0.4.2", features = ["serde"] }
 
