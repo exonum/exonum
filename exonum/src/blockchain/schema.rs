@@ -16,8 +16,10 @@ use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, Transact
 use crypto::{CryptoHash, Hash, PublicKey};
 use helpers::{Height, Round};
 use messages::{Connect, Precommit, RawMessage};
-use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
-              ProofMapIndex, Snapshot};
+use storage::{
+    Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
+    Snapshot,
+};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {

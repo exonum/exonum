@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashMap,
-          ffi::OsString,
-          fmt,
-          panic::{self, PanicInfo}};
+use std::{
+    collections::HashMap, ffi::OsString, fmt, panic::{self, PanicInfo},
+};
 
-use super::{clap_backend::ClapBackend,
-            details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
-                      RunDev},
-            info::Info,
-            internal::{CollectedCommand, Command, Feedback},
-            keys,
-            maintenance::Maintenance,
-            CommandName,
-            ServiceFactory};
+use super::{
+    clap_backend::ClapBackend,
+    details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
+    info::Info, internal::{CollectedCommand, Command, Feedback}, keys, maintenance::Maintenance,
+    CommandName, ServiceFactory,
+};
 use blockchain::Service;
 use node::Node;
 

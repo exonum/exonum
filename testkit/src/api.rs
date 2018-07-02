@@ -23,10 +23,11 @@ use serde_urlencoded;
 
 use std::fmt::{self, Display};
 
-use exonum::{api::{self, ApiAggregator, ServiceApiState},
-             blockchain::{SharedNodeState, Transaction},
-             encoding::serialize::reexport::{DeserializeOwned, Serialize},
-             node::{ApiSender, TransactionSend}};
+use exonum::{
+    api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
+    encoding::serialize::reexport::{DeserializeOwned, Serialize},
+    node::{ApiSender, TransactionSend},
+};
 
 use TestKit;
 

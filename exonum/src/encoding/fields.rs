@@ -19,9 +19,9 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use rust_decimal::Decimal;
 use uuid::{self, Uuid};
 
-use std::{mem,
-          net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-          result::Result as StdResult};
+use std::{
+    mem, net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr}, result::Result as StdResult,
+};
 
 use super::{CheckedOffset, Error, Offset, Result};
 use crypto::{Hash, PublicKey, Signature};

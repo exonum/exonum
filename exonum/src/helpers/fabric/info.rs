@@ -18,10 +18,9 @@ use serde_json;
 
 use std::collections::HashMap;
 
-use super::{internal::{CollectedCommand, Command, Feedback},
-            Argument,
-            CommandName,
-            Context};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, Argument, CommandName, Context,
+};
 
 // Context entry for the type of the requested information.
 const INFO_REQUEST: &str = "INFO_REQUEST";

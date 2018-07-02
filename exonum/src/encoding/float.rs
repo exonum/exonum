@@ -18,11 +18,10 @@ use serde_json::value::{Number, Value};
 use std::{error::Error, mem};
 
 use super::{Error as EncodingError, Result as EncodingResult};
-use encoding::{serialize::json::{ExonumJson, ExonumJsonDeserialize},
-               serialize::WriteBufferWrapper,
-               CheckedOffset,
-               Field,
-               Offset};
+use encoding::{
+    serialize::json::{ExonumJson, ExonumJsonDeserialize}, serialize::WriteBufferWrapper,
+    CheckedOffset, Field, Offset,
+};
 
 /// Wrapper for the `f32` type that restricts non-finite
 /// (NaN, Infinity, negative zero and subnormal) values.
@@ -239,9 +238,9 @@ impl ExonumJson for F32 {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(
-            Value::Number(Number::from_f64(f64::from(self.get())).ok_or("Can't cast float as json")?),
-        )
+        Ok(Value::Number(
+            Number::from_f64(f64::from(self.get())).ok_or("Can't cast float as json")?
+        ))
     }
 }
 
@@ -269,7 +268,9 @@ impl ExonumJson for F64 {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(Value::Number(Number::from_f64(self.get()).ok_or("Can't cast float as json")?))
+        Ok(Value::Number(
+            Number::from_f64(self.get()).ok_or("Can't cast float as json")?
+        ))
     }
 }
 

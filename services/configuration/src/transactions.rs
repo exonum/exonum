@@ -14,11 +14,11 @@
 
 //! Transaction definitions for the configuration service.
 
-use exonum::{blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
-             crypto::{CryptoHash, Hash, PublicKey},
-             messages::Message,
-             node::State,
-             storage::{Fork, Snapshot}};
+use exonum::{
+    blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
+    crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
+    storage::{Fork, Snapshot},
+};
 
 use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};

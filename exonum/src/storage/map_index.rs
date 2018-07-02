@@ -16,12 +16,10 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey,
-            StorageValue};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
+    StorageKey, StorageValue,
+};
 
 /// A map of keys and values.
 ///

@@ -17,11 +17,9 @@
 use std::{borrow::Cow, error::Error};
 
 use crypto::{CryptoHash, Hash};
-use encoding::{serialize::{json, WriteBufferWrapper},
-               CheckedOffset,
-               Error as EncodingError,
-               Field,
-               Offset};
+use encoding::{
+    serialize::{json, WriteBufferWrapper}, CheckedOffset, Error as EncodingError, Field, Offset,
+};
 use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";

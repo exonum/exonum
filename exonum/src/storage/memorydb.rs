@@ -14,9 +14,9 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::{clone::Clone,
-          collections::{BTreeMap, HashMap},
-          sync::{Arc, RwLock}};
+use std::{
+    clone::Clone, collections::{BTreeMap, HashMap}, sync::{Arc, RwLock},
+};
 
 use super::{db::Change, Database, Iter, Iterator, Patch, Result, Snapshot};
 

@@ -32,13 +32,15 @@
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-pub use self::{block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
-               config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
-               genesis::GenesisConfig,
-               schema::{Schema, TxLocation},
-               service::{Service, ServiceContext, SharedNodeState},
-               transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
-                             TransactionErrorType, TransactionResult, TransactionSet}};
+pub use self::{
+    block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
+    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys}, genesis::GenesisConfig,
+    schema::{Schema, TxLocation}, service::{Service, ServiceContext, SharedNodeState},
+    transaction::{
+        ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
+        TransactionResult, TransactionSet,
+    },
+};
 
 pub mod config;
 
@@ -46,14 +48,10 @@ use byteorder::{ByteOrder, LittleEndian};
 use failure;
 use vec_map::VecMap;
 
-use std::{collections::{BTreeMap, HashMap},
-          error::Error as StdError,
-          fmt,
-          iter,
-          mem,
-          net::SocketAddr,
-          panic,
-          sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
+    panic, sync::Arc,
+};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;

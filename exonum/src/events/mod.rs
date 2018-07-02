@@ -21,12 +21,9 @@ pub mod internal;
 pub mod network;
 pub mod noise;
 
-use futures::{sink::Wait,
-              sync::mpsc::{self, Sender},
-              Async,
-              Future,
-              Poll,
-              Stream};
+use futures::{
+    sink::Wait, sync::mpsc::{self, Sender}, Async, Future, Poll, Stream,
+};
 
 use std::{cmp::Ordering, time::SystemTime};
 

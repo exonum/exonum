@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{blockchain::{Schema, StoredConfiguration, Transaction},
-             crypto::{hash, CryptoHash, Hash, HASH_SIZE},
-             helpers::{Height, ValidatorId},
-             storage::StorageValue};
+use exonum::{
+    blockchain::{Schema, StoredConfiguration, Transaction},
+    crypto::{hash, CryptoHash, Hash, HASH_SIZE}, helpers::{Height, ValidatorId},
+    storage::StorageValue,
+};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
 use std::str;
 
-use {Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
-     VotingDecision};
+use {
+    Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
+    VotingDecision,
+};
 
 mod api;
 

@@ -29,13 +29,11 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::{api::ServiceApiBuilder,
-             blockchain::{Service, Transaction, TransactionSet},
-             crypto::Hash,
-             encoding::Error as EncodingError,
-             helpers::fabric::{self, Context},
-             messages::RawTransaction,
-             storage::Snapshot};
+use exonum::{
+    api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet}, crypto::Hash,
+    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
+    storage::Snapshot,
+};
 
 use transactions::WalletTransactions;
 

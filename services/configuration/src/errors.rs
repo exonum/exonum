@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{blockchain::{ExecutionError, StoredConfiguration},
-             crypto::Hash,
-             encoding::serialize::json::reexport::Error as JsonError,
-             helpers::Height};
+use exonum::{
+    blockchain::{ExecutionError, StoredConfiguration}, crypto::Hash,
+    encoding::serialize::json::reexport::Error as JsonError, helpers::Height,
+};
 
 use transactions::Propose;
 

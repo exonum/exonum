@@ -15,14 +15,13 @@
 use futures::{self, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 
-use std::{io,
-          time::{Duration, SystemTime}};
+use std::{
+    io, time::{Duration, SystemTime},
+};
 
-use super::{error::{into_other, other_error},
-            to_box,
-            InternalEvent,
-            InternalRequest,
-            TimeoutRequest};
+use super::{
+    error::{into_other, other_error}, to_box, InternalEvent, InternalRequest, TimeoutRequest,
+};
 
 #[derive(Debug)]
 pub struct InternalPart {

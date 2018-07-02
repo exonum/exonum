@@ -18,26 +18,49 @@ use api::{ServiceApiScope, ServiceApiState};
 use blockchain::{Schema, SharedNodeState};
 use helpers::user_agent;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 /// Information about the current state of the Node memory pool.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct MemPoolInfo {
     /// Total number of uncommitted transactions.
     pub size: usize,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-/// Information about whether the node is connected to other peers.
-pub struct HealthCheckInfo {
-    /// Indicates whether the node is connected to the other peers.
-    pub connectivity: bool,
+/// Information about the amount of connected peers to the node.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct PeersAmount {
+    /// Amount of connected peers.
+    pub amount: usize,
 }
 
-/// Shows the possibility to achieve the consensus between validators
-/// in the current state.
+/// Information about whether the node is connected to other peers.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct ConsensusStatusInfo {
-    /// Consensus status: true - if consensus is achieved, false otherwise.
-    pub status: bool,
+pub enum ConnectivityStatus {
+    /// The node has no connected peers.
+    NotConnected,
+    /// The node has connected peers and their amount.
+    Connected(PeersAmount),
+}
+
+/// Information about the possibility to achieve the consensus between
+/// validators in the current state.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum ConsensusStatus {
+    /// Consensus disabled on this node.
+    Disabled,
+    /// Consensus enabled on this node.
+    Enabled,
+    /// Consensus enabled and the node has enough connected peers.
+    Active,
+}
+
+/// Information about whether the node is connected to other peers and
+/// its consensus status.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct HealthCheckInfo {
+    /// Consensus status.
+    pub consensus_status: ConsensusStatus,
+    /// Connectivity status.
+    pub connectivity: ConnectivityStatus,
 }
 
 /// Public system API.
@@ -63,16 +86,6 @@ impl SystemApi {
         self
     }
 
-    fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(HealthCheckInfo {
-                connectivity: !self.shared_api_state.peers_info().is_empty(),
-            })
-        });
-        self_
-    }
-
     fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(user_agent::get())
@@ -80,26 +93,45 @@ impl SystemApi {
         self
     }
 
-    fn handle_consensus_status_info(
-        self,
-        name: &'static str,
-        api_scope: &mut ServiceApiScope,
-    ) -> Self {
+    fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(ConsensusStatusInfo {
-                status: self.shared_api_state.consensus_status(),
+            Ok(HealthCheckInfo {
+                consensus_status: self.get_consensus_status(),
+                connectivity: self.get_connectivity_status(),
             })
         });
         self_
+    }
+
+    fn get_connectivity_status(&self) -> ConnectivityStatus {
+        let peers_info = self.shared_api_state.peers_info();
+        if peers_info.is_empty() {
+            ConnectivityStatus::NotConnected
+        } else {
+            ConnectivityStatus::Connected(PeersAmount {
+                amount: peers_info.len(),
+            })
+        }
+    }
+
+    fn get_consensus_status(&self) -> ConsensusStatus {
+        if self.shared_api_state.is_enabled() {
+            if self.shared_api_state.consensus_status() {
+                ConsensusStatus::Active
+            } else {
+                ConsensusStatus::Enabled
+            }
+        } else {
+            ConsensusStatus::Disabled
+        }
     }
 
     /// Adds public system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         self.handle_mempool_info("v1/mempool", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
-            .handle_user_agent_info("v1/user_agent", api_scope)
-            .handle_consensus_status_info("v1/consensus_status", api_scope);
+            .handle_user_agent_info("v1/user_agent", api_scope);
         api_scope
     }
 }

@@ -164,16 +164,15 @@ use tokio_core::reactor::Core;
 use std::sync::{Arc, RwLock};
 use std::{fmt, net::SocketAddr};
 
-use exonum::{api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
-                   ApiAccess},
-             blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
-                          Transaction},
-             crypto::{self, Hash},
-             explorer::{BlockWithTransactions, BlockchainExplorer},
-             helpers::{Height, ValidatorId},
-             messages::RawMessage,
-             node::{ApiSender, ExternalMessage, State as NodeState},
-             storage::{MemoryDB, Patch, Snapshot}};
+use exonum::{
+    api::{
+        backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
+    },
+    blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
+    crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
+    helpers::{Height, ValidatorId}, messages::RawMessage,
+    node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
+};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use poll_events::poll_events;
