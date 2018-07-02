@@ -119,7 +119,7 @@ impl CryptocurrencyApi {
         state: &ServiceApiState,
         query: WalletTransactions,
     ) -> api::Result<TransactionResponse> {
-        let transaction: Box<Transaction> = query.into();
+        let transaction: Box<dyn Transaction> = query.into();
         let tx_hash = transaction.hash();
         state.sender().send(transaction)?;
         Ok(TransactionResponse { tx_hash })

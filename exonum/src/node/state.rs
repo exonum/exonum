@@ -854,7 +854,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose<S: AsRef<Snapshot>>(
+    pub fn add_propose<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: &Propose,
         transactions: &MapIndex<S, Hash, RawMessage>,
@@ -922,7 +922,7 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
-    pub fn create_incomplete_block<S: AsRef<Snapshot>>(
+    pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: &BlockResponse,
         txs: &MapIndex<S, Hash, RawMessage>,

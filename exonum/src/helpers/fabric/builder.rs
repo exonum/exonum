@@ -30,7 +30,7 @@ use node::Node;
 #[derive(Default)]
 pub struct NodeBuilder {
     commands: HashMap<CommandName, CollectedCommand>,
-    service_factories: Vec<Box<ServiceFactory>>,
+    service_factories: Vec<Box<dyn ServiceFactory>>,
 }
 
 impl NodeBuilder {
@@ -43,7 +43,7 @@ impl NodeBuilder {
     }
 
     /// Appends service to the `NodeBuilder` context.
-    pub fn with_service(mut self, mut factory: Box<ServiceFactory>) -> NodeBuilder {
+    pub fn with_service(mut self, mut factory: Box<dyn ServiceFactory>) -> NodeBuilder {
         //TODO: Take endpoints, etc... (ECR-164)
 
         for (name, command) in &mut self.commands {
@@ -70,7 +70,7 @@ impl NodeBuilder {
                 let config = ctx.get(keys::NODE_CONFIG)
                     .expect("could not find node_config");
                 let db = Run::db_helper(ctx, &config.database);
-                let services: Vec<Box<Service>> = self.service_factories
+                let services: Vec<Box<dyn Service>> = self.service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
                     .collect();
@@ -101,7 +101,7 @@ impl NodeBuilder {
                 .iter()
                 .map(|f| f.service_name().to_owned())
                 .collect();
-            let info: Box<Command> = Box::new(Info::new(services));
+            let info: Box<dyn Command> = Box::new(Info::new(services));
             self.commands
                 .insert(info.name(), CollectedCommand::new(info));
         }
@@ -118,7 +118,7 @@ impl NodeBuilder {
 
     fn commands() -> HashMap<CommandName, CollectedCommand> {
         vec![
-            Box::new(GenerateTestnet) as Box<Command>,
+            Box::new(GenerateTestnet) as Box<dyn Command>,
             Box::new(Run),
             Box::new(RunDev),
             Box::new(GenerateNodeConfig),

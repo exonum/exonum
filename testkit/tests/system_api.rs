@@ -26,7 +26,12 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
-fn test_healthcheck_status_false() {
+fn healthcheck() {
+    // This test checks whether the endpoint return expected result and correctness of
+    // serialisation.
+    // Expected:
+    // consensus - enabled
+    // connectivity - not connected, due to testkit unable to emulate nodes properly.
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
@@ -39,7 +44,7 @@ fn test_healthcheck_status_false() {
 }
 
 #[test]
-fn test_user_agent_info() {
+fn user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
@@ -49,7 +54,7 @@ fn test_user_agent_info() {
 }
 
 #[test]
-fn test_network() {
+fn network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
@@ -60,7 +65,7 @@ fn test_network() {
 }
 
 #[test]
-fn test_shutdown() {
+fn shutdown() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 

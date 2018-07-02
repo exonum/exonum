@@ -30,7 +30,7 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
-    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
+    pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
             .for_each(move |request| {

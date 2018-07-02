@@ -21,7 +21,7 @@ use super::{error, ServiceApiState};
 /// Type alias for the usual synchronous result.
 pub type Result<I> = ::std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
-pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
+pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract handler from various entities.
 /// The basic idea of this structure is to extract type parameters from the given handler,

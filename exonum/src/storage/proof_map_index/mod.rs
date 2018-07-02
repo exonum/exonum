@@ -107,7 +107,7 @@ enum RemoveResult {
 
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
@@ -761,7 +761,7 @@ where
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
@@ -811,7 +811,7 @@ where
 
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue + fmt::Debug,
 {
@@ -825,7 +825,7 @@ where
 
         impl<'a, T, K, V> Entry<'a, T, K, V>
         where
-            T: AsRef<Snapshot>,
+            T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
             V: StorageValue,
         {
@@ -849,7 +849,7 @@ where
 
         impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
         where
-            T: AsRef<Snapshot>,
+            T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
             V: StorageValue + fmt::Debug,
         {

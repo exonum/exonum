@@ -14,6 +14,8 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
+#![deny(missing_debug_implementations, unsafe_code, bare_trait_objects)]
+
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -57,12 +59,12 @@ impl Service for CurrencyService {
         CRYPTOCURRENCY_SERVICE_ID
     }
 
-    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
         let schema = CurrencySchema::new(view);
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, EncodingError> {
         WalletTransactions::tx_from_raw(raw).map(Into::into)
     }
 
@@ -71,6 +73,7 @@ impl Service for CurrencyService {
     }
 }
 
+#[derive(Debug)]
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
@@ -78,7 +81,7 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<Service> {
+    fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
         Box::new(CurrencyService)
     }
 }

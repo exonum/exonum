@@ -56,7 +56,7 @@ impl<T> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
 {
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &self.view)

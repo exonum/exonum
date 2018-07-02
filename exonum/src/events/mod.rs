@@ -79,7 +79,7 @@ pub struct HandlerPart<H: EventHandler> {
 }
 
 impl<H: EventHandler + 'static> HandlerPart<H> {
-    pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
+    pub fn run(self) -> Box<dyn Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
         let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
@@ -215,6 +215,6 @@ where
     }
 }
 
-fn to_box<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
+fn to_box<F: Future + 'static>(f: F) -> Box<dyn Future<Item = (), Error = F::Error>> {
     Box::new(f.map(drop))
 }

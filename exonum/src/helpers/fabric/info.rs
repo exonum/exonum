@@ -73,7 +73,7 @@ impl Command for Info {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _: &Fn(Context) -> Context,
+        _: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let request = context
             .arg::<String>(INFO_REQUEST)

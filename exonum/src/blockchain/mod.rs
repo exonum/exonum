@@ -74,17 +74,17 @@ mod tests;
 /// Only nodes with an identical set of services and genesis block can be combined
 /// into a single network.
 pub struct Blockchain {
-    db: Arc<Database>,
-    service_map: Arc<VecMap<Box<Service>>>,
+    db: Arc<dyn Database>,
+    service_map: Arc<VecMap<Box<dyn Service>>>,
     pub(crate) service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new<D: Into<Arc<Database>>>(
+    pub fn new<D: Into<Arc<dyn Database>>>(
         storage: D,
-        services: Vec<Box<Service>>,
+        services: Vec<Box<dyn Service>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
@@ -121,12 +121,12 @@ impl Blockchain {
     /// Returns the `VecMap` for all services. This is a map which
     /// contains service identifiers and service interfaces. The VecMap
     /// allows proceeding from the service identifier to the service itself.
-    pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
+    pub fn service_map(&self) -> &Arc<VecMap<Box<dyn Service>>> {
         &self.service_map
     }
 
     /// Creates a read-only snapshot of the current storage state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
     }
 
@@ -142,7 +142,7 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -427,7 +427,6 @@ impl Blockchain {
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
         patch: &Patch,
@@ -533,7 +532,7 @@ impl Blockchain {
     }
 }
 
-fn before_commit(service: &Service, fork: &mut Fork) {
+fn before_commit(service: &dyn Service, fork: &mut Fork) {
     fork.checkpoint();
     match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
         Ok(..) => fork.commit(),

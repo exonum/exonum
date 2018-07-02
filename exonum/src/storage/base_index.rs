@@ -60,7 +60,7 @@ pub struct BaseIndexIter<'a, K, V> {
 
 impl<T> BaseIndex<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
 {
     /// Creates a new index representation based on the name and storage view.
     ///

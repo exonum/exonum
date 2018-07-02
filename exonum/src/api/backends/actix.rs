@@ -41,11 +41,11 @@ pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Err
 /// Type alias for the concrete `actix-web` HTTP request.
 pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler = Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
+pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
 /// Type alias for the `actix-web::App` with the ServiceApiState.
 pub type App = actix_web::App<ServiceApiState>;
 /// Type alias for the `actix-web::App` configuration.
-pub type AppConfig = Arc<Fn(App) -> App + 'static + Send + Sync>;
+pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
 
 /// Type alias for the `actix-web` HTTP server runtime address.
 type HttpServerAddr = Addr<Syn, HttpServer<<App as IntoHttpHandler>::Handler>>;

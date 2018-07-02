@@ -148,7 +148,7 @@ impl IntoIterator for Patch {
 }
 
 /// A generalized iterator over the storage views.
-pub type Iter<'a> = Box<Iterator + 'a>;
+pub type Iter<'a> = Box<dyn Iterator + 'a>;
 
 /// An enum that represents a kind of change to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
@@ -196,7 +196,7 @@ pub enum Change {
 
 // FIXME: make &mut Fork "unwind safe". (ECR-176)
 pub struct Fork {
-    snapshot: Box<Snapshot>,
+    snapshot: Box<dyn Snapshot>,
     patch: Patch,
     changelog: Vec<(String, Vec<u8>, Option<Change>)>,
     logged: bool,
@@ -246,7 +246,7 @@ enum NextIterValue {
 /// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
-    fn snapshot(&self) -> Box<Snapshot>;
+    fn snapshot(&self) -> Box<dyn Snapshot>;
 
     /// Creates a new fork of the database from its current state.
     fn fork(&self) -> Fork {
@@ -502,14 +502,14 @@ impl Fork {
     }
 }
 
-impl AsRef<Snapshot> for Snapshot + 'static {
-    fn as_ref(&self) -> &Snapshot {
+impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
+    fn as_ref(&self) -> &dyn Snapshot {
         self
     }
 }
 
-impl AsRef<Snapshot> for Fork {
-    fn as_ref(&self) -> &Snapshot {
+impl AsRef<dyn Snapshot> for Fork {
+    fn as_ref(&self) -> &dyn Snapshot {
         self
     }
 }
@@ -624,8 +624,8 @@ impl<'a> Iterator for ForkIter<'a> {
     }
 }
 
-impl<T: Database> From<T> for Box<Database> {
+impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
-        Box::new(db) as Box<Database>
+        Box::new(db) as Box<dyn Database>
     }
 }

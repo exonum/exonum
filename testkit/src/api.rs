@@ -92,7 +92,7 @@ impl TestKitApi {
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
-        T: Into<Box<Transaction>>,
+        T: Into<Box<dyn Transaction>>,
     {
         self.api_sender
             .send(transaction.into())
