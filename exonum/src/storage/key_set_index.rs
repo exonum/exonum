@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of set for items that implement `StorageKey` trait.
+//! An implementation of a set for items that utilize the `StorageKey` trait.
+//!
+//! `KeySetIndex` implements a set that stores elements as keys with empty values.
+//! The given section contains information on the methods related to `KeySetIndex`
+//! and the iterator over the items of this set.
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -20,10 +24,10 @@ use super::{
     base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot, StorageKey,
 };
 
-/// A set of items that implement `StorageKey` trait.
+/// A set of key items.
 ///
-/// `KeySetIndex` implements a set, storing the elements as keys with empty values.
-/// `KeySetIndex` requires that the elements implement the [`StorageKey`] trait.
+/// `KeySetIndex` implements a set that stores the elements as keys with empty values.
+/// `KeySetIndex` requires that elements should implement the [`StorageKey`] trait.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
 #[derive(Debug)]
@@ -32,10 +36,10 @@ pub struct KeySetIndex<T, K> {
     _k: PhantomData<K>,
 }
 
-/// An iterator over the items of a `KeySetIndex`.
+/// Returns an iterator over the items of a `KeySetIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`KeySetIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`KeySetIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.KeySetIndex.html#method.iter
 /// [`iter_from`]: struct.KeySetIndex.html#method.iter_from
@@ -52,8 +56,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -76,11 +80,11 @@ where
         }
     }
 
-    /// Creates a new index representation based on the name, index id in family
+    /// Creates a new index representation based on the name, index ID in family
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -108,7 +112,7 @@ where
         }
     }
 
-    /// Returns `true` if the set contains a value.
+    /// Returns `true` if the set contains the indicated value.
     ///
     /// # Examples
     ///
@@ -132,7 +136,7 @@ where
         self.base.contains(item)
     }
 
-    /// An iterator visiting all elements in ascending order. The iterator element type is K.
+    /// Returns an iterator visiting all elements in ascending order. The iterator element type is K.
     ///
     /// # Examples
     ///
@@ -154,7 +158,7 @@ where
         }
     }
 
-    /// An iterator visiting all elements in arbitrary order starting from the specified value.
+    /// Returns an iterator visiting all elements in arbitrary order starting from the specified value.
     /// The iterator element type is K.
     ///
     /// # Examples
@@ -182,7 +186,7 @@ impl<'a, K> KeySetIndex<&'a mut Fork, K>
 where
     K: StorageKey,
 {
-    /// Adds a value to the set.
+    /// Adds a key to the set.
     ///
     /// # Examples
     ///
@@ -202,7 +206,7 @@ where
         self.base.put(&item, ())
     }
 
-    /// Removes a value from the set.
+    /// Removes a key from the set.
     ///
     /// # Examples
     ///
@@ -231,8 +235,8 @@ where
     /// Clears the set, removing all values.
     ///
     /// # Notes
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples
