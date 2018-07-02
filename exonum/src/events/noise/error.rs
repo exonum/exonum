@@ -17,6 +17,7 @@
 #![allow(bare_trait_objects)]
 
 use failure;
+
 use std::io;
 
 #[derive(Fail, Debug, Clone)]

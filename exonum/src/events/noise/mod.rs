@@ -12,27 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
-use events::codec::MessagesCodec;
-use futures::future::Future;
-use std::io;
-use tokio_io::{codec::Framed,
-               io::{read_exact, write_all},
-               AsyncRead,
-               AsyncWrite};
-
-pub mod error;
-pub mod wrappers;
-
-#[cfg(test)]
-mod tests;
-
 #[cfg(feature = "sodiumoxide-crypto")]
 #[doc(inline)]
 pub use self::wrappers::sodium_wrapper::{handshake::{HandshakeParams, NoiseHandshake},
                                          wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH,
                                                    NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
                                                    NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH}};
+
+use byteorder::{ByteOrder, LittleEndian};
+use events::codec::MessagesCodec;
+use futures::future::Future;
+use tokio_io::{codec::Framed,
+               io::{read_exact, write_all},
+               AsyncRead,
+               AsyncWrite};
+
+use std::io;
+
+pub mod error;
+pub mod wrappers;
+
+#[cfg(test)]
+mod tests;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;

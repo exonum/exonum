@@ -27,13 +27,7 @@
 //! fast signing and key generation, as well as security and collision
 //! resilience.
 
-// spell-checker:disable
 extern crate exonum_sodiumoxide as sodiumoxide;
-use self::sodiumoxide::crypto::hash::sha256;
-use self::sodiumoxide::crypto::sign::ed25519;
-// spell-checker:enable
-
-pub mod x25519;
 
 /// Digest type for sodiumoxide-based implementation.
 pub use self::sha256::Digest as Hash;
@@ -57,6 +51,10 @@ pub use self::ed25519::State as SignState;
 /// Contains the state for multi-part (streaming) hash computations
 /// for sodiumoxide-based implementation.
 pub use self::sha256::State as HashState;
+
+use self::sodiumoxide::crypto::{hash::sha256, sign::ed25519};
+
+pub mod x25519;
 
 /// Number of bytes in a `Hash`.
 pub const HASH_SIZE: usize = sha256::DIGESTBYTES;

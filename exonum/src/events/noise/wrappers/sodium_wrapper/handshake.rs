@@ -23,8 +23,9 @@ use events::{
     noise::{read, write, Handshake, HandshakeResult}
 };
 use futures::future::{done, Future};
-use std::io;
 use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
+
+use std::io;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]

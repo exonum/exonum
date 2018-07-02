@@ -18,15 +18,14 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use events::noise::{error::NoiseError, NOISE_HEADER_LENGTH, NOISE_MAX_MESSAGE_LENGTH, TAG_LENGTH};
 use snow::{NoiseBuilder, Session};
 
 use std::{
     fmt::{self, Error, Formatter}, io,
 };
 
-use super::handshake::HandshakeParams;
-use super::resolver::SodiumResolver;
+use events::noise::{error::NoiseError, NOISE_HEADER_LENGTH, NOISE_MAX_MESSAGE_LENGTH, TAG_LENGTH};
+use super::{handshake::HandshakeParams, resolver::SodiumResolver};
 
 pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
 pub const NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;

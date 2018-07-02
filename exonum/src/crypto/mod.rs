@@ -20,6 +20,18 @@
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
+#[cfg(feature = "sodiumoxide-crypto")]
+pub use self::crypto_lib::sodiumoxide::x25519;
+#[doc(inline)]
+pub use self::crypto_impl::{
+    HASH_SIZE,
+    PUBLIC_KEY_LENGTH,
+    SECRET_KEY_LENGTH,
+    SEED_LENGTH,
+    SIGNATURE_LENGTH,
+};
+
+
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
@@ -37,28 +49,14 @@ use encoding::{
     serialize::{encode_hex, FromHex, FromHexError, ToHex}, Field, Offset,
 };
 use helpers::Round;
+// A way to set an active cryptographic backend is to export it as `crypto_impl`.
+#[cfg(feature = "sodiumoxide-crypto")]
+use self::crypto_lib::sodiumoxide as crypto_impl;
 
 #[macro_use]
 mod macros;
 
 pub(crate) mod crypto_lib;
-// A way to set an active cryptographic backend is to export it as `crypto_impl`.
-#[cfg(feature = "sodiumoxide-crypto")]
-use self::crypto_lib::sodiumoxide as crypto_impl;
-
-#[cfg(feature = "sodiumoxide-crypto")]
-pub use self::crypto_lib::sodiumoxide::x25519;
-
-#[doc(inline)]
-pub use self::crypto_impl::HASH_SIZE;
-#[doc(inline)]
-pub use self::crypto_impl::PUBLIC_KEY_LENGTH;
-#[doc(inline)]
-pub use self::crypto_impl::SECRET_KEY_LENGTH;
-#[doc(inline)]
-pub use self::crypto_impl::SEED_LENGTH;
-#[doc(inline)]
-pub use self::crypto_impl::SIGNATURE_LENGTH;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
