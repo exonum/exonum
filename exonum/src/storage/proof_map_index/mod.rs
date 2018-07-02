@@ -494,8 +494,8 @@ where
         hash
     }
 
-    // Inserts a new node as child of current branch and returns updated hash
-    // or if a new node has a shorter key, returns a new key length
+    // Inserts a new node of the current branch and returns the updated hash
+    // or, if a new node has a shorter key, returns a new key length.
     fn insert_branch(
         &mut self,
         parent: &BranchNode,

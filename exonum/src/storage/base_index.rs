@@ -30,9 +30,9 @@ use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 /// This structure is not intended for direct use, rather it is the basis for building other types
 /// of indices.
 ///
-/// `BaseIndex` requires that keys implement the [`StorageKey`] trait and values implement
-/// the [`StorageValue`] trait. However, this structure is not bound to specific types and allows the
-/// use of *any* types as keys or values.
+/// `BaseIndex` requires that keys should implement the [`StorageKey`] trait and
+/// values should implement the [`StorageValue`] trait. However, this structure
+/// is not bound to specific types and allows the use of *any* types as keys or values.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html

@@ -310,7 +310,7 @@ pub trait Snapshot: 'static {
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
-/// the standard [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html) 
+/// the standard [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
 /// trait, `Iterator` in Exonum is low-level and, therefore, operates with bytes.
 pub trait Iterator {
     /// Advances the iterator and returns a reference to the next key and value.
@@ -490,7 +490,8 @@ impl Fork {
     ///
     /// # Panics
     ///
-    /// Panics if a checkpoint has been created before and was not committed or rolled back yet.
+    /// Panics if a checkpoint has been created before and has not been committed
+    /// or rolled back yet.
     pub fn merge(&mut self, patch: Patch) {
         if self.logged {
             panic!("call merge before commit or rollback");

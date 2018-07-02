@@ -24,8 +24,8 @@ type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
 /// Database implementation that stores all the data in RAM.
 ///
-/// This database is only used for testing and experimenting; it is not designed to be
-/// efficient.
+/// This database is only used for testing and experimenting; is not designed to
+/// operate under load in production.
 #[derive(Default, Debug)]
 pub struct MemoryDB {
     map: RwLock<DB>,

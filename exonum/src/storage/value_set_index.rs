@@ -31,7 +31,7 @@ use crypto::Hash;
 /// A set of value items.
 ///
 /// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
-/// `ValueSetIndex` requires that elements implement the [`StorageValue`] trait.
+/// `ValueSetIndex` requires that elements should implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]

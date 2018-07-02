@@ -21,7 +21,7 @@ use crypto::Hash;
 
 /// An index that may only contain one element.
 ///
-/// You can add an element to this index an check whether it exists. A value
+/// You can add an element to this index and check whether it exists. A value
 /// should implement [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: trait.StorageValue.html

@@ -26,8 +26,8 @@ use super::{base_index::{BaseIndex, BaseIndexIter},
             StorageKey,
             StorageValue};
 
-/// A list of items where elements are added to the back of the list and are
-/// removed starting from the back of the list.
+/// A list of items where elements are added to the end of the list and are
+/// removed starting from the end of the list.
 ///
 /// Access to the elements is obtained using the indices of the list items.
 /// `ListIndex` implements an array list, storing the elements as values and
@@ -141,7 +141,7 @@ where
         self.base.get(&index)
     }
 
-    /// Returns the last element of the list or `None` if it is empty.
+    /// Returns the last element of the list or `None` if the list is empty.
     ///
     /// # Examples
     ///

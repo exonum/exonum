@@ -29,7 +29,7 @@ use super::{base_index::{BaseIndex, BaseIndexIter},
 /// A set of key items.
 ///
 /// `KeySetIndex` implements a set that stores the elements as keys with empty values.
-/// `KeySetIndex` requires that elements implement the [`StorageKey`] trait.
+/// `KeySetIndex` requires that elements should implement the [`StorageKey`] trait.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
 #[derive(Debug)]

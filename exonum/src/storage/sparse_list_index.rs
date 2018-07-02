@@ -73,8 +73,8 @@ impl StorageValue for SparseListSize {
 /// try to get the element for index 4 or 6, you'll get `None`.
 ///
 /// Later, elements can be added to the
-/// spaces, if required. Elements in this list are added to the back of the list and are
-/// removed either from the back of the list or from certain indices.
+/// spaces, if required. Elements in this list are added to the end of the list and are
+/// removed either from the end of the list or from certain indices.
 ///
 /// `SparseListIndex` has length and capacity. Length is the number of non-empty
 /// elements in the list. Capacity is the number of all elements in the list, both
@@ -82,7 +82,7 @@ impl StorageValue for SparseListSize {
 ///
 /// `SparseListIndex` implements an array list, storing an element as a value and using `u64`
 /// as an index.
-/// `SparseListIndex` requires that elements implement the [`StorageValue`] trait.
+/// `SparseListIndex` requires that elements should implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
@@ -208,7 +208,7 @@ where
     }
 
     /// Returns an element at the indicated position or `None` if the indicated
-    /// position is out of bounds or it does not exist.
+    /// position is out of bounds or if it does not exist.
     ///
     /// # Examples
     ///
@@ -428,7 +428,7 @@ where
     }
 
     /// Removes the element with the given index from the list and returns it,
-    /// or returns None if it is empty.
+    /// or returns `None` if it is empty.
     ///
     /// # Examples
     ///
@@ -498,7 +498,7 @@ where
     /// the current capacity, the capacity of the list is considered index + 1 and all further elements
     /// without specific index values will be appended after this index.
     ///
-    /// Returns the value of a previous element at the indicated position or `None` if it was empty.
+    /// Returns the value of a previous element at the indicated position or `None` if it is empty.
     ///
     /// # Examples
     ///
@@ -560,7 +560,7 @@ where
     }
 
     /// Removes the first element from the 'SparseListIndex' and returns it, or
-    /// returns None if it is empty.
+    /// returns `None` if it is empty.
     ///
     /// # Examples
     ///
