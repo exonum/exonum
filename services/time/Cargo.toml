@@ -16,15 +16,12 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.8.0", path = "../../exonum" }
-iron = "=0.6.0"
-bodyparser = "=0.8.0"
-router = "=0.6.0"
-serde = "1.0.10"
-serde_json = "1.0.2"
-serde_derive = "1.0.10"
-failure = "=0.1.1"
 chrono = { version = "=0.4.2", features = ["serde"] }
+exonum = { version = "0.8.0", path = "../../exonum" }
+failure = "=0.1.1"
+serde = "1.0.10"
+serde_derive = "1.0.10"
+serde_json = "1.0.2"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.8.0", path = "../../testkit" }

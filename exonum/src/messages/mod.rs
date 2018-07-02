@@ -14,9 +14,13 @@
 
 //! Consensus and other messages and related utilities.
 
-pub use self::{protocol::*,
-               raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage,
-                     HEADER_LENGTH, PROTOCOL_MAJOR_VERSION}};
+pub use self::{
+    protocol::*,
+    raw::{
+        Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage, HEADER_LENGTH,
+        PROTOCOL_MAJOR_VERSION,
+    },
+};
 
 use bit_vec::BitVec;
 
@@ -121,7 +125,6 @@ impl RequestMessage {
     }
 
     /// Verifies the message signature with given public key.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
             RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),

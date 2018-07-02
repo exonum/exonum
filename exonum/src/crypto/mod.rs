@@ -35,38 +35,42 @@
 //! suited for Exonum.
 
 // spell-checker:disable
-pub use sodiumoxide::crypto::{hash::sha256::DIGESTBYTES as HASH_SIZE,
-                              sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
-                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                              SEEDBYTES as SEED_LENGTH,
-                                              SIGNATUREBYTES as SIGNATURE_LENGTH}};
+pub use sodiumoxide::crypto::{
+    hash::sha256::DIGESTBYTES as HASH_SIZE,
+    sign::ed25519::{
+        PUBLICKEYBYTES as PUBLIC_KEY_LENGTH, SECRETKEYBYTES as SECRET_KEY_LENGTH,
+        SEEDBYTES as SEED_LENGTH, SIGNATUREBYTES as SIGNATURE_LENGTH,
+    },
+};
 // spell-checker:enable
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
-use serde::{de::{self, Deserialize, Deserializer, Visitor},
-            Serialize,
-            Serializer};
-use sodiumoxide::{self,
-                  crypto::{hash::sha256::{hash as hash_sodium, Digest as DigestSodium,
-                                          State as HashState},
-                           sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
-                                           sign_detached, verify_detached,
-                                           PublicKey as PublicKeySodium,
-                                           SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                           Signature as SignatureSodium, State as SignState}}};
+use serde::{
+    de::{self, Deserialize, Deserializer, Visitor}, Serialize, Serializer,
+};
+use sodiumoxide::{
+    self,
+    crypto::{
+        hash::sha256::{hash as hash_sodium, Digest as DigestSodium, State as HashState},
+        sign::ed25519::{
+            gen_keypair as gen_keypair_sodium, keypair_from_seed, sign_detached, verify_detached,
+            PublicKey as PublicKeySodium, SecretKey as SecretKeySodium, Seed as SeedSodium,
+            Signature as SignatureSodium, State as SignState,
+        },
+    },
+};
 use uuid::Uuid;
 
-use std::{default::Default,
-          fmt,
-          ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-          str::FromStr,
-          time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    default::Default, fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo}, str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use encoding::{serialize::{encode_hex, FromHex, FromHexError, ToHex},
-               Field,
-               Offset};
+use encoding::{
+    serialize::{encode_hex, FromHex, FromHexError, ToHex}, Field, Offset,
+};
 use helpers::Round;
 
 #[macro_use]

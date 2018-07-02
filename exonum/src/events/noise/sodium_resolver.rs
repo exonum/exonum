@@ -8,8 +8,9 @@ use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
 use sodiumoxide::crypto::hash::sha256 as sodium_sha256;
 
 use crypto::x25519;
-use crypto::{PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
-             SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH};
+use crypto::{
+    PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+};
 
 pub struct SodiumResolver {
     parent: DefaultResolver,
@@ -24,25 +25,25 @@ impl SodiumResolver {
 }
 
 impl CryptoResolver for SodiumResolver {
-    fn resolve_rng(&self) -> Option<Box<Random + Send>> {
+    fn resolve_rng(&self) -> Option<Box<dyn Random + Send>> {
         Some(Box::new(SodiumRandom::default()))
     }
 
-    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<Dh + Send>> {
+    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh + Send>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
             _ => self.parent.resolve_dh(choice),
         }
     }
 
-    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<Hash + Send>> {
+    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash + Send>> {
         match *choice {
             HashChoice::SHA256 => Some(Box::new(SodiumSha256::default())),
             _ => self.parent.resolve_hash(choice),
         }
     }
 
-    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<Cipher + Send>> {
+    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher + Send>> {
         match *choice {
             CipherChoice::ChaChaPoly => Some(Box::new(SodiumChaChaPoly::default())),
             _ => self.parent.resolve_cipher(choice),
@@ -100,7 +101,7 @@ impl Dh for SodiumDh25519 {
         self.pubkey = x25519::scalarmult_base(&self.privkey);
     }
 
-    fn generate(&mut self, rng: &mut Random) {
+    fn generate(&mut self, rng: &mut dyn Random) {
         let mut privkey_bytes = [0; x25519::SECRET_KEY_LENGTH];
         rng.fill_bytes(&mut privkey_bytes);
         x25519::convert_to_private_key(&mut privkey_bytes);

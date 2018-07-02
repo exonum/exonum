@@ -12,57 +12,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bodyparser;
-use exonum::{api::{Api, ApiError},
-             blockchain::{self, BlockProof, Blockchain, Transaction},
-             crypto::Hash,
-             node::TransactionSend,
-             storage::MapProof};
-use iron::{IronResult, Plugin, Request, Response};
-use router::Router;
+use exonum::{
+    api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof},
+    crypto::{CryptoHash, Hash}, node::TransactionSend, storage::MapProof,
+};
 
 use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
 use TIMESTAMPING_SERVICE;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct TimestampQuery {
+    pub hash: Hash,
+}
+
+impl TimestampQuery {
+    pub fn new(hash: Hash) -> Self {
+        TimestampQuery { hash }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimestampProof {
     pub block_info: BlockProof,
     pub state_proof: MapProof<Hash, Hash>,
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
 
-#[derive(Clone)]
-pub struct PublicApi<T: TransactionSend + Clone + 'static> {
-    channel: T,
-    blockchain: Blockchain,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct PublicApi;
 
-impl<T: TransactionSend + Clone + 'static> PublicApi<T> {
-    pub fn new(blockchain: Blockchain, channel: T) -> PublicApi<T> {
-        PublicApi {
-            blockchain,
-            channel,
-        }
-    }
-
-    pub fn put_transaction<Tx: Transaction>(&self, tx: Tx) -> Result<Hash, ApiError> {
-        let hash = tx.hash();
-        self.channel.send(Box::new(tx))?;
+impl PublicApi {
+    pub fn handle_post_transaction(
+        state: &ServiceApiState,
+        transaction: TxTimestamp,
+    ) -> api::Result<Hash> {
+        let hash = transaction.hash();
+        state.sender().send(transaction.into())?;
         Ok(hash)
     }
 
-    pub fn timestamp_proof(&self, content_hash: &Hash) -> Result<TimestampProof, ApiError> {
-        let snapshot = self.blockchain.snapshot();
+    pub fn handle_timestamp(
+        state: &ServiceApiState,
+        query: TimestampQuery,
+    ) -> api::Result<Option<TimestampEntry>> {
+        let snapshot = state.snapshot();
+        let schema = Schema::new(&snapshot);
+        Ok(schema.timestamps().get(&query.hash))
+    }
+
+    pub fn handle_timestamp_proof(
+        state: &ServiceApiState,
+        query: TimestampQuery,
+    ) -> api::Result<TimestampProof> {
+        let snapshot = state.snapshot();
         let (state_proof, block_info) = {
             let core_schema = blockchain::Schema::new(&snapshot);
-            let last_block_height = self.blockchain.last_block().height();
+            let last_block_height = state.blockchain().last_block().height();
             let block_proof = core_schema.block_and_precommits(last_block_height).unwrap();
             let state_proof = core_schema.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
             (state_proof, block_proof)
         };
         let schema = Schema::new(&snapshot);
-        let timestamp_proof = schema.timestamps().get_proof(*content_hash);
+        let timestamp_proof = schema.timestamps().get_proof(query.hash);
         Ok(TimestampProof {
             block_info,
             state_proof,
@@ -70,57 +82,11 @@ impl<T: TransactionSend + Clone + 'static> PublicApi<T> {
         })
     }
 
-    pub fn timestamp(&self, content_hash: &Hash) -> Result<Option<TimestampEntry>, ApiError> {
-        let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        Ok(schema.timestamps().get(content_hash))
-    }
-
-    fn wire_timestamp_proof(self, router: &mut Router) {
-        let timestamp_proof = move |req: &mut Request| -> IronResult<Response> {
-            let content_hash: Hash = self.url_fragment(req, "content_hash")?;
-            let proof = self.timestamp_proof(&content_hash)?;
-            self.ok_response(&json!(proof))
-        };
-        router.get(
-            "/v1/timestamps/proof/:content_hash",
-            timestamp_proof,
-            "get_timestamp_proof",
-        );
-    }
-
-    fn wire_timestamp(self, router: &mut Router) {
-        let timestamp = move |req: &mut Request| -> IronResult<Response> {
-            let content_hash: Hash = self.url_fragment(req, "content_hash")?;
-            let timestamp = self.timestamp(&content_hash)?;
-            self.ok_response(&json!(timestamp))
-        };
-        router.get(
-            "/v1/timestamps/value/:content_hash",
-            timestamp,
-            "get_timestamp",
-        );
-    }
-
-    fn wire_post_timestamp(self, router: &mut Router) {
-        let post_timestamp = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<TxTimestamp>>() {
-                Ok(Some(tx)) => {
-                    let hash = self.put_transaction(tx)?;
-                    self.ok_response(&json!(hash))
-                }
-                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-            }
-        };
-        router.post("/v1/timestamps", post_timestamp, "post_timestamp");
-    }
-}
-
-impl<T: TransactionSend + Clone + 'static> Api for PublicApi<T> {
-    fn wire(&self, router: &mut Router) {
-        self.clone().wire_timestamp(router);
-        self.clone().wire_timestamp_proof(router);
-        self.clone().wire_post_timestamp(router);
+    pub fn wire(builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("v1/timestamps/value", Self::handle_timestamp)
+            .endpoint("v1/timestamps/proof", Self::handle_timestamp_proof)
+            .endpoint_mut("v1/timestamps", Self::handle_post_transaction);
     }
 }

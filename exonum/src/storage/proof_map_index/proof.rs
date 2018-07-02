@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
-            node::{BranchNode, Node}};
+use super::{
+    key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE}, node::{BranchNode, Node},
+};
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 

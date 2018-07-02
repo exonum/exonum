@@ -258,7 +258,7 @@ impl TransactionError {
     }
 
     /// Creates a new `TransactionError` instance from `std::thread::Result`'s `Err`.
-    pub(crate) fn from_panic(panic: &Box<Any + Send>) -> Self {
+    pub(crate) fn from_panic(panic: &Box<dyn Any + Send>) -> Self {
         Self::panic(panic_description(panic))
     }
 
@@ -275,7 +275,7 @@ impl TransactionError {
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(use_self))]
-impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
+impl<'a, T: Transaction> From<T> for Box<dyn Transaction + 'a> {
     fn from(tx: T) -> Self {
         Box::new(tx) as Self
     }
@@ -358,7 +358,9 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
-pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+pub trait TransactionSet:
+    Into<Box<dyn Transaction>> + DeserializeOwned + Serialize + Clone
+{
     /// Parses a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
@@ -576,8 +578,8 @@ macro_rules! transactions {
             }
         }
 
-        impl Into<Box<$crate::blockchain::Transaction>> for $transaction_set {
-            fn into(self) -> Box<$crate::blockchain::Transaction> {
+        impl Into<Box<dyn $crate::blockchain::Transaction>> for $transaction_set {
+            fn into(self) -> Box<dyn $crate::blockchain::Transaction> {
                 match self {$(
                     $transaction_set::$name(tx) => Box::new(tx),
                 )*}
@@ -632,12 +634,12 @@ macro_rules! transactions {
 }
 
 /// Tries to get a meaningful description from the given panic.
-fn panic_description(any: &Box<Any + Send>) -> Option<String> {
+fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
     if let Some(s) = any.downcast_ref::<&str>() {
         Some(s.to_string())
     } else if let Some(s) = any.downcast_ref::<String>() {
         Some(s.clone())
-    } else if let Some(error) = any.downcast_ref::<Box<Error + Send>>() {
+    } else if let Some(error) = any.downcast_ref::<Box<dyn Error + Send>>() {
         Some(error.description().to_string())
     } else {
         None
@@ -826,7 +828,7 @@ mod tests {
 
     #[test]
     fn box_error_panic() {
-        let error: Box<Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
+        let error: Box<dyn Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
         let description = error.description().to_owned();
         let error = make_panic(error);
         assert_eq!(Some(description), panic_description(&error));
@@ -838,7 +840,7 @@ mod tests {
         assert_eq!(None, panic_description(&error));
     }
 
-    fn make_panic<T: Send + 'static>(val: T) -> Box<Any + Send> {
+    fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
         panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
     }
 
@@ -847,7 +849,7 @@ mod tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
-            vec![Box::new(TxResultService) as Box<Service>],
+            vec![Box::new(TxResultService) as Box<dyn Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
@@ -865,11 +867,14 @@ mod tests {
             "test service"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+        fn tx_from_raw(
+            &self,
+            raw: RawTransaction,
+        ) -> Result<Box<dyn Transaction>, encoding::Error> {
             Ok(Box::new(TxResult::from_raw(raw)?))
         }
     }

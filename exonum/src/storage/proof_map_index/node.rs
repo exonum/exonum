@@ -16,8 +16,9 @@
 
 use std::borrow::Cow;
 
-use super::{super::{StorageKey, StorageValue},
-            key::{ChildKind, ProofPath, PROOF_PATH_SIZE}};
+use super::{
+    super::{StorageKey, StorageValue}, key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
+};
 use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);

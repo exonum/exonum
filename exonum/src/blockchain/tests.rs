@@ -39,11 +39,11 @@ impl Service for TestService {
         "test service"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         Ok(Box::new(Tx::from_raw(raw)?))
     }
 }
@@ -372,11 +372,11 @@ impl Service for ServiceGood {
         "some_service"
     }
 
-    fn state_hash(&self, _snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         unimplemented!()
     }
 
@@ -397,11 +397,11 @@ impl Service for ServicePanic {
         "some_service"
     }
 
-    fn state_hash(&self, _snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         unimplemented!()
     }
 
@@ -421,11 +421,11 @@ impl Service for ServicePanicStorageError {
         "some_service"
     }
 
-    fn state_hash(&self, _snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         unimplemented!()
     }
 
@@ -434,7 +434,7 @@ impl Service for ServicePanicStorageError {
     }
 }
 
-fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
+fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
@@ -443,7 +443,7 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
     assert_eq!(index.get(0), Some(1));
 }
 
-fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
+fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
@@ -460,7 +460,7 @@ mod memorydb_tests {
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 
-    fn create_database() -> Box<Database> {
+    fn create_database() -> Box<dyn Database> {
         Box::new(MemoryDB::new())
     }
 
@@ -469,14 +469,14 @@ mod memorydb_tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
-            vec![Box::new(super::TestService) as Box<Service>],
+            vec![Box::new(super::TestService) as Box<dyn Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
         )
     }
 
-    fn create_blockchain_with_service(service: Box<Service>) -> Blockchain {
+    fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
@@ -535,7 +535,7 @@ mod rocksdb_tests {
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 
-    fn create_database(path: &Path) -> Box<Database> {
+    fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
@@ -546,14 +546,14 @@ mod rocksdb_tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             db,
-            vec![Box::new(super::TestService) as Box<Service>],
+            vec![Box::new(super::TestService) as Box<dyn Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
         )
     }
 
-    fn create_blockchain_with_service(path: &Path, service: Box<Service>) -> Blockchain {
+    fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);

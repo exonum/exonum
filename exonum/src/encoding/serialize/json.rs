@@ -36,7 +36,7 @@ macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> Result<Self, Box<::std::error::Error>> {
+                -> Result<Self, Box<dyn (::std::error::Error)>> {
                 use $crate::encoding::serialize::json::reexport::from_value;
                 Ok(from_value(value.clone())?)
             }
@@ -58,17 +58,17 @@ pub trait ExonumJson {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>>
+    ) -> Result<(), Box<dyn Error>>
     where
         Self: Sized;
     /// serialize field as `json::Value`
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>>;
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>>;
 }
 
 /// `ExonumJsonDeserialize` is trait for objects that could be constructed from exonum json.
 pub trait ExonumJsonDeserialize {
     /// deserialize `json` value.
-    fn deserialize(value: &Value) -> Result<Self, Box<Error>>
+    fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>>
     where
         Self: Sized;
 }
@@ -93,14 +93,14 @@ macro_rules! impl_deserialize_int {
                                                          buffer: &mut B,
                                                          from: Offset,
                                                          to: Offset)
-                -> Result<(), Box<Error>>
+                -> Result<(), Box<dyn Error>>
             {
                 let number = value.as_i64().ok_or("Can't cast json as integer")?;
                 buffer.write(from, to, number as $typename);
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+            fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
                 Ok(Value::Number((*self).into()))
             }
         }
@@ -115,7 +115,7 @@ macro_rules! impl_deserialize_bigint {
                                                         buffer: & mut B,
                                                         from: Offset,
                                                         to: Offset)
-            -> Result<(), Box<Error>>
+            -> Result<(), Box<dyn Error>>
             {
                 let string = value.as_str().ok_or("Can't cast json as string")?;
                 let val: $typename =  string.parse()?;
@@ -123,7 +123,7 @@ macro_rules! impl_deserialize_bigint {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+            fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
                 Ok(Value::String(self.to_string()))
             }
         }
@@ -138,7 +138,7 @@ macro_rules! impl_deserialize_hex_segment {
                                                         buffer: & mut B,
                                                         from: Offset,
                                                         to: Offset)
-                -> Result<(), Box<Error>>
+                -> Result<(), Box<dyn Error>>
             {
                 let string = value.as_str().ok_or("Can't cast json as string")?;
                 let val = <$typename as FromHex>:: from_hex(string)?;
@@ -146,7 +146,7 @@ macro_rules! impl_deserialize_hex_segment {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+            fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
                 let hex_str = $crate::encoding::serialize::encode_hex(&self[..]);
                 Ok(Value::String(hex_str))
             }
@@ -167,13 +167,13 @@ impl ExonumJson for bool {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let val = value.as_bool().ok_or("Can't cast json as bool")?;
         buffer.write(from, to, val);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(Value::Bool(*self))
     }
 }
@@ -184,13 +184,13 @@ impl<'a> ExonumJson for &'a str {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let val = value.as_str().ok_or("Can't cast json as string")?;
         buffer.write(from, to, val);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(Value::String(self.to_string()))
     }
 }
@@ -201,14 +201,14 @@ impl ExonumJson for DateTime<Utc> {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let helper: TimestampHelper = serde_json::from_value(value.clone())?;
         let date_time = Utc.timestamp(helper.secs.parse()?, helper.nanos);
         buffer.write(from, to, date_time);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let timestamp = TimestampHelper {
             secs: self.timestamp().to_string(),
             nanos: self.timestamp_subsec_nanos(),
@@ -223,7 +223,7 @@ impl ExonumJson for Duration {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let helper: DurationHelper = serde_json::from_value(value.clone())?;
         let seconds = helper.secs.parse()?;
 
@@ -243,7 +243,7 @@ impl ExonumJson for Duration {
         }
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let secs = self.num_seconds();
         let nanos_as_duration = *self - Self::seconds(secs);
         // Since we're working with only nanos, no overflow is expected here.
@@ -263,13 +263,13 @@ impl ExonumJson for SocketAddr {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let addr: Self = serde_json::from_value(value.clone())?;
         buffer.write(from, to, addr);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(serde_json::to_value(&self)?)
     }
 }
@@ -280,7 +280,7 @@ impl<'a> ExonumJson for &'a [Hash] {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let arr = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Vec<Hash> = Vec::new();
         for el in arr {
@@ -292,7 +292,7 @@ impl<'a> ExonumJson for &'a [Hash] {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let mut vec = Vec::new();
         for hash in self.iter() {
             vec.push(hash.serialize_field()?)
@@ -306,14 +306,14 @@ impl<'a> ExonumJson for &'a [u8] {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let bytes = value.as_str().ok_or("Can't cast json as string")?;
         let arr = <Vec<u8> as FromHex>::from_hex(bytes)?;
         buffer.write(from, to, arr.as_slice());
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(Value::String(::encoding::serialize::encode_hex(self)))
     }
 }
@@ -325,7 +325,7 @@ impl ExonumJson for Vec<RawMessage> {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         use messages::MessageBuffer;
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Self = Self::new();
@@ -338,7 +338,7 @@ impl ExonumJson for Vec<RawMessage> {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let vec = self.iter()
             .map(|slice| Value::String(::encoding::serialize::encode_hex(slice)))
             .collect();
@@ -351,7 +351,7 @@ where
     T: ExonumJsonDeserialize,
     for<'a> Vec<T>: Field<'a>,
 {
-    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
+    fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>> {
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Self = Self::new();
         for el in bytes {
@@ -376,7 +376,7 @@ where
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Vec<_> = Vec::new();
         for el in bytes {
@@ -387,7 +387,7 @@ where
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let mut vec = Vec::new();
         for item in self {
             vec.push(item.serialize_field()?);
@@ -402,7 +402,7 @@ impl ExonumJson for BitVec {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let string = value.as_str().ok_or("Can't cast json as string")?;
         let mut vec = Self::new();
         for (i, ch) in string.chars().enumerate() {
@@ -419,7 +419,7 @@ impl ExonumJson for BitVec {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let mut out = String::new();
         for i in self.iter() {
             if i {
@@ -439,13 +439,13 @@ impl ExonumJson for Height {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let val: u64 = value.as_str().ok_or("Can't cast json as string")?.parse()?;
         buffer.write(from, to, Height(val));
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let val: u64 = self.to_owned().into();
         Ok(Value::String(val.to_string()))
     }
@@ -457,13 +457,13 @@ impl ExonumJson for Round {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let number = value.as_i64().ok_or("Can't cast json as integer")?;
         buffer.write(from, to, Round(number as u32));
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let val: u32 = self.to_owned().into();
         Ok(Value::Number(val.into()))
     }
@@ -475,13 +475,13 @@ impl ExonumJson for ValidatorId {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let number = value.as_i64().ok_or("Can't cast json as integer")?;
         buffer.write(from, to, ValidatorId(number as u16));
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let val: u16 = self.to_owned().into();
         Ok(Value::Number(val.into()))
     }
@@ -493,13 +493,13 @@ impl ExonumJson for Uuid {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let uuid: Self = serde_json::from_value(value.clone())?;
         buffer.write(from, to, uuid);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(serde_json::to_value(&self)?)
     }
 }
@@ -510,13 +510,13 @@ impl ExonumJson for Decimal {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let decimal: Self = serde_json::from_value(value.clone())?;
         buffer.write(from, to, decimal);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(serde_json::to_value(&self)?)
     }
 }

@@ -112,8 +112,9 @@ pub use self::{error::Error, fields::Field, segments::SegmentField};
 #[macro_use]
 pub mod serialize;
 
-use std::{convert::From,
-          ops::{Add, Div, Mul, Sub}};
+use std::{
+    convert::From, ops::{Add, Div, Mul, Sub},
+};
 
 mod error;
 #[macro_use]

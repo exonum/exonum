@@ -215,11 +215,11 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
 /// method with a signature like `fn<S: AsRef<Snapshot>>(view: S) -> Self`.
 pub trait ComparableSnapshot<S> {
     /// Compares this snapshot with an older one.
-    fn compare(self, old: S) -> Comparison<Box<Snapshot>>;
+    fn compare(self, old: S) -> Comparison<Box<dyn Snapshot>>;
 }
 
-impl ComparableSnapshot<Box<Snapshot>> for Box<Snapshot> {
-    fn compare(self, old: Box<Snapshot>) -> Comparison<Box<Snapshot>> {
+impl ComparableSnapshot<Box<dyn Snapshot>> for Box<dyn Snapshot> {
+    fn compare(self, old: Box<dyn Snapshot>) -> Comparison<Box<dyn Snapshot>> {
         Comparison::new(old, self)
     }
 }

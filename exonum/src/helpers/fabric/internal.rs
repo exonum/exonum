@@ -36,7 +36,7 @@ pub trait Command {
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback;
 }
 
@@ -47,14 +47,14 @@ pub trait Command {
 /// abstracted dynamic object without trait objects.
 /// 2. Additionally this state is common for all commands.
 pub struct CollectedCommand {
-    command: Box<Command>,
+    command: Box<dyn Command>,
     args: Vec<Argument>,
-    exts: Vec<Box<CommandExtension>>,
+    exts: Vec<Box<dyn CommandExtension>>,
 }
 
 impl CollectedCommand {
-    pub fn new(command: Box<Command>) -> Self {
-        Self {
+    pub fn new(command: Box<dyn Command>) -> Self {
+            Self {
             args: command.args(),
             command,
             exts: Vec::new(),
@@ -73,7 +73,7 @@ impl CollectedCommand {
         self.command.about()
     }
 
-    pub fn extend(&mut self, extender: Option<Box<CommandExtension>>) {
+    pub fn extend(&mut self, extender: Option<Box<dyn CommandExtension>>) {
         if let Some(extender) = extender {
             let args = extender.args();
             self.args.extend(args.into_iter());

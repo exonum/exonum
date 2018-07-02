@@ -15,32 +15,29 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
-// spell-checker:ignore cors
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
-#![cfg_attr(feature = "flame_profile", feature(plugin, custom_attribute))]
-#![cfg_attr(feature = "flame_profile", plugin(exonum_flamer))]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
-#![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
-#![cfg_attr(feature = "cargo-clippy", allow(stutter, similar_names, items_after_statements))]
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(
-        use_self, cast_possible_truncation, replace_consts, enum_glob_use, cast_sign_loss,
-        used_underscore_binding, cast_possible_wrap, single_match_else, filter_map
-    )
-)]
+//#![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
+//#![cfg_attr(feature = "cargo-clippy", allow(stutter, similar_names, items_after_statements))]
+//#![cfg_attr(
+//    feature = "cargo-clippy",
+//    allow(
+//        use_self, cast_possible_truncation, replace_consts, enum_glob_use, cast_sign_loss,
+//        used_underscore_binding, cast_possible_wrap, single_match_else, filter_map
+//    )
+//)]
 
+extern crate actix;
+extern crate actix_web;
 extern crate atty;
 extern crate bit_vec;
-extern crate bodyparser;
 extern crate byteorder;
 extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate colored;
-extern crate cookie;
 extern crate env_logger;
 extern crate exonum_rocksdb as rocksdb;
 extern crate exonum_sodiumoxide as sodiumoxide;
@@ -48,16 +45,10 @@ extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate failure;
 extern crate futures;
 extern crate hex;
-extern crate hyper;
-extern crate iron;
-extern crate iron_cors;
 #[macro_use]
 extern crate log;
-extern crate mount;
 extern crate os_info;
-extern crate params;
 extern crate rand;
-extern crate router;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]

@@ -136,7 +136,7 @@ pub enum Error {
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields.
-    Other(Box<StdError>),
+    Other(Box<dyn StdError>),
 }
 
 impl fmt::Display for Error {
@@ -171,7 +171,7 @@ impl StdError for Error {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         use std::ops::Deref;
         if let Error::Other(ref error) = *self {
             Some(error.deref())
@@ -181,8 +181,8 @@ impl StdError for Error {
     }
 }
 
-impl From<Box<StdError>> for Error {
-    fn from(t: Box<StdError>) -> Self {
+impl From<Box<dyn StdError>> for Error {
+    fn from(t: Box<dyn StdError>) -> Self {
         Error::Other(t)
     }
 }

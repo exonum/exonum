@@ -18,8 +18,9 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use std::{convert, fmt::Debug, ops::Deref, sync};
 
-use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
-             SIGNATURE_LENGTH};
+use crypto::{
+    hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH,
+};
 use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.

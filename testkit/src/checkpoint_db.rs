@@ -44,7 +44,7 @@ impl<T: Database> CheckpointDb<T> {
 }
 
 impl<T: Database> Database for CheckpointDb<T> {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         self.inner
             .read()
             .expect("Cannot lock CheckpointDb for snapshot")
@@ -63,9 +63,9 @@ impl<T: Database> Database for CheckpointDb<T> {
     }
 }
 
-impl<T: Database> From<CheckpointDb<T>> for Arc<Database> {
-    fn from(db: CheckpointDb<T>) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+impl<T: Database> From<CheckpointDb<T>> for Arc<dyn Database> {
+    fn from(db: CheckpointDb<T>) -> Arc<dyn Database> {
+        Arc::from(Box::new(db) as Box<dyn Database>)
     }
 }
 
@@ -113,7 +113,7 @@ impl<T: Database> CheckpointDbInner<T> {
         }
     }
 
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
     }
 

@@ -14,14 +14,20 @@
 
 // spell-checker:ignore postpropose, postvote
 
-use exonum::{blockchain::{Schema, StoredConfiguration},
-             crypto::{CryptoHash, Hash},
-             helpers::{Height, ValidatorId}};
+use exonum::{
+    blockchain::{Schema, StoredConfiguration}, crypto::{CryptoHash, Hash},
+    helpers::{Height, ValidatorId},
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
-use super::{new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
-            ConfigurationSchema, ConfigurationTestKit};
-use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposeResponse, VoteResponse, VotesInfo};
+use super::{
+    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
+    ConfigurationSchema, ConfigurationTestKit,
+};
+use api::{
+    ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
+    VoteResponse, VotesInfo,
+};
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;
@@ -42,100 +48,89 @@ trait ConfigurationApiTest {
         actual_from_filter: Option<Height>,
     ) -> Vec<ConfigHashInfo>;
 
-    fn votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo;
+    fn votes_for_propose(&self, cfg_hash: Hash) -> VotesInfo;
 
     fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse;
 
-    fn post_config_vote(&self, cfg_hash: &Hash) -> VoteResponse;
+    fn post_config_vote(&self, cfg_hash: Hash) -> VoteResponse;
 
-    fn post_config_vote_against(&self, cfg_hash: &Hash) -> VoteResponse;
-}
-
-fn params_to_query(
-    previous_cfg_hash_filter: Option<Hash>,
-    actual_from_filter: Option<Height>,
-) -> String {
-    let mut query = String::new();
-    let mut prefix = "?";
-    if let Some(previous_cfg_hash_filter) = previous_cfg_hash_filter {
-        query += &format!(
-            "{}previous_cfg_hash={}",
-            prefix,
-            previous_cfg_hash_filter.to_string()
-        );
-        prefix = "&";
-    }
-    if let Some(actual_from_filter) = actual_from_filter {
-        query += &format!("{}actual_from={}", prefix, actual_from_filter.to_string());
-    }
-    query
+    fn post_config_vote_against(&self, cfg_hash: Hash) -> VoteResponse;
 }
 
 impl ConfigurationApiTest for TestKitApi {
     fn actual_config(&self) -> ConfigHashInfo {
-        self.get(ApiKind::Service("configuration"), "/v1/configs/actual")
+        self.public(ApiKind::Service("configuration"))
+            .get("v1/configs/actual")
+            .unwrap()
     }
 
     fn following_config(&self) -> Option<ConfigHashInfo> {
-        self.get(ApiKind::Service("configuration"), "/v1/configs/following")
+        self.public(ApiKind::Service("configuration"))
+            .get("v1/configs/following")
+            .unwrap()
     }
 
-    fn config_by_hash(&self, config_hash: Hash) -> ConfigInfo {
-        self.get(
-            ApiKind::Service("configuration"),
-            &format!("/v1/configs/{}", config_hash.to_string()),
-        )
+    fn config_by_hash(&self, hash: Hash) -> ConfigInfo {
+        self.public(ApiKind::Service("configuration"))
+            .query(&HashQuery { hash })
+            .get("v1/configs")
+            .unwrap()
     }
 
     fn all_proposes(
         &self,
-        previous_cfg_hash_filter: Option<Hash>,
-        actual_from_filter: Option<Height>,
+        previous_cfg_hash: Option<Hash>,
+        actual_from: Option<Height>,
     ) -> Vec<ProposeHashInfo> {
-        self.get(
-            ApiKind::Service("configuration"),
-            &format!(
-                "/v1/configs/proposed{}",
-                &params_to_query(previous_cfg_hash_filter, actual_from_filter),
-            ),
-        )
+        self.public(ApiKind::Service("configuration"))
+            .query(&FilterQuery {
+                previous_cfg_hash,
+                actual_from,
+            })
+            .get("v1/configs/proposed")
+            .unwrap()
     }
 
-    fn votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo {
-        let endpoint = format!("/v1/configs/{}/votes", cfg_hash.to_string());
-        self.get(ApiKind::Service("configuration"), &endpoint)
+    fn votes_for_propose(&self, hash: Hash) -> VotesInfo {
+        self.public(ApiKind::Service("configuration"))
+            .query(&HashQuery { hash })
+            .get("v1/configs/votes")
+            .unwrap()
     }
 
     fn all_committed(
         &self,
-        previous_cfg_hash_filter: Option<Hash>,
-        actual_from_filter: Option<Height>,
+        previous_cfg_hash: Option<Hash>,
+        actual_from: Option<Height>,
     ) -> Vec<ConfigHashInfo> {
-        self.get(
-            ApiKind::Service("configuration"),
-            &format!(
-                "/v1/configs/committed{}",
-                &params_to_query(previous_cfg_hash_filter, actual_from_filter),
-            ),
-        )
+        self.public(ApiKind::Service("configuration"))
+            .query(&FilterQuery {
+                previous_cfg_hash,
+                actual_from,
+            })
+            .get("v1/configs/committed")
+            .unwrap()
     }
 
     fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse {
-        self.post_private(
-            ApiKind::Service("configuration"),
-            "/v1/configs/postpropose",
-            cfg,
-        )
+        self.private(ApiKind::Service("configuration"))
+            .query(cfg)
+            .post("v1/configs/postpropose")
+            .unwrap()
     }
 
-    fn post_config_vote(&self, cfg_hash: &Hash) -> VoteResponse {
-        let endpoint = format!("/v1/configs/{}/postvote", cfg_hash.to_string());
-        self.post_private(ApiKind::Service("configuration"), &endpoint, &())
+    fn post_config_vote(&self, hash: Hash) -> VoteResponse {
+        self.private(ApiKind::Service("configuration"))
+            .query(&HashQuery { hash })
+            .post("v1/configs/postvote")
+            .unwrap()
     }
 
-    fn post_config_vote_against(&self, cfg_hash: &Hash) -> VoteResponse {
-        let endpoint = format!("/v1/configs/{}/postagainst", cfg_hash.to_string());
-        self.post_private(ApiKind::Service("configuration"), &endpoint, &())
+    fn post_config_vote_against(&self, hash: Hash) -> VoteResponse {
+        self.private(ApiKind::Service("configuration"))
+            .query(&HashQuery { hash })
+            .post("v1/configs/postagainst")
+            .unwrap()
     }
 }
 
@@ -264,11 +259,11 @@ fn test_votes_for_propose() {
     };
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     let cfg_proposal_hash = new_cfg.hash();
-    assert_eq!(None, api.votes_for_propose(&new_cfg.hash()));
+    assert_eq!(None, api.votes_for_propose(new_cfg.hash()));
     testkit.create_block_with_transactions(txvec![tx_propose]);
     assert_eq!(
         Some(vec![None; testkit.network().validators().len()]),
-        api.votes_for_propose(&new_cfg.hash())
+        api.votes_for_propose(new_cfg.hash())
     );
     // Push votes
     let tx_votes = testkit
@@ -279,7 +274,7 @@ fn test_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
-    let response = api.votes_for_propose(&new_cfg.hash())
+    let response = api.votes_for_propose(new_cfg.hash())
         .expect("Votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("Vote for config is absent");
@@ -308,11 +303,11 @@ fn test_dissenting_votes_for_propose() {
     };
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     let cfg_proposal_hash = new_cfg.hash();
-    assert_eq!(None, api.votes_for_propose(&new_cfg.hash()));
+    assert_eq!(None, api.votes_for_propose(new_cfg.hash()));
     testkit.create_block_with_transaction(tx_propose);
     assert_eq!(
         Some(vec![None; testkit.network().validators().len()]),
-        api.votes_for_propose(&new_cfg.hash())
+        api.votes_for_propose(new_cfg.hash())
     );
     // Push dissenting votes
     let tx_dissenting_votes = testkit
@@ -323,7 +318,7 @@ fn test_dissenting_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_dissenting_votes);
-    let response = api.votes_for_propose(&new_cfg.hash())
+    let response = api.votes_for_propose(new_cfg.hash())
         .expect("Dissenting votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("VoteAgainst for config is absent");
@@ -506,7 +501,7 @@ fn test_post_vote_tx() {
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     testkit.create_block_with_transactions(txvec![tx]);
 
-    let info = api.post_config_vote(&new_cfg.hash());
+    let info = api.post_config_vote(new_cfg.hash());
     testkit.poll_events();
     // Check results
     let tx = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
@@ -528,7 +523,7 @@ fn test_post_vote_against_tx() {
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     testkit.create_block_with_transaction(tx);
 
-    let info = api.post_config_vote_against(&new_cfg.hash());
+    let info = api.post_config_vote_against(new_cfg.hash());
     testkit.poll_events();
     // Check results
     let tx = new_tx_config_vote_against(&testkit.network().validators()[0], new_cfg.hash());

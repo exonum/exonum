@@ -26,8 +26,9 @@ use super::{CheckedOffset, Field, Offset};
 use blockchain::{self, Block, BlockProof};
 use crypto::{gen_keypair, hash, CryptoHash};
 use helpers::{user_agent, Height, Round, ValidatorId};
-use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
-               RawMessage, Status};
+use messages::{
+    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, RawMessage, Status,
+};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);

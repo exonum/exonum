@@ -27,9 +27,9 @@ use colored::*;
 use env_logger::{Builder, Formatter};
 use log::{Level, Record, SetLoggerError};
 
-use std::{env,
-          io::{self, Write},
-          time::SystemTime};
+use std::{
+    env, io::{self, Write}, time::SystemTime,
+};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;

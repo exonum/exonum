@@ -22,17 +22,15 @@ use futures::{sync::oneshot, Future};
 use serde_json::Value;
 use tokio_timer::Timer;
 
-use std::{sync::{Arc, Mutex},
-          thread::{self, JoinHandle},
-          time::Duration};
+use std::{
+    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
+};
 
-use exonum::{blockchain::{Service, ServiceContext, Transaction},
-             crypto::Hash,
-             encoding::Error as EncodingError,
-             helpers,
-             messages::RawTransaction,
-             node::{ApiSender, ExternalMessage, Node},
-             storage::{Database, Fork, MemoryDB, Snapshot}};
+use exonum::{
+    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash,
+    encoding::Error as EncodingError, helpers, messages::RawTransaction,
+    node::{ApiSender, ExternalMessage, Node}, storage::{Database, Fork, MemoryDB, Snapshot},
+};
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 

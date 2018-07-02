@@ -19,12 +19,10 @@ pub use self::proof::{ListProof, ListProofError};
 use std::{cell::Cell, marker::PhantomData};
 
 use self::key::ProofListKey;
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey,
-            StorageValue};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
+    StorageKey, StorageValue,
+};
 use crypto::{hash, Hash, HashStream};
 
 mod key;
@@ -69,7 +67,7 @@ fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
 
 impl<T, V> ProofListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -593,7 +591,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     type Item = V;
