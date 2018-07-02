@@ -179,17 +179,18 @@ impl PublicApi {
     fn handle_config_by_hash(
         state: &ServiceApiState,
         query: HashQuery,
-    ) -> api::Result<Option<ConfigInfo>> {
+    ) -> api::Result<ConfigInfo> {
         let snapshot = state.snapshot();
-        Ok(CoreSchema::new(&snapshot)
-            .configs()
-            .get(&query.hash)
-            .map(|committed_config| ConfigInfo {
-                committed_config: Some(committed_config),
-                propose: Schema::new(&snapshot)
-                    .propose_data_by_config_hash()
-                    .get(&query.hash),
-            }))
+
+        let committed_config = CoreSchema::new(&snapshot).configs().get(&query.hash);
+        let propose = Schema::new(&snapshot)
+            .propose_data_by_config_hash()
+            .get(&query.hash);
+
+        Ok(ConfigInfo {
+            committed_config,
+            propose,
+        })
     }
 
     fn handle_votes_for_propose(
