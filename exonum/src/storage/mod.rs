@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A module that provides interfaces to work with the persisted blockchain data.
+//! A module that provides interfaces to work with persisted blockchain data.
 //!
 //! See also [the documentation page on storage][doc:storage].
 //!
@@ -38,14 +38,14 @@
 //!
 //! If you need to make changes to the database, you need to create a [`Fork`] using
 //! the [`fork`][2] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
-//! but also allows to create a sequence of changes to the database that are specified
+//! but also allows creating a sequence of changes to the database that are specified
 //! as a [`Patch`]. A patch can be atomically [`merge`]d into a database. Different threads
 //! may call `merge` concurrently.
 //!
 //! # `StorageKey` and `StorageValue` traits
 //!
 //! If you need to use your own data types as keys or values in the storage, you need to implement
-//! the [`StorageKey`] or [`StorageValue`] traits respectively. These traits are already
+//! the [`StorageKey`] or [`StorageValue`] traits respectively. These traits have already been
 //! implemented for most standard types.
 //!
 //! # Indices
@@ -61,7 +61,7 @@
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
-//! was authorized by the blockchain validators without having to replicate
+//! was authorized by the blockchain validators, without having to replicate
 //! the entire blockchain contents.
 //!
 //! Exonum provides the following index types:

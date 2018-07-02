@@ -24,9 +24,9 @@ use crypto::{hash, Hash};
 pub enum ListProof<V> {
     /// A branch of proof in which both children contain requested elements.
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
-    /// A branch of proof in which only left child contains requested elements.
+    /// A branch of proof in which only the left child contains requested elements.
     Left(Box<ListProof<V>>, Option<Hash>),
-    /// A branch of proof in which only right child contains requested elements.
+    /// A branch of proof in which only the right child contains requested elements.
     Right(Hash, Box<ListProof<V>>),
     /// A leaf of proof with requested element.
     Leaf(V),

@@ -21,7 +21,8 @@ use crypto::Hash;
 
 /// An index that may only contain one element.
 ///
-/// A value should implement [`StorageValue`] trait.
+/// You can add an element to this index and check whether it exists. A value
+/// should implement [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: trait.StorageValue.html
 #[derive(Debug)]
@@ -37,8 +38,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: trait.Snapshot.html
