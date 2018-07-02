@@ -64,7 +64,7 @@ impl TestkitServerApi {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
                 Err(api::Error::BadRequest(format!(
-                    "\"Transaction not in mempool: {}\"",
+                    "Transaction not in mempool: {}",
                     missing_tx.to_string()
                 )))?;
             }
@@ -85,7 +85,7 @@ impl TestkitServerApi {
     ) -> api::Result<Option<BlockWithTransactions<Box<dyn Transaction>>>> {
         if height == Height(0) {
             Err(api::Error::BadRequest(
-                "\"Cannot rollback past genesis block\"".into(),
+                "Cannot rollback past genesis block".into(),
             ))?;
         }
 
