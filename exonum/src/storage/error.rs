@@ -19,6 +19,11 @@
 //! An implementation of `Error` type.
 
 /// The error type for I/O operations with storage.
+///
+/// These errors result in a panic. Storage errors are fatal as in the case of
+/// database issues, the system stops working. Assuming that there are other
+/// nodes and secret keys and other crucial data are not stored in the data base,
+/// the operation of the system can be resumed from a backup or by rebooting the node.
 #[derive(Fail, Debug, Clone)]
 #[fail(display = "{}", message)]
 pub struct Error {

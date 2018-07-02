@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of key-value map.
+//! An implementation of a key-value map.
+//!
+//! `MapIndex` requires that keys implement the [`StorageKey`] trait and values implement
+//! the [`StorageValue`] trait. The given section contains methods related to
+//! `MapIndex` and iterators over the items of this map.
 
 use std::{borrow::Borrow, marker::PhantomData};
 
@@ -21,10 +25,10 @@ use super::{
     StorageKey, StorageValue,
 };
 
-/// A map of keys and values.
+/// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
-/// `MapIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
-/// [`StorageValue`] trait.
+/// `MapIndex` requires that keys implement the [`StorageKey`] trait and values implement
+/// the [`StorageValue`] trait.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
@@ -35,10 +39,10 @@ pub struct MapIndex<T, K, V> {
     _v: PhantomData<V>,
 }
 
-/// An iterator over the entries of a `MapIndex`.
+/// Returns an iterator over the entries of a `MapIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`MapIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`MapIndex`]. See its documentation for additional details.
 ///
 /// [`iter`]: struct.MapIndex.html#method.iter
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
@@ -48,10 +52,10 @@ pub struct MapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, K, V>,
 }
 
-/// An iterator over the keys of a `MapIndex`.
+/// Returns an iterator over the keys of a `MapIndex`.
 ///
 /// This struct is created by the [`keys`] or
-/// [`keys_from`] methods on [`MapIndex`]. See its documentation for more.
+/// [`keys_from`] method on [`MapIndex`]. See its documentation for additional details.
 ///
 /// [`keys`]: struct.MapIndex.html#method.keys
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
@@ -61,10 +65,10 @@ pub struct MapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>,
 }
 
-/// An iterator over the values of a `MapIndex`.
+/// Returns an iterator over the values of a `MapIndex`.
 ///
 /// This struct is created by the [`values`] or
-/// [`values_from`] methods on [`MapIndex`]. See its documentation for more.
+/// [`values_from`] method on [`MapIndex`]. See its documentation for additional details.
 ///
 /// [`values`]: struct.MapIndex.html#method.values
 /// [`values_from`]: struct.MapIndex.html#method.values_from
@@ -82,8 +86,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -107,11 +111,11 @@ where
         }
     }
 
-    /// Creates a new index representation based on the name, index id in family
+    /// Creates a new index representation based on the name, index ID in family
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -165,7 +169,7 @@ where
         self.base.get(key)
     }
 
-    /// Returns `true` if the map contains a value for the specified key.
+    /// Returns `true` if the map contains a value corresponding to the specified key.
     ///
     /// # Examples
     ///
@@ -211,7 +215,7 @@ where
         }
     }
 
-    /// Returns an iterator over the keys of the map in ascending order. The iterator element
+    /// Returns an iterator over the keys of a map in ascending order. The iterator element
     /// type is K.
     ///
     /// # Examples
@@ -234,7 +238,7 @@ where
         }
     }
 
-    /// Returns an iterator over the values of the map in ascending order of keys. The iterator
+    /// Returns an iterator over the values of a map in ascending order of keys. The iterator
     /// element type is V.
     ///
     /// # Examples
@@ -257,7 +261,7 @@ where
         }
     }
 
-    /// Returns an iterator over the entries of the map in ascending order starting from the
+    /// Returns an iterator over the entries of a map in ascending order starting from the
     /// specified key. The iterator element type is (K, V).
     ///
     /// # Examples
@@ -284,7 +288,7 @@ where
         }
     }
 
-    /// Returns an iterator over the keys of the map in ascending order starting from the
+    /// Returns an iterator over the keys of a map in ascending order starting from the
     /// specified key. The iterator element type is K.
     ///
     /// # Examples
@@ -311,7 +315,7 @@ where
         }
     }
 
-    /// Returns an iterator over the values of the map in ascending order of keys starting from the
+    /// Returns an iterator over the values of a map in ascending order of keys starting from the
     /// specified key. The iterator element type is V.
     ///
     /// # Examples
@@ -343,7 +347,7 @@ where
     K: StorageKey,
     V: StorageValue,
 {
-    /// Inserts the key-value pair into the map.
+    /// Inserts a key-value pair into a map.
     ///
     /// # Examples
     ///
@@ -361,7 +365,7 @@ where
         self.base.put(key, value)
     }
 
-    /// Removes the key from the map.
+    /// Removes a key from a map.
     ///
     /// # Examples
     ///
@@ -386,11 +390,11 @@ where
         self.base.remove(key)
     }
 
-    /// Clears the map, removing all entries.
+    /// Clears a map, removing all entries.
     ///
     /// # Notes
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples
