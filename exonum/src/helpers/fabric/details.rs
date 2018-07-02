@@ -34,8 +34,7 @@ use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::ConnectListConfig;
-use node::{NodeApiConfig, NodeConfig};
+use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";

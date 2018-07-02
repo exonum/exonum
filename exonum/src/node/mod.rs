@@ -38,8 +38,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use blockchain::ValidatorKeys;
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use blockchain::{
+    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
+};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
     error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
@@ -330,7 +331,7 @@ pub struct ConnectListConfig {
 impl ConnectListConfig {
     /// Creates `ConnectList` from validators public configs.
     pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
-        let peers: Vec<_> = list.iter()
+        let peers = list.iter()
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.addr,
