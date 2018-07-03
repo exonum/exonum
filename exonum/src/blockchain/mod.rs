@@ -196,11 +196,11 @@ impl Blockchain {
     /// Initialized node-local metadata.
     fn initialize_metadata(&mut self) {
         let mut fork = self.db.fork();
-        storage::StorageVersion::write_current(&mut fork);
+        storage::StorageMetadata::write_current(&mut fork);
         if self.merge(fork.into_patch()).is_ok() {
             info!(
                 "Storage version successfully initialized with value [{}].",
-                storage::StorageVersion::read(&self.db.snapshot()).unwrap(),
+                storage::StorageMetadata::read(&self.db.snapshot()).unwrap(),
             )
         } else {
             panic!("Could not set database version.")
@@ -213,7 +213,7 @@ impl Blockchain {
     ///
     /// Panics if version is not supported or is not specified.
     fn assert_storage_version(&self) {
-        match storage::StorageVersion::read(self.db.snapshot()) {
+        match storage::StorageMetadata::read(self.db.snapshot()) {
             Ok(ver) => info!("Storage version is supported with value [{}].", ver),
             Err(e) => panic!("{}", e),
         }
