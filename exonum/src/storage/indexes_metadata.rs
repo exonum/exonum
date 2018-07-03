@@ -14,9 +14,11 @@
 
 #![allow(unsafe_code)]
 
-use std::{borrow::Cow, error::Error};
+use serde_json::{self, Error as JsonError};
 
-use crypto::{CryptoHash, Hash};
+use std::{borrow::Cow, error::Error, fmt};
+
+use crypto::{self, CryptoHash, Hash};
 use encoding::{
     serialize::{json, WriteBufferWrapper}, CheckedOffset, Error as EncodingError, Field, Offset,
 };
@@ -26,10 +28,8 @@ pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
 // Value of this constant is to be incremented manually
 // upon the introduction of breaking changes to the storage.
-const CORE_STORAGE_VERSION: VersionValue = 0;
+const CORE_STORAGE_VERSION: StorageVersion = StorageVersion { version: 0 };
 const CORE_STORAGE_VERSION_KEY: &str = "__STORAGE_VERSION__";
-
-pub(crate) type VersionValue = u64;
 
 encoding_struct! {
     struct IndexMetadata {
@@ -161,16 +161,22 @@ pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, vie
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum StorageVersion {
-    Supported(VersionValue),
-    Unsupported(VersionValue),
-    Unspecified,
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct StorageVersion {
+    version: u32,
 }
 
 impl StorageVersion {
-    pub(crate) fn current() -> VersionValue {
+    pub fn current() -> Self {
         CORE_STORAGE_VERSION
+    }
+
+    pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
+        serde_json::to_vec(&self)
+    }
+
+    pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        serde_json::from_slice(serialized)
     }
 
     pub(crate) fn write_current(view: &mut Fork) {
@@ -178,13 +184,43 @@ impl StorageVersion {
         metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), Self::current());
     }
 
-    pub(crate) fn read<T: AsRef<dyn Snapshot>>(view: T) -> Self {
+    pub(crate) fn read<T: AsRef<dyn Snapshot>>(view: T) -> Result<Self, super::Error> {
         let metadata = BaseIndex::indexes_metadata(view);
-        match metadata.get::<_, VersionValue>(CORE_STORAGE_VERSION_KEY) {
-            Some(ver) if ver == CORE_STORAGE_VERSION => StorageVersion::Supported(ver),
-            Some(ver) => StorageVersion::Unsupported(ver),
-            None => StorageVersion::Unspecified,
+        match metadata.get::<_, Self>(CORE_STORAGE_VERSION_KEY) {
+            Some(ref ver) if *ver == CORE_STORAGE_VERSION => Ok(ver.clone()),
+            Some(ref ver) => Err(super::Error::new(format!(
+                "Unsupported storage version: [{}]. Current storage version: [{}].",
+                ver,
+                StorageVersion::current(),
+            ))),
+            None => Err(super::Error::new(format!(
+                "Storage version is not specified. Current storage version: [{}].",
+                StorageVersion::current()
+            ))),
         }
+    }
+}
+
+impl CryptoHash for StorageVersion {
+    fn hash(&self) -> Hash {
+        let vec_bytes = self.try_serialize().unwrap();
+        crypto::hash(&vec_bytes)
+    }
+}
+
+impl StorageValue for StorageVersion {
+    fn into_bytes(self) -> Vec<u8> {
+        self.try_serialize().unwrap()
+    }
+
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
+        StorageVersion::try_deserialize(v.as_ref()).unwrap()
+    }
+}
+
+impl fmt::Display for StorageVersion {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.version)
     }
 }
 
@@ -201,8 +237,8 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 #[cfg(test)]
 mod tests {
     use super::{
-        IndexMetadata, IndexType, StorageVersion, VersionValue, CORE_STORAGE_VERSION,
-        CORE_STORAGE_VERSION_KEY, INDEXES_METADATA_TABLE_NAME,
+        IndexMetadata, IndexType, StorageVersion, CORE_STORAGE_VERSION, CORE_STORAGE_VERSION_KEY,
+        INDEXES_METADATA_TABLE_NAME,
     };
     use crypto::{Hash, PublicKey};
     use storage::{base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
@@ -364,47 +400,41 @@ mod tests {
         let snap = database.snapshot();
 
         let core_ver = StorageVersion::current();
-        assert_matches!(
-            StorageVersion::read(snap),
-            StorageVersion::Supported(ver) if ver == core_ver
-        );
+
+        let read = StorageVersion::read(snap);
+        assert!(read.is_ok());
+        assert_eq!(read.unwrap(), core_ver);
     }
 
     #[test]
     fn test_storage_version_read() {
-        use super::StorageVersion::*;
-
         let database = MemoryDB::new();
         {
-            let ver = 1337;
+            let ver = StorageVersion { version: 1337 };
             let mut fork = database.fork();
             set_storage_version(&mut fork, ver);
 
-            assert_matches!(
-                StorageVersion::read(fork),
-                Unsupported(v) if v == ver
-            );
+            assert!(StorageVersion::read(fork).is_err());
         }
 
         {
             let ver = CORE_STORAGE_VERSION;
             let mut fork = database.fork();
-            set_storage_version(&mut fork, ver);
+            set_storage_version(&mut fork, ver.clone());
 
-            assert_matches!(
-                StorageVersion::read(fork),
-                Supported(v) if v == ver
-            );
+            let read = StorageVersion::read(fork);
+            assert!(read.is_ok());
+            assert_eq!(read.unwrap(), ver)
         }
 
         {
             let snap = database.snapshot();
 
-            assert_matches!(StorageVersion::read(snap), Unspecified);
+            assert!(StorageVersion::read(snap).is_err());
         }
     }
 
-    fn set_storage_version(view: &mut Fork, ver: VersionValue) {
+    fn set_storage_version(view: &mut Fork, ver: StorageVersion) {
         let mut metadata = BaseIndex::indexes_metadata(view);
         metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), ver);
     }

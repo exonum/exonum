@@ -65,9 +65,6 @@ extern crate lazy_static;
 extern crate tempdir;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
 
 #[macro_use]
 pub mod encoding;
