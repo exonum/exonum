@@ -7,9 +7,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
- - A method `iter` in the `BaseIndex` module has been become unified and
-   a method `iter_from` has been removed. 
-   A method `iter` has changed a signature in trait `Snapshot`. (#772)
+- A method `iter` in the `BaseIndex` module has been become unified and
+  a method `iter_from` has been removed. 
+  A method `iter` has changed a signature in trait `Snapshot`. (#772)
 
 #### exonum
 
