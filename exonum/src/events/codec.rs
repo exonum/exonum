@@ -34,17 +34,13 @@ impl Decoder for MessagesCodec {
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        unimplemented!();
-        // Read header
-        /*if buf.len() < HEADER_LENGTH {
+        use byteorder::ByteOrder;
+        const U32_SIZE: usize = 4;
+
+        if buf.len() < U32_SIZE {
             return Ok(None);
         }
 
-        if buf[0] != 0 {
-            return Err(other_error("Message first byte must be set to 0"));
-        }
-
-        // Check payload len
         let total_len = LittleEndian::read_u32(&buf) as usize;
 
         if total_len as u32 > self.max_message_len {
@@ -55,23 +51,14 @@ impl Decoder for MessagesCodec {
             );
         }
 
-        if total_len < HEADER_LENGTH {
-            bail!(
-                "Received malicious message with insufficient \
-                size in header: {}, expected header size {}",
-                total_len,
-                HEADER_LENGTH
-            );
-        }
-
         // Read message
         if buf.len() + 4 >= total_len {
-            buf.advance(4); //ignore total_len
+            buf.advance(4); //ignore buffer len
             let data = buf.split_to(total_len).to_vec();
             let raw = UncheckedBuffer::new(data);
             return Ok(Some(raw));
         }
-        Ok(None) */
+        Ok(None)
     }
 }
 
@@ -80,11 +67,9 @@ impl Encoder for MessagesCodec {
     type Error = Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        /*let buffer = msg.into_buffer()?;
-        buf.write_u32::<LittleEndian>(buffer.len() as u32);
+        let buffer = msg.to_vec();
+        LittleEndian::write_u32(&mut *buf, buffer.len() as u32);
         buf.extend_from_slice(&buffer);
-        */
-        unimplemented!();
         Ok(())
     }
 }

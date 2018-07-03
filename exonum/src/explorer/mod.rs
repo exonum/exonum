@@ -27,7 +27,7 @@ use std::slice;
 
 use crypto::{CryptoHash, Hash};
 use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
-                 TransactionResult, TxLocation};
+                 TransactionResult, TxLocation, TransactionMessage};
 use encoding;
 use helpers::Height;
 use messages::{Precommit, Message, RawTransaction, SignedMessage};
@@ -269,19 +269,18 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// The type parameter corresponds to some representation of `Box<Transaction>`.
 /// This generalization is needed to deserialize the type, e.g.,
 /// by using `BlockWithTransactions<serde_json::Value>`.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: SerializeContent"))]
-pub struct BlockWithTransactions<T = Box<Transaction>> {
+#[derive(Debug, Serialize)]
+pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
     pub header: Block,
     /// Precommits.
     pub precommits: Vec<Message<Precommit>>,
     /// Transactions in the order they appear in the block.
-    pub transactions: Vec<CommittedTransaction<T>>,
+    pub transactions: Vec<CommittedTransaction>,
 }
 
-impl<T> BlockWithTransactions<T> {
+impl BlockWithTransactions {
     /// Returns the height of this block.
     ///
     /// This method is equivalent to calling `block.header.height()`.
@@ -300,7 +299,7 @@ impl<T> BlockWithTransactions<T> {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> EagerTransactions<T> {
+    pub fn iter(&self) -> EagerTransactions {
         self.transactions.iter()
     }
 }
@@ -308,12 +307,12 @@ impl<T> BlockWithTransactions<T> {
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactions<'a, T> = slice::Iter<'a, CommittedTransaction<T>>;
+pub type EagerTransactions<'a> = slice::Iter<'a, CommittedTransaction>;
 
-impl<T> Index<usize> for BlockWithTransactions<T> {
-    type Output = CommittedTransaction<T>;
+impl Index<usize> for BlockWithTransactions {
+    type Output = CommittedTransaction;
 
-    fn index(&self, index: usize) -> &CommittedTransaction<T> {
+    fn index(&self, index: usize) -> &CommittedTransaction {
         self.transactions.get(index).expect(&format!(
             "Index exceeds number of transactions in block {}",
             self.len()
@@ -321,11 +320,11 @@ impl<T> Index<usize> for BlockWithTransactions<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
-    type Item = &'a CommittedTransaction<T>;
-    type IntoIter = EagerTransactions<'a, T>;
+impl<'a> IntoIterator for &'a BlockWithTransactions {
+    type Item = &'a CommittedTransaction;
+    type IntoIter = EagerTransactions<'a>;
 
-    fn into_iter(self) -> EagerTransactions<'a, T> {
+    fn into_iter(self) -> EagerTransactions<'a> {
         self.iter()
     }
 }
@@ -432,11 +431,9 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: SerializeContent"))]
-pub struct CommittedTransaction<T = Box<Transaction>> {
-    #[serde(serialize_with = "SerializeContent::serialize_content")]
-    content: T,
+#[derive(Debug, Serialize)]
+pub struct CommittedTransaction {
+    content: TransactionMessage,
     location: TxLocation,
     location_proof: ListProof<Hash>,
     #[serde(with = "TxStatus")]
@@ -507,9 +504,9 @@ impl<'a> From<TxStatus<'a>> for TransactionResult {
     }
 }
 
-impl<T> CommittedTransaction<T> {
+impl CommittedTransaction {
     /// Returns the content of the transaction.
-    pub fn content(&self) -> &T {
+    pub fn content(&self) -> &TransactionMessage {
         &self.content
     }
 
@@ -603,66 +600,22 @@ impl<T> CommittedTransaction<T> {
 /// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: SerializeContent"))]
-pub enum TransactionInfo<T = Box<Transaction>> {
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
-        #[serde(serialize_with = "SerializeContent::serialize_content")]
-        content: T,
+        content: TransactionMessage,
     },
 
     /// Transaction is already committed to the blockchain.
-    Committed(CommittedTransaction<T>),
+    Committed(CommittedTransaction),
 }
 
-/// A helper trait functionally equivalent to `serde`'s `Serialize`.
-///
-/// The trait is used to specify bounds on the `Serialize` implementation
-/// in transaction-related types in the `explorer` module, such as [`TransactionInfo`]
-/// and [`CommittedTransaction`].
-///
-/// # Why separate trait?
-///
-/// It is impossible to implement `Serialize` for `Box<Transaction>` (per Rust restrictions).
-/// Similarly, it is impossible to specify `Serialize` as a super-trait for `Transaction`,
-/// as it would render `Transaction` not object-safe. Thus, `SerializeContent` makes
-/// `Box<Transaction>` (as well as types containing transactions) serializable without
-/// needing a manual implementation of `Serialize`.
-///
-/// [`TransactionInfo`]: enum.TransactionInfo.html
-/// [`CommittedTransaction`]: struct.CommittedTransaction.html
-pub trait SerializeContent {
-    /// Serializes content of a transaction with the given serializer.
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer;
-}
-
-impl<T: Serialize> SerializeContent for T {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.serialize(serializer)
-    }
-}
-
-impl SerializeContent for Box<Transaction> {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::Error;
-        unimplemented!();
-
-    }
-}
-
-impl<T> TransactionInfo<T> {
+impl TransactionInfo {
     /// Returns the content of this transaction.
-    pub fn content(&self) -> &T {
+    pub fn content(&self) -> &TransactionMessage {
         match *self {
             TransactionInfo::InPool { ref content } => content,
             TransactionInfo::Committed(ref tx) => tx.content(),
@@ -687,7 +640,7 @@ impl<T> TransactionInfo<T> {
 
     /// Returns a reference to the inner committed transaction if this transaction is committed.
     /// For transactions in pool, returns `None`.
-    pub fn as_committed(&self) -> Option<&CommittedTransaction<T>> {
+    pub fn as_committed(&self) -> Option<&CommittedTransaction> {
         match *self {
             TransactionInfo::Committed(ref tx) => Some(tx),
             _ => None,
@@ -705,7 +658,7 @@ impl<T> TransactionInfo<T> {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(Message<RawTransaction>) -> ParseResult>,
+    transaction_parser: Box<'a + Fn(&Message<RawTransaction>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -728,12 +681,13 @@ impl<'a> BlockchainExplorer<'a> {
         let schema = Schema::new(&self.snapshot);
         let raw_tx = schema.transactions().get(tx_hash)?;
 
-        let content = (self.transaction_parser)(raw_tx.clone());
-        if let Err(e) = content {
-            error!("Error while parsing transaction {:?}: {}", raw_tx, e);
-            return None;
-        }
-        let content = content.unwrap();
+        let content = match TransactionMessage::tx_from_raw(raw_tx, &*self.transaction_parser){
+            Err(e) => {
+                error ! ("Error while parsing transaction {:?}: {}", tx_hash, e);
+                return None;
+            },
+            Ok(v) => v
+        };
 
         if schema.transactions_pool().contains(tx_hash) {
             return Some(TransactionInfo::InPool { content });
@@ -763,7 +717,7 @@ impl<'a> BlockchainExplorer<'a> {
     fn committed_transaction(
         &self,
         tx_hash: &Hash,
-        maybe_content: Option<Box<Transaction>>,
+        maybe_content: Option<TransactionMessage>,
     ) -> CommittedTransaction {
         let schema = Schema::new(&self.snapshot);
 
@@ -785,7 +739,7 @@ impl<'a> BlockchainExplorer<'a> {
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
                 let raw_tx = schema.transactions().get(tx_hash).unwrap();
-                (self.transaction_parser)(raw_tx).unwrap()
+                TransactionMessage::tx_from_raw(raw_tx, &*self.transaction_parser).unwrap()
             }),
 
             location,

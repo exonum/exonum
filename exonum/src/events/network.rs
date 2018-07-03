@@ -366,7 +366,7 @@ impl Listener {
                 .and_then(move |(raw, stream)|{
                     let raw = raw.ok_or_else(|| format_err!("Incomming socket closed."))?;
                     let signed = SignedMessage::verify_buffer(raw)?;
-                    let (payload, message) = signed.to_message().into_parts();
+                    let (payload, message) = signed.into_message().into_parts();
                     match payload {
                         Protocol::Connect(payload) => Ok((Message::from_parts(payload, message)?, stream)),
                         other => bail!(

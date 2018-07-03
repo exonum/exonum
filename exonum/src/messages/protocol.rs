@@ -438,8 +438,8 @@ encoding_struct! {
 }
 
 
-pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol> {}
-impl<T: Debug + Into<Protocol> + PartialEq<Protocol>> ProtocolMessage for T {}
+pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol> + Clone{}
+impl<T: Debug + Into<Protocol> + PartialEq<Protocol> + Clone> ProtocolMessage for T {}
 /*
 pub enum Protocol {
     /// `Connect` message.

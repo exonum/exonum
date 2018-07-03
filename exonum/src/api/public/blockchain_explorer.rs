@@ -125,8 +125,14 @@ impl ExplorerApi {
                 Some(info) => self.ok_response(&::serde_json::to_value(info).unwrap()),
             }
         };
+        let post_transaction = move |req: &mut Request| -> IronResult<Response> {
+           // let PeerAddInfo { ip } = self.parse_body(request)?;
+            //self.node_channel.peer_add(ip).map_err(ApiError::from)?;
+            unimplemented!();
+        };
 
-        router.get("/v1/transactions/:hash", transaction, "hash");
+        router.get("/v1/transaction/:hash", transaction, "hash");
+        router.post("/v1/transaction/", post_transaction, "transaction");
     }
 }
 

@@ -18,7 +18,7 @@ use std::ops::Deref;
 
 use failure::Error;
 
-use ::crypto::PublicKey;
+use ::crypto::{PublicKey, SecretKey};
 
 pub use self::authorisation::SignedMessage;
 pub use self::protocol::*;
@@ -67,6 +67,16 @@ where T: ProtocolMessage
 }
 
 impl<T: ProtocolMessage> Message<T> {
+    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
+        let message = SignedMessage::new(payload.clone(),
+                                         author,
+                                         secret_key)
+            .expect("Serialization error");
+        Message {
+            payload,
+            message
+        }
+    }
 
     pub fn map<U, F>(self, func: F) -> Result<Message<U>, Error>
         where U: ProtocolMessage,
@@ -88,6 +98,10 @@ impl<T: ProtocolMessage> Message<T> {
             payload,
             message,
         })
+    }
+
+    pub fn to_hex_string(&self) -> String {
+        self.message.to_hex_string()
     }
 
     pub fn downgrade(self) -> Message<Protocol> {

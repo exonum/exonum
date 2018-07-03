@@ -34,6 +34,7 @@ extern crate clap;
 extern crate colored;
 extern crate cookie;
 extern crate env_logger;
+extern crate erased_serde;
 #[macro_use]
 extern crate exonum_profiler;
 extern crate exonum_rocksdb as rocksdb;

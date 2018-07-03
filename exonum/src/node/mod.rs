@@ -406,7 +406,13 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = unimplemented!();
+        let connect = Message::new(
+            Connect::new(
+                external_address,
+                system_state.current_time().into(),
+                &user_agent::get()),
+            config.listener.consensus_public_key,
+            &config.listener.consensus_secret_key);
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
@@ -441,12 +447,8 @@ impl NodeHandler {
     }
 
     fn sign_message<T: ProtocolMessage>(&self, message: T) -> Message<T> {
-        /*let message = SignedMessage::new(message,
-                           *self.state.consensus_public_key(),
-                           self.state.consensus_secret_key()).unwrap();
-
-        let (protocol, signed) = message.to_message().into_parts();*/
-        unimplemented!();
+        Message::new(message, *self.state.consensus_public_key(),
+                           self.state.consensus_secret_key())
     }
 
     /// Return internal `SharedNodeState`
@@ -560,7 +562,6 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-        unimplemented!()
         // self.send_to_addr(address, connect);
     }
 

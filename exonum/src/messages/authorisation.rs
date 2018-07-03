@@ -13,9 +13,10 @@ use storage::StorageValue;
 use super::protocol::{Protocol, ProtocolMessage};
 use super::{PROTOCOL_MAJOR_VERSION, MAX_MESSAGE_SIZE};
 
+use encoding::serialize::encode_hex;
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct AuthorisedMessage {
-    pub reserved: u8,
     pub version: u8,
     pub author: PublicKey,
     pub protocol: Protocol
@@ -24,7 +25,6 @@ pub struct AuthorisedMessage {
 impl AuthorisedMessage {
     fn new<T: Into<Protocol>>(value: T, author: PublicKey) -> Result<Self, Error> {
         Ok(AuthorisedMessage {
-            reserved: 0,
             version: PROTOCOL_MAJOR_VERSION,
             author,
             protocol: value.into(),
@@ -65,11 +65,15 @@ impl SignedMessage {
         Ok(message)
     }
 
-    pub fn into_buffer(self) -> Result<Vec<u8>, Error> {
-        Ok(::bincode::config().no_limit().serialize(&self)?)
+    pub fn to_vec(&self) -> Vec<u8> {
+        ::bincode::config().no_limit().serialize(&self).expect("Could not serialize SignedMessage.")
     }
 
-    pub fn to_message(self) -> Message {
+    pub fn to_hex_string(&self) -> String {
+        encode_hex(&self.to_vec())
+    }
+
+    pub fn into_message(self) -> Message {
         Message {
             payload: self.authorised_message.protocol.clone(),
             message: self
@@ -104,7 +108,7 @@ impl SignedMessage {
 
 impl StorageValue for SignedMessage {
     fn into_bytes(self) -> Vec<u8> {
-        self.into_buffer().expect("Serialisation failed")
+        self.to_vec()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {

@@ -44,19 +44,37 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 /// framework) that can be obtained through `Schema`'s `transaction_statuses` method.
 pub type TransactionResult = Result<(), TransactionError>;
 
-
+#[derive(Serialize)]
 pub struct TransactionMessage {
-    logic: Box<Transaction>,
-    originam_message: Message<RawTransaction>
+    transaction: Box<Transaction>,
+    message: Message<RawTransaction>
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-        unimplemented!()
+        fmt.debug_struct("TransactionMessage")
+            .field("debug", &self.transaction)
+            .field("message", &self.message.to_hex_string())
+            .finish()
     }
 }
 impl TransactionMessage {
     pub fn raw(&self) -> &Message<RawTransaction> {
-        unimplemented!()
+        &self.message
+    }
+    pub fn tx_from_raw<F>(message: Message<RawTransaction>, parser: &F)
+        -> Result<Self,::encoding::Error>
+        where F: ?Sized + Fn(&Message<RawTransaction>) ->  Result<Box<Transaction>, ::encoding::Error> {
+        let transaction = parser(&message)?;
+        Ok(TransactionMessage {
+            transaction,
+            message
+        })
+    }
+}
+impl ::serde::Serialize for Box<Transaction> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: ::serde::Serializer {
+        ::erased_serde::serialize(&self, serializer)
     }
 }
 
@@ -66,7 +84,7 @@ impl TransactionMessage {
 /// See also [the documentation page on transactions][doc:transactions].
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
-pub trait Transaction: ::std::fmt::Debug + Send + 'static {
+pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
     /// Verifies the internal consistency of the transaction. `verify` should usually include
     /// checking the message signature (via [`verify_signature`]) and, possibly,
     /// other internal constraints. `verify` has no access to the blockchain state;

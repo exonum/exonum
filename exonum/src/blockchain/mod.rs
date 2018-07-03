@@ -52,6 +52,7 @@ use std::sync::Arc;
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
 use std::error::Error as StdError;
+use std::ops::Deref;
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use messages::{Connect, Precommit, Protocol, SignedMessage,
@@ -142,12 +143,12 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: Message<RawTransaction>) -> Result<Box<Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: &Message<RawTransaction>) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
             .ok_or_else(|| MessageError::from("Service not found."))?;
-        service.tx_from_raw(raw.into_parts().0)
+        service.tx_from_raw(raw.deref().clone())
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -362,7 +363,7 @@ impl Blockchain {
                 .get(&tx_hash)
                 .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
-            self.tx_from_raw(tx).or_else(|error| {
+            self.tx_from_raw(&tx).or_else(|error| {
                 Err(failure::err_msg(format!(
                     "{}, tx: {:?}",
                     error.description(),
