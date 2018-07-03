@@ -179,12 +179,12 @@ impl StorageVersion {
         serde_json::from_slice(serialized)
     }
 
-    pub(crate) fn write_current(view: &mut Fork) {
+    pub fn write_current(view: &mut Fork) {
         let mut metadata = BaseIndex::indexes_metadata(view);
         metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), Self::current());
     }
 
-    pub(crate) fn read<T: AsRef<dyn Snapshot>>(view: T) -> Result<Self, super::Error> {
+    pub fn read<T: AsRef<dyn Snapshot>>(view: T) -> Result<Self, super::Error> {
         let metadata = BaseIndex::indexes_metadata(view);
         match metadata.get::<_, Self>(CORE_STORAGE_VERSION_KEY) {
             Some(ref ver) if *ver == CORE_STORAGE_VERSION => Ok(ver.clone()),
