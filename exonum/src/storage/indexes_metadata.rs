@@ -26,10 +26,11 @@ use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
-// Value of this constant is to be incremented manually
+// Storage metadata of a current Exonum version.
+// Value of this constant is to be changed manually
 // upon the introduction of breaking changes to the storage.
-const CORE_STORAGE_VERSION: StorageMetadata = StorageMetadata { version: 0 };
-const CORE_STORAGE_VERSION_KEY: &str = "__STORAGE_VERSION__";
+const CORE_STORAGE_METADATA: StorageMetadata = StorageMetadata { version: 0 };
+const CORE_STORAGE_METADATA_KEY: &str = "__STORAGE_METADATA__";
 
 encoding_struct! {
     struct IndexMetadata {
@@ -168,7 +169,7 @@ pub(crate) struct StorageMetadata {
 
 impl StorageMetadata {
     pub fn current() -> Self {
-        CORE_STORAGE_VERSION
+        CORE_STORAGE_METADATA
     }
 
     pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
@@ -181,13 +182,13 @@ impl StorageMetadata {
 
     pub fn write_current(view: &mut Fork) {
         let mut metadata = BaseIndex::indexes_metadata(view);
-        metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), Self::current());
+        metadata.put(&CORE_STORAGE_METADATA_KEY.to_owned(), Self::current());
     }
 
     pub fn read<T: AsRef<dyn Snapshot>>(view: T) -> Result<Self, super::Error> {
         let metadata = BaseIndex::indexes_metadata(view);
-        match metadata.get::<_, Self>(CORE_STORAGE_VERSION_KEY) {
-            Some(ref ver) if *ver == CORE_STORAGE_VERSION => Ok(ver.clone()),
+        match metadata.get::<_, Self>(CORE_STORAGE_METADATA_KEY) {
+            Some(ref ver) if *ver == CORE_STORAGE_METADATA => Ok(ver.clone()),
             Some(ref ver) => Err(super::Error::new(format!(
                 "Unsupported storage version: [{}]. Current storage version: [{}].",
                 ver,
@@ -225,7 +226,7 @@ impl fmt::Display for StorageMetadata {
 }
 
 pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: &mut Fork) {
-    if name == INDEXES_METADATA_TABLE_NAME || name == CORE_STORAGE_VERSION_KEY {
+    if name == INDEXES_METADATA_TABLE_NAME || name == CORE_STORAGE_METADATA_KEY {
         panic!("Attempt to access an internal storage infrastructure");
     }
     let mut metadata = BaseIndex::indexes_metadata(view);
@@ -237,8 +238,8 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 #[cfg(test)]
 mod tests {
     use super::{
-        IndexMetadata, IndexType, StorageMetadata, CORE_STORAGE_VERSION, CORE_STORAGE_VERSION_KEY,
-        INDEXES_METADATA_TABLE_NAME,
+        IndexMetadata, IndexType, StorageMetadata, CORE_STORAGE_METADATA,
+        CORE_STORAGE_METADATA_KEY, INDEXES_METADATA_TABLE_NAME,
     };
     use crypto::{Hash, PublicKey};
     use storage::{base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
@@ -418,7 +419,7 @@ mod tests {
         }
 
         {
-            let ver = CORE_STORAGE_VERSION;
+            let ver = CORE_STORAGE_METADATA;
             let mut fork = database.fork();
             set_storage_version(&mut fork, ver.clone());
 
@@ -436,6 +437,6 @@ mod tests {
 
     fn set_storage_version(view: &mut Fork, ver: StorageMetadata) {
         let mut metadata = BaseIndex::indexes_metadata(view);
-        metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), ver);
+        metadata.put(&CORE_STORAGE_METADATA_KEY.to_owned(), ver);
     }
 }
