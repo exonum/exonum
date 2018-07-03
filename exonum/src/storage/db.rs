@@ -309,7 +309,7 @@ pub trait Snapshot: 'static {
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
+    fn iter<'a>(&'a self, name: &str, from: Option<&[u8]>) -> Iter<'a>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -348,8 +348,11 @@ impl Snapshot for Fork {
         self.snapshot.contains(name, key)
     }
 
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        let range = (Included(from), Unbounded);
+    fn iter<'a>(&'a self, name: &str, from: Option<&[u8]>) -> Iter<'a> {
+        let range = match from {
+            Some(from) => (Included(from), Unbounded),
+            None => (Unbounded, Unbounded),
+        };
         let changes = match self.patch.changes(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
@@ -466,8 +469,7 @@ impl Fork {
             changes.data.clear();
         }
         // Remove from storage
-        let mut iter = self.snapshot
-            .iter(name, prefix.map_or(&[], |k| k.as_slice()));
+        let mut iter = self.snapshot.iter(name, prefix.map(|k| k.as_slice()));
         while let Some((k, ..)) = iter.next() {
             let change = changes.data.insert(k.to_vec(), Change::Delete);
             if self.logged {

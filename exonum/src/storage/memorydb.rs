@@ -96,12 +96,12 @@ impl Snapshot for MemoryDB {
             .map_or(false, |table| table.contains_key(key))
     }
 
-    fn iter(&self, name: &str, from: &[u8]) -> Iter {
+    fn iter(&self, name: &str, from: Option<&[u8]>) -> Iter {
         let map_guard = self.map.read().unwrap();
         let data = match map_guard.get(name) {
             Some(table) => table
                 .iter()
-                .skip_while(|&(k, _)| k.as_slice() < from)
+                .skip_while(|&(k, _)| k.as_slice() < from.unwrap_or(&[]))
                 .map(|(k, v)| (k.to_vec(), v.to_vec()))
                 .collect(),
             None => Vec::new(),
