@@ -197,7 +197,6 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<'a, T> SegmentField<'a> for Vec<T>
 where
     T: Field<'a>,
@@ -216,7 +215,7 @@ where
     // but this is possible only after specialization land. (ECR-156)
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
         // read vector len
-        let mut vec = Self::with_capacity(count as usize);
+        let mut vec = Vec::with_capacity(count as usize);
         let mut start = from;
         for _ in 0..count {
             vec.push(T::read(buffer, start, start + Self::item_size()));

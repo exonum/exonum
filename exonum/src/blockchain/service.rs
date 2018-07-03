@@ -518,7 +518,6 @@ impl SharedNodeState {
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<'a, S: Service> From<S> for Box<dyn Service + 'a> {
     fn from(s: S) -> Self {
         Box::new(s) as Self

@@ -49,7 +49,7 @@ pub struct SystemApi {
 impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
     pub fn new(shared_api_state: SharedNodeState) -> Self {
-        SystemApi { shared_api_state }
+        Self { shared_api_state }
     }
 
     fn handle_mempool_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {

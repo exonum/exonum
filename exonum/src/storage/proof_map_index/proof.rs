@@ -681,7 +681,7 @@ where
                         }
                     }
                 } else {
-                    // Both children of `branch` do not fit
+                    // Both children of `branch` do not fit.
 
                     let next_hash = *branch.child_hash(next_bit);
                     match next_bit {

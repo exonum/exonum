@@ -18,15 +18,15 @@
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
-//#![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
-//#![cfg_attr(feature = "cargo-clippy", allow(stutter, similar_names, items_after_statements))]
-//#![cfg_attr(
-//    feature = "cargo-clippy",
-//    allow(
-//        use_self, cast_possible_truncation, replace_consts, enum_glob_use, cast_sign_loss,
-//        used_underscore_binding, cast_possible_wrap, single_match_else, filter_map
-//    )
-//)]
+#![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
+#![cfg_attr(
+    feature = "cargo-clippy",
+    allow(
+          stutter, similar_names, items_after_statements, use_self,
+          cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
+          pub_enum_variant_names
+    )
+)]
 
 extern crate actix;
 extern crate actix_web;

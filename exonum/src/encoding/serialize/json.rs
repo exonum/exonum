@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//#![cfg_attr(feature = "cargo-clippy", allow(use_self))]
-
 use bit_vec::BitVec;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hex::FromHex;
@@ -318,7 +316,6 @@ impl<'a> ExonumJson for &'a [u8] {
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl ExonumJson for Vec<RawMessage> {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -328,7 +325,7 @@ impl ExonumJson for Vec<RawMessage> {
     ) -> Result<(), Box<dyn Error>> {
         use messages::MessageBuffer;
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Self = Self::new();
+        let mut vec: Vec<_> = Vec::new();
         for el in bytes {
             let string = el.as_str().ok_or("Can't cast json as string")?;
             let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
@@ -353,7 +350,7 @@ where
 {
     fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>> {
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Self = Self::new();
+        let mut vec: Vec<_> = Vec::new();
         for el in bytes {
             let obj = T::deserialize(el)?;
             vec.push(obj);
@@ -365,7 +362,6 @@ where
 
 // TODO: Remove `ExonumJsonDeserialize` needs
 // after it remove impl `ExonumJsonDeserialize` for all types expect struct. (ECR-156)
-#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<T> ExonumJson for Vec<T>
 where
     T: ExonumJsonDeserialize + ExonumJson,

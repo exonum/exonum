@@ -186,7 +186,7 @@ pub struct ProofPath {
 }
 
 impl ProofPath {
-    /// Create a path from the given key.
+    /// Creates a path from the given key.
     pub fn new<K: ProofMapKey>(key: &K) -> Self {
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;

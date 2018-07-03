@@ -274,7 +274,6 @@ impl TransactionError {
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(use_self))]
 impl<'a, T: Transaction> From<T> for Box<dyn Transaction + 'a> {
     fn from(tx: T) -> Self {
         Box::new(tx) as Self
