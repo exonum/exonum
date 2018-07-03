@@ -19,26 +19,32 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::node::{
-        private::NodeInfo, public::system::{ConsensusStatusInfo, HealthCheckInfo},
+        private::NodeInfo, public::system::{ConsensusStatus, ConnectivityStatus, HealthCheckInfo},
     },
     helpers::user_agent, messages::PROTOCOL_MAJOR_VERSION,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
-fn test_healthcheck_connectivity_false() {
+fn healthcheck() {
+    // This test checks whether the endpoint returns expected result and correctness of
+    // serialize.
+    // Expected:
+    // consensus - enabled
+    // connectivity - not connected, due to testkit unable to emulate nodes properly.
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
     let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
     let expected = HealthCheckInfo {
-        connectivity: false,
+        consensus_status: ConsensusStatus::Enabled,
+        connectivity: ConnectivityStatus::NotConnected,
     };
     assert_eq!(info, expected);
 }
 
 #[test]
-fn test_user_agent_info() {
+fn user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
@@ -48,7 +54,7 @@ fn test_user_agent_info() {
 }
 
 #[test]
-fn test_network() {
+fn network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
@@ -59,19 +65,7 @@ fn test_network() {
 }
 
 #[test]
-fn test_consensus_status_false() {
-    let testkit = TestKitBuilder::validator().create();
-    let api = testkit.api();
-
-    let info: ConsensusStatusInfo = api.public(ApiKind::System)
-        .get("v1/consensus_status")
-        .unwrap();
-    let expected = ConsensusStatusInfo { status: false };
-    assert_eq!(info, expected);
-}
-
-#[test]
-fn test_shutdown() {
+fn shutdown() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
 
