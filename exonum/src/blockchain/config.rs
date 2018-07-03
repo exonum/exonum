@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
-use storage::{self, StorageValue};
+use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -59,8 +59,6 @@ pub struct StoredConfiguration {
     /// configuration will not take effect at all; the old configuration will
     /// remain actual.
     pub actual_from: Height,
-    /// Core storage version.
-    pub storage_version: u64,
     /// List of validators consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
@@ -222,15 +220,6 @@ impl StoredConfiguration {
             ));
         }
 
-        // Check storage_version.
-        if config.storage_version != storage::StorageVersion::current() {
-            return Err(JsonError::custom(format!(
-                "storage_version({}) must be the same with storage version set in the core ({})",
-                config.storage_version,
-                storage::StorageVersion::current(),
-            )));
-        }
-
         Ok(config)
     }
 }
@@ -258,7 +247,6 @@ mod tests {
 
     use super::*;
     use crypto::{gen_keypair_from_seed, Seed};
-    use storage;
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
@@ -274,7 +262,6 @@ mod tests {
         let toml_content = r#"
             previous_cfg_hash = "0000000000000000000000000000000000000000000000000000000000000000"
             actual_from = 42
-            storage_version = 0
 
             [[validator_keys]]
             consensus_key = "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
@@ -364,7 +351,6 @@ mod tests {
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
             majority_count: None,
-            storage_version: storage::StorageVersion::current(),
         }
     }
 

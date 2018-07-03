@@ -169,17 +169,17 @@ impl Blockchain {
     }
 
     /// Returns the latest committed block.
-    ///
-    /// # Panics
-    ///
-    /// * If the genesis block was not committed.
-    /// * If storage version is not specified or not supported.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block()
     }
 
     /// Creates and commits the genesis block with the given genesis configuration
     /// if the blockchain has not been initialized.
+    ///
+    /// # Panics
+    ///
+    /// * If the genesis block was not committed.
+    /// * If storage version is not specified or not supported.
     pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let has_genesis_block = !Schema::new(&self.snapshot())
             .block_hashes_by_height()
@@ -238,7 +238,6 @@ impl Blockchain {
             consensus: cfg.consensus,
             services: BTreeMap::new(),
             majority_count: None,
-            storage_version: storage::StorageVersion::current(),
         };
 
         let patch = {
