@@ -24,10 +24,8 @@ use self::iron::status::Status;
 use self::iron::{Handler, IronError};
 use self::router::Router;
 use exonum::api::{Api, ApiError};
-use exonum::blockchain::{
-    ApiContext, Blockchain, ExecutionResult, Schema as CoreSchema, Service, Transaction,
-    TransactionSet,
-};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionResult, Schema as CoreSchema, Service,
+                         Transaction, TransactionSet};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::encoding::serialize::FromHex;

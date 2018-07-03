@@ -18,8 +18,8 @@ extern crate futures;
 extern crate serde_json;
 extern crate tokio_timer;
 
-use futures::sync::oneshot;
 use futures::Future;
+use futures::sync::oneshot;
 use serde_json::Value;
 use tokio_timer::Timer;
 

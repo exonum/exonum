@@ -14,48 +14,77 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure::Error;
-use messages::{SignedMessage, UncheckedBuffer};
 use tokio_io::codec::{Decoder, Encoder};
+
+use std::io;
+
+use super::error::other_error;
+use events::noise::wrapper::NOISE_HEADER_LENGTH;
+use events::noise::wrapper::NoiseWrapper;
+use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
+
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
     max_message_len: u32,
+    /// Noise session to encrypt/decrypt messages.
+    session: NoiseWrapper,
 }
 
 impl MessagesCodec {
-    pub fn new(max_message_len: u32) -> MessagesCodec {
-        MessagesCodec { max_message_len }
+    pub fn new(max_message_len: u32, session: NoiseWrapper) -> MessagesCodec {
+        MessagesCodec {
+            max_message_len,
+            session,
+        }
     }
 }
 
 impl Decoder for MessagesCodec {
-    type Item = UncheckedBuffer;
-    type Error = Error;
+    type Item = RawMessage;
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        use byteorder::ByteOrder;
-        const U32_SIZE: usize = 4;
-
-        if buf.len() < U32_SIZE {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, io::Error> {
+        // Read header
+        if buf.len() < HEADER_LENGTH {
             return Ok(None);
         }
 
-        let total_len = LittleEndian::read_u32(&buf) as usize;
+        let len = LittleEndian::read_u32(buf) as usize;
+
+        // To fix some weird `decode()` behavior https://github.com/carllerche/bytes/issues/104
+        if buf.len() < len + NOISE_HEADER_LENGTH {
+            return Ok(None);
+        }
+
+        let mut buf = self.session.decrypt_msg(len, buf)?;
+
+        if buf[0] != 0 {
+            return Err(other_error("Message first byte must be set to 0"));
+        }
+
+        // Check payload len
+        let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
 
         if total_len as u32 > self.max_message_len {
-            bail!(
+            return Err(other_error(format!(
                 "Received message is too long: {}, maximum allowed length is {} bytes",
-                total_len,
-                self.max_message_len,
-            );
+                total_len, self.max_message_len,
+            )));
+        }
+
+        if total_len < HEADER_LENGTH {
+            return Err(other_error(format!(
+                "Received malicious message with insufficient \
+                 size in header: {}, expected header size {}",
+                total_len, HEADER_LENGTH
+            )));
         }
 
         // Read message
-        if buf.len() + 4 >= total_len {
-            buf.advance(4); //ignore buffer len
+        if buf.len() >= total_len {
             let data = buf.split_to(total_len).to_vec();
-            let raw = UncheckedBuffer::new(data);
+            let raw = RawMessage::new(MessageBuffer::from_vec(data));
             return Ok(Some(raw));
         }
         Ok(None)
@@ -63,13 +92,11 @@ impl Decoder for MessagesCodec {
 }
 
 impl Encoder for MessagesCodec {
-    type Item = SignedMessage;
-    type Error = Error;
+    type Item = RawMessage;
+    type Error = io::Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        let buffer = msg.to_vec();
-        LittleEndian::write_u32(&mut *buf, buffer.len() as u32);
-        buf.extend_from_slice(&buffer);
+    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> io::Result<()> {
+        self.session.encrypt_msg(msg.as_ref(), buf)?;
         Ok(())
     }
 }
@@ -79,17 +106,21 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
+    use crypto::{gen_keypair_from_seed, Seed};
+    use events::noise::HandshakeParams;
+    use events::noise::wrapper::NoiseWrapper;
     use messages::{MessageBuffer, RawMessage};
-    use tokio_io::codec::Decoder;
+    use tokio_io::codec::{Decoder, Encoder};
 
     #[test]
     fn decode_message_valid_header_size() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
-        let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec {
-            max_message_len: 10000,
-        };
-        match codec.decode(&mut bytes) {
+        let mut bytes: BytesMut = BytesMut::new();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data.clone()));
+        initiator.encode(raw, &mut bytes).unwrap();
+
+        match responder.decode(&mut bytes) {
             Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
             _ => panic!("Wrong input"),
         };
@@ -98,20 +129,71 @@ mod test {
     #[test]
     fn decode_message_small_size_in_header() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec {
-            max_message_len: 10000,
-        };
-        assert!(codec.decode(&mut bytes).is_err());
+        let mut bytes: BytesMut = BytesMut::new();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data));
+        initiator.encode(raw, &mut bytes).unwrap();
+
+        assert!(responder.decode(&mut bytes).is_err());
     }
 
     #[test]
     fn decode_message_zero_byte() {
         let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
-        let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec {
-            max_message_len: 10000,
+        let mut bytes: BytesMut = BytesMut::new();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data));
+
+        initiator.encode(raw, &mut bytes).unwrap();
+        assert!(responder.decode(&mut bytes).is_err());
+    }
+
+    fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+
+        let params = HandshakeParams {
+            public_key,
+            secret_key,
+            max_message_len: 1024,
         };
-        assert!(codec.decode(&mut bytes).is_err());
+
+        let mut initiator = NoiseWrapper::initiator(&params).session;
+        let mut responder = NoiseWrapper::responder(&params).session;
+
+        let mut buffer_msg = vec![0u8; 1024];
+        let mut buffer_out = [0u8; 1024];
+
+        // Simple handshake for testing.
+        let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        responder
+            .read_message(&buffer_msg[..len], &mut buffer_out)
+            .unwrap();
+        let len = responder.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        initiator
+            .read_message(&buffer_msg[..len], &mut buffer_out)
+            .unwrap();
+        let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        responder
+            .read_message(&buffer_msg[..len], &mut buffer_out)
+            .unwrap();
+
+        let responder = NoiseWrapper {
+            session: responder.into_transport_mode().unwrap(),
+        };
+        let initiator = NoiseWrapper {
+            session: initiator.into_transport_mode().unwrap(),
+        };
+
+        let responder_codec = MessagesCodec {
+            max_message_len: 10000,
+            session: initiator,
+        };
+
+        let initiator_codec = MessagesCodec {
+            max_message_len: 10000,
+            session: responder,
+        };
+
+        (responder_codec, initiator_codec)
     }
 }

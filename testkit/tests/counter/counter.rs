@@ -18,12 +18,11 @@ extern crate bodyparser;
 extern crate iron;
 extern crate router;
 
-use self::iron::{prelude::*, Handler};
+use self::iron::{Handler, prelude::*};
 use self::router::Router;
 use exonum::api::{Api, ApiError};
-use exonum::blockchain::{
-    ApiContext, Blockchain, ExecutionError, ExecutionResult, Service, Transaction, TransactionSet,
-};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Service,
+                         Transaction, TransactionSet};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::messages::{Message, RawTransaction};

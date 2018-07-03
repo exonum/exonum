@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of `Error` type.
+#[macro_use]
+extern crate criterion;
+#[macro_use]
+extern crate exonum;
+extern crate futures;
+extern crate num;
+extern crate rand;
+extern crate tempdir;
 
-/// The error type for I/O operations with storage.
-#[derive(Fail, Debug, Clone)]
-#[fail(display = "{}", message)]
-pub struct Error {
-    message: String,
-}
+use block::bench_block;
+use criterion::Criterion;
+use crypto::bench_crypto;
+use storage::bench_storage;
+mod block;
+mod crypto;
+mod storage;
 
-impl Error {
-    /// Creates a new storage error with an information message about the reason.
-    pub(crate) fn new<T: Into<String>>(message: T) -> Error {
-        Error {
-            message: message.into(),
-        }
-    }
-}
+criterion_group!(benches, bench_crypto, bench_block, bench_storage);
+criterion_main!(benches);

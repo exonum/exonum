@@ -23,13 +23,12 @@ use std::net::SocketAddr;
 use std::ops::Deref;
 use std::time::{Duration, SystemTime};
 
-use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction, SignedMessage,
 };
-use node::timeout_adjuster::{Constant, Dynamic, MovingAverage, TimeoutAdjuster};
 use node::whitelist::Whitelist;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
@@ -69,7 +68,7 @@ pub struct State {
     locked_propose: Option<Hash>,
     last_hash: Hash,
 
-    // messages
+    // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), Votes<Message<Prevote>>>,
@@ -83,12 +82,12 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node height in consensus messages
+    // Maximum of node height in consensus messages.
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
-    timeout_adjuster: Box<TimeoutAdjuster>,
+    // Current value of the propose timeout.
     propose_timeout: Milliseconds,
 }
 
@@ -406,8 +405,7 @@ impl State {
 
             requests: HashMap::new(),
 
-            timeout_adjuster: make_timeout_adjuster(&stored.consensus),
-            propose_timeout: 0,
+            propose_timeout: stored.consensus.max_propose_timeout,
             config: stored,
         }
     }
@@ -499,13 +497,11 @@ impl State {
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
-        self.timeout_adjuster = make_timeout_adjuster(&config.consensus);
         self.config = config;
     }
 
-    /// Adjusts propose timeout (see `TimeoutAdjuster` for the details).
-    pub fn adjust_timeout(&mut self, snapshot: &Snapshot) {
-        let timeout = self.timeout_adjuster.adjust_timeout(snapshot);
+    /// Sets a new propose timeout value.
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         self.propose_timeout = timeout;
     }
 
@@ -1053,28 +1049,5 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Message<Connect>) {
         self.our_connect_message = msg;
-    }
-}
-
-fn make_timeout_adjuster(config: &ConsensusConfig) -> Box<TimeoutAdjuster> {
-    match config.timeout_adjuster {
-        TimeoutAdjusterConfig::Constant { timeout } => Box::new(Constant::new(timeout)),
-        TimeoutAdjusterConfig::Dynamic {
-            min,
-            max,
-            threshold,
-        } => Box::new(Dynamic::new(min, max, threshold)),
-        TimeoutAdjusterConfig::MovingAverage {
-            min,
-            max,
-            adjustment_speed,
-            optimal_block_load,
-        } => Box::new(MovingAverage::new(
-            min,
-            max,
-            adjustment_speed,
-            config.txs_block_limit,
-            optimal_block_load,
-        )),
     }
 }

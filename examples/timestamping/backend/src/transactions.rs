@@ -21,8 +21,8 @@ use exonum::messages::Message;
 use exonum::storage::Fork;
 use exonum_time::schema::TimeSchema;
 
-use schema::{Schema, Timestamp, TimestampEntry};
 use TIMESTAMPING_SERVICE;
+use schema::{Schema, Timestamp, TimestampEntry};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]

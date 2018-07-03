@@ -120,8 +120,8 @@ pub mod keys {
 
     use toml;
 
-    use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
     use super::ContextKey;
+    use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
     use node::NodeConfig;
 
     /// Configuration for this node.

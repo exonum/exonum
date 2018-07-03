@@ -15,9 +15,8 @@
 use bodyparser;
 use exonum::api::ApiError;
 use exonum::blockchain::{SharedNodeState, Transaction};
-use exonum::node::{
-    create_private_api_handler, create_public_api_handler, ApiSender, TransactionSend,
-};
+use exonum::node::{create_private_api_handler, create_public_api_handler, ApiSender,
+                   TransactionSend};
 use iron::headers::{ContentType, Headers};
 use iron::status::{self, StatusClass};
 use iron::{Chain, Handler, IronError, IronResult, Plugin, Request, Response};

@@ -57,7 +57,14 @@ impl<T> ContextKey<T> {
 
 /// Constructs a `ContextKey` from a given name.
 ///
+/// For additional information refer to
+/// [`exonum:helpers:fabric:ContextKey`].
+///
+/// [`exonum:helpers:fabric:ContextKey`]: ./helpers/fabric/struct.ContextKey.html
+///
 /// # Examples
+///
+/// The example below creates a constant using the `ContextKey` macro.
 ///
 /// ```
 /// #[macro_use]

@@ -24,9 +24,8 @@ use super::timestamping::{TimestampTx, TimestampingTxGenerator};
 use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{
-    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction,
-};
+use messages::{Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
+               RawTransaction};
 use storage::Database;
 
 pub type TimestampingSandbox = Sandbox;

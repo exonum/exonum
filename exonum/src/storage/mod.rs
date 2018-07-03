@@ -109,10 +109,8 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
-pub use self::db::{
-    Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
-    Snapshot,
-};
+pub use self::db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
+                   PatchIterator, Snapshot};
 pub use self::error::Error;
 
 pub use self::memorydb::MemoryDB;

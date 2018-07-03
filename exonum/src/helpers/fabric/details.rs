@@ -24,16 +24,15 @@ use std::fs;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
+use super::DEFAULT_EXONUM_LISTEN_PORT;
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::keys;
-use super::shared::{
-    AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
-};
-use super::DEFAULT_EXONUM_LISTEN_PORT;
+use super::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
+                    SharedConfig};
 use super::{Argument, CommandName, Context};
-use blockchain::{config::ValidatorKeys, GenesisConfig};
+use blockchain::{GenesisConfig, config::ValidatorKeys};
 use crypto;
-use helpers::{config::ConfigFile, generate_testnet_config};
+use helpers::{generate_testnet_config, config::ConfigFile};
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 

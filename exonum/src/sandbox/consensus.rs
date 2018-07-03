@@ -27,16 +27,12 @@ use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SER
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
-use messages::{
-    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
-    TransactionsResponse, CONSENSUS,
-};
+use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+               TransactionsResponse, CONSENSUS};
 use node;
-use node::state::{
-    BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-    TRANSACTIONS_REQUEST_TIMEOUT,
-};
+use node::state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+                  TRANSACTIONS_REQUEST_TIMEOUT};
 
 // HANDLE CONSENSUS BASIC
 
@@ -728,21 +724,20 @@ fn test_store_txs_positions() {
 /// - reach that first height
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
-// TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-// is fixed.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    sandbox.recv(&Prevote::new(VALIDATOR_3,
-                              HEIGHT_TWO,
-                              ROUND_ONE,
-                              &empty_hash(),
-                              Round::zero(),
-                              sandbox.s(VALIDATOR_3)));
+    sandbox.recv(&Prevote::new(
+        VALIDATOR_3,
+        HEIGHT_TWO,
+        ROUND_ONE,
+        &empty_hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_3),
+    ));
 
     add_one_height(&sandbox, &sandbox_state);
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
@@ -757,13 +752,9 @@ fn test_queue_prevote_message_from_next_height() {
 /// - and observe Prevote for queued Propose
 /// check line from `NodeHandler.handle_consensus()`
 /// case `msg.height() == self.state.height() + 1`
-// TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-// is fixed.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
-
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
@@ -780,23 +771,29 @@ fn test_queue_propose_message_from_next_height() {
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let future_propose = Propose::new(VALIDATOR_0,
-                                      HEIGHT_TWO,
-                                      ROUND_TWO,
-                                      &block_at_first_height.clone().hash(),
-                                      &[], // there are no transactions in future propose
-                                      sandbox.s(VALIDATOR_0));
+    let future_propose = Propose::new(
+        VALIDATOR_0,
+        HEIGHT_TWO,
+        ROUND_TWO,
+        &block_at_first_height.clone().hash(),
+        &[], // there are no transactions in future propose
+        sandbox.s(VALIDATOR_0),
+    );
 
     sandbox.recv(&future_propose);
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
 
-    info!("last_block={:#?}, hash={:?}",
-          sandbox.last_block(),
-          sandbox.last_block().hash());
-    info!("proposed_block={:#?}, hash={:?}",
-          block_at_first_height,
-          block_at_first_height.hash());
+    info!(
+        "last_block={:#?}, hash={:?}",
+        sandbox.last_block(),
+        sandbox.last_block().hash()
+    );
+    info!(
+        "proposed_block={:#?}, hash={:?}",
+        block_at_first_height,
+        block_at_first_height.hash()
+    );
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     sandbox.add_time(Duration::from_millis(0));
@@ -1475,8 +1472,6 @@ fn not_request_txs_when_get_tx_and_propose() {
 /// HANDLE TX
 /// - verify signature
 /// - should panic because tx has wrong signature and is not considered
-// TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-// is fixed.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
@@ -3454,20 +3449,19 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - lock to propose
 ///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
-// TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-// is fixed.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
 fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.recv(&Prevote::new(VALIDATOR_2,
-                              HEIGHT_ONE,
-                              ROUND_TWO,
-                              &empty_hash(),
-                              Round::zero(),
-                              sandbox.s(VALIDATOR_2)));
+    sandbox.recv(&Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_TWO,
+        &empty_hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_2),
+    ));
 
     // trigger round_timeout
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));

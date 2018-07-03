@@ -21,7 +21,6 @@ pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
-pub mod timeout_adjuster;
 
 use failure::{self, Error};
 use futures::{sync::mpsc, Future, Sink};
@@ -42,9 +41,7 @@ use std::time::{Duration, SystemTime};
 use std::{fmt, io};
 
 use api::{private, public, Api};
-use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, TransactionMessage,
-};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::error::{into_failure, log_error, LogError};
 use events::{
@@ -421,7 +418,7 @@ impl NodeHandler {
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(
+        let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -436,9 +433,6 @@ impl NodeHandler {
             last_height,
             system_state.current_time(),
         );
-
-        // Adjust propose timeout for the first time.
-        state.adjust_timeout(&*snapshot);
 
         NodeHandler {
             blockchain,
@@ -482,6 +476,21 @@ impl NodeHandler {
     /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
     pub fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
+    }
+
+    /// Returns value of the minimal propose timeout.
+    pub fn min_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().min_propose_timeout
+    }
+
+    /// Returns value of the maximal propose timeout.
+    pub fn max_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().max_propose_timeout
+    }
+
+    /// Returns threshold starting from which the minimal propose timeout value is used.
+    pub fn propose_timeout_threshold(&self) -> u32 {
+        self.state().consensus_config().propose_timeout_threshold
     }
 
     /// Returns `State` of the node.
@@ -571,6 +580,7 @@ impl NodeHandler {
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
         // self.send_to_addr(address, connect);
+        unimplemented!();
     }
 
     /// Add timeout request.
@@ -605,9 +615,17 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_timeout = self.state.propose_timeout();
-        let time =
-            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
+        let snapshot = self.blockchain.snapshot();
+        let timeout = if Schema::new(&snapshot).transactions_pool_len()
+            >= self.propose_timeout_threshold() as usize
+        {
+            self.min_propose_timeout()
+        } else {
+            self.max_propose_timeout()
+        };
+        self.state.set_propose_timeout(timeout);
+
+        let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -858,17 +876,18 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self) -> Result<(), Error> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new().map_err(into_failure)?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
-            let network_handler = network_part.run(&core.handle());
+            let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler)
                 .map(drop)
                 .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
@@ -914,7 +933,12 @@ impl Node {
             info!("Public exonum api started on {}", listen_address);
         };
 
-        self.run_handler()?;
+        let handshake_params = HandshakeParams {
+            public_key: *self.handler().state().consensus_public_key(),
+            secret_key: self.handler().state().consensus_secret_key().clone(),
+            max_message_len: self.max_message_len,
+        };
+        self.run_handler(&handshake_params)?;
 
         // Stop all api handlers.
         for mut handler in api_handlers {

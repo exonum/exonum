@@ -94,8 +94,8 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
 fn has_colors() -> bool {
     use atty;
     use std::io;
-    use term::terminfo::TerminfoTerminal;
     use term::Terminal;
+    use term::terminfo::TerminfoTerminal;
 
     let out = io::stderr();
     match TerminfoTerminal::new(out) {

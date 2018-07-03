@@ -37,11 +37,12 @@ const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
 // `Err(TransactionErrorType::Panic)`.
 const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 
-/// Return value of the `Transaction`'s `execute' method. Changes made by the transaction are
-/// discarded if `Err` is returned, see `Transaction` documentation for the details.
+/// Returns a result of the `Transaction` `execute` method. This result may be
+/// either an empty unit type, in case of success, or an `ExecutionError`, if execution has
+/// failed. Errors consist of an error code and an optional description.
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
-/// framework) that can be obtained through `Schema`'s `transaction_statuses` method.
+/// framework) that can be obtained through `Schema` `transaction_statuses` method.
 pub type TransactionResult = Result<(), TransactionError>;
 
 #[derive(Serialize)]
@@ -87,6 +88,10 @@ impl ::serde::Serialize for Box<Transaction> {
 /// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
 ///
+/// A transaction in Exonum is a group of sequential operations with the data.
+/// Transaction processing rules are defined in services; these rules determine
+/// the business logic of any Exonum-powered blockchain.
+///
 /// See also [the documentation page on transactions][doc:transactions].
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
@@ -94,9 +99,9 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// Verifies the internal consistency of the transaction. `verify` should usually include
     /// checking the message signature (via [`verify_signature`]) and, possibly,
     /// other internal constraints. `verify` has no access to the blockchain state;
-    /// checks involving the blockchains state must be preformed in [`execute`](#tymethod.execute).
+    /// checks involving the blockchain state must be preformed in [`execute`](#tymethod.execute).
     ///
-    /// If a transaction fails `verify`,  is considered incorrect and cannot be included into
+    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -143,10 +148,10 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// # Notes
     ///
     /// - Transaction itself is considered committed regardless whether `Ok` or `Err` has been
-    ///   returned or even if panic occurred during execution.
-    /// - Changes made by the transaction are discarded if `Err` is returned or panic occurred.
+    ///   returned or even if panic occurs during execution.
+    /// - Changes made by the transaction are discarded if `Err` is returned or panic occurs.
     /// - A transaction execution status (see `ExecutionResult` and `TransactionResult` for the
-    ///   details) is stored in the blockchain and can be accessed through api.
+    ///   details) is stored in the blockchain and can be accessed through API.
     /// - Blockchain state hash is affected by the transactions execution status.
     ///
     /// # Examples
@@ -187,10 +192,17 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
 }
 
 /// Result of unsuccessful transaction execution.
+///
+/// An execution error consists
+/// of an error code and optional description. The error code affects the blockchain
+/// state hash, while the description does not. Therefore,
+/// descriptions are mostly used for developer purposes, not for interaction of
+/// the system with users.
+///
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExecutionError {
-    /// User-defined error code. Can have different meanings for different transactions and
-    /// services.
+    /// User-defined error code. Error codes can have different meanings for different
+    /// transactions and services.
     code: u8,
     /// Optional error description.
     description: Option<String>,
@@ -214,7 +226,7 @@ impl ExecutionError {
     }
 }
 
-/// Type of the transaction error.
+/// Type of transaction error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TransactionErrorType {
     /// Panic occurred during transaction execution.
@@ -226,10 +238,11 @@ pub enum TransactionErrorType {
 
 /// Result of unsuccessful transaction execution encompassing both service and framework-wide error
 /// handling.
+/// This error indicates whether a panic or a user error has occurred.
 ///
 /// # Notes:
 ///
-/// - Content of `description`' field is excluded from hash calculation (see `StorageValue`
+/// - Content of the `description` field is excluded from the hash calculation (see `StorageValue`
 ///   implementation for the details).
 /// - `TransactionErrorType::Panic` is set by the framework if panic is raised during transaction
 ///   execution.
@@ -237,6 +250,11 @@ pub enum TransactionErrorType {
 ///   description.
 ///
 /// # Examples
+///
+/// The example below creates a schema; retrieves the table
+/// with transaction results from this schema; using a hash takes the result
+/// of a certain transaction and returns a message that depends on whether the
+/// transaction is successful or not.
 ///
 /// ```
 /// # use exonum::storage::{MemoryDB, Database};
@@ -290,7 +308,8 @@ impl TransactionError {
         Self::panic(panic_description(panic))
     }
 
-    /// Returns error type of this `TransactionError` instance.
+    /// Returns an error type of this `TransactionError` instance. This can be
+    /// either a panic or a user-defined error code.
     pub fn error_type(&self) -> TransactionErrorType {
         self.error_type
     }
@@ -355,7 +374,7 @@ impl StorageValue for TransactionResult {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let main_part = u16::from_bytes(Cow::Borrowed(&bytes));
+        let main_part = <u16 as StorageValue>::from_bytes(Cow::Borrowed(&bytes));
         let description = if bool::from_bytes(Cow::Borrowed(&bytes[2..3])) {
             Some(String::from_bytes(Cow::Borrowed(&bytes[3..])))
         } else {
@@ -392,31 +411,37 @@ pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize 
 /// `transactions!` is used to declare a set of transactions of a particular service.
 ///
 /// The macro generates a type for each transaction and a helper enum which can hold
-/// any of the transactions. You must implement `Transaction` trait for each of the
+/// any of the transactions. You need to implement the `Transaction` trait for each of the
 /// transactions yourself.
 ///
-/// See `Service` trait documentation for a full example of usage.
+/// See [`Service`] trait documentation for a full example of usage.
 ///
-/// Each transaction is specified as a Rust struct. For additional reference about
-/// data layout see the documentation of the [`encoding` module](./encoding/index.html).
+/// Each transaction is specified as a Rust struct. For additional information about
+/// data layout, see the documentation on the [`encoding` module](./encoding/index.html).
 ///
-/// Additionally, the macro must define identifier of a service, which will be used
+/// Additionally, the macro must define the identifier of a service, which will be used
 /// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
 /// within the Exonum blockchain.
 ///
-/// For each transaction the macro creates getter methods for all fields with the same names as
-/// fields. In addition, two constructors are defined:
+/// For each transaction, the macro creates getter methods for all defined fields.
+/// The names of the methods coincide with the field names. In addition,
+/// two constructors are defined:
 ///
-/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
-///   to sign the message as the last argument.
-/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
-///   and a message [`Signature`].
+/// - `new` accepts as arguments all fields in the order of their declaration in
+///   the macro, and a [`SecretKey`] as the last argument. A `SecretKey` is used
+///   to sign the message. The constructor returns a transaction which contains
+///   the fields and a signature. In this case, the constructor creates a signature
+///   for the message using the secret key.
+/// - `new_with_signature` accepts as arguments all fields in the order of their
+///   declaration in the macro, and a message [`Signature`]. The constructor returns
+///   a transaction which contains the fields and a signature. In this case, the
+///   constructor signs the message using the indicated signature.
 ///
 /// Each transaction also implements [`SegmentField`],
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
 ///
 ///
-/// **NB.** `transactions!` uses other macros in the `exonum` crate internally.
+/// **Note.** `transactions!` uses other macros in the `exonum` crate internally.
 /// Be sure to add them to the global scope.
 ///
 /// [`Transaction`]: ./blockchain/trait.Transaction.html
@@ -427,7 +452,12 @@ pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize 
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
 /// [`Message`]: ./messages/trait.Message.html
+/// [`ServiceMessage`]: ./messages/trait.ServiceMessage.html
+/// [`Service`]: ./blockchain/trait.Service.html
 /// # Examples
+///
+/// The example below uses the `transactions!` macro; declares a set of
+/// transactions for a service with the indicated ID and adds two transactions.
 ///
 /// ```
 /// #[macro_use] extern crate exonum;

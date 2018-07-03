@@ -28,22 +28,16 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use super::config_updater::ConfigUpdateService;
 use super::sandbox_tests_helper::VALIDATOR_0;
 use super::timestamping::TimestampingService;
-use blockchain::{
-    Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-    SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig, Transaction, ValidatorKeys,
-};
+use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+                 SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 use events::network::NetworkConfiguration;
-use events::{
-    Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
-    TimeoutRequest,
-};
+use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
+             TimeoutRequest};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use node::{
-    ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-    ServiceConfig, State, SystemStateProvider,
-};
+use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
+           ServiceConfig, State, SystemStateProvider};
 use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
@@ -479,10 +473,7 @@ impl Sandbox {
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
-        match self.cfg().consensus.timeout_adjuster {
-            TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            _ => panic!("Unexpected timeout adjuster config type"),
-        }
+        self.node_state().propose_timeout()
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
@@ -703,7 +694,9 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         peers_timeout: 600_000,
         txs_block_limit: 1000,
         max_message_len: 1024 * 1024,
-        timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 200 },
+        min_propose_timeout: 200,
+        max_propose_timeout: 200,
+        propose_timeout_threshold: 0,
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
@@ -798,10 +791,8 @@ mod tests {
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
     use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{
-        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
-        ROUND_TWO,
-    };
+    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
+                                        VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
     use storage::{Fork, Snapshot};
 
     const SERVICE_ID: u16 = 1;

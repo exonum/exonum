@@ -20,15 +20,14 @@ use std::panic::{self, PanicInfo};
 use blockchain::Service;
 use node::Node;
 
+use super::CommandName;
+use super::ServiceFactory;
 use super::clap_backend::ClapBackend;
-use super::details::{
-    Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev,
-};
+use super::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
+                     RunDev};
 use super::internal::{CollectedCommand, Feedback};
 use super::keys;
 use super::maintenance::Maintenance;
-use super::CommandName;
-use super::ServiceFactory;
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.

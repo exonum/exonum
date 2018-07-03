@@ -517,9 +517,6 @@ impl NodeHandler {
         self.broadcast_status();
         self.add_status_timeout();
 
-        // Adjust propose timeout after accepting a new block.
-        self.state.adjust_timeout(&*self.blockchain.snapshot());
-
         // Add timeout for first round
         self.add_round_timeout();
         // Send propose we is leader

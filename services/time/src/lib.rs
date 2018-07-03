@@ -45,9 +45,7 @@ pub mod time_provider;
 pub mod transactions;
 
 use exonum::api::Api;
-use exonum::blockchain::{
-    ApiContext, ExecutionError, Service, ServiceContext, Transaction, TransactionSet,
-};
+use exonum::blockchain::{ApiContext, Service, ServiceContext, Transaction, TransactionSet};
 use exonum::crypto::Hash;
 use exonum::encoding;
 use exonum::encoding::serialize::json::reexport::Value;
@@ -65,12 +63,6 @@ use transactions::*;
 pub const SERVICE_ID: u16 = 4;
 /// Time service name.
 pub const SERVICE_NAME: &str = "exonum_time";
-
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        ExecutionError::new(value as u8)
-    }
-}
 
 /// Define the service.
 #[derive(Debug)]

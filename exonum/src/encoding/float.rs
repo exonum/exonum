@@ -20,8 +20,8 @@ use std::mem;
 
 use super::Error as EncodingError;
 use super::Result as EncodingResult;
-use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
 use encoding::serialize::WriteBufferWrapper;
+use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
 use encoding::{CheckedOffset, Field, Offset};
 
 /// Wrapper for the `f32` type that restricts non-finite
@@ -269,9 +269,7 @@ impl ExonumJson for F64 {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(Value::Number(
-            Number::from_f64(self.get()).ok_or("Can't cast float as json")?
-        ))
+        Ok(Value::Number(Number::from_f64(self.get()).ok_or("Can't cast float as json")?))
     }
 }
 
@@ -286,8 +284,8 @@ impl ExonumJsonDeserialize for F64 {
 mod tests {
     use super::{F32, F64};
     use byteorder::{ByteOrder, LittleEndian};
-    use encoding::fields::Field;
     use encoding::Offset;
+    use encoding::fields::Field;
     use std::num::FpCategory;
     use std::panic;
     use std::{f32, f64};
@@ -355,10 +353,12 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn test_f32_struct() {
-        encoding_struct!(struct Msg {
-            single_float: F32,
-            vec: Vec<F32>,
-        });
+        encoding_struct! {
+            struct Msg {
+                single_float: F32,
+                vec: Vec<F32>,
+            }
+        }
         let test_vec = vec![F32::new(0.0), F32::new(3.14), F32::new(5.82)];
 
         let msg = Msg::new(F32::new(0.0), test_vec.clone());
@@ -369,10 +369,12 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn test_f64_struct() {
-        encoding_struct!(struct Msg {
-            single_float: F64,
-            vec: Vec<F64>,
-        });
+        encoding_struct! {
+            struct Msg {
+                single_float: F64,
+                vec: Vec<F64>,
+            }
+        }
 
         let test_vec = vec![F64::new(0.0), F64::new(3.14), F64::new(5.82)];
 

@@ -48,7 +48,7 @@ impl BranchNode {
                 ChildKind::Right => HASH_SIZE,
                 ChildKind::Left => 0,
             };
-            ::std::mem::transmute(&self.raw[from])
+            &*(&self.raw[from] as *const u8 as *const Hash)
         }
     }
 

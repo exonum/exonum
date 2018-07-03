@@ -58,36 +58,6 @@ mod tests {
         (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
-    fn merkle_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
-        let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let mut storage = db.fork();
-        let mut table = ProofListIndex::new(NAME, &mut storage);
-
-        b.iter(|| {
-            let v_generator = |_| {
-                let mut chunk = vec![0; 10];
-                rng.fill_bytes(&mut chunk);
-                chunk
-            };
-
-            for item in (0..1000).map(v_generator) {
-                table.push(item);
-            }
-        });
-    }
-
-    fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
-        let data = generate_random_kv(200);
-        let mut storage = db.fork();
-        let mut table = ProofMapIndex::new(NAME, &mut storage);
-
-        b.iter(|| {
-            for item in &data {
-                table.put(&item.0, item.1.clone());
-            }
-        });
-    }
-
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: &T) {
         let data = generate_random_kv(200);
 
@@ -172,61 +142,10 @@ mod tests {
     }
 
     #[bench]
-    fn bench_merkle_table_append_memorydb(b: &mut Bencher) {
-        let db = MemoryDB::new();
-        merkle_table_insertion(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_table_append_rocksdb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_rocksdb(&tempdir);
-        merkle_table_insertion(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
-        let db = MemoryDB::new();
-        merkle_patricia_table_insertion(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_patricia_table_insertion_fork_memorydb(b: &mut Bencher) {
-        let db = MemoryDB::new();
-        merkle_patricia_table_insertion_fork(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_rocksdb(&tempdir);
-        merkle_patricia_table_insertion(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_patricia_table_insertion_fork_rocksdb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_rocksdb(&tempdir);
-        merkle_patricia_table_insertion_fork(b, &db);
-    }
-
-    #[bench]
-    fn long_bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
-        let db = MemoryDB::new();
-        merkle_patricia_table_insertion_large_map(b, &db);
-    }
-
-    #[bench]
     fn long_bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
         merkle_patricia_table_insertion_large_map(b, &db);
-    }
-
-    #[bench]
-    fn long_bench_proof_map_index_build_proofs_memorydb(b: &mut Bencher) {
-        let db = MemoryDB::new();
-        proof_map_index_build_proofs(b, &db);
     }
 
     #[bench]

@@ -17,8 +17,8 @@ use clap;
 use std::collections::HashMap;
 use std::ffi::OsString;
 
-use super::internal::{CollectedCommand, Feedback};
 use super::CommandName;
+use super::internal::{CollectedCommand, Feedback};
 use super::{ArgumentType, Context};
 
 pub struct ClapBackend;

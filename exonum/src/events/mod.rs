@@ -19,6 +19,7 @@ pub mod codec;
 pub mod error;
 pub mod internal;
 pub mod network;
+pub mod noise;
 
 use futures::sink::Wait;
 use futures::sync::mpsc::{self, Sender};
