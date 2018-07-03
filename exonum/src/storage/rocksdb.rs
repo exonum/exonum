@@ -30,7 +30,12 @@ impl From<rocksdb::Error> for storage::Error {
     }
 }
 
-/// Database implementation on the top of `RocksDB` backend.
+/// Database implementation on top of [`RocksDB`](https://rocksdb.org)
+/// backend.
+///
+/// RocksDB is an embedded database for key-value data, which is optimized for fast storage.
+/// This structure is required to potentially adapt the interface to
+/// use different databases.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
 }
@@ -58,7 +63,11 @@ struct RocksDBIterator {
 }
 
 impl RocksDB {
-    /// Open a database stored in the specified path with the specified options.
+    /// Opens a database stored at the specified path with the specified options.
+    ///
+    /// If the database does not exist at the indicated path and the option
+    /// `create_if_missing` is switched on in `DbOptions`, a new database will
+    /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
@@ -92,7 +101,7 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: Arc::clone(&self.db),
@@ -159,9 +168,9 @@ impl Iterator for RocksDBIterator {
     }
 }
 
-impl From<RocksDB> for Arc<Database> {
-    fn from(db: RocksDB) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+impl From<RocksDB> for Arc<dyn Database> {
+    fn from(db: RocksDB) -> Arc<dyn Database> {
+        Arc::from(Box::new(db) as Box<dyn Database>)
     }
 }
 

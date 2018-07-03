@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,14 +19,15 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use std::{cell::{Ref, RefCell},
-          collections::Bound,
-          fmt,
-          ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-          slice};
+use std::{
+    cell::{Ref, RefCell}, collections::Bound, fmt,
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo}, slice,
+};
 
-use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
-                 TransactionResult, TxLocation};
+use blockchain::{
+    Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+    TransactionResult, TxLocation,
+};
 use crypto::{CryptoHash, Hash};
 use encoding;
 use helpers::Height;
@@ -34,7 +35,7 @@ use messages::{Precommit, RawMessage};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<Box<Transaction>, encoding::Error>;
+type ParseResult = Result<Box<dyn Transaction>, encoding::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -271,7 +272,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// by using `BlockWithTransactions<serde_json::Value>`.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: SerializeContent"))]
-pub struct BlockWithTransactions<T = Box<Transaction>> {
+pub struct BlockWithTransactions<T = Box<dyn Transaction>> {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
     pub header: Block,
@@ -436,7 +437,7 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: SerializeContent"))]
-pub struct CommittedTransaction<T = Box<Transaction>> {
+pub struct CommittedTransaction<T = Box<dyn Transaction>> {
     #[serde(serialize_with = "SerializeContent::serialize_content")]
     content: T,
     location: TxLocation,
@@ -607,7 +608,7 @@ impl<T> CommittedTransaction<T> {
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: SerializeContent"))]
-pub enum TransactionInfo<T = Box<Transaction>> {
+pub enum TransactionInfo<T = Box<dyn Transaction>> {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
@@ -651,7 +652,7 @@ impl<T: Serialize> SerializeContent for T {
     }
 }
 
-impl SerializeContent for Box<Transaction> {
+impl SerializeContent for Box<dyn Transaction> {
     fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -709,8 +710,8 @@ impl<T> TransactionInfo<T> {
 ///
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
-    snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
+    snapshot: Box<dyn Snapshot>,
+    transaction_parser: Box<dyn Fn(RawMessage) -> ParseResult + 'a>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -768,7 +769,7 @@ impl<'a> BlockchainExplorer<'a> {
     fn committed_transaction(
         &self,
         tx_hash: &Hash,
-        maybe_content: Option<Box<Transaction>>,
+        maybe_content: Option<Box<dyn Transaction>>,
     ) -> CommittedTransaction {
         let schema = Schema::new(&self.snapshot);
 

@@ -186,7 +186,7 @@ pub struct ProofPath {
 }
 
 impl ProofPath {
-    /// Create a path from the given key.
+    /// Creates a path from the given key.
     pub fn new<K: ProofMapKey>(key: &K) -> ProofPath {
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
@@ -220,7 +220,7 @@ impl ProofPath {
 
     /// Sets the right border of the bit range.
     fn set_end(&mut self, end: Option<u8>) {
-        // Update ProofPath kind and right bound.
+        // Updates ProofPath kind and right bound.
         if let Some(pos) = end {
             self.bytes[0] = BRANCH_KEY_PREFIX;
             self.bytes[PROOF_PATH_LEN_POS] = pos as u8;
@@ -249,7 +249,7 @@ pub(crate) trait BitsRange {
         self.end() == self.start()
     }
 
-    /// Get bit at index `idx`.
+    /// Gets bit at index `idx`.
     fn bit(&self, idx: u16) -> ChildKind {
         debug_assert!(self.start() + idx < self.end());
 
@@ -264,13 +264,13 @@ pub(crate) trait BitsRange {
         }
     }
 
-    /// Returns the copy of this bit range with the given left border.
+    /// Returns a copy of this bit range with the given left border.
     fn start_from(&self, pos: u16) -> Self;
 
     /// Returns a copy of this bit range shortened to the specified length.
     fn prefix(&self, len: u16) -> Self;
 
-    /// Returns the copy of this bit range where the start is shifted by the `len`
+    /// Returns a copy of this bit range where the start is shifted by the `len`
     /// bits to the right.
     fn suffix(&self, len: u16) -> Self;
 

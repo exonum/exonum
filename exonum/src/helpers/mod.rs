@@ -27,14 +27,13 @@ use colored::*;
 use env_logger::{Builder, Formatter};
 use log::{Level, Record, SetLoggerError};
 
-use std::{env,
-          io::{self, Write},
-          time::SystemTime};
+use std::{
+    env, io::{self, Write}, time::SystemTime,
+};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;
-use node::ConnectList;
-use node::NodeConfig;
+use node::{ConnectListConfig, NodeConfig};
 
 mod types;
 
@@ -82,7 +81,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
             service_public_key: service.0,
             service_secret_key: service.1,
             genesis: genesis.clone(),
-            connect_list: ConnectList::from_validator_keys(&genesis.validator_keys, &peers),
+            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),

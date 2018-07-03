@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Private part of the Exonum rest api.
+//! Exonum node API implementation.
 
-pub use self::system::{NodeInfo, SystemApi};
-
-mod system;
+pub mod private;
+pub mod public;

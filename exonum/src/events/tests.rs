@@ -16,17 +16,16 @@ use futures::{stream::Wait, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::Core;
 use tokio_timer::{TimeoutStream, Timer};
 
-use std::{net::SocketAddr,
-          thread,
-          time::{self, Duration}};
+use std::{
+    net::SocketAddr, thread, time::{self, Duration},
+};
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
-use events::{error::log_error,
-             network::{NetworkConfiguration, NetworkPart},
-             noise::HandshakeParams,
-             NetworkEvent,
-             NetworkRequest};
+use events::{
+    error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
+    NetworkEvent, NetworkRequest,
+};
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use node::{EventsPoolCapacity, NodeChannel};

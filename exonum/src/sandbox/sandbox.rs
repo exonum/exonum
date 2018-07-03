@@ -17,27 +17,33 @@
 
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
-use std::{cell::{Ref, RefCell, RefMut},
-          collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
-          iter::FromIterator,
-          net::{IpAddr, Ipv4Addr, SocketAddr},
-          ops::{AddAssign, Deref},
-          sync::{Arc, Mutex},
-          time::{Duration, SystemTime, UNIX_EPOCH}};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
+    net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
-use super::{config_updater::ConfigUpdateService,
-            sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
-            timestamping::TimestampingService};
-use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-                 SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
+use super::{
+    config_updater::ConfigUpdateService, sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
+    timestamping::TimestampingService,
+};
+use blockchain::{
+    Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+    SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+};
 use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
-use events::{network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
-             NetworkEvent, NetworkRequest, TimeoutRequest};
+use events::{
+    network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
+    NetworkEvent, NetworkRequest, TimeoutRequest,
+};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
-use node::{ApiSender, Configuration, ConnectList, ExternalMessage, ListenerConfig, NodeHandler,
-           NodeSender, ServiceConfig, State, SystemStateProvider};
+use node::{
+    ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
+    NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
+};
 use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
@@ -687,7 +693,7 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 /// Constructs an instance of a `Sandbox` and initializes connections.
-pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
+pub fn sandbox_with_services(services: Vec<Box<dyn Service>>) -> Sandbox {
     let mut sandbox = sandbox_with_services_uninitialized(services);
     let time = sandbox.time();
     let validators_count = sandbox.validators_map.len();
@@ -696,7 +702,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 /// Constructs an uninitialized instance of a `Sandbox`.
-pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandbox {
+pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; 32])),
         gen_keypair_from_seed(&Seed::new([13; 32])),
@@ -743,7 +749,8 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             }),
     );
 
-    let connect_list = ConnectList::from_validator_keys(&genesis.validator_keys, &addresses);
+    let connect_list_config =
+        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &addresses);
 
     blockchain.initialize(genesis).unwrap();
 
@@ -752,7 +759,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             address: addresses[0],
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
-            connect_list: connect_list.clone(),
+            connect_list: ConnectList::from_config(connect_list_config),
         },
         service: ServiceConfig {
             service_public_key: service_keys[0].0,
@@ -828,8 +835,10 @@ mod tests {
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
     use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
-                                        VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
+    use sandbox::sandbox_tests_helper::{
+        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
+        ROUND_TWO,
+    };
     use storage::{Fork, Snapshot};
 
     const SERVICE_ID: u16 = 1;
@@ -872,11 +881,14 @@ mod tests {
             SERVICE_ID
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+        fn tx_from_raw(
+            &self,
+            raw: RawTransaction,
+        ) -> Result<Box<dyn Transaction>, encoding::Error> {
             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

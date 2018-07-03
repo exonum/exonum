@@ -27,7 +27,7 @@ module.exports = {
       tx_hashes: txHashes
     }
 
-    const response = await fetch(`${TESTKIT_URL}/v1/blocks`, {
+    const response = await fetch(`${TESTKIT_URL}/v1/blocks/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -36,8 +36,10 @@ module.exports = {
   },
 
   async rollbackToHeight (height) {
-    const response = await fetch(`${TESTKIT_URL}/v1/blocks/${height + 1}`, {
-      method: 'DELETE'
+    const response = await fetch(`${TESTKIT_URL}/v1/blocks/rollback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(height + 1)
     })
     return response.json()
   },

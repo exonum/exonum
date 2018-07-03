@@ -53,20 +53,16 @@
 //! }
 //! ```
 
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
-extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate iron;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate params;
-extern crate router;
 #[macro_use]
 extern crate serde_derive;
 
@@ -84,15 +80,11 @@ pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use exonum::{api::Api,
-             blockchain::{self, ApiContext, Transaction, TransactionSet},
-             crypto::Hash,
-             encoding::Error as EncodingError,
-             helpers::fabric::{self, Context},
-             messages::RawTransaction,
-             storage::Snapshot};
-use iron::Handler;
-use router::Router;
+use exonum::{
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
+    storage::Snapshot,
+};
 
 mod api;
 mod errors;
@@ -119,27 +111,18 @@ impl blockchain::Service for Service {
         SERVICE_ID
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = Schema::new(snapshot);
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, EncodingError> {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = api::PublicApi::new(ctx);
-        api.wire(&mut router);
-        Some(Box::new(router))
-    }
-
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = api::PrivateApi::new(ctx);
-        api.wire(&mut router);
-        Some(Box::new(router))
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi::wire(builder);
+        api::PrivateApi::wire(builder);
     }
 }
 
@@ -152,7 +135,7 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<blockchain::Service> {
+    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
         Box::new(Service {})
     }
 }
