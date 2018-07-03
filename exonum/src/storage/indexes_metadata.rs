@@ -178,7 +178,7 @@ impl StorageVersion {
         metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), Self::current());
     }
 
-    pub(crate) fn read<T: AsRef<Snapshot>>(view: T) -> Self {
+    pub(crate) fn read<T: AsRef<dyn Snapshot>>(view: T) -> Self {
         let metadata = BaseIndex::indexes_metadata(view);
         match metadata.get::<_, VersionValue>(CORE_STORAGE_VERSION_KEY) {
             Some(ver) if ver == CORE_STORAGE_VERSION => StorageVersion::Supported(ver),
@@ -200,10 +200,12 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexMetadata, IndexType, StorageVersion, VersionValue, CORE_STORAGE_VERSION,
-                CORE_STORAGE_VERSION_KEY, INDEXES_METADATA_TABLE_NAME};
+    use super::{
+        IndexMetadata, IndexType, StorageVersion, VersionValue, CORE_STORAGE_VERSION,
+        CORE_STORAGE_VERSION_KEY, INDEXES_METADATA_TABLE_NAME,
+    };
     use crypto::{Hash, PublicKey};
-    use storage::{BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
+    use storage::{base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
 
     #[test]
     fn index_metadata_roundtrip() {

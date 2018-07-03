@@ -107,8 +107,8 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
-pub(crate) use self::indexes_metadata::{initialize_storage_version, storage_version_status,
-                                        VersionStatus};
+pub(crate) use self::indexes_metadata::StorageVersion;
+
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{
@@ -121,7 +121,6 @@ pub use self::{
     proof_list_index::{ListProof, ProofListIndex}, rocksdb::RocksDB,
     sparse_list_index::SparseListIndex, value_set_index::ValueSetIndex, values::StorageValue,
 };
-pub(crate) use self::indexes_metadata::{storage_version_status, initialize_storage_version, VersionStatus};
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
