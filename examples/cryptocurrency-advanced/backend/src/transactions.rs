@@ -17,8 +17,8 @@ use exonum::crypto::{CryptoHash, PublicKey};
 use exonum::messages::Message;
 use exonum::storage::Fork;
 
-use CRYPTOCURRENCY_SERVICE_ID;
 use schema::CurrencySchema;
+use CRYPTOCURRENCY_SERVICE_ID;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]

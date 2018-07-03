@@ -15,19 +15,18 @@
 #![allow(unsafe_code)]
 
 use bit_vec::BitVec;
-use chrono::{Duration, Utc};
 use byteorder::{ByteOrder, LittleEndian};
-use uuid::Uuid;
+use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
+use super::{Field, Offset};
+use blockchain::{self, Block, BlockProof};
+use crypto::{gen_keypair, hash};
+use helpers::{user_agent, Height, Round, ValidatorId};
+use messages::{BlockRequest, BlockResponse, Connect, Precommit, Prevote, Propose, Status};
 use std::net::SocketAddr;
 use std::str::FromStr;
-use crypto::{hash, gen_keypair};
-use blockchain::{self, BlockProof, Block};
-use messages::{Connect, Propose, Prevote, Precommit, Status, BlockResponse,
-               BlockRequest};
-use helpers::{Height, Round, ValidatorId, user_agent};
-use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);
@@ -56,8 +55,17 @@ use self::ignore_new::*;
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
 fn test_zero_size_segment() {
-    let buf = vec![8,0,0,0, // not overlap
-                   0,0,0,0,0]; // but with zero size
+    let buf = vec![
+        8,
+        0,
+        0,
+        0, // not overlap
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]; // but with zero size
 
     <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }
@@ -65,8 +73,17 @@ fn test_zero_size_segment() {
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
 fn test_incorrect_pointer() {
-    let buf = vec![8,0,0,0, // not overlap
-                   0,0,0,0,0]; // but with zero size
+    let buf = vec![
+        8,
+        0,
+        0,
+        0, // not overlap
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]; // but with zero size
 
     <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }

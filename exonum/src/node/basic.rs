@@ -14,12 +14,12 @@
 
 use rand::{self, Rng};
 
-use std::net::SocketAddr;
 use std::error::Error;
+use std::net::SocketAddr;
 
-use messages::{Protocol, Connect, Message, PeersRequest, SignedMessage, Status};
-use helpers::Height;
 use super::{NodeHandler, RequestData};
+use helpers::Height;
+use messages::{Connect, Message, PeersRequest, Protocol, SignedMessage, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -33,7 +33,9 @@ impl NodeHandler {
             Protocol::Request(msg) => self.handle_request(Message::from_parts(msg, message)?)?,
             Protocol::Block(msg) => self.handle_block(Message::from_parts(msg, message)?),
             Protocol::Transaction(msg) => self.handle_tx(Message::from_parts(msg, message)?),
-            Protocol::TransactionsBatch(msg) => self.handle_txs_batch(Message::from_parts(msg, message)?),
+            Protocol::TransactionsBatch(msg) => {
+                self.handle_txs_batch(Message::from_parts(msg, message)?)
+            }
         };
         Ok(())
     }
@@ -155,9 +157,8 @@ impl NodeHandler {
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
     pub fn handle_request_peers(&mut self, msg: Message<PeersRequest>) {
-        let peers: Vec<Message<Connect>> = self.state
-            .peers()
-            .iter().map(|(_, b)| b.clone()).collect();
+        let peers: Vec<Message<Connect>> =
+            self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,
@@ -193,9 +194,7 @@ impl NodeHandler {
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = PeersRequest::new(
-                peer.author(),
-            );
+            let msg = PeersRequest::new(peer.author());
             trace!("Request peers from peer with addr {:?}", peer.addr());
             let message = self.sign_message(msg);
             self.send_to_peer(*peer.author(), message);
@@ -212,13 +211,10 @@ impl NodeHandler {
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
-        let status = Status::new(
-            self.state.height(),
-            &hash,
-        );
+        let status = Status::new(self.state.height(), &hash);
         trace!("Broadcast status: {:?}", status);
 
         let message = self.sign_message(status);
-        self.broadcast( message);
+        self.broadcast(message);
     }
 }

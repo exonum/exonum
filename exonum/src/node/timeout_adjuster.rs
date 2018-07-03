@@ -16,9 +16,9 @@
 
 use std::fmt::Debug;
 
+use blockchain::Schema;
 use helpers::Milliseconds;
 use storage::Snapshot;
-use blockchain::Schema;
 
 /// `TimeoutAdjuster` trait is used to dynamically change propose timeout.
 ///

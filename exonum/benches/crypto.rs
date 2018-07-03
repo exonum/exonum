@@ -19,8 +19,8 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use test::Bencher;
     use exonum::crypto::{gen_keypair, hash, sign, verify};
+    use test::Bencher;
 
     #[bench]
     fn bench_sign_64(b: &mut Bencher) {

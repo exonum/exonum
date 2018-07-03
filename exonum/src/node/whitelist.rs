@@ -34,7 +34,8 @@ pub struct Whitelist {
 impl Whitelist {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_enabled || self.validators_list.contains(peer)
+        !self.whitelist_enabled
+            || self.validators_list.contains(peer)
             || self.whitelisted_peers.contains(peer)
     }
 

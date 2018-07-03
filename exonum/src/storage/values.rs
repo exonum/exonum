@@ -16,17 +16,17 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use uuid::Uuid;
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
-use std::mem;
 use std::borrow::Cow;
+use std::mem;
 
+use super::UniqueHash;
 use crypto::{Hash, PublicKey};
 use encoding::{Field, Offset};
-use messages::SignedMessage;
 use helpers::Round;
-use super::UniqueHash;
+use messages::SignedMessage;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///

@@ -24,37 +24,40 @@ pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-
 pub mod timeout_adjuster;
 
 use failure::{self, Error};
-use toml::Value;
-use router::Router;
-use mount::Mount;
+use futures::{sync::mpsc, Future, Sink};
 use iron::{Chain, Iron, Listening};
 use iron_cors::CorsMiddleware;
+use mount::Mount;
+use router::Router;
 use serde::{de, ser};
-use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
+use toml::Value;
 
-use std::{fmt, io};
+use std::collections::{BTreeMap, HashSet};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-use std::collections::{BTreeMap, HashSet};
+use std::{fmt, io};
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service,
-                 SharedNodeState, Transaction, TransactionMessage};
 use api::{private, public, Api};
-use messages::{Connect, Message, Protocol, SignedMessage, ProtocolMessage};
-use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
+use blockchain::{
+    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, TransactionMessage,
+};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::error::{into_failure, log_error, LogError};
+use events::{
+    HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
+    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use messages::{Connect, Message, Protocol, ProtocolMessage, SignedMessage};
 use storage::{Database, DbOptions};
 
-mod events;
 mod basic;
 mod consensus;
+mod events;
 mod requests;
 mod whitelist;
 
@@ -410,9 +413,11 @@ impl NodeHandler {
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
-                &user_agent::get()),
+                &user_agent::get(),
+            ),
             config.listener.consensus_public_key,
-            &config.listener.consensus_secret_key);
+            &config.listener.consensus_secret_key,
+        );
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
@@ -447,8 +452,11 @@ impl NodeHandler {
     }
 
     fn sign_message<T: ProtocolMessage>(&self, message: T) -> Message<T> {
-        Message::new(message, *self.state.consensus_public_key(),
-                           self.state.consensus_secret_key())
+        Message::new(
+            message,
+            *self.state.consensus_public_key(),
+            self.state.consensus_secret_key(),
+        )
     }
 
     /// Return internal `SharedNodeState`
@@ -487,7 +495,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(|s|s.addr());
+            let it = self.state.peers().values().map(|s| s.addr());
             let it = it.chain(self.peer_discovery.iter().cloned());
             let it = it.filter(|&address| address != listen_address);
             it.collect()
@@ -861,9 +869,9 @@ impl Node {
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
             let network_handler = network_part.run(&core.handle());
-            core.run(network_handler).map(drop).map_err(|e| {
-                format_err!("An error in the `Network` thread occurred: {}", e)
-            })
+            core.run(network_handler)
+                .map(drop)
+                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
         });
 
         let mut core = Core::new().map_err(into_failure)?;

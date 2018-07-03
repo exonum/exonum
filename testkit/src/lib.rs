@@ -151,8 +151,8 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
 
-use futures::{Future, Stream};
 use futures::sync::mpsc;
+use futures::{Future, Stream};
 use iron::Iron;
 use tokio_core::reactor::Core;
 
@@ -161,14 +161,15 @@ use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
-                         Transaction};
+use exonum::blockchain::{
+    Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction,
+};
 use exonum::crypto::{self, Hash};
 use exonum::explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum::helpers::{Height, ValidatorId};
+use exonum::messages::RawMessage;
 use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState};
 use exonum::storage::{MemoryDB, Patch, Snapshot};
-use exonum::messages::RawMessage;
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use handler::create_testkit_handler;

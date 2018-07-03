@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
-               RequestMessage, TransactionsRequest, TransactionsResponse};
-use blockchain::Schema;
-use failure;
-use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use super::NodeHandler;
+use blockchain::Schema;
+use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use failure;
+use messages::{
+    BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, RequestMessage,
+    TransactionsRequest, TransactionsResponse,
+};
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
@@ -28,10 +30,7 @@ impl NodeHandler {
     pub fn handle_request(&mut self, msg: Message<RequestMessage>) -> Result<(), failure::Error> {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
-            bail!(
-                "Received message addressed to other peer = {:?}.",
-                msg.to()
-            );
+            bail!("Received message addressed to other peer = {:?}.", msg.to());
         }
 
         if !self.state.whitelist().allow(msg.author()) {
@@ -43,16 +42,21 @@ impl NodeHandler {
 
         let (msg, signed) = msg.into_parts();
         match msg {
-            RequestMessage::Propose(msg) =>
-                self.handle_request_propose(Message::from_parts(msg, signed)?),
-            RequestMessage::Transactions(msg) =>
-                self.handle_request_txs(Message::from_parts(msg, signed)?),
-            RequestMessage::Prevotes(msg) =>
-                self.handle_request_prevotes(Message::from_parts(msg, signed)?),
-            RequestMessage::Peers(msg) =>
-                self.handle_request_peers(Message::from_parts(msg, signed)?),
-            RequestMessage::Block(msg) =>
-                self.handle_request_block(Message::from_parts(msg, signed)?),
+            RequestMessage::Propose(msg) => {
+                self.handle_request_propose(Message::from_parts(msg, signed)?)
+            }
+            RequestMessage::Transactions(msg) => {
+                self.handle_request_txs(Message::from_parts(msg, signed)?)
+            }
+            RequestMessage::Prevotes(msg) => {
+                self.handle_request_prevotes(Message::from_parts(msg, signed)?)
+            }
+            RequestMessage::Peers(msg) => {
+                self.handle_request_peers(Message::from_parts(msg, signed)?)
+            }
+            RequestMessage::Block(msg) => {
+                self.handle_request_block(Message::from_parts(msg, signed)?)
+            }
         };
         Ok(())
     }
@@ -131,7 +135,8 @@ impl NodeHandler {
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
             .filter(|p| !has_prevotes[p.validator().into()])
-            .map(|p| p.clone()).collect::<Vec<_>>();
+            .map(|p| p.clone())
+            .collect::<Vec<_>>();
 
         for prevote in prevotes {
             self.send_to_peer(*msg.author(), prevote);

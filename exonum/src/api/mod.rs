@@ -14,26 +14,26 @@
 
 //! `RESTful` API and corresponding utilities.
 
-pub mod public;
 pub mod private;
+pub mod public;
 
-use iron::{status, IronError, headers::Cookie};
-use iron::prelude::*;
-use hyper::header::{ContentType, SetCookie};
-use cookie::Cookie as CookiePair;
-use router::Router;
-use params;
-use serde_json;
-use serde::{Serialize, Serializer};
-use serde::de::{self, Deserialize, Deserializer, Visitor};
-use failure::{Fail, self};
 use bodyparser;
+use cookie::Cookie as CookiePair;
+use failure::{self, Fail};
+use hyper::header::{ContentType, SetCookie};
+use iron::prelude::*;
+use iron::{headers::Cookie, status, IronError};
+use params;
+use router::Router;
+use serde::de::{self, Deserialize, Deserializer, Visitor};
+use serde::{Serialize, Serializer};
+use serde_json;
 
-use std::{fmt, io};
-use std::ops::Deref;
-use std::marker::PhantomData;
 use std::collections::BTreeMap;
+use std::marker::PhantomData;
+use std::ops::Deref;
 use std::str::FromStr;
+use std::{fmt, io};
 
 use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};

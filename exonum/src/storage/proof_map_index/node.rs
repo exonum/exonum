@@ -16,9 +16,9 @@
 
 use std::borrow::Cow;
 
-use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 use super::super::{StorageKey, StorageValue};
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 // TODO: implement Field for ProofPath and define BranchNode as StorageValue (ECR-22)
 

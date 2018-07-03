@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::{future, unsync, Future, IntoFuture, Poll, Sink, Stream};
 use futures::{future::Either, sync::mpsc};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
-use tokio_retry::{Retry, strategy::{jitter, FixedInterval}};
-use failure;
+use tokio_retry::{
+    strategy::{jitter, FixedInterval}, Retry,
+};
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
-use std::time::Duration;
-use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::time::Duration;
 
-use messages::{Protocol, Connect, Message, SignedMessage, UncheckedBuffer};
-use helpers::Milliseconds;
-use super::to_box;
-use super::error::{into_failure, log_error, result_ok};
 use super::codec::MessagesCodec;
+use super::error::{into_failure, log_error, result_ok};
+use super::to_box;
+use helpers::Milliseconds;
+use messages::{Connect, Message, Protocol, SignedMessage, UncheckedBuffer};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -99,9 +101,10 @@ impl ConnectionsPool {
     }
 
     fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<SignedMessage>, failure::Error> {
-        self.inner.borrow_mut().remove(peer).ok_or_else(||
-            format_err!("there is no sender in the connection pool"),
-        )
+        self.inner
+            .borrow_mut()
+            .remove(peer)
+            .ok_or_else(|| format_err!("there is no sender in the connection pool"))
     }
 
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<SignedMessage>> {
@@ -344,60 +347,66 @@ impl Listener {
         // Incoming connections handler
         let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
-        let server = listener.incoming().for_each(move |(sock, addr)| {
-            let holder = Rc::downgrade(&incoming_connections_counter);
-            // Check incoming connections count
-            let connections_count = Rc::weak_count(&incoming_connections_counter);
-            if connections_count > incoming_connections_limit {
-                warn!(
-                    "Rejected incoming connection with peer={}, \
-                     connections limit reached.",
-                    addr
-                );
-                return to_box(future::ok(()));
-            }
-            trace!("Accepted incoming connection with peer={}", addr);
-            let stream = sock.framed(MessagesCodec::new(max_message_len));
-            let (_, stream) = stream.split();
-            let network_tx = network_tx.clone();
-            let connection_handler = stream
-                .into_future()
-                .map_err(|e| e.0)
-                .and_then(move |(raw, stream)|{
-                    let raw = raw.ok_or_else(|| format_err!("Incomming socket closed."))?;
-                    let signed = SignedMessage::verify_buffer(raw)?;
-                    let (payload, message) = signed.into_message().into_parts();
-                    match payload {
-                        Protocol::Connect(payload) => Ok((Message::from_parts(payload, message)?, stream)),
-                        other => bail!(
-                            "First message is not Connect, got={:?}",
-                            other
-                            )
-                    }
-                })
-                .and_then(move |(connect, stream)| {
-                    trace!("Received handshake message={:?}", connect);
-                    let event = NetworkEvent::PeerConnected(addr, connect);
-                    let stream = network_tx
-                        .clone()
-                        .send(event)
-                        .map_err(into_failure)
-                        .and_then(move |_| Ok(stream))
-                        .flatten_stream();
-
-                    stream.for_each(move |raw| {
-                        let event = NetworkEvent::MessageReceived(addr, raw);
-                        network_tx.clone().send(event).map_err(into_failure).map(drop)
+        let server = listener
+            .incoming()
+            .for_each(move |(sock, addr)| {
+                let holder = Rc::downgrade(&incoming_connections_counter);
+                // Check incoming connections count
+                let connections_count = Rc::weak_count(&incoming_connections_counter);
+                if connections_count > incoming_connections_limit {
+                    warn!(
+                        "Rejected incoming connection with peer={}, \
+                         connections limit reached.",
+                        addr
+                    );
+                    return to_box(future::ok(()));
+                }
+                trace!("Accepted incoming connection with peer={}", addr);
+                let stream = sock.framed(MessagesCodec::new(max_message_len));
+                let (_, stream) = stream.split();
+                let network_tx = network_tx.clone();
+                let connection_handler = stream
+                    .into_future()
+                    .map_err(|e| e.0)
+                    .and_then(move |(raw, stream)| {
+                        let raw = raw.ok_or_else(|| format_err!("Incomming socket closed."))?;
+                        let signed = SignedMessage::verify_buffer(raw)?;
+                        let (payload, message) = signed.into_message().into_parts();
+                        match payload {
+                            Protocol::Connect(payload) => {
+                                Ok((Message::from_parts(payload, message)?, stream))
+                            }
+                            other => bail!("First message is not Connect, got={:?}", other),
+                        }
                     })
-                })
-                .map(|_| {
-                    // Ensure that holder lives until the stream ends.
-                    let _holder = holder;
-                })
-                .map_err(log_error);
-            handle.spawn(to_box(connection_handler));
-            to_box(future::ok(()))
-        }).map_err(into_failure);
+                    .and_then(move |(connect, stream)| {
+                        trace!("Received handshake message={:?}", connect);
+                        let event = NetworkEvent::PeerConnected(addr, connect);
+                        let stream = network_tx
+                            .clone()
+                            .send(event)
+                            .map_err(into_failure)
+                            .and_then(move |_| Ok(stream))
+                            .flatten_stream();
+
+                        stream.for_each(move |raw| {
+                            let event = NetworkEvent::MessageReceived(addr, raw);
+                            network_tx
+                                .clone()
+                                .send(event)
+                                .map_err(into_failure)
+                                .map(drop)
+                        })
+                    })
+                    .map(|_| {
+                        // Ensure that holder lives until the stream ends.
+                        let _holder = holder;
+                    })
+                    .map_err(log_error);
+                handle.spawn(to_box(connection_handler));
+                to_box(future::ok(()))
+            })
+            .map_err(into_failure);
 
         Ok(Listener(to_box(server)))
     }

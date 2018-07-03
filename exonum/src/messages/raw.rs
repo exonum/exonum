@@ -14,19 +14,16 @@
 
 #[derive(Debug)]
 pub struct UncheckedBuffer {
-    message: Vec<u8>
+    message: Vec<u8>,
 }
 
 impl UncheckedBuffer {
     pub fn new(vec: Vec<u8>) -> UncheckedBuffer {
-        UncheckedBuffer {
-            message: vec
-        }
+        UncheckedBuffer { message: vec }
     }
     pub fn get_vec(&self) -> &Vec<u8> {
         &self.message
     }
-
 }
 
 impl AsRef<[u8]> for UncheckedBuffer {
@@ -34,4 +31,3 @@ impl AsRef<[u8]> for UncheckedBuffer {
         &self.message
     }
 }
-

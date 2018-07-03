@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
-use events::error::LogError;
 use super::{ExternalMessage, NodeHandler, NodeTimeout};
+use events::error::LogError;
+use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 use messages::SignedMessage;
 
 impl EventHandler for NodeHandler {
-    fn handle_event(&mut self, event: Event){
+    fn handle_event(&mut self, event: Event) {
         match event {
             Event::Network(network) => self.handle_network_event(network).unwrap(),
             Event::Api(api) => self.handle_api_event(api),
@@ -54,7 +54,7 @@ impl NodeHandler {
             NetworkEvent::MessageReceived(_, raw) => {
                 let msg = SignedMessage::verify_buffer(&raw.get_vec())?.into_message();
                 self.handle_message(msg)?;
-            },
+            }
         }
         Ok(())
     }

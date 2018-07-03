@@ -109,13 +109,15 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
+pub use self::db::{
+    Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
+    Snapshot,
+};
 pub use self::error::Error;
-pub use self::db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
-                   PatchIterator, Snapshot};
 
+pub use self::memorydb::MemoryDB;
 pub use self::options::DbOptions;
 pub use self::rocksdb::RocksDB;
-pub use self::memorydb::MemoryDB;
 
 pub use self::keys::StorageKey;
 pub use self::values::StorageValue;
@@ -123,39 +125,39 @@ pub use self::values::StorageValue;
 pub use self::entry::Entry;
 
 pub use self::base_index::{BaseIndex, BaseIndexIter};
-pub use self::map_index::MapIndex;
-pub use self::list_index::ListIndex;
-pub use self::sparse_list_index::SparseListIndex;
+pub use self::hash::UniqueHash;
 pub use self::key_set_index::KeySetIndex;
-pub use self::value_set_index::ValueSetIndex;
+pub use self::list_index::ListIndex;
+pub use self::map_index::MapIndex;
 pub use self::proof_list_index::{ListProof, ProofListIndex};
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
-pub use self::hash::UniqueHash;
+pub use self::sparse_list_index::SparseListIndex;
+pub use self::value_set_index::ValueSetIndex;
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
-mod error;
 mod db;
+mod entry;
+mod error;
+mod hash;
+mod keys;
+mod memorydb;
 mod options;
 mod rocksdb;
-mod memorydb;
-mod keys;
 mod values;
-mod entry;
-mod hash;
 
 pub mod base_index;
 mod indexes_metadata;
 
-pub mod map_index;
-pub mod list_index;
-pub mod sparse_list_index;
 pub mod key_set_index;
-pub mod value_set_index;
+pub mod list_index;
+pub mod map_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
+pub mod sparse_list_index;
+pub mod value_set_index;
 
 #[cfg(test)]
 mod tests;

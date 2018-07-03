@@ -1,17 +1,19 @@
 use std::borrow::Cow;
 
-use failure::Error;
-use byteorder::{ByteOrder, LittleEndian};
 use bincode::Config;
-use serde::{Serialize, Deserialize};
+use byteorder::{ByteOrder, LittleEndian};
+use failure::Error;
+use serde::{Deserialize, Serialize};
 
-use crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature,
-             SIGNATURE_LENGTH, PUBLIC_KEY_LENGTH};
+use crypto::{
+    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
+    SIGNATURE_LENGTH,
+};
 use messages::Message;
 use storage::StorageValue;
 
 use super::protocol::{Protocol, ProtocolMessage};
-use super::{PROTOCOL_MAJOR_VERSION, MAX_MESSAGE_SIZE};
+use super::{MAX_MESSAGE_SIZE, PROTOCOL_MAJOR_VERSION};
 
 use encoding::serialize::encode_hex;
 
@@ -19,7 +21,7 @@ use encoding::serialize::encode_hex;
 pub struct AuthorisedMessage {
     pub version: u8,
     pub author: PublicKey,
-    pub protocol: Protocol
+    pub protocol: Protocol,
 }
 
 impl AuthorisedMessage {
@@ -39,10 +41,11 @@ pub struct SignedMessage {
 }
 
 impl SignedMessage {
-    pub fn new<T: Into<Protocol>>(value: T,
-                                       author: PublicKey,
-                                       secret_key: &SecretKey)
-                                       -> Result<SignedMessage, Error> {
+    pub fn new<T: Into<Protocol>>(
+        value: T,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Result<SignedMessage, Error> {
         let authorised_message = AuthorisedMessage::new(value, author)?;
         let signature = Self::sign(&authorised_message, secret_key)?;
 
@@ -59,14 +62,19 @@ impl SignedMessage {
         // This two factors lead to additional `serialize` inside verify
         let buffer = buffer.as_ref();
         let message: SignedMessage = ::bincode::config().no_limit().deserialize(&buffer)?;
-        Self::verify(&message.authorised_message,
-                     &message.signature,
-                    &message.authorised_message.author)?;
+        Self::verify(
+            &message.authorised_message,
+            &message.signature,
+            &message.authorised_message.author,
+        )?;
         Ok(message)
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
-        ::bincode::config().no_limit().serialize(&self).expect("Could not serialize SignedMessage.")
+        ::bincode::config()
+            .no_limit()
+            .serialize(&self)
+            .expect("Could not serialize SignedMessage.")
     }
 
     pub fn to_hex_string(&self) -> String {
@@ -76,7 +84,7 @@ impl SignedMessage {
     pub fn into_message(self) -> Message {
         Message {
             payload: self.authorised_message.protocol.clone(),
-            message: self
+            message: self,
         }
     }
 
@@ -88,23 +96,23 @@ impl SignedMessage {
 
     fn hash(&self) -> Hash {
         hash(&::bincode::config()
-                .no_limit()
-                .serialize(self)
-                .expect("Expected serialize to work"))
+            .no_limit()
+            .serialize(self)
+            .expect("Expected serialize to work"))
     }
 
-    fn verify<T: Serialize>(val: &T, signature: &Signature, public_key: &PublicKey) -> Result<(), Error> {
+    fn verify<T: Serialize>(
+        val: &T,
+        signature: &Signature,
+        public_key: &PublicKey,
+    ) -> Result<(), Error> {
         let full_buffer = ::bincode::config().no_limit().serialize(&val)?;
-        if !crypto::verify(signature,
-                           &full_buffer,
-                           &public_key) {
+        if !crypto::verify(signature, &full_buffer, &public_key) {
             bail!("Can't verify message.");
         }
         Ok(())
     }
-
 }
-
 
 impl StorageValue for SignedMessage {
     fn into_bytes(self) -> Vec<u8> {

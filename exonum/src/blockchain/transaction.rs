@@ -14,20 +14,20 @@
 
 //! `Transaction` related types.
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use std::borrow::Cow;
 use std::any::Any;
+use std::borrow::Cow;
+use std::convert::Into;
 use std::error::Error;
 use std::{fmt, u8};
-use std::convert::Into;
 
-use messages::{Message, RawTransaction, SignedMessage};
-use storage::{Fork, StorageValue};
 use crypto::{CryptoHash, Hash};
 use encoding;
 use encoding::serialize::json::ExonumJson;
+use messages::{Message, RawTransaction, SignedMessage};
+use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
@@ -47,7 +47,7 @@ pub type TransactionResult = Result<(), TransactionError>;
 #[derive(Serialize)]
 pub struct TransactionMessage {
     transaction: Box<Transaction>,
-    message: Message<RawTransaction>
+    message: Message<RawTransaction>,
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
@@ -61,19 +61,25 @@ impl TransactionMessage {
     pub fn raw(&self) -> &Message<RawTransaction> {
         &self.message
     }
-    pub fn tx_from_raw<F>(message: Message<RawTransaction>, parser: &F)
-        -> Result<Self,::encoding::Error>
-        where F: ?Sized + Fn(&Message<RawTransaction>) ->  Result<Box<Transaction>, ::encoding::Error> {
+    pub fn tx_from_raw<F>(
+        message: Message<RawTransaction>,
+        parser: &F,
+    ) -> Result<Self, ::encoding::Error>
+    where
+        F: ?Sized + Fn(&Message<RawTransaction>) -> Result<Box<Transaction>, ::encoding::Error>,
+    {
         let transaction = parser(&message)?;
         Ok(TransactionMessage {
             transaction,
-            message
+            message,
         })
     }
 }
 impl ::serde::Serialize for Box<Transaction> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: ::serde::Serializer {
+    where
+        S: ::serde::Serializer,
+    {
         ::erased_serde::serialize(&self, serializer)
     }
 }
@@ -378,8 +384,7 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
-pub trait TransactionSet
-    : Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
     /// Parse a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
@@ -658,16 +663,16 @@ fn panic_description(any: &Box<Any + Send>) -> Option<String> {
 mod tests {
     use futures::sync::mpsc;
 
-    use std::sync::Mutex;
     use std::panic;
+    use std::sync::Mutex;
 
     use super::*;
+    use blockchain::{Blockchain, Schema, Service};
     use crypto;
     use encoding;
-    use blockchain::{Blockchain, Schema, Service};
-    use storage::{Database, Entry, MemoryDB, Snapshot};
-    use node::ApiSender;
     use helpers::{Height, ValidatorId};
+    use node::ApiSender;
+    use storage::{Database, Entry, MemoryDB, Snapshot};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 

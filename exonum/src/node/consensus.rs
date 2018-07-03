@@ -15,22 +15,27 @@
 use std::collections::HashSet;
 use std::error::Error;
 
-use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction, TransactionMessage};
-use messages::{BlockRequest, BlockResponse, ConsensusMessage, Precommit, Prevote, Message,
-               PrevotesRequest, Propose, ProposeRequest, Protocol, SignedMessage,
-               RawTransaction, TransactionsRequest, TransactionsResponse};
-use helpers::{Height, Round, ValidatorId};
-use storage::Patch;
-use node::{NodeHandler, RequestData};
+use crypto::{CryptoHash, Hash, PublicKey};
 use events::InternalRequest;
 use failure;
+use helpers::{Height, Round, ValidatorId};
+use messages::{
+    BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
+    Propose, ProposeRequest, Protocol, RawTransaction, SignedMessage, TransactionsRequest,
+    TransactionsResponse,
+};
+use node::{NodeHandler, RequestData};
+use storage::Patch;
 
 // TODO reduce view invocations (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_consensus(&mut self, msg: Message<ConsensusMessage>) -> Result<(), failure::Error>{
+    pub fn handle_consensus(
+        &mut self,
+        msg: Message<ConsensusMessage>,
+    ) -> Result<(), failure::Error> {
         if !self.is_enabled {
             info!(
                 "Ignoring a consensus message {:?} because the node is disabled",
@@ -75,12 +80,15 @@ impl NodeHandler {
         trace!("Handle message={:?}", msg);
         let (consensus_msg, signed) = msg.into_parts();
         match consensus_msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(key,
-                                                  Message::from_parts(msg, signed)? ),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(key,
-                                                  Message::from_parts(msg, signed)? ),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(key,
-                                                  Message::from_parts(msg, signed)?),
+            ConsensusMessage::Propose(msg) => {
+                self.handle_propose(key, Message::from_parts(msg, signed)?)
+            }
+            ConsensusMessage::Prevote(msg) => {
+                self.handle_prevote(key, Message::from_parts(msg, signed)?)
+            }
+            ConsensusMessage::Precommit(msg) => {
+                self.handle_precommit(key, Message::from_parts(msg, signed)?)
+            }
         }
         Ok(())
     }
@@ -113,16 +121,17 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&*snapshot);
         //TODO: remove this match after errors refactor. (ECR-979)
-        let has_unknown_txs =
-            match self.state
-                .add_propose(msg.clone(), &schema.transactions(), &schema.transactions_pool())
-            {
-                Ok(state) => state.has_unknown_txs(),
-                Err(err) => {
-                    warn!("{}, msg={:?}", err, msg);
-                    return;
-                }
-            };
+        let has_unknown_txs = match self.state.add_propose(
+            msg.clone(),
+            &schema.transactions(),
+            &schema.transactions_pool(),
+        ) {
+            Ok(state) => state.has_unknown_txs(),
+            Err(err) => {
+                warn!("{}, msg={:?}", err, msg);
+                return;
+            }
+        };
 
         let hash = msg.hash();
 
@@ -140,7 +149,7 @@ impl NodeHandler {
             self.handle_full_propose(hash, msg.round());
         }
     }
-/*
+    /*
     // Validates transaction from the block and appends them into the pool.
     // Returns tuple of transaction hashes and Patch of changes in the pool.
     fn validate_block_transactions(&self, block: &BlockResponse) -> Option<(Vec<Hash>, Patch)> {
@@ -593,7 +602,7 @@ impl NodeHandler {
         }
 
         for tx in msg.transactions() {
-            self.handle_tx(unimplemented!());//tx);
+            self.handle_tx(unimplemented!()); //tx);
         }
     }
 
@@ -699,7 +708,8 @@ impl NodeHandler {
                 self.state.height(),
                 round,
                 self.state.last_hash(),
-                &txs));
+                &txs,
+            ));
             // Put our propose to the consensus messages cache
             self.blockchain.save_message(round, propose.clone());
 
@@ -724,40 +734,35 @@ impl NodeHandler {
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
-            let message: SignedMessage = match *data {
-                RequestData::Propose(ref propose_hash) =>
-                    self.sign_message(ProposeRequest::new(
-                    &peer,
-                    self.state.height(),
-                    propose_hash,
-                )).into(),
-                RequestData::Transactions(ref propose_hash) => {
-                    let txs: Vec<_> = self.state
-                        .propose(propose_hash)
-                        .unwrap()
-                        .unknown_txs()
-                        .iter()
-                        .cloned()
-                        .collect();
-                    self.sign_message(TransactionsRequest::new(
-                        &peer,
-                        &txs,
-                    )).into()
-                }
-                RequestData::Prevotes(round, ref propose_hash) =>
-                    self.sign_message(PrevotesRequest::new(
-                    &peer,
-                    self.state.height(),
-                    round,
-                    propose_hash,
-                    self.state.known_prevotes(round, propose_hash),
-                )).into(),
-                RequestData::Block(height) =>
-                    self.sign_message(BlockRequest::new(
-                    &peer,
-                    height,
-                )).into(),
-            };
+            let message: SignedMessage =
+                match *data {
+                    RequestData::Propose(ref propose_hash) => self.sign_message(
+                        ProposeRequest::new(&peer, self.state.height(), propose_hash),
+                    ).into(),
+                    RequestData::Transactions(ref propose_hash) => {
+                        let txs: Vec<_> = self.state
+                            .propose(propose_hash)
+                            .unwrap()
+                            .unknown_txs()
+                            .iter()
+                            .cloned()
+                            .collect();
+                        self.sign_message(TransactionsRequest::new(&peer, &txs))
+                            .into()
+                    }
+                    RequestData::Prevotes(round, ref propose_hash) => {
+                        self.sign_message(PrevotesRequest::new(
+                            &peer,
+                            self.state.height(),
+                            round,
+                            propose_hash,
+                            self.state.known_prevotes(round, propose_hash),
+                        )).into()
+                    }
+                    RequestData::Block(height) => {
+                        self.sign_message(BlockRequest::new(&peer, height)).into()
+                    }
+                };
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, message);
         }

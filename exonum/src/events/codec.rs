@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bytes::BytesMut;
 use byteorder::{ByteOrder, LittleEndian};
-use tokio_io::codec::{Decoder, Encoder};
+use bytes::BytesMut;
 use failure::Error;
-use messages::{UncheckedBuffer, SignedMessage};
+use messages::{SignedMessage, UncheckedBuffer};
+use tokio_io::codec::{Decoder, Encoder};
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
@@ -78,8 +78,8 @@ impl Encoder for MessagesCodec {
 mod test {
     use super::MessagesCodec;
 
-    use messages::{MessageBuffer, RawMessage};
     use bytes::BytesMut;
+    use messages::{MessageBuffer, RawMessage};
     use tokio_io::codec::Decoder;
 
     #[test]

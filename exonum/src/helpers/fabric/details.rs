@@ -19,22 +19,23 @@
 
 use toml;
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::net::{IpAddr, SocketAddr};
 use std::collections::{BTreeMap, HashMap};
+use std::fs;
+use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 
-use blockchain::{GenesisConfig, config::ValidatorKeys};
-use helpers::{generate_testnet_config, config::ConfigFile};
+use super::internal::{CollectedCommand, Command, Feedback};
+use super::keys;
+use super::shared::{
+    AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
+};
+use super::DEFAULT_EXONUM_LISTEN_PORT;
+use super::{Argument, CommandName, Context};
+use blockchain::{config::ValidatorKeys, GenesisConfig};
+use crypto;
+use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
-use crypto;
-use super::internal::{CollectedCommand, Command, Feedback};
-use super::{Argument, CommandName, Context};
-use super::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
-                    SharedConfig};
-use super::DEFAULT_EXONUM_LISTEN_PORT;
-use super::keys;
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
@@ -224,16 +225,14 @@ impl RunDev {
 
 impl Command for RunDev {
     fn args(&self) -> Vec<Argument> {
-        vec![
-            Argument::new_named(
-                "ARTIFACTS_DIR",
-                false,
-                "The path where configuration and db files will be generated.",
-                "a",
-                "artifacts-dir",
-                false,
-            ),
-        ]
+        vec![Argument::new_named(
+            "ARTIFACTS_DIR",
+            false,
+            "The path where configuration and db files will be generated.",
+            "a",
+            "artifacts-dir",
+            false,
+        )]
     }
 
     fn name(&self) -> CommandName {

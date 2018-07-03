@@ -15,31 +15,36 @@
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 
-use futures::{self, Async, Future, Sink, Stream, sync::mpsc};
+use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
-use std::ops::{AddAssign, Deref};
-use std::sync::{Arc, Mutex};
 use std::cell::{Ref, RefCell, RefMut};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::ops::{AddAssign, Deref};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-           ServiceConfig, State, SystemStateProvider};
-use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-                 SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig, Transaction,
-                 ValidatorKeys};
-use storage::{MapProof, MemoryDB};
-use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
-             TimeoutRequest};
-use events::network::NetworkConfiguration;
-use super::timestamping::TimestampingService;
 use super::config_updater::ConfigUpdateService;
 use super::sandbox_tests_helper::VALIDATOR_0;
+use super::timestamping::TimestampingService;
+use blockchain::{
+    Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+    SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig, Transaction, ValidatorKeys,
+};
+use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
+use events::network::NetworkConfiguration;
+use events::{
+    Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
+    TimeoutRequest,
+};
+use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use node::{
+    ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
+    ServiceConfig, State, SystemStateProvider,
+};
+use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -790,12 +795,14 @@ pub fn timestamping_sandbox() -> Sandbox {
 mod tests {
     use super::*;
     use blockchain::{ExecutionResult, ServiceContext, TransactionSet};
-    use messages::RawTransaction;
-    use encoding;
     use crypto::{gen_keypair_from_seed, Seed};
+    use encoding;
+    use messages::RawTransaction;
+    use sandbox::sandbox_tests_helper::{
+        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
+        ROUND_TWO,
+    };
     use storage::{Fork, Snapshot};
-    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
-                                        VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
 
     const SERVICE_ID: u16 = 1;
 

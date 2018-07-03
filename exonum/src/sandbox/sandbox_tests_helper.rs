@@ -13,21 +13,21 @@
 // limitations under the License.
 
 /// purpose of this module is to keep functions with reusable code used for sandbox tests
-
 use bit_vec::BitVec;
 
-use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::time::Duration;
 
-use messages::{Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
-               RawTransaction};
-use blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use crypto::{CryptoHash, Hash, HASH_SIZE};
-use storage::Database;
-use helpers::{Height, Milliseconds, Round, ValidatorId};
 use super::sandbox::Sandbox;
 use super::timestamping::{TimestampTx, TimestampingTxGenerator};
+use blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use crypto::{CryptoHash, Hash, HASH_SIZE};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
+use messages::{
+    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction,
+};
+use storage::Database;
 
 pub type TimestampingSandbox = Sandbox;
 

@@ -16,9 +16,9 @@ use bodyparser;
 use exonum::api::ApiError;
 use exonum::crypto;
 use exonum::explorer::BlockchainExplorer;
-use iron::prelude::*;
 use iron::headers::ContentType;
 use iron::modifiers::Header;
+use iron::prelude::*;
 use iron::status::Status;
 use router::Router;
 use serde::Serialize;
@@ -171,13 +171,13 @@ impl TestKitHandler for TestKit {
 mod tests {
     use exonum::blockchain::{ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
-    use exonum::encoding::{Error as EncodingError, serialize::json::ExonumJson};
+    use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction};
     use exonum::storage::{Fork, Snapshot};
-    use iron::Handler;
     use iron::headers::{ContentType, Headers};
+    use iron::Handler;
     use iron_test::{request, response};
 
     use super::*;

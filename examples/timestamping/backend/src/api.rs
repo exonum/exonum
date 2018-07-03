@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::crypto::Hash;
-use exonum::blockchain::{self, BlockProof, Blockchain, Transaction};
-use exonum::node::TransactionSend;
 use exonum::api::{Api, ApiError};
+use exonum::blockchain::{self, BlockProof, Blockchain, Transaction};
+use exonum::crypto::Hash;
+use exonum::node::TransactionSend;
 use exonum::storage::MapProof;
 
+use bodyparser;
 use iron::{IronResult, Plugin, Request, Response};
 use router::Router;
-use bodyparser;
 
-use TIMESTAMPING_SERVICE;
 use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
+use TIMESTAMPING_SERVICE;
 
 #[derive(Debug, Serialize)]
 pub struct TimestampProof {

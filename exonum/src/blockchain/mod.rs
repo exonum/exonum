@@ -33,38 +33,43 @@
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{Schema, TxLocation};
+pub use self::config::{
+    ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys,
+};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+pub use self::schema::{Schema, TxLocation};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
-                            TransactionErrorType, TransactionResult, TransactionSet, TransactionMessage};
+pub use self::transaction::{
+    ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
+    TransactionMessage, TransactionResult, TransactionSet,
+};
 
 pub mod config;
 
-use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
-use mount::Mount;
 use failure;
+use mount::Mount;
+use vec_map::VecMap;
 
-use std::{fmt, iter, mem, panic};
-use std::sync::Arc;
 use std::collections::{BTreeMap, HashMap};
-use std::net::SocketAddr;
 use std::error::Error as StdError;
+use std::net::SocketAddr;
 use std::ops::Deref;
+use std::sync::Arc;
+use std::{fmt, iter, mem, panic};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use messages::{Connect, Precommit, Protocol, SignedMessage,
-               Message, ProtocolMessage, RawTransaction};
-use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, Round, ValidatorId};
-use node::ApiSender;
 use encoding::Error as MessageError;
+use helpers::{Height, Round, ValidatorId};
+use messages::{
+    Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
+};
+use node::ApiSender;
+use storage::{Database, Error, Fork, Patch, Snapshot};
 
 mod block;
-mod schema;
 mod genesis;
+mod schema;
 mod service;
 #[macro_use]
 mod transaction;
@@ -143,7 +148,10 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: &Message<RawTransaction>) -> Result<Box<Transaction>, MessageError> {
+    pub fn tx_from_raw(
+        &self,
+        raw: &Message<RawTransaction>,
+    ) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -415,12 +423,7 @@ impl Blockchain {
     /// After that invokes `handle_commit` for each service in order of their identifiers
     /// and returns the list of transactions which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn commit<I>(
-        &mut self,
-        patch: &Patch,
-        block_hash: Hash,
-        precommits: I,
-    ) -> Result<(), Error>
+    pub fn commit<I>(&mut self, patch: &Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
     where
         I: Iterator<Item = Message<Precommit>>,
     {

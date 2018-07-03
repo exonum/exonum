@@ -19,9 +19,9 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use storage::StorageValue;
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
+use storage::StorageValue;
 
 /// Public keys of a validator.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -236,13 +236,13 @@ pub enum TimeoutAdjusterConfig {
 
 #[cfg(test)]
 mod tests {
-    use toml;
     use serde::{Deserialize, Serialize};
+    use toml;
 
     use std::fmt::Debug;
 
-    use crypto::{gen_keypair_from_seed, Seed};
     use super::*;
+    use crypto::{gen_keypair_from_seed, Seed};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]

@@ -18,22 +18,22 @@ use std::ops::Deref;
 
 use failure::Error;
 
-use ::crypto::{PublicKey, SecretKey};
+use crypto::{PublicKey, SecretKey};
 
 pub use self::authorisation::SignedMessage;
-pub use self::protocol::*;
 pub use self::helpers::BinaryForm;
+pub use self::protocol::*;
 pub(crate) use self::raw::UncheckedBuffer;
 
-mod raw;
-mod protocol;
 mod authorisation;
 mod helpers;
+mod protocol;
+mod raw;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 // FIXME: Use config value.
-pub const MAX_MESSAGE_SIZE: usize  = 1024 * 1024;
+pub const MAX_MESSAGE_SIZE: usize = 1024 * 1024;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct RawTransaction {
@@ -59,8 +59,9 @@ impl fmt::Debug for RawTransaction {
 /// Wrappers around pair of serialized message, and its binary form
 // TODO: Rewrite using owning_ref
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Message<T=Protocol>
-where T: ProtocolMessage
+pub struct Message<T = Protocol>
+where
+    T: ProtocolMessage,
 {
     payload: T,
     message: SignedMessage,
@@ -68,19 +69,15 @@ where T: ProtocolMessage
 
 impl<T: ProtocolMessage> Message<T> {
     pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
-        let message = SignedMessage::new(payload.clone(),
-                                         author,
-                                         secret_key)
-            .expect("Serialization error");
-        Message {
-            payload,
-            message
-        }
+        let message =
+            SignedMessage::new(payload.clone(), author, secret_key).expect("Serialization error");
+        Message { payload, message }
     }
 
     pub fn map<U, F>(self, func: F) -> Result<Message<U>, Error>
-        where U: ProtocolMessage,
-              F: Fn(T)-> U
+    where
+        U: ProtocolMessage,
+        F: Fn(T) -> U,
     {
         let (payload, message) = self.into_parts();
         Message::from_parts(func(payload), message)
@@ -94,10 +91,7 @@ impl<T: ProtocolMessage> Message<T> {
         if payload != message.authorised_message.protocol {
             bail!("Type {:?} is not a part of exonum protocol", payload)
         }
-        Ok(Message {
-            payload,
-            message,
-        })
+        Ok(Message { payload, message })
     }
 
     pub fn to_hex_string(&self) -> String {
@@ -107,9 +101,8 @@ impl<T: ProtocolMessage> Message<T> {
     pub fn downgrade(self) -> Message<Protocol> {
         Message {
             payload: self.message.authorised_message.protocol.clone(),
-            message: self.message
+            message: self.message,
         }
-
     }
 
     pub fn author(&self) -> &PublicKey {
@@ -130,7 +123,6 @@ impl<T: ProtocolMessage> AsRef<T> for Message<T> {
 }
 
 impl<T: ProtocolMessage> Into<SignedMessage> for Message<T> {
-
     fn into(self) -> SignedMessage {
         self.message
     }

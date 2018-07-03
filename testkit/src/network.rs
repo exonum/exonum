@@ -180,7 +180,11 @@ impl TestNode {
     }
 
     /// Creates a `Precommit` message signed by this validator.
-    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> ProtocolMessage<Precommit> {
+    pub fn create_precommit(
+        &self,
+        propose: &Propose,
+        block_hash: &crypto::Hash,
+    ) -> ProtocolMessage<Precommit> {
         use std::time::SystemTime;
 
         Precommit::new(

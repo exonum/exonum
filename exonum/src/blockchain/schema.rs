@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{CryptoHash, Hash, PublicKey};
-use messages::{Connect, Precommit, Protocol, Message, SignedMessage, RawTransaction};
-use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
-              ProofMapIndex, Snapshot};
-use helpers::{Height, Round};
-use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
+use super::{Block, BlockProof, Blockchain, TransactionResult};
+use crypto::{CryptoHash, Hash, PublicKey};
+use helpers::{Height, Round};
+use messages::{Connect, Message, Precommit, Protocol, RawTransaction, SignedMessage};
+use storage::{
+    Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
+    Snapshot,
+};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -48,25 +50,21 @@ define_names!(
     CONSENSUS_ROUND => "consensus_round";
 );
 
-encoding_struct! (
-    /// Configuration index.
-    struct ConfigReference {
-        /// The height, starting from which this configuration becomes actual.
-        actual_from: Height,
-        /// Hash of the configuration contents that serialized as raw bytes vec.
-        cfg_hash: &Hash,
-    }
-);
+encoding_struct!(/// Configuration index.
+struct ConfigReference {
+    /// The height, starting from which this configuration becomes actual.
+    actual_from: Height,
+    /// Hash of the configuration contents that serialized as raw bytes vec.
+    cfg_hash: &Hash,
+});
 
-encoding_struct! (
-    /// Transaction location in block.
-    struct TxLocation {
-        /// Height of block in the blockchain.
-        block_height: Height,
-        /// Index in block.
-        position_in_block: u64,
-    }
-);
+encoding_struct!(/// Transaction location in block.
+struct TxLocation {
+    /// Height of block in the blockchain.
+    block_height: Height,
+    /// Index in block.
+    position_in_block: u64,
+});
 
 /// Information schema for `exonum-core`.
 #[derive(Debug)]
@@ -359,7 +357,9 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, Message<RawTransaction>> {
+    pub(crate) fn transactions_mut(
+        &mut self,
+    ) -> MapIndex<&mut Fork, Hash, Message<RawTransaction>> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 
@@ -414,7 +414,10 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
-    pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Message<Precommit>> {
+    pub(crate) fn precommits_mut(
+        &mut self,
+        hash: &Hash,
+    ) -> ListIndex<&mut Fork, Message<Precommit>> {
         ListIndex::new_in_family(PRECOMMITS, hash, self.view)
     }
 
@@ -449,7 +452,9 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
-    pub(crate) fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, Message<Protocol>> {
+    pub(crate) fn consensus_messages_cache_mut(
+        &mut self,
+    ) -> ListIndex<&mut Fork, Message<Protocol>> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 

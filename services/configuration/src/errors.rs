@@ -85,8 +85,9 @@ pub(crate) enum Error {
     #[fail(display = "Cannot parse configuration: {}", _0)]
     InvalidConfig(#[cause] JsonError),
 
-    #[fail(display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min,
-           max)]
+    #[fail(
+        display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min, max
+    )]
     InvalidMajorityCount {
         min: usize,
         max: usize,

@@ -15,22 +15,22 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use serde_json::Value;
 use iron::Handler;
+use serde_json::Value;
 
-use std::fmt;
-use std::sync::{Arc, RwLock};
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
 
-use crypto::{Hash, PublicKey, SecretKey};
-use storage::{Fork, Snapshot};
-use messages::RawTransaction;
-use encoding::Error as MessageError;
-use node::{ApiSender, Node, State, TransactionSend};
-use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
-use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
+use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use crypto::{Hash, PublicKey, SecretKey};
+use encoding::Error as MessageError;
+use helpers::{Height, Milliseconds, ValidatorId};
+use messages::RawTransaction;
+use node::{ApiSender, Node, State, TransactionSend};
+use storage::{Fork, Snapshot};
 
 /// A trait that describes business logic of a concrete service.
 ///
@@ -296,7 +296,7 @@ impl ServiceContext {
 
     /// Broadcast new transaction signed by this service.
     pub fn broadcast_transaction<T>(&self, val: T) {
-       unimplemented!();
+        unimplemented!();
     }
 
     /// Returns the actual blockchain global configuration.

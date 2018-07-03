@@ -25,12 +25,14 @@ use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::slice;
 
+use blockchain::{
+    Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+    TransactionMessage, TransactionResult, TxLocation,
+};
 use crypto::{CryptoHash, Hash};
-use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
-                 TransactionResult, TxLocation, TransactionMessage};
 use encoding;
 use helpers::Height;
-use messages::{Precommit, Message, RawTransaction, SignedMessage};
+use messages::{Message, Precommit, RawTransaction, SignedMessage};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
@@ -681,12 +683,12 @@ impl<'a> BlockchainExplorer<'a> {
         let schema = Schema::new(&self.snapshot);
         let raw_tx = schema.transactions().get(tx_hash)?;
 
-        let content = match TransactionMessage::tx_from_raw(raw_tx, &*self.transaction_parser){
+        let content = match TransactionMessage::tx_from_raw(raw_tx, &*self.transaction_parser) {
             Err(e) => {
-                error ! ("Error while parsing transaction {:?}: {}", tx_hash, e);
+                error!("Error while parsing transaction {:?}: {}", tx_hash, e);
                 return None;
-            },
-            Ok(v) => v
+            }
+            Ok(v) => v,
         };
 
         if schema.transactions_pool().contains(tx_hash) {

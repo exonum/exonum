@@ -23,10 +23,10 @@
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 
 extern crate atty;
+extern crate bincode;
 extern crate bit_vec;
 extern crate bodyparser;
 extern crate byteorder;
-extern crate bincode;
 extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
@@ -89,8 +89,8 @@ pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
-pub mod explorer;
 pub mod api;
+pub mod explorer;
 
 mod events;
 #[cfg(test)]

@@ -37,8 +37,8 @@ use router::Router;
 
 use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
 use exonum::crypto::Hash;
-use exonum::encoding::Error as EncodingError;
 use exonum::encoding::serialize::json::reexport as serde_json;
+use exonum::encoding::Error as EncodingError;
 use exonum::helpers::fabric::{self, Context};
 use exonum::messages::RawTransaction;
 use exonum::storage::Snapshot;

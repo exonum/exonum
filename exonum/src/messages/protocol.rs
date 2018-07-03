@@ -26,16 +26,16 @@
 //!     * processing - how message is processed and result of the processing
 //!     * generation - in which cases message is generated
 
-use chrono::{DateTime, Utc};
 use bit_vec::BitVec;
+use chrono::{DateTime, Utc};
 
-use std::net::SocketAddr;
 use std::fmt::{Debug, Error, Formatter};
+use std::net::SocketAddr;
 
-use crypto::{Hash, PublicKey};
+use super::{RawTransaction, SignedMessage};
 use blockchain;
+use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
-use super::{SignedMessage, RawTransaction};
 
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -134,7 +134,6 @@ impl ConsensusMessage {
             ConsensusMessage::Precommit(ref msg) => msg.round(),
         }
     }
-
 }
 
 impl Debug for ConsensusMessage {
@@ -437,8 +436,7 @@ encoding_struct! {
     }
 }
 
-
-pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol> + Clone{}
+pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol> + Clone {}
 impl<T: Debug + Into<Protocol> + PartialEq<Protocol> + Clone> ProtocolMessage for T {}
 /*
 pub enum Protocol {
@@ -508,42 +506,42 @@ macro_rules! impl_protocol {
 //TODO: Replace by better arm parsing
 
 impl_protocol!{Connect => c =
-    (Protocol::Connect(c)) => Protocol::Connect(ref c)}
+(Protocol::Connect(c)) => Protocol::Connect(ref c)}
 impl_protocol!{Status => c =
-    (Protocol::Status(c)) => Protocol::Status(ref c)}
+(Protocol::Status(c)) => Protocol::Status(ref c)}
 impl_protocol!{BlockResponse => c =
-    (Protocol::Block(c)) => Protocol::Block(ref c)}
+(Protocol::Block(c)) => Protocol::Block(ref c)}
 impl_protocol!{RawTransaction => c =
-    (Protocol::Transaction(c)) => Protocol::Transaction(ref c)}
+(Protocol::Transaction(c)) => Protocol::Transaction(ref c)}
 impl_protocol!{TransactionsResponse => c =
-    (Protocol::TransactionsBatch(c)) => Protocol::TransactionsBatch(ref c)}
+(Protocol::TransactionsBatch(c)) => Protocol::TransactionsBatch(ref c)}
 
 impl_protocol!{ConsensusMessage => c =
-    (Protocol::Consensus(c)) => Protocol::Consensus(ref c)}
+(Protocol::Consensus(c)) => Protocol::Consensus(ref c)}
 impl_protocol!{Propose => c =
-    (Protocol::Consensus(ConsensusMessage::Propose(c))) =>
-    Protocol::Consensus(ConsensusMessage::Propose(ref c))}
+(Protocol::Consensus(ConsensusMessage::Propose(c))) =>
+Protocol::Consensus(ConsensusMessage::Propose(ref c))}
 impl_protocol!{Prevote => c =
-    (Protocol::Consensus(ConsensusMessage::Prevote(c))) =>
-    Protocol::Consensus(ConsensusMessage::Prevote(ref c))}
+(Protocol::Consensus(ConsensusMessage::Prevote(c))) =>
+Protocol::Consensus(ConsensusMessage::Prevote(ref c))}
 impl_protocol!{Precommit => c =
-    (Protocol::Consensus(ConsensusMessage::Precommit(c))) =>
-    Protocol::Consensus(ConsensusMessage::Precommit(ref c))}
+(Protocol::Consensus(ConsensusMessage::Precommit(c))) =>
+Protocol::Consensus(ConsensusMessage::Precommit(ref c))}
 
 impl_protocol!{RequestMessage => c =
-    (Protocol::Request(c)) => Protocol::Request(ref c)}
+(Protocol::Request(c)) => Protocol::Request(ref c)}
 impl_protocol!{ProposeRequest => c =
-    (Protocol::Request(RequestMessage::Propose(c))) =>
-    Protocol::Request(RequestMessage::Propose(ref c))}
+(Protocol::Request(RequestMessage::Propose(c))) =>
+Protocol::Request(RequestMessage::Propose(ref c))}
 impl_protocol!{TransactionsRequest => c =
-    (Protocol::Request(RequestMessage::Transactions(c))) =>
-    Protocol::Request(RequestMessage::Transactions(ref c))}
+(Protocol::Request(RequestMessage::Transactions(c))) =>
+Protocol::Request(RequestMessage::Transactions(ref c))}
 impl_protocol!{PrevotesRequest => c =
-    (Protocol::Request(RequestMessage::Prevotes(c))) =>
-    Protocol::Request(RequestMessage::Prevotes(ref c))}
+(Protocol::Request(RequestMessage::Prevotes(c))) =>
+Protocol::Request(RequestMessage::Prevotes(ref c))}
 impl_protocol!{PeersRequest => c =
-    (Protocol::Request(RequestMessage::Peers(c))) =>
-    Protocol::Request(RequestMessage::Peers(ref c))}
+(Protocol::Request(RequestMessage::Peers(c))) =>
+Protocol::Request(RequestMessage::Peers(ref c))}
 impl_protocol!{BlockRequest => c =
-    (Protocol::Request(RequestMessage::Block(c))) =>
-    Protocol::Request(RequestMessage::Block(ref c))}
+(Protocol::Request(RequestMessage::Block(c))) =>
+Protocol::Request(RequestMessage::Block(ref c))}

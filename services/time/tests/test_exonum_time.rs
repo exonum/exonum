@@ -26,12 +26,14 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 
 use exonum::blockchain::{Schema, Transaction, TransactionErrorType};
-use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, CryptoHash, PublicKey};
+use exonum::helpers::{Height, ValidatorId};
 use exonum::storage::Snapshot;
-use exonum_time::{TimeService, api::ValidatorTime, schema::TimeSchema,
-                  time_provider::MockTimeProvider, transactions::Error, transactions::TxTime};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
+use exonum_time::{
+    api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
+    transactions::TxTime, TimeService,
+};
 
 fn assert_storage_times_eq<T: AsRef<Snapshot>>(
     snapshot: T,

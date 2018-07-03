@@ -14,10 +14,10 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crypto::{CryptoHash, Hash, HashStream};
-use storage::StorageValue;
 use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 use super::node::{BranchNode, Node};
+use crypto::{CryptoHash, Hash, HashStream};
+use storage::StorageValue;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -47,8 +47,8 @@ impl<'de> Deserialize<'de> for ProofPath {
     where
         D: Deserializer<'de>,
     {
-        use std::fmt;
         use serde::de::{self, Unexpected, Visitor};
+        use std::fmt;
 
         struct ProofPathVisitor;
 
@@ -462,8 +462,8 @@ where
     V: StorageValue,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
-        use std::cmp::Ordering;
         use self::MapProofError::*;
+        use std::cmp::Ordering;
 
         // Check that entries in proof are in increasing order
         for w in self.proof.windows(2) {

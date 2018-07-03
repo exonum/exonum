@@ -14,18 +14,18 @@
 
 #![allow(unsafe_code)]
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
-use uuid::{self, Uuid};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use rust_decimal::Decimal;
+use uuid::{self, Uuid};
 
 use std::mem;
-use std::result::Result as StdResult;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::result::Result as StdResult;
 
+use super::{CheckedOffset, Error, Offset, Result};
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
-use super::{CheckedOffset, Error, Offset, Result};
 
 const SOCKET_ADDR_HEADER_SIZE: usize = 1;
 const PORT_SIZE: usize = 2;
@@ -77,50 +77,61 @@ pub trait Field<'a> {
 /// - writer signature is `fn (&mut [u8], T)`
 #[macro_export]
 macro_rules! implement_std_field {
-    ($name:ident $fn_read:expr; $fn_write:expr) => (
+    ($name:ident $fn_read:expr; $fn_write:expr) => {
         impl<'a> Field<'a> for $name {
             fn field_size() -> $crate::encoding::Offset {
                 mem::size_of::<$name>() as $crate::encoding::Offset
             }
 
-            unsafe fn read(buffer: &'a [u8],
-                           from: $crate::encoding::Offset,
-                           to: $crate::encoding::Offset) -> $name {
+            unsafe fn read(
+                buffer: &'a [u8],
+                from: $crate::encoding::Offset,
+                to: $crate::encoding::Offset,
+            ) -> $name {
                 $fn_read(&buffer[from as usize..to as usize])
             }
 
-            fn write(&self,
-                        buffer: &mut Vec<u8>,
-                        from: $crate::encoding::Offset,
-                        to: $crate::encoding::Offset) {
+            fn write(
+                &self,
+                buffer: &mut Vec<u8>,
+                from: $crate::encoding::Offset,
+                to: $crate::encoding::Offset,
+            ) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
         }
-    )
+    };
 }
 
 /// Implements `Field` for the tuple struct type definitions that contain simple types.
 macro_rules! implement_std_typedef_field {
-    ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
+    ($name:ident($t:ty) $fn_read:expr; $fn_write:expr) => {
         impl<'a> Field<'a> for $name {
             fn field_size() -> $crate::encoding::Offset {
                 mem::size_of::<$t>() as $crate::encoding::Offset
             }
 
-            unsafe fn read(buffer: &'a [u8],
-                           from: $crate::encoding::Offset,
-                           to: $crate::encoding::Offset) -> $name {
+            unsafe fn read(
+                buffer: &'a [u8],
+                from: $crate::encoding::Offset,
+                to: $crate::encoding::Offset,
+            ) -> $name {
                 $name($fn_read(&buffer[from as usize..to as usize]))
             }
 
-            fn write(&self,
-                        buffer: &mut Vec<u8>,
-                        from: $crate::encoding::Offset,
-                        to: $crate::encoding::Offset) {
-                $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
+            fn write(
+                &self,
+                buffer: &mut Vec<u8>,
+                from: $crate::encoding::Offset,
+                to: $crate::encoding::Offset,
+            ) {
+                $fn_write(
+                    &mut buffer[from as usize..to as usize],
+                    self.to_owned().into(),
+                )
             }
         }
-    )
+    };
 }
 
 /// Implement field helper for all POD types
@@ -129,34 +140,34 @@ macro_rules! implement_std_typedef_field {
 /// **Beware of platform specific data representation.**
 #[macro_export]
 macro_rules! implement_pod_as_ref_field {
-    ($name:ident) => (
+    ($name:ident) => {
         impl<'a> Field<'a> for &'a $name {
-            fn field_size() ->  $crate::encoding::Offset {
+            fn field_size() -> $crate::encoding::Offset {
                 ::std::mem::size_of::<$name>() as $crate::encoding::Offset
             }
 
-            unsafe fn read(buffer: &'a [u8],
-                            from: $crate::encoding::Offset,
-                            _: $crate::encoding::Offset) -> &'a $name
-            {
+            unsafe fn read(
+                buffer: &'a [u8],
+                from: $crate::encoding::Offset,
+                _: $crate::encoding::Offset,
+            ) -> &'a $name {
                 ::std::mem::transmute(&buffer[from as usize])
             }
 
-            fn write(&self,
-                        buffer: &mut Vec<u8>,
-                        from: $crate::encoding::Offset,
-                        to: $crate::encoding::Offset)
-            {
+            fn write(
+                &self,
+                buffer: &mut Vec<u8>,
+                from: $crate::encoding::Offset,
+                to: $crate::encoding::Offset,
+            ) {
                 let ptr: *const $name = *self as *const $name;
                 let slice = unsafe {
-                    ::std::slice::from_raw_parts(ptr as * const u8,
-                                                        ::std::mem::size_of::<$name>())};
+                    ::std::slice::from_raw_parts(ptr as *const u8, ::std::mem::size_of::<$name>())
+                };
                 buffer[from as usize..to as usize].copy_from_slice(slice);
             }
         }
-
-
-    )
+    };
 }
 
 impl<'a> Field<'a> for bool {

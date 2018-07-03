@@ -14,13 +14,13 @@
 
 #![allow(unsafe_code)]
 
-use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
+use byteorder::{ByteOrder, LittleEndian};
 
 use messages::SignedMessage;
 
-use crypto::Hash;
 use super::{CheckedOffset, Error, Field, Offset, Result};
+use crypto::Hash;
 
 /// Trait for fields, that has unknown `compile-time` size.
 /// Usually important for arrays,
@@ -178,7 +178,6 @@ impl<'a> SegmentField<'a> for SignedMessage {
     }
 }
 
-
 impl<'a, T> SegmentField<'a> for Vec<T>
 where
     T: Field<'a>,
@@ -299,8 +298,7 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 /// **Beware of platform specific data representation.**
 #[macro_export]
 macro_rules! implement_pod_array_field {
-    ($name:ident) => (
-
+    ($name:ident) => {
         impl<'a> SegmentField<'a> for &'a [$name] {
             fn item_size() -> Offset {
                 ::std::mem::size_of::<$name>() as Offset
@@ -313,26 +311,32 @@ macro_rules! implement_pod_array_field {
             unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
                 let to = from + count * Self::item_size();
                 let slice = &buffer[(from as usize)..(to as usize)];
-                ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
-                                            slice.len() / Self::item_size() as usize)
+                ::std::slice::from_raw_parts(
+                    slice.as_ptr() as *const Hash,
+                    slice.len() / Self::item_size() as usize,
+                )
             }
 
             fn extend_buffer(&self, buffer: &mut Vec<u8>) {
                 let slice = unsafe {
-                    ::std::slice::from_raw_parts(self.as_ptr() as *const u8,
-                                                self.len() * Self::item_size() as usize)
+                    ::std::slice::from_raw_parts(
+                        self.as_ptr() as *const u8,
+                        self.len() * Self::item_size() as usize,
+                    )
                 };
                 buffer.extend_from_slice(slice)
             }
 
-            fn check_data(_: &'a [u8],
-                        _: CheckedOffset,
-                        _: CheckedOffset,
-                        latest_segment: CheckedOffset) -> Result {
+            fn check_data(
+                _: &'a [u8],
+                _: CheckedOffset,
+                _: CheckedOffset,
+                latest_segment: CheckedOffset,
+            ) -> Result {
                 Ok(latest_segment)
             }
         }
-    )
+    };
 }
 
 implement_pod_array_field!{Hash}

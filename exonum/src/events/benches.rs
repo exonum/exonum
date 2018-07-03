@@ -17,9 +17,9 @@ use test::Bencher;
 use std::net::SocketAddr;
 use std::thread;
 
-use node::EventsPoolCapacity;
 use events::network::NetworkConfiguration;
 use events::tests::{connect_message, raw_message, TestEvents};
+use node::EventsPoolCapacity;
 
 struct BenchConfig {
     times: usize,

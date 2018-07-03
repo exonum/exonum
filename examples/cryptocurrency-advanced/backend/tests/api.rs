@@ -31,9 +31,9 @@ use exonum::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::CurrencyService;
 use cryptocurrency::transactions::{CreateWallet, Transfer};
 use cryptocurrency::wallet::Wallet;
+use cryptocurrency::CurrencyService;
 
 // Imports shared test constants.
 use constants::{ALICE_NAME, BOB_NAME};

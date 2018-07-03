@@ -14,23 +14,24 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
 use bit_vec::BitVec;
 use failure;
+use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
+use std::collections::{hash_map::Entry, BTreeMap, HashMap, HashSet};
 use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
 use std::ops::Deref;
+use std::time::{Duration, SystemTime};
 
-use messages::{Connect, ConsensusMessage, Message, RawTransaction,
-               Precommit, Prevote, Propose, SignedMessage};
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use node::whitelist::Whitelist;
+use messages::{
+    Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction, SignedMessage,
+};
 use node::timeout_adjuster::{Constant, Dynamic, MovingAverage, TimeoutAdjuster};
+use node::whitelist::Whitelist;
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: move request timeouts into node configuration (ECR-171)
 
@@ -365,7 +366,7 @@ impl State {
         tx_pool_capacity: usize,
         whitelist: Whitelist,
         stored: StoredConfiguration,
-        connect:  Message<Connect>,
+        connect: Message<Connect>,
         peers: HashMap<PublicKey, Message<Connect>>,
         last_hash: Hash,
         last_height: Height,

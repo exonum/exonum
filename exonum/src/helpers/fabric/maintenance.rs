@@ -17,15 +17,15 @@
 //! This module implements node maintenance actions.
 // spell-checker:ignore exts
 
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
 
-use blockchain::Schema;
-use helpers::config::ConfigFile;
-use storage::{Database, DbOptions, RocksDB};
-use node::NodeConfig;
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::{Argument, CommandName, Context};
+use blockchain::Schema;
+use helpers::config::ConfigFile;
+use node::NodeConfig;
+use storage::{Database, DbOptions, RocksDB};
 
 // Context entry for the path to the node config.
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";

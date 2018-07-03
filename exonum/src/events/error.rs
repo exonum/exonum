@@ -16,8 +16,8 @@
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
 use failure::{Error, Fail};
-use std::io;
 use std::error::Error as StdErr;
+use std::io;
 
 // Common error helpers (TODO move to helpers)
 

@@ -39,14 +39,15 @@ extern crate serde_json;
 pub mod api;
 /// Database schema.
 pub mod schema;
-/// Node transactions.
-pub mod transactions;
 /// System time provider.
 pub mod time_provider;
+/// Node transactions.
+pub mod transactions;
 
 use exonum::api::Api;
-use exonum::blockchain::{ApiContext, ExecutionError, Service, ServiceContext, Transaction,
-                         TransactionSet};
+use exonum::blockchain::{
+    ApiContext, ExecutionError, Service, ServiceContext, Transaction, TransactionSet,
+};
 use exonum::crypto::Hash;
 use exonum::encoding;
 use exonum::encoding::serialize::json::reexport::Value;
