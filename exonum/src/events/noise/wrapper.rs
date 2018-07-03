@@ -105,7 +105,7 @@ impl NoiseWrapper {
         // length we need to substract `TAG_LENGTH` multiplied by messages count
         // from `data.len()`.
         let len = data.len() - TAG_LENGTH * (data.len() / MAX_MESSAGE_LENGTH);
-        let mut decoded_message = vec![0u8; len];
+        let mut decoded_message = Vec::with_capacity(len);
 
         for msg in data.chunks(MAX_MESSAGE_LENGTH) {
             let len_to_read = if msg.len() == MAX_MESSAGE_LENGTH {
@@ -115,10 +115,10 @@ impl NoiseWrapper {
             };
 
             let read_to = self.read(msg, len_to_read)?;
-            debug_assert_eq!(read_to.len(), len_to_read);
             decoded_message.extend_from_slice(&read_to);
         }
 
+        debug_assert_eq!(len, decoded_message.len());
         Ok(BytesMut::from(decoded_message))
     }
 
@@ -131,14 +131,14 @@ impl NoiseWrapper {
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<Option<()>, io::Error> {
-        let mut len = 0usize;
-        let mut encoded_message = vec![0u8; 0];
+        // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
+        // calculate actual message length.
+        let len = msg.len() + TAG_LENGTH * ((msg.len() / MAX_MESSAGE_LENGTH) + 1);
+        let mut encoded_message = Vec::with_capacity(len);
 
         for msg in msg.chunks(MAX_MESSAGE_LENGTH - TAG_LENGTH) {
             let written = self.write(msg)?;
             encoded_message.extend_from_slice(&written);
-            debug_assert_eq!(written.len(), msg.len() + TAG_LENGTH);
-            len += written.len();
         }
 
         let mut msg_len_buf = vec![0u8; NOISE_HEADER_LENGTH];
@@ -147,6 +147,8 @@ impl NoiseWrapper {
         let encoded_message = &encoded_message[0..len];
         msg_len_buf.extend_from_slice(encoded_message);
         buf.extend_from_slice(&msg_len_buf);
+
+        debug_assert_eq!(len, encoded_message.len());
         Ok(None)
     }
 
