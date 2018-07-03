@@ -79,6 +79,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added a public `v1/consensus_status` endpoint. (#736)
 
+- Merged public healthcheck and consensus endpoints to `v1/healthcheck`. (#766)
+
 ### Bug fixes
 
 #### exonum
