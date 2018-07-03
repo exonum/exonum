@@ -33,9 +33,9 @@
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 pub use self::{
-    block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
-    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys}, genesis::GenesisConfig,
-    schema::{Schema, TxLocation}, service::{Service, ServiceContext, SharedNodeState},
+    block::{Block, BlockProof}, config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    genesis::GenesisConfig, schema::{Schema, TxLocation},
+    service::{Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
         TransactionResult, TransactionSet,
@@ -354,7 +354,6 @@ impl Blockchain {
 
             // Create block.
             let block = Block::new(
-                SCHEMA_MAJOR_VERSION,
                 proposer_id,
                 height,
                 tx_hashes.len() as u32,
