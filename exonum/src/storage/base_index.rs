@@ -13,6 +13,11 @@
 // limitations under the License.
 
 //! An implementation of base index with most common features.
+//!
+//! The `BaseIndex` structure is not intended for direct use, rather it is the
+//! basis for building other types of indices. The given section contains methods
+//! related to `BaseIndex` and the iterator over the items of this index.
+
 // spell-checker:ignore subprefix
 
 use std::{borrow::Cow, marker::PhantomData};
@@ -25,9 +30,9 @@ use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 /// This structure is not intended for direct use, rather it is the basis for building other types
 /// of indices.
 ///
-/// `BaseIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
-/// [`StorageValue`] trait. However, this structure is not bound to specific types and allows the
-/// use of *any* types as keys or values.
+/// `BaseIndex` requires that keys should implement the [`StorageKey`] trait and
+/// values should implement the [`StorageValue`] trait. However, this structure
+/// is not bound to specific types and allows the use of *any* types as keys or values.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
@@ -44,7 +49,7 @@ pub struct BaseIndex<T> {
 /// An iterator over the entries of a `BaseIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`BaseIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`BaseIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.BaseIndex.html#method.iter
 /// [`iter_from`]: struct.BaseIndex.html#method.iter_from
@@ -64,8 +69,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -91,11 +96,11 @@ where
         }
     }
 
-    /// Creates a new index representation based on the family name, index id inside family
+    /// Creates a new index representation based on the family name, index ID inside family
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -181,7 +186,7 @@ where
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
-    /// type is *any* key-value pair. An argument `subprefix` allows to specify a subset of keys
+    /// type is *any* key-value pair. An argument `subprefix` allows specifying a subset of keys
     /// for iteration.
     pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
     where
@@ -202,7 +207,7 @@ where
 
     /// Returns an iterator over the entries of the index in ascending order starting from the
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
-    /// allows to specify a subset of iteration.
+    /// allows specifying a subset of iteration.
     pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
     where
         P: StorageKey,
@@ -257,12 +262,12 @@ impl<'a> BaseIndex<&'a mut Fork> {
         self.view.remove(&self.name, key);
     }
 
-    /// Clears the index, removing entries with keys that starts with a prefix or all entries
+    /// Clears the index, removing entries with keys that start with a prefix or all entries
     /// if `prefix` is `None`.
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// Currently this method is not optimized to delete a large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     pub fn clear(&mut self) {

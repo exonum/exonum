@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of array list of items.
+//! An implementation of an array list of items.
+//!
+//! The given section contains methods related to `ListIndex` and the iterator
+//! over the items of this list.
 
 use std::{cell::Cell, marker::PhantomData};
 
@@ -21,10 +24,13 @@ use super::{
     StorageKey, StorageValue,
 };
 
-/// A list of items that implement `StorageValue` trait.
+/// A list of items where elements are added to the end of the list and are
+/// removed starting from the end of the list.
 ///
-/// `ListIndex` implements an array list, storing the element as values and using `u64` as an index.
-/// `ListIndex` requires that the elements implement the [`StorageValue`] trait.
+/// Access to the elements is obtained using the indices of the list items.
+/// `ListIndex` implements an array list, storing the elements as values and
+/// using `u64` as an index. `ListIndex` requires that elements implement the
+/// [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -34,10 +40,10 @@ pub struct ListIndex<T, V> {
     _v: PhantomData<V>,
 }
 
-/// An iterator over the items of a `ListIndex`.
+/// Returns an iterator over the items of a `ListIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`ListIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`ListIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.ListIndex.html#method.iter
 /// [`iter_from`]: struct.ListIndex.html#method.iter_from
@@ -54,8 +60,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -79,11 +85,11 @@ where
         }
     }
 
-    /// Creates a new index representation based on the name, index id in family
+    /// Creates a new index representation based on the name, index ID in family
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -112,7 +118,8 @@ where
         }
     }
 
-    /// Returns an element at that position or `None` if out of bounds.
+    /// Returns an element at the indicated position or `None` if the indicated
+    /// position is out of bounds.
     ///
     /// # Examples
     ///
@@ -132,7 +139,7 @@ where
         self.base.get(&index)
     }
 
-    /// Returns the last element of the list, or `None` if it is empty.
+    /// Returns the last element of the list or `None` if the list is empty.
     ///
     /// # Examples
     ///
@@ -283,7 +290,7 @@ where
         self.set_len(len + 1)
     }
 
-    /// Removes the last element from the list and returns it, or None if it is empty.
+    /// Removes the last element from the list and returns it, or returns `None` if it is empty.
     ///
     /// # Examples
     ///
@@ -340,9 +347,10 @@ where
         self.set_len(len);
     }
 
-    /// Shortens the list, keeping the first `len` elements and dropping the rest.
+    /// Shortens the list, keeping the indicated number of first `len` elements
+    /// and dropping the rest.
     ///
-    /// If `len` is greater than the list's current length, this has no effect.
+    /// If `len` is greater than the current length of the list, this has no effect.
     ///
     /// # Examples
     ///
@@ -371,7 +379,8 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `index` is equal or greater than the list's current length.
+    /// Panics if the indicated position (`index`) is equal to or greater than
+    /// the current length of the list.
     ///
     /// # Examples
     ///
@@ -405,8 +414,8 @@ where
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples
