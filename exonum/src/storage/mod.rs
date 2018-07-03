@@ -98,7 +98,6 @@
 //! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
 //! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
 //! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
-//! [`BaseIndex`]: base_index/struct.BaseIndex.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
