@@ -132,12 +132,14 @@ impl Snapshot for RocksDBSnapshot {
         }
     }
 
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
+    fn iter<'a>(&'a self, name: &str, from: Option<&[u8]>) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
+        let iterator_mode = match from {
+            Some(from) => IteratorMode::From(from, Direction::Forward),
+            None => IteratorMode::Start,
+        };
         let iter = match self._db.cf_handle(name) {
-            Some(cf) => self.snapshot
-                .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
-                .unwrap(),
+            Some(cf) => self.snapshot.iterator_cf(cf, iterator_mode).unwrap(),
             None => self.snapshot.iterator(IteratorMode::Start),
         };
         Box::new(RocksDBIterator {

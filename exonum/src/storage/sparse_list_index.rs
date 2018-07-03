@@ -317,7 +317,7 @@ where
     /// ```
     pub fn iter(&self) -> SparseListIndexIter<V> {
         SparseListIndexIter {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter(&(), Some(&0u64)),
         }
     }
 
@@ -340,7 +340,7 @@ where
     /// ```
     pub fn indices(&self) -> SparseListIndexKeys {
         SparseListIndexKeys {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter(&(), Some(&0u64)),
         }
     }
 
@@ -364,7 +364,7 @@ where
     /// ```
     pub fn values(&self) -> SparseListIndexValues<V> {
         SparseListIndexValues {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter(&(), Some(&0u64)),
         }
     }
 
@@ -389,7 +389,7 @@ where
     /// ```
     pub fn iter_from(&self, from: u64) -> SparseListIndexIter<V> {
         SparseListIndexIter {
-            base_iter: self.base.iter_from(&(), &from),
+            base_iter: self.base.iter(&(), Some(&from)),
         }
     }
 }

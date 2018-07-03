@@ -230,7 +230,7 @@ where
     /// ```
     pub fn iter(&self) -> ListIndexIter<V> {
         ListIndexIter {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter(&(), Some(&0u64)),
         }
     }
 
@@ -255,7 +255,7 @@ where
     /// ```
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
         ListIndexIter {
-            base_iter: self.base.iter_from(&(), &from),
+            base_iter: self.base.iter(&(), Some(&from)),
         }
     }
 }

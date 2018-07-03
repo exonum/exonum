@@ -411,7 +411,7 @@ where
     /// ```
     pub fn iter(&self) -> ProofListIndexIter<V> {
         ProofListIndexIter {
-            base_iter: self.base.iter(&0u8),
+            base_iter: self.base.iter(&0u8, None as Option<&[u8]>),
         }
     }
 
@@ -434,7 +434,7 @@ where
     /// ```
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
         ProofListIndexIter {
-            base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)),
+            base_iter: self.base.iter(&0u8, Some(&ProofListKey::leaf(from))),
         }
     }
 }

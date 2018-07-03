@@ -211,7 +211,7 @@ where
     /// ```
     pub fn iter(&self) -> MapIndexIter<K, V> {
         MapIndexIter {
-            base_iter: self.base.iter(&()),
+            base_iter: self.base.iter(&(), None as Option<&[u8]>),
         }
     }
 
@@ -234,7 +234,7 @@ where
     /// ```
     pub fn keys(&self) -> MapIndexKeys<K> {
         MapIndexKeys {
-            base_iter: self.base.iter(&()),
+            base_iter: self.base.iter(&(), None as Option<&[u8]>),
         }
     }
 
@@ -257,7 +257,7 @@ where
     /// ```
     pub fn values(&self) -> MapIndexValues<V> {
         MapIndexValues {
-            base_iter: self.base.iter(&()),
+            base_iter: self.base.iter(&(), None as Option<&[u8]>),
         }
     }
 
@@ -284,7 +284,7 @@ where
         Q: StorageKey + ?Sized,
     {
         MapIndexIter {
-            base_iter: self.base.iter_from(&(), from),
+            base_iter: self.base.iter(&(), Some(from)),
         }
     }
 
@@ -311,7 +311,7 @@ where
         Q: StorageKey + ?Sized,
     {
         MapIndexKeys {
-            base_iter: self.base.iter_from(&(), from),
+            base_iter: self.base.iter(&(), Some(from)),
         }
     }
 
@@ -337,7 +337,7 @@ where
         Q: StorageKey + ?Sized,
     {
         MapIndexValues {
-            base_iter: self.base.iter_from(&(), from),
+            base_iter: self.base.iter(&(), Some(from)),
         }
     }
 }

@@ -154,7 +154,7 @@ where
     /// ```
     pub fn iter(&self) -> KeySetIndexIter<K> {
         KeySetIndexIter {
-            base_iter: self.base.iter(&()),
+            base_iter: self.base.iter(&(), None as Option<&[u8]>),
         }
     }
 
@@ -177,7 +177,7 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
         KeySetIndexIter {
-            base_iter: self.base.iter_from(&(), from),
+            base_iter: self.base.iter(&(), Some(from)),
         }
     }
 }

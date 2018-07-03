@@ -185,30 +185,10 @@ where
             .contains(&self.name, &self.prefixed_key(key))
     }
 
-    /// Returns an iterator over the entries of the index in ascending order. The iterator element
-    /// type is *any* key-value pair. An argument `subprefix` allows specifying a subset of keys
-    /// for iteration.
-    pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
-    where
-        P: StorageKey,
-        K: StorageKey,
-        V: StorageValue,
-    {
-        let iter_prefix = self.prefixed_key(subprefix);
-        BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&self.name, &iter_prefix),
-            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
-            index_id: iter_prefix,
-            ended: false,
-            _k: PhantomData,
-            _v: PhantomData,
-        }
-    }
-
     /// Returns an iterator over the entries of the index in ascending order starting from the
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows specifying a subset of iteration.
-    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
+    pub fn iter<P, F, K, V>(&self, subprefix: &P, from: Option<&F>) -> BaseIndexIter<K, V>
     where
         P: StorageKey,
         F: StorageKey + ?Sized,
@@ -216,9 +196,14 @@ where
         V: StorageValue,
     {
         let iter_prefix = self.prefixed_key(subprefix);
-        let iter_from = self.prefixed_key(from);
+        let iter_from = from.map(|f| self.prefixed_key(f));
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&self.name, &iter_from),
+            base_iter: self.view.as_ref().iter(
+                &self.name,
+                iter_from
+                    .as_ref()
+                    .map_or(Some(iter_prefix.as_ref()), |f| Some(f.as_slice())),
+            ),
             base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
             index_id: iter_prefix,
             ended: false,

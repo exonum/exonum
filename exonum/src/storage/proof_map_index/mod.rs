@@ -190,7 +190,7 @@ where
 
     fn get_root_path(&self) -> Option<ProofPath> {
         self.base
-            .iter::<_, ProofPath, _>(&())
+            .iter::<_, _, ProofPath, _>(&(), None as Option<&ProofPath>)
             .next()
             .map(|(k, _): (ProofPath, ())| k)
     }
@@ -351,7 +351,7 @@ where
     /// ```
     pub fn iter(&self) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+            base_iter: self.base.iter(&LEAF_KEY_PREFIX, None as Option<&[u8]>),
             _k: PhantomData,
         }
     }
@@ -376,7 +376,7 @@ where
     /// ```
     pub fn keys(&self) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+            base_iter: self.base.iter(&LEAF_KEY_PREFIX, None as Option<&[u8]>),
             _k: PhantomData,
         }
     }
@@ -401,7 +401,7 @@ where
     /// ```
     pub fn values(&self) -> ProofMapIndexValues<V> {
         ProofMapIndexValues {
-            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+            base_iter: self.base.iter(&LEAF_KEY_PREFIX, None as Option<&[u8]>),
         }
     }
 
@@ -426,7 +426,8 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
+            base_iter: self.base
+                .iter(&LEAF_KEY_PREFIX, Some(&ProofPath::new(from))),
             _k: PhantomData,
         }
     }
@@ -452,7 +453,8 @@ where
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
+            base_iter: self.base
+                .iter(&LEAF_KEY_PREFIX, Some(&ProofPath::new(from))),
             _k: PhantomData,
         }
     }
@@ -478,7 +480,8 @@ where
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
         ProofMapIndexValues {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
+            base_iter: self.base
+                .iter(&LEAF_KEY_PREFIX, Some(&ProofPath::new(from))),
         }
     }
 }

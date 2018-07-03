@@ -34,7 +34,7 @@ fn fork_iter<T: Database>(db: T) {
     fn assert_iter(fork: &Fork, from: u8, assumed: &[(u8, u8)]) {
         let mut values = Vec::new();
 
-        let mut iter = fork.iter(IDX_NAME, &[from]);
+        let mut iter = fork.iter(IDX_NAME, Some(&[from]));
         while let Some((k, v)) = iter.next() {
             values.push((k[0], v[0]));
         }

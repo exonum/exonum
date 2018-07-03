@@ -188,7 +188,7 @@ where
     /// ```
     pub fn iter(&self) -> ValueSetIndexIter<V> {
         ValueSetIndexIter {
-            base_iter: self.base.iter(&()),
+            base_iter: self.base.iter(&(), None as Option<&[u8]>),
         }
     }
 
@@ -214,7 +214,7 @@ where
     /// ```
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
         ValueSetIndexIter {
-            base_iter: self.base.iter_from(&(), from),
+            base_iter: self.base.iter(&(), Some(from)),
         }
     }
 
@@ -237,7 +237,7 @@ where
     /// ```
     pub fn hashes(&self) -> ValueSetIndexHashes {
         ValueSetIndexHashes {
-            base_iter: self.base.iter(&()),
+            base_iter: self.base.iter(&(), None as Option<&[u8]>),
         }
     }
 
@@ -263,7 +263,7 @@ where
     /// ```
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
         ValueSetIndexHashes {
-            base_iter: self.base.iter_from(&(), from),
+            base_iter: self.base.iter(&(), Some(from)),
         }
     }
 }
