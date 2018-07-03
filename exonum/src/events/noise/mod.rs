@@ -22,7 +22,7 @@ use std::io;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
-use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
+use events::noise::wrapper::MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{
     codec::MessagesCodec, noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH},
 };
@@ -163,7 +163,7 @@ impl HandshakeRawMessage {
         sock: S,
     ) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
         let len = self.0.len();
-        debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
+        debug_assert!(len < MAX_HANDSHAKE_MESSAGE_LENGTH);
 
         write_all(sock, vec![len as u8; HANDSHAKE_HEADER_LENGTH])
             .and_then(move |(sock, _)| write_all(sock, self.0))

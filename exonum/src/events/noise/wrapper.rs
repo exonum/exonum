@@ -28,12 +28,12 @@ use std::{
 use events::noise::sodium_resolver::SodiumResolver;
 use events::noise::HandshakeParams;
 
-pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
+pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
 pub const NOISE_HEADER_LENGTH: usize = 4;
 pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
-pub const NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
-pub const NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
+pub const MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
+pub const MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
@@ -72,13 +72,11 @@ impl NoiseWrapper {
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<Vec<u8>, NoiseError> {
-        if input.len() < NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH
-            || input.len() > NOISE_MAX_MESSAGE_LENGTH
-        {
+        if input.len() < MIN_HANDSHAKE_MESSAGE_LENGTH || input.len() > MAX_MESSAGE_LENGTH {
             return Err(NoiseError::WrongMessageLength(input.len()));
         }
 
-        self.read(input, NOISE_MAX_MESSAGE_LENGTH)
+        self.read(input, MAX_MESSAGE_LENGTH)
     }
 
     pub fn write_handshake_msg(&mut self) -> Result<Vec<u8>, NoiseError> {
@@ -101,18 +99,25 @@ impl NoiseWrapper {
     pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
         let data = buf.split_to(len + NOISE_HEADER_LENGTH).to_vec();
         let data = &data[NOISE_HEADER_LENGTH..];
-        let mut decoded_message = vec![0u8; 0];
 
-        data.chunks(NOISE_MAX_MESSAGE_LENGTH).for_each(|msg| {
-            let len_to_read = if msg.len() == NOISE_MAX_MESSAGE_LENGTH {
+        // Each message consists of the payload and 16 bytes(`TAG_LENGTH`)
+        // of AEAD authentification data. Therefore to calculate an actual message
+        // length we need to substract `TAG_LENGTH` multiplied by messages count
+        // from `data.len()`.
+        let len = data.len() - TAG_LENGTH * (data.len() / MAX_MESSAGE_LENGTH);
+        let mut decoded_message = vec![0u8; len];
+
+        for msg in data.chunks(MAX_MESSAGE_LENGTH) {
+            let len_to_read = if msg.len() == MAX_MESSAGE_LENGTH {
                 msg.len() - TAG_LENGTH
             } else {
                 msg.len()
             };
 
-            let read_to = self.read(msg, len_to_read).unwrap();
+            let read_to = self.read(msg, len_to_read)?;
+            debug_assert_eq!(read_to.len(), len_to_read);
             decoded_message.extend_from_slice(&read_to);
-        });
+        }
 
         Ok(BytesMut::from(decoded_message))
     }
@@ -129,12 +134,12 @@ impl NoiseWrapper {
         let mut len = 0usize;
         let mut encoded_message = vec![0u8; 0];
 
-        msg.chunks(NOISE_MAX_MESSAGE_LENGTH - TAG_LENGTH)
-            .for_each(|msg| {
-                let written = self.write(msg).unwrap();
-                encoded_message.extend_from_slice(&written);
-                len += written.len();
-            });
+        for msg in msg.chunks(MAX_MESSAGE_LENGTH - TAG_LENGTH) {
+            let written = self.write(msg)?;
+            encoded_message.extend_from_slice(&written);
+            debug_assert_eq!(written.len(), msg.len() + TAG_LENGTH);
+            len += written.len();
+        }
 
         let mut msg_len_buf = vec![0u8; NOISE_HEADER_LENGTH];
 
@@ -152,9 +157,10 @@ impl NoiseWrapper {
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
+        let mut buf = vec![0u8; MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
-        Ok(buf[..len].to_vec())
+        buf.truncate(len);
+        Ok(buf)
     }
 
     fn noise_builder<'a>() -> NoiseBuilder<'a> {
