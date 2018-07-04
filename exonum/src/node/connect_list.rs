@@ -17,10 +17,8 @@
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 
-use blockchain::ValidatorKeys;
 use crypto::PublicKey;
-use helpers::fabric::NodePublicConfig;
-use node::ConnectInfo;
+use node::{ConnectInfo, ConnectListConfig};
 
 /// `ConnectList` stores mapping between IP-addresses and public keys.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -31,6 +29,17 @@ pub struct ConnectList {
 }
 
 impl ConnectList {
+    /// Creates `ConnectList` from config.
+    pub fn from_config(config: ConnectListConfig) -> Self {
+        let peers: BTreeMap<PublicKey, SocketAddr> = config
+            .peers
+            .into_iter()
+            .map(|peer| (peer.public_key, peer.address))
+            .collect();
+
+        ConnectList { peers }
+    }
+
     /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
         self.peers.contains_key(peer)
@@ -46,37 +55,12 @@ impl ConnectList {
         self.peers.insert(peer.public_key, peer.address);
     }
 
-    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
-    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
-        let peers: BTreeMap<PublicKey, SocketAddr> = peers
-            .iter()
-            .zip(validators_keys.iter())
-            .map(|(p, v)| (v.consensus_key, *p))
-            .collect();
-
-        Self { peers }
-    }
-
-    /// Creates `ConnectList` from validators public configs.
-    pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
-        let peers: BTreeMap<PublicKey, SocketAddr> = list.iter()
-            .map(|config| (config.validator_keys.consensus_key, config.addr))
-            .collect();
-
-        Self { peers }
-    }
-
     /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
         self.peers
             .iter()
             .find(|(_, a)| a == &address)
             .map(|(p, _)| p)
-    }
-
-    /// `ConnectList` peers addresses.
-    pub fn addresses(&self) -> Vec<SocketAddr> {
-        self.peers.values().cloned().collect()
     }
 }
 
