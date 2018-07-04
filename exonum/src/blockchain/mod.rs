@@ -58,7 +58,7 @@ use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
 use node::ApiSender;
-use storage::{Database, Error, Fork, Patch, Snapshot};
+use storage::{self, Database, Error, Fork, Patch, Snapshot};
 
 mod block;
 mod genesis;
@@ -169,24 +169,54 @@ impl Blockchain {
     }
 
     /// Returns the latest committed block.
-    ///
-    /// # Panics
-    ///
-    /// If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block()
     }
 
     /// Creates and commits the genesis block with the given genesis configuration
     /// if the blockchain has not been initialized.
+    ///
+    /// # Panics
+    ///
+    /// * If the genesis block was not committed.
+    /// * If storage version is not specified or not supported.
     pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let has_genesis_block = !Schema::new(&self.snapshot())
             .block_hashes_by_height()
             .is_empty();
-        if !has_genesis_block {
+        if has_genesis_block {
+            self.assert_storage_version();
+        } else {
+            self.initialize_metadata();
             self.create_genesis_block(cfg)?;
         }
         Ok(())
+    }
+
+    /// Initialized node-local metadata.
+    fn initialize_metadata(&mut self) {
+        let mut fork = self.db.fork();
+        storage::StorageMetadata::write_current(&mut fork);
+        if self.merge(fork.into_patch()).is_ok() {
+            info!(
+                "Storage version successfully initialized with value [{}].",
+                storage::StorageMetadata::read(&self.db.snapshot()).unwrap(),
+            )
+        } else {
+            panic!("Could not set database version.")
+        }
+    }
+
+    /// Checks if storage version is supported.
+    ///
+    /// # Panics
+    ///
+    /// Panics if version is not supported or is not specified.
+    fn assert_storage_version(&self) {
+        match storage::StorageMetadata::read(self.db.snapshot()) {
+            Ok(ver) => info!("Storage version is supported with value [{}].", ver),
+            Err(e) => panic!("{}", e),
+        }
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
