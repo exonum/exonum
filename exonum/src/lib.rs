@@ -22,9 +22,19 @@
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
-          stutter, similar_names, items_after_statements, use_self,
+          items_after_statements, option_map_unwrap_or_else,
+          // Next cast.. lints don't give alternatives.
           cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
-          pub_enum_variant_names, single_match_else, option_map_unwrap_or_else
+          // The lint does not work properly with desugaring and macro.
+          used_underscore_binding,
+          // Variant name ends with the enum's name. Similar behavior to similar_names.
+          pub_enum_variant_names,
+          // filter(..).map(..) often looks more shorter and readable.
+          filter_map,
+          // Next lints produce too much noise.
+          stutter, similar_names,
+          // Next lints allowed due to false possitive.
+          doc_markdown, use_self,
     )
 )]
 

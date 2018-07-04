@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::cmp::{min, Ordering};
+use std::ops;
 
 use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
 use storage::StorageKey;
@@ -151,7 +152,7 @@ pub enum ChildKind {
     Right,
 }
 
-impl ::std::ops::Not for ChildKind {
+impl ops::Not for ChildKind {
     type Output = Self;
 
     fn not(self) -> Self {

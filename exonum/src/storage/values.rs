@@ -244,11 +244,11 @@ impl StorageValue for RawMessage {
 }
 
 impl StorageValue for Vec<u8> {
-    fn into_bytes(self) -> Self {
+    fn into_bytes(self) -> Vec<u8> {
         self
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Vec<u8> {
         value.into_owned()
     }
 }

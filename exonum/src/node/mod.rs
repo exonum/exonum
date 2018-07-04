@@ -549,19 +549,16 @@ impl NodeHandler {
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         let public_key = self.state.connect_list().find_key_by_address(&address);
 
-        match public_key {
-            Some(public_key) => {
-                trace!("Send to address: {}", address);
-                let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
-                self.channel.network_requests.send(request).log_error();
-            }
-            _ => {
-                warn!(
-                    "Attempt to connect to the peer with address {:?} which \
+        if let Some(public_key) = public_key {
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+            self.channel.network_requests.send(request).log_error();
+        } else {
+            warn!(
+                "Attempt to connect to the peer with address {:?} which \
                      is not in the ConnectList",
-                    address
-                );
-            }
+                address
+            );
         }
     }
 

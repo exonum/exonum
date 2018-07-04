@@ -76,21 +76,18 @@ impl NodeHandler {
             return;
         }
 
-        let key = match self.state.consensus_public_key_of(msg.validator()) {
-            Some(public_key) => {
-                if !msg.verify(&public_key) {
-                    error!(
-                        "Received consensus message with incorrect signature, msg={:?}",
-                        msg
-                    );
-                    return;
-                }
-                public_key
-            }
-            None => {
-                error!("Received message from incorrect validator, msg={:?}", msg);
+        let key = if let Some(public_key) = self.state.consensus_public_key_of(msg.validator()) {
+            if !msg.verify(&public_key) {
+                error!(
+                    "Received consensus message with incorrect signature, msg={:?}",
+                    msg
+                );
                 return;
             }
+            public_key
+        } else {
+            error!("Received message from incorrect validator, msg={:?}", msg);
+            return;
         };
 
         trace!("Handle message={:?}", msg);
