@@ -52,7 +52,7 @@ impl DbOptions {
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: rocksdb::Snapshot<'static>,
-    _db: Arc<rocksdb::DB>,
+    db: Arc<rocksdb::DB>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -104,7 +104,7 @@ impl Database for RocksDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-            _db: Arc::clone(&self.db),
+            db: Arc::clone(&self.db),
         })
     }
 
@@ -122,7 +122,7 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self._db.cf_handle(name) {
+        if let Some(cf) = self.db.cf_handle(name) {
             match self.snapshot.get_cf(cf, key) {
                 Ok(value) => value.map(|v| v.to_vec()),
                 Err(e) => panic!(e),
@@ -134,7 +134,7 @@ impl Snapshot for RocksDBSnapshot {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
-        let iter = match self._db.cf_handle(name) {
+        let iter = match self.db.cf_handle(name) {
             Some(cf) => self.snapshot
                 .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
                 .unwrap(),

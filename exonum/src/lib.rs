@@ -22,11 +22,8 @@
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
-          option_map_unwrap_or_else,
           // Next cast.. lints don't give alternatives.
           cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
-          // The lint does not work properly with desugaring and macro.
-          used_underscore_binding,
           // filter(..).map(..) often looks more shorter and readable.
           filter_map,
           // Next lints produce too much noise.
@@ -35,7 +32,8 @@
           pub_enum_variant_names,
           // Next lints allowed due to false possitive.
           doc_markdown,
-          use_self, // can be enabled when rust-lang-nursery/rust-clippy#2894 is fixed.
+          // Can be enabled when rust-lang-nursery/rust-clippy#2894 is fixed.
+          use_self,
     )
 )]
 

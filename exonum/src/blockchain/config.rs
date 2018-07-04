@@ -136,7 +136,7 @@ impl ConsensusConfig {
     pub fn warn_if_nonoptimal(&self) {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
-        
+
         if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \

@@ -806,16 +806,14 @@ impl State {
     pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
         self.prevotes
             .get(&(round, propose_hash))
-            .map(|votes| votes.messages().as_slice())
-            .unwrap_or_else(|| &[])
+            .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns pre-commits for the specified round and propose hash.
     pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
         self.precommits
             .get(&(round, propose_hash))
-            .map(|votes| votes.messages().as_slice())
-            .unwrap_or_else(|| &[])
+            .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns `true` if this node has pre-vote for the specified round.
