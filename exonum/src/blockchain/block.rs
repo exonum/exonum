@@ -16,9 +16,6 @@ use crypto::Hash;
 use helpers::{Height, ValidatorId};
 use messages::Precommit;
 
-/// Current core information schema version.
-pub const SCHEMA_MAJOR_VERSION: u16 = 0;
-
 encoding_struct! {
     /// Exonum block header data structure.
     ///
@@ -29,8 +26,6 @@ encoding_struct! {
     /// The header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
     struct Block {
-        /// Schema version.
-        schema_version: u16,
         /// Identifier of the leader node which has proposed the block.
         proposer_id: ValidatorId,
         /// Height of the block, which is also the number of this particular
@@ -77,7 +72,6 @@ mod tests {
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
         let block = Block::new(
-            SCHEMA_MAJOR_VERSION,
             proposer_id,
             height,
             tx_count,
@@ -86,7 +80,6 @@ mod tests {
             &state_hash,
         );
 
-        assert_eq!(block.schema_version(), SCHEMA_MAJOR_VERSION);
         assert_eq!(block.proposer_id(), proposer_id);
         assert_eq!(block.height(), height);
         assert_eq!(block.tx_count(), tx_count);
