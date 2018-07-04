@@ -281,7 +281,7 @@ impl From<Round> for u32 {
 
 impl From<Round> for u64 {
     fn from(val: Round) -> Self {
-        Self::from(val.0)
+        u64::from(val.0)
     }
 }
 
@@ -299,7 +299,7 @@ impl From<ValidatorId> for u16 {
 
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
-        val.0 as Self
+        val.0 as usize
     }
 }
 

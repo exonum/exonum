@@ -114,11 +114,11 @@ impl StorageValue for bool {
 }
 
 impl StorageValue for u8 {
-    fn into_bytes(self) -> Vec<Self> {
+    fn into_bytes(self) -> Vec<u8> {
         vec![self]
     }
 
-    fn from_bytes(value: Cow<[Self]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Self {
         assert_eq!(value.len(), 1);
         value[0]
     }
@@ -153,7 +153,7 @@ impl StorageValue for u32 {
 /// Uses little-endian encoding.
 impl StorageValue for u64 {
     fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<Self>()];
+        let mut v = vec![0; mem::size_of::<u64>()];
         LittleEndian::write_u64(&mut v, self);
         v
     }
@@ -170,7 +170,7 @@ impl StorageValue for i8 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         assert_eq!(value.len(), 1);
-        value[0] as Self
+        value[0] as i8
     }
 }
 
@@ -317,7 +317,7 @@ impl StorageValue for Uuid {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::from_bytes(&value).unwrap()
+        Uuid::from_bytes(&value).unwrap()
     }
 }
 

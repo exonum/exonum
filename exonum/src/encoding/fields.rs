@@ -223,11 +223,11 @@ impl<'a> Field<'a> for u8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [Self], from: Offset, _: Offset) -> Self {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize]
     }
 
-    fn write(&self, buffer: &mut Vec<Self>, from: Offset, _: Offset) {
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self;
     }
 }
@@ -239,7 +239,7 @@ impl<'a> Field<'a> for i8 {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
-        buffer[from as usize] as Self
+        buffer[from as usize] as i8
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {

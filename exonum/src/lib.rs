@@ -24,7 +24,7 @@
     allow(
           stutter, similar_names, items_after_statements, use_self,
           cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
-          pub_enum_variant_names
+          pub_enum_variant_names, single_match_else, option_map_unwrap_or_else
     )
 )]
 

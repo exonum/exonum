@@ -804,7 +804,6 @@ impl State {
 
     /// Returns pre-votes for the specified round and propose hash.
     pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
-        #[cfg_attr(feature = "cargo-clippy", allow(option_map_unwrap_or_else))]
         self.prevotes
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())
@@ -813,7 +812,6 @@ impl State {
 
     /// Returns pre-commits for the specified round and propose hash.
     pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
-        #[cfg_attr(feature = "cargo-clippy", allow(option_map_unwrap_or_else))]
         self.precommits
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())

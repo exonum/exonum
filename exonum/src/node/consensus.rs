@@ -76,7 +76,6 @@ impl NodeHandler {
             return;
         }
 
-        #[cfg_attr(feature = "cargo-clippy", allow(single_match_else))]
         let key = match self.state.consensus_public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(&public_key) {
