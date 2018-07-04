@@ -15,7 +15,7 @@
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{Schema as CoreSchema, StoredConfiguration}, crypto::{CryptoHash, Hash},
-    helpers::Height, node::TransactionSend, storage::StorageValue,
+    helpers::Height, storage::StorageValue,
 };
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};
@@ -176,10 +176,7 @@ impl PublicApi {
             .map(|cfg| Self::config_with_proofs(state, cfg)))
     }
 
-    fn handle_config_by_hash(
-        state: &ServiceApiState,
-        query: HashQuery,
-    ) -> api::Result<ConfigInfo> {
+    fn handle_config_by_hash(state: &ServiceApiState, query: HashQuery) -> api::Result<ConfigInfo> {
         let snapshot = state.snapshot();
 
         let committed_config = CoreSchema::new(&snapshot).configs().get(&query.hash);

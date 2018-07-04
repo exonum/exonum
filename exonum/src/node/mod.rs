@@ -39,16 +39,16 @@ use std::{
 };
 
 use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys, TransactionMessage
+    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
-    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
-    NetworkRequest, SyncSender, TimeoutRequest,
+    error::{into_failure, log_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
+    SyncSender, TimeoutRequest,
 };
 use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Connect, Message, ProtocolMessage, SignedMessage};
+use messages::{Connect, Message, ProtocolMessage, RawTransaction, SignedMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -63,7 +63,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Box<dyn Transaction>),
+    Transaction(Message<RawTransaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -529,7 +529,7 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its id.
-    pub fn send_to_validator<M: Into<SignedMessage>>(&mut self, id: u32, message: M) {
+    pub(crate) fn send_to_validator<M: Into<SignedMessage>>(&mut self, id: u32, message: M) {
         if id as usize >= self.state.validators().len() {
             error!("Invalid validator id: {}", id);
         } else {
@@ -539,7 +539,11 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer<M: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: M) {
+    pub(crate) fn send_to_peer<M: Into<SignedMessage>>(
+        &mut self,
+        public_key: PublicKey,
+        message: M,
+    ) {
         let address = {
             if let Some(conn) = self.state.peers().get(&public_key) {
                 conn.addr()
@@ -556,14 +560,18 @@ impl NodeHandler {
     }
 
     /// Sends `SignedMessage` to the specified address.
-    pub fn send_to_addr<M: Into<SignedMessage>>(&mut self, address: &SocketAddr, message: M) {
+    pub(crate) fn send_to_addr<M: Into<SignedMessage>>(
+        &mut self,
+        address: &SocketAddr,
+        message: M,
+    ) {
         trace!("Send to address: {}", address);
         let public_key = self.state.connect_list().find_key_by_address(&address);
 
         match public_key {
             Some(public_key) => {
                 trace!("Send to address: {}", address);
-                let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+                let request = NetworkRequest::SendMessage(*address, message.into(), *public_key);
                 self.channel.network_requests.send(request).log_error();
             }
             _ => {
@@ -577,15 +585,15 @@ impl NodeHandler {
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
+    pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
         let peers: Vec<SocketAddr> = self.state
             .peers()
             .values()
             .map(|conn| conn.addr())
             .collect();
-
+        let message = message.into();
         for address in peers {
-            self.send_to_addr(&address, message);
+            self.send_to_addr(&address, message.clone());
         }
     }
 
@@ -708,13 +716,6 @@ impl fmt::Debug for NodeHandler {
     }
 }
 
-/// `TransactionSend` represents interface for sending transactions. For details see `ApiSender`
-/// implementation.
-pub trait TransactionSend: Send + Sync {
-    /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()>;
-}
-
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> ApiSender {
@@ -736,19 +737,13 @@ impl ApiSender {
             .map(drop)
             .map_err(into_failure)
     }
-}
-/*
-impl TransactionSend for ApiSender {
-    fn send(&self, tx: UncheckedBuffer) -> io::Result<()> {
-        if !tx.verify() {
-            let msg = "Unable to verify transaction";
-            return Err(io::Error::new(io::ErrorKind::Other, msg));
-        }
+    /// Broadcast transaction to other node.
+    pub fn broadcast_transaction(&self, tx: Message<RawTransaction>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
 }
-*/
+
 impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")

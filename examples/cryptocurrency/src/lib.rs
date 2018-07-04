@@ -280,7 +280,7 @@ pub mod contracts {
 pub mod api {
     use exonum::{
         api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::Transaction,
-        crypto::{Hash, PublicKey}, node::TransactionSend,
+        crypto::{Hash, PublicKey},
     };
 
     use schema::{CurrencySchema, Wallet};

@@ -19,7 +19,7 @@ use tokio_io::codec::{Decoder, Encoder};
 use failure::{self, Error};
 
 use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
-use messages::{UncheckedBuffer, SignedMessage};
+use messages::{SignedMessage, UncheckedBuffer};
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -84,7 +84,7 @@ mod test {
     use crypto::{gen_keypair_from_seed, Seed};
     use events::noise::wrapper::NoiseWrapper;
     use events::noise::HandshakeParams;
-    use messages::{MessageBuffer, RawMessage};
+    use messages::{MessageBuffer, SignedMessage};
     use tokio_io::codec::{Decoder, Encoder};
 
     #[test]

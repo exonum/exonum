@@ -14,13 +14,15 @@
 
 //! `Transaction` related types.
 
+use failure;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
-use crypto::{CryptoHash, Hash};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::{self, serialize::json::ExonumJson};
-use messages::{Message, RawTransaction, SignedMessage};
+use events::error::into_failure;
+use messages::{BinaryForm, Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -40,8 +42,11 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 pub type TransactionResult = Result<(), TransactionError>;
 
 #[derive(Serialize)]
+/// Data transfer object for transaction.
+/// This structure is used to send api info about transaction,
+/// and take some new transaction into pool from user input.
 pub struct TransactionMessage {
-    transaction: Box<Transaction>,
+    transaction: Box<dyn Transaction>,
     message: Message<RawTransaction>,
 }
 impl ::std::fmt::Debug for TransactionMessage {
@@ -52,25 +57,32 @@ impl ::std::fmt::Debug for TransactionMessage {
             .finish()
     }
 }
+
 impl TransactionMessage {
+    /// Returns raw transaction.
     pub fn raw(&self) -> &Message<RawTransaction> {
         &self.message
     }
-    pub fn tx_from_raw<F>(
+    /// Returns transaction smart contract.
+    pub fn transaction(&self) -> &Box<dyn Transaction> {
+        &self.transaction
+    }
+    /// Create new `TransactionMessage` from raw message.
+    pub(crate) fn tx_from_raw<F>(
         message: Message<RawTransaction>,
         parser: &F,
-    ) -> Result<Self, ::encoding::Error>
+    ) -> Result<Self, failure::Error>
     where
-        F: ?Sized + Fn(&Message<RawTransaction>) -> Result<Box<Transaction>, ::encoding::Error>,
+        F: ?Sized + Fn(&Message<RawTransaction>) -> Result<Box<dyn Transaction>, ::encoding::Error>,
     {
-        let transaction = parser(&message)?;
+        let transaction = parser(&message).map_err(into_failure)?;
         Ok(TransactionMessage {
             transaction,
             message,
         })
     }
 }
-impl ::serde::Serialize for Box<Transaction> {
+impl ::serde::Serialize for Box<dyn Transaction> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ::serde::Serializer,
@@ -136,7 +148,8 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// # fn main() {}
     fn verify(&self) -> bool;
 
-    /// Receives a fork of the current blockchain state and can modify it depending on the contents
+    /// Receives a `TransactionContext` witch contain fork
+    /// of the current blockchain state and can modify it depending on the contents
     /// of the transaction.
     ///
     /// # Notes
@@ -182,7 +195,40 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// #   fn verify(&self) -> bool { true }
     /// }
     /// # fn main() {}
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult;
+    fn execute<'a>(&self, context: TransactionContext<'a>) -> ExecutionResult;
+}
+
+//TODO: Add doc/examples.
+/// Wrapper around database and tx hash.
+#[derive(Debug)]
+pub struct TransactionContext<'a> {
+    fork: &'a mut Fork,
+    service_id: u16,
+    tx_hash: Hash,
+}
+
+impl<'a> TransactionContext<'a> {
+    pub(crate) fn new(fork: &'a mut Fork, service_id: u16, tx_hash: Hash) -> Self {
+        TransactionContext {
+            fork,
+            service_id,
+            tx_hash,
+        }
+    }
+    /// Returns fork of current blockchain state.
+    pub fn fork(&mut self) -> &mut Fork {
+        self.fork
+    }
+    /// Returns id of service that own this transaction.
+    pub fn service_id(&self) -> u16 {
+        self.service_id
+    }
+
+    /// Returns current transaction message hash.
+    /// This hash could be used to link some data in storage for external usage.
+    pub fn tx_hash(&self) -> Hash {
+        self.tx_hash
+    }
 }
 
 /// Result of unsuccessful transaction execution.

@@ -30,10 +30,10 @@ impl NodeHandler {
             Protocol::Status(msg) => self.handle_status(Message::from_parts(msg, message)?),
             Protocol::Consensus(msg) => self.handle_consensus(Message::from_parts(msg, message)?)?,
             Protocol::Request(msg) => self.handle_request(Message::from_parts(msg, message)?)?,
-            Protocol::Block(msg) => self.handle_block(Message::from_parts(msg, message)?),
+            Protocol::Block(msg) => self.handle_block(Message::from_parts(msg, message)?)?,
             Protocol::Transaction(msg) => self.handle_tx(Message::from_parts(msg, message)?),
             Protocol::TransactionsBatch(msg) => {
-                self.handle_txs_batch(Message::from_parts(msg, message)?)
+                self.handle_txs_batch(Message::from_parts(msg, message)?)?
             }
         };
         Ok(())
@@ -88,7 +88,7 @@ impl NodeHandler {
         if !self.state.connect_list().is_peer_allowed(&public_key) {
             error!(
                 "Received connect message from {:?} peer which not in ConnectList.",
-                message.pub_key()
+                public_key
             );
             return;
         }

@@ -57,8 +57,17 @@ use self::ignore_new::*;
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
 fn test_zero_size_segment() {
-    let buf = vec![8,0,0,0, // not overlap
-                   0,0,0,0,0]; // but with zero size
+    let buf = vec![
+        8,
+        0,
+        0,
+        0, // not overlap
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]; // but with zero size
 
     <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }
@@ -66,8 +75,17 @@ fn test_zero_size_segment() {
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
 fn test_incorrect_pointer() {
-    let buf = vec![8,0,0,0, // not overlap
-                   0,0,0,0,0]; // but with zero size
+    let buf = vec![
+        8,
+        0,
+        0,
+        0, // not overlap
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]; // but with zero size
 
     <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
 }

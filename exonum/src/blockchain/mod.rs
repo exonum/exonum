@@ -37,8 +37,8 @@ pub use self::{
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys}, genesis::GenesisConfig,
     schema::{Schema, TxLocation}, service::{Service, ServiceContext, SharedNodeState},
     transaction::{
-        ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
-        TransactionResult, TransactionSet,
+        ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
+        TransactionErrorType, TransactionMessage, TransactionResult, TransactionSet,
     },
 };
 
@@ -50,7 +50,7 @@ use vec_map::VecMap;
 
 use std::{
     collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
-    panic, sync::Arc,
+    ops::Deref, panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -149,7 +149,7 @@ impl Blockchain {
     pub fn tx_from_raw(
         &self,
         raw: &Message<RawTransaction>,
-    ) -> Result<Box<Transaction>, MessageError> {
+    ) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -374,21 +374,19 @@ impl Blockchain {
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
 
-            let tx = self.tx_from_raw(&tx).or_else(|error| {
-                Err(failure::err_msg(format!(
-                    "Service <{}>: {}, tx: {:?}",
-                    service_name,
-                    error.description(),
-                    tx_hash
-                )))
-            })?;
+            let transaction_message =
+                TransactionMessage::tx_from_raw(tx, &|tx| self.tx_from_raw(tx))?;
 
-            (tx, service_name)
+            (transaction_message, service_name)
         };
 
         fork.checkpoint();
 
-        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
+        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            let context =
+                TransactionContext::new(&mut *fork, tx.raw().service_id(), tx.raw().hash());
+            tx.transaction().execute(context)
+        }));
 
         let tx_result = match catch_result {
             Ok(execution_result) => {
@@ -463,15 +461,17 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-        // Initializes the context after merge.
-        let context = ServiceContext::new(
-            self.service_keypair.0,
-            self.service_keypair.1.clone(),
-            self.api_sender.clone(),
-            self.fork(),
-        );
+
         // Invokes `after_commit` for each service in order of their identifiers
-        for service in self.service_map.values() {
+        for (service_id, service) in self.service_map.iter() {
+            let context = ServiceContext::new(
+                self.service_keypair.0,
+                self.service_keypair.1.clone(),
+                self.api_sender.clone(),
+                self.fork(),
+                service_id as u16,
+                self,
+            );
             service.after_commit(&context);
         }
         Ok(())

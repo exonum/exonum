@@ -1,10 +1,12 @@
-use encoding::Field;
-use failure::Error;
+use encoding::{Error, Field};
 use storage::StorageValue;
-//TODO: temp trait for internal purposes.
+
+///Transaction binary form, can be converted
 pub trait BinaryForm: Sized {
+    /// Converts transaction into serialized form.
     fn serialize(self) -> Result<Vec<u8>, Error>;
 
+    /// Converts serialized byte array into transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, Error>;
 }
 
@@ -23,6 +25,5 @@ where
             <Self as Field>::field_size().into(),
             <Self as Field>::field_size().into(),
         ).map(|_| StorageValue::from_bytes(buffer.into()))
-            .map_err(|e| unimplemented!())
     }
 }

@@ -313,7 +313,7 @@ pub type EagerTransactions<'a> = slice::Iter<'a, CommittedTransaction>;
 impl Index<usize> for BlockWithTransactions {
     type Output = CommittedTransaction;
 
-    fn index(&self, index: usize) -> &CommittedTransaction<T> {
+    fn index(&self, index: usize) -> &CommittedTransaction {
         self.transactions.get(index).unwrap_or_else(|| {
             panic!(
                 "Index exceeds number of transactions in block {}",
@@ -616,53 +616,7 @@ pub enum TransactionInfo {
     Committed(CommittedTransaction),
 }
 
-/// A helper trait functionally equivalent to `serde`'s `Serialize`.
-///
-/// The trait is used to specify bounds on the `Serialize` implementation
-/// in transaction-related types in the `explorer` module, such as [`TransactionInfo`]
-/// and [`CommittedTransaction`].
-///
-/// # Why separate trait?
-///
-/// It is impossible to implement `Serialize` for `Box<Transaction>` (per Rust restrictions).
-/// Similarly, it is impossible to specify `Serialize` as a super-trait for `Transaction`,
-/// as it would render `Transaction` not object-safe. Thus, `SerializeContent` makes
-/// `Box<Transaction>` (as well as types containing transactions) serializable without
-/// needing a manual implementation of `Serialize`.
-///
-/// [`TransactionInfo`]: enum.TransactionInfo.html
-/// [`CommittedTransaction`]: struct.CommittedTransaction.html
-pub trait SerializeContent {
-    /// Serializes content of a transaction with the given serializer.
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer;
-}
-
-impl<T: Serialize> SerializeContent for T {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.serialize(serializer)
-    }
-}
-
-impl SerializeContent for Box<dyn Transaction> {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::Error;
-
-        let value = self.as_ref()
-            .serialize_field()
-            .map_err(|err| S::Error::custom(err.description()))?;
-        value.serialize(serializer)
-    }
-}
-
-impl<T> TransactionInfo<T> {
+impl TransactionInfo {
     /// Returns the content of this transaction.
     pub fn content(&self) -> &TransactionMessage {
         match *self {
@@ -707,7 +661,7 @@ impl<T> TransactionInfo<T> {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<dyn Snapshot>,
-    transaction_parser: Box<dyn Fn(&Message<RawTransaction>) -> ParseResult>,
+    transaction_parser: Box<dyn 'a + Fn(&Message<RawTransaction>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {

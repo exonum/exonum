@@ -25,8 +25,7 @@ use std::fmt::{self, Display};
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
-    encoding::serialize::reexport::{DeserializeOwned, Serialize},
-    node::{ApiSender, TransactionSend},
+    encoding::serialize::reexport::{DeserializeOwned, Serialize}, node::ApiSender,
 };
 
 use TestKit;

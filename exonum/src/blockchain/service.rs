@@ -18,17 +18,21 @@
 use serde_json::Value;
 
 use std::{
-    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
+    collections::{HashMap, HashSet}, fmt::{Debug, Error, Formatter}, net::SocketAddr,
+    sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;
-use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use blockchain::{
+    Blockchain, ConsensusConfig, Schema, StoredConfiguration, TransactionMessage, ValidatorKeys,
+};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
+use events::error::into_failure;
 use helpers::{Height, Milliseconds, ValidatorId};
-use messages::RawTransaction;
-use node::{ApiSender, NodeRole, State, TransactionSend};
+use messages::{BinaryForm, Message, RawTransaction};
+use node::{ApiSender, NodeRole, State};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
@@ -191,7 +195,7 @@ pub trait Service: Send + Sync + 'static {
     /// has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn after_commit(&self, context: &ServiceContext) {}
+    fn after_commit<'a>(&self, context: &ServiceContext) {}
 
     /// Extends API by handlers of this service. The request handlers are mounted on
     /// the `/api/services/{service_name}` path at the listen address of every
@@ -205,27 +209,46 @@ pub trait Service: Send + Sync + 'static {
 /// execution context. This structure is passed to the `after_commit` method
 /// of the `Service` trait and is used for the interaction between service
 /// business logic and the current node state.
-#[derive(Debug)]
-pub struct ServiceContext {
+pub struct ServiceContext<'a> {
     validator_id: Option<ValidatorId>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
     fork: Fork,
     stored_configuration: StoredConfiguration,
     height: Height,
+    service_id: u16,
+    tx_parser: Box<
+        dyn 'a + Fn(&Message<RawTransaction>) -> Result<Box<dyn Transaction>, ::encoding::Error>,
+    >,
 }
 
-impl ServiceContext {
+impl<'a> Debug for ServiceContext<'a> {
+    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+        fmt.debug_struct("ServiceContext")
+            .field("validator_id", &self.validator_id)
+            .field("service_keypair", &self.service_keypair)
+            .field("api_sender", &self.api_sender)
+            .field("fork", &self.fork)
+            .field("stored_configuration", &self.stored_configuration)
+            .field("height", &self.height)
+            .field("service_id", &self.service_id)
+            .finish()
+    }
+}
+
+impl<'a> ServiceContext<'a> {
     /// Creates service context for the given node.
     ///
     /// This method is necessary if you want to implement an alternative exonum node.
     /// For example, you can implement a special node without consensus for regression
-    /// testing of services business logic.
+    /// testing of services business logic.`
     pub fn new(
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
         fork: Fork,
+        service_id: u16,
+        blockchain: &Blockchain,
     ) -> ServiceContext {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
@@ -245,7 +268,9 @@ impl ServiceContext {
             api_sender,
             fork,
             stored_configuration,
+            service_id,
             height,
+            tx_parser: Box::new(move |tx| blockchain.tx_from_raw(tx)),
         }
     }
 
@@ -291,10 +316,18 @@ impl ServiceContext {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Returns a reference to the transaction sender, which can then be used
-    /// to broadcast a transaction to other nodes in the network.
-    pub fn transaction_sender(&self) -> &dyn TransactionSend {
-        &self.api_sender
+    /// Broadcast transaction to other nodes in the network.
+    pub fn broadcast_transaction<T: Transaction + BinaryForm>(&self, tx: T) {
+        let tx_process = move || -> Result<(), ::failure::Error> {
+            let tx = tx.serialize().map_err(into_failure)?;
+            let raw = RawTransaction::new(self.service_id, tx);
+            let msg = Message::new(raw, self.service_keypair.0, &self.service_keypair.1);
+            self.api_sender.broadcast_transaction(msg)
+        };
+
+        if let Err(e) = tx_process() {
+            error!("Could't broadcast transaction {}.", e);
+        }
     }
 
     /// Returns the actual blockchain global configuration.

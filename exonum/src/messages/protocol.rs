@@ -32,11 +32,17 @@ use chrono::{DateTime, Utc};
 use std::fmt::{Debug, Error, Formatter};
 use std::net::SocketAddr;
 
-use super::{RawTransaction, SignedMessage};
+use failure;
+
+use super::{Message, RawTransaction, SignedMessage, UncheckedBuffer};
 use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex};
+
+#[doc(hidden)]
+/// TransactionResponse size with zero transactions inside.
+pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 0;
 
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -58,7 +64,7 @@ pub enum Protocol {
 }
 
 /// Consensus message.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConsensusMessage {
     /// `Propose` message.
     Propose(Propose),
@@ -69,7 +75,7 @@ pub enum ConsensusMessage {
 }
 
 /// A request for the some data.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RequestMessage {
     /// Propose request.
     Propose(ProposeRequest),
@@ -92,18 +98,6 @@ impl RequestMessage {
             RequestMessage::Prevotes(ref msg) => msg.to(),
             RequestMessage::Peers(ref msg) => msg.to(),
             RequestMessage::Block(ref msg) => msg.to(),
-        }
-    }
-}
-
-impl Debug for RequestMessage {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        match *self {
-            RequestMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Transactions(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Prevotes(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
@@ -133,16 +127,6 @@ impl ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => msg.round(),
             ConsensusMessage::Prevote(ref msg) => msg.round(),
             ConsensusMessage::Precommit(ref msg) => msg.round(),
-        }
-    }
-}
-
-impl Debug for ConsensusMessage {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Prevote(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Precommit(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
@@ -310,7 +294,7 @@ encoding_struct! {
         /// Block header.
         block: blockchain::Block,
         /// List of pre-commits.
-        precommits: Vec<SignedMessage>,
+        precommits: Vec<UncheckedBuffer>,
         /// List of the transaction hashes.
         transactions: &[Hash],
     }
@@ -333,7 +317,7 @@ encoding_struct! {
         /// Public key of the recipient.
         to: &PublicKey,
         /// List of the transactions.
-        transactions: Vec<SignedMessage>,
+        transactions: Vec<UncheckedBuffer>,
     }
 
 }
@@ -450,52 +434,37 @@ impl BlockResponse {
     }
 }
 
-pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol> + Clone {}
-impl<T: Debug + Into<Protocol> + PartialEq<Protocol> + Clone> ProtocolMessage for T {}
-/*
-pub enum Protocol {
-    /// `Connect` message.
-    Connect(Connect),
-    /// `Status` message.
-    Status(Status),
-    /// `Block` message.
-    Block(BlockResponse),
-    /// Consensus message.
-    Consensus(ConsensusMessage),
-    /// Request for the some data.
-    Request(RequestMessage),
-    /// A batch of the transactions.
-    TransactionsBatch(TransactionsResponse),
-    /// Transaction.
-    Transaction(RawTransaction),
+impl Precommit {
+    /// Verify precommit's signature and return it's safer wrapper
+    pub(crate) fn verify_precommit(
+        buffer: UncheckedBuffer,
+    ) -> Result<Message<Precommit>, ::failure::Error> {
+        let signed = SignedMessage::verify_buffer(buffer)?;
+        signed.into_message().map_into::<Precommit>()
+    }
+}
+/// Full message constraints list.
+#[doc(hidden)]
+pub trait ProtocolMessage:
+    Debug + Into<Protocol> + PartialEq<Protocol> + Clone + TryFromProtocol
+{
+}
+impl<T: Debug + Into<Protocol> + PartialEq<Protocol> + Clone + TryFromProtocol> ProtocolMessage
+    for T
+{
 }
 
-/// Consensus message.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub enum ConsensusMessage {
-    /// `Propose` message.
-    Propose(Propose),
-    /// `Prevote` message.
-    Prevote(Prevote),
-    /// `Precommit` message.
-    Precommit(Precommit),
+/// Specialised `TryFrom` analog.
+#[doc(hidden)]
+pub trait TryFromProtocol: Sized {
+    fn try_from_protocol(value: Protocol) -> Result<Self, failure::Error>;
 }
 
-/// A request for the some data.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub enum RequestMessage {
-    /// Propose request.
-    Propose(ProposeRequest),
-    /// Transactions request.
-    Transactions(TransactionsRequest),
-    /// Prevotes request.
-    Prevotes(PrevotesRequest),
-    /// Peers request.
-    Peers(PeersRequest),
-    /// Block request.
-    Block(BlockRequest),
+impl TryFromProtocol for Protocol {
+    fn try_from_protocol(value: Protocol) -> Result<Self, failure::Error> {
+        Ok(value)
+    }
 }
-*/
 
 macro_rules! impl_protocol {
     ($val:ident => $v:ident = ($($ma:tt)*) => $($ma2:tt)*) => {
@@ -507,6 +476,16 @@ macro_rules! impl_protocol {
             false
         }
     }
+
+    impl TryFromProtocol for $val {
+        fn try_from_protocol(value: Protocol) -> Result<Self, failure::Error> {
+            match value {
+                $($ma)* => Ok($v),
+                _ => bail!(concat!("Received message other than ", stringify!($val)) )
+            }
+        }
+    }
+
     impl Into<Protocol> for $val {
         fn into(self) -> Protocol {
             let $v = self;

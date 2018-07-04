@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::{self, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 

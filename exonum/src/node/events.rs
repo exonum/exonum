@@ -14,6 +14,7 @@
 
 use super::{ExternalMessage, NodeHandler, NodeTimeout};
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
+use messages::SignedMessage;
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {

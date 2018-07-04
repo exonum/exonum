@@ -19,7 +19,7 @@ use failure;
 use serde_json::Value;
 
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr, ops::Deref,
     time::{Duration, SystemTime},
 };
 
@@ -27,8 +27,10 @@ use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
+    BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
+    SignedMessage,
 };
+use node::connect_list::ConnectList;
 use node::ConnectInfo;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
@@ -146,7 +148,7 @@ pub struct BlockState {
 /// Incomplete block.
 #[derive(Clone, Debug)]
 pub struct IncompleteBlock {
-    msg: BlockResponse,
+    msg: Message<BlockResponse>,
     unknown_txs: HashSet<Hash>,
 }
 
@@ -365,7 +367,7 @@ impl BlockState {
 
 impl IncompleteBlock {
     /// Returns `BlockResponse` message.
-    pub fn message(&self) -> &BlockResponse {
+    pub fn message(&self) -> &Message<BlockResponse> {
         &self.msg
     }
 
@@ -856,7 +858,7 @@ impl State {
     pub fn add_propose<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: Message<Propose>,
-        transactions: &MapIndex<S, Hash, RawMessage>,
+        transactions: &MapIndex<S, Hash, Message<RawTransaction>>,
         transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
@@ -923,8 +925,8 @@ impl State {
     /// - Received block has already committed transaction.
     pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
         &mut self,
-        msg: &BlockResponse,
-        txs: &MapIndex<S, Hash, RawMessage>,
+        msg: &Message<BlockResponse>,
+        txs: &MapIndex<S, Hash, Message<RawTransaction>>,
         txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());

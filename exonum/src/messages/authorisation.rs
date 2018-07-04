@@ -11,7 +11,7 @@ use messages::Message;
 use storage::StorageValue;
 
 use super::protocol::{Protocol, ProtocolMessage};
-use super::{MAX_MESSAGE_SIZE, PROTOCOL_MAJOR_VERSION};
+use super::PROTOCOL_MAJOR_VERSION;
 
 use encoding::serialize::encode_hex;
 
@@ -32,6 +32,7 @@ impl AuthorisedMessage {
     }
 }
 
+/// Correct raw message that was deserialized and verifyied, from `UncheckedBuffer`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SignedMessage {
     pub(crate) authorised_message: AuthorisedMessage,
@@ -39,7 +40,7 @@ pub struct SignedMessage {
 }
 
 impl SignedMessage {
-    pub fn new<T: Into<Protocol>>(
+    pub(crate) fn new<T: Into<Protocol>>(
         value: T,
         author: PublicKey,
         secret_key: &SecretKey,
@@ -53,6 +54,8 @@ impl SignedMessage {
         })
     }
 
+    /// Create `SignedMessage` wrapper from `UncheckedBuffer`.
+    /// Checks binary format and signature.
     pub fn verify_buffer<T: AsRef<[u8]>>(buffer: T) -> Result<SignedMessage, Error> {
         // TODO: external serialization library shadows any knowledge about internal
         // binary representation.
@@ -68,6 +71,7 @@ impl SignedMessage {
         Ok(message)
     }
 
+    /// Serialize safe wrapper into unchecked byte array.
     pub fn to_vec(&self) -> Vec<u8> {
         ::bincode::config()
             .no_limit()
@@ -75,10 +79,12 @@ impl SignedMessage {
             .expect("Could not serialize SignedMessage.")
     }
 
+    /// Serialize message as hex encoded byte array
     pub fn to_hex_string(&self) -> String {
         encode_hex(&self.to_vec())
     }
 
+    /// Converts signed message into root safe wrapper.
     pub fn into_message(self) -> Message {
         Message {
             payload: self.authorised_message.protocol.clone(),
@@ -87,6 +93,7 @@ impl SignedMessage {
     }
 
     fn sign<T: Serialize>(val: &T, secret_key: &SecretKey) -> Result<Signature, Error> {
+        // TODO: limit bincode max_message_length using config
         let full_buffer = ::bincode::config().no_limit().serialize(&val)?;
         let signature = crypto::sign(&full_buffer, secret_key);
         Ok(signature)
@@ -118,6 +125,7 @@ impl StorageValue for SignedMessage {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
+        // TODO: remove signature validation (StorageValue is an internal trait)
         SignedMessage::verify_buffer(&value).unwrap()
     }
 }
@@ -130,11 +138,13 @@ impl CryptoHash for SignedMessage {
 
 impl<T: ProtocolMessage> StorageValue for Message<T> {
     fn into_bytes(self) -> Vec<u8> {
-        unimplemented!()
+        self.message.to_vec()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        unimplemented!()
+        //TODO: Remove signature checks and type checks (Getting value from database should be safe)
+        let message = SignedMessage::verify_buffer(&value).unwrap().into_message();
+        message.map_into().unwrap()
     }
 }
 

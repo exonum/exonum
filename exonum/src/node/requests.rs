@@ -18,7 +18,7 @@ use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use failure;
 use messages::{
     BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, RequestMessage,
-    TransactionsRequest, TransactionsResponse,
+    TransactionsRequest, TransactionsResponse, UncheckedBuffer, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
@@ -35,7 +35,7 @@ impl NodeHandler {
         if !self.state.connect_list().is_peer_allowed(msg.author()) {
             error!(
                 "Received request message from peer = {:?} which not in ConnectList.",
-                msg.from()
+                msg.author()
             );
         }
 
@@ -84,42 +84,37 @@ impl NodeHandler {
     pub fn handle_request_txs(&mut self, msg: Message<TransactionsRequest>) {
         use std::mem;
         trace!("HANDLE TRANSACTIONS REQUEST");
-        unimplemented!();
-        /*let snapshot = self.blockchain.snapshot();
+        let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 
         let mut txs = Vec::new();
         let mut txs_size = 0;
-        let EMPTY_RESPONSE_SIZE: u32 = unimplemented!();
-           // (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
         let unoccupied_message_size =
-            self.state.config().consensus.max_message_len - EMPTY_RESPONSE_SIZE;
+            self.state.config().consensus.max_message_len - TRANSACTION_RESPONSE_EMPTY_SIZE as u32;
 
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
-                if txs_size + tx.raw().len() as u32 > unoccupied_message_size {
+                let raw = UncheckedBuffer::new(tx.into_parts().1.to_vec());
+                if txs_size + raw.as_ref().len() as u32 > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
                         msg.author(),
                         mem::replace(&mut txs, vec![]),
                     ));
 
-                    self.send_to_peer(*msg.author(), txs_response.raw());
+                    self.send_to_peer(*msg.author(), txs_response);
                     txs_size = 0;
                 }
-                txs_size += tx.raw().len() as u32;
-                txs.push(tx);
+                txs_size += raw.as_ref().len() as u32;
+                txs.push(raw);
             }
         }
 
         if !txs.is_empty() {
-            let txs_response = self.sign_message(TransactionsResponse::new(
-                msg.author(),
-                txs,
-            ));
+            let txs_response = self.sign_message(TransactionsResponse::new(msg.author(), txs));
 
             self.send_to_peer(*msg.author(), txs_response);
-        }*/
+        }
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
@@ -144,8 +139,6 @@ impl NodeHandler {
 
     /// Handles `BlockRequest` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: Message<BlockRequest>) {
-        unimplemented!();
-        /*
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),
@@ -168,13 +161,12 @@ impl NodeHandler {
         let block_msg = self.sign_message(BlockResponse::new(
             msg.author(),
             block,
-            precommits.iter().collect(),
-            transactions
+            precommits
                 .iter()
-                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
+                .map(|p| UncheckedBuffer::new(p.into_parts().1.to_vec()))
                 .collect(),
+            &transactions.iter().collect::<Vec<_>>(),
         ));
         self.send_to_peer(*msg.author(), block_msg);
-        */
     }
 }

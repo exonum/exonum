@@ -15,13 +15,10 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
+use failure::Error;
 use std::{error::Error as StdError, io};
 
-pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, s.as_ref())
-}
-
-pub fn result_ok<T, E: StdError>(_: T) -> Result<(), E> {
+pub fn result_ok<T>(_: T) -> Result<(), Error> {
     Ok(())
 }
 
@@ -29,7 +26,7 @@ pub fn log_error(err: Error) {
     error!("An error occurred: {}", err)
 }
 
-pub fn into_failure<E: StdErr>(err: E) -> Error {
+pub fn into_failure<E: StdError>(err: E) -> Error {
     format_err!("An error occurred, {}", err.description())
 }
 
