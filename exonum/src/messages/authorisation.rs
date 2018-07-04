@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use bincode::Config;
-use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 

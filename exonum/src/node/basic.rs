@@ -14,12 +14,11 @@
 
 use rand::{self, Rng};
 
-use std::error::Error;
 use std::net::SocketAddr;
 
 use super::{NodeHandler, RequestData};
 use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Protocol, SignedMessage, Status};
+use messages::{Connect, Message, PeersRequest, Protocol, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.

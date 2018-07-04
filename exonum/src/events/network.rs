@@ -26,10 +26,10 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 use std::time::Duration;
 
-use super::error::{into_other, log_error, other_error, result_ok};
+use super::error::{into_failure, log_error, result_ok};
 use super::to_box;
 use helpers::Milliseconds;
-use messages::{Any, Connect, Message, RawMessage};
+use messages::{Protocol, Connect, Message, UncheckedBuffer, SignedMessage};
 
 use events::noise::HandshakeParams;
 use events::noise::NoiseHandshake;
@@ -377,14 +377,17 @@ impl Listener {
                 .into_future()
                 .and_then(Ok)
                 .map_err(|e| e.0)
-                .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
-                    Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                    Some(Ok(other)) => Err(other_error(&format!(
-                        "First message is not Connect, got={:?}",
-                        other
-                    ))),
-                    Some(Err(e)) => Err(into_other(e)),
-                    None => Err(other_error("Incoming socket closed")),
+                .and_then(move |(raw, stream)|{
+                    let raw = raw.ok_or_else(||
+                        format_err!("Connection closed before first message."))?;
+                    let signed = SignedMessage::verify_buffer(raw)?;
+                    let (payload, signed)  = signed.into_message().into_parts();
+                    let payload = match payload {
+                        Protocol::Connect(c) => c,
+                        _ => bail!("Received first message different\
+                        from Connect msg = {:?}.", payload),
+                    };
+                    Ok((Message::from_parts(payload, signed)?, stream))
                 })
                 .and_then(move |(connect, stream)| {
                     trace!("Received handshake message={:?}", connect);
@@ -392,13 +395,13 @@ impl Listener {
                     let stream = network_tx
                         .clone()
                         .send(event)
-                        .map_err(into_other)
+                        .map_err(into_failure)
                         .and_then(move |_| Ok(stream))
                         .flatten_stream();
 
                     stream.for_each(move |raw| {
                         let event = NetworkEvent::MessageReceived(addr, raw);
-                        network_tx.clone().send(event).map_err(into_other).map(drop)
+                        network_tx.clone().send(event).map_err(into_failure).map(drop)
                     })
                 })
                 .map(|_| {
@@ -408,7 +411,8 @@ impl Listener {
                 .map_err(log_error);
             handle.spawn(to_box(connection_handler));
             to_box(future::ok(()))
-        });
+        })
+        .map_err(into_failure);
 
         Ok(Listener(to_box(server)))
     }

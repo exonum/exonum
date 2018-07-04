@@ -59,7 +59,7 @@ pub struct BlockProof {
     /// in the block, etc.
     pub block: Block,
     /// List of `Precommit` messages for the block.
-    pub precommits: Vec<Message<Precommit>>,,
+    pub precommits: Vec<Message<Precommit>>,
 }
 
 #[cfg(test)]

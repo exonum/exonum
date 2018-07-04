@@ -143,7 +143,7 @@ where
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
-    pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Message<Precommit>> {
         ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 

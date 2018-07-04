@@ -17,15 +17,16 @@ use futures::future::{done, Future};
 use tokio_core::net::TcpStream;
 use tokio_io::{AsyncRead, codec::Framed, io::{read_exact, write_all}};
 
-use std::io;
+use failure;
 
 use crypto::{PublicKey, SecretKey};
 use events::codec::MessagesCodec;
 use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
+use events::error::into_failure;
 
 pub mod wrapper;
 
-type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
+type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = failure::Error>>;
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
@@ -87,11 +88,12 @@ fn send_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResul
     Box::new(framed)
 }
 
-fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
+fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = failure::Error>> {
     let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     Box::new(
         read_exact(sock, buf)
-            .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize])),
+            .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
+            .map_err(into_failure),
     )
 }
 
@@ -99,16 +101,16 @@ fn write(
     sock: TcpStream,
     buf: &[u8],
     len: usize,
-) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
+) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = failure::Error>> {
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     LittleEndian::write_u16(&mut message, len as u16);
     message.extend_from_slice(&buf[0..len]);
-    Box::new(write_all(sock, message))
+    Box::new(write_all(sock, message).map_err(into_failure))
 }
 
 fn write_handshake_msg(
     noise: &mut NoiseWrapper,
-) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
+) -> Box<Future<Item = (usize, Vec<u8>), Error = failure::Error>> {
     let res = noise.write_handshake_msg();
     Box::new(done(res.map_err(|e| e.into())))
 }

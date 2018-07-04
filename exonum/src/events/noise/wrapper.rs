@@ -86,7 +86,7 @@ impl NoiseWrapper {
     /// 1. Message splits to packets of length smaller or equal to 65_535 bytes.
     /// 2. Then each packet is decrypted by selected noise algorithm.
     /// 3. Append all decrypted packets to `decoded_message`.
-    pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
+    pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> BytesMut {
         let data = buf.split_to(len + NOISE_HEADER_LENGTH).to_vec();
         let data = &data[NOISE_HEADER_LENGTH..];
         let mut decoded_message = vec![0u8; 0];
@@ -102,7 +102,7 @@ impl NoiseWrapper {
             decoded_message.extend_from_slice(&read_to);
         });
 
-        Ok(BytesMut::from(decoded_message))
+        BytesMut::from(decoded_message)
     }
 
     /// Encrypts `msg` using Noise session
@@ -113,7 +113,7 @@ impl NoiseWrapper {
     /// 3. Result message: first 4 bytes is message length(`len').
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
-    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<Option<()>, io::Error> {
+    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Option<()> {
         let mut len = 0usize;
         let mut encoded_message = vec![0u8; 0];
 
@@ -130,7 +130,7 @@ impl NoiseWrapper {
         let encoded_message = &encoded_message[0..len];
         msg_len_buf.extend_from_slice(encoded_message);
         buf.extend_from_slice(&msg_len_buf);
-        Ok(None)
+        None
     }
 
     fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {

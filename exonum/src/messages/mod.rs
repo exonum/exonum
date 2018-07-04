@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Consensus and other messages and related utilities.
-use std::fmt::{self, Debug};
+use std::fmt;
 use std::ops::Deref;
 
 use failure::Error;

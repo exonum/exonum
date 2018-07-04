@@ -495,7 +495,7 @@ impl Blockchain {
     }
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Message<Connect>) {
         let mut fork = self.fork();
 
         {

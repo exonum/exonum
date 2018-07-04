@@ -126,7 +126,7 @@ impl ExplorerApi {
             }
         };
         let post_transaction = move |req: &mut Request| -> IronResult<Response> {
-            // let PeerAddInfo { ip } = self.parse_body(request)?;
+            let PeerAddInfo { ip } = self.parse_body(request)?;
             //self.node_channel.peer_add(ip).map_err(ApiError::from)?;
             unimplemented!();
         };

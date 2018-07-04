@@ -41,15 +41,17 @@ use std::time::{Duration, SystemTime};
 use std::{fmt, io};
 
 use api::{private, public, Api};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
+                 TransactionMessage};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::error::{into_failure, log_error, LogError};
 use events::{
     HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest
 };
+use events::noise::HandshakeParams;
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Connect, Message, Protocol, ProtocolMessage, SignedMessage};
+use messages::{Connect, Message, ProtocolMessage, SignedMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
