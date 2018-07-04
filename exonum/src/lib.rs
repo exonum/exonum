@@ -22,11 +22,11 @@
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
-          // Next cast.. lints don't give alternatives.
+          // Next `cast_*` lints don't give alternatives.
           cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
-          // filter(..).map(..) often looks more shorter and readable.
+          // `filter(..).map(..)` often looks more shorter and readable.
           filter_map,
-          // Next lints produce too much noise.
+          // Next lints produce too much noise/false positives.
           stutter, similar_names,
           // Variant name ends with the enum's name. Similar behavior to similar_names.
           pub_enum_variant_names,
