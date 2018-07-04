@@ -92,8 +92,7 @@ mod test {
         let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        let raw = RawMessage::new(MessageBuffer::from_vec(data.clone()));
-        initiator.encode(raw, &mut bytes).unwrap();
+        initiator.encode(data, &mut bytes).unwrap();
 
         match responder.decode(&mut bytes) {
             Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
@@ -106,8 +105,7 @@ mod test {
         let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        let raw = RawMessage::new(MessageBuffer::from_vec(data));
-        initiator.encode(raw, &mut bytes).unwrap();
+        initiator.encode(data, &mut bytes).unwrap();
 
         assert!(responder.decode(&mut bytes).is_err());
     }
@@ -117,9 +115,8 @@ mod test {
         let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        let raw = RawMessage::new(MessageBuffer::from_vec(data));
+        initiator.encode(data, &mut bytes).unwrap();
 
-        initiator.encode(raw, &mut bytes).unwrap();
         assert!(responder.decode(&mut bytes).is_err());
     }
 

@@ -29,7 +29,7 @@ use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+    PrevotesRequest, Propose, ProposeRequest, RawTransaction Status, TransactionsRequest,
     TransactionsResponse, CONSENSUS,
 };
 use node::{
@@ -707,8 +707,8 @@ fn test_store_txs_positions() {
     let num_txs = rng.gen_range(3, 100);
     let committed_block1 = generator
         .take(num_txs)
-        .map(|tx| (tx.hash(), tx.raw().clone()))
-        .collect::<BTreeMap<Hash, RawMessage>>();
+        .map(|tx| (tx.hash(), tx.))
+        .collect::<BTreeMap<Hash, Message<RawTransaction>>>();
 
     let hashes =
         add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());

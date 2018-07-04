@@ -128,6 +128,10 @@ impl SandboxInner {
         api_getter.wait().unwrap();
     }
 }
+fn sign_raw_tx<T:>(data: Vec<u8>, service_id: u16, service_keypair:(PublicKey, &SecretKey)) -> Message<RawTransaction> {
+    let raw = RawTransaction::new(service_id, data);
+    Message::new(raw, service_keypair.0, service_keypair.1)
+}
 
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,

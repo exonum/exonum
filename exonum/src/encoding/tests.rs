@@ -27,7 +27,7 @@ use blockchain::{self, Block, BlockProof};
 use crypto::{gen_keypair, hash, CryptoHash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, RawMessage, Status,
+    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, Status,
 };
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);

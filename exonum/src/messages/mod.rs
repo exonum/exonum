@@ -25,6 +25,8 @@ pub use self::helpers::BinaryForm;
 pub use self::protocol::*;
 pub(crate) use self::raw::UncheckedBuffer;
 
+#[macro_use]
+mod spec;
 mod authorisation;
 mod helpers;
 mod protocol;

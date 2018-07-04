@@ -80,5 +80,5 @@ macro_rules! __ex_message {
 
     );
 
-    { $service_id:expr, $message_id:expr, } => ();
+    { } => ();
 }

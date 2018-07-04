@@ -75,12 +75,13 @@ impl TimestampingTxGenerator {
 }
 
 impl Iterator for TimestampingTxGenerator {
-    type Item = TimestampTx;
+    type Item = Message<RawTransaction>;
 
     fn next(&mut self) -> Option<TimestampTx> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        Some(TimestampTx::new(&self.public_key, &data, &self.secret_key))
+        let buf = TimestampTx::new(&self.public_key, &data, &self.secret_key).raw().clone()
+        Some(::super::sign_raw_tx(buf, TIMESTAMPING_SERVICE, (self.public_key, &self.secret_key) ))
     }
 }
 
