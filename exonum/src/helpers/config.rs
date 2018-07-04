@@ -116,6 +116,7 @@ impl ConfigManager {
     }
 
     fn update_connect_list(connect_list: ConnectListConfig, path: &String) {
+        info!("Updating connect list. New value: {:?}", connect_list);
         // TODO: remove expect.
         let mut current_config: NodeConfig =
             ConfigFile::load(path.clone()).expect("Can't load node config file");
