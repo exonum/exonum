@@ -47,7 +47,10 @@ use events::{
     InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
     NetworkRequest, SyncSender, TimeoutRequest,
 };
-use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{
+    config::ConfigManager, fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round,
+    ValidatorId,
+};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
@@ -118,6 +121,8 @@ pub struct NodeHandler {
     is_enabled: bool,
     /// Node role.
     node_role: NodeRole,
+    /// Configuration file manager.
+    config_manager: Option<ConfigManager>,
 }
 
 /// Service configuration.
@@ -329,7 +334,7 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectList` from validators public configs.
+    /// Creates `ConnectListConfig` from validators public configs.
     pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
         let peers = list.iter()
             .map(|config| ConnectInfo {
@@ -341,7 +346,7 @@ impl ConnectListConfig {
         ConnectListConfig { peers }
     }
 
-    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
+    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
         let peers = peers
             .iter()
@@ -349,6 +354,20 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: *a,
                 public_key: v.consensus_key,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// Creates `ConnectListConfig` from `ConnectList`.
+    pub fn from_connect_list(connect_list: &ConnectList) -> Self {
+        let peers = connect_list
+            .peers
+            .iter()
+            .map(|(pk, a)| ConnectInfo {
+                address: *a,
+                public_key: *pk,
             })
             .collect();
 
@@ -370,6 +389,7 @@ impl NodeHandler {
         system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
+        config_file_path: Option<String>,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -423,6 +443,11 @@ impl NodeHandler {
 
         api_state.set_node_role(node_role);
 
+        let config_manager = match config_file_path {
+            Some(path) => Some(ConfigManager::new(path)),
+            None => None,
+        };
+
         NodeHandler {
             blockchain,
             api_state,
@@ -432,6 +457,7 @@ impl NodeHandler {
             peer_discovery: config.peer_discovery,
             is_enabled,
             node_role,
+            config_manager,
         }
     }
 
@@ -832,6 +858,7 @@ impl Node {
         db: D,
         services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
+        config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
 
@@ -879,6 +906,7 @@ impl Node {
             system_state,
             config,
             api_state,
+            config_file_path,
         );
         Node {
             api_options: node_cfg.api,
@@ -1064,7 +1092,7 @@ mod tests {
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg);
+        let mut node = Node::new(db, services, node_cfg, None);
 
         let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
 

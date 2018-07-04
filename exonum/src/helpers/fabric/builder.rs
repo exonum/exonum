@@ -67,6 +67,7 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
+                let config_file_path = ctx.get(keys::NODE_CONFIG_PATH).ok();
                 let config = ctx.get(keys::NODE_CONFIG)
                     .expect("could not find node_config");
                 let db = Run::db_helper(ctx, &config.database);
@@ -74,7 +75,7 @@ impl NodeBuilder {
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
                     .collect();
-                let node = Node::new(db, services, config);
+                let node = Node::new(db, services, config, config_file_path);
                 Some(node)
             }
             _ => None,

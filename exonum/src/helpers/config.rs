@@ -19,8 +19,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use toml;
 
 use std::{
-    fs::{self, File}, io::{Read, Write}, path::Path,
+    fs::{self, File}, io::{Read, Write}, mem::drop, path::Path, sync::mpsc, thread,
 };
+
+use node::{ConnectListConfig, NodeConfig};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
@@ -65,4 +67,61 @@ fn do_save<T: Serialize>(value: &T, path: &Path) -> Result<(), Error> {
     let value_toml = toml::Value::try_from(value)?;
     file.write_all(value_toml.to_string().as_bytes())?;
     Ok(())
+}
+
+/// Structure that handles work with config file in runtime.
+#[derive(Debug)]
+pub struct ConfigManager {
+    handle: thread::JoinHandle<()>,
+    tx: mpsc::Sender<ConfigRequest>,
+}
+
+/// Messages for ConfigReader.
+#[derive(Debug)]
+pub enum ConfigRequest {
+    /// Request for connect list update in config file.
+    UpdateConnectList(ConnectListConfig),
+}
+
+impl ConfigManager {
+    /// Creates a new `ConfigManager` instance for the given path.
+    pub fn new(path: String) -> Self {
+        let (tx, rx) = mpsc::channel();
+        let handle = thread::spawn(move || {
+            info!("ConfigManager started");
+            for command in rx {
+                match command {
+                    ConfigRequest::UpdateConnectList(connect_list) => {
+                        Self::update_connect_list(connect_list, &path)
+                    }
+                }
+            }
+            info!("ConfigManager stopped");
+        });
+
+        ConfigManager { handle, tx }
+    }
+
+    /// Stores updated connect list in file system.
+    pub fn store_connect_list(&self, connect_list: ConnectListConfig) {
+        self.tx
+            .send(ConfigRequest::UpdateConnectList(connect_list))
+            .expect("Can't write");
+    }
+
+    /// Stops `ConfigManager`.
+    pub fn stop(self) {
+        drop(self.tx);
+        self.handle.join().expect("Can't stop thread");
+    }
+
+    fn update_connect_list(connect_list: ConnectListConfig, path: &String) {
+        // TODO: remove expect.
+        let mut current_config: NodeConfig =
+            ConfigFile::load(path.clone()).expect("Can't load node config file");
+
+        current_config.connect_list = connect_list;
+
+        ConfigFile::save(&current_config, path.clone()).expect("Can't save node config file");
+    }
 }
