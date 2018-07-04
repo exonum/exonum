@@ -94,7 +94,7 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let node = Node::new(MemoryDB::new(), vec![service], node_cfg);
+        let node = Node::new(MemoryDB::new(), vec![service], node_cfg, None);
         let api_tx = node.channel();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || {
@@ -131,7 +131,7 @@ fn test_node_run() {
 fn test_node_restart_regression() {
     let start_node = |node_cfg, db, init_times| {
         let service = Box::new(InitializeCheckerService(init_times));
-        let node = Node::new(db, vec![service], node_cfg);
+        let node = Node::new(db, vec![service], node_cfg, None);
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();
