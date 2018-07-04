@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(missing_debug_implementations, missing_docs)]
+
 pub use self::internal::InternalPart;
 pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
 

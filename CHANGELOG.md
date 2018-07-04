@@ -9,6 +9,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `schema_version` field in `Block` has been removed. (#774)
+
+- Storage in exonum is now versioned. Old databases will not work with this
+  update. (#707)
+
 - `Iron` based web API has been replaced by the new implementation based
   on `actix-web`. (#727)
 
