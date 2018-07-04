@@ -100,11 +100,7 @@ impl NoiseWrapper {
         let data = buf.split_to(len + NOISE_HEADER_LENGTH).to_vec();
         let data = &data[NOISE_HEADER_LENGTH..];
 
-        // Each message consists of the payload and 16 bytes(`TAG_LENGTH`)
-        // of AEAD authentification data. Therefore to calculate an actual message
-        // length we need to substract `TAG_LENGTH` multiplied by messages count
-        // from `data.len()`.
-        let len = data.len() - TAG_LENGTH * (data.len() / MAX_MESSAGE_LENGTH);
+        let len = self.decrypted_msg_len(data.len());
         let mut decoded_message = Vec::with_capacity(len);
 
         for msg in data.chunks(MAX_MESSAGE_LENGTH) {
@@ -131,9 +127,7 @@ impl NoiseWrapper {
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<Option<()>, io::Error> {
-        // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
-        // calculate actual message length.
-        let len = msg.len() + TAG_LENGTH * ((msg.len() / MAX_MESSAGE_LENGTH) + 1);
+        let len = self.encrypted_msg_len(msg.len());
         let mut encoded_message = Vec::with_capacity(len);
 
         for msg in msg.chunks(MAX_MESSAGE_LENGTH - TAG_LENGTH) {
@@ -163,6 +157,20 @@ impl NoiseWrapper {
         let len = self.session.write_message(msg, &mut buf)?;
         buf.truncate(len);
         Ok(buf)
+    }
+
+    // Each message consists of the payload and 16 bytes(`TAG_LENGTH`)
+    // of AEAD authentification data. Therefore to calculate an actual message
+    // length we need to substract `TAG_LENGTH` multiplied by messages count
+    // from `data.len()`.
+    fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
+        raw_message_len - TAG_LENGTH * (raw_message_len / MAX_MESSAGE_LENGTH)
+    }
+
+    // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
+    // calculate actual message length.
+    fn encrypted_msg_len(&self, raw_message_len: usize) -> usize {
+        raw_message_len + TAG_LENGTH * ((raw_message_len / MAX_MESSAGE_LENGTH) + 1)
     }
 
     fn noise_builder<'a>() -> NoiseBuilder<'a> {
