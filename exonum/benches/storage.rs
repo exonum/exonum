@@ -22,11 +22,11 @@ extern crate test;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
-    use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
-    use exonum::storage::{Database, DbOptions, MemoryDB, ProofListIndex, ProofMapIndex, RocksDB};
-    use rand::{Rng, SeedableRng, XorShiftRng};
-    use tempdir::TempDir;
     use test::Bencher;
+    use tempdir::TempDir;
+    use rand::{Rng, SeedableRng, XorShiftRng};
+    use exonum::storage::{Database, DbOptions, MemoryDB, ProofListIndex, ProofMapIndex, RocksDB,
+        proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE};
 
     use std::collections::HashSet;
 

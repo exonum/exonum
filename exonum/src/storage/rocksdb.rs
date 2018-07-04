@@ -16,21 +16,13 @@
 
 //! An implementation of `RocksDB` database.
 
-pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
-pub use rocksdb::WriteOptions as RocksDBWriteOptions;
+pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use exonum_profiler::ProfilerSpan;
-use rocksdb::utils::get_cf_names;
-use rocksdb::{self, DBIterator, Options as RocksDbOptions, WriteBatch};
+use rocksdb::{self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch};
 
-use std::error::Error;
-use std::iter::Peekable;
-use std::path::Path;
-use std::sync::Arc;
-use std::{fmt, mem};
+use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use storage::db::Change;
-use storage::{self, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
+use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
 impl From<rocksdb::Error> for storage::Error {
     fn from(err: rocksdb::Error) -> storage::Error {
@@ -38,7 +30,12 @@ impl From<rocksdb::Error> for storage::Error {
     }
 }
 
-/// Database implementation on the top of `RocksDB` backend.
+/// Database implementation on top of [`RocksDB`](https://rocksdb.org)
+/// backend.
+///
+/// RocksDB is an embedded database for key-value data, which is optimized for fast storage.
+/// This structure is required to potentially adapt the interface to
+/// use different databases.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
 }
@@ -66,7 +63,11 @@ struct RocksDBIterator {
 }
 
 impl RocksDB {
-    /// Open a database stored in the specified path with the specified options.
+    /// Opens a database stored at the specified path with the specified options.
+    ///
+    /// If the database does not exist at the indicated path and the option
+    /// `create_if_missing` is switched on in `DbOptions`, a new database will
+    /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
@@ -80,7 +81,6 @@ impl RocksDB {
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
-        let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
@@ -101,8 +101,7 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn snapshot(&self) -> Box<Snapshot> {
-        let _p = ProfilerSpan::new("RocksDB::snapshot");
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: Arc::clone(&self.db),
@@ -123,7 +122,6 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        let _p = ProfilerSpan::new("RocksDBSnapshot::get");
         if let Some(cf) = self._db.cf_handle(name) {
             match self.snapshot.get_cf(cf, key) {
                 Ok(value) => value.map(|v| v.to_vec()),
@@ -136,7 +134,6 @@ impl Snapshot for RocksDBSnapshot {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
-        let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
         let iter = match self._db.cf_handle(name) {
             Some(cf) => self.snapshot
                 .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
@@ -153,7 +150,6 @@ impl Snapshot for RocksDBSnapshot {
 
 impl Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = ProfilerSpan::new("RocksDBIterator::next");
         if let Some((key, value)) = self.iter.next() {
             self.key = Some(key);
             self.value = Some(value);
@@ -164,7 +160,6 @@ impl Iterator for RocksDBIterator {
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = ProfilerSpan::new("RocksDBIterator::peek");
         if let Some(&(ref key, ref value)) = self.iter.peek() {
             Some((key, value))
         } else {
@@ -173,9 +168,9 @@ impl Iterator for RocksDBIterator {
     }
 }
 
-impl From<RocksDB> for Arc<Database> {
-    fn from(db: RocksDB) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+impl From<RocksDB> for Arc<dyn Database> {
+    fn from(db: RocksDB) -> Arc<dyn Database> {
+        Arc::from(Box::new(db) as Box<dyn Database>)
     }
 }
 

@@ -21,17 +21,18 @@ extern crate exonum_time;
 extern crate pretty_assertions;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-
-use std::collections::HashMap;
-use std::iter::FromIterator;
-
-use exonum::blockchain::{Schema, Transaction, TransactionErrorType};
-use exonum::crypto::{gen_keypair, CryptoHash, PublicKey};
-use exonum::helpers::{Height, ValidatorId};
-use exonum::storage::Snapshot;
+use exonum::{
+    blockchain::{Schema, Transaction, TransactionErrorType},
+    crypto::{gen_keypair, CryptoHash, PublicKey}, helpers::{Height, ValidatorId},
+    storage::Snapshot,
+};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
-use exonum_time::{TimeService, api::ValidatorTime, schema::TimeSchema,
-                  time_provider::MockTimeProvider, transactions::Error, transactions::TxTime};
+use exonum_time::{
+    api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
+    transactions::TxTime, TimeService,
+};
+
+use std::{collections::HashMap, iter::FromIterator};
 
 fn assert_storage_times_eq<T: AsRef<Snapshot>>(
     snapshot: T,
@@ -459,25 +460,31 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     assert_eq!(schema.validators_times().get(pub_key), Some(time0));
 }
 
-fn get_current_time(api: &TestKitApi) -> Option<DateTime<Utc>> {
-    api.get(ApiKind::Service("exonum_time"), "v1/current_time")
+fn get_current_time(api: &mut TestKitApi) -> Option<DateTime<Utc>> {
+    api.public(ApiKind::Service("exonum_time"))
+        .get("v1/current_time")
+        .unwrap()
 }
 
-fn get_current_validators_times(api: &TestKitApi) -> Vec<ValidatorTime> {
-    api.get_private(ApiKind::Service("exonum_time"), "v1/validators_times")
+fn get_current_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
+    api.private(ApiKind::Service("exonum_time"))
+        .get("v1/validators_times")
+        .unwrap()
 }
 
-fn get_all_validators_times(api: &TestKitApi) -> Vec<ValidatorTime> {
-    api.get_private(ApiKind::Service("exonum_time"), "v1/validators_times/all")
+fn get_all_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
+    api.private(ApiKind::Service("exonum_time"))
+        .get("v1/validators_times/all")
+        .unwrap()
 }
 
-fn assert_current_time_eq(api: &TestKitApi, expected_time: Option<DateTime<Utc>>) {
+fn assert_current_time_eq(api: &mut TestKitApi, expected_time: Option<DateTime<Utc>>) {
     let current_time = get_current_time(api);
     assert_eq!(expected_time, current_time);
 }
 
 fn assert_current_validators_times_eq(
-    api: &TestKitApi,
+    api: &mut TestKitApi,
     expected_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
 ) {
     let validators_times = HashMap::from_iter(
@@ -490,7 +497,7 @@ fn assert_current_validators_times_eq(
 }
 
 fn assert_all_validators_times_eq(
-    api: &TestKitApi,
+    api: &mut TestKitApi,
     expected_validators_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
 ) {
     let validators_times = HashMap::from_iter(
@@ -509,7 +516,7 @@ fn test_endpoint_api() {
         .with_service(TimeService::new())
         .create();
 
-    let api = testkit.api();
+    let mut api = testkit.api();
     let validators = testkit.network().validators().to_vec();
     let mut current_validators_times: HashMap<PublicKey, Option<DateTime<Utc>>> =
         HashMap::from_iter(
@@ -519,9 +526,9 @@ fn test_endpoint_api() {
         );
     let mut all_validators_times = HashMap::new();
 
-    assert_current_time_eq(&api, None);
-    assert_current_validators_times_eq(&api, &current_validators_times);
-    assert_all_validators_times_eq(&api, &all_validators_times);
+    assert_current_time_eq(&mut api, None);
+    assert_current_validators_times_eq(&mut api, &current_validators_times);
+    assert_all_validators_times_eq(&mut api, &all_validators_times);
 
     let time0 = Utc::now();
     let (pub_key, sec_key) = validators[0].service_keypair();
@@ -529,9 +536,9 @@ fn test_endpoint_api() {
     current_validators_times.insert(*pub_key, Some(time0));
     all_validators_times.insert(*pub_key, Some(time0));
 
-    assert_current_time_eq(&api, Some(time0));
-    assert_current_validators_times_eq(&api, &current_validators_times);
-    assert_all_validators_times_eq(&api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time0));
+    assert_current_validators_times_eq(&mut api, &current_validators_times);
+    assert_all_validators_times_eq(&mut api, &all_validators_times);
 
     let time1 = time0 + Duration::seconds(10);
     let (pub_key, sec_key) = validators[1].service_keypair();
@@ -539,9 +546,9 @@ fn test_endpoint_api() {
     current_validators_times.insert(*pub_key, Some(time1));
     all_validators_times.insert(*pub_key, Some(time1));
 
-    assert_current_time_eq(&api, Some(time1));
-    assert_current_validators_times_eq(&api, &current_validators_times);
-    assert_all_validators_times_eq(&api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time1));
+    assert_current_validators_times_eq(&mut api, &current_validators_times);
+    assert_all_validators_times_eq(&mut api, &all_validators_times);
 
     let time2 = time1 + Duration::seconds(10);
     let (pub_key, sec_key) = validators[2].service_keypair();
@@ -549,9 +556,9 @@ fn test_endpoint_api() {
     current_validators_times.insert(*pub_key, Some(time2));
     all_validators_times.insert(*pub_key, Some(time2));
 
-    assert_current_time_eq(&api, Some(time2));
-    assert_current_validators_times_eq(&api, &current_validators_times);
-    assert_all_validators_times_eq(&api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time2));
+    assert_current_validators_times_eq(&mut api, &current_validators_times);
+    assert_all_validators_times_eq(&mut api, &all_validators_times);
 
     let public_key_0 = validators[0].service_keypair().0;
     let cfg_change_height = Height(10);
@@ -578,9 +585,9 @@ fn test_endpoint_api() {
         all_validators_times.insert(*public_key_0, Some(time));
     }
 
-    assert_current_time_eq(&api, Some(time2));
-    assert_current_validators_times_eq(&api, &current_validators_times);
-    assert_all_validators_times_eq(&api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time2));
+    assert_current_validators_times_eq(&mut api, &current_validators_times);
+    assert_all_validators_times_eq(&mut api, &all_validators_times);
 
     let time3 = time2 + Duration::seconds(10);
     let (pub_key, sec_key) = validators[0].service_keypair();
@@ -588,7 +595,7 @@ fn test_endpoint_api() {
     current_validators_times.insert(*pub_key, Some(time3));
     all_validators_times.insert(*pub_key, Some(time3));
 
-    assert_current_time_eq(&api, Some(time3));
-    assert_current_validators_times_eq(&api, &current_validators_times);
-    assert_all_validators_times_eq(&api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time3));
+    assert_current_validators_times_eq(&mut api, &current_validators_times);
+    assert_all_validators_times_eq(&mut api, &all_validators_times);
 }

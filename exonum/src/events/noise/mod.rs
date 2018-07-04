@@ -12,105 +12,156 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
 use futures::future::{done, Future};
-use tokio_core::net::TcpStream;
-use tokio_io::{AsyncRead, codec::Framed, io::{read_exact, write_all}};
+use tokio_io::{
+    codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
+};
 
 use failure;
 
-use crypto::{PublicKey, SecretKey};
-use events::codec::MessagesCodec;
-use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
-use events::error::into_failure;
+use crypto::{
+    x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
+};
+use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
+use events::{
+    codec::MessagesCodec, noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH},
+    error::into_failure,
+};
 
+pub mod sodium_resolver;
 pub mod wrapper;
 
-type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = failure::Error>>;
+#[cfg(test)]
+mod tests;
+
+type HandshakeResult<S> = Box<dyn Future<Item = Framed<S, MessagesCodec>, Error = io::Error>>;
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
 pub struct HandshakeParams {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    pub public_key: x25519::PublicKey,
+    pub secret_key: x25519::SecretKey,
     pub max_message_len: u32,
+    pub remote_key: Option<x25519::PublicKey>,
+}
+
+impl HandshakeParams {
+    pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
+        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+
+        HandshakeParams {
+            public_key,
+            secret_key,
+            max_message_len,
+            remote_key: None,
+        }
+    }
+
+    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
+        self.remote_key = Some(into_x25519_public_key(remote_key));
+    }
+}
+
+pub trait Handshake {
+    fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
+    fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
 }
 
 #[derive(Debug)]
-pub struct NoiseHandshake {}
+pub struct NoiseHandshake {
+    noise: NoiseWrapper,
+    max_message_len: u32,
+}
 
 impl NoiseHandshake {
-    pub fn listen(params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        listen_handshake(stream, params)
+    pub fn initiator(params: &HandshakeParams) -> Self {
+        let noise = NoiseWrapper::initiator(params);
+        NoiseHandshake {
+            noise,
+            max_message_len: params.max_message_len,
+        }
     }
 
-    pub fn send(params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        send_handshake(stream, params)
+    pub fn responder(params: &HandshakeParams) -> Self {
+        let noise = NoiseWrapper::responder(params);
+        NoiseHandshake {
+            noise,
+            max_message_len: params.max_message_len,
+        }
     }
-}
 
-fn listen_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResult {
-    let max_message_len = params.max_message_len;
-    let mut noise = NoiseWrapper::responder(params);
-    let framed = read(stream).and_then(move |(stream, msg)| {
-        let _buf = noise.read_handshake_msg(&msg);
-        write_handshake_msg(&mut noise)
+    fn read_handshake_msg<S: AsyncRead + 'static>(
+        mut self,
+        stream: S,
+    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+        read(stream).and_then(move |(stream, msg)| {
+            self.noise.read_handshake_msg(&msg)?;
+            Ok((stream, self))
+        })
+    }
+
+    fn write_handshake_msg<S: AsyncWrite + 'static>(
+        mut self,
+        stream: S,
+    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+        done(self.noise.write_handshake_msg())
+            .map_err(|e| e.into())
             .and_then(|(len, buf)| write(stream, &buf, len))
-            .and_then(|(stream, _msg)| read(stream))
-            .and_then(move |(stream, msg)| {
-                let _buf = noise.read_handshake_msg(&msg);
-                let noise = noise.into_transport_mode()?;
-                let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                Ok(framed)
-            })
-    });
+            .map(move |(stream, _)| (stream, self))
+    }
 
-    Box::new(framed)
+    fn finalize<S: AsyncRead + AsyncWrite + 'static>(
+        self,
+        stream: S,
+    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+        let noise = self.noise.into_transport_mode()?;
+        let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
+        Ok(framed)
+    }
 }
 
-fn send_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResult {
-    let max_message_len = params.max_message_len;
-    let mut noise = NoiseWrapper::initiator(params);
-    let framed = write_handshake_msg(&mut noise)
-        .and_then(|(len, buf)| write(stream, &buf, len))
-        .and_then(|(stream, _msg)| read(stream))
-        .and_then(move |(stream, msg)| {
-            let _buf = noise.read_handshake_msg(&msg);
-            write_handshake_msg(&mut noise)
-                .and_then(|(len, buf)| write(stream, &buf, len))
-                .and_then(move |(stream, _msg)| {
-                    let noise = noise.into_transport_mode()?;
-                    let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                    Ok(framed)
-                })
-        });
+impl Handshake for NoiseHandshake {
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
+        let framed = self.read_handshake_msg(stream)
+            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.finalize(stream));
+        Box::new(framed)
+    }
 
-    Box::new(framed)
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
+        let framed = self.write_handshake_msg(stream)
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.finalize(stream));
+        Box::new(framed)
+    }
 }
 
-fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = failure::Error>> {
+fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Error = failure::Error> {
     let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
-    Box::new(
-        read_exact(sock, buf)
+    // First byte of handshake message is payload length, remaining bytes [1; len] is
+    // the handshake payload. Therefore, we need to read first byte and after that
+    // remaining payload.
+    read_exact(sock, buf)
             .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
-            .map_err(into_failure),
-    )
+            .map_err(into_failure)
 }
 
-fn write(
-    sock: TcpStream,
+fn write<S: AsyncWrite + 'static>(
+    sock: S,
     buf: &[u8],
     len: usize,
-) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = failure::Error>> {
-    let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
-    LittleEndian::write_u16(&mut message, len as u16);
-    message.extend_from_slice(&buf[0..len]);
-    Box::new(write_all(sock, message).map_err(into_failure))
-}
+) -> impl Future<Item = (S, Vec<u8>), Error = failure::Error> {
+    debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
 
-fn write_handshake_msg(
-    noise: &mut NoiseWrapper,
-) -> Box<Future<Item = (usize, Vec<u8>), Error = failure::Error>> {
-    let res = noise.write_handshake_msg();
-    Box::new(done(res.map_err(|e| e.into())))
+    let mut message = vec![len as u8; HANDSHAKE_HEADER_LENGTH];
+    message.extend_from_slice(&buf[0..len]);
+    write_all(sock, message).map_err(into_failure)
 }

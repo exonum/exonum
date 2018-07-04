@@ -32,29 +32,26 @@
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::config::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-pub use self::genesis::GenesisConfig;
-pub use self::schema::{Schema, TxLocation};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{
-    ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
-    TransactionMessage, TransactionResult, TransactionSet,
+pub use self::{
+    block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
+    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys}, genesis::GenesisConfig,
+    schema::{Schema, TxLocation}, service::{Service, ServiceContext, SharedNodeState},
+    transaction::{
+        ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
+        TransactionResult, TransactionSet,
+    },
 };
 
 pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
 use failure;
-use mount::Mount;
 use vec_map::VecMap;
 
-use std::collections::{BTreeMap, HashMap};
-use std::error::Error as StdError;
-use std::net::SocketAddr;
-use std::ops::Deref;
-use std::sync::Arc;
-use std::{fmt, iter, mem, panic};
+use std::{
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
+    panic, sync::Arc,
+};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -76,21 +73,22 @@ mod tests;
 
 const CORE_SERVICE: u16 = 0;
 
-/// Exonum blockchain instance with the concrete services set and data storage.
-/// Only blockchains with the identical set of services and genesis block can be combined
-/// into the single network.
+/// Exonum blockchain instance with a certain services set and data storage.
+///
+/// Only nodes with an identical set of services and genesis block can be combined
+/// into a single network.
 pub struct Blockchain {
-    db: Arc<Database>,
-    service_map: Arc<VecMap<Box<Service>>>,
-    service_keypair: (PublicKey, SecretKey),
-    api_sender: ApiSender,
+    db: Arc<dyn Database>,
+    service_map: Arc<VecMap<Box<dyn Service>>>,
+    pub(crate) service_keypair: (PublicKey, SecretKey),
+    pub(crate) api_sender: ApiSender,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new<D: Into<Arc<Database>>>(
+    pub fn new<D: Into<Arc<dyn Database>>>(
         storage: D,
-        services: Vec<Box<Service>>,
+        services: Vec<Box<dyn Service>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
@@ -127,12 +125,12 @@ impl Blockchain {
     /// Returns the `VecMap` for all services. This is a map which
     /// contains service identifiers and service interfaces. The VecMap
     /// allows proceeding from the service identifier to the service itself.
-    pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
+    pub fn service_map(&self) -> &Arc<VecMap<Box<dyn Service>>> {
         &self.service_map
     }
 
     /// Creates a read-only snapshot of the current storage state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
     }
 
@@ -227,7 +225,7 @@ impl Blockchain {
             {
                 let mut schema = Schema::new(&mut fork);
                 if schema.block_hash_by_height(Height::zero()).is_some() {
-                    // TODO create genesis block for MemoryDB and compare in hash with zero block
+                    // TODO create genesis block for MemoryDB and compare it hash with zero block. (ECR-1630)
                     return Ok(());
                 }
                 schema.commit_configuration(config_propose);
@@ -287,7 +285,7 @@ impl Blockchain {
             for service in self.service_map.values() {
                 // Skip execution for genesis block.
                 if height > Height(0) {
-                    service_execute(service.as_ref(), &mut fork);
+                    before_commit(service.as_ref(), &mut fork);
                 }
             }
 
@@ -363,7 +361,7 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let tx = {
+        let (tx, service_name) = {
             let schema = Schema::new(&fork);
 
             let tx = schema
@@ -371,13 +369,21 @@ impl Blockchain {
                 .get(&tx_hash)
                 .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
-            self.tx_from_raw(&tx).or_else(|error| {
+            let service_name = self.service_map
+                .get(tx.service_id() as usize)
+                .ok_or_else(|| failure::err_msg("Service not found."))?
+                .service_name();
+
+            let tx = self.tx_from_raw(&tx).or_else(|error| {
                 Err(failure::err_msg(format!(
-                    "{}, tx: {:?}",
+                    "Service <{}>: {}, tx: {:?}",
+                    service_name,
                     error.description(),
                     tx_hash
                 )))
-            })?
+            })?;
+
+            (tx, service_name)
         };
 
         fork.checkpoint();
@@ -393,7 +399,10 @@ impl Blockchain {
                     Err(ref e) => {
                         // Unlike panic, transaction failure isn't that rare, so logging the
                         // whole transaction body is an overkill: it can be relatively big.
-                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                        info!(
+                            "Service <{}>: {:?} transaction execution failed: {:?}",
+                            service_name, tx_hash, e
+                        );
                         fork.rollback();
                     }
                 }
@@ -405,7 +414,10 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                error!(
+                    "Service <{}>: {:?} transaction execution panicked: {:?}",
+                    service_name, tx, err
+                );
                 Err(TransactionError::from_panic(&err))
             }
         };
@@ -420,17 +432,21 @@ impl Blockchain {
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
-    /// hash and Precommit messages. After that invokes `handle_commit`
+    /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
-    #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn commit<I>(&mut self, patch: &Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
+    pub fn commit<'a, I>(
+        &mut self,
+        patch: &Patch,
+        block_hash: Hash,
+        precommits: I,
+    ) -> Result<(), Error>
     where
         I: Iterator<Item = Message<Precommit>>,
     {
         let patch = {
             let mut fork = {
                 let mut fork = self.db.fork();
-                fork.merge(patch.clone()); // FIXME: avoid cloning here
+                fork.merge(patch.clone()); // FIXME: Avoid cloning here. (ECR-1631)
                 fork
             };
 
@@ -454,44 +470,11 @@ impl Blockchain {
             self.api_sender.clone(),
             self.fork(),
         );
-        // Invokes `handle_commit` for each service in order of their identifiers
+        // Invokes `after_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
-            service.handle_commit(&context);
+            service.after_commit(&context);
         }
         Ok(())
-    }
-
-    /// Returns the `Mount` object that aggregates public API handlers.
-    pub fn mount_public_api(&self) -> Mount {
-        let context = self.api_context();
-        let mut mount = Mount::new();
-        for service in self.service_map.values() {
-            if let Some(handler) = service.public_api_handler(&context) {
-                mount.mount(service.service_name(), handler);
-            }
-        }
-        mount
-    }
-
-    /// Returns the `Mount` object that aggregates private API handlers.
-    pub fn mount_private_api(&self) -> Mount {
-        let context = self.api_context();
-        let mut mount = Mount::new();
-        for service in self.service_map.values() {
-            if let Some(handler) = service.private_api_handler(&context) {
-                mount.mount(service.service_name(), handler);
-            }
-        }
-        mount
-    }
-
-    fn api_context(&self) -> ApiContext {
-        ApiContext::from_parts(
-            self,
-            self.api_sender.clone(),
-            &self.service_keypair.0,
-            &self.service_keypair.1,
-        )
     }
 
     /// Saves the `Connect` message from a peer to the cache.
@@ -556,9 +539,9 @@ impl Blockchain {
     }
 }
 
-fn service_execute(service: &Service, fork: &mut Fork) {
+fn before_commit(service: &dyn Service, fork: &mut Fork) {
     fork.checkpoint();
-    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(fork))) {
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
         Ok(..) => fork.commit(),
         Err(err) => {
             if err.is::<Error>() {
@@ -567,7 +550,7 @@ fn service_execute(service: &Service, fork: &mut Fork) {
             }
             fork.rollback();
             error!(
-                "{} service execute failed with error: {:?}",
+                "{} service before_commit failed with error: {:?}",
                 service.service_name(),
                 err
             );

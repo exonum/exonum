@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bodyparser;
-use exonum::api::{Api, ApiError};
-use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration};
-use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use exonum::encoding::serialize::json::reexport as serde_json;
-use exonum::helpers::Height;
-use exonum::node::{ApiSender, TransactionSend};
-use exonum::storage::StorageValue;
-use iron::prelude::*;
-use router::Router;
+use exonum::{
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    blockchain::{Schema as CoreSchema, StoredConfiguration}, crypto::{CryptoHash, Hash},
+    helpers::Height, node::TransactionSend, storage::StorageValue,
+};
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};
 
@@ -58,24 +53,25 @@ pub struct VoteResponse {
     pub tx_hash: Hash,
 }
 
-#[derive(Clone)]
-pub struct PrivateApi {
-    channel: ApiSender,
-    service_keys: (PublicKey, SecretKey),
-}
-
-#[derive(Clone)]
-pub struct PublicApi {
-    blockchain: Blockchain,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct HashQuery {
+    pub hash: Hash,
 }
 
 /// Filter for stored configurations.
-struct Filter {
-    previous_cfg_hash: Option<Hash>,
-    actual_from: Option<Height>,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct FilterQuery {
+    pub previous_cfg_hash: Option<Hash>,
+    pub actual_from: Option<Height>,
 }
 
-impl Filter {
+#[derive(Debug, Clone, Copy)]
+pub struct PrivateApi;
+
+#[derive(Debug, Clone, Copy)]
+pub struct PublicApi;
+
+impl FilterQuery {
     /// Checks if a supplied configuration satisfies this filter.
     fn matches(&self, cfg: &StoredConfiguration) -> bool {
         if let Some(ref prev) = self.previous_cfg_hash {
@@ -95,17 +91,11 @@ impl Filter {
 }
 
 impl PublicApi {
-    pub fn new(context: &ApiContext) -> Self {
-        PublicApi {
-            blockchain: context.blockchain().clone(),
-        }
-    }
-
-    fn config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
-        let propose = Schema::new(self.blockchain.snapshot())
+    fn config_with_proofs(state: &ServiceApiState, config: StoredConfiguration) -> ConfigHashInfo {
+        let propose = Schema::new(state.snapshot())
             .propose(&config.hash())
             .map(|p| p.hash());
-        let votes = self.votes_for_propose(&config.hash());
+        let votes = Self::votes_for_propose(state, &config.hash());
         ConfigHashInfo {
             hash: config.hash(),
             config,
@@ -114,8 +104,8 @@ impl PublicApi {
         }
     }
 
-    fn votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
-        let schema = Schema::new(self.blockchain.snapshot());
+    fn votes_for_propose(state: &ServiceApiState, config_hash: &Hash) -> VotesInfo {
+        let schema = Schema::new(state.snapshot());
         if schema.propose_data_by_config_hash().contains(config_hash) {
             Some(schema.votes(config_hash))
         } else {
@@ -124,18 +114,17 @@ impl PublicApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn proposed_configs(&self, filter: &Filter) -> Vec<ProposeHashInfo> {
-        let schema = Schema::new(self.blockchain.snapshot());
+    fn proposed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ProposeHashInfo> {
+        let schema = Schema::new(state.snapshot());
         let index = schema.config_hash_by_ordinal();
         let proposes_by_hash = schema.propose_data_by_config_hash();
 
         let proposes = index
             .iter()
             .map(|cfg_hash| {
-                let propose_data = proposes_by_hash.get(&cfg_hash).expect(&format!(
-                    "Not found propose for following cfg_hash: {:?}",
-                    cfg_hash
-                ));
+                let propose_data = proposes_by_hash.get(&cfg_hash).unwrap_or_else(|| {
+                    panic!("Not found propose for following cfg_hash: {:?}", cfg_hash)
+                });
 
                 (cfg_hash, propose_data)
             })
@@ -151,8 +140,8 @@ impl PublicApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn committed_configs(&self, filter: &Filter) -> Vec<ConfigHashInfo> {
-        let core_schema = CoreSchema::new(self.blockchain.snapshot());
+    fn committed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ConfigHashInfo> {
+        let core_schema = CoreSchema::new(state.snapshot());
         let actual_from = core_schema.configs_actual_from();
         let configs = core_schema.configs();
 
@@ -160,197 +149,126 @@ impl PublicApi {
             .iter()
             .map(|config_ref| {
                 let config_hash = config_ref.cfg_hash();
-                configs.get(config_hash).expect(&format!(
-                    "Config with hash {:?} is absent in configs table",
-                    config_hash
-                ))
+                configs.get(config_hash).unwrap_or_else(|| {
+                    panic!(
+                        "Config with hash {:?} is absent in configs table",
+                        config_hash
+                    )
+                })
             })
             .filter(|config| filter.matches(config))
-            .map(|config| self.config_with_proofs(config))
+            .map(|config| Self::config_with_proofs(state, config))
             .collect();
         committed_configs
     }
 
-    fn handle_actual_config(self, router: &mut Router) {
-        let actual_config = move |_: &mut Request| -> IronResult<Response> {
-            let config = CoreSchema::new(self.blockchain.snapshot()).actual_configuration();
-            let config = self.config_with_proofs(config);
-            self.ok_response(&serde_json::to_value(config).unwrap())
-        };
-
-        router.get("/v1/configs/actual", actual_config, "actual_config");
+    fn handle_actual_config(state: &ServiceApiState, _query: ()) -> api::Result<ConfigHashInfo> {
+        let config = CoreSchema::new(state.snapshot()).actual_configuration();
+        Ok(Self::config_with_proofs(state, config))
     }
 
-    fn handle_following_config(self, router: &mut Router) {
-        let following_config = move |_: &mut Request| -> IronResult<Response> {
-            let config = CoreSchema::new(self.blockchain.snapshot())
-                .following_configuration()
-                .map(|cfg| self.config_with_proofs(cfg));
-            self.ok_response(&serde_json::to_value(config).unwrap())
-        };
-
-        router.get(
-            "/v1/configs/following",
-            following_config,
-            "following_config",
-        );
+    fn handle_following_config(
+        state: &ServiceApiState,
+        _query: (),
+    ) -> api::Result<Option<ConfigHashInfo>> {
+        Ok(CoreSchema::new(state.snapshot())
+            .following_configuration()
+            .map(|cfg| Self::config_with_proofs(state, cfg)))
     }
 
-    fn handle_config_by_hash(self, router: &mut Router) {
-        let config_by_hash = move |req: &mut Request| -> IronResult<Response> {
-            let hash: Hash = self.url_fragment(req, "hash")?;
+    fn handle_config_by_hash(
+        state: &ServiceApiState,
+        query: HashQuery,
+    ) -> api::Result<ConfigInfo> {
+        let snapshot = state.snapshot();
 
-            let snapshot = self.blockchain.snapshot();
-            let committed_config = CoreSchema::new(&snapshot).configs().get(&hash);
-            let propose = Schema::new(&snapshot)
-                .propose_data_by_config_hash()
-                .get(&hash);
+        let committed_config = CoreSchema::new(&snapshot).configs().get(&query.hash);
+        let propose = Schema::new(&snapshot)
+            .propose_data_by_config_hash()
+            .get(&query.hash);
 
-            self.ok_response(&serde_json::to_value(ConfigInfo {
-                committed_config,
-                propose,
-            }).unwrap())
-        };
-
-        router.get("/v1/configs/:hash", config_by_hash, "config_by_hash");
-    }
-
-    fn handle_votes_for_propose(self, router: &mut Router) {
-        let votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
-            let config_hash: Hash = self.url_fragment(req, "hash")?;
-            let votes = self.votes_for_propose(&config_hash);
-            self.ok_response(&serde_json::to_value(votes).unwrap())
-        };
-
-        router.get(
-            "/v1/configs/:hash/votes",
-            votes_for_propose,
-            "votes_for_propose",
-        );
-    }
-
-    fn retrieve_filter(&self, request: &mut Request) -> Result<Filter, ApiError> {
-        let previous_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
-        let actual_from: Option<Height> = self.optional_param(request, "actual_from")?;
-        Ok(Filter {
-            previous_cfg_hash,
-            actual_from,
+        Ok(ConfigInfo {
+            committed_config,
+            propose,
         })
     }
 
-    fn handle_proposed_configs(self, router: &mut Router) {
-        let proposed_configs = move |req: &mut Request| -> IronResult<Response> {
-            let proposes = self.proposed_configs(&self.retrieve_filter(req)?);
-            self.ok_response(&serde_json::to_value(proposes).unwrap())
-        };
-
-        router.get("/v1/configs/proposed", proposed_configs, "proposed_configs");
+    fn handle_votes_for_propose(
+        state: &ServiceApiState,
+        query: HashQuery,
+    ) -> api::Result<VotesInfo> {
+        Ok(Self::votes_for_propose(state, &query.hash))
     }
 
-    fn handle_committed_configs(self, router: &mut Router) {
-        let committed_configs = move |req: &mut Request| -> IronResult<Response> {
-            let configs = self.committed_configs(&self.retrieve_filter(req)?);
-            self.ok_response(&serde_json::to_value(configs).unwrap())
-        };
+    fn handle_proposed_configs(
+        state: &ServiceApiState,
+        query: FilterQuery,
+    ) -> api::Result<Vec<ProposeHashInfo>> {
+        Ok(Self::proposed_configs(state, &query))
+    }
 
-        router.get(
-            "/v1/configs/committed",
-            committed_configs,
-            "committed_configs",
-        );
+    fn handle_committed_configs(
+        state: &ServiceApiState,
+        query: FilterQuery,
+    ) -> api::Result<Vec<ConfigHashInfo>> {
+        Ok(Self::committed_configs(state, &query))
+    }
+
+    pub fn wire(builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("v1/configs/actual", Self::handle_actual_config)
+            .endpoint("v1/configs/following", Self::handle_following_config)
+            .endpoint("v1/configs", Self::handle_config_by_hash)
+            .endpoint("v1/configs/votes", Self::handle_votes_for_propose)
+            .endpoint("v1/configs/proposed", Self::handle_proposed_configs)
+            .endpoint("v1/configs/committed", Self::handle_committed_configs);
     }
 }
 
 impl PrivateApi {
-    pub fn new(context: &ApiContext) -> Self {
-        PrivateApi {
-            channel: context.node_channel().clone(),
-            service_keys: (*context.public_key(), context.secret_key().clone()),
-        }
-    }
+    fn handle_propose(
+        state: &ServiceApiState,
+        config: StoredConfiguration,
+    ) -> api::Result<ProposeResponse> {
+        config.consensus.warn_if_nonoptimal();
 
-    fn handle_propose(self, router: &mut Router) {
-        let post_propose = move |req: &mut Request| -> IronResult<Response> {
-            let config = match req.get::<bodyparser::Struct<StoredConfiguration>>() {
-                Ok(Some(config)) => config,
-                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-            };
-
-            config.consensus.warn_if_nonoptimal();
-
-            let cfg_hash = config.hash();
-            let propose = Propose::new(
-                &self.service_keys.0,
-                ::std::str::from_utf8(config.into_bytes().as_slice()).unwrap(),
-                &self.service_keys.1,
-            );
-            let tx_hash = propose.hash();
-
-            self.channel.send(propose.into()).map_err(ApiError::from)?;
-
-            let response = ProposeResponse { tx_hash, cfg_hash };
-            self.ok_response(&serde_json::to_value(response).unwrap())
-        };
-
-        router.post("/v1/configs/postpropose", post_propose, "post_propose");
-    }
-
-    fn handle_vote(self, router: &mut Router) {
-        let post_vote = move |req: &mut Request| -> IronResult<Response> {
-            let cfg_hash: Hash = self.url_fragment(req, "hash")?;
-
-            let vote = Vote::new(&self.service_keys.0, &cfg_hash, &self.service_keys.1);
-            let tx_hash = vote.hash();
-
-            self.channel.send(vote.into()).map_err(ApiError::from)?;
-
-            let response = VoteResponse { tx_hash };
-            self.ok_response(&serde_json::to_value(response).unwrap())
-        };
-
-        router.post("/v1/configs/:hash/postvote", post_vote, "post_vote");
-    }
-
-    fn handle_vote_against(self, router: &mut Router) {
-        let post_vote_against = move |req: &mut Request| -> IronResult<Response> {
-            let cfg_hash: Hash = self.url_fragment(req, "hash")?;
-
-            let vote_against =
-                VoteAgainst::new(&self.service_keys.0, &cfg_hash, &self.service_keys.1);
-            let tx_hash = vote_against.hash();
-
-            self.channel
-                .send(vote_against.into())
-                .map_err(ApiError::from)?;
-
-            let response = VoteResponse { tx_hash };
-            self.ok_response(&serde_json::to_value(response).unwrap())
-        };
-
-        router.post(
-            "/v1/configs/:hash/postagainst",
-            post_vote_against,
-            "post_vote_against",
+        let cfg_hash = config.hash();
+        let propose = Propose::new(
+            state.public_key(),
+            ::std::str::from_utf8(config.into_bytes().as_slice()).unwrap(),
+            state.secret_key(),
         );
-    }
-}
+        let tx_hash = propose.hash();
 
-impl Api for PublicApi {
-    fn wire(&self, router: &mut Router) {
-        self.clone().handle_actual_config(router);
-        self.clone().handle_following_config(router);
-        self.clone().handle_config_by_hash(router);
-        self.clone().handle_votes_for_propose(router);
-        self.clone().handle_proposed_configs(router);
-        self.clone().handle_committed_configs(router);
-    }
-}
+        state.sender().send(propose.into())?;
 
-impl Api for PrivateApi {
-    fn wire(&self, router: &mut Router) {
-        self.clone().handle_propose(router);
-        self.clone().handle_vote(router);
-        self.clone().handle_vote_against(router);
+        Ok(ProposeResponse { tx_hash, cfg_hash })
+    }
+
+    fn handle_vote(state: &ServiceApiState, query: HashQuery) -> api::Result<VoteResponse> {
+        let vote = Vote::new(state.public_key(), &query.hash, state.secret_key());
+        let tx_hash = vote.hash();
+
+        state.sender().send(vote.into())?;
+
+        Ok(VoteResponse { tx_hash })
+    }
+
+    fn handle_vote_against(state: &ServiceApiState, query: HashQuery) -> api::Result<VoteResponse> {
+        let vote_against = VoteAgainst::new(state.public_key(), &query.hash, state.secret_key());
+        let tx_hash = vote_against.hash();
+
+        state.sender().send(vote_against.into())?;
+
+        Ok(VoteResponse { tx_hash })
+    }
+
+    pub fn wire(builder: &mut ServiceApiBuilder) {
+        builder
+            .private_scope()
+            .endpoint_mut("v1/configs/postpropose", Self::handle_propose)
+            .endpoint_mut("v1/configs/postvote", Self::handle_vote)
+            .endpoint_mut("v1/configs/postagainst", Self::handle_vote_against);
     }
 }

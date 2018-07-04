@@ -105,17 +105,16 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-pub use self::error::Error;
-pub use self::fields::Field;
 #[cfg(feature = "float_serialize")]
 pub use self::float::{F32, F64};
-pub use self::segments::SegmentField;
+pub use self::{error::Error, fields::Field, segments::SegmentField};
 
 #[macro_use]
 pub mod serialize;
 
-use std::convert::From;
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    convert::From, ops::{Add, Div, Mul, Sub},
+};
 
 mod error;
 #[macro_use]
@@ -135,7 +134,7 @@ pub type Offset = u32;
 /// Type alias that should be returned in `check` method of `Field`
 pub type Result = ::std::result::Result<CheckedOffset, Error>;
 
-// TODO replace by more generic type (ECR-156).
+// TODO: Replace by more generic type. (ECR-156)
 /// `CheckedOffset` is a type that take control over overflow,
 /// so you can't panic without `unwrap`,
 /// and work with this value without overflow checks.

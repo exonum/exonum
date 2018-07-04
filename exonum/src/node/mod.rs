@@ -17,56 +17,53 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::state::{RequestData, State, ValidatorState};
-pub use self::whitelist::Whitelist;
+pub use self::{
+    connect_list::ConnectList, state::{RequestData, State, ValidatorState},
+};
 
-pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
+// TODO: Temporary solution to get access to WAIT constants. (ECR-167)
+pub mod state;
 
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};
 use failure::{self, Error};
 use futures::{sync::mpsc, Future, Sink};
-use iron::{Chain, Iron, Listening};
-use iron_cors::CorsMiddleware;
-use mount::Mount;
-use router::Router;
-use serde::{de, ser};
 use tokio_core::reactor::Core;
 use toml::Value;
 
-use std::collections::{BTreeMap, HashSet};
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, SystemTime};
-use std::{fmt, io};
-
-use api::{private, public, Api};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
-                 TransactionMessage};
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use events::error::{into_failure, log_error, LogError};
-use events::{
-    HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest
+use std::{
+    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    time::{Duration, SystemTime},
 };
-use events::noise::HandshakeParams;
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+
+use blockchain::{
+    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys, TransactionMessage
+};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use events::{
+    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
+    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
+    NetworkRequest, SyncSender, TimeoutRequest,
+};
+use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, ProtocolMessage, SignedMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
+mod connect_list;
 mod consensus;
 mod events;
 mod requests;
-mod whitelist;
 
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
     /// Add a new connection.
-    PeerAdd(SocketAddr),
+    PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(TransactionMessage),
+    Transaction(Box<dyn Transaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -110,16 +107,17 @@ pub struct NodeHandler {
     /// Shared api state.
     pub api_state: SharedNodeState,
     /// System state.
-    pub system_state: Box<SystemStateProvider>,
+    pub system_state: Box<dyn SystemStateProvider>,
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
     /// Blockchain.
     pub blockchain: Blockchain,
     /// Known peer addresses.
-    // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
+    /// Node role.
+    node_role: NodeRole,
 }
 
 /// Service configuration.
@@ -138,8 +136,8 @@ pub struct ListenerConfig {
     pub consensus_public_key: PublicKey,
     /// Secret key.
     pub consensus_secret_key: SecretKey,
-    /// Whitelist.
-    pub whitelist: Whitelist,
+    /// ConnectList.
+    pub connect_list: ConnectList,
     /// Socket address.
     pub address: SocketAddr,
 }
@@ -177,102 +175,6 @@ impl Default for NodeApiConfig {
             public_allow_origin: None,
             private_allow_origin: None,
         }
-    }
-}
-
-/// CORS header specification
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AllowOrigin {
-    /// Allow access from any host.
-    Any,
-    /// Allow access only from the following hosts.
-    Whitelist(Vec<String>),
-}
-
-impl From<AllowOrigin> for CorsMiddleware {
-    fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
-        match allow_origin {
-            AllowOrigin::Any => CorsMiddleware::with_allow_any(),
-            AllowOrigin::Whitelist(hosts) => {
-                CorsMiddleware::with_whitelist(hosts.into_iter().collect())
-            }
-        }
-    }
-}
-
-impl ser::Serialize for AllowOrigin {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        match *self {
-            AllowOrigin::Any => "*".serialize(serializer),
-            AllowOrigin::Whitelist(ref hosts) => {
-                if hosts.len() == 1 {
-                    hosts[0].serialize(serializer)
-                } else {
-                    hosts.serialize(serializer)
-                }
-            }
-        }
-    }
-}
-
-impl<'de> de::Deserialize<'de> for AllowOrigin {
-    fn deserialize<D>(d: D) -> Result<AllowOrigin, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = AllowOrigin;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a list of hosts or \"*\"")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<AllowOrigin, E>
-            where
-                E: de::Error,
-            {
-                match value {
-                    "*" => Ok(AllowOrigin::Any),
-                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
-                }
-            }
-
-            fn visit_seq<A>(self, seq: A) -> Result<AllowOrigin, A::Error>
-            where
-                A: de::SeqAccess<'de>,
-            {
-                let hosts =
-                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
-                Ok(AllowOrigin::Whitelist(hosts))
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
-}
-
-impl FromStr for AllowOrigin {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "*" {
-            return Ok(AllowOrigin::Any);
-        }
-
-        let v: Vec<_> = s.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if v.is_empty() {
-            bail!("Invalid AllowOrigin::Whitelist value");
-        }
-
-        Ok(AllowOrigin::Whitelist(v))
     }
 }
 
@@ -330,9 +232,6 @@ pub struct NodeConfig {
     pub external_address: Option<SocketAddr>,
     /// Network configuration.
     pub network: NetworkConfiguration,
-    /// Peer addresses.
-    #[serde(default)]
-    pub peers: Vec<SocketAddr>,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.
@@ -341,8 +240,6 @@ pub struct NodeConfig {
     pub service_public_key: PublicKey,
     /// Service secret key.
     pub service_secret_key: SecretKey,
-    /// Node's whitelist.
-    pub whitelist: Whitelist,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -353,6 +250,8 @@ pub struct NodeConfig {
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,
+    /// Node's ConnectList.
+    pub connect_list: ConnectListConfig,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -381,17 +280,97 @@ pub struct NodeSender {
     pub api_requests: SyncSender<ExternalMessage>,
 }
 
+/// Node role.
+#[derive(Debug, Clone, Copy)]
+pub enum NodeRole {
+    /// Validator node.
+    Validator(ValidatorId),
+    /// Auditor node.
+    Auditor,
+}
+
+impl Default for NodeRole {
+    fn default() -> Self {
+        NodeRole::Auditor
+    }
+}
+
+impl NodeRole {
+    /// Constructs new NodeRole from `validator_id`.
+    pub fn new(validator_id: Option<ValidatorId>) -> Self {
+        match validator_id {
+            Some(validator_id) => NodeRole::Validator(validator_id),
+            None => NodeRole::Auditor,
+        }
+    }
+
+    /// Checks if node is validator.
+    pub fn is_validator(self) -> bool {
+        match self {
+            NodeRole::Validator(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Checks if node is auditor.
+    pub fn is_auditor(self) -> bool {
+        match self {
+            NodeRole::Auditor => true,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// ConnectList representation in node's config file.
+pub struct ConnectListConfig {
+    /// Peers to which we can connect.
+    pub peers: Vec<ConnectInfo>,
+}
+
+impl ConnectListConfig {
+    /// Creates `ConnectList` from validators public configs.
+    pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
+        let peers = list.iter()
+            .map(|config| ConnectInfo {
+                public_key: config.validator_keys.consensus_key,
+                address: config.addr,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
+    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
+        let peers = peers
+            .iter()
+            .zip(validators_keys.iter())
+            .map(|(a, v)| ConnectInfo {
+                address: *a,
+                public_key: v.consensus_key,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// `ConnectListConfig` peers addresses.
+    pub fn addresses(&self) -> Vec<SocketAddr> {
+        self.peers.iter().map(|p| p.address).collect()
+    }
+}
+
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
         external_address: SocketAddr,
         sender: NodeSender,
-        system_state: Box<SystemStateProvider>,
+        system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
     ) -> Self {
-        // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
             (block.hash(), block.height().next())
@@ -418,8 +397,7 @@ impl NodeHandler {
             &config.listener.consensus_secret_key,
         );
 
-        let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
+        let connect_list = config.listener.connect_list;
         let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
@@ -427,7 +405,7 @@ impl NodeHandler {
             config.service.service_public_key,
             config.service.service_secret_key,
             config.mempool.tx_pool_capacity,
-            whitelist,
+            connect_list,
             stored,
             connect,
             blockchain.get_saved_peers(),
@@ -436,6 +414,17 @@ impl NodeHandler {
             system_state.current_time(),
         );
 
+        let node_role = NodeRole::new(validator_id);
+
+        if node_role.is_auditor() && api_state.is_enabled() {
+            error!("Consensus is enabled but current node is auditor");
+            api_state.set_enabled(false);
+        }
+
+        let is_enabled = api_state.is_enabled();
+
+        api_state.set_node_role(node_role);
+
         NodeHandler {
             blockchain,
             api_state,
@@ -443,7 +432,8 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            is_enabled: true,
+            is_enabled,
+            node_role,
         }
     }
 
@@ -550,39 +540,68 @@ impl NodeHandler {
 
     /// Sends the given message to a peer by its public key.
     pub fn send_to_peer<M: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: M) {
-        if let Some(conn) = self.state.peers().get(&public_key) {
-            let address = conn.addr();
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.into());
-            self.channel.network_requests.send(request).log_error();
-        } else {
-            warn!("Hasn't connection with peer {:?}", public_key);
-        }
+        let address = {
+            if let Some(conn) = self.state.peers().get(&public_key) {
+                conn.addr()
+            } else {
+                warn!(
+                    "Attempt to send message to peer with key {:?} without connection",
+                    public_key
+                );
+                return;
+            }
+        };
+
+        self.send_to_addr(&address, message);
     }
 
     /// Sends `SignedMessage` to the specified address.
     pub fn send_to_addr<M: Into<SignedMessage>>(&mut self, address: &SocketAddr, message: M) {
         trace!("Send to address: {}", address);
-        let request = NetworkRequest::SendMessage(*address, message.into());
-        self.channel.network_requests.send(request).log_error();
+        let public_key = self.state.connect_list().find_key_by_address(&address);
+
+        match public_key {
+            Some(public_key) => {
+                trace!("Send to address: {}", address);
+                let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+                self.channel.network_requests.send(request).log_error();
+            }
+            _ => {
+                warn!(
+                    "Attempt to connect to the peer with address {:?} which \
+                     is not in the ConnectList",
+                    address
+                );
+            }
+        }
     }
 
     /// Broadcasts given message to all peers.
     pub fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
-        let message = message.into();
-        for conn in self.state.peers().values() {
-            let address = conn.addr();
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.clone());
-            self.channel.network_requests.send(request).log_error();
+        let peers: Vec<SocketAddr> = self.state
+            .peers()
+            .values()
+            .map(|conn| conn.addr())
+            .collect();
+
+        for address in peers {
+            self.send_to_addr(&address, message);
         }
     }
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-        // self.send_to_addr(address, connect);
-        unimplemented!();
+
+        if self.state.connect_list().is_address_allowed(&address) {
+            self.send_to_addr(address, connect.clone());
+        } else {
+            warn!(
+                "Attempt to connect to the peer {:?} which \
+                 is not in the ConnectList",
+                address
+            );
+        }
     }
 
     /// Add timeout request.
@@ -625,7 +644,6 @@ impl NodeHandler {
         } else {
             self.max_propose_timeout()
         };
-        self.state.set_propose_timeout(timeout);
 
         let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 
@@ -694,7 +712,7 @@ impl fmt::Debug for NodeHandler {
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
+    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()>;
 }
 
 impl ApiSender {
@@ -704,7 +722,7 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: SocketAddr) -> Result<(), Error> {
+    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), Error> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
@@ -734,6 +752,21 @@ impl TransactionSend for ApiSender {
 impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
+    }
+}
+
+/// Data needed to add peer into `ConnectList`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ConnectInfo {
+    /// Peer address.
+    pub address: SocketAddr,
+    /// Peer public key.
+    pub public_key: PublicKey,
+}
+
+impl fmt::Display for ConnectInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.address)
     }
 }
 
@@ -772,8 +805,6 @@ pub struct NodeChannel {
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
-const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
-
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
@@ -808,21 +839,12 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new<D: Into<Arc<Database>>>(
+    pub fn new<D: Into<Arc<dyn Database>>>(
         db: D,
-        services: Vec<Box<Service>>,
+        services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
     ) -> Self {
         crypto::init();
-
-        if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(
-                &format!(
-                    "You compiled exonum with profiling support, but {}",
-                    PROFILE_ENV_VARIABLE_NAME
-                ),
-            ))
-        };
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
@@ -834,11 +856,13 @@ impl Node {
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
+        let peers = node_cfg.connect_list.addresses();
+
         let config = Configuration {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
                 consensus_secret_key: node_cfg.consensus_secret_key,
-                whitelist: node_cfg.whitelist,
+                connect_list: ConnectList::from_config(node_cfg.connect_list),
                 address: node_cfg.listen_address,
             },
             service: ServiceConfig {
@@ -847,7 +871,7 @@ impl Node {
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
-            peer_discovery: node_cfg.peers,
+            peer_discovery: peers,
         };
 
         let external_address = if let Some(v) = node_cfg.external_address {
@@ -906,47 +930,63 @@ impl Node {
     /// Explorer api prefix is `/api/explorer`
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
-    pub fn run(self) -> Result<(), Error> {
-        let api_state = self.handler.api_state.clone();
-        let blockchain = self.handler.blockchain.clone();
-        let mut api_handlers: Vec<Listening> = Vec::new();
+    pub fn run(self) -> Result<(), failure::Error> {
+        // Runs actix-web api.
+        let actix_api_runtime = SystemRuntimeConfig {
+            api_runtimes: {
+                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
+                    let app_config = move |app: App| -> App {
+                        let cors = Cors::from(allow_origin.clone());
+                        app.middleware(cors)
+                    };
+                    Arc::new(app_config)
+                };
 
-        // Start private api.
-        if let Some(listen_address) = self.api_options.private_api_address {
-            let api_sender = self.channel();
-            let handler = create_private_api_handler(
-                blockchain.clone(),
-                api_state.clone(),
-                api_sender,
-                &self.api_options,
-            );
-            let listener = Iron::new(handler).http(listen_address).unwrap();
-            api_handlers.push(listener);
+                let public_api_handler = self.api_options
+                    .public_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Public,
+                        app_config: self.api_options
+                            .public_allow_origin
+                            .clone()
+                            .map(into_app_config),
+                    })
+                    .into_iter();
+                let private_api_handler = self.api_options
+                    .private_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Private,
+                        app_config: self.api_options
+                            .private_allow_origin
+                            .clone()
+                            .map(into_app_config),
+                    })
+                    .into_iter();
+                // Collects API handlers.
+                public_api_handler
+                    .chain(private_api_handler)
+                    .collect::<Vec<_>>()
+            },
+            api_aggregator: ApiAggregator::new(
+                self.handler.blockchain.clone(),
+                self.handler.api_state.clone(),
+            ),
+        }.start()?;
 
-            info!("Private exonum api started on {}", listen_address);
-        };
-
-        // Start public api.
-        if let Some(listen_address) = self.api_options.public_api_address {
-            let handler = create_public_api_handler(blockchain, api_state, &self.api_options);
-            let listener = Iron::new(handler).http(listen_address).unwrap();
-            api_handlers.push(listener);
-
-            info!("Public exonum api started on {}", listen_address);
-        };
-
-        let handshake_params = HandshakeParams {
-            public_key: *self.handler().state().consensus_public_key(),
-            secret_key: self.handler().state().consensus_secret_key().clone(),
-            max_message_len: self.max_message_len,
-        };
+        // Runs NodeHandler.
+        let handshake_params = HandshakeParams::new(
+            *self.state().consensus_public_key(),
+            self.state().consensus_secret_key().clone(),
+            self.max_message_len,
+        );
         self.run_handler(&handshake_params)?;
 
-        // Stop all api handlers.
-        for mut handler in api_handlers {
-            handler.close().unwrap();
-        }
+        // Stops actix web runtime.
+        actix_api_runtime.stop()?;
 
+        info!("Exonum node stopped");
         Ok(())
     }
 
@@ -999,110 +1039,64 @@ impl Node {
     }
 }
 
-/// Public for testing
-#[doc(hidden)]
-pub fn create_public_api_handler(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-    config: &NodeApiConfig,
-) -> Chain {
-    let mut mount = Mount::new();
-    mount.mount("api/services", blockchain.mount_public_api());
-
-    if config.enable_blockchain_explorer {
-        let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(blockchain.clone());
-        explorer_api.wire(&mut router);
-        mount.mount("api/explorer", router);
-    }
-
-    let mut router = Router::new();
-    let system_api = public::SystemApi::new(blockchain, shared_api_state);
-    system_api.wire(&mut router);
-    mount.mount("api/system", router);
-
-    let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.public_allow_origin {
-        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
-    }
-    chain
-}
-
-/// Public for testing
-#[doc(hidden)]
-pub fn create_private_api_handler(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-    api_sender: ApiSender,
-    config: &NodeApiConfig,
-) -> Chain {
-    let mut mount = Mount::new();
-    mount.mount("api/services", blockchain.mount_private_api());
-
-    let mut router = Router::new();
-    let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, api_sender);
-    system_api.wire(&mut router);
-    mount.mount("api/system", router);
-
-    let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.private_allow_origin {
-        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
-    }
-    chain
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use blockchain::{ExecutionResult, Schema, Transaction};
+    use crypto::gen_keypair;
+    use events::EventHandler;
+    use helpers;
+    use storage::{Database, Fork, MemoryDB};
 
-    #[test]
-    fn allow_origin_toml() {
-        fn check(text: &str, allow_origin: AllowOrigin) {
-            #[derive(Serialize, Deserialize)]
-            struct Config {
-                allow_origin: AllowOrigin,
-            }
-            let config_toml = format!("allow_origin = {}\n", text);
-            let config: Config = ::toml::from_str(&config_toml).unwrap();
-            assert_eq!(config.allow_origin, allow_origin);
-            assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+    messages! {
+        const SERVICE_ID = 0;
+
+        struct TxSimple {
+            public_key: &PublicKey,
+            msg: &str,
+        }
+    }
+
+    impl Transaction for TxSimple {
+        fn verify(&self) -> bool {
+            true
         }
 
-        check(r#""*""#, AllowOrigin::Any);
-        check(
-            r#""http://example.com""#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"["http://a.org", "http://b.org"]"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
+        fn execute(&self, _view: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
     }
 
     #[test]
-    fn allow_origin_from_str() {
-        fn check(text: &str, expected: AllowOrigin) {
-            let from_str = AllowOrigin::from_str(text).unwrap();
-            assert_eq!(from_str, expected);
-        }
+    fn test_duplicated_transaction() {
+        let (p_key, s_key) = gen_keypair();
 
-        check(r#"*"#, AllowOrigin::Any);
-        check(
-            r#"http://example.com"#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org, "#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org,http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+
+        let mut node = Node::new(db, services, node_cfg);
+
+        let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+
+        // Create original transaction.
+        let tx_orig = Box::new(tx.clone());
+        let event = ExternalMessage::Transaction(tx_orig);
+        node.handler.handle_event(event.into());
+
+        // Initial transaction should be added to the pool.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 1);
+
+        // Create duplicated transaction.
+        let tx_copy = Box::new(tx.clone());
+        let event = ExternalMessage::Transaction(tx_copy);
+        node.handler.handle_event(event.into());
+
+        // Duplicated transaction shouldn't be added to the pool.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 1);
     }
 }

@@ -18,8 +18,7 @@ use tokio_io::codec::{Decoder, Encoder};
 
 use failure::{self, Error};
 
-use events::noise::wrapper::NOISE_HEADER_LENGTH;
-use events::noise::wrapper::NoiseWrapper;
+use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
 use messages::{UncheckedBuffer, SignedMessage};
 
 #[derive(Debug)]
@@ -83,8 +82,8 @@ mod test {
 
     use bytes::BytesMut;
     use crypto::{gen_keypair_from_seed, Seed};
-    use events::noise::HandshakeParams;
     use events::noise::wrapper::NoiseWrapper;
+    use events::noise::HandshakeParams;
     use messages::{MessageBuffer, RawMessage};
     use tokio_io::codec::{Decoder, Encoder};
 
@@ -125,13 +124,9 @@ mod test {
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
-
-        let params = HandshakeParams {
-            public_key,
-            secret_key,
-            max_message_len: 1024,
-        };
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+        let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+        params.set_remote_key(public_key);
 
         let mut initiator = NoiseWrapper::initiator(&params).session;
         let mut responder = NoiseWrapper::responder(&params).session;

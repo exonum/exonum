@@ -319,7 +319,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than max_propose_timeout(50)")]
+    #[should_panic(
+        expected = "round_timeout(50) must be strictly larger than max_propose_timeout(50)"
+    )]
     fn invalid_round_timeout() {
         let mut configuration = create_test_configuration();
         configuration.consensus.round_timeout = 50;

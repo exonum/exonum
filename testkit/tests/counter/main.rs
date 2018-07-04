@@ -28,16 +28,18 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::api::ApiError;
-use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
-use exonum::crypto::{self, CryptoHash, PublicKey};
-use exonum::encoding::serialize::{FromHex, json::ExonumJson};
-use exonum::helpers::Height;
-use exonum::messages::Message;
+use exonum::{
+    api::{node::public::explorer::TransactionQuery, Error as ApiError},
+    blockchain::{Transaction, TransactionErrorType as ErrorType},
+    crypto::{self, CryptoHash, PublicKey}, encoding::serialize::{json::ExonumJson, FromHex},
+    helpers::Height, messages::Message,
+};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
 
-use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
+use counter::{
+    CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
+};
 
 mod counter;
 
@@ -52,7 +54,10 @@ fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
     // Create a pre-signed transaction
     let tx = TxIncrement::new(&pubkey, by, &key);
 
-    let tx_info: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
+    let tx_info: TransactionResponse = api.public(ApiKind::Service("counter"))
+        .query(&tx)
+        .post("count")
+        .unwrap();
     assert_eq!(tx_info.tx_hash, tx.hash());
     tx
 }
@@ -66,7 +71,9 @@ fn test_inc_count_create_block() {
     testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));
 
     // Check that the user indeed is persisted by the service
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 5);
 
     testkit.create_block_with_transactions(txvec![
@@ -74,7 +81,9 @@ fn test_inc_count_create_block() {
         TxIncrement::new(&pubkey, 1, &key),
     ]);
 
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 10);
 }
 
@@ -96,7 +105,9 @@ fn test_inc_count_api() {
     testkit.create_block();
 
     // Check that the user indeed is persisted by the service
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 5);
 }
 
@@ -114,7 +125,9 @@ fn test_inc_count_with_multiple_transactions() {
     }
 
     assert_eq!(testkit.height(), Height(100));
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 1_000);
 }
 
@@ -126,15 +139,21 @@ fn test_inc_count_with_manual_tx_control() {
 
     // Empty block
     testkit.create_block_with_tx_hashes(&[]);
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 0);
 
     testkit.create_block_with_tx_hashes(&[tx_b.hash()]);
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 3);
 
     testkit.create_block_with_tx_hashes(&[tx_a.hash()]);
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 8);
 }
 
@@ -145,7 +164,9 @@ fn test_private_api() {
     inc_count(&api, 3);
 
     testkit.create_block();
-    let counter: u64 = api.get_private(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.private(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 8);
 
     let (pubkey, key) = crypto::gen_keypair_from_seed(&crypto::Seed::from_slice(
@@ -154,11 +175,16 @@ fn test_private_api() {
     assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
 
     let tx = TxReset::new(&pubkey, &key);
-    let tx_info: TransactionResponse = api.post_private(ApiKind::Service("counter"), "reset", &tx);
+    let tx_info: TransactionResponse = api.private(ApiKind::Service("counter"))
+        .query(&tx)
+        .post("reset")
+        .unwrap();
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     testkit.create_block();
-    let counter: u64 = api.get_private(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.private(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 0);
 }
 
@@ -175,7 +201,9 @@ fn test_probe() {
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(5));
     // Verify that the patch has not been applied to the blockchain
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 0);
 
     let other_tx = {
@@ -188,7 +216,10 @@ fn test_probe() {
     assert_eq!(schema.count(), Some(8));
 
     // Posting a transaction is not enough to change the blockchain!
-    let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
+    let _: TransactionResponse = api.public(ApiKind::Service("counter"))
+        .query(&tx)
+        .post("count")
+        .unwrap();
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
@@ -204,10 +235,18 @@ fn test_duplicate_tx() {
 
     let tx = inc_count(&api, 5);
     testkit.create_block();
-    let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
-    let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
+    let _: TransactionResponse = api.public(ApiKind::Service("counter"))
+        .query(&tx)
+        .post("count")
+        .unwrap();
+    let _: TransactionResponse = api.public(ApiKind::Service("counter"))
+        .query(&tx)
+        .post("count")
+        .unwrap();
     testkit.create_block();
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.public(ApiKind::Service("counter"))
+        .get("count")
+        .unwrap();
     assert_eq!(counter, 5);
 }
 
@@ -355,19 +394,19 @@ fn test_snapshot_comparison_panic() {
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| {
-            new == old + tx.by()
-        });
+        .assert("Counter has increased", |&old, &new| new == old + tx.by());
 }
 
 #[test]
 fn test_explorer_blocks() {
-    use exonum::api::public::BlocksRange;
+    use exonum::api::node::public::explorer::BlocksRange;
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
 
-    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(0));
@@ -378,7 +417,9 @@ fn test_explorer_blocks() {
     // Check empty block creation
     testkit.create_block();
 
-    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(1));
@@ -389,10 +430,9 @@ fn test_explorer_blocks() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
-    let response: BlocksRange = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=10&skip_empty_blocks=true",
-    );
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 0);
     assert_eq!(range.start, Height(0));
@@ -405,7 +445,9 @@ fn test_explorer_blocks() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 2
 
-    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].height(), Height(2));
@@ -415,10 +457,9 @@ fn test_explorer_blocks() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    let response: BlocksRange = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=10&skip_empty_blocks=true",
-    );
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
@@ -428,10 +469,9 @@ fn test_explorer_blocks() {
     testkit.create_block(); // height == 3
     testkit.create_block(); // height == 4
 
-    let response: BlocksRange = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=10&skip_empty_blocks=true",
-    );
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
@@ -455,20 +495,18 @@ fn test_explorer_blocks() {
     testkit.create_block(); // height == 5
 
     // Check block filtering
-    let response: BlocksRange = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=1&skip_empty_blocks=true",
-    );
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=1&skip_empty_blocks=true")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(range.start, Height(5));
     assert_eq!(range.end, Height(6));
 
-    let response: BlocksRange = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=3&skip_empty_blocks=true",
-    );
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=3&skip_empty_blocks=true")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
@@ -477,10 +515,9 @@ fn test_explorer_blocks() {
     assert_eq!(range.end, Height(6));
 
     // Check `latest` param
-    let response: BlocksRange = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=10&skip_empty_blocks=true&latest=4",
-    );
+    let response: BlocksRange = api.public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
+        .unwrap();
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
@@ -551,10 +588,10 @@ fn test_explorer_transaction_info() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    let info: ApiError = api.get_err(
-        ApiKind::Explorer,
-        &format!("v1/transactions/{}", &tx.hash().to_string()),
-    );
+
+    let info = api.public(ApiKind::Explorer)
+        .get::<Value>(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .unwrap_err();
     let error_body = json!({ "type": "unknown" });
     assert_matches!(
         info,
@@ -564,10 +601,9 @@ fn test_explorer_transaction_info() {
     api.send(tx.clone());
     testkit.poll_events();
 
-    let info: Value = api.get(
-        ApiKind::Explorer,
-        &format!("v1/transactions/{}", &tx.hash().to_string()),
-    );
+    let info: Value = api.public(ApiKind::Explorer)
+        .get(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .unwrap();
     assert_eq!(
         info,
         json!({
@@ -577,10 +613,9 @@ fn test_explorer_transaction_info() {
     );
 
     testkit.create_block();
-    let info: TransactionInfo<Value> = api.get(
-        ApiKind::Explorer,
-        &format!("v1/transactions/{}", &tx.hash().to_string()),
-    );
+    let info: TransactionInfo<Value> = api.public(ApiKind::Explorer)
+        .get(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .unwrap();
     assert!(info.is_committed());
     let committed = info.as_committed().unwrap();
     assert_eq!(committed.location().block_height(), Height(1));
@@ -651,8 +686,10 @@ fn test_explorer_transaction_statuses() {
     let statuses: Vec<_> = [tx.hash(), error_tx.hash(), panicking_tx.hash()]
         .iter()
         .map(|hash| {
-            let info: TransactionInfo<Value> =
-                api.get(ApiKind::Explorer, &format!("v1/transactions/{}", hash));
+            let info: TransactionInfo<Value> = api.public(ApiKind::Explorer)
+                .query(&TransactionQuery::new(*hash))
+                .get("v1/transactions")
+                .unwrap();
             info.as_committed().unwrap().status().map_err(Clone::clone)
         })
         .collect();

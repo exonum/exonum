@@ -14,18 +14,18 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::clone::Clone;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, RwLock};
+use std::{
+    clone::Clone, collections::{BTreeMap, HashMap}, sync::{Arc, RwLock},
+};
 
-use super::db::Change;
-use super::{Database, Iter, Iterator, Patch, Result, Snapshot};
+use super::{db::Change, Database, Iter, Iterator, Patch, Result, Snapshot};
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
-/// Database implementation that stores all the data in memory.
+/// Database implementation that stores all the data in RAM.
 ///
-/// It's mainly used for testing and not designed to be efficient.
+/// This database is only used for testing and experimenting; is not designed to
+/// operate under load in production.
 #[derive(Default, Debug)]
 pub struct MemoryDB {
     map: RwLock<DB>,
@@ -47,7 +47,7 @@ impl MemoryDB {
 }
 
 impl Database for MemoryDB {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(MemoryDB {
             map: RwLock::new(self.map.read().unwrap().clone()),
         })
@@ -134,9 +134,9 @@ impl Iterator for MemoryDBIter {
     }
 }
 
-impl From<MemoryDB> for Arc<Database> {
-    fn from(db: MemoryDB) -> Arc<Database> {
-        Arc::from(Box::new(db) as Box<Database>)
+impl From<MemoryDB> for Arc<dyn Database> {
+    fn from(db: MemoryDB) -> Arc<dyn Database> {
+        Arc::from(Box::new(db) as Box<dyn Database>)
     }
 }
 

@@ -12,10 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
-use super::node::{BranchNode, Node};
+use super::{
+    key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE}, node::{BranchNode, Node},
+};
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 
@@ -183,8 +188,9 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 }
 
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
-/// which jointly allow to restore the `merkle_root()` of the index. Besides existing elements,
-/// `MapProof` can assert absence of certain keys from the underlying index.
+/// which jointly allow restoring the `merkle_root()` of the index. Apart from the
+/// existing elements, `MapProof` can assert absence of certain keys from the underlying
+/// index.
 ///
 /// # Workflow
 ///
@@ -370,7 +376,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
 /// Builder for [`MapProof`]s.
 ///
-/// This struct is rarely needs to be used explicitly (except for testing purposes). Instead,
+/// This struct rarely needs to be used explicitly (except for testing purposes). Instead,
 /// `MapProof`s can be created using [`get_proof()`] and [`get_multiproof()`] methods, or
 /// deserialized using `serde`.
 ///

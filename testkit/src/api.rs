@@ -12,31 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bodyparser;
-use exonum::api::ApiError;
-use exonum::blockchain::{SharedNodeState, Transaction};
-use exonum::node::{create_private_api_handler, create_public_api_handler, ApiSender,
-                   TransactionSend};
-use iron::headers::{ContentType, Headers};
-use iron::status::{self, StatusClass};
-use iron::{Chain, Handler, IronError, IronResult, Plugin, Request, Response};
-use iron_test::{request, response};
-use log::Level;
-use mount::{Mount, OriginalUrl};
-use serde::{Deserialize, Serialize};
+//! API encapsulation for the testkit.
+
+pub use exonum::api::ApiAccess;
+
+use actix_web::{test::TestServer, App};
+use reqwest::{Client, Response, StatusCode};
 use serde_json;
-use serde_json::Value as JsonValue;
+use serde_urlencoded;
 
-use std::fmt;
+use std::fmt::{self, Display};
 
-use super::TestKit;
+use exonum::{
+    api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
+    encoding::serialize::reexport::{DeserializeOwned, Serialize},
+    node::{ApiSender, TransactionSend},
+};
+
+use TestKit;
 
 /// Kind of public or private REST API of an Exonum node.
 ///
 /// `ApiKind` allows to use `get*` and `post*` methods of [`TestKitApi`] more safely.
 ///
 /// [`TestKitApi`]: struct.TestKitApi.html
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ApiKind {
     /// `api/system` endpoints of the built-in Exonum REST API.
     System,
@@ -46,12 +46,12 @@ pub enum ApiKind {
     Service(&'static str),
 }
 
-impl ApiKind {
-    fn into_prefix(self) -> String {
+impl ::fmt::Display for ApiKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ApiKind::System => "api/system".to_string(),
-            ApiKind::Explorer => "api/explorer".to_string(),
-            ApiKind::Service(name) => format!("api/services/{}", name),
+            ApiKind::System => write!(f, "api/system"),
+            ApiKind::Explorer => write!(f, "api/explorer"),
+            ApiKind::Service(name) => write!(f, "api/services/{}", name),
         }
     }
 }
@@ -59,8 +59,8 @@ impl ApiKind {
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
-    public_handler: Chain,
-    private_handler: Chain,
+    test_server: TestServer,
+    test_client: Client,
     api_sender: ApiSender,
 }
 
@@ -72,408 +72,224 @@ impl fmt::Debug for TestKitApi {
 
 impl TestKitApi {
     /// Creates a new instance of API.
-    pub(crate) fn new(testkit: &TestKit) -> Self {
-        let blockchain = &testkit.blockchain;
-        let api_state = SharedNodeState::new(10_000);
+    pub fn new(testkit: &TestKit) -> Self {
+        Self::from_raw_parts(
+            ApiAggregator::new(testkit.blockchain().clone(), SharedNodeState::new(10_000)),
+            testkit.api_sender.clone(),
+        )
+    }
+
+    pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
+        trace!("Created testkit api: {:#?}", aggregator);
 
         TestKitApi {
-            public_handler: {
-                let mut handler = create_public_api_handler(
-                    blockchain.clone(),
-                    api_state.clone(),
-                    &testkit.api_config,
-                );
-                handler.link_after(|req: &mut Request, resp| {
-                    log_request(&ApiAccess::Public, req, resp)
-                });
-                handler
-            },
-
-            private_handler: {
-                let mut handler = create_private_api_handler(
-                    blockchain.clone(),
-                    api_state,
-                    testkit.api_sender.clone(),
-                    &testkit.api_config,
-                );
-                handler.link_after(|req: &mut Request, resp| {
-                    log_request(&ApiAccess::Private, req, resp)
-                });
-                handler
-            },
-
-            api_sender: testkit.api_sender.clone(),
+            test_server: create_test_server(aggregator),
+            test_client: Client::new(),
+            api_sender,
         }
-    }
-
-    /// Returns the mounting point for public APIs. Useful for intricate testing not covered
-    /// by `get*` and `post*` functions.
-    pub fn public_handler(&self) -> &Chain {
-        &self.public_handler
-    }
-
-    /// Returns the mounting point for private APIs. Useful for intricate testing not covered
-    /// by `get*` and `post*` functions.
-    pub fn private_handler(&self) -> &Chain {
-        &self.private_handler
-    }
-
-    pub(crate) fn into_handlers<H: Handler>(self, testkit_handler: H) -> (Chain, Chain) {
-        let (public_handler, private_handler) = (self.public_handler, self.private_handler);
-
-        let mut testkit_handler = Chain::new(testkit_handler);
-        testkit_handler
-            .link_after(|req: &mut Request, resp| log_request(&ApiAccess::Private, req, resp));
-
-        let mut private_mount = Mount::new();
-        private_mount.mount("api/testkit", testkit_handler);
-        private_mount.mount("", private_handler);
-
-        (public_handler, Chain::new(private_mount))
     }
 
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
-        T: Into<Box<Transaction>>,
+        T: Into<Box<dyn Transaction>>,
     {
         self.api_sender
             .send(transaction.into())
             .expect("Cannot send transaction");
     }
 
-    fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool) -> D
-    where
-        H: Handler,
-        for<'de> D: Deserialize<'de>,
-    {
-        let status_class = if expect_error {
-            StatusClass::ClientError
-        } else {
-            StatusClass::Success
-        };
+    /// Creates a requests builder for the public API scope.
+    pub fn public(&self, kind: impl Display) -> RequestBuilder {
+        RequestBuilder::new(
+            self.test_server.url(""),
+            &self.test_client,
+            ApiAccess::Public,
+            kind.to_string(),
+        )
+    }
 
-        let url = format!("http://localhost:3000/{}", endpoint);
-        let resp = request::get(&url, Headers::new(), handler);
-        let resp = if expect_error {
-            // Support either "normal" or erroneous responses.
-            // For example, `Api.not_found_response()` returns the response as `Ok(..)`.
-            match resp {
-                Ok(resp) => resp,
-                Err(IronError { response, .. }) => response,
-            }
-        } else {
-            resp.expect("Got unexpected `Err(..)` response")
-        };
+    /// Creates a requests builder for the private API scope.
+    pub fn private(&self, kind: impl Display) -> RequestBuilder {
+        RequestBuilder::new(
+            self.test_server.url(""),
+            &self.test_client,
+            ApiAccess::Private,
+            kind.to_string(),
+        )
+    }
+}
 
-        if let Some(ref status) = resp.status {
-            if status.class() != status_class {
-                panic!("Unexpected response status: {:?}", status);
-            }
-        } else {
-            panic!("Response status not set");
+/// An HTTP requests builder. This type can be used to send requests to
+/// the appropriate `TestKitApi` handlers.
+pub struct RequestBuilder<'a, 'b, Q = ()>
+where
+    Q: 'b,
+{
+    test_server_url: String,
+    test_client: &'a Client,
+    access: ApiAccess,
+    prefix: String,
+    query: Option<&'b Q>,
+}
+
+impl<'a, 'b, Q> fmt::Debug for RequestBuilder<'a, 'b, Q>
+where
+    Q: 'b + fmt::Debug + Serialize,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("RequestBuilder")
+            .field("access", &self.access)
+            .field("prefix", &self.prefix)
+            .field("query", &self.query)
+            .finish()
+    }
+}
+
+impl<'a, 'b, Q> RequestBuilder<'a, 'b, Q>
+where
+    Q: 'b + Serialize,
+{
+    fn new(
+        test_server_url: String,
+        test_client: &'a Client,
+        access: ApiAccess,
+        prefix: String,
+    ) -> Self {
+        RequestBuilder {
+            test_server_url,
+            test_client,
+            access,
+            prefix,
+            query: None,
         }
-
-        let resp = response::extract_body_to_string(resp);
-        serde_json::from_str(&resp).unwrap()
     }
 
-    /// Gets information from a public endpoint of the node.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown), or if the response has a non-20x response status.
-    pub fn get<D>(&self, kind: ApiKind, endpoint: &str) -> D
+    /// Sets a query data of the current request.
+    pub fn query<T>(&'a self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
+        RequestBuilder {
+            test_server_url: self.test_server_url.clone(),
+            test_client: self.test_client,
+            access: self.access,
+            prefix: self.prefix.clone(),
+            query: Some(query),
+        }
+    }
+
+    /// Sends a get request to the testing API endpoint and decodes response as
+    /// the corresponding type.
+    pub fn get<R>(&self, endpoint: &str) -> api::Result<R>
     where
-        for<'de> D: Deserialize<'de>,
+        R: DeserializeOwned + 'static,
     {
-        TestKitApi::get_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            false,
-        )
+        let params = self.query
+            .as_ref()
+            .map(|query| {
+                format!(
+                    "?{}",
+                    serde_urlencoded::to_string(query).expect("Unable to serialize query.")
+                )
+            })
+            .unwrap_or_default();
+        let url = format!(
+            "{url}{access}/{prefix}/{endpoint}{query}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint,
+            query = params
+        );
+
+        trace!("GET {}", url);
+
+        let response = self.test_client
+            .get(&url)
+            .send()
+            .expect("Unable to send request");
+        Self::response_to_api_result(response)
     }
 
-    /// Gets information from a private endpoint of the node.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown), or if the response has a non-20x response status.
-    pub fn get_private<D>(&self, kind: ApiKind, endpoint: &str) -> D
+    /// Sends a post request to the testing API endpoint and decodes response as
+    /// the corresponding type.
+    pub fn post<R>(&self, endpoint: &str) -> api::Result<R>
     where
-        for<'de> D: Deserialize<'de>,
+        R: DeserializeOwned + 'static,
     {
-        TestKitApi::get_internal(
-            &self.private_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            false,
-        )
-    }
+        let url = format!(
+            "{url}{access}/{prefix}/{endpoint}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint
+        );
 
-    /// Gets an error from a public endpoint of the node.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if the response has a non-error response status.
-    pub fn get_err(&self, kind: ApiKind, endpoint: &str) -> ApiError {
-        let url = format!("http://localhost:3000/{}/{}", kind.into_prefix(), endpoint);
-        let response = match request::get(&url, Headers::new(), &self.public_handler) {
-            Ok(response) | Err(IronError { response, .. }) => response,
+        trace!("POST {}", url);
+
+        let mut builder = self.test_client.post(&url);
+        if let Some(ref query) = self.query.as_ref() {
+            trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
+            builder.json(query)
+        } else {
+            builder.json(&serde_json::Value::Null)
         };
-        TestKitApi::response_to_api_error(response)
+        let response = builder.send().expect("Unable to send request");
+        Self::response_to_api_result(response)
     }
 
-    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T) -> D
+    /// Converts reqwest Response to api::Result.
+    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
     where
-        H: Handler,
-        T: Serialize,
-        for<'de> D: Deserialize<'de>,
+        R: DeserializeOwned + 'static,
     {
-        let url = format!("http://localhost:3000/{}", endpoint);
-        let body = serde_json::to_string(&data).expect("Cannot serialize data to JSON");
-        let resp = request::post(
-            &url,
-            {
-                let mut headers = Headers::new();
-                headers.set(ContentType::json());
-                headers
-            },
-            &body,
-            handler,
-        ).expect("Cannot send data");
+        trace!("Response status: {}", response.status());
 
-        let resp = response::extract_body_to_string(resp);
-        serde_json::from_str(&resp).expect("Cannot parse result")
-    }
-
-    /// Posts a transaction to the service using the public API. The returned value is the result
-    /// of synchronous transaction processing, which includes running the API shim
-    /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
-    /// gets to a block via one of `create_block*()` methods.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown).
-    pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
-    where
-        T: Serialize,
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::post_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            transaction,
-        )
-    }
-
-    /// Posts a transaction to the service using the private API. The returned value is the result
-    /// of synchronous transaction processing, which includes running the API shim
-    /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
-    /// gets to a block via one of `create_block*()` methods.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown).
-    pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
-    where
-        T: Serialize,
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::post_internal(
-            &self.private_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            transaction,
-        )
-    }
-
-    /// Converts iron Response to ApiError.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if the response has a non-error response status.
-    fn response_to_api_error(response: Response) -> ApiError {
         fn extract_description(body: &str) -> Option<String> {
-            match serde_json::from_str::<JsonValue>(body).ok()? {
-                JsonValue::Object(ref object) if object.contains_key("description") => {
+            trace!("Error: {}", body);
+            match serde_json::from_str::<serde_json::Value>(body).ok()? {
+                serde_json::Value::Object(ref object) if object.contains_key("description") => {
                     Some(object["description"].as_str()?.to_owned())
                 }
-                JsonValue::String(string) => Some(string),
+                serde_json::Value::String(string) => Some(string),
                 _ => None,
             }
         }
 
-        fn error(response: Response) -> String {
-            let body = response::extract_body_to_string(response);
+        fn error(mut response: Response) -> String {
+            let body = response.text().expect("Unable to get response text");
             extract_description(&body).unwrap_or(body)
         }
 
-        let status = response.status.expect("Status header is not set");
-
-        match status {
-            status::Forbidden => ApiError::Unauthorized,
-            status::BadRequest => ApiError::BadRequest(error(response)),
-            status::NotFound => ApiError::NotFound(error(response)),
-            s if s.is_server_error() => ApiError::InternalError(error(response).into()),
-            s => panic!("Received non-error response status: {}", s.to_u16()),
+        match response.status() {
+            StatusCode::Ok => Ok({
+                let body = response.text().expect("Unable to get response text");
+                trace!("Body: {}", body);
+                serde_json::from_str(&body).expect("Unable to deserialize body")
+            }),
+            StatusCode::Forbidden => Err(api::Error::Unauthorized),
+            StatusCode::BadRequest => Err(api::Error::BadRequest(error(response))),
+            StatusCode::NotFound => Err(api::Error::NotFound(error(response))),
+            s if s.is_server_error() => Err(api::Error::InternalError(error(response).into())),
+            s => panic!("Received non-error response status: {}", s.as_u16()),
         }
     }
 }
 
-#[derive(Debug)]
-enum ApiAccess {
-    Public,
-    Private,
-}
+/// Creates a test server.
+fn create_test_server(aggregator: ApiAggregator) -> TestServer {
+    let server = TestServer::with_factory(move || {
+        let state = ServiceApiState::new(aggregator.blockchain().clone());
+        App::with_state(state.clone())
+            .scope("public/api", |scope| {
+                trace!("Create public/api");
+                aggregator.extend_backend(ApiAccess::Public, scope)
+            })
+            .scope("private/api", |scope| {
+                trace!("Create private/api");
+                aggregator.extend_backend(ApiAccess::Private, scope)
+            })
+    });
 
-impl fmt::Display for ApiAccess {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ApiAccess::Public => formatter.write_str("public"),
-            ApiAccess::Private => formatter.write_str("private"),
-        }
-    }
-}
+    info!("Test server created on {}", server.addr());
 
-// Logging middleware for `TestKitApi`.
-fn log_request(
-    access: &ApiAccess,
-    request: &mut Request,
-    mut response: Response,
-) -> IronResult<Response> {
-    use iron::headers::ContentLength;
-    use iron::method::Method;
-    use iron::response::WriteBody;
-
-    fn has_body(method: &Method) -> bool {
-        match *method {
-            Method::Get | Method::Head | Method::Delete | Method::Trace => false,
-            _ => true,
-        }
-    }
-
-    if !log_enabled!(Level::Trace) {
-        // Avoid expensive string allocations.
-        return Ok(response);
-    }
-
-    let mut url = request
-        .extensions
-        .get::<OriginalUrl>()
-        .unwrap_or(&request.url)
-        .path()
-        .join("/");
-    if let Some(query) = request.url.query() {
-        url += "?";
-        url += query;
-    }
-
-    let req_body: Option<String> = if has_body(&request.method) {
-        request
-            .get::<bodyparser::Raw>()
-            .expect("cannot read request body")
-    } else {
-        None
-    };
-
-    let response_body: Option<String> = {
-        let len: u64 = response
-            .headers
-            .get::<ContentLength>()
-            .map(|len| len.0)
-            .unwrap_or_default();
-
-        response.body.take().map(|mut body| {
-            let mut buffer = Vec::with_capacity(len as usize);
-            body.write_body(&mut buffer)
-                .expect("cannot write response body to buffer");
-            String::from_utf8(buffer).expect("cannot decode response body")
-        })
-    };
-
-    trace!(
-        "{method} ({access}) /{url}{req_body_tag}{req_body}\n\
-         Response: {resp_status}\n{resp_body}\n",
-        method = request.method,
-        access = access,
-        url = url,
-        req_body_tag = if req_body.is_some() { "\nBody: " } else { "" },
-        req_body = req_body.unwrap_or_default(),
-        resp_status = response
-            .status
-            .as_ref()
-            .map(ToString::to_string)
-            .unwrap_or_else(|| "(no status)".to_string()),
-        resp_body = response_body
-            .as_ref()
-            .map(String::as_ref)
-            .unwrap_or("(no body)")
-    );
-
-    // Return the body to the response
-    response.body = response_body.map(|body| Box::new(body) as Box<WriteBody>);
-    Ok(response)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_err_non_json() {
-        let response = Response::with((status::NotFound, "Not found"));
-        assert_matches!(
-            TestKitApi::response_to_api_error(response),
-            ApiError::NotFound(ref body) if body == "Not found"
-        );
-    }
-
-    #[test]
-    fn test_get_err_json_string() {
-        let response = Response::with((status::NotFound, "\"Wallet not found\""));
-        assert_matches!(
-            TestKitApi::response_to_api_error(response),
-            ApiError::NotFound(ref body) if body == "Wallet not found"
-        );
-    }
-
-    #[test]
-    fn test_get_err_json_object_with_description() {
-        let response_body = r#"{ "debug": "Some debug info", "description": "Some description" }"#;
-        let response = Response::with((status::BadRequest, response_body));
-        assert_matches!(
-            TestKitApi::response_to_api_error(response),
-            ApiError::BadRequest(ref body) if body == "Some description"
-        );
-    }
-
-    #[test]
-    fn test_get_err_json_object_without_description() {
-        let response_body = r#"{ "type": "unknown" }"#;
-        let response = Response::with((status::BadRequest, response_body));
-        assert_matches!(
-            TestKitApi::response_to_api_error(response),
-            ApiError::BadRequest(ref body) if body == response_body
-        );
-    }
-
-    #[test]
-    fn test_get_err_other_json() {
-        let response_body = r#"[1, 2, 3]"#;
-        let response = Response::with((status::BadRequest, response_body));
-        assert_matches!(
-            TestKitApi::response_to_api_error(response),
-            ApiError::BadRequest(ref body) if body == response_body
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "Received non-error response status")]
-    fn test_get_err_non_error_status() {
-        let response = Response::with(status::Ok);
-        TestKitApi::response_to_api_error(response);
-    }
+    server
 }

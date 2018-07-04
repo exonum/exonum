@@ -21,12 +21,12 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
+use crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since keys are sorted in the serialized form, the big-endian encoding should be used
-/// with unsigned integer types. Note however that the big-endian encoding
+/// with unsigned integer types. Note, however, that the big-endian encoding
 /// will not sort signed integer types in the natural order; therefore, they are
 /// mapped to the corresponding unsigned type by adding a constant to the source value.
 ///
@@ -80,11 +80,11 @@ pub trait StorageKey: ToOwned {
     ///
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
     /// of the serialized key.
-    // TODO: should be unsafe (ECR-174)?
+    // TODO: Should be unsafe? (ECR-174)
     fn write(&self, buffer: &mut [u8]);
 
     /// Deserializes the key from the specified buffer of bytes.
-    // TODO: should be unsafe (ECR-174)?
+    // TODO: Should be unsafe? (ECR-174)
     fn read(buffer: &[u8]) -> Self::Owned;
 }
 
@@ -175,33 +175,27 @@ storage_key_for_ints!{u16, i16, 2, read_u16, write_u16}
 storage_key_for_ints!{u32, i32, 4, read_u32, write_u32}
 storage_key_for_ints!{u64, i64, 8, read_u64, write_u64}
 
-impl StorageKey for Hash {
-    fn size(&self) -> usize {
-        HASH_SIZE
-    }
+macro_rules! storage_key_for_crypto_types {
+    ($type:ident, $size:expr) => {
+        impl StorageKey for $type {
+            fn size(&self) -> usize {
+                $size
+            }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
-    }
+            fn write(&self, buffer: &mut [u8]) {
+                buffer.copy_from_slice(self.as_ref())
+            }
 
-    fn read(buffer: &[u8]) -> Self::Owned {
-        Hash::from_slice(buffer).unwrap()
-    }
+            fn read(buffer: &[u8]) -> Self {
+                $type::from_slice(buffer).unwrap()
+            }
+        }
+    };
 }
 
-impl StorageKey for PublicKey {
-    fn size(&self) -> usize {
-        PUBLIC_KEY_LENGTH
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        PublicKey::from_slice(buffer).unwrap()
-    }
-}
+storage_key_for_crypto_types!{Hash, HASH_SIZE}
+storage_key_for_crypto_types!{PublicKey, PUBLIC_KEY_LENGTH}
+storage_key_for_crypto_types!{Signature, SIGNATURE_LENGTH}
 
 impl StorageKey for Vec<u8> {
     fn size(&self) -> usize {
@@ -317,8 +311,9 @@ impl StorageKey for Decimal {
 mod tests {
     use super::*;
 
+    use std::{fmt::Debug, str::FromStr};
+
     use chrono::{Duration, TimeZone};
-    use std::str::FromStr;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -397,7 +392,7 @@ mod tests {
     fn signed_int_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
-        let db: Box<Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &mut fork);
@@ -447,7 +442,7 @@ mod tests {
             }
         }
 
-        let db: Box<Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &mut fork);
@@ -494,11 +489,7 @@ mod tests {
             Utc.timestamp(0, 1_500_000_000), // leap second
         ];
 
-        let mut buffer = [0u8; 12];
-        for time in times.iter() {
-            time.write(&mut buffer);
-            assert_eq!(*time, DateTime::read(&buffer));
-        }
+        assert_round_trip_eq(&times);
     }
 
     #[test]
@@ -527,7 +518,7 @@ mod tests {
     fn system_time_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
-        let db: Box<Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let x1 = Utc.timestamp(80, 0);
         let x2 = Utc.timestamp(10, 0);
         let y1 = Utc::now();
@@ -590,6 +581,28 @@ mod tests {
     }
 
     #[test]
+    fn hash_round_trip() {
+        let hashes = [Hash::from_str(
+            "326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78",
+        ).unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
+    fn public_key_round_trip() {
+        let hashes = [PublicKey::from_str(
+            "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
+        ).unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
+    fn signature_round_trip() {
+        let hashes = [Signature::from_str("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
     fn uuid_round_trip() {
         let uuids = [
             Uuid::nil(),
@@ -597,16 +610,12 @@ mod tests {
             Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
         ];
 
-        let mut buffer = [0u8; 16];
-        for uuid in uuids.iter() {
-            uuid.write(&mut buffer);
-            assert_eq!(*uuid, Uuid::read(&buffer));
-        }
+        assert_round_trip_eq(&uuids);
     }
 
     #[test]
     fn decimal_round_trip() {
-        let values = [
+        let decimals = [
             Decimal::from_str("3.14").unwrap(),
             Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
             Decimal::new(9497628354687268, 12),
@@ -614,10 +623,19 @@ mod tests {
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
 
-        let mut buffer = [0u8; 16];
-        for value in values.iter() {
-            value.write(&mut buffer);
-            assert_eq!(*value, Decimal::read(&buffer));
+        assert_round_trip_eq(&decimals);
+    }
+
+    fn assert_round_trip_eq<T>(values: &[T])
+    where
+        T: StorageKey + PartialEq<<T as ToOwned>::Owned> + Debug,
+        <T as ToOwned>::Owned: Debug,
+    {
+        for original_value in values.iter() {
+            let mut buffer = get_buffer(original_value);
+            original_value.write(&mut buffer);
+            let new_value = <T as StorageKey>::read(&buffer);
+            assert_eq!(*original_value, new_value);
         }
     }
 

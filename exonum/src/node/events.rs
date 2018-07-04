@@ -13,9 +13,7 @@
 // limitations under the License.
 
 use super::{ExternalMessage, NodeHandler, NodeTimeout};
-use events::error::LogError;
-use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
-use messages::SignedMessage;
+use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
@@ -71,18 +69,23 @@ impl NodeHandler {
                 }
                 self.handle_incoming_tx(tx);
             }
-            ExternalMessage::PeerAdd(address) => {
+            ExternalMessage::PeerAdd(info) => {
                 if !self.is_enabled {
                     info!(
                         "Ignoring a connect message to {} because the node is disabled",
-                        address
+                        info
                     );
                     return;
                 }
-                info!("Send Connect message to {}", address);
-                self.connect(&address);
+                info!("Send Connect message to {}", info);
+                self.state.add_peer_to_connect_list(info);
+                self.connect(&info.address);
             }
             ExternalMessage::Enable(value) => {
+                if self.node_role.is_auditor() {
+                    error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
+                    return;
+                }
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
                     info!("Node is already {}", s);

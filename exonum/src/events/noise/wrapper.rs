@@ -12,25 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
+
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use failure;
 use snow::{NoiseBuilder, Session};
 
-use std::fmt;
-use std::fmt::{Error, Formatter};
-use std::io;
+use std::{
+    fmt::{self, Error, Formatter}, io,
+};
 
+use events::noise::sodium_resolver::SodiumResolver;
 use events::noise::HandshakeParams;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
 pub const NOISE_HEADER_LENGTH: usize = 4;
-pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
+pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
+pub const NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
+pub const NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
-static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+static PARAMS: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
 /// Wrapper around noise session to provide latter convenient interface.
 pub struct NoiseWrapper {
@@ -38,29 +46,38 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-    pub fn responder(params: &HandshakeParams) -> Self {
-        let builder: NoiseBuilder = Self::noise_builder(params);
-        let private_key = builder.generate_private_key().unwrap();
-        let session = builder
-            .local_private_key(&private_key)
-            .build_responder()
-            .unwrap();
-
-        NoiseWrapper { session }
+    pub fn initiator(params: &HandshakeParams) -> Self {
+        if let Some(ref remote_key) = params.remote_key {
+            let builder: NoiseBuilder = Self::noise_builder()
+                .local_private_key(params.secret_key.as_ref())
+                .remote_public_key(remote_key.as_ref());
+            let session = builder
+                .build_initiator()
+                .expect("Noise session initiator failed to initialize");
+            return NoiseWrapper { session };
+        } else {
+            panic!("Remote public key is not specified")
+        }
     }
 
-    pub fn initiator(params: &HandshakeParams) -> Self {
-        let builder: NoiseBuilder = Self::noise_builder(params);
-        let private_key = builder.generate_private_key().unwrap();
+    pub fn responder(params: &HandshakeParams) -> Self {
+        let builder: NoiseBuilder = Self::noise_builder();
+
         let session = builder
-            .local_private_key(&private_key)
-            .build_initiator()
-            .unwrap();
+            .local_private_key(params.secret_key.as_ref())
+            .build_responder()
+            .expect("Noise session responder failed to initialize");
 
         NoiseWrapper { session }
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
+        if input.len() < NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH
+            || input.len() > NOISE_MAX_MESSAGE_LENGTH
+        {
+            return Err(NoiseError::WrongMessageLength(input.len()));
+        }
+
         self.read(input, NOISE_MAX_MESSAGE_LENGTH)
     }
 
@@ -71,12 +88,7 @@ impl NoiseWrapper {
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
         // Transition into transport mode after handshake is finished.
-        let session = self.session.into_transport_mode().map_err(|e| {
-            NoiseError::new(format!(
-                "Error when converting session into transport mode {}.",
-                e
-            ))
-        })?;
+        let session = self.session.into_transport_mode()?;
         Ok(NoiseWrapper { session })
     }
 
@@ -135,23 +147,18 @@ impl NoiseWrapper {
 
     fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; len];
-        let len = self.session
-            .read_message(input, &mut buf)
-            .map_err(|e| NoiseError::new(format!("Error while reading noise message: {:?}", e.0)))?;
+        let len = self.session.read_message(input, &mut buf)?;
         Ok((len, buf))
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
-        let len = self.session
-            .write_message(msg, &mut buf)
-            .map_err(|e| NoiseError::new(format!("Error while writing noise message: {:?}", e.0)))?;
+        let len = self.session.write_message(msg, &mut buf)?;
         Ok((len, buf))
     }
 
-    fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
-        let public_key = params.public_key.as_ref();
-        NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
+    fn noise_builder<'a>() -> NoiseBuilder<'a> {
+        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
     }
 }
 
@@ -166,21 +173,30 @@ impl fmt::Debug for NoiseWrapper {
 }
 
 #[derive(Fail, Debug, Clone)]
-#[fail(display = "{}", message)]
-pub struct NoiseError {
-    message: String,
-}
+pub enum NoiseError {
+    #[fail(display = "Wrong handshake message length {}", _0)]
+    WrongMessageLength(usize),
 
-impl NoiseError {
-    pub fn new<T: Into<String>>(message: T) -> Self {
-        NoiseError {
-            message: message.into(),
-        }
-    }
+    #[fail(display = "Remote public key is not specified")]
+    MissingRemotePublicKey,
+
+    #[fail(display = "{}", _0)]
+    Other(String),
 }
 
 impl From<NoiseError> for io::Error {
     fn from(e: NoiseError) -> Self {
-        io::Error::new(io::ErrorKind::Other, e.message)
+        let message = match e {
+            NoiseError::Other(message) => message,
+            _ => format!("{:?}", e),
+        };
+
+        io::Error::new(io::ErrorKind::Other, message)
+    }
+}
+
+impl From<failure::Error> for NoiseError {
+    fn from(e: failure::Error) -> Self {
+        NoiseError::Other(format!("{:?}", e))
     }
 }

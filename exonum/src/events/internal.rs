@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
-use futures::sync::mpsc;
-use futures::{self, Future, Sink, Stream};
+use futures::{self, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 
 use std::time::{Duration, SystemTime};
@@ -29,7 +27,7 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
-    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = failure::Error>> {
+    pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
             .for_each(move |request| {

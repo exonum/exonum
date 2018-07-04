@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::config::StoredConfiguration;
-use super::{Block, BlockProof, Blockchain, TransactionResult};
+use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{CryptoHash, Hash, PublicKey};
 use helpers::{Height, Round};
-use messages::{Connect, Message, Precommit, Protocol, RawTransaction, SignedMessage};
+use messages::{Connect, Precommit, RawMessage};
 use storage::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
     Snapshot,
@@ -84,7 +83,7 @@ pub struct Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
 {
     /// Constructs information schema for the given `snapshot`.
     pub fn new(snapshot: T) -> Schema<T> {
@@ -263,10 +262,9 @@ where
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
-                    "Config with hash {:?} is absent in configs table",
-                    cfg_hash
-                ));
+                let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| {
+                    panic!("Config with hash {:?} is absent in configs table", cfg_hash)
+                });
                 Some(cfg)
             }
             None => None,
@@ -280,12 +278,11 @@ where
         if idx > 0 {
             let cfg_ref = self.configs_actual_from()
                 .get(idx - 1)
-                .expect(&format!("Configuration at index {} not found", idx));
+                .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
             let cfg_hash = cfg_ref.cfg_hash();
-            let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
-                "Config with hash {:?} is absent in configs table",
-                cfg_hash
-            ));
+            let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| {
+                panic!("Config with hash {:?} is absent in configs table", cfg_hash)
+            });
             Some(cfg)
         } else {
             None
@@ -297,12 +294,10 @@ where
         let idx = self.find_configurations_index_by_height(height);
         let cfg_ref = self.configs_actual_from()
             .get(idx)
-            .expect(&format!("Configuration at index {} not found", idx));
+            .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
-        self.configuration_by_hash(cfg_hash).expect(&format!(
-            "Config with hash {:?} is absent in configs table",
-            cfg_hash
-        ))
+        self.configuration_by_hash(cfg_hash)
+            .unwrap_or_else(|| panic!("Config with hash {:?} is absent in configs table", cfg_hash))
     }
 
     /// Returns the configuration for the given configuration hash.
@@ -489,7 +484,7 @@ impl<'a> Schema<&'a mut Fork> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
-                // TODO: Replace panic with errors (ECR-123).
+                // TODO: Replace panic with errors. (ECR-123)
                 panic!(
                     "Attempting to commit configuration with incorrect previous hash: {:?}, \
                      expected: {:?}",
@@ -518,7 +513,6 @@ impl<'a> Schema<&'a mut Fork> {
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
-        // TODO: clear storages
     }
 
     /// Adds transaction into the persistent pool.

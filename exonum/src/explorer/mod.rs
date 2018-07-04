@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,10 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use std::cell::{Ref, RefCell};
-use std::collections::Bound;
-use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::slice;
+use std::{
+    cell::{Ref, RefCell}, collections::Bound, fmt,
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo}, slice,
+};
 
 use blockchain::{
     Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
@@ -36,7 +35,7 @@ use messages::{Message, Precommit, RawTransaction, SignedMessage};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<Box<Transaction>, encoding::Error>;
+type ParseResult = Result<Box<dyn Transaction>, encoding::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,10 +120,10 @@ impl<'a> BlockInfo<'a> {
 
             let block_hash = hashes
                 .get(height.0)
-                .expect(&format!("Block not found, height: {:?}", height));
+                .unwrap_or_else(|| panic!("Block not found, height: {:?}", height));
             blocks
                 .get(&block_hash)
-                .expect(&format!("Block not found, hash: {:?}", block_hash))
+                .unwrap_or_else(|| panic!("Block not found, hash: {:?}", block_hash))
         };
 
         BlockInfo {
@@ -314,11 +313,13 @@ pub type EagerTransactions<'a> = slice::Iter<'a, CommittedTransaction>;
 impl Index<usize> for BlockWithTransactions {
     type Output = CommittedTransaction;
 
-    fn index(&self, index: usize) -> &CommittedTransaction {
-        self.transactions.get(index).expect(&format!(
-            "Index exceeds number of transactions in block {}",
-            self.len()
-        ))
+    fn index(&self, index: usize) -> &CommittedTransaction<T> {
+        self.transactions.get(index).unwrap_or_else(|| {
+            panic!(
+                "Index exceeds number of transactions in block {}",
+                self.len()
+            )
+        })
     }
 }
 
@@ -615,7 +616,53 @@ pub enum TransactionInfo {
     Committed(CommittedTransaction),
 }
 
-impl TransactionInfo {
+/// A helper trait functionally equivalent to `serde`'s `Serialize`.
+///
+/// The trait is used to specify bounds on the `Serialize` implementation
+/// in transaction-related types in the `explorer` module, such as [`TransactionInfo`]
+/// and [`CommittedTransaction`].
+///
+/// # Why separate trait?
+///
+/// It is impossible to implement `Serialize` for `Box<Transaction>` (per Rust restrictions).
+/// Similarly, it is impossible to specify `Serialize` as a super-trait for `Transaction`,
+/// as it would render `Transaction` not object-safe. Thus, `SerializeContent` makes
+/// `Box<Transaction>` (as well as types containing transactions) serializable without
+/// needing a manual implementation of `Serialize`.
+///
+/// [`TransactionInfo`]: enum.TransactionInfo.html
+/// [`CommittedTransaction`]: struct.CommittedTransaction.html
+pub trait SerializeContent {
+    /// Serializes content of a transaction with the given serializer.
+    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer;
+}
+
+impl<T: Serialize> SerializeContent for T {
+    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.serialize(serializer)
+    }
+}
+
+impl SerializeContent for Box<dyn Transaction> {
+    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+
+        let value = self.as_ref()
+            .serialize_field()
+            .map_err(|err| S::Error::custom(err.description()))?;
+        value.serialize(serializer)
+    }
+}
+
+impl<T> TransactionInfo<T> {
     /// Returns the content of this transaction.
     pub fn content(&self) -> &TransactionMessage {
         match *self {
@@ -659,8 +706,8 @@ impl TransactionInfo {
 ///
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
-    snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(&Message<RawTransaction>) -> ParseResult>,
+    snapshot: Box<dyn Snapshot>,
+    transaction_parser: Box<dyn Fn(&Message<RawTransaction>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -726,10 +773,7 @@ impl<'a> BlockchainExplorer<'a> {
         let location = schema
             .transactions_locations()
             .get(tx_hash)
-            .expect(&format!(
-                "Location not found for transaction hash {:?}",
-                tx_hash
-            ));
+            .unwrap_or_else(|| panic!("Location not found for transaction hash {:?}", tx_hash));
 
         let location_proof = schema
             .block_transactions(location.block_height())

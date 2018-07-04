@@ -14,8 +14,7 @@
 
 // spell-checker:ignore exts
 
-use std::collections::HashMap;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use super::{Argument, CommandExtension, CommandName, Context};
 
@@ -37,7 +36,7 @@ pub trait Command {
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        exts: &Fn(Context) -> Context,
+        exts: &dyn Fn(Context) -> Context,
     ) -> Feedback;
 }
 
@@ -48,13 +47,13 @@ pub trait Command {
 /// abstracted dynamic object without trait objects.
 /// 2. Additionally this state is common for all commands.
 pub struct CollectedCommand {
-    command: Box<Command>,
+    command: Box<dyn Command>,
     args: Vec<Argument>,
-    exts: Vec<Box<CommandExtension>>,
+    exts: Vec<Box<dyn CommandExtension>>,
 }
 
 impl CollectedCommand {
-    pub fn new(command: Box<Command>) -> CollectedCommand {
+    pub fn new(command: Box<dyn Command>) -> CollectedCommand {
         CollectedCommand {
             args: command.args(),
             command,
@@ -74,7 +73,7 @@ impl CollectedCommand {
         self.command.about()
     }
 
-    pub fn extend(&mut self, extender: Option<Box<CommandExtension>>) {
+    pub fn extend(&mut self, extender: Option<Box<dyn CommandExtension>>) {
         if let Some(extender) = extender {
             let args = extender.args();
             self.args.extend(args.into_iter());
@@ -88,7 +87,7 @@ impl CollectedCommand {
         context: Context,
     ) -> Feedback {
         self.command.execute(commands, context, &|context| {
-            // TODO: check duplicates, in services context keys (ECR-164)
+            // TODO: Check duplicates, in services context keys. (ECR-164)
             let mut new_context = context.clone();
             for ext in &self.exts {
                 new_context = ext.execute(new_context)

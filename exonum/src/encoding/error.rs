@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
-use std::error::Error as StdError;
-use std::fmt;
+use std::{borrow::Cow, error::Error as StdError, fmt};
 
 use super::Offset;
 
@@ -22,7 +20,7 @@ use super::Offset;
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    // TODO: Check this message after refactor buffer (ECR-156).
+    // TODO: Check this message after refactor buffer. (ECR-156)
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
         /// real message size.
@@ -138,7 +136,7 @@ pub enum Error {
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields.
-    Other(Box<StdError>),
+    Other(Box<dyn StdError>),
 }
 
 impl fmt::Display for Error {
@@ -173,7 +171,7 @@ impl StdError for Error {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         use std::ops::Deref;
         if let Error::Other(ref error) = *self {
             Some(error.deref())
@@ -183,8 +181,8 @@ impl StdError for Error {
     }
 }
 
-impl From<Box<StdError>> for Error {
-    fn from(t: Box<StdError>) -> Error {
+impl From<Box<dyn StdError>> for Error {
+    fn from(t: Box<dyn StdError>) -> Error {
         Error::Other(t)
     }
 }

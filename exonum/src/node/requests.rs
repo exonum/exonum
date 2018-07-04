@@ -21,9 +21,8 @@ use messages::{
     TransactionsRequest, TransactionsResponse,
 };
 
-// TODO: height should be updated after any message, not only after status (if signature is correct)
-// TODO: Request propose makes sense only if we know that node is on our height.
-// (ECR-171)
+// TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
+// TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
@@ -33,10 +32,10 @@ impl NodeHandler {
             bail!("Received message addressed to other peer = {:?}.", msg.to());
         }
 
-        if !self.state.whitelist().allow(msg.author()) {
-            bail!(
-                "Received request message from peer = {:?} which not in whitelist.",
-                msg.author()
+        if !self.state.connect_list().is_peer_allowed(msg.author()) {
+            error!(
+                "Received request message from peer = {:?} which not in ConnectList.",
+                msg.from()
             );
         }
 

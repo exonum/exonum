@@ -21,12 +21,11 @@ pub mod internal;
 pub mod network;
 pub mod noise;
 
-use futures::sink::Wait;
-use futures::sync::mpsc::{self, Sender};
-use futures::{Async, Future, Poll, Stream};
+use futures::{
+    sink::Wait, sync::mpsc::{self, Sender}, Async, Future, Poll, Stream,
+};
 
-use std::cmp::Ordering;
-use std::time::SystemTime;
+use std::{cmp::Ordering, time::SystemTime};
 
 use helpers::{Height, Round};
 use node::{ExternalMessage, NodeTimeout};
@@ -80,7 +79,7 @@ pub struct HandlerPart<H: EventHandler> {
 }
 
 impl<H: EventHandler + 'static> HandlerPart<H> {
-    pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
+    pub fn run(self) -> Box<dyn Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
         let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
@@ -216,6 +215,6 @@ where
     }
 }
 
-fn to_box<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
+fn to_box<F: Future + 'static>(f: F) -> Box<dyn Future<Item = (), Error = F::Error>> {
     Box::new(f.map(drop))
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A module that provides interfaces to work with the persisted blockchain data.
+//! A module that provides interfaces to work with persisted blockchain data.
 //!
 //! See also [the documentation page on storage][doc:storage].
 //!
@@ -38,14 +38,14 @@
 //!
 //! If you need to make changes to the database, you need to create a [`Fork`] using
 //! the [`fork`][2] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
-//! but also allows to create a sequence of changes to the database that are specified
+//! but also allows creating a sequence of changes to the database that are specified
 //! as a [`Patch`]. A patch can be atomically [`merge`]d into a database. Different threads
 //! may call `merge` concurrently.
 //!
 //! # `StorageKey` and `StorageValue` traits
 //!
 //! If you need to use your own data types as keys or values in the storage, you need to implement
-//! the [`StorageKey`] or [`StorageValue`] traits respectively. These traits are already
+//! the [`StorageKey`] or [`StorageValue`] traits respectively. These traits have already been
 //! implemented for most standard types.
 //!
 //! # Indices
@@ -61,7 +61,7 @@
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
-//! was authorized by the blockchain validators without having to replicate
+//! was authorized by the blockchain validators, without having to replicate
 //! the entire blockchain contents.
 //!
 //! Exonum provides the following index types:
@@ -78,8 +78,6 @@
 //!   proofs of existence and is implemented as a binary Merkle Patricia tree.
 //! - [`KeySetIndex`] and [`ValueSetIndex`] is a set of items, similar to [`BTreeSet`] and
 //!   [`HashSet`].
-//!
-//! To implement a new index type, you should create a wrapper around [`BaseIndex`].
 //!
 //! [`Database`]: trait.Database.html
 //! [`RocksDB`]: struct.RocksDB.html
@@ -100,7 +98,6 @@
 //! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
 //! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
 //! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
-//! [`BaseIndex`]: base_index/struct.BaseIndex.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
@@ -109,45 +106,33 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
-pub use self::db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
-                   PatchIterator, Snapshot};
-pub use self::error::Error;
-
-pub use self::memorydb::MemoryDB;
-pub use self::options::DbOptions;
-pub use self::rocksdb::RocksDB;
-
-pub use self::keys::StorageKey;
-pub use self::values::StorageValue;
-
-pub use self::entry::Entry;
-
-pub use self::base_index::{BaseIndex, BaseIndexIter};
-pub use self::hash::UniqueHash;
-pub use self::key_set_index::KeySetIndex;
-pub use self::list_index::ListIndex;
-pub use self::map_index::MapIndex;
-pub use self::proof_list_index::{ListProof, ProofListIndex};
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
-pub use self::sparse_list_index::SparseListIndex;
-pub use self::value_set_index::ValueSetIndex;
+pub use self::{
+    db::{
+        Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
+        Snapshot,
+    },
+    entry::Entry, error::Error, hash::UniqueHash, key_set_index::KeySetIndex, keys::StorageKey,
+    list_index::ListIndex, map_index::MapIndex, memorydb::MemoryDB, options::DbOptions,
+    proof_list_index::{ListProof, ProofListIndex}, rocksdb::RocksDB,
+    sparse_list_index::SparseListIndex, value_set_index::ValueSetIndex, values::StorageValue,
+};
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
+mod base_index;
 mod db;
 mod entry;
 mod error;
 mod hash;
+mod indexes_metadata;
 mod keys;
 mod memorydb;
 mod options;
 mod rocksdb;
 mod values;
-
-pub mod base_index;
-mod indexes_metadata;
 
 pub mod key_set_index;
 pub mod list_index;

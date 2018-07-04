@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::de::Error;
-use serde::ser::SerializeStruct;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use self::ListProof::*;
-use super::super::StorageValue;
-use super::key::ProofListKey;
-use super::pair_hash;
+use super::{super::StorageValue, key::ProofListKey, pair_hash};
 use crypto::{hash, Hash};
 
 /// An enum that represents a proof of existence for a proof list elements.
@@ -28,9 +24,9 @@ use crypto::{hash, Hash};
 pub enum ListProof<V> {
     /// A branch of proof in which both children contain requested elements.
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
-    /// A branch of proof in which only left child contains requested elements.
+    /// A branch of proof in which only the left child contains requested elements.
     Left(Box<ListProof<V>>, Option<Hash>),
-    /// A branch of proof in which only right child contains requested elements.
+    /// A branch of proof in which only the right child contains requested elements.
     Right(Hash, Box<ListProof<V>>),
     /// A leaf of proof with requested element.
     Leaf(V),

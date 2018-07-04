@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::crypto::{Hash, PublicKey};
-use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
+use exonum::{
+    crypto::{Hash, PublicKey}, storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot},
+};
 
 use wallet::Wallet;
 use INITIAL_BALANCE;
@@ -32,7 +33,7 @@ impl<T> AsMut<T> for CurrencySchema<T> {
 
 impl<T> CurrencySchema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
 {
     /// Constructs schema from the database view.
     pub fn new(view: T) -> Self {
@@ -54,7 +55,7 @@ where
         self.wallets().get(pub_key)
     }
 
-    /// Returns database state hash.
+    /// Returns state hash of service database.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.wallets().merkle_root()]
     }

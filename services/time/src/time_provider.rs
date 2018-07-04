@@ -1,4 +1,19 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use chrono::{DateTime, Duration, TimeZone, Utc};
+
 use std::sync::{Arc, RwLock};
 
 /// A helper trait that provides the node with a current time.
@@ -102,8 +117,8 @@ impl TimeProvider for MockTimeProvider {
     }
 }
 
-impl From<MockTimeProvider> for Box<TimeProvider> {
+impl From<MockTimeProvider> for Box<dyn TimeProvider> {
     fn from(mock_time_provider: MockTimeProvider) -> Self {
-        Box::new(mock_time_provider) as Box<TimeProvider>
+        Box::new(mock_time_provider) as Box<dyn TimeProvider>
     }
 }

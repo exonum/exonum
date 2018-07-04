@@ -14,17 +14,16 @@
 
 use clap;
 
-use std::collections::HashMap;
-use std::ffi::OsString;
+use std::{collections::HashMap, ffi::OsString};
 
-use super::CommandName;
-use super::internal::{CollectedCommand, Feedback};
-use super::{ArgumentType, Context};
+use super::{
+    internal::{CollectedCommand, Feedback}, ArgumentType, CommandName, Context,
+};
 
 pub struct ClapBackend;
 
 impl ClapBackend {
-    // TODO: remove code duplication (ECR-164)
+    // TODO: Remove code duplication. (ECR-164)
     #[doc(hidden)]
     pub fn execute_cmd_string<I, T>(
         commands: &HashMap<CommandName, CollectedCommand>,

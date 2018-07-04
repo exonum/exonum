@@ -125,9 +125,9 @@ macro_rules! encoding_struct {
             fn field_size() -> $crate::encoding::Offset {
                 // We write `encoding_struct` as regular buffer,
                 // so real `field_size` is 8.
-                // TODO: maybe we should write it as sub structure in place?
+                // TODO: Maybe we should write it as sub structure in place?
                 // We could get benefit from it: we limit indirection
-                // in deserializing sub fields, by only one calculation (ECR-156).
+                // in deserializing sub fields, by only one calculation. (ECR-156)
 
                 // $body as $crate::encoding::Offset
 
@@ -153,7 +153,7 @@ macro_rules! encoding_struct {
             }
         }
 
-        // TODO extract some fields like hash and from_raw into trait (ECR-156)
+        // TODO: Extract some fields like hash and from_raw into trait. (ECR-156)
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(unused_imports, unused_mut)]
@@ -193,7 +193,7 @@ macro_rules! encoding_struct {
                                         buffer: & mut B,
                                         from: $crate::encoding::Offset,
                                         to: $crate::encoding::Offset )
-                -> Result<(), Box<::std::error::Error>>
+                -> Result<(), Box<dyn (::std::error::Error)>>
                 where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::ExonumJsonDeserialize;
@@ -209,7 +209,7 @@ macro_rules! encoding_struct {
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
-                          Box<::std::error::Error + Send + Sync>>
+                          Box<dyn (::std::error::Error) + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 let mut map = $crate::encoding::serialize::json::reexport::Map::new();
@@ -223,7 +223,7 @@ macro_rules! encoding_struct {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             #[allow(unused_imports, unused_mut)]
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> Result<Self, Box<::std::error::Error>> {
+                -> Result<Self, Box<dyn (::std::error::Error)>> {
                 use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
                 let mut buf = vec![0; $name::__ex_header_size() as usize];
                 let _obj = value.as_object().ok_or("Can't cast json as object.")?;
@@ -235,7 +235,7 @@ macro_rules! encoding_struct {
             }
         }
 
-        // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
+        // TODO: Rewrite Deserialize and Serialize implementation. (ECR-156)
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::encoding::serialize::reexport::Deserializer<'de>

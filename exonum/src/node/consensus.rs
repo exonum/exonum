@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashSet;
-use std::error::Error;
+use std::{collections::HashSet, error::Error};
 
 use blockchain::{Schema, Transaction, TransactionMessage};
 use crypto::{CryptoHash, Hash, PublicKey};
@@ -28,7 +27,7 @@ use messages::{
 use node::{NodeHandler, RequestData};
 use storage::Patch;
 
-// TODO reduce view invocations (ECR-171)
+// TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
@@ -44,17 +43,24 @@ impl NodeHandler {
             return Ok(());
         }
 
-        // Ignore messages from previous and future height
-        if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
-            bail!(
+        // Warning for messages from previous and future height
+        if msg.height() < self.state.height().previous()
+            || msg.height() > self.state.height().next()
+        {
+            warn!(
                 "Received consensus message from other height: msg.height={}, self.height={}",
                 msg.height(),
                 self.state.height()
             );
         }
 
+        // Ignore messages from previous and future height
+        if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
+            return;
+        }
+
         // Queued messages from next height or round
-        // TODO: should we ignore messages from far rounds (ECR-171)?
+        // TODO: Should we ignore messages from far rounds? (ECR-171)
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
@@ -119,19 +125,18 @@ impl NodeHandler {
         trace!("Handle propose");
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&*snapshot);
-        //TODO: remove this match after errors refactor. (ECR-979)
-        let has_unknown_txs = match self.state.add_propose(
-            msg.clone(),
-            &schema.transactions(),
-            &schema.transactions_pool(),
-        ) {
-            Ok(state) => state.has_unknown_txs(),
-            Err(err) => {
-                warn!("{}, msg={:?}", err, msg);
-                return;
-            }
-        };
+        let schema = Schema::new(snapshot);
+        //TODO: Remove this match after errors refactor. (ECR-979)
+        let has_unknown_txs =
+            match self.state
+                .add_propose(msg, &schema.transactions(), &schema.transactions_pool())
+            {
+                Ok(state) => state.has_unknown_txs(),
+                Err(err) => {
+                    warn!("{}, msg={:?}", err, msg);
+                    return;
+                }
+            };
 
         let hash = msg.hash();
 
@@ -140,140 +145,109 @@ impl NodeHandler {
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS");
-            self.request(RequestData::Transactions(hash), from);
+            self.request(RequestData::ProposeTransactions(hash), from);
 
             for node in known_nodes {
-                self.request(RequestData::Transactions(hash), node);
+                self.request(RequestData::ProposeTransactions(hash), node);
             }
         } else {
             self.handle_full_propose(hash, msg.round());
         }
     }
-    /*
-    // Validates transaction from the block and appends them into the pool.
-    // Returns tuple of transaction hashes and Patch of changes in the pool.
-    fn validate_block_transactions(&self, block: &BlockResponse) -> Option<(Vec<Hash>, Patch)> {
-        let mut fork = self.blockchain.fork();
-        let mut tx_hashes = Vec::new();
-        {
-            let mut schema = Schema::new(&mut fork);
-            for raw in block.transactions() {
-                let tx = match self.blockchain.tx_from_raw(raw) {
-                    Ok(tx) => tx,
-                    Err(e) => {
-                        error!("{}, block={:?}", e.description(), block);
-                        return None;
-                    }
-                };
 
-                let hash = tx.hash();
-                if schema.transactions().contains(&hash)
-                    && !schema.transactions_pool().contains(&hash)
-                {
-                    error!(
-                        "Received block with already committed transaction, block={:?}",
-                        block
-                    );
-                    return None;
-                }
-                profiler_span!("tx.verify()", {
-                    if !tx.verify() {
-                        error!("Incorrect transaction in block detected, block={:?}", block);
-                        return None;
-                    }
-                });
-                schema.add_transaction_into_pool(tx.raw().clone());
-                tx_hashes.push(hash);
-            }
-        }
-        Some((tx_hashes, fork.into_patch()))
-    }
-*/
-    /// Handles the `Block` message. For details see the message documentation.
-    // TODO write helper function which returns Result (ECR-123)
-    #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_block(&mut self, msg: Message<BlockResponse>) {
-        unimplemented!();
-        /*
-        // Request are sent to us
+    fn validate_block_response(&self, msg: &BlockResponse) -> Result<(), String> {
         if msg.to() != self.state.consensus_public_key() {
-            error!(
+            return Err(format!(
                 "Received block intended for another peer, to={}, from={}",
                 msg.to().to_hex(),
-                msg.author().to_hex()
-            );
-            return;
+                msg.from().to_hex()
+            ));
         }
 
-        if !self.state.whitelist().allow(msg.author()) {
-            error!(
-                "Received request message from peer = {} which not in whitelist.",
-                msg.author().to_hex()
-            );
-            return;
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
+            return Err(format!(
+                "Received request message from peer = {} which not in ConnectList.",
+                msg.from().to_hex()
+            ));
         }
-
-        if !msg.verify_signature(msg.author()) {
-            error!("Received block with incorrect signature, msg={:?}", msg);
-            return;
-        }
-
-        trace!("Handle block");
 
         let block = msg.block();
         let block_hash = block.hash();
 
-        // TODO add block with greater height to queue (ECR-171)
+        // TODO: Add block with greater height to queue. (ECR-171)
         if self.state.height() != block.height() {
-            return;
+            return Err(format!("Received block has another height, msg={:?}", msg));
         }
 
-        // Check block content
+        if !msg.verify_signature(msg.from()) {
+            return Err(format!(
+                "Received block with incorrect signature, msg={:?}",
+                msg
+            ));
+        }
+
+        // Check block content.
         if block.prev_hash() != &self.last_block_hash() {
-            error!(
+            return Err(format!(
                 "Received block prev_hash is distinct from the one in db, \
                  block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
                 msg,
                 *block.prev_hash(),
                 self.last_block_hash()
-            );
-            return;
+            ));
+        }
+
+        if self.state.incomplete_block().is_some() {
+            return Err(format!(
+                "Already there is an incomplete block, msg={:?}",
+                msg
+            ));
+        }
+
+        if !msg.verify_tx_hash() {
+            return Err(format!("Received block has invalid tx_hash, msg={:?}", msg));
         }
 
         if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
-            error!("{}, block={:?}", err, msg);
+            return Err(format!("{}, block={:?}", err, msg));
+        }
+
+        Ok(())
+    }
+
+    /// Handles the `Block` message. For details see the message documentation.
+    // TODO: Write helper function which returns Result. (ECR-123)
+    pub fn handle_block(&mut self, msg: &BlockResponse) {
+        if let Err(err) = self.validate_block_response(msg) {
+            error!("{}", err);
             return;
         }
 
+        let block = msg.block();
+        let block_hash = block.hash();
         if self.state.block(&block_hash).is_none() {
-            // Verify transactions
-            let tx_hashes = if let Some(res) = self.validate_block_transactions(msg) {
-                self.blockchain
-                    .merge(res.1)
-                    .expect("Unable to save transaction to persistent pool.");
-                res.0
+            let snapshot = self.blockchain.snapshot();
+            let schema = Schema::new(snapshot);
+            let has_unknown_txs = self.state
+                .create_incomplete_block(msg, &schema.transactions(), &schema.transactions_pool())
+                .has_unknown_txs();
+
+            let known_nodes = self.remove_request(&RequestData::Block(block.height()));
+
+            if has_unknown_txs {
+                trace!("REQUEST TRANSACTIONS");
+                self.request(RequestData::BlockTransactions, *msg.from());
+
+                for node in known_nodes {
+                    self.request(RequestData::BlockTransactions, node);
+                }
             } else {
-                return;
-            };
-
-            let (block_hash, patch) =
-                self.create_block(block.proposer_id(), block.height(), tx_hashes.as_slice());
-            // Verify block_hash
-            if block_hash != block.hash() {
-                panic!(
-                    "Block_hash incorrect in the received block={:?}. Either a node's \
-                     implementation is incorrect or validators majority works incorrectly",
-                    msg
-                );
+                self.handle_full_block(msg);
             }
-
-            // Commit block
-            self.state
-                .add_block(block_hash, patch, tx_hashes, block.proposer_id());
+        } else {
+            self.commit(block_hash, msg.precommits().iter(), None);
+            self.request_next_block();
         }
-        self.commit(block_hash, msg.precommits().iter(), None);
-        self.request_next_block();
-        */
     }
 
     /// Executes and commits block. This function is called when node has full propose information.
@@ -283,7 +257,7 @@ impl NodeHandler {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
                 self.broadcast_prevote(propose_round, &hash);
             } else {
-                // TODO: what if we HAVE prevote for the propose round (ECR-171)?
+                // TODO: what if we HAVE prevote for the propose round? (ECR-171)
             }
         }
 
@@ -311,6 +285,38 @@ impl NodeHandler {
             let precommits = self.state.precommits(round, our_block_hash).to_vec();
             self.commit(our_block_hash, precommits.into_iter(), Some(propose_round));
         }
+    }
+
+    /// Executes and commits block. This function is called when node has full block information.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the received block has incorrect `block_hash`.
+    pub fn handle_full_block(&mut self, msg: &BlockResponse) {
+        let block = msg.block();
+        let block_hash = block.hash();
+
+        if self.state.block(&block_hash).is_none() {
+            let (computed_block_hash, patch) =
+                self.create_block(block.proposer_id(), block.height(), msg.transactions());
+            // Verify block_hash.
+            assert!(
+                computed_block_hash == block_hash,
+                "Block_hash incorrect in the received block={:?}. Either a node's \
+                 implementation is incorrect or validators majority works incorrectly",
+                msg
+            );
+
+            self.state.add_block(
+                computed_block_hash,
+                patch,
+                msg.transactions().to_vec(),
+                block.proposer_id(),
+            );
+        }
+
+        self.commit(block_hash, msg.precommits().iter(), None);
+        self.request_next_block();
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
@@ -381,7 +387,7 @@ impl NodeHandler {
             }
         };
         if let Some(proposer) = proposer {
-            self.request(RequestData::Transactions(*propose_hash), proposer);
+            self.request(RequestData::ProposeTransactions(*propose_hash), proposer);
             return;
         }
 
@@ -454,7 +460,7 @@ impl NodeHandler {
 
         // Request prevotes
         // TODO: If Precommit sender in on a greater height, then it cannot have +2/3 prevotes.
-        // So can we get rid of useless sending RequestPrevotes message (ECR-171)?
+        // So can we get rid of useless sending RequestPrevotes message? (ECR-171)
         if msg.round() > self.state.locked_round() {
             self.request(
                 RequestData::Prevotes(msg.round(), *msg.propose_hash()),
@@ -469,7 +475,6 @@ impl NodeHandler {
     }
 
     /// Commits block, so new height is achieved.
-    // FIXME: push precommits into storage
     pub fn commit<I: Iterator<Item = Message<Precommit>>>(
         &mut self,
         block_hash: Hash,
@@ -480,15 +485,15 @@ impl NodeHandler {
 
         // Merge changes into storage
         let (committed_txs, proposer) = {
-            // FIXME Avoid of clone here.
+            // FIXME: Avoid of clone here. (ECR-171)
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
                 .commit(block_state.patch(), block_hash, precommits)
                 .unwrap();
-            // Update node state
+            // Update node state.
             self.state
                 .update_config(Schema::new(&self.blockchain.snapshot()).actual_configuration());
-            // Update state to new height
+            // Update state to new height.
             let block_hash = self.blockchain.last_hash();
             self.state
                 .new_height(&block_hash, self.system_state.current_time());
@@ -513,7 +518,6 @@ impl NodeHandler {
             block_hash.to_hex(),
         );
 
-        // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
         self.add_status_timeout();
 
@@ -532,15 +536,13 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool.
     fn handle_tx_inner(&mut self, msg: Message<RawTransaction>) -> Result<(), failure::Error> {
-        //trace!("Handle transaction");
         let hash = msg.hash();
 
-        profiler_span!("Make sure that it is new transaction", {
-            let snapshot = self.blockchain.snapshot();
-            if Schema::new(&snapshot).transactions().contains(&hash) {
-                bail!("Received already processed transaction, hash {:?}", hash);
-            }
-        });
+        let snapshot = self.blockchain.snapshot();
+        if Schema::new(&snapshot).transactions().contains(&hash) {
+            let err = format!("Received already processed transaction, hash {:?}", hash);
+            return Err(err);
+        }
 
         let mut fork = self.blockchain.fork();
         {
@@ -552,17 +554,23 @@ impl NodeHandler {
             .expect("Unable to save transaction to persistent pool.");
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
-        // Go to handle full propose if we get last transaction
+        // Go to handle full propose if we get last transaction.
         for (hash, round) in full_proposes {
-            self.remove_request(&RequestData::Transactions(hash));
+            self.remove_request(&RequestData::ProposeTransactions(hash));
             self.handle_full_propose(hash, round);
+        }
+
+        let full_block = self.state.remove_unknown_transaction(hash);
+        // Go to handle full block if we get last transaction
+        if let Some(block) = full_block {
+            self.remove_request(&RequestData::BlockTransactions);
+            self.handle_full_block(block.message());
         }
         Ok(())
     }
 
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: Message<RawTransaction>) {
         let tx = match self.blockchain.tx_from_raw(&msg) {
             Ok(tx) => tx,
@@ -579,7 +587,6 @@ impl NodeHandler {
     }
 
     /// Handles raw transactions.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_txs_batch(&mut self, msg: Message<TransactionsResponse>) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -590,9 +597,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(msg.author()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
-                "Received response message from peer = {} which not in whitelist.",
+                "Received response message from peer = {} which not in ConnectList.",
                 msg.author().to_hex()
             );
             return;
@@ -654,7 +661,7 @@ impl NodeHandler {
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
-        // TODO debug asserts (ECR-171)?
+        // TODO: Debug asserts? (ECR-171)
         if height != self.state.height() {
             return;
         }
@@ -727,7 +734,7 @@ impl NodeHandler {
     /// Handles request timeout by sending the corresponding request message to a peer.
     pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
         trace!("HANDLE REQUEST TIMEOUT");
-        // FIXME: check height?
+        // FIXME: Check height? (ECR-171)
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
@@ -736,7 +743,7 @@ impl NodeHandler {
                     RequestData::Propose(ref propose_hash) => self.sign_message(
                         ProposeRequest::new(&peer, self.state.height(), propose_hash),
                     ).into(),
-                    RequestData::Transactions(ref propose_hash) => {
+                    RequestData::ProposeTransactions(ref propose_hash) => {
                         let txs: Vec<_> = self.state
                             .propose(propose_hash)
                             .unwrap()
@@ -746,6 +753,21 @@ impl NodeHandler {
                             .collect();
                         self.sign_message(TransactionsRequest::new(&peer, &txs))
                             .into()
+                    }
+                    RequestData::BlockTransactions => {
+                        let txs: Vec<_> = match self.state.incomplete_block() {
+                        Some(incomplete_block) => {
+                            incomplete_block.unknown_txs().iter().cloned().collect()
+                        }
+                        None => return,
+                        };
+                        TransactionsRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            &txs,
+                            self.state.consensus_secret_key(),
+                        ).raw()
+                        .clone()
                     }
                     RequestData::Prevotes(round, ref propose_hash) => {
                         self.sign_message(PrevotesRequest::new(
@@ -777,8 +799,6 @@ impl NodeHandler {
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
-    // FIXME: remove this bull shit
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
         if let Some(hash) = self.state.propose_mut(propose_hash).unwrap().block_hash() {
@@ -807,7 +827,7 @@ impl NodeHandler {
             Some(state) => {
                 // Request transactions
                 if state.has_unknown_txs() {
-                    Some(RequestData::Transactions(*propose_hash))
+                    Some(RequestData::ProposeTransactions(*propose_hash))
                 } else {
                     None
                 }
@@ -829,7 +849,7 @@ impl NodeHandler {
     /// Requests a block for the next height from all peers with a bigger height. Called when the
     /// node tries to catch up with other nodes' height.
     pub fn request_next_block(&mut self) {
-        // TODO randomize next peer (ECR-171)
+        // TODO: Randomize next peer. (ECR-171)
         let heights: Vec<_> = self.state
             .nodes_with_bigger_height()
             .into_iter()
@@ -848,7 +868,7 @@ impl NodeHandler {
 
     /// Removes the specified request from the pending request list.
     pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
-        // TODO: clear timeout (ECR-171)
+        // TODO: Clear timeout. (ECR-171)
         self.state.remove_request(data)
     }
 

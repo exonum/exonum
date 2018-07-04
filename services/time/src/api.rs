@@ -1,27 +1,24 @@
-use exonum::api::Api;
-use exonum::blockchain::{Blockchain, Schema};
-use exonum::crypto::PublicKey;
-use exonum::encoding::serialize::json::reexport as serde_json;
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Exonum-time API.
 
 use chrono::{DateTime, Utc};
-use iron::prelude::*;
-use router::Router;
 
-use super::TimeSchema;
+use exonum::{api, blockchain::Schema, crypto::PublicKey};
 
-/// Implements the node public API.
-#[derive(Clone, Debug)]
-pub struct PublicApi {
-    /// Exonum blockchain.
-    pub blockchain: Blockchain,
-}
-
-/// Implements the node private API.
-#[derive(Clone, Debug)]
-pub struct PrivateApi {
-    /// Exonum blockchain.
-    pub blockchain: Blockchain,
-}
+use TimeSchema;
 
 /// Structure for saving public key of the validator and last known local time.
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,84 +29,80 @@ pub struct ValidatorTime {
     pub time: Option<DateTime<Utc>>,
 }
 
-/// Shortcut to get data from storage.
-impl PublicApi {
-    /// Endpoint for getting value of the time that is saved in storage.
-    fn wire_current_time(self, router: &mut Router) {
-        let current_time = move |_: &mut Request| -> IronResult<Response> {
-            let view = self.blockchain.snapshot();
-            let schema = TimeSchema::new(&view);
-            self.ok_response(&json!(schema.time().get()))
-        };
+/// Implements the exonum-time public API.
+#[derive(Debug)]
+pub struct PublicApi;
 
-        router.get("v1/current_time", current_time, "get_current_time");
+impl PublicApi {
+    /// Endpoint for getting time values for all validators.
+    pub fn current_time(
+        state: &api::ServiceApiState,
+        _query: (),
+    ) -> api::Result<Option<DateTime<Utc>>> {
+        let view = state.snapshot();
+        let schema = TimeSchema::new(&view);
+        Ok(schema.time().get())
+    }
+
+    /// Used to extend Api.
+    pub fn wire(builder: &mut api::ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("v1/current_time", Self::current_time);
     }
 }
+
+/// Implements the exonum-time private API.
+#[derive(Debug)]
+pub struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
-    fn wire_get_all_validators_times(self, router: &mut Router) {
-        let get_all_validators_times = move |_: &mut Request| -> IronResult<Response> {
-            let view = self.blockchain.snapshot();
-            let schema = TimeSchema::new(&view);
-            let idx = schema.validators_times();
+    pub fn all_validators_times(
+        state: &api::ServiceApiState,
+        _query: (),
+    ) -> api::Result<Vec<ValidatorTime>> {
+        let view = state.snapshot();
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_times();
 
-            // The times of all validators for which time is known.
-            let validators_times = idx.iter()
-                .map(|(public_key, time)| ValidatorTime {
-                    public_key,
-                    time: Some(time),
-                })
-                .collect::<Vec<_>>();
-
-            self.ok_response(&serde_json::to_value(validators_times).unwrap())
-        };
-
-        router.get(
-            "v1/validators_times/all",
-            get_all_validators_times,
-            "get_all_validators_times",
-        );
+        // The times of all validators for which time is known.
+        let validators_times = idx.iter()
+            .map(|(public_key, time)| ValidatorTime {
+                public_key,
+                time: Some(time),
+            })
+            .collect::<Vec<_>>();
+        Ok(validators_times)
     }
 
     /// Endpoint for getting time values for current validators.
-    fn wire_get_current_validators_times(self, router: &mut Router) {
-        let validators_times = move |_: &mut Request| -> IronResult<Response> {
-            let view = self.blockchain.snapshot();
-            let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-            let schema = TimeSchema::new(&view);
-            let idx = schema.validators_times();
+    pub fn current_validators_time(
+        state: &api::ServiceApiState,
+        _query: (),
+    ) -> api::Result<Vec<ValidatorTime>> {
+        let view = state.snapshot();
+        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_times();
 
-            // The times of current validators.
-            // `None` if the time of the validator is unknown.
-            let validators_times = validator_keys
-                .iter()
-                .map(|validator| ValidatorTime {
-                    public_key: validator.service_key,
-                    time: idx.get(&validator.service_key),
-                })
-                .collect::<Vec<_>>();
-
-            self.ok_response(&serde_json::to_value(validators_times).unwrap())
-        };
-
-        router.get(
-            "v1/validators_times",
-            validators_times,
-            "get_current_validators_times",
-        );
+        // The times of current validators.
+        // `None` if the time of the validator is unknown.
+        let validators_times = validator_keys
+            .iter()
+            .map(|validator| ValidatorTime {
+                public_key: validator.service_key,
+                time: idx.get(&validator.service_key),
+            })
+            .collect::<Vec<_>>();
+        Ok(validators_times)
     }
-}
 
-impl Api for PublicApi {
-    fn wire(&self, router: &mut Router) {
-        self.clone().wire_current_time(router);
-    }
-}
-
-impl Api for PrivateApi {
-    fn wire(&self, router: &mut Router) {
-        self.clone().wire_get_all_validators_times(router);
-        self.clone().wire_get_current_validators_times(router);
+    /// Used to extend Api.
+    pub fn wire(builder: &mut api::ServiceApiBuilder) {
+        builder
+            .private_scope()
+            .endpoint("v1/validators_times", Self::current_validators_time)
+            .endpoint("v1/validators_times/all", Self::all_validators_times);
     }
 }

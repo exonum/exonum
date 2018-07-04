@@ -1,0 +1,22 @@
+[package]
+name = "exonum-testkit-server"
+publish = false
+version = "0.0.0"
+authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+documentation = "https://docs.rs/exonum-testkit"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["test", "blockchain", "framework", "exonum"]
+categories = ["development-tools::testing"]
+description = "This example demonstrates how to use the testkit together with client-side testing."
+
+[badges]
+travis-ci = { repository = "exonum/exonum" }
+circle-ci = { repository = "exonum/exonum" }
+
+[dependencies]
+exonum = { version = "0.8.0", path = "../../exonum" }
+exonum-testkit = { version = "0.8.0", path = ".." }
+exonum-cryptocurrency = { version = "0.0.0", path = "../../examples/cryptocurrency" }

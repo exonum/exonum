@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration,
-                Throughput};
+use criterion::{
+    AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
+};
 use exonum::crypto::{gen_keypair, hash, sign, verify};
 use num::pow::pow;
 

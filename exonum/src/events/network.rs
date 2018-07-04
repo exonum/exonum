@@ -13,26 +13,23 @@
 // limitations under the License.
 
 use failure;
-use futures::{future, unsync, Future, IntoFuture, Poll, Sink, Stream};
-use futures::{future::Either, sync::mpsc};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Handle;
-use tokio_retry::{Retry, strategy::{jitter, FixedInterval}};
+use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Handle,
+};
+use tokio_retry::{
+    strategy::{jitter, FixedInterval}, Retry,
+};
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::io;
-use std::net::SocketAddr;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
 
-use super::error::{into_failure, log_error, result_ok};
-use super::to_box;
+use super::{
+    error::{into_failure, log_error, result_ok}, to_box,
+};
+use crypto::PublicKey;
+use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
 use messages::{Protocol, Connect, Message, UncheckedBuffer, SignedMessage};
-
-use events::noise::HandshakeParams;
-use events::noise::NoiseHandshake;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -46,14 +43,14 @@ pub enum NetworkEvent {
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    SendMessage(SocketAddr, SignedMessage),
+    SendMessage(SocketAddr, SignedMessage, PublicKey),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    // TODO: think more about config parameters (ECR-162)
+    // TODO: Think more about config parameters. (ECR-162)
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
@@ -155,9 +152,7 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                NoiseHandshake::send(&handshake_params, sock).and_then(|framed|{
-                    Ok(framed)
-                })
+                NoiseHandshake::initiator(&handshake_params).send(sock)
             })
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
@@ -194,7 +189,7 @@ impl ConnectionsPool {
         &self,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> Box<Future<Item = (), Error = failure::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let fut = self.remove(&peer)
             .into_future()
             .and_then(move |_| {
@@ -212,7 +207,7 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> Box<Future<Item = (), Error = failure::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -226,7 +221,7 @@ impl NetworkPart {
             cancel_sender,
             handshake_params,
         );
-        // TODO Don't use unwrap here!
+        // TODO Don't use unwrap here! (ECR-1633)
         let server = Listener::bind(
             network_config,
             self.listen_address,
@@ -250,7 +245,7 @@ impl NetworkPart {
 
 struct RequestHandler(
     // TODO: Replace with concrete type
-    Box<Future<Item = (), Error = failure::Error>>,
+    Box<dyn Future<Item = (), Error = failure::Error>>,
 );
 
 impl RequestHandler {
@@ -264,13 +259,16 @@ impl RequestHandler {
         handshake_params: &HandshakeParams,
     ) -> RequestHandler {
         let mut cancel_sender = Some(cancel_sender);
-        let handshake_params = handshake_params.clone();
         let outgoing_connections = ConnectionsPool::new();
+        let handshake_params = handshake_params.clone();
         let requests_handler = receiver
             .map_err(|_| format_err!("no network requests"))
             .for_each(move |request| {
                 match request {
-                    NetworkRequest::SendMessage(peer, msg) => {
+                    NetworkRequest::SendMessage(peer, msg, remote_key) => {
+                        let mut handshake_params = handshake_params.clone();
+                        handshake_params.set_remote_key(remote_key);
+
                         let conn_tx = outgoing_connections
                             .get(peer)
                             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
@@ -338,7 +336,7 @@ impl Future for RequestHandler {
     }
 }
 
-struct Listener(Box<Future<Item = (), Error = failure::Error>>);
+struct Listener(Box<dyn Future<Item = (), Error = failure::Error>>);
 
 impl Listener {
     fn bind(
@@ -371,7 +369,8 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
 
-            let stream = NoiseHandshake::listen(&handshake_params, sock).flatten_stream();
+            let handshake = NoiseHandshake::responder(&handshake_params);
+            let stream = handshake.listen(sock).flatten_stream();
 
             let connection_handler = stream
                 .into_future()
@@ -427,7 +426,7 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error>>
+fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error>>
 where
     F: Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error> + 'static,
 {

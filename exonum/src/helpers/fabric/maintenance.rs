@@ -12,16 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_debug_implementations)]
-
 //! This module implements node maintenance actions.
-// spell-checker:ignore exts
 
-use std::collections::HashMap;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
-use super::internal::{CollectedCommand, Command, Feedback};
-use super::{Argument, CommandName, Context};
+use super::{
+    internal::{CollectedCommand, Command, Feedback}, Argument, CommandName, Context,
+};
 use blockchain::Schema;
 use helpers::config::ConfigFile;
 use node::NodeConfig;
@@ -37,23 +34,19 @@ const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 /// Maintenance command. Supported actions:
 ///
 /// - `clear-cache` - clear message cache.
+#[derive(Debug)]
 pub struct Maintenance;
 
 impl Maintenance {
-    /// Returns the name of the `Maintenance` command.
-    pub fn name() -> CommandName {
-        "maintenance"
-    }
-
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>(NODE_CONFIG_PATH)
-            .expect(&format!("{} not found.", NODE_CONFIG_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
-    fn database(ctx: &Context, options: &DbOptions) -> Box<Database> {
+    fn database(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
-            .expect(&format!("{} not found.", DATABASE_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }
 
@@ -104,7 +97,7 @@ impl Command for Maintenance {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "maintenance"
     }
 
     fn about(&self) -> &str {
@@ -115,11 +108,11 @@ impl Command for Maintenance {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _exts: &Fn(Context) -> Context,
+        _: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let action = context
             .arg::<String>(MAINTENANCE_ACTION_PATH)
-            .expect(&format!("{} not found.", MAINTENANCE_ACTION_PATH));
+            .unwrap_or_else(|_| panic!("{} not found.", MAINTENANCE_ACTION_PATH));
 
         match action.as_ref() {
             "clear-cache" => Self::clear_cache(&context),
