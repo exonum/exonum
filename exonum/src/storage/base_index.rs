@@ -86,7 +86,7 @@ where
             view.as_ref(),
         );
 
-        BaseIndex {
+        Self {
             name: index_name.as_ref().to_string(),
             is_family,
             index_id: None,
@@ -121,7 +121,7 @@ where
             view.as_ref(),
         );
 
-        BaseIndex {
+        Self {
             name: family_name.as_ref().to_string(),
             is_family,
             index_id: {
@@ -136,7 +136,7 @@ where
     }
 
     pub(crate) fn indexes_metadata(view: T) -> Self {
-        BaseIndex {
+        Self {
             name: INDEXES_METADATA_TABLE_NAME.to_string(),
             is_family: false,
             index_id: None,
@@ -147,18 +147,15 @@ where
     }
 
     fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
-        match self.index_id {
-            Some(ref prefix) => {
-                let mut v = vec![0; prefix.len() + key.size()];
-                v[..prefix.len()].copy_from_slice(prefix);
-                key.write(&mut v[prefix.len()..]);
-                v
-            }
-            None => {
-                let mut v = vec![0; key.size()];
-                key.write(&mut v);
-                v
-            }
+        if let Some(ref prefix) = self.index_id {
+            let mut v = vec![0; prefix.len() + key.size()];
+            v[..prefix.len()].copy_from_slice(prefix);
+            key.write(&mut v[prefix.len()..]);
+            v
+        } else {
+            let mut v = vec![0; key.size()];
+            key.write(&mut v);
+            v
         }
     }
 

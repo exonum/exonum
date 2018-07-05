@@ -25,15 +25,15 @@ use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
 impl From<rocksdb::Error> for storage::Error {
-    fn from(err: rocksdb::Error) -> storage::Error {
-        storage::Error::new(err.description())
+    fn from(err: rocksdb::Error) -> Self {
+        Self::new(err.description())
     }
 }
 
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
 /// backend.
 ///
-/// RocksDB is an embedded database for key-value data, which is optimized for fast storage.
+/// `RocksDB` is an embedded database for key-value data, which is optimized for fast storage.
 /// This structure is required to potentially adapt the interface to
 /// use different databases.
 pub struct RocksDB {
@@ -52,7 +52,7 @@ impl DbOptions {
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: rocksdb::Snapshot<'static>,
-    _db: Arc<rocksdb::DB>,
+    db: Arc<rocksdb::DB>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -68,7 +68,7 @@ impl RocksDB {
     /// If the database does not exist at the indicated path and the option
     /// `create_if_missing` is switched on in `DbOptions`, a new database will
     /// be created at the indicated path.
-    pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<Self> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
@@ -77,7 +77,7 @@ impl RocksDB {
                 rocksdb::DB::open(&options.to_rocksdb(), path)?
             }
         };
-        Ok(RocksDB { db: Arc::new(db) })
+        Ok(Self { db: Arc::new(db) })
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
@@ -104,7 +104,7 @@ impl Database for RocksDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-            _db: Arc::clone(&self.db),
+            db: Arc::clone(&self.db),
         })
     }
 
@@ -122,7 +122,7 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self._db.cf_handle(name) {
+        if let Some(cf) = self.db.cf_handle(name) {
             match self.snapshot.get_cf(cf, key) {
                 Ok(value) => value.map(|v| v.to_vec()),
                 Err(e) => panic!(e),
@@ -134,7 +134,7 @@ impl Snapshot for RocksDBSnapshot {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
-        let iter = match self._db.cf_handle(name) {
+        let iter = match self.db.cf_handle(name) {
             Some(cf) => self.snapshot
                 .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
                 .unwrap(),
@@ -169,8 +169,8 @@ impl Iterator for RocksDBIterator {
 }
 
 impl From<RocksDB> for Arc<dyn Database> {
-    fn from(db: RocksDB) -> Arc<dyn Database> {
-        Arc::from(Box::new(db) as Box<dyn Database>)
+    fn from(db: RocksDB) -> Self {
+        Self::from(Box::new(db) as Box<dyn Database>)
     }
 }
 

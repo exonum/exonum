@@ -158,8 +158,8 @@ where
     S2: Stream,
     S3: Stream,
 {
-    pub fn new(internal: S1, network: S2, api: S3) -> EventsAggregator<S1, S2, S3> {
-        EventsAggregator {
+    pub fn new(internal: S1, network: S2, api: S3) -> Self {
+        Self {
             done: false,
             network,
             internal,

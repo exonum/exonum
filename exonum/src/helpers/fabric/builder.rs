@@ -36,14 +36,14 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates a new empty `NodeBuilder`.
     pub fn new() -> Self {
-        NodeBuilder {
+        Self {
             commands: Self::commands(),
             service_factories: Vec::new(),
         }
     }
 
     /// Appends service to the `NodeBuilder` context.
-    pub fn with_service(mut self, mut factory: Box<dyn ServiceFactory>) -> NodeBuilder {
+    pub fn with_service(mut self, mut factory: Box<dyn ServiceFactory>) -> Self {
         //TODO: Take endpoints, etc... (ECR-164)
 
         for (name, command) in &mut self.commands {

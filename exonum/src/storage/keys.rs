@@ -62,7 +62,7 @@ use crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE
 /// }
 /// # fn main() {
 /// # // Check the natural ordering of keys
-/// # let (mut x, mut y) = (vec![0u8; 6], vec![0u8; 6]);
+/// # let (mut x, mut y) = (vec![0_u8; 6], vec![0_u8; 6]);
 /// # Key { a: -1, b: 2 }.write(&mut x);
 /// # Key { a: 1, b: 513 }.write(&mut y);
 /// # assert!(x < y);
@@ -273,7 +273,7 @@ impl StorageKey for DateTime<Utc> {
     fn read(buffer: &[u8]) -> Self::Owned {
         let secs = i64::read(&buffer[0..8]);
         let nanos = u32::read(&buffer[8..12]);
-        DateTime::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+        Self::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
     }
 }
 
@@ -301,9 +301,9 @@ impl StorageKey for Decimal {
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        let mut bytes = [0u8; 16];
+        let mut bytes = [0_u8; 16];
         bytes.copy_from_slice(buffer);
-        Decimal::deserialize(bytes)
+        Self::deserialize(bytes)
     }
 }
 
@@ -328,14 +328,14 @@ mod tests {
                 const MAX: $type = ::std::$type::MAX;
 
                 // Roundtrip
-                let mut buffer = [0u8; $size];
+                let mut buffer = [0_u8; $size];
                 for x in (MIN..MAX).chain(once(MAX)) {
                     x.write(&mut buffer);
                     assert_eq!($type::read(&buffer), x);
                 }
 
                 // Ordering
-                let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
+                let (mut x_buffer, mut y_buffer) = ([0_u8; $size], [0_u8; $size]);
                 for x in MIN..MAX {
                     let y = x + 1;
                     x.write(&mut x_buffer);
@@ -351,7 +351,7 @@ mod tests {
                 let mut rng = thread_rng();
 
                 // Fuzzed roundtrip
-                let mut buffer = [0u8; $size];
+                let mut buffer = [0_u8; $size];
                 let handpicked_vals = vec![$type::min_value(), $type::max_value()];
                 for x in rng.gen_iter::<$type>()
                     .take(FUZZ_SAMPLES)
@@ -362,7 +362,7 @@ mod tests {
                 }
 
                 // Fuzzed ordering
-                let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
+                let (mut x_buffer, mut y_buffer) = ([0_u8; $size], [0_u8; $size]);
                 let mut vals: Vec<$type> = rng.gen_iter().take(FUZZ_SAMPLES).collect();
                 vals.sort();
                 for w in vals.windows(2) {
@@ -498,7 +498,7 @@ mod tests {
 
         let mut rng = thread_rng();
 
-        let (mut buffer1, mut buffer2) = ([0u8; 12], [0u8; 12]);
+        let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
             let time1 = Utc.timestamp(
                 rng.gen::<i64>() % (i32::max_value() as i64),

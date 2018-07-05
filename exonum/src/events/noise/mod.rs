@@ -47,14 +47,14 @@ pub trait Handshake {
 }
 
 fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+    let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
     // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message is the payload length
     // in little-endian, remaining bytes is the handshake payload. Therefore, we need to read
     // `HANDSHAKE_HEADER_LENGTH` bytes as a little-endian integer and than we need to read
     // remaining payload.
     read_exact(sock, buf).and_then(|(stream, msg)| {
         let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
-        read_exact(stream, vec![0u8; len as usize])
+        read_exact(stream, vec![0_u8; len as usize])
     })
 }
 
@@ -67,7 +67,7 @@ fn write<S: AsyncWrite + 'static>(
 
     // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message
     // is the payload length in little-endian.
-    let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+    let mut message = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
     LittleEndian::write_uint(&mut message, len as u64, HANDSHAKE_HEADER_LENGTH);
     message.extend_from_slice(&buf[0..len]);
     write_all(sock, message)

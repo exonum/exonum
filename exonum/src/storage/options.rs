@@ -16,7 +16,7 @@
 
 /// Options for the database.
 ///
-/// These parameters apply to the underlying database of Exonum, currently RocksDB.
+/// These parameters apply to the underlying database of Exonum, currently `RocksDB`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DbOptions {
     /// Number of open files that can be used by the database.
