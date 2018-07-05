@@ -9,6 +9,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `schema_version` field in `Block` has been removed. (#774)
+
+- Storage in exonum is now versioned. Old databases will not work with this
+  update. (#707)
+
 - `Iron` based web API has been replaced by the new implementation based
   on `actix-web`. (#727)
 
@@ -63,6 +68,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   specify here all validator consensus public keys with corresponding ip-addresses.
   For example `16ef83ca...da72 = "127.0.0.1:6333"`.
 
+- Healthcheck and consensus endpoints (`v1/healthcheck` and
+  `v1/consensus_status`) have been merged to `v1/healthcheck`. (#736, #766)
+
 ### New features
 
 #### exonum
@@ -76,8 +84,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
   has been introduced. (#722)
-
-- Added a public `v1/consensus_status` endpoint. (#736)
 
 ### Bug fixes
 

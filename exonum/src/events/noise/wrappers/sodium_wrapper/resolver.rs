@@ -38,6 +38,12 @@ impl SodiumResolver {
     }
 }
 
+impl Default for SodiumResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CryptoResolver for SodiumResolver {
     fn resolve_rng(&self) -> Option<Box<dyn Random + Send>> {
         Some(Box::new(SodiumRandom::default()))
