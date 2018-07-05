@@ -146,13 +146,13 @@ impl NoiseWrapper {
     }
 
     fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0u8; len];
+        let mut buf = vec![0_u8; len];
         self.session.read_message(input, &mut buf)?;
         Ok(buf)
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0u8; MAX_MESSAGE_LENGTH];
+        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
         buf.truncate(len);
         Ok(buf)

@@ -149,12 +149,12 @@ impl HandshakeRawMessage {
     pub fn read<S: AsyncRead + 'static>(
         sock: S,
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+        let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
         // First byte of handshake message is payload length, remaining bytes [1; len] is
         // the handshake payload. Therefore, we need to read first byte and after that
         // remaining payload.
         read_exact(sock, buf)
-            .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
+            .and_then(|(stream, msg)| read_exact(stream, vec![0_u8; msg[0] as usize]))
             .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
     }
 
