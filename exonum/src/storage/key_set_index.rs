@@ -74,7 +74,7 @@ where
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        KeySetIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::KeySet, view),
             _k: PhantomData,
         }
@@ -106,7 +106,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        KeySetIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::KeySet, view),
             _k: PhantomData,
         }

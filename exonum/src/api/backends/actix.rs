@@ -42,7 +42,7 @@ pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Err
 pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
 pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
-/// Type alias for the `actix-web::App` with the ServiceApiState.
+/// Type alias for the `actix-web::App` with the `ServiceApiState`.
 pub type App = actix_web::App<ServiceApiState>;
 /// Type alias for the `actix-web::App` configuration.
 pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
@@ -81,7 +81,7 @@ pub struct ApiBuilder {
 impl ApiBuilder {
     /// Constructs a new backend builder instance.
     pub fn new() -> Self {
-        ApiBuilder::default()
+        Self::default()
     }
 }
 
@@ -150,7 +150,7 @@ where
             Box::new(future)
         };
 
-        RequestHandler {
+        Self {
             name: f.name,
             method: actix_web::http::Method::GET,
             inner: Arc::from(index) as Arc<RawHandler>,
@@ -180,7 +180,7 @@ where
                 .responder()
         };
 
-        RequestHandler {
+        Self {
             name: f.name,
             method: actix_web::http::Method::POST,
             inner: Arc::from(index) as Arc<RawHandler>,
@@ -207,7 +207,7 @@ where
                 .responder()
         };
 
-        RequestHandler {
+        Self {
             name: f.name,
             method: actix_web::http::Method::GET,
             inner: Arc::from(index) as Arc<RawHandler>,
@@ -237,7 +237,7 @@ where
                 .responder()
         };
 
-        RequestHandler {
+        Self {
             name: f.name,
             method: actix_web::http::Method::POST,
             inner: Arc::from(index) as Arc<RawHandler>,
@@ -272,7 +272,7 @@ pub struct ApiRuntimeConfig {
 impl ApiRuntimeConfig {
     /// Creates api runtime configuration for the given address and access level.
     pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
-        ApiRuntimeConfig {
+        Self {
             listen_address,
             access,
             app_config: Default::default(),
@@ -374,7 +374,7 @@ impl SystemRuntime {
             api_runtime_addresses
         };
 
-        Ok(SystemRuntime {
+        Ok(Self {
             system_thread,
             system_address,
             api_runtime_addresses,
@@ -437,7 +437,7 @@ impl ser::Serialize for AllowOrigin {
 }
 
 impl<'de> de::Deserialize<'de> for AllowOrigin {
-    fn deserialize<D>(d: D) -> result::Result<AllowOrigin, D::Error>
+    fn deserialize<D>(d: D) -> result::Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
@@ -495,11 +495,11 @@ impl FromStr for AllowOrigin {
 }
 
 impl<'a> From<&'a AllowOrigin> for Cors {
-    fn from(origin: &'a AllowOrigin) -> Cors {
+    fn from(origin: &'a AllowOrigin) -> Self {
         match *origin {
-            AllowOrigin::Any => Cors::build().finish(),
+            AllowOrigin::Any => Self::build().finish(),
             AllowOrigin::Whitelist(ref hosts) => {
-                let mut builder = Cors::build();
+                let mut builder = Self::build();
                 for host in hosts {
                     builder.allowed_origin(host);
                 }
@@ -510,8 +510,8 @@ impl<'a> From<&'a AllowOrigin> for Cors {
 }
 
 impl From<AllowOrigin> for Cors {
-    fn from(origin: AllowOrigin) -> Cors {
-        Cors::from(&origin)
+    fn from(origin: AllowOrigin) -> Self {
+        Self::from(&origin)
     }
 }
 

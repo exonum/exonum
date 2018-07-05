@@ -225,7 +225,7 @@ module.exports = {
         TxCreateWallet.signature = signature
         const hash = TxCreateWallet.hash(data)
 
-        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
           .then(() => { 
             return { data: { tx_hash : hash } }
           })
@@ -244,7 +244,7 @@ module.exports = {
         TxIssue.signature = signature
         const hash = TxIssue.hash(data)
 
-        return TxIssue.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+        return TxIssue.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
           .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
         
@@ -264,7 +264,7 @@ module.exports = {
         TxTransfer.signature = signature
         const hash = TxTransfer.hash(data)
 
-        return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+        return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
           .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
       },

@@ -59,8 +59,8 @@ pub struct NetworkConfiguration {
 }
 
 impl Default for NetworkConfiguration {
-    fn default() -> NetworkConfiguration {
-        NetworkConfiguration {
+    fn default() -> Self {
+        Self {
             max_incoming_connections: 128,
             max_outgoing_connections: 128,
             tcp_keep_alive: None,
@@ -87,8 +87,8 @@ struct ConnectionsPool {
 }
 
 impl ConnectionsPool {
-    fn new() -> ConnectionsPool {
-        ConnectionsPool::default()
+    fn new() -> Self {
+        Self::default()
     }
 
     fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<RawMessage>) {
@@ -257,7 +257,7 @@ impl RequestHandler {
         receiver: mpsc::Receiver<NetworkRequest>,
         cancel_sender: unsync::oneshot::Sender<()>,
         handshake_params: &HandshakeParams,
-    ) -> RequestHandler {
+    ) -> Self {
         let mut cancel_sender = Some(cancel_sender);
         let outgoing_connections = ConnectionsPool::new();
         let handshake_params = handshake_params.clone();
@@ -284,13 +284,13 @@ impl RequestHandler {
                                     )
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
-                                        if &msg != connect_message.raw() {
+                                        if &msg == connect_message.raw() {
+                                            conn_fut(Ok(conn_tx).into_future())
+                                        } else {
                                             conn_fut(conn_tx.send(connect_message.raw().clone())
                                                 .map_err(|_| {
                                                     other_error("can't send message to a connection")
                                                 }))
-                                        } else {
-                                            conn_fut(Ok(conn_tx).into_future())
                                         })
                             });
                         if let Some(conn_tx) = conn_tx {
@@ -344,7 +344,7 @@ impl Listener {
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
         handshake_params: &HandshakeParams,
-    ) -> Result<Listener, io::Error> {
+    ) -> Result<Self, io::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
         // The reference counter is used to automatically count the number of the open connections.

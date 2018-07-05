@@ -45,14 +45,14 @@ pub trait SegmentField<'a>: Sized {
 }
 
 impl<'a, T> Field<'a> for T
-where
-    T: SegmentField<'a>,
+    where
+        T: SegmentField<'a>,
 {
     fn field_size() -> Offset {
         8
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> T {
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let pos = LittleEndian::read_u32(&buffer[from as usize..from as usize + 4]);
         let count = LittleEndian::read_u32(&buffer[from as usize + 4..to as usize]);
         Self::from_buffer(buffer, pos, count)
@@ -162,7 +162,7 @@ impl<'a> SegmentField<'a> for RawMessage {
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let to = from + to * Self::item_size();
         let slice = &buffer[from as usize..to as usize];
-        RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)))
+        Self::new(MessageBuffer::from_vec(Vec::from(slice)))
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
@@ -264,7 +264,7 @@ impl<'a> SegmentField<'a> for BitVec {
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
         let to = from + count * Self::item_size();
         let slice = &buffer[from as usize..to as usize];
-        BitVec::from_bytes(slice)
+        Self::from_bytes(slice)
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {

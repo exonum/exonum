@@ -317,12 +317,12 @@ impl<'a> Field<'a> for Duration {
             LittleEndian::read_i32(&buffer[from as usize + mem::size_of::<i64>()..to as usize]);
 
         // Assuming that buffer was checked and Duration object can be constructed.
-        Duration::seconds(secs) + Duration::nanoseconds(i64::from(nanos))
+        Self::seconds(secs) + Self::nanoseconds(i64::from(nanos))
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         let secs = self.num_seconds();
-        let nanos_as_duration = *self - Duration::seconds(secs);
+        let nanos_as_duration = *self - Self::seconds(secs);
         // Since we're working with only nanos, no overflow is expected here.
         let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
 
@@ -358,8 +358,8 @@ impl<'a> Field<'a> for Duration {
         let nanos =
             LittleEndian::read_i32(&buffer[from_unchecked + mem::size_of::<i64>()..to_unchecked]);
 
-        let max_duration = Duration::max_value();
-        let min_duration = Duration::min_value();
+        let max_duration = Self::max_value();
+        let min_duration = Self::min_value();
 
         // Duration::seconds() panics if amount of seconds exceeds limits.
         if secs > max_duration.num_seconds() || secs < min_duration.num_seconds() {
@@ -371,7 +371,7 @@ impl<'a> Field<'a> for Duration {
         }
 
         // Result will be None in case of overflow.
-        let result = Duration::seconds(secs).checked_add(&Duration::nanoseconds(i64::from(nanos)));
+        let result = Self::seconds(secs).checked_add(&Self::nanoseconds(i64::from(nanos)));
         match result {
             Some(_) => Ok(latest_segment),
             None => Err(Error::DurationOverflow),
@@ -400,7 +400,7 @@ impl<'a> Field<'a> for SocketAddr {
             header => panic!("Unknown header `{:X}` for SocketAddr", header),
         };
         let port = LittleEndian::read_u16(&buffer[to as usize - PORT_SIZE..to as usize]);
-        SocketAddr::new(ip, port)
+        Self::new(ip, port)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
@@ -412,7 +412,7 @@ impl<'a> Field<'a> for SocketAddr {
                     .copy_from_slice(&addr.ip().octets());
                 // Padding.
                 buffer[to as usize - SIZE_DIFF - PORT_SIZE..to as usize - PORT_SIZE]
-                    .copy_from_slice(&[0u8; SIZE_DIFF]);
+                    .copy_from_slice(&[0_u8; SIZE_DIFF]);
             }
             SocketAddr::V6(ref addr) => {
                 buffer[from as usize] = IPV6_HEADER;
@@ -446,7 +446,7 @@ impl<'a> Field<'a> for SocketAddr {
 
         if buffer[from_unchecked] == IPV4_HEADER
             && buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
-                != [0u8; SIZE_DIFF]
+                != [0_u8; SIZE_DIFF]
         {
             let mut value: [u8; SIZE_DIFF] = unsafe { mem::uninitialized() };
             value.copy_from_slice(&buffer[to_unchecked - SIZE_DIFF..to_unchecked]);
@@ -498,7 +498,7 @@ impl<'a> Field<'a> for Decimal {
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let mut bytes: [u8; DECIMAL_SIZE] = mem::uninitialized();
         bytes.copy_from_slice(&buffer[from as usize..to as usize]);
-        Decimal::deserialize(bytes)
+        Self::deserialize(bytes)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {

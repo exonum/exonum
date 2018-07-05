@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,25 +42,25 @@ type ParseResult = Result<Box<dyn Transaction>, encoding::Error>;
 pub struct HeightRange(pub Bound<Height>, pub Bound<Height>);
 
 impl From<RangeFull> for HeightRange {
-    fn from(_: RangeFull) -> HeightRange {
+    fn from(_: RangeFull) -> Self {
         HeightRange(Bound::Unbounded, Bound::Unbounded)
     }
 }
 
 impl From<Range<Height>> for HeightRange {
-    fn from(range: Range<Height>) -> HeightRange {
+    fn from(range: Range<Height>) -> Self {
         HeightRange(Bound::Included(range.start), Bound::Excluded(range.end))
     }
 }
 
 impl From<RangeFrom<Height>> for HeightRange {
-    fn from(range: RangeFrom<Height>) -> HeightRange {
+    fn from(range: RangeFrom<Height>) -> Self {
         HeightRange(Bound::Included(range.start), Bound::Unbounded)
     }
 }
 
 impl From<RangeTo<Height>> for HeightRange {
-    fn from(range: RangeTo<Height>) -> HeightRange {
+    fn from(range: RangeTo<Height>) -> Self {
         HeightRange(Bound::Unbounded, Bound::Excluded(range.end))
     }
 }
@@ -491,7 +491,7 @@ impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
 }
 
 impl<'a> From<TxStatus<'a>> for TransactionResult {
-    fn from(status: TxStatus<'a>) -> TransactionResult {
+    fn from(status: TxStatus<'a>) -> Self {
         fn to_option(s: &str) -> Option<String> {
             if s.is_empty() {
                 None

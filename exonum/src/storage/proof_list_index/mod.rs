@@ -94,7 +94,7 @@ where
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &mut fork);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        ProofListIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
@@ -133,7 +133,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        ProofListIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
@@ -411,7 +411,7 @@ where
     /// ```
     pub fn iter(&self) -> ProofListIndexIter<V> {
         ProofListIndexIter {
-            base_iter: self.base.iter(&0u8),
+            base_iter: self.base.iter(&0_u8),
         }
     }
 
@@ -434,7 +434,7 @@ where
     /// ```
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
         ProofListIndexIter {
-            base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)),
+            base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
     }
 }

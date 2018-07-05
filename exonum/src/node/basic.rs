@@ -77,13 +77,13 @@ impl NodeHandler {
             return;
         }
 
-        let pub_key = *message.pub_key();
-        if pub_key == *self.state.our_connect_message().pub_key() {
+        let public_key = *message.pub_key();
+        if public_key == *self.state.our_connect_message().pub_key() {
             trace!("Received Connect with same pub_key as ours.");
             return;
         }
 
-        if !self.state.connect_list().is_peer_allowed(message.pub_key()) {
+        if !self.state.connect_list().is_peer_allowed(&public_key) {
             error!(
                 "Received connect message from {:?} peer which not in ConnectList.",
                 message.pub_key()
@@ -91,7 +91,6 @@ impl NodeHandler {
             return;
         }
 
-        let public_key = *message.pub_key();
         if !message.verify_signature(&public_key) {
             error!(
                 "Received connect-message with incorrect signature, msg={:?}",
@@ -108,11 +107,11 @@ impl NodeHandler {
                 return;
             } else if saved_message.time() < message.time() {
                 need_connect = saved_message.addr() != message.addr();
-            } else if saved_message.addr() != message.addr() {
+            } else if saved_message.addr() == message.addr() {
+                need_connect = false;
+            } else {
                 error!("Received weird Connect message from {}", address);
                 return;
-            } else {
-                need_connect = false;
             }
         }
         self.state.add_peer(public_key, message.clone());

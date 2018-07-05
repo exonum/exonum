@@ -503,8 +503,8 @@ implement_index_traits! {Signature}
 
 /// Returns a hash consisting of zeros.
 impl Default for Hash {
-    fn default() -> Hash {
-        Hash::zero()
+    fn default() -> Self {
+        Self::zero()
     }
 }
 
@@ -610,7 +610,7 @@ impl CryptoHash for SystemTime {
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
-        let mut buffer = [0u8; 12];
+        let mut buffer = [0_u8; 12];
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         hash(&buffer)
@@ -631,9 +631,9 @@ impl CryptoHash for DateTime<Utc> {
 
 impl CryptoHash for Duration {
     fn hash(&self) -> Hash {
-        let mut buffer = vec![0; Duration::field_size() as usize];
+        let mut buffer = vec![0; Self::field_size() as usize];
         let from: Offset = 0;
-        let to: Offset = Duration::field_size();
+        let to: Offset = Self::field_size();
         self.write(&mut buffer, from, to);
         buffer.hash()
     }
