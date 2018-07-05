@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use super::{ProtocolMessage, Message};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UncheckedBuffer {
@@ -29,5 +30,11 @@ impl UncheckedBuffer {
 impl AsRef<[u8]> for UncheckedBuffer {
     fn as_ref(&self) -> &[u8] {
         &self.message
+    }
+}
+
+impl<T: ProtocolMessage> From<Message<T>> for UncheckedBuffer {
+    fn from(val: Message<T>) -> UncheckedBuffer {
+        UncheckedBuffer::new(val.into_parts().1.to_vec())
     }
 }

@@ -265,8 +265,7 @@ fn wait_for_handshake_result(
         .wait()
         .next()
         .expect("No listener error sent")
-        .expect("Could not receive listener error")
-        .map_err(into_failure);
+        .expect("Could not receive listener error");
     (sender_err, Err(listener_err))
 }
 

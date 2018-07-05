@@ -14,6 +14,7 @@
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+use bit_vec::BitVec;
 
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
@@ -38,8 +39,10 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Protocol, Propose, Precommit, Prevote, Connect, Message,
-               RawTransaction, Status, ProtocolMessage};
+use messages::{
+    BlockResponse, TransactionsResponse,
+               Protocol, Propose, Precommit, Prevote, Connect, Message,
+               RawTransaction, Status, ProtocolMessage, UncheckedBuffer};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -146,7 +149,7 @@ impl Sandbox {
         start_index: usize,
         end_index: usize,
     ) {
-        let connect = Connect::new(
+        let connect = self.create_connect(
             &self.p(VALIDATOR_0),
             self.a(VALIDATOR_0),
             connect_message_time.into(),
@@ -156,7 +159,7 @@ impl Sandbox {
 
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
-            self.recv(&Connect::new(
+            self.recv(&self.create_connect(
                 &self.p(validator),
                 self.a(validator),
                 self.time().into(),
@@ -188,6 +191,40 @@ impl Sandbox {
     pub fn a(&self, id: ValidatorId) -> SocketAddr {
         let id: usize = id.into();
         self.addresses[id]
+    }
+
+    /// Creates a `BlockResponse` message signed by this validator.
+    pub fn create_blockresponse<X: Into<UncheckedBuffer>, I: IntoIterator< Item = X>>(
+        &self,
+        public_key: &PublicKey,
+        to: &PublicKey,
+        block: Block,
+        precommits: I,
+        tx_hashes: &[Hash],
+        secret_key: &SecretKey,
+    ) -> Message<BlockResponse> {
+        Message::new(BlockResponse::new(
+            to,
+            block,
+            precommits.map(|x| x.into()).collect(),
+            tx_hashes,
+        ), *public_key, secret_key)
+    }
+
+    /// Creates a `Connect` message signed by this validator.
+    pub fn create_connect(
+        &self,
+        public_key: &PublicKey,
+        addr: SocketAddr,
+        time: ::chrono::DateTime<::chrono::Utc>,
+        user_agent: &str,
+        secret_key: &SecretKey,
+    ) -> Message<Connect> {
+        Message::new(Connect::new(
+            addr,
+            time,
+            user_agent,
+        ), *public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -247,6 +284,24 @@ impl Sandbox {
             &propose_hash,
             locked_round,
         ), self.p(validator_id), secret_key)
+    }
+
+    /// Creates a `PrevoteRequest` message signed by this validator.
+    pub fn create_prevote_request(
+        &self,
+        pk: &PublicKey,
+        precommit_height: Height,
+        precommit_round: Round,
+        precommit_hash: &Hash,
+        validators: BitVec,
+        secret_key: &SecretKey,
+    ) -> Message<Precommit> {
+        Message::new(PrevotesRequest::new(
+            precommit_height,
+            precommit_round,
+            precommit_hash,
+            validators)
+        ), &pk, secret_key)
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -592,7 +647,7 @@ impl Sandbox {
     /// Creates new sandbox with "restarted" node initialized by the given time.
     pub fn restart_with_time(self, time: SystemTime) -> Self {
         let connect = self.connect().map(|c| {
-            Connect::new(
+            self.create_connect(
                 c.pub_key(),
                 c.addr(),
                 time.into(),
@@ -974,7 +1029,7 @@ mod tests {
         // Socket address doesn't matter in this case.
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
 
-        s.recv(&Connect::new(
+        s.recv(&s.create_connect(
             &public,
             s.a(VALIDATOR_2),
             s.time().into(),
@@ -983,7 +1038,7 @@ mod tests {
         ));
         s.send(
             s.a(VALIDATOR_2),
-            &Connect::new(
+            &s.create_connect(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time().into(),
@@ -1010,7 +1065,7 @@ mod tests {
         let s = timestamping_sandbox();
         s.send(
             s.a(VALIDATOR_1),
-            &Connect::new(
+            &s.create_connect(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time().into(),
@@ -1032,7 +1087,7 @@ mod tests {
             service_key: service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&Connect::new(
+        s.recv(&s.create_connect(
             &public,
             s.a(VALIDATOR_2),
             s.time().into(),
@@ -1041,7 +1096,7 @@ mod tests {
         ));
         s.send(
             s.a(VALIDATOR_1),
-            &Connect::new(
+            &s.create_connect(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time().into(),
@@ -1063,7 +1118,7 @@ mod tests {
             service_key: service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&Connect::new(
+        s.recv(&s.create_connect(
             &public,
             s.a(VALIDATOR_2),
             s.time().into(),
@@ -1084,14 +1139,14 @@ mod tests {
             service_key: service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&Connect::new(
+        s.recv(&s.create_connect(
             &public,
             s.a(VALIDATOR_2),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
-        s.recv(&Connect::new(
+        s.recv(&s.create_connect(
             &public,
             s.a(VALIDATOR_3),
             s.time().into(),
@@ -1113,7 +1168,7 @@ mod tests {
             service_key: service,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&Connect::new(
+        s.recv(&s.create_connect(
             &public,
             s.a(VALIDATOR_2),
             s.time().into(),

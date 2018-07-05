@@ -171,6 +171,11 @@ impl<T: ProtocolMessage> Message<T> {
             message: self.message,
         }
     }
+    /// Clones payload and returns as result
+    #[doc(hidden)]
+    pub fn clone_child(&self) -> T {
+        self.payload.clone()
+    }
 
     /// Returns public key of message creator.
     pub fn author(&self) -> &PublicKey {

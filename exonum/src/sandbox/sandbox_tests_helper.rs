@@ -620,7 +620,7 @@ fn try_check_and_broadcast_propose_and_prevote(
 pub fn receive_valid_propose_with_transactions(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
-) -> Propose {
+) -> Message<Propose> {
     let propose = sandbox.create_propose(
         sandbox.current_leader(),
         sandbox.current_height(),
@@ -636,7 +636,7 @@ pub fn receive_valid_propose_with_transactions(
 pub fn make_request_propose_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> ProposeRequest {
+) -> Message<ProposeRequest> {
     ProposeRequest::new(
         &sandbox.p(VALIDATOR_0),
         &sandbox.p(precommit.validator()),
@@ -649,10 +649,9 @@ pub fn make_request_propose_from_precommit(
 pub fn make_request_prevote_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> PrevotesRequest {
+) -> Message<PrevotesRequest> {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
-    PrevotesRequest::new(
-        &sandbox.p(VALIDATOR_0),
+    sandbox.create_prevote_request(
         &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.round(),
@@ -664,7 +663,7 @@ pub fn make_request_prevote_from_precommit(
 
 /// idea of the method is to return valid Prevote using provided Propose.
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
-pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Prevote {
+pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Message<Prevote> {
     sandbox.create_prevote(
         VALIDATOR_0,
         propose.height(),

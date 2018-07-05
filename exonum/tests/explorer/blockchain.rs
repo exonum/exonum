@@ -15,19 +15,19 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 extern crate futures;
-use futures::sync::mpsc;
+use self::futures::sync::mpsc;
 
 use exonum::{
     blockchain::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service,
         Transaction, TransactionSet, TransactionContext
     },
-    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+    crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
     messages::{ Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
 transactions! {
-    ExplorerTransactions {
+    pub ExplorerTransactions {
         struct CreateWallet {
             pubkey: &PublicKey,
             name: &str,
@@ -84,7 +84,7 @@ impl Service for MyService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-        Transactions::tx_from_raw(raw).map(Transactions::into)
+        ExplorerTransactions::tx_from_raw(raw).map(ExplorerTransactions::into)
     }
 }
 

@@ -28,7 +28,7 @@ use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit,
+    BlockRequest, Message, PeersRequest, Precommit,
     PrevotesRequest, ProposeRequest, RawTransaction, Status, TransactionsRequest,
     TransactionsResponse
 };
@@ -283,7 +283,7 @@ fn test_retrieve_block_and_precommits() {
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
     let block = block_proof.block;
-    let precommits: Vec<Precommit> = block_proof.precommits;
+    let precommits: Vec<Message<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
     let expected_block_hash = block.hash();
 
@@ -665,8 +665,8 @@ fn should_restore_peers_after_restart() {
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
     let time = sandbox.time();
-    let connect_from_0 = Connect::new(&p0, a0, time.into(), &user_agent::get(), &s0);
-    let connect_from_1 = Connect::new(&p1, a1, time.into(), &user_agent::get(), &s1);
+    let connect_from_0 = sandbox.create_connect(&p0, a0, time.into(), &user_agent::get(), &s0);
+    let connect_from_1 = sandbox.create_connect(&p1, a1, time.into(), &user_agent::get(), &s1);
     let peers_request = PeersRequest::new(&p1, &p0, &s1);
 
     // check that peers are absent
@@ -1345,7 +1345,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3.into(), true);
 
-        sandbox.recv(&PrevotesRequest::new(
+        sandbox.recv(&sandbox.create_prevote_request(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -1436,7 +1436,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3.into(), true);
 
-        sandbox.recv(&PrevotesRequest::new(
+        sandbox.recv(&sandbox.create_prevote_request(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -1594,7 +1594,7 @@ fn request_prevotes_when_get_prevote_message() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &PrevotesRequest::new(
+        &sandbox.create_prevote_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -3149,7 +3149,7 @@ fn handle_block_response_tx_in_pool() {
     );
     sandbox.recv(&tx);
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3238,7 +3238,7 @@ fn handle_block_response_with_unknown_tx() {
         ),
     );
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3345,7 +3345,7 @@ fn handle_block_response_with_invalid_txs_order() {
     );
 
     // Invalid transactions order.
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3432,7 +3432,7 @@ fn handle_block_response_with_invalid_precommits() {
     );
     sandbox.recv(&tx);
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block1.clone(),
@@ -3519,7 +3519,7 @@ fn handle_block_response_with_known_transaction() {
         ),
     );
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3629,7 +3629,7 @@ fn handle_block_response_with_all_known_transactions() {
         ),
     );
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3724,7 +3724,7 @@ fn received_block_while_there_is_full_propose() {
         ),
     );
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3847,7 +3847,7 @@ fn received_block_while_there_is_pending_block() {
         ),
     );
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3860,7 +3860,7 @@ fn received_block_while_there_is_pending_block() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),
@@ -3982,7 +3982,7 @@ fn transactions_request_to_multiple_nodes() {
         ),
     );
 
-    sandbox.recv(&BlockResponse::new(
+    sandbox.recv(&sandbox.create_blockresponse(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block.clone(),

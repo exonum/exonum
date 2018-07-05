@@ -24,7 +24,7 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{Schema, Transaction, TransactionErrorType, TxLocation, TransactionSet},
-    crypto::{self, CryptoHash, Hash}, explorer::*, helpers::Height,
+    crypto::{self, Hash}, explorer::*, helpers::Height,
     messages::{Message, RawTransaction},
 };
 
@@ -314,7 +314,7 @@ fn test_transaction_iterator() {
         }
         for (i, tx) in block.iter().enumerate() {
             let raw_tx = tx.content().raw().clone();
-            let tx = ExplorerTransactions::tx_from_raw(raw_tx);
+            let tx = ExplorerTransactions::tx_from_raw(raw_tx.clone_child()).unwrap();
             match tx {
                 ExplorerTransactions::CreateWallet(parsed_tx) => assert_eq!(parsed_tx.name(), &format!("Alice #{}", i)),
                 _ => panic!("Transaction couldn't be parsed.")
@@ -352,7 +352,7 @@ fn test_transaction_iterator() {
         .iter()
         .filter(|tx|{
                     if let ExplorerTransactions::CreateWallet(_) =
-                    ExplorerTransactions::tx_from_raw(tx.content().raw().clone()).unwrap(){
+                    ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap(){
                         true
                     } else {
                         false
@@ -379,8 +379,8 @@ fn test_block_with_transactions() {
         block
             .iter()
             .all(|tx|{
-            if let Transactions::CreateWallet(_) =
-            Transactions::tx_from_raw(tx.content().raw().clone()).unwrap(){
+            if let ExplorerTransactions::CreateWallet(_) =
+            ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap(){
                 true
             } else {
                 false
