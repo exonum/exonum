@@ -29,9 +29,13 @@ pub enum Feedback {
 
 /// `Command` trait is used to create sub-command for `NodeBuilder`.
 pub trait Command {
+    /// List of command arguments.
     fn args(&self) -> Vec<Argument>;
+    /// Command name.
     fn name(&self) -> CommandName;
+    /// Short information about the command.
     fn about(&self) -> &str;
+    #[doc(hidden)]
     fn execute(
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
