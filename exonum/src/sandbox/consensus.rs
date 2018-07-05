@@ -698,7 +698,7 @@ fn test_store_txs_positions() {
         gen_keypair_from_seed(&Seed::new([11; 32])),
     );
 
-    let committed_height = Height(rng.gen_range(2, 30u64));
+    let committed_height = Height(rng.gen_range(2, 30_u64));
     {
         for _ in 1..committed_height.0 {
             add_one_height(&sandbox, &sandbox_state)

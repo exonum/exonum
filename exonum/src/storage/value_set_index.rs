@@ -89,7 +89,7 @@ where
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        ValueSetIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::ValueSet, view),
             _v: PhantomData,
         }
@@ -121,7 +121,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        ValueSetIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ValueSet, view),
             _v: PhantomData,
         }

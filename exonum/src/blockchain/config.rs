@@ -134,6 +134,9 @@ impl ConsensusConfig {
     /// method, but some values can decrease consensus performance.
     #[doc(hidden)]
     pub fn warn_if_nonoptimal(&self) {
+        const MIN_TXS_BLOCK_LIMIT: u32 = 100;
+        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
+
         if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
@@ -141,9 +144,6 @@ impl ConsensusConfig {
                 self.round_timeout, self.max_propose_timeout
             );
         }
-
-        const MIN_TXS_BLOCK_LIMIT: u32 = 100;
-        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 
         if self.txs_block_limit < MIN_TXS_BLOCK_LIMIT || self.txs_block_limit > MAX_TXS_BLOCK_LIMIT
         {
@@ -157,7 +157,7 @@ impl ConsensusConfig {
 
 impl Default for ConsensusConfig {
     fn default() -> Self {
-        ConsensusConfig {
+        Self {
             round_timeout: 3000,
             status_timeout: 5000,
             peers_timeout: 10_000,
@@ -180,8 +180,8 @@ impl StoredConfiguration {
     /// Tries to deserialize `StorageConfiguration` from the given UTF-8 encoded
     /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
-    pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
-        let config: StoredConfiguration = serde_json::from_slice(serialized)?;
+    pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        let config: Self = serde_json::from_slice(serialized)?;
 
         // Check that there are no duplicated keys.
         {
@@ -237,7 +237,7 @@ impl StorageValue for StoredConfiguration {
     }
 
     fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
+        Self::try_deserialize(v.as_ref()).unwrap()
     }
 }
 

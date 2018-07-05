@@ -104,7 +104,7 @@ fn insert_same_key(db: Box<dyn Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
     assert_eq!(table.merkle_root(), Hash::zero());
-    let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
+    let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
     let hash = HashStream::new()
         .update(root_prefix)
         .update(hash(&[2]).as_ref())

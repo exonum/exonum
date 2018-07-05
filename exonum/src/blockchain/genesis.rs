@@ -41,7 +41,7 @@ impl GenesisConfig {
         I: Iterator<Item = ValidatorKeys>,
     {
         consensus.warn_if_nonoptimal();
-        GenesisConfig {
+        Self {
             consensus,
             validator_keys: validator_keys.collect(),
         }

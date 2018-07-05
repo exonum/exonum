@@ -56,7 +56,7 @@ where
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        Entry {
+        Self {
             base: BaseIndex::new(index_name.as_ref(), IndexType::Entry, view),
             _v: PhantomData,
         }

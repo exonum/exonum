@@ -70,7 +70,7 @@ impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
         S: Into<String>,
         W: Into<With<Q, I, R, F>>,
     {
-        NamedWith {
+        Self {
             name: name.into(),
             inner: inner.into(),
             _kind: PhantomData::default(),
@@ -85,7 +85,7 @@ where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I>,
 {
     fn from(handler: F) -> Self {
-        With {
+        Self {
             handler,
             _query_type: PhantomData,
             _item_type: PhantomData,
@@ -101,7 +101,7 @@ where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I>,
 {
     fn from(handler: F) -> Self {
-        With {
+        Self {
             handler,
             _query_type: PhantomData,
             _item_type: PhantomData,
