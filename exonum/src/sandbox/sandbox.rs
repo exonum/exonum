@@ -40,9 +40,9 @@ use events::{
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockResponse, TransactionsResponse,
-               Protocol, Propose, Precommit, Prevote, Connect, Message,
-               RawTransaction, Status, ProtocolMessage, UncheckedBuffer};
+    BlockResponse, Connect, Message, Precommit, Prevote, Propose, Protocol, ProtocolMessage,
+    RawTransaction, Status, TransactionsResponse, UncheckedBuffer,
+};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -194,7 +194,7 @@ impl Sandbox {
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_blockresponse<X: Into<UncheckedBuffer>, I: IntoIterator< Item = X>>(
+    pub fn create_blockresponse<X: Into<UncheckedBuffer>, I: IntoIterator<Item = X>>(
         &self,
         public_key: &PublicKey,
         to: &PublicKey,
@@ -203,12 +203,11 @@ impl Sandbox {
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
     ) -> Message<BlockResponse> {
-        Message::new(BlockResponse::new(
-            to,
-            block,
-            precommits.map(|x| x.into()).collect(),
-            tx_hashes,
-        ), *public_key, secret_key)
+        Message::new(
+            BlockResponse::new(to, block, precommits.map(|x| x.into()).collect(), tx_hashes),
+            *public_key,
+            secret_key,
+        )
     }
 
     /// Creates a `Connect` message signed by this validator.
@@ -220,11 +219,11 @@ impl Sandbox {
         user_agent: &str,
         secret_key: &SecretKey,
     ) -> Message<Connect> {
-        Message::new(Connect::new(
-            addr,
-            time,
-            user_agent,
-        ), *public_key, secret_key)
+        Message::new(
+            Connect::new(addr, time, user_agent),
+            *public_key,
+            secret_key,
+        )
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -237,13 +236,11 @@ impl Sandbox {
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
     ) -> Message<Propose> {
-        Message::new(Propose::new(
-            validator_id,
-            height,
-            round,
-            last_hash,
-            tx_hashes,
-        ), self.p(validator_id), secret_key)
+        Message::new(
+            Propose::new(validator_id, height, round, last_hash, tx_hashes),
+            self.p(validator_id),
+            secret_key,
+        )
     }
 
     /// Creates a `Precommit` message signed by this validator.
@@ -257,14 +254,18 @@ impl Sandbox {
         system_time: ::chrono::DateTime<::chrono::Utc>,
         secret_key: &SecretKey,
     ) -> Message<Precommit> {
-        Message::new(Precommit::new(
-            validator_id,
-            propose_height,
-            propose_round,
-            propose_hash,
-            block_hash,
-            system_time,
-        ), self.p(validator_id), secret_key)
+        Message::new(
+            Precommit::new(
+                validator_id,
+                propose_height,
+                propose_round,
+                propose_hash,
+                block_hash,
+                system_time,
+            ),
+            self.p(validator_id),
+            secret_key,
+        )
     }
 
     /// Creates a `Precommit` message signed by this validator.
@@ -277,13 +278,17 @@ impl Sandbox {
         locked_round: Round,
         secret_key: &SecretKey,
     ) -> Message<Precommit> {
-        Message::new(Prevote::new(
-            validator_id,
-            propose_height,
-            propose_round,
-            &propose_hash,
-            locked_round,
-        ), self.p(validator_id), secret_key)
+        Message::new(
+            Prevote::new(
+                validator_id,
+                propose_height,
+                propose_round,
+                &propose_hash,
+                locked_round,
+            ),
+            self.p(validator_id),
+            secret_key,
+        )
     }
 
     /// Creates a `PrevoteRequest` message signed by this validator.
@@ -296,12 +301,16 @@ impl Sandbox {
         validators: BitVec,
         secret_key: &SecretKey,
     ) -> Message<Precommit> {
-        Message::new(PrevotesRequest::new(
-            precommit_height,
-            precommit_round,
-            precommit_hash,
-            validators)
-        ), &pk, secret_key)
+        Message::new(
+            PrevotesRequest::new(
+                precommit_height,
+                precommit_round,
+                precommit_hash,
+                validators,
+            ),
+            &pk,
+            secret_key,
+        )
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -974,7 +983,7 @@ mod tests {
             true
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
             Ok(())
         }
     }

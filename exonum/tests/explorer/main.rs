@@ -23,12 +23,11 @@ extern crate serde_json;
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{Schema, Transaction, TransactionErrorType, TxLocation, TransactionSet},
-    crypto::{self, Hash}, explorer::*, helpers::Height,
-    messages::{Message, RawTransaction},
+    blockchain::{Schema, Transaction, TransactionErrorType, TransactionSet, TxLocation},
+    crypto::{self, Hash}, explorer::*, helpers::Height, messages::{Message, RawTransaction},
 };
 
-use blockchain::{create_block, create_blockchain, CreateWallet, Transfer, ExplorerTransactions};
+use blockchain::{create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer};
 
 mod blockchain;
 
@@ -40,11 +39,16 @@ fn test_explorer_basics() {
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
     let tx_alice = Message::sign_tx(
-        CreateWallet::new(&pk_alice, "Alice"), 0, (pk_alice, &key_alice) );
-    let tx_bob = Message::sign_tx(
-        CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob) );
+        CreateWallet::new(&pk_alice, "Alice"),
+        0,
+        (pk_alice, &key_alice),
+    );
+    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
     let tx_transfer = Message::sign_tx(
-        Transfer::new(&pk_alice, &pk_bob, 2), 0, (pk_alice, &key_alice) );
+        Transfer::new(&pk_alice, &pk_bob, 2),
+        0,
+        (pk_alice, &key_alice),
+    );
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
@@ -70,7 +74,10 @@ fn test_explorer_basics() {
         assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
         assert_eq!(tx_info.status(), Ok(()));
         assert_eq!(tx_info.content().raw(), &tx_alice);
-        assert_eq!(tx_info.content().raw().hash(), block.transaction_hashes()[0]);
+        assert_eq!(
+            tx_info.content().raw().hash(),
+            block.transaction_hashes()[0]
+        );
 
         let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
         assert!(!tx_info.is_in_pool());
@@ -98,10 +105,7 @@ fn test_explorer_basics() {
 
     // Block #2: other transactions.
 
-    create_block(
-        &mut blockchain,
-        vec![tx_bob.clone(), tx_transfer.clone()],
-    );
+    create_block(&mut blockchain, vec![tx_bob.clone(), tx_transfer.clone()]);
 
     let explorer = BlockchainExplorer::new(&blockchain);
     assert_eq!(explorer.height(), Height(2));
@@ -156,7 +160,10 @@ fn test_explorer_pool_transaction() {
 
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let tx_alice = Message::sign_tx(
-        CreateWallet::new(&pk_alice, "Alice"), 0, (pk_alice, &key_alice) );
+        CreateWallet::new(&pk_alice, "Alice"),
+        0,
+        (pk_alice, &key_alice),
+    );
     let tx_hash = tx_alice.hash();
 
     {
@@ -181,7 +188,11 @@ fn test_explorer_pool_transaction() {
 fn tx_generator() -> Box<Iterator<Item = Message<RawTransaction>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
-        Message::sign_tx(CreateWallet::new(&pk, &format!("Alice #{}", i)), 0, (pk, &key) )
+        Message::sign_tx(
+            CreateWallet::new(&pk, &format!("Alice #{}", i)),
+            0,
+            (pk, &key),
+        )
     }))
 }
 
@@ -316,8 +327,10 @@ fn test_transaction_iterator() {
             let raw_tx = tx.content().raw().clone();
             let tx = ExplorerTransactions::tx_from_raw(raw_tx.clone_child()).unwrap();
             match tx {
-                ExplorerTransactions::CreateWallet(parsed_tx) => assert_eq!(parsed_tx.name(), &format!("Alice #{}", i)),
-                _ => panic!("Transaction couldn't be parsed.")
+                ExplorerTransactions::CreateWallet(parsed_tx) => {
+                    assert_eq!(parsed_tx.name(), &format!("Alice #{}", i))
+                }
+                _ => panic!("Transaction couldn't be parsed."),
             }
         }
     }
@@ -326,16 +339,20 @@ fn test_transaction_iterator() {
 
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice =  Message::sign_tx(CreateWallet::new(&pk_alice, "Alice"), 0, (pk_alice, &key_alice));
-    let tx_bob =  Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
-    let tx_transfer =  Message::sign_tx(Transfer::new(&pk_alice, &pk_bob, 2), 0, (pk_alice, &key_alice));
+    let tx_alice = Message::sign_tx(
+        CreateWallet::new(&pk_alice, "Alice"),
+        0,
+        (pk_alice, &key_alice),
+    );
+    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
+    let tx_transfer = Message::sign_tx(
+        Transfer::new(&pk_alice, &pk_bob, 2),
+        0,
+        (pk_alice, &key_alice),
+    );
     create_block(
         &mut blockchain,
-        vec![
-            tx_alice.clone(),
-            tx_bob.clone(),
-            tx_transfer.clone(),
-        ],
+        vec![tx_alice.clone(), tx_bob.clone(), tx_transfer.clone()],
     );
 
     let explorer = BlockchainExplorer::new(&blockchain);
@@ -350,13 +367,14 @@ fn test_transaction_iterator() {
 
     let create_wallet_positions: Vec<_> = block
         .iter()
-        .filter(|tx|{
-                    if let ExplorerTransactions::CreateWallet(_) =
-                    ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap(){
-                        true
-                    } else {
-                        false
-                    }
+        .filter(|tx| {
+            if let ExplorerTransactions::CreateWallet(_) =
+                ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap()
+            {
+                true
+            } else {
+                false
+            }
         })
         .map(|tx| tx.location().position_in_block())
         .collect();
@@ -375,18 +393,15 @@ fn test_block_with_transactions() {
     assert!(!block.is_empty());
     assert!(block[1].status().is_ok());
 
-    assert!(
-        block
-            .iter()
-            .all(|tx|{
-            if let ExplorerTransactions::CreateWallet(_) =
-            ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap(){
-                true
-            } else {
-                false
-            }
-        })
-    );
+    assert!(block.iter().all(|tx| {
+        if let ExplorerTransactions::CreateWallet(_) =
+            ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap()
+        {
+            true
+        } else {
+            false
+        }
+    }));
 }
 
 #[test]

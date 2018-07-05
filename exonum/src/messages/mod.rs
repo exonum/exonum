@@ -18,8 +18,8 @@ use std::ops::Deref;
 
 use failure::Error;
 
-use crypto::{hash, Hash, PublicKey, SecretKey};
 use blockchain::Transaction;
+use crypto::{hash, Hash, PublicKey, SecretKey};
 
 pub use self::authorisation::SignedMessage;
 pub use self::helpers::BinaryForm;
@@ -102,9 +102,11 @@ impl Message<Protocol> {
 
 impl Message<RawTransaction> {
     #[doc(hidden)]
-    pub fn create_raw_tx(data: Vec<u8>,
-                         service_id: u16,
-                         service_keypair:(PublicKey, &SecretKey)) -> Message<RawTransaction> {
+    pub fn create_raw_tx(
+        data: Vec<u8>,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction> {
         let raw = RawTransaction::new(service_id, data);
         Message::new(raw, service_keypair.0, &service_keypair.1)
     }
@@ -113,9 +115,11 @@ impl Message<RawTransaction> {
     /// # Panics
     ///
     /// On serialization fail this method can panic.
-    pub fn sign_tx<X:Transaction + BinaryForm>(tx: X,
-                                               service_id: u16,
-                                               service_keypair:(PublicKey, &SecretKey)) -> Message<RawTransaction> {
+    pub fn sign_tx<X: Transaction + BinaryForm>(
+        tx: X,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction> {
         let data = tx.serialize().unwrap();
         Message::create_raw_tx(data, service_id, service_keypair)
     }
@@ -128,7 +132,6 @@ impl<T: ProtocolMessage> Message<T> {
             SignedMessage::new(payload.clone(), author, secret_key).expect("Serialization error");
         Message { payload, message }
     }
-
 
     /// Makes new instance of map from existing,
     /// trying convert internal payload to provided type,

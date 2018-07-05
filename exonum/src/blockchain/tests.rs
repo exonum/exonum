@@ -18,12 +18,13 @@ use chrono::{DateTime, TimeZone, Utc};
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionSet,
-                 TransactionContext};
+use blockchain::{
+    Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+};
 use crypto::{gen_keypair, CryptoHash, Hash};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
-use messages::{ Message, RawTransaction};
+use messages::{Message, RawTransaction};
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
@@ -189,9 +190,9 @@ fn gen_tempdir_name() -> String {
 fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (pk, sec_key) = gen_keypair();
     let tx_ok1 = Message::sign_tx(Tx::new(3), 1, (pk, &sec_key));
-    let tx_ok2 = Message::sign_tx(Tx::new(4), 1,(pk, &sec_key));
-    let tx_failed = Message::sign_tx(Tx::new(0),1, (pk, &sec_key));
-    let tx_storage_error = Message::sign_tx(Tx::new(42),1, (pk, &sec_key));
+    let tx_ok2 = Message::sign_tx(Tx::new(4), 1, (pk, &sec_key));
+    let tx_failed = Message::sign_tx(Tx::new(0), 1, (pk, &sec_key));
+    let tx_storage_error = Message::sign_tx(Tx::new(42), 1, (pk, &sec_key));
 
     let patch = {
         let mut fork = blockchain.fork();
@@ -244,9 +245,9 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 
     let (pk, sec_key) = gen_keypair();
     let tx_ok1 = Message::sign_tx(Tx::new(3), 1, (pk, &sec_key));
-    let tx_ok2 = Message::sign_tx(Tx::new(4), 1,(pk, &sec_key));
-    let tx_failed = Message::sign_tx(Tx::new(0),1, (pk, &sec_key));
-    let tx_storage_error = Message::sign_tx(Tx::new(42),1, (pk, &sec_key));
+    let tx_ok2 = Message::sign_tx(Tx::new(4), 1, (pk, &sec_key));
+    let tx_failed = Message::sign_tx(Tx::new(0), 1, (pk, &sec_key));
+    let tx_storage_error = Message::sign_tx(Tx::new(42), 1, (pk, &sec_key));
 
     let patch = {
         let mut fork = blockchain.fork();
@@ -268,9 +269,9 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 }
 
 mod transactions_tests {
-    use blockchain::{ExecutionResult, Transaction, TransactionSet, TransactionContext};
-    use messages::{Message, RawTransaction};
+    use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crypto::gen_keypair;
+    use messages::{Message, RawTransaction};
     use serde::Serialize;
     use serde_json;
 
@@ -341,19 +342,18 @@ mod transactions_tests {
     #[test]
     fn deserialize_from_raw() {
         fn round_trip(t: Message<RawTransaction>) {
-            use ::std::ops::Deref;
+            use std::ops::Deref;
             let raw: &RawTransaction = t.deref();
             let initial = serde_json::to_value(raw).unwrap();
             let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
-            let round_tripped= serde_json::to_value(&parsed).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
             assert_eq!(initial, round_tripped);
         }
 
-
         let (pk, sec_key) = gen_keypair();
-        let a =  Message::sign_tx(A::new(0), 1,(pk, &sec_key));
-        let b =  Message::sign_tx(B::new(1, 2), 1, (pk, &sec_key));
-        let c =  Message::sign_tx(C::new(0), 1,(pk, &sec_key));
+        let a = Message::sign_tx(A::new(0), 1, (pk, &sec_key));
+        let b = Message::sign_tx(B::new(1, 2), 1, (pk, &sec_key));
+        let c = Message::sign_tx(C::new(0), 1, (pk, &sec_key));
         round_trip(a);
         round_trip(b);
         round_trip(c);

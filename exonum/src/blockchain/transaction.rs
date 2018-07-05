@@ -68,8 +68,7 @@ impl TransactionMessage {
     pub(crate) fn new(
         message: Message<RawTransaction>,
         transaction: Box<dyn Transaction>,
-    ) -> TransactionMessage
-    {
+    ) -> TransactionMessage {
         TransactionMessage {
             transaction,
             message,
@@ -197,19 +196,21 @@ pub struct TransactionContext<'a> {
     fork: &'a mut Fork,
     service_id: u16,
     tx_hash: Hash,
-    author: PublicKey
+    author: PublicKey,
 }
 
 impl<'a> TransactionContext<'a> {
-    pub(crate) fn new(fork: &'a mut Fork,
-                      service_id: u16,
-                      tx_hash: Hash,
-                      author: PublicKey) -> Self {
+    pub(crate) fn new(
+        fork: &'a mut Fork,
+        service_id: u16,
+        tx_hash: Hash,
+        author: PublicKey,
+    ) -> Self {
         TransactionContext {
             fork,
             service_id,
             tx_hash,
-            author
+            author,
         }
     }
     /// Returns fork of current blockchain state.
@@ -807,8 +808,8 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction = Message::sign_tx(TxResult::new(index),
-                                               TX_RESULT_SERVICE_ID, (pk, &sec_key));
+            let transaction =
+                Message::sign_tx(TxResult::new(index), TX_RESULT_SERVICE_ID, (pk, &sec_key));
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();

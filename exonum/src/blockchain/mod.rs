@@ -49,17 +49,14 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, fmt, iter, mem, net::SocketAddr,
-    ops::Deref, panic, sync::Arc,
+    collections::{BTreeMap, HashMap}, fmt, iter, mem, net::SocketAddr, ops::Deref, panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
-use helpers::{Height, Round, ValidatorId};
-use messages::{
-    Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction,
-};
 use events::error::into_failure;
+use helpers::{Height, Round, ValidatorId};
+use messages::{Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction};
 use node::ApiSender;
 use storage::{Database, Error, Fork, Patch, Snapshot};
 
@@ -376,8 +373,7 @@ impl Blockchain {
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
 
-            let transaction_message = self.tx_from_raw(tx)
-                                                                       .map_err(into_failure)?;
+            let transaction_message = self.tx_from_raw(tx).map_err(into_failure)?;
 
             (transaction_message, service_name)
         };
@@ -385,10 +381,12 @@ impl Blockchain {
         fork.checkpoint();
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let context = TransactionContext::new(&mut *fork,
-                                        tx.raw().service_id(),
-                                        tx.raw().hash(),
-                                        *tx.raw().author());
+            let context = TransactionContext::new(
+                &mut *fork,
+                tx.raw().service_id(),
+                tx.raw().hash(),
+                *tx.raw().author(),
+            );
             tx.transaction().execute(context)
         }));
 

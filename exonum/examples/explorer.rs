@@ -23,8 +23,7 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
-    helpers::{Height, ValidatorId},
-    messages::{Message, RawTransaction},
+    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction},
 };
 
 use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer};
@@ -37,7 +36,7 @@ pub fn mempool_transaction() -> Message<RawTransaction> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    Message::sign_tx(CreateWallet::new(&pk_alex, "Alex"), 0,(pk_alex, &key_alex))
+    Message::sign_tx(CreateWallet::new(&pk_alex, "Alex"), 0, (pk_alex, &key_alex))
 }
 
 /// Creates a sample blockchain for the example.
@@ -53,14 +52,19 @@ pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Message::sign_tx(CreateWallet::new(&pk_alice, "Alice"), 0, (pk_alice, &key_alice));
-    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
-    let tx_transfer = Message::sign_tx(Transfer::new(&pk_alice, &pk_bob, 100), 0, (pk_alice, &key_alice));
-
-    create_block(
-        &mut blockchain,
-        vec![tx_alice, tx_bob, tx_transfer],
+    let tx_alice = Message::sign_tx(
+        CreateWallet::new(&pk_alice, "Alice"),
+        0,
+        (pk_alice, &key_alice),
     );
+    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
+    let tx_transfer = Message::sign_tx(
+        Transfer::new(&pk_alice, &pk_bob, 100),
+        0,
+        (pk_alice, &key_alice),
+    );
+
+    create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     let mut fork = blockchain.fork();
     {
@@ -179,7 +183,9 @@ fn main() {
     println!("{:?}", tx.content());
 
     // JSON serialization for committed transactions
-    let committed_tx: TransactionInfo = explorer.transaction(&block[0].content().raw().hash()).unwrap();
+    let committed_tx: TransactionInfo = explorer
+        .transaction(&block[0].content().raw().hash())
+        .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(
         serde_json::to_value(&committed_tx).unwrap(),

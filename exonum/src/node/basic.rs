@@ -31,7 +31,7 @@ impl NodeHandler {
             Protocol::Consensus(msg) => self.handle_consensus(Message::from_parts(msg, message)?)?,
             Protocol::Request(msg) => self.handle_request(Message::from_parts(msg, message)?)?,
             Protocol::Block(msg) => self.handle_block(Message::from_parts(msg, message)?)?,
-                                            // ignore tx duplication error,
+            // ignore tx duplication error,
             Protocol::Transaction(msg) => drop(self.handle_tx(Message::from_parts(msg, message)?)),
             Protocol::TransactionsBatch(msg) => {
                 self.handle_txs_batch(Message::from_parts(msg, message)?)?

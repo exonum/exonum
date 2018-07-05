@@ -36,7 +36,7 @@ impl Transaction for TimestampTx {
         true
     }
 
-    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
         Ok(())
     }
 }
@@ -79,7 +79,11 @@ impl Iterator for TimestampingTxGenerator {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
         let buf = TimestampTx::new(&self.public_key, &data, &self.secret_key).clone();
-        Some(Message::sign_tx(buf, TIMESTAMPING_SERVICE, (self.public_key, &self.secret_key)))
+        Some(Message::sign_tx(
+            buf,
+            TIMESTAMPING_SERVICE,
+            (self.public_key, &self.secret_key),
+        ))
     }
 }
 

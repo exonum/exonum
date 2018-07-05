@@ -13,14 +13,14 @@
 // limitations under the License.
 
 use blockchain::{
-    ExecutionResult, Schema, Service, StoredConfiguration, Transaction,
-    TransactionSet, TransactionContext
+    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
+    TransactionSet,
 };
 use crypto::{Hash, PublicKey};
 use encoding::Error as MessageError;
 use helpers::Height;
 use messages::RawTransaction;
-use storage::{Snapshot};
+use storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
 

@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::sync::{mpsc, mpsc::Sender};
 use futures::{future::Either, Future, Sink, Stream};
 use snow::{types::Dh, wrappers::crypto_wrapper::Dh25519, NoiseBuilder};
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
-use failure;
 
 use std::net::SocketAddr;
 use std::thread;

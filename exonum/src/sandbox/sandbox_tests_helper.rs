@@ -24,7 +24,7 @@ use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Message
+    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction,
 };
 use storage::Database;
 
@@ -663,7 +663,10 @@ pub fn make_request_prevote_from_precommit(
 
 /// idea of the method is to return valid Prevote using provided Propose.
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
-pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Message<Prevote> {
+pub fn make_prevote_from_propose(
+    sandbox: &TimestampingSandbox,
+    propose: &Propose,
+) -> Message<Prevote> {
     sandbox.create_prevote(
         VALIDATOR_0,
         propose.height(),

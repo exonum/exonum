@@ -25,8 +25,8 @@ use std::{
 };
 
 use blockchain::{
-    Block, Blockchain, Schema, TransactionError, TransactionErrorType,
-    TransactionMessage, TransactionResult, TxLocation,
+    Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
+    TransactionResult, TxLocation,
 };
 use crypto::{CryptoHash, Hash};
 use encoding;
@@ -457,7 +457,6 @@ impl<'a> TxStatus<'a> {
         let status = TxStatus::from(result);
         status.serialize(serializer)
     }
-
 }
 
 impl<'a> From<&'a TransactionResult> for TxStatus<'a> {

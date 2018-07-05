@@ -28,9 +28,8 @@ use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
 use messages::{
-    BlockRequest, Message, PeersRequest, Precommit,
-    PrevotesRequest, ProposeRequest, RawTransaction, Status, TransactionsRequest,
-    TransactionsResponse
+    BlockRequest, Message, PeersRequest, Precommit, PrevotesRequest, ProposeRequest,
+    RawTransaction, Status, TransactionsRequest, TransactionsResponse,
 };
 use node::{
     self,
@@ -40,7 +39,7 @@ use node::{
     },
 };
 
-const CONSENSUS:u16 = 0;
+const CONSENSUS: u16 = 0;
 // HANDLE CONSENSUS BASIC
 
 #[test]

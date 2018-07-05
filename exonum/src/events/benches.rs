@@ -16,10 +16,10 @@ use test::Bencher;
 
 use std::{net::SocketAddr, thread};
 
+use crypto::{gen_keypair_from_seed, Seed};
 use events::{
     network::NetworkConfiguration, tests::{connect_message, raw_message, TestEvents},
 };
-use crypto::{gen_keypair_from_seed, Seed};
 use node::EventsPoolCapacity;
 
 struct BenchConfig {
@@ -41,10 +41,9 @@ fn test_events(cfg: &BenchConfig, listen_address: SocketAddr) -> TestEvents {
 }
 
 fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
-    let (p,s) = gen_keypair_from_seed(&Seed::new([1; 32]));
+    let (p, s) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let keypair = (p, &s);
-    let (p, k) =
-    b.iter(|| {
+    let (p, k) = b.iter(|| {
         let times = cfg.times;
         let len = cfg.len;
         let first = addrs[0];
@@ -90,7 +89,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
 
         drop(t1);
         drop(t2);
-    })
+    });
 }
 
 #[bench]

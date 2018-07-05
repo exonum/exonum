@@ -38,9 +38,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
-};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
     error::{into_failure, log_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
@@ -1061,7 +1059,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg);
 
-        let tx = Message::sign_tx(TxSimple::new(&p_key, "Hello, World!"), 0,  (p_key, &s_key));
+        let tx = Message::sign_tx(TxSimple::new(&p_key, "Hello, World!"), 0, (p_key, &s_key));
 
         // Create original transaction.
         let tx_orig = tx.clone();

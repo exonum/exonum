@@ -27,8 +27,8 @@ use blockchain::{self, Block};
 use crypto::{gen_keypair, hash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Precommit, Prevote, Propose, Status,
-    UncheckedBuffer, Message
+    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, Status,
+    UncheckedBuffer,
 };
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -346,7 +346,6 @@ fn test_empty_segments() {
 
 #[test]
 fn test_segments_of_status_messages() {
-
     let m1 = Status::new(Height(2), &hash(&[]));
     let m2 = Status::new(Height(4), &hash(&[1]));
     let m3 = Status::new(Height(5), &hash(&[3]));
@@ -363,11 +362,7 @@ fn test_connect(addr: &str) {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let connect = Connect::new(
-        socket_address,
-        time,
-        &user_agent::get(),
-    );
+    let connect = Connect::new(socket_address, time, &user_agent::get());
     let connect = Message::new(connect, public_key, &secret_key);
     // read
     assert_eq!(connect.author(), &public_key);
@@ -411,13 +406,7 @@ fn test_prevote() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let prevote = Prevote::new(
-        VALIDATOR,
-        HEIGHT,
-        ROUND,
-        &propose_hash,
-        locked_round,
-    );
+    let prevote = Prevote::new(VALIDATOR, HEIGHT, ROUND, &propose_hash, locked_round);
     // read
     assert_eq!(prevote.validator(), VALIDATOR);
     assert_eq!(prevote.height(), HEIGHT);
@@ -434,14 +423,7 @@ fn test_precommit() {
     let time = Utc::now();
 
     // write
-    let precommit = Precommit::new(
-        VALIDATOR,
-        HEIGHT,
-        ROUND,
-        &propose_hash,
-        &block_hash,
-        time,
-    );
+    let precommit = Precommit::new(VALIDATOR, HEIGHT, ROUND, &propose_hash, &block_hash, time);
     // read
     assert_eq!(precommit.validator(), VALIDATOR);
     assert_eq!(precommit.height(), HEIGHT);
@@ -483,12 +465,7 @@ fn test_empty_block() {
 
     let precommits = Vec::new();
     let transactions = Vec::new();
-    let block = BlockResponse::new(
-        &pub_key,
-        content.clone(),
-        precommits.clone(),
-        &transactions,
-    );
+    let block = BlockResponse::new(&pub_key, content.clone(), precommits.clone(), &transactions);
 
     assert_eq!(block.to(), &pub_key);
     assert_eq!(block.block(), content);

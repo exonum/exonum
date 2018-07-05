@@ -19,11 +19,11 @@ use self::futures::sync::mpsc;
 
 use exonum::{
     blockchain::{
-        Blockchain, ExecutionError, ExecutionResult, Schema, Service,
-        Transaction, TransactionSet, TransactionContext
+        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
+        TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::{ Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
+    messages::{Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
 transactions! {
@@ -46,7 +46,7 @@ impl Transaction for CreateWallet {
         true
     }
 
-    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
         if self.name().starts_with("Al") {
             Ok(())
         } else {
@@ -63,7 +63,7 @@ impl Transaction for Transfer {
         true
     }
 
-    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
         panic!("oops")
     }
 }
@@ -143,22 +143,26 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTr
     let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
-    let propose = Message::new(Propose::new(
-        ValidatorId(0),
-        height,
-        Round::first(),
-        &blockchain.last_hash(),
-        &tx_hashes,),
+    let propose = Message::new(
+        Propose::new(
+            ValidatorId(0),
+            height,
+            Round::first(),
+            &blockchain.last_hash(),
+            &tx_hashes,
+        ),
         consensus_public_key,
         &consensus_secret_key,
     );
-    let precommit = Message::new(Precommit::new(
-        ValidatorId(0),
-        propose.height(),
-        propose.round(),
-        &propose.hash(),
-        &block_hash,
-        SystemTime::now().into(),),
+    let precommit = Message::new(
+        Precommit::new(
+            ValidatorId(0),
+            propose.height(),
+            propose.round(),
+            &propose.hash(),
+            &block_hash,
+            SystemTime::now().into(),
+        ),
         consensus_public_key,
         &consensus_secret_key,
     );

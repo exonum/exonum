@@ -16,8 +16,7 @@ use std::collections::HashSet;
 
 use blockchain::Schema;
 use crypto::{CryptoHash, Hash, PublicKey};
-use events::{InternalRequest,
-                error::LogError};
+use events::{error::LogError, InternalRequest};
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
@@ -946,9 +945,11 @@ impl NodeHandler {
             if &pub_key != precommit.author() {
                 bail!(
                     "Received precommit with different validator id,\
-                    validator_id = {}, validator_key: {:?},\
-                    author_key = {:?}",
-                    precommit.validator(), pub_key, precommit.author()
+                     validator_id = {}, validator_key: {:?},\
+                     author_key = {:?}",
+                    precommit.validator(),
+                    pub_key,
+                    precommit.author()
                 )
             }
             if precommit.block_hash() != block_hash {

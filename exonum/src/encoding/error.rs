@@ -170,7 +170,6 @@ impl From<&'static str> for Error {
 }
 
 impl From<Box<::bincode::ErrorKind>> for Error {
-
     fn from(t: Box<::bincode::ErrorKind>) -> Error {
         (t as Box<dyn StdError>).into()
     }

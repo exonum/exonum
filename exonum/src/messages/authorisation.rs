@@ -3,9 +3,7 @@ use std::borrow::Cow;
 use failure::Error;
 use serde::Serialize;
 
-use crypto::{
-    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature,
-};
+use crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature};
 use messages::Message;
 use storage::StorageValue;
 
@@ -63,8 +61,10 @@ impl SignedMessage {
         let buffer = buffer.as_ref();
         let message: SignedMessage = ::bincode::config().no_limit().deserialize(&buffer)?;
         if message.authorised_message.version != PROTOCOL_MAJOR_VERSION {
-            bail!("Message version differ from our supported, msg_version = {}",
-                message.authorised_message.version)
+            bail!(
+                "Message version differ from our supported, msg_version = {}",
+                message.authorised_message.version
+            )
         }
         Self::verify(
             &message.authorised_message,

@@ -81,13 +81,13 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, Seed, PublicKey, SecretKey};
+    use crypto::{gen_keypair_from_seed, PublicKey, SecretKey, Seed};
     use events::noise::wrapper::NoiseWrapper;
     use events::noise::HandshakeParams;
+    use messages::{Message, SignedMessage};
     use tokio_io::codec::{Decoder, Encoder};
-    use messages::{SignedMessage, Message};
 
-    pub fn raw_message(id: u16, tx:Vec<u8>, keypair: (PublicKey, &SecretKey)) -> SignedMessage {
+    pub fn raw_message(id: u16, tx: Vec<u8>, keypair: (PublicKey, &SecretKey)) -> SignedMessage {
         Message::create_raw_tx(tx, id, keypair).into_parts().1
     }
 
@@ -102,7 +102,10 @@ mod test {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         initiator.encode(signed, &mut bytes).unwrap();
 
-        assert_eq!(responder.decode(&mut bytes).unwrap().unwrap().get_vec(), &source);
+        assert_eq!(
+            responder.decode(&mut bytes).unwrap().unwrap().get_vec(),
+            &source
+        );
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {

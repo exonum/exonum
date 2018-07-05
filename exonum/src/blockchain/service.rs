@@ -25,8 +25,8 @@ use std::{
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;
 use blockchain::{
-    Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys,
-    transaction::TransactionMessage
+    transaction::TransactionMessage, Blockchain, ConsensusConfig, Schema, StoredConfiguration,
+    ValidatorKeys,
 };
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -215,9 +215,8 @@ pub struct ServiceContext<'a> {
     stored_configuration: StoredConfiguration,
     height: Height,
     service_id: u16,
-    tx_parser: Box<
-        dyn 'a + Fn(Message<RawTransaction>) -> Result<TransactionMessage, ::encoding::Error>,
-    >,
+    tx_parser:
+        Box<dyn 'a + Fn(Message<RawTransaction>) -> Result<TransactionMessage, ::encoding::Error>>,
 }
 
 impl<'a> Debug for ServiceContext<'a> {
@@ -317,8 +316,11 @@ impl<'a> ServiceContext<'a> {
     /// Broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction<T: Transaction + BinaryForm>(&self, tx: T) {
         let tx_process = move || -> Result<(), ::failure::Error> {
-            let msg = Message::sign_tx(tx, self.service_id,
-                                       (self.service_keypair.0, &self.service_keypair.1));
+            let msg = Message::sign_tx(
+                tx,
+                self.service_id,
+                (self.service_keypair.0, &self.service_keypair.1),
+            );
             self.api_sender.broadcast_transaction(msg)
         };
 
