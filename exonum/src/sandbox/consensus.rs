@@ -203,7 +203,8 @@ fn test_disable_and_enable() {
 
     // A fail is expected here as the node is disabled.
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    let result = try_add_one_height(&sandbox, &sandbox_state);
+    // TODO: use try_add_one_height (ECR-1817)
+    let result = try_add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     assert!(result.is_err());
 
     // Re-enable the node.
