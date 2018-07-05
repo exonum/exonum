@@ -14,7 +14,7 @@
 
 use criterion::{Benchmark, Criterion};
 use exonum::{
-    blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction},
+    blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext},
     crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey},
     encoding::Error as EncodingError, helpers::{Height, ValidatorId},
     messages::{Message, RawTransaction}, node::ApiSender,
@@ -67,7 +67,6 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
 
     transactions! {
         TimestampingTransactions {
-            const SERVICE_ID = TIMESTAMPING_SERVICE_ID;
             struct Tx {
                 from: &PublicKey,
                 data: &Hash,
@@ -80,7 +79,7 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
             self.verify_signature(self.from())
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
             Ok(())
         }
     }
@@ -141,7 +140,6 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
 
     transactions! {
         CryptocurrencyTransactions {
-            const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
             struct Tx {
                 from: &PublicKey,
                 to: &PublicKey,
@@ -154,7 +152,8 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
             self.verify_signature(self.from())
         }
 
-        fn execute(&self, view: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+            let view = tc.fork()
             let mut index = ProofMapIndex::new("balances_txs", view);
             let from_balance = index.get(self.from()).unwrap_or(0u64);
             let to_balance = index.get(self.to()).unwrap_or(0u64);

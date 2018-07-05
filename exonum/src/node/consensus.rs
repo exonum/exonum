@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashSet, error::Error};
+use std::collections::HashSet;
 
-use blockchain::{Schema, Transaction};
+use blockchain::Schema;
 use crypto::{CryptoHash, Hash, PublicKey};
-use events::InternalRequest;
+use events::{InternalRequest,
+                error::LogError};
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, Protocol, RawTransaction, SignedMessage, TransactionsRequest,
+    Propose, ProposeRequest, RawTransaction, SignedMessage, TransactionsRequest,
     TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
@@ -30,7 +31,6 @@ use storage::Patch;
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(
         &mut self,
         msg: Message<ConsensusMessage>,
@@ -533,12 +533,13 @@ impl NodeHandler {
 
         // Handle queued messages
         for msg in self.state.queued() {
-            self.handle_consensus(msg);
+            self.handle_consensus(msg).log_error();
         }
     }
 
-    /// Checks if the transaction is new and adds it to the pool.
-    fn handle_tx_inner(&mut self, msg: Message<RawTransaction>) -> Result<(), failure::Error> {
+    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
+    /// added to the transactions pool.
+    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) -> Result<(), failure::Error> {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -571,23 +572,6 @@ impl NodeHandler {
         Ok(())
     }
 
-    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
-    /// added to the transactions pool.
-    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) {
-        let tx = match self.blockchain.tx_from_raw(&msg) {
-            Ok(tx) => tx,
-            Err(e) => {
-                let service_id = msg.service_id();
-                error!("{}, service_id={}", e.description(), service_id);
-                return;
-            }
-        };
-
-        // We don't care about result, because situation when transaction received twice
-        // is normal for internal messages (transaction may be received from 2+ nodes).
-        let _ = self.handle_tx_inner(msg);
-    }
-
     /// Handles raw transactions.
     pub fn handle_txs_batch(
         &mut self,
@@ -612,7 +596,9 @@ impl NodeHandler {
             .map(RawTransaction::verify_transaction)
             .collect();
         for tx in txs? {
-            self.handle_tx(tx);
+            // This is a valid case for node to receive two transactions
+            // so just ignore error about it.
+            drop(self.handle_tx(tx))
         }
         Ok(())
     }
@@ -622,7 +608,7 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Message<RawTransaction>) {
         trace!("Handle incoming transaction");
-        match self.handle_tx_inner(msg.clone()) {
+        match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),
             Err(e) => error!("{}", e),
         }
@@ -662,7 +648,7 @@ impl NodeHandler {
 
         // Handle queued messages
         for msg in self.state.queued() {
-            self.handle_consensus(msg);
+            self.handle_consensus(msg).log_error();
         }
     }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
@@ -954,9 +940,17 @@ impl NodeHandler {
         block_hash: &Hash,
         block_height: Height,
         precommit_round: Round,
-        precommit: &Precommit,
+        precommit: &Message<Precommit>,
     ) -> Result<(), failure::Error> {
         if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator()) {
+            if &pub_key != precommit.author() {
+                bail!(
+                    "Received precommit with different validator id,\
+                    validator_id = {}, validator_key: {:?},\
+                    author_key = {:?}",
+                    precommit.validator(), pub_key, precommit.author()
+                )
+            }
             if precommit.block_hash() != block_hash {
                 bail!(
                     "Received precommit with wrong block_hash, precommit={:?}",

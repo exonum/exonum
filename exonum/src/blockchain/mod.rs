@@ -49,7 +49,7 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
+    collections::{BTreeMap, HashMap}, fmt, iter, mem, net::SocketAddr,
     ops::Deref, panic, sync::Arc,
 };
 
@@ -57,8 +57,9 @@ use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
+    Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction,
 };
+use events::error::into_failure;
 use node::ApiSender;
 use storage::{Database, Error, Fork, Patch, Snapshot};
 
@@ -140,21 +141,22 @@ impl Blockchain {
         self.db.fork()
     }
 
-    /// Tries to create a `Transaction` object from the given raw message.
-    /// A raw message can be converted into a `Transaction` object only
+    /// Tries to create a `TransactionMessage` object from the given raw message.
+    /// A raw message can be converted into a `TransactionMessage` only
     /// if the following conditions are met:
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(
         &self,
-        raw: &Message<RawTransaction>,
-    ) -> Result<Box<dyn Transaction>, MessageError> {
+        raw: Message<RawTransaction>,
+    ) -> Result<TransactionMessage, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
             .ok_or_else(|| MessageError::from("Service not found."))?;
-        service.tx_from_raw(raw.deref().clone())
+        let tx = service.tx_from_raw(raw.deref().clone());
+        Ok(TransactionMessage::new(raw, tx?))
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -374,8 +376,8 @@ impl Blockchain {
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
 
-            let transaction_message =
-                TransactionMessage::tx_from_raw(tx, &|tx| self.tx_from_raw(tx))?;
+            let transaction_message = self.tx_from_raw(tx)
+                                                                       .map_err(into_failure)?;
 
             (transaction_message, service_name)
         };
@@ -383,8 +385,10 @@ impl Blockchain {
         fork.checkpoint();
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let context =
-                TransactionContext::new(&mut *fork, tx.raw().service_id(), tx.raw().hash());
+            let context = TransactionContext::new(&mut *fork,
+                                        tx.raw().service_id(),
+                                        tx.raw().hash(),
+                                        *tx.raw().author());
             tx.transaction().execute(context)
         }));
 

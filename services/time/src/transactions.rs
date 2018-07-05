@@ -18,13 +18,11 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction}, crypto::PublicKey,
-    messages::Message, storage::{Fork, Snapshot},
+    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext}, crypto::PublicKey,
+    storage::{Fork, Snapshot},
 };
 
 use schema::TimeSchema;
-
-use super::SERVICE_ID;
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
@@ -49,7 +47,6 @@ impl From<Error> for ExecutionError {
 transactions! {
     /// Define TimeService transaction.
     pub TimeTransactions {
-        const SERVICE_ID = SERVICE_ID;
 
         /// Transaction that is sent by the validator after the commit of the block.
         struct TxTime {
@@ -127,10 +124,11 @@ impl TxTime {
 
 impl Transaction for TxTime {
     fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
+        true
     }
 
-    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+        let view = tc.fork();
         self.check_signed_by_validator(view.as_ref())?;
         self.update_validator_time(view)?;
         Self::update_consolidated_time(view);

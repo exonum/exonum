@@ -25,7 +25,6 @@ use super::UniqueHash;
 use crypto::{Hash, PublicKey};
 use encoding::{Field, Offset};
 use helpers::Round;
-use messages::SignedMessage;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///

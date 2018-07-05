@@ -168,3 +168,10 @@ impl From<&'static str> for Error {
         Error::Basic(t.into())
     }
 }
+
+impl From<Box<::bincode::ErrorKind>> for Error {
+
+    fn from(t: Box<::bincode::ErrorKind>) -> Error {
+        (t as Box<dyn StdError>).into()
+    }
+}

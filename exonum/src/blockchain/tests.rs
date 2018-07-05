@@ -18,11 +18,12 @@ use chrono::{DateTime, TimeZone, Utc};
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction};
+use blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionSet,
+                 TransactionContext};
 use crypto::{gen_keypair, CryptoHash, Hash};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
-use messages::{Message, RawTransaction};
+use messages::{ Message, RawTransaction};
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
@@ -44,13 +45,12 @@ impl Service for TestService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
-        Ok(Box::new(Tx::from_raw(raw)?))
+        Ok(TestServiceTxs::tx_from_raw(raw)?.into())
     }
 }
 
 transactions! {
     TestServiceTxs {
-        const SERVICE_ID = TEST_SERVICE_ID;
         struct Tx {
             value: u64,
         }
@@ -62,11 +62,11 @@ impl Transaction for Tx {
         true
     }
 
-    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
         if self.value() == 42 {
             panic!(Error::new("42"))
         }
-        let mut index = ListIndex::new(IDX_NAME, view);
+        let mut index = ListIndex::new(IDX_NAME, tc.fork());
         index.push(self.value());
         index.push(42 / self.value());
         Ok(())
@@ -187,22 +187,21 @@ fn gen_tempdir_name() -> String {
 }
 
 fn handling_tx_panic(blockchain: &mut Blockchain) {
-    let (_, sec_key) = gen_keypair();
-
-    let tx_ok1 = Tx::new(3, &sec_key);
-    let tx_ok2 = Tx::new(4, &sec_key);
-    let tx_failed = Tx::new(0, &sec_key);
-    let tx_storage_error = Tx::new(42, &sec_key);
+    let (pk, sec_key) = gen_keypair();
+    let tx_ok1 = Message::sign_tx(Tx::new(3), 1, (pk, &sec_key));
+    let tx_ok2 = Message::sign_tx(Tx::new(4), 1,(pk, &sec_key));
+    let tx_failed = Message::sign_tx(Tx::new(0),1, (pk, &sec_key));
+    let tx_storage_error = Message::sign_tx(Tx::new(42),1, (pk, &sec_key));
 
     let patch = {
         let mut fork = blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
 
-            schema.add_transaction_into_pool(tx_ok1.raw().clone());
-            schema.add_transaction_into_pool(tx_ok2.raw().clone());
-            schema.add_transaction_into_pool(tx_failed.raw().clone());
-            schema.add_transaction_into_pool(tx_storage_error.raw().clone());
+            schema.add_transaction_into_pool(tx_ok1.clone());
+            schema.add_transaction_into_pool(tx_ok2.clone());
+            schema.add_transaction_into_pool(tx_failed.clone());
+            schema.add_transaction_into_pool(tx_storage_error.clone());
         }
         fork.into_patch()
     };
@@ -220,15 +219,15 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
     let schema = Schema::new(&snapshot);
     assert_eq!(
         schema.transactions().get(&tx_ok1.hash()),
-        Some(tx_ok1.raw().clone())
+        Some(tx_ok1.clone())
     );
     assert_eq!(
         schema.transactions().get(&tx_ok2.hash()),
-        Some(tx_ok2.raw().clone())
+        Some(tx_ok2.clone())
     );
     assert_eq!(
         schema.transactions().get(&tx_failed.hash()),
-        Some(tx_failed.raw().clone())
+        Some(tx_failed.clone())
     );
 
     let index = ListIndex::new(IDX_NAME, &snapshot);
@@ -243,19 +242,20 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
 fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
     let (_, sec_key) = gen_keypair();
 
-    let tx_ok1 = Tx::new(3, &sec_key);
-    let tx_ok2 = Tx::new(4, &sec_key);
-    let tx_failed = Tx::new(0, &sec_key);
-    let tx_storage_error = Tx::new(42, &sec_key);
+    let (pk, sec_key) = gen_keypair();
+    let tx_ok1 = Message::sign_tx(Tx::new(3), 1, (pk, &sec_key));
+    let tx_ok2 = Message::sign_tx(Tx::new(4), 1,(pk, &sec_key));
+    let tx_failed = Message::sign_tx(Tx::new(0),1, (pk, &sec_key));
+    let tx_storage_error = Message::sign_tx(Tx::new(42),1, (pk, &sec_key));
 
     let patch = {
         let mut fork = blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
-            schema.add_transaction_into_pool(tx_ok1.raw().clone());
-            schema.add_transaction_into_pool(tx_ok2.raw().clone());
-            schema.add_transaction_into_pool(tx_failed.raw().clone());
-            schema.add_transaction_into_pool(tx_storage_error.raw().clone());
+            schema.add_transaction_into_pool(tx_ok1.clone());
+            schema.add_transaction_into_pool(tx_ok2.clone());
+            schema.add_transaction_into_pool(tx_failed.clone());
+            schema.add_transaction_into_pool(tx_storage_error.clone());
         }
         fork.into_patch()
     };
@@ -268,16 +268,14 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 }
 
 mod transactions_tests {
-    use blockchain::{ExecutionResult, Transaction, TransactionSet};
+    use blockchain::{ExecutionResult, Transaction, TransactionSet, TransactionContext};
+    use messages::{Message, RawTransaction};
     use crypto::gen_keypair;
     use serde::Serialize;
     use serde_json;
-    use storage::Fork;
 
     transactions! {
         MyTransactions {
-            const SERVICE_ID = 92;
-
             struct A {
                 a: u32
             }
@@ -298,7 +296,7 @@ mod transactions_tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
             Ok(())
         }
     }
@@ -308,7 +306,7 @@ mod transactions_tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
             Ok(())
         }
     }
@@ -318,7 +316,7 @@ mod transactions_tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
             Ok(())
         }
     }
@@ -332,10 +330,9 @@ mod transactions_tests {
             assert_eq!(initial, round_tripped);
         }
 
-        let (_pub_key, sec_key) = gen_keypair();
-        let a = A::new(0, &sec_key);
-        let b = B::new(1, 2, &sec_key);
-        let c = C::new(0, &sec_key);
+        let a = A::new(0);
+        let b = B::new(1, 2);
+        let c = C::new(0);
         round_trip(&a);
         round_trip(&b);
         round_trip(&c);
@@ -343,21 +340,23 @@ mod transactions_tests {
 
     #[test]
     fn deserialize_from_raw() {
-        fn round_trip<T: Transaction + Serialize>(t: &T) {
-            let initial = serde_json::to_value(&t).unwrap();
-            let raw = t.raw();
+        fn round_trip(t: Message<RawTransaction>) {
+            use ::std::ops::Deref;
+            let raw: &RawTransaction = t.deref();
+            let initial = serde_json::to_value(raw).unwrap();
             let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
-            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            let round_tripped= serde_json::to_value(&parsed).unwrap();
             assert_eq!(initial, round_tripped);
         }
 
-        let (_pub_key, sec_key) = gen_keypair();
-        let a = A::new(0, &sec_key);
-        let b = B::new(1, 2, &sec_key);
-        let c = C::new(0, &sec_key);
-        round_trip(&a);
-        round_trip(&b);
-        round_trip(&c);
+
+        let (pk, sec_key) = gen_keypair();
+        let a =  Message::sign_tx(A::new(0), 1,(pk, &sec_key));
+        let b =  Message::sign_tx(B::new(1, 2), 1, (pk, &sec_key));
+        let c =  Message::sign_tx(C::new(0), 1,(pk, &sec_key));
+        round_trip(a);
+        round_trip(b);
+        round_trip(c);
     }
 }
 

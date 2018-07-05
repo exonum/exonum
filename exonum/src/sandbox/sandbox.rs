@@ -38,7 +38,8 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use messages::{Protocol, Propose, Precommit, Prevote, Connect, Message,
+               RawTransaction, Status, ProtocolMessage};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -70,7 +71,7 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 pub struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
-    pub sent: VecDeque<(SocketAddr, RawMessage)>,
+    pub sent: VecDeque<(SocketAddr, Message<Protocol>)>,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
@@ -128,10 +129,6 @@ impl SandboxInner {
         api_getter.wait().unwrap();
     }
 }
-fn sign_raw_tx<T:>(data: Vec<u8>, service_id: u16, service_keypair:(PublicKey, &SecretKey)) -> Message<RawTransaction> {
-    let raw = RawTransaction::new(service_id, data);
-    Message::new(raw, service_keypair.0, service_keypair.1)
-}
 
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
@@ -175,8 +172,7 @@ impl Sandbox {
 
     fn check_unexpected_message(&self) {
         if let Some((addr, msg)) = self.inner.borrow_mut().sent.pop_front() {
-            let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
-            panic!("Send unexpected message {:?} to {}", any_msg, addr);
+            panic!("Send unexpected message {:?} to {}", msg, addr);
         }
     }
 
@@ -194,6 +190,65 @@ impl Sandbox {
         self.addresses[id]
     }
 
+    /// Creates a `Propose` message signed by this validator.
+    pub fn create_propose(
+        &self,
+        validator_id: ValidatorId,
+        height: Height,
+        round: Round,
+        last_hash: &Hash,
+        tx_hashes: &[Hash],
+        secret_key: &SecretKey,
+    ) -> Message<Propose> {
+        Message::new(Propose::new(
+            validator_id,
+            height,
+            round,
+            last_hash,
+            tx_hashes,
+        ), self.p(validator_id), secret_key)
+    }
+
+    /// Creates a `Precommit` message signed by this validator.
+    pub fn create_precommit(
+        &self,
+        validator_id: ValidatorId,
+        propose_height: Height,
+        propose_round: Round,
+        propose_hash: &Hash,
+        block_hash: &Hash,
+        system_time: ::chrono::DateTime<::chrono::Utc>,
+        secret_key: &SecretKey,
+    ) -> Message<Precommit> {
+        Message::new(Precommit::new(
+            validator_id,
+            propose_height,
+            propose_round,
+            propose_hash,
+            block_hash,
+            system_time,
+        ), self.p(validator_id), secret_key)
+    }
+
+    /// Creates a `Precommit` message signed by this validator.
+    pub fn create_prevote(
+        &self,
+        validator_id: ValidatorId,
+        propose_height: Height,
+        propose_round: Round,
+        propose_hash: &Hash,
+        locked_round: Round,
+        secret_key: &SecretKey,
+    ) -> Message<Precommit> {
+        Message::new(Prevote::new(
+            validator_id,
+            propose_height,
+            propose_round,
+            &propose_hash,
+            locked_round,
+        ), self.p(validator_id), secret_key)
+    }
+
     pub fn validators(&self) -> Vec<PublicKey> {
         self.cfg()
             .validator_keys
@@ -201,7 +256,6 @@ impl Sandbox {
             .map(|x| x.consensus_key)
             .collect()
     }
-
     pub fn n_validators(&self) -> usize {
         self.validators().len()
     }
@@ -240,11 +294,11 @@ impl Sandbox {
         self.connect.as_ref()
     }
 
-    pub fn recv<T: Message>(&self, msg: &T) {
+    pub fn recv<T: ProtocolMessage>(&self, msg: &Message<T>) {
         self.check_unexpected_message();
         // TODO Think about addresses. (ECR-1627)
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
-        let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
+        let event = NetworkEvent::MessageReceived(dummy_addr, msg.clone().into_parts().1.to_vec());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -252,36 +306,35 @@ impl Sandbox {
         self.inner.borrow_mut().process_events();
     }
 
-    pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
+    pub fn send<T: ProtocolMessage>(&self, addr: SocketAddr, msg: &Message<T>) {
+        let expected_msg = msg.clone().downgrade();
         self.process_events();
-        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let send = self.inner.borrow_mut().sent.pop_front();
         if let Some((real_addr, real_msg)) = send {
-            let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
-            if real_addr != addr || any_real_msg != any_expected_msg {
+            if real_addr != addr || real_msg != expected_msg {
                 panic!(
                     "Expected to send the message {:?} to {} instead sending {:?} to {}",
-                    any_expected_msg, addr, any_real_msg, real_addr
+                    expected_msg, addr, real_msg, real_addr
                 )
             }
         } else {
             panic!(
                 "Expected to send the message {:?} to {} but nothing happened",
-                any_expected_msg, addr
+                expected_msg, addr
             );
         }
     }
 
-    pub fn broadcast<T: Message>(&self, msg: &T) {
+    pub fn broadcast<T: ProtocolMessage>(&self, msg: &Message<T>) {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
-    pub fn try_broadcast<T: Message>(&self, msg: &T) -> Result<(), String> {
+    pub fn try_broadcast<T: ProtocolMessage>(&self, msg: &Message<T>) -> Result<(), String> {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
     // TODO: Add self-test for broadcasting? (ECR-1627)
-    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
+    pub fn broadcast_to_addrs<'a, T: ProtocolMessage, I>(&self, msg: &Message<T>, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
@@ -289,15 +342,15 @@ impl Sandbox {
     }
 
     // TODO: Add self-test for broadcasting? (ECR-1627)
-    pub fn try_broadcast_to_addrs<'a, T: Message, I>(
+    pub fn try_broadcast_to_addrs<'a, T: ProtocolMessage, I>(
         &self,
-        msg: &T,
+        msg: &Message<T>,
         addresses: I,
     ) -> Result<(), String>
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
-        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+        let expected_msg = msg.clone().downgrade();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -306,17 +359,16 @@ impl Sandbox {
         for _ in 0..expected_set.len() {
             let send = self.inner.borrow_mut().sent.pop_front();
             if let Some((real_addr, real_msg)) = send {
-                let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
-                if any_real_msg != any_expected_msg {
+                if expected_msg != real_msg {
                     return Err(format!(
                         "Expected to broadcast the message {:?} instead sending {:?} to {}",
-                        any_expected_msg, any_real_msg, real_addr
+                        expected_msg, real_msg, real_addr
                     ));
                 }
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
-                        any_expected_msg, real_addr
+                        expected_msg, real_addr
                     )
                 } else {
                     expected_set.remove(&real_addr);
@@ -325,7 +377,7 @@ impl Sandbox {
                 panic!(
                     "Expected to broadcast the message {:?} but someone don't receive \
                      messages: {:?}",
-                    any_expected_msg, expected_set
+                    expected_msg, expected_set
                 );
             }
         }
@@ -388,9 +440,9 @@ impl Sandbox {
         *self.last_block().state_hash()
     }
 
-    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<RawMessage>
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Message<RawTransaction>>
     where
-        I: IntoIterator<Item = &'a RawMessage>,
+        I: IntoIterator<Item = Message<RawTransaction>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain_ref().snapshot();
@@ -408,7 +460,6 @@ impl Sandbox {
                 }
                 true
             })
-            .cloned()
             .collect()
     }
 
@@ -835,7 +886,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, ServiceContext, TransactionSet};
+    use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
     use messages::RawTransaction;
@@ -843,13 +894,12 @@ mod tests {
         add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
         ROUND_TWO,
     };
-    use storage::{Fork, Snapshot};
+    use storage::Snapshot;
 
     const SERVICE_ID: u16 = 1;
 
     transactions! {
         HandleCommitTransactions {
-            const SERVICE_ID = SERVICE_ID;
 
             struct TxAfterCommit {
                 height: Height,
@@ -869,7 +919,7 @@ mod tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
             Ok(())
         }
     }

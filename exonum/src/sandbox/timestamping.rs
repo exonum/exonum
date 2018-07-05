@@ -14,20 +14,18 @@
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
-use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
+use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use messages::{Message, RawTransaction};
-use storage::{Fork, Snapshot};
+use storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 
 transactions! {
     TimestampingTransactions {
-        const SERVICE_ID = TIMESTAMPING_SERVICE;
 
         struct TimestampTx {
-            pub_key: &PublicKey,
             data: &[u8],
         }
     }
@@ -35,10 +33,10 @@ transactions! {
 
 impl Transaction for TimestampTx {
     fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
+        true
     }
 
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
+    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
         Ok(())
     }
 }
@@ -77,11 +75,11 @@ impl TimestampingTxGenerator {
 impl Iterator for TimestampingTxGenerator {
     type Item = Message<RawTransaction>;
 
-    fn next(&mut self) -> Option<TimestampTx> {
+    fn next(&mut self) -> Option<Message<RawTransaction>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        let buf = TimestampTx::new(&self.public_key, &data, &self.secret_key).raw().clone()
-        Some(::super::sign_raw_tx(buf, TIMESTAMPING_SERVICE, (self.public_key, &self.secret_key) ))
+        let buf = TimestampTx::new(&self.public_key, &data, &self.secret_key).clone();
+        Some(Message::sign_tx(buf, TIMESTAMPING_SERVICE, (self.public_key, &self.secret_key)))
     }
 }
 

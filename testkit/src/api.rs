@@ -24,7 +24,9 @@ use serde_urlencoded;
 use std::fmt::{self, Display};
 
 use exonum::{
-    api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
+    api::{self, ApiAggregator, ServiceApiState},
+    blockchain::{SharedNodeState},
+    messages::{Message, RawTransaction},
     encoding::serialize::reexport::{DeserializeOwned, Serialize}, node::ApiSender,
 };
 
@@ -91,10 +93,10 @@ impl TestKitApi {
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
-        T: Into<Box<dyn Transaction>>,
+        T: Into<Message<RawTransaction>>,
     {
         self.api_sender
-            .send(transaction.into())
+            .broadcast_transaction(transaction.into())
             .expect("Cannot send transaction");
     }
 
@@ -267,7 +269,8 @@ where
             StatusCode::Forbidden => Err(api::Error::Unauthorized),
             StatusCode::BadRequest => Err(api::Error::BadRequest(error(response))),
             StatusCode::NotFound => Err(api::Error::NotFound(error(response))),
-            s if s.is_server_error() => Err(api::Error::InternalError(error(response).into())),
+            s if s.is_server_error() => Err(api::Error::InternalError(
+                format_err!("{}", error(response)))),
             s => panic!("Received non-error response status: {}", s.as_u16()),
         }
     }

@@ -24,11 +24,10 @@ use std::{
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
-    SignedMessage,
 };
 use node::connect_list::ConnectList;
 use node::ConnectInfo;

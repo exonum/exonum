@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
 use failure::Error;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crypto::{
-    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
-    SIGNATURE_LENGTH,
+    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature,
 };
 use messages::Message;
 use storage::StorageValue;
@@ -63,11 +62,16 @@ impl SignedMessage {
         // This two factors lead to additional `serialize` inside verify
         let buffer = buffer.as_ref();
         let message: SignedMessage = ::bincode::config().no_limit().deserialize(&buffer)?;
+        if message.authorised_message.version != PROTOCOL_MAJOR_VERSION {
+            bail!("Message version differ from our supported, msg_version = {}",
+                message.authorised_message.version)
+        }
         Self::verify(
             &message.authorised_message,
             &message.signature,
             &message.authorised_message.author,
         )?;
+
         Ok(message)
     }
 
@@ -150,6 +154,6 @@ impl<T: ProtocolMessage> StorageValue for Message<T> {
 
 impl<T: ProtocolMessage> CryptoHash for Message<T> {
     fn hash(&self) -> Hash {
-        unimplemented!()
+        self.hash()
     }
 }

@@ -14,9 +14,9 @@
 
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
-
+//TODO: Move this module into node helpers.
 use failure::Error;
-use std::{error::Error as StdError, io};
+use std::error::Error as StdError;
 
 pub fn result_ok<T>(_: T) -> Result<(), Error> {
     Ok(())

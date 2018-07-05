@@ -15,7 +15,7 @@
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{CryptoHash, Hash, PublicKey};
 use helpers::{Height, Round};
-use messages::{Connect, Message, Precommit, Protocol, RawTransaction, SignedMessage};
+use messages::{Connect, Message, Precommit, Protocol, RawTransaction};
 use storage::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
     Snapshot,

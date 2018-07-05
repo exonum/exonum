@@ -25,11 +25,11 @@ use std::{
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;
 use blockchain::{
-    Blockchain, ConsensusConfig, Schema, StoredConfiguration, TransactionMessage, ValidatorKeys,
+    Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys,
+    transaction::TransactionMessage
 };
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
-use events::error::into_failure;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::{BinaryForm, Message, RawTransaction};
 use node::{ApiSender, NodeRole, State};
@@ -50,7 +50,7 @@ use storage::{Fork, Snapshot};
 /// ```
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
 /// # use exonum::messages::{Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
@@ -83,8 +83,6 @@ use storage::{Fork, Snapshot};
 /// // Transaction definitions
 /// transactions! {
 ///     MyTransactions {
-///         const SERVICE_ID = SERVICE_ID;
-///
 ///         struct TxA {
 ///             // Transaction fields
 ///         }
@@ -98,12 +96,12 @@ use storage::{Fork, Snapshot};
 /// impl Transaction for TxA {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
 /// }
 ///
 /// impl Transaction for TxB {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
 /// }
 ///
 /// // Service
@@ -218,7 +216,7 @@ pub struct ServiceContext<'a> {
     height: Height,
     service_id: u16,
     tx_parser: Box<
-        dyn 'a + Fn(&Message<RawTransaction>) -> Result<Box<dyn Transaction>, ::encoding::Error>,
+        dyn 'a + Fn(Message<RawTransaction>) -> Result<TransactionMessage, ::encoding::Error>,
     >,
 }
 
@@ -319,9 +317,8 @@ impl<'a> ServiceContext<'a> {
     /// Broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction<T: Transaction + BinaryForm>(&self, tx: T) {
         let tx_process = move || -> Result<(), ::failure::Error> {
-            let tx = tx.serialize().map_err(into_failure)?;
-            let raw = RawTransaction::new(self.service_id, tx);
-            let msg = Message::new(raw, self.service_keypair.0, &self.service_keypair.1);
+            let msg = Message::sign_tx(tx, self.service_id,
+                                       (self.service_keypair.0, &self.service_keypair.1));
             self.api_sender.broadcast_transaction(msg)
         };
 

@@ -14,7 +14,7 @@
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::{SharedNodeState, Transaction}, crypto,
+    blockchain::{SharedNodeState}, crypto,
     explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
 };
 
@@ -58,7 +58,7 @@ impl TestkitServerApi {
     fn create_block(
         &self,
         tx_hashes: Option<Vec<crypto::Hash>>,
-    ) -> api::Result<BlockWithTransactions<Box<dyn Transaction>>> {
+    ) -> api::Result<BlockWithTransactions> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
@@ -82,7 +82,7 @@ impl TestkitServerApi {
     fn rollback(
         &self,
         height: Height,
-    ) -> api::Result<Option<BlockWithTransactions<Box<dyn Transaction>>>> {
+    ) -> api::Result<Option<BlockWithTransactions>> {
         if height == Height(0) {
             Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
@@ -159,7 +159,7 @@ mod tests {
     use serde_json;
 
     use exonum::api;
-    use exonum::blockchain::{ExecutionResult, Service, Transaction};
+    use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
@@ -174,7 +174,6 @@ mod tests {
 
     transactions! {
         Any {
-            const SERVICE_ID = 1000;
 
             struct TxTimestamp {
                 from: &PublicKey,
@@ -195,7 +194,7 @@ mod tests {
             self.verify_signature(self.from())
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
             Ok(())
         }
     }

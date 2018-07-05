@@ -17,7 +17,7 @@
 #![allow(bare_trait_objects)]
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
+    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext}, crypto::{CryptoHash, PublicKey},
     messages::Message, storage::Fork,
 };
 
@@ -62,7 +62,6 @@ impl From<Error> for ExecutionError {
 
 transactions! {
     pub WalletTransactions {
-        const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
 
         /// Transfer `amount` of the currency from one wallet to another.
         struct Transfer {
@@ -92,8 +91,8 @@ impl Transaction for Transfer {
         (self.from() != self.to()) && self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CurrencySchema::new(fork);
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+        let mut schema = CurrencySchema::new(tc.fork());
 
         let from = self.from();
         let to = self.to();
@@ -120,8 +119,8 @@ impl Transaction for Issue {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CurrencySchema::new(fork);
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+        let mut schema = CurrencySchema::new(tc.fork());
         let pub_key = self.pub_key();
         let hash = self.hash();
 
@@ -140,8 +139,8 @@ impl Transaction for CreateWallet {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CurrencySchema::new(fork);
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+        let mut schema = CurrencySchema::new(tc.fork());
         let pub_key = self.pub_key();
         let hash = self.hash();
 

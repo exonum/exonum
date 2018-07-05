@@ -19,7 +19,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
+    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext}, crypto::{CryptoHash, PublicKey},
     messages::Message, storage::Fork,
 };
 use exonum_time::schema::TimeSchema;
@@ -45,7 +45,6 @@ impl From<Error> for ExecutionError {
 
 transactions! {
     pub TimeTransactions {
-        const SERVICE_ID = TIMESTAMPING_SERVICE;
 
         /// A timestamp transaction.
         struct TxTimestamp {
@@ -63,8 +62,8 @@ impl Transaction for TxTimestamp {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let time = TimeSchema::new(&fork)
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+        let time = TimeSchema::new(&tc.fork())
             .time()
             .get()
             .expect("Can't get the time");
@@ -72,7 +71,7 @@ impl Transaction for TxTimestamp {
         let content = self.content();
         let hash = content.content_hash();
 
-        let mut schema = Schema::new(fork);
+        let mut schema = Schema::new(tc.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
             Err(Error::HashAlreadyExists)?;
         }

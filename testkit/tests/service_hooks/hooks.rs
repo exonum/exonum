@@ -24,7 +24,6 @@ const SERVICE_ID: u16 = 512;
 
 transactions! {
     HandleCommitTransactions {
-        const SERVICE_ID = SERVICE_ID;
 
         struct TxAfterCommit {
             height: Height,

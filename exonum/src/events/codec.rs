@@ -16,7 +16,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use tokio_io::codec::{Decoder, Encoder};
 
-use failure::{self, Error};
+use failure::Error;
 
 use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
 use messages::{SignedMessage, UncheckedBuffer};
@@ -81,43 +81,28 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, PublicKey, SecretKey};
     use events::noise::wrapper::NoiseWrapper;
     use events::noise::HandshakeParams;
-    use messages::{MessageBuffer, SignedMessage};
     use tokio_io::codec::{Decoder, Encoder};
+    use messages::{SignedMessage, Message};
 
+    pub fn raw_message(id: u16, tx:Vec<u8>, keypair: (PublicKey, &SecretKey)) -> SignedMessage {
+        Message::create_raw_tx(tx, id, keypair).into_parts().1
+    }
+
+    //TODO: Add more tests.
     #[test]
-    fn decode_message_valid_header_size() {
+    fn decode_message_roundtrip() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let keypair = gen_keypair_from_seed(&Seed::new([1; 32]));
+        let signed = raw_message(0, data, (keypair.0, &keypair.1));
+        let source = signed.to_vec();
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        initiator.encode(data, &mut bytes).unwrap();
+        initiator.encode(signed, &mut bytes).unwrap();
 
-        match responder.decode(&mut bytes) {
-            Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
-            _ => panic!("Wrong input"),
-        };
-    }
-
-    #[test]
-    fn decode_message_small_size_in_header() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        let mut bytes: BytesMut = BytesMut::new();
-        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        initiator.encode(data, &mut bytes).unwrap();
-
-        assert!(responder.decode(&mut bytes).is_err());
-    }
-
-    #[test]
-    fn decode_message_zero_byte() {
-        let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
-        let mut bytes: BytesMut = BytesMut::new();
-        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        initiator.encode(data, &mut bytes).unwrap();
-
-        assert!(responder.decode(&mut bytes).is_err());
+        assert_eq!(responder.decode(&mut bytes).unwrap().unwrap().get_vec(), &source);
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {

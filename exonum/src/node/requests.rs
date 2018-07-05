@@ -14,7 +14,6 @@
 
 use super::NodeHandler;
 use blockchain::Schema;
-use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use failure;
 use messages::{
     BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, RequestMessage,

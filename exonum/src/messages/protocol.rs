@@ -29,7 +29,7 @@
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 
-use std::fmt::{Debug, Error, Formatter};
+use std::fmt::Debug;
 use std::net::SocketAddr;
 
 use failure;
@@ -41,22 +41,26 @@ use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex};
 
 #[doc(hidden)]
-/// TransactionResponse size with zero transactions inside.
+/// TransactionsResponse size with zero transactions inside.
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 0;
+
+#[doc(hidden)]
+/// RawTransaction size with zero transactions payload.
+pub const RAW_TRANSACTION_EMPTY_SIZE: usize = 0;
 
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Protocol {
     /// Transaction.
     Transaction(RawTransaction),
+    /// Consensus message.
+    Consensus(ConsensusMessage),
     /// `Connect` message.
     Connect(Connect),
     /// `Status` message.
     Status(Status),
     /// `Block` message.
     Block(BlockResponse),
-    /// Consensus message.
-    Consensus(ConsensusMessage),
     /// Request for the some data.
     Request(RequestMessage),
     /// A batch of the transactions.
@@ -66,12 +70,12 @@ pub enum Protocol {
 /// Consensus message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConsensusMessage {
+    /// `Precommit` message.
+    Precommit(Precommit),
     /// `Propose` message.
     Propose(Propose),
     /// `Prevote` message.
     Prevote(Prevote),
-    /// `Precommit` message.
-    Precommit(Precommit),
 }
 
 /// A request for the some data.

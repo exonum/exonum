@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use blockchain::{
-    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionSet,
+    ExecutionResult, Schema, Service, StoredConfiguration, Transaction,
+    TransactionSet, TransactionContext
 };
 use crypto::{Hash, PublicKey};
 use encoding::Error as MessageError;
 use helpers::Height;
-use messages::{Message, RawTransaction};
-use storage::{Fork, Snapshot};
+use messages::RawTransaction;
+use storage::{Snapshot};
 
 pub const CONFIG_SERVICE: u16 = 1;
 
 transactions! {
     ConfigUpdaterTransactions {
-        const SERVICE_ID = CONFIG_SERVICE;
 
         struct TxConfig {
             from: &PublicKey,
@@ -46,11 +46,11 @@ impl ConfigUpdateService {
 
 impl Transaction for TxConfig {
     fn verify(&self) -> bool {
-        self.verify_signature(self.from())
+        true
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = Schema::new(fork);
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+        let mut schema = Schema::new(tc.fork());
         schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
         Ok(())
     }

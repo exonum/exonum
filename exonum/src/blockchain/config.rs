@@ -243,7 +243,6 @@ impl StorageValue for StoredConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use serde::{Deserialize, Serialize};
     use toml;
 
     use super::*;

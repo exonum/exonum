@@ -17,7 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 
 use std::{
     cell::{Ref, RefCell}, collections::Bound, fmt,
@@ -25,17 +25,17 @@ use std::{
 };
 
 use blockchain::{
-    Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+    Block, Blockchain, Schema, TransactionError, TransactionErrorType,
     TransactionMessage, TransactionResult, TxLocation,
 };
 use crypto::{CryptoHash, Hash};
 use encoding;
 use helpers::Height;
-use messages::{Message, Precommit, RawTransaction, SignedMessage};
+use messages::{Message, Precommit, RawTransaction};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<Box<dyn Transaction>, encoding::Error>;
+type ParseResult = Result<TransactionMessage, encoding::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -387,15 +387,12 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// ```
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
-/// # use exonum::blockchain::{ExecutionResult, Transaction};
+/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
 /// # use exonum::helpers::Height;
-/// # use exonum::storage::Fork;
 /// transactions! {
 ///     Transactions {
-///         const SERVICE_ID = 1000;
-///
 ///         struct CreateWallet {
 ///             public_key: &PublicKey,
 ///             name: &str,
@@ -405,7 +402,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// }
 /// # impl Transaction for CreateWallet {
 /// #     fn verify(&self) -> bool { true }
-/// #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
 /// # }
 ///
 /// # fn main() {
@@ -461,13 +458,6 @@ impl<'a> TxStatus<'a> {
         status.serialize(serializer)
     }
 
-    fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
-    where
-        D: Deserializer<'a>,
-    {
-        let tx_status = <Self as Deserialize>::deserialize(deserializer)?;
-        Ok(TransactionResult::from(tx_status))
-    }
 }
 
 impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
@@ -561,14 +551,11 @@ impl CommittedTransaction {
 /// ```
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
-/// # use exonum::blockchain::{ExecutionResult, Transaction};
+/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{PublicKey, Signature};
 /// # use exonum::explorer::TransactionInfo;
-/// # use exonum::storage::Fork;
 /// transactions! {
 ///     Transactions {
-///         const SERVICE_ID = 1000;
-///
 ///         struct CreateWallet {
 ///             public_key: &PublicKey,
 ///             name: &str,
@@ -578,7 +565,7 @@ impl CommittedTransaction {
 /// }
 /// # impl Transaction for CreateWallet {
 /// #     fn verify(&self) -> bool { true }
-/// #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
 /// # }
 ///
 /// # fn main() {
@@ -661,7 +648,7 @@ impl TransactionInfo {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<dyn Snapshot>,
-    transaction_parser: Box<dyn 'a + Fn(&Message<RawTransaction>) -> ParseResult>,
+    transaction_parser: Box<dyn 'a + Fn(Message<RawTransaction>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -684,7 +671,7 @@ impl<'a> BlockchainExplorer<'a> {
         let schema = Schema::new(&self.snapshot);
         let raw_tx = schema.transactions().get(tx_hash)?;
 
-        let content = match TransactionMessage::tx_from_raw(raw_tx, &*self.transaction_parser) {
+        let content = match (*self.transaction_parser)(raw_tx) {
             Err(e) => {
                 error!("Error while parsing transaction {:?}: {}", tx_hash, e);
                 return None;
@@ -739,7 +726,7 @@ impl<'a> BlockchainExplorer<'a> {
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
                 let raw_tx = schema.transactions().get(tx_hash).unwrap();
-                TransactionMessage::tx_from_raw(raw_tx, &*self.transaction_parser).unwrap()
+                (&*self.transaction_parser)(raw_tx).unwrap()
             }),
 
             location,

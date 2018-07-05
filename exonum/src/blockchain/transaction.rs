@@ -13,16 +13,13 @@
 // limitations under the License.
 
 //! `Transaction` related types.
-
-use failure;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use encoding::{self, serialize::json::ExonumJson};
-use events::error::into_failure;
-use messages::{BinaryForm, Message, RawTransaction, SignedMessage};
+use crypto::{CryptoHash, Hash, PublicKey};
+use encoding;
+use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -68,20 +65,18 @@ impl TransactionMessage {
         &self.transaction
     }
     /// Create new `TransactionMessage` from raw message.
-    pub(crate) fn tx_from_raw<F>(
+    pub(crate) fn new(
         message: Message<RawTransaction>,
-        parser: &F,
-    ) -> Result<Self, failure::Error>
-    where
-        F: ?Sized + Fn(&Message<RawTransaction>) -> Result<Box<dyn Transaction>, ::encoding::Error>,
+        transaction: Box<dyn Transaction>,
+    ) -> TransactionMessage
     {
-        let transaction = parser(&message).map_err(into_failure)?;
-        Ok(TransactionMessage {
+        TransactionMessage {
             transaction,
             message,
-        })
+        }
     }
 }
+
 impl ::serde::Serialize for Box<dyn Transaction> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -102,9 +97,9 @@ impl ::serde::Serialize for Box<dyn Transaction> {
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
 pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
-    /// Verifies the internal consistency of the transaction. `verify` should usually include
-    /// checking the message signature (via [`verify_signature`]) and, possibly,
-    /// other internal constraints. `verify` has no access to the blockchain state;
+    /// Verifies the internal consistency of the transaction. `verify` should include
+    /// only invariant checking. The message signature is checked internaly.
+    /// `verify` has no access to the blockchain state;
     /// checks involving the blockchain state must be preformed in [`execute`](#tymethod.execute).
     ///
     /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
@@ -119,15 +114,13 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use exonum::blockchain::Transaction;
+    /// use exonum::blockchain::{Transaction, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum::messages::Message;
     /// # use exonum::blockchain::ExecutionResult;
-    /// # use exonum::storage::Fork;
     ///
     /// transactions! {
     ///     MyTransactions {
-    ///         const SERVICE_ID = 1;
     ///
     ///         struct MyTransaction {
     ///             // Transaction definition...
@@ -143,7 +136,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+    /// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
     /// }
     /// # fn main() {}
     fn verify(&self) -> bool;
@@ -166,13 +159,12 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use exonum::blockchain::{Transaction, ExecutionResult};
+    /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
     /// transactions! {
     ///     MyTransactions {
-    ///         const SERVICE_ID = 1;
     ///
     ///         struct MyTransaction {
     ///             // Transaction definition...
@@ -182,7 +174,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+    ///     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
     ///         // Read and/or write into storage.
     ///         // ...
     ///
@@ -205,14 +197,19 @@ pub struct TransactionContext<'a> {
     fork: &'a mut Fork,
     service_id: u16,
     tx_hash: Hash,
+    author: PublicKey
 }
 
 impl<'a> TransactionContext<'a> {
-    pub(crate) fn new(fork: &'a mut Fork, service_id: u16, tx_hash: Hash) -> Self {
+    pub(crate) fn new(fork: &'a mut Fork,
+                      service_id: u16,
+                      tx_hash: Hash,
+                      author: PublicKey) -> Self {
         TransactionContext {
             fork,
             service_id,
             tx_hash,
+            author
         }
     }
     /// Returns fork of current blockchain state.
@@ -223,7 +220,10 @@ impl<'a> TransactionContext<'a> {
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
-
+    /// Returns transaction author public key
+    pub fn author(&self) -> &PublicKey {
+        &self.author
+    }
     /// Returns current transaction message hash.
     /// This hash could be used to link some data in storage for external usage.
     pub fn tx_hash(&self) -> Hash {
@@ -449,7 +449,7 @@ pub trait TransactionSet:
     /// Parses a transaction from this set from a `RawTransaction`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
     /// Serialize current transaction into RawTransaction
-    fn tx_into_raw(&self) -> Vec<u8>;
+    fn tx_into_raw(&self) -> Result<Vec<u8>, encoding::Error>;
 }
 
 /// `transactions!` is used to declare a set of transactions of a particular service.
@@ -463,23 +463,13 @@ pub trait TransactionSet:
 /// Each transaction is specified as a Rust struct. For additional information about
 /// data layout, see the documentation on the [`encoding` module](./encoding/index.html).
 ///
-/// Additionally, the macro must define the identifier of a service, which will be used
-/// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
-/// within the Exonum blockchain.
-///
 /// For each transaction, the macro creates getter methods for all defined fields.
 /// The names of the methods coincide with the field names. In addition,
 /// two constructors are defined:
 ///
 /// - `new` accepts as arguments all fields in the order of their declaration in
-///   the macro, and a [`SecretKey`] as the last argument. A `SecretKey` is used
-///   to sign the message. The constructor returns a transaction which contains
-///   the fields and a signature. In this case, the constructor creates a signature
-///   for the message using the secret key.
-/// - `new_with_signature` accepts as arguments all fields in the order of their
-///   declaration in the macro, and a message [`Signature`]. The constructor returns
-///   a transaction which contains the fields and a signature. In this case, the
-///   constructor signs the message using the indicated signature.
+///   the macro. The constructor returns a transaction which contains
+///   the fields. This transaction could be converted into [`Message<RawTransaction>`]
 ///
 /// Each transaction also implements [`SegmentField`],
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
@@ -496,6 +486,7 @@ pub trait TransactionSet:
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
 /// [`Message`]: ./messages/struct.Message.html
+/// [`Message<RawTransaction>`]: ./messages/struct.Message.html
 /// [`Service`]: ./blockchain/trait.Service.html
 /// # Examples
 ///
@@ -506,11 +497,10 @@ pub trait TransactionSet:
 /// #[macro_use] extern crate exonum;
 /// use exonum::crypto::PublicKey;
 /// # use exonum::storage::Fork;
-/// # use exonum::blockchain::{Transaction, ExecutionResult};
+/// # use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
 ///
 /// transactions! {
 ///     WalletTransactions {
-///         const SERVICE_ID = 1;
 ///
 ///         struct Create {
 ///             key: &PublicKey
@@ -525,12 +515,12 @@ pub trait TransactionSet:
 /// }
 /// # impl Transaction for Create {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
 /// # }
 /// #
 /// # impl Transaction for Transfer {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
 /// # }
 /// #
 /// # fn main() { }
@@ -543,7 +533,6 @@ macro_rules! transactions {
     {
         $(#[$tx_set_attr:meta])*
         $transaction_set:ident {
-            const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
@@ -554,7 +543,6 @@ macro_rules! transactions {
         }
     } => {
         messages! {
-            const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
@@ -578,7 +566,6 @@ macro_rules! transactions {
     {
         $(#[$tx_set_attr:meta])*
         pub $transaction_set:ident {
-            const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
@@ -589,7 +576,6 @@ macro_rules! transactions {
         }
     } => {
         messages! {
-            const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
@@ -613,7 +599,6 @@ macro_rules! transactions {
     {
         $(#[$tx_set_attr:meta])*
         pub($($vis:tt)+) $transaction_set:ident {
-            const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
@@ -624,7 +609,6 @@ macro_rules! transactions {
         }
     } => {
         messages! {
-            const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
@@ -654,7 +638,7 @@ macro_rules! transactions {
                 Ok($crate::encoding::serialize::reexport::bincode::config().no_limit().deserialize(raw.payload())?)
             }
             fn tx_into_raw(&self) -> ::std::result::Result<::std::vec::Vec<u8>, $crate::encoding::Error> {
-                Ok($crate::encoding::serialize::reexport::bincode::config().no_limit().serialize(&self))
+                Ok($crate::encoding::serialize::reexport::bincode::config().no_limit().serialize(&self)?)
             }
         }
 
@@ -814,7 +798,7 @@ mod tests {
             Ok(()),
         ];
 
-        let (_, sec_key) = crypto::gen_keypair();
+        let (pk, sec_key) = crypto::gen_keypair();
         let mut blockchain = create_blockchain();
         let db = Box::new(MemoryDB::new());
 
@@ -823,13 +807,14 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction = TxResult::new(index, &sec_key);
+            let transaction = Message::sign_tx(TxResult::new(index),
+                                               TX_RESULT_SERVICE_ID, (pk, &sec_key));
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();
                 {
                     let mut schema = Schema::new(&mut fork);
-                    schema.add_transaction_into_pool(transaction.raw().clone());
+                    schema.add_transaction_into_pool(transaction.clone());
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
             }
@@ -911,14 +896,12 @@ mod tests {
             &self,
             raw: RawTransaction,
         ) -> Result<Box<dyn Transaction>, encoding::Error> {
-            Ok(Box::new(TxResult::from_raw(raw)?))
+            Ok(TestTxs::tx_from_raw(raw)?.into())
         }
     }
 
     transactions! {
         TestTxs {
-            const SERVICE_ID = TX_RESULT_SERVICE_ID;
-
             struct TxResult {
                 index: u64,
             }
@@ -930,8 +913,8 @@ mod tests {
             true
         }
 
-        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            let mut entry = create_entry(fork);
+        fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+            let mut entry = create_entry(tc.fork);
             entry.set(self.index());
             EXECUTION_STATUS.lock().unwrap().clone()
         }

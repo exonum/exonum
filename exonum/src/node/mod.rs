@@ -34,12 +34,12 @@ use tokio_core::reactor::Core;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, net::SocketAddr, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 
 use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
+    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
@@ -524,17 +524,7 @@ impl NodeHandler {
         // the start of event processing.
         let messages = schema.consensus_messages_cache();
         for msg in messages.iter() {
-            self.handle_message(msg);
-        }
-    }
-
-    /// Sends the given message to a peer by its id.
-    pub(crate) fn send_to_validator<M: Into<SignedMessage>>(&mut self, id: u32, message: M) {
-        if id as usize >= self.state.validators().len() {
-            error!("Invalid validator id: {}", id);
-        } else {
-            let public_key = self.state.validators()[id as usize].consensus_key;
-            self.send_to_peer(public_key, message);
+            self.handle_message(msg).log_error();
         }
     }
 
@@ -1037,14 +1027,13 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, Schema, Transaction};
+    use blockchain::{ExecutionResult, Schema, Transaction, TransactionContext};
     use crypto::gen_keypair;
     use events::EventHandler;
     use helpers;
-    use storage::{Database, Fork, MemoryDB};
+    use storage::{Database, MemoryDB};
 
     messages! {
-        const SERVICE_ID = 0;
 
         struct TxSimple {
             public_key: &PublicKey,
@@ -1057,7 +1046,7 @@ mod tests {
             true
         }
 
-        fn execute(&self, _view: &mut Fork) -> ExecutionResult {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
             Ok(())
         }
     }
@@ -1072,10 +1061,10 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg);
 
-        let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+        let tx = Message::sign_tx(TxSimple::new(&p_key, "Hello, World!"), 0,  (p_key, &s_key));
 
         // Create original transaction.
-        let tx_orig = Box::new(tx.clone());
+        let tx_orig = tx.clone();
         let event = ExternalMessage::Transaction(tx_orig);
         node.handler.handle_event(event.into());
 
@@ -1085,7 +1074,7 @@ mod tests {
         assert_eq!(schema.transactions_pool_len(), 1);
 
         // Create duplicated transaction.
-        let tx_copy = Box::new(tx.clone());
+        let tx_copy = tx.clone();
         let event = ExternalMessage::Transaction(tx_copy);
         node.handler.handle_event(event.into());
 

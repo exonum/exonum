@@ -17,8 +17,6 @@
 #[macro_export]
 macro_rules! messages {
     {
-        const SERVICE_ID = $service_id:expr;
-
         $(
             $(#[$tx_attr:meta])*
             struct $name:ident {

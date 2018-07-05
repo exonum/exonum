@@ -21,13 +21,13 @@ use std::{
 };
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
+use crypto::{gen_keypair_from_seed, PublicKey, Seed, SecretKey};
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, MessageWriter, RawMessage};
+use messages::{Connect, Message, SignedMessage};
 use node::{EventsPoolCapacity, NodeChannel};
 
 static FAKE_SEED: [u8; 32] = [1; 32];
@@ -83,7 +83,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
+    pub fn send_to(&self, addr: SocketAddr, raw: SignedMessage) {
         let (public_key, _) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
         self.network_requests_tx
             .clone()
@@ -92,7 +92,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn wait_for_connect(&mut self) -> Connect {
+    pub fn wait_for_connect(&mut self) -> Message<Connect> {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
@@ -108,7 +108,7 @@ impl TestHandler {
         }
     }
 
-    pub fn wait_for_message(&mut self) -> RawMessage {
+    pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
             Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
             Ok(other) => panic!("Unexpected message received, {:?}", other),
@@ -139,14 +139,16 @@ pub struct TestEvents {
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub events_config: EventsPoolCapacity,
+    pub keypair: (PublicKey, SecretKey),
 }
 
 impl TestEvents {
-    pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
+    pub fn with_addr(listen_address: SocketAddr, keypair: (PublicKey, SecretKey)) -> TestEvents {
         TestEvents {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
+            keypair,
         }
     }
 
@@ -154,9 +156,8 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
             let handshake_params =
-                HandshakeParams::new(public_key, secret_key, network_part.max_message_len);
+                HandshakeParams::new(self.keypair.0, self.keypair.1, network_part.max_message_len);
             let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });
@@ -169,9 +170,8 @@ impl TestEvents {
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
         let network_requests_tx = channel.network_requests.0.clone();
-
         let network_part = NetworkPart {
-            our_connect_message: connect_message(self.listen_address),
+            our_connect_message: connect_message(self.listen_address, (self.keypair.0, &self.keypair.0)),
             listen_address: self.listen_address,
             network_config,
             max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
@@ -184,20 +184,19 @@ impl TestEvents {
     }
 }
 
-pub fn connect_message(addr: SocketAddr) -> Connect {
+pub fn connect_message(addr: SocketAddr, keypair: (PublicKey, &SecretKey)) -> Message<Connect> {
     let time = time::UNIX_EPOCH;
-    Connect::new_with_signature(
-        &PublicKey::zero(),
+
+    let connect = Connect::new(
         addr,
         time.into(),
         &user_agent::get(),
-        &Signature::zero(),
-    )
+    );
+    Message::new(connect, keypair.0, keypair.1)
 }
 
-pub fn raw_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, 0, id, len);
-    RawMessage::new(writer.sign(&gen_keypair().1))
+pub fn raw_message(id: u16, tx_len: usize, keypair: (PublicKey, &SecretKey)) -> SignedMessage {
+    Message::create_raw_tx(vec![0; tx_len], id, keypair)
 }
 
 #[test]
@@ -208,8 +207,9 @@ fn test_network_handshake() {
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
 
-    let c1 = connect_message(first);
-    let c2 = connect_message(second);
+    let (p, s) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
+    let c1 = connect_message(first, (p, &s));
+    let c2 = connect_message(second, (p, &s));
 
     let mut e1 = e1.spawn();
     let mut e2 = e2.spawn();
@@ -231,9 +231,10 @@ fn test_network_handshake() {
 fn test_network_big_message() {
     let first = "127.0.0.1:17200".parse().unwrap();
     let second = "127.0.0.1:17201".parse().unwrap();
-
-    let m1 = raw_message(15, 100000);
-    let m2 = raw_message(16, 400);
+    let (p,s) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
+    let keypair = (p, &s);
+    let m1 = raw_message(15, 100000, keypair);
+    let m2 = raw_message(16, 400, keypair);
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
@@ -277,11 +278,13 @@ fn test_network_max_message_len() {
     let first = "127.0.0.1:17202".parse().unwrap();
     let second = "127.0.0.1:17303".parse().unwrap();
 
+    let (p,s) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
+    let keypair = (p, &s);
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
     let max_payload_length =
-        max_message_length - ::messages::HEADER_LENGTH - ::crypto::SIGNATURE_LENGTH;
-    let acceptable_message = raw_message(15, max_payload_length);
-    let too_big_message = raw_message(16, max_payload_length + 1000);
+        max_message_length - ::messages::RAW_TRANSACTION_EMPTY_SIZE;
+    let acceptable_message = raw_message(15, max_payload_length, keypair);
+    let too_big_message = raw_message(16, max_payload_length + 1000, keypair);
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
@@ -306,14 +309,16 @@ fn test_network_max_message_len() {
 fn test_network_reconnect() {
     let first = "127.0.0.1:19100".parse().unwrap();
     let second = "127.0.0.1:19101".parse().unwrap();
+    let (p,s) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
+    let keypair = (p, &s);
 
-    let msg = raw_message(11, 1000);
-    let c1 = connect_message(first);
+    let msg = raw_message(11, 1000, keypair);
+    let c1 = connect_message(first, keypair);
 
-    let mut t1 = TestEvents::with_addr(first).spawn();
+    let mut t1 = TestEvents::with_addr(first, (p,s)).spawn();
 
     // First connect attempt.
-    let mut t2 = TestEvents::with_addr(second).spawn();
+    let mut t2 = TestEvents::with_addr(second, (p,s)).spawn();
 
     // Handle first attempt.
     t1.connect_with(second);
@@ -327,7 +332,7 @@ fn test_network_reconnect() {
     assert_eq!(t1.wait_for_disconnect(), second);
 
     // Handle second attempt.
-    let mut t2 = TestEvents::with_addr(second).spawn();
+    let mut t2 = TestEvents::with_addr(second, (p,s)).spawn();
 
     t1.connect_with(second);
     assert_eq!(t2.wait_for_connect(), c1);
@@ -369,11 +374,13 @@ fn test_network_multiple_connect() {
 fn test_send_first_not_connect() {
     let main = "127.0.0.1:19500".parse().unwrap();
     let other = "127.0.0.1:19501".parse().unwrap();
+    let keypair = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
 
-    let mut node = TestEvents::with_addr(main).spawn();
-    let other_node = TestEvents::with_addr(other).spawn();
 
-    let message = raw_message(11, 1000);
+    let mut node = TestEvents::with_addr(main, keypair).spawn();
+    let other_node = TestEvents::with_addr(other, keypair).spawn();
+
+    let message = raw_message(11, 1000, (keypair.0, &keypair.1));
     other_node.send_to(main, message.clone()); // should connect before send message
 
     assert_eq!(node.wait_for_connect(), connect_message(other));
