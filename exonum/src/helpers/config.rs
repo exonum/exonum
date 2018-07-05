@@ -115,14 +115,14 @@ impl ConfigManager {
         self.handle.join().expect("Can't stop thread");
     }
 
-    fn update_connect_list(connect_list: ConnectListConfig, path: &String) {
+    fn update_connect_list(connect_list: ConnectListConfig, path: &str) {
         info!("Updating connect list. New value: {:?}", connect_list);
         // TODO: remove expect.
         let mut current_config: NodeConfig =
-            ConfigFile::load(path.clone()).expect("Can't load node config file");
+            ConfigFile::load(path).expect("Can't load node config file");
 
         current_config.connect_list = connect_list;
 
-        ConfigFile::save(&current_config, path.clone()).expect("Can't save node config file");
+        ConfigFile::save(&current_config, path).expect("Can't save node config file");
     }
 }
