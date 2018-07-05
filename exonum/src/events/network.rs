@@ -156,7 +156,7 @@ impl ConnectionsPool {
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
                 trace!("Established connection with peer={}", peer);
-                let (sink, stream) = stream.split();
+                let (sink, stream) = stream.0.split();
 
                 let writer = conn_rx
                     .map_err(|_| other_error("Can't send data into socket"))
@@ -369,7 +369,9 @@ impl Listener {
             let network_tx = network_tx.clone();
 
             let handshake = NoiseHandshake::responder(&handshake_params);
-            let stream = handshake.listen(sock).flatten_stream();
+            let stream = handshake.listen(sock).map(|(sock, key)| {
+                sock
+            }).flatten_stream();
 
             let connection_handler = stream
                 .into_future()
