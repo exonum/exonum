@@ -54,7 +54,7 @@ impl NoiseWrapper {
             let session = builder
                 .build_initiator()
                 .expect("Noise session initiator failed to initialize");
-            return NoiseWrapper { session };
+            return Self { session };
         } else {
             panic!("Remote public key is not specified")
         }
@@ -68,7 +68,7 @@ impl NoiseWrapper {
             .build_responder()
             .expect("Noise session responder failed to initialize");
 
-        NoiseWrapper { session }
+        Self { session }
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
@@ -83,13 +83,13 @@ impl NoiseWrapper {
 
     pub fn write_handshake_msg(&mut self) -> Result<(usize, Vec<u8>), NoiseError> {
         // Payload in handshake messages can be empty.
-        self.write(&[0u8])
+        self.write(&[0_u8])
     }
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
         // Transition into transport mode after handshake is finished.
         let session = self.session.into_transport_mode()?;
-        Ok(NoiseWrapper { session })
+        Ok(Self { session })
     }
 
     /// Decrypts `msg` using Noise session.
@@ -101,7 +101,7 @@ impl NoiseWrapper {
     pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> BytesMut {
         let data = buf.split_to(len + NOISE_HEADER_LENGTH).to_vec();
         let data = &data[NOISE_HEADER_LENGTH..];
-        let mut decoded_message = vec![0u8; 0];
+        let mut decoded_message = vec![0_u8; 0];
 
         data.chunks(NOISE_MAX_MESSAGE_LENGTH).for_each(|msg| {
             let len_to_read = if msg.len() == NOISE_MAX_MESSAGE_LENGTH {
@@ -126,8 +126,8 @@ impl NoiseWrapper {
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Option<()> {
-        let mut len = 0usize;
-        let mut encoded_message = vec![0u8; 0];
+        let mut len = 0_usize;
+        let mut encoded_message = vec![0_u8; 0];
 
         msg.chunks(NOISE_MAX_MESSAGE_LENGTH - TAG_LENGTH)
             .for_each(|msg| {
@@ -136,7 +136,7 @@ impl NoiseWrapper {
                 len += written_bytes;
             });
 
-        let mut msg_len_buf = vec![0u8; NOISE_HEADER_LENGTH];
+        let mut msg_len_buf = vec![0_u8; NOISE_HEADER_LENGTH];
 
         LittleEndian::write_u32(&mut msg_len_buf, len as u32);
         let encoded_message = &encoded_message[0..len];
@@ -146,13 +146,13 @@ impl NoiseWrapper {
     }
 
     fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
-        let mut buf = vec![0u8; len];
+        let mut buf = vec![0_u8; len];
         let len = self.session.read_message(input, &mut buf)?;
         Ok((len, buf))
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
-        let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
+        let mut buf = vec![0_u8; NOISE_MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
         Ok((len, buf))
     }
@@ -191,7 +191,7 @@ impl From<NoiseError> for io::Error {
             _ => format!("{:?}", e),
         };
 
-        io::Error::new(io::ErrorKind::Other, message)
+        Self::new(io::ErrorKind::Other, message)
     }
 }
 

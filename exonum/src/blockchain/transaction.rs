@@ -24,7 +24,7 @@ use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
-const MAX_ERROR_CODE: u16 = u8::MAX as u16;
+const MAX_ERROR_CODE: u16 = u8::max_value() as u16;
 // Represent `(Ok())` `TransactionResult` value.
 const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
 // `Err(TransactionErrorType::Panic)`.
@@ -363,7 +363,7 @@ impl TransactionError {
 
 impl<'a, T: Transaction> From<T> for Box<dyn Transaction + 'a> {
     fn from(tx: T) -> Self {
-        Box::new(tx) as Box<dyn Transaction>
+        Box::new(tx) as Self
     }
 }
 

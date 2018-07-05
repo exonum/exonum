@@ -127,10 +127,10 @@ impl Message<RawTransaction> {
 
 impl<T: ProtocolMessage> Message<T> {
     /// Creates new instance of message
-    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
+    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Self {
         let message =
             SignedMessage::new(payload.clone(), author, secret_key).expect("Serialization error");
-        Message { payload, message }
+        Self { payload, message }
     }
 
     /// Makes new instance of map from existing,
@@ -142,7 +142,7 @@ impl<T: ProtocolMessage> Message<T> {
         F: Fn(T) -> U,
     {
         let (payload, message) = self.into_parts();
-        Message::from_parts(func(payload), message)
+        Self::from_parts(func(payload), message)
     }
 
     /// Split message into payload and signed raw parts
@@ -155,7 +155,7 @@ impl<T: ProtocolMessage> Message<T> {
         if payload != message.authorised_message.protocol {
             bail!("Type {:?} is not a part of exonum protocol", payload)
         }
-        Ok(Message { payload, message })
+        Ok(Self { payload, message })
     }
     /// Returns hahs of full message
     pub fn hash(&self) -> Hash {
@@ -169,7 +169,7 @@ impl<T: ProtocolMessage> Message<T> {
 
     /// Downgrade `Message<T>` into root `Message<Protocol>`
     pub fn downgrade(self) -> Message<Protocol> {
-        Message {
+        Self {
             payload: self.message.authorised_message.protocol.clone(),
             message: self.message,
         }

@@ -43,12 +43,12 @@ fn test_convert_ed_to_curve_dh() {
     // Do DH.
     let mut keypair_i: Dh25519 = Default::default();
     keypair_i.set(secret_key_i.as_ref());
-    let mut output_i = [0u8; PUBLIC_KEY_LENGTH];
+    let mut output_i = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_i.dh(public_key_r.as_ref(), &mut output_i);
 
     let mut keypair_r: Dh25519 = Default::default();
     keypair_r.set(secret_key_r.as_ref());
-    let mut output_r = [0u8; PUBLIC_KEY_LENGTH];
+    let mut output_r = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_r.dh(public_key_i.as_ref(), &mut output_r);
 
     assert_eq!(output_i, output_r);
@@ -79,16 +79,16 @@ fn test_converted_keys_handshake() {
         .build_responder()
         .expect("Unable to create responder");
 
-    let mut buffer_msg = [0u8; MSG_SIZE * 2];
-    let mut buffer_out = [0u8; MSG_SIZE * 2];
+    let mut buffer_msg = [0_u8; MSG_SIZE * 2];
+    let mut buffer_out = [0_u8; MSG_SIZE * 2];
 
-    let len = h_i.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
     h_r.read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
-    let len = h_r.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+    let len = h_r.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
     h_i.read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
-    let len = h_i.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
     h_r.read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
 

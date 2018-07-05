@@ -49,7 +49,7 @@ impl HandshakeParams {
     pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
         let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
 
-        HandshakeParams {
+        Self {
             public_key,
             secret_key,
             max_message_len,
@@ -76,7 +76,7 @@ pub struct NoiseHandshake {
 impl NoiseHandshake {
     pub fn initiator(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::initiator(params);
-        NoiseHandshake {
+        Self {
             noise,
             max_message_len: params.max_message_len,
         }
@@ -84,7 +84,7 @@ impl NoiseHandshake {
 
     pub fn responder(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::responder(params);
-        NoiseHandshake {
+        Self {
             noise,
             max_message_len: params.max_message_len,
         }
@@ -147,12 +147,12 @@ impl Handshake for NoiseHandshake {
 fn read<S: AsyncRead + 'static>(
     sock: S,
 ) -> impl Future<Item = (S, Vec<u8>), Error = failure::Error> {
-    let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+    let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
     // First byte of handshake message is payload length, remaining bytes [1; len] is
     // the handshake payload. Therefore, we need to read first byte and after that
     // remaining payload.
     read_exact(sock, buf)
-        .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
+        .and_then(|(stream, msg)| read_exact(stream, vec![0_u8; msg[0] as usize]))
         .map_err(into_failure)
 }
 

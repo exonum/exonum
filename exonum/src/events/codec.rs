@@ -30,8 +30,8 @@ pub struct MessagesCodec {
 }
 
 impl MessagesCodec {
-    pub fn new(max_message_len: u32, session: NoiseWrapper) -> MessagesCodec {
-        MessagesCodec {
+    pub fn new(max_message_len: u32, session: NoiseWrapper) -> Self {
+        Self {
             max_message_len,
             session,
         }
@@ -91,13 +91,9 @@ mod test {
         Message::create_raw_tx(tx, id, keypair).into_parts().1
     }
 
-    //TODO: Add more tests.
     #[test]
-    fn decode_message_roundtrip() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
-        let keypair = gen_keypair_from_seed(&Seed::new([1; 32]));
-        let signed = raw_message(0, data, (keypair.0, &keypair.1));
-        let source = signed.to_vec();
+    fn decode_message_small_size_in_header() {
+        let data = vec![0_u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         initiator.encode(signed, &mut bytes).unwrap();
@@ -120,15 +116,21 @@ mod test {
         let mut buffer_out = [0u8; 1024];
 
         // Simple handshake for testing.
-        let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        let len = initiator
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = responder.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        let len = responder
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         initiator
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        let len = initiator
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();

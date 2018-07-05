@@ -152,19 +152,19 @@ impl StdError for Error {
 }
 
 impl From<Box<dyn StdError>> for Error {
-    fn from(t: Box<dyn StdError>) -> Error {
+    fn from(t: Box<dyn StdError>) -> Self {
         Error::Other(t)
     }
 }
 
 impl From<Cow<'static, str>> for Error {
-    fn from(t: Cow<'static, str>) -> Error {
+    fn from(t: Cow<'static, str>) -> Self {
         Error::Basic(t)
     }
 }
 
 impl From<&'static str> for Error {
-    fn from(t: &'static str) -> Error {
+    fn from(t: &'static str) -> Self {
         Error::Basic(t.into())
     }
 }

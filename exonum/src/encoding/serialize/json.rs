@@ -225,8 +225,8 @@ impl ExonumJson for Duration {
         let helper: DurationHelper = serde_json::from_value(value.clone())?;
         let seconds = helper.secs.parse()?;
 
-        let seconds_duration = Duration::seconds(seconds);
-        let nanos_duration = Duration::nanoseconds(i64::from(helper.nanos));
+        let seconds_duration = Self::seconds(seconds);
+        let nanos_duration = Self::nanoseconds(i64::from(helper.nanos));
 
         let result = seconds_duration.checked_add(&nanos_duration);
         match result {
@@ -243,7 +243,7 @@ impl ExonumJson for Duration {
 
     fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         let secs = self.num_seconds();
-        let nanos_as_duration = *self - Duration::seconds(secs);
+        let nanos_as_duration = *self - Self::seconds(secs);
         // Since we're working with only nanos, no overflow is expected here.
         let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
 
@@ -262,7 +262,7 @@ impl ExonumJson for SocketAddr {
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<dyn Error>> {
-        let addr: SocketAddr = serde_json::from_value(value.clone())?;
+        let addr: Self = serde_json::from_value(value.clone())?;
         buffer.write(from, to, addr);
         Ok(())
     }
@@ -373,7 +373,7 @@ impl ExonumJson for BitVec {
         to: Offset,
     ) -> Result<(), Box<dyn Error>> {
         let string = value.as_str().ok_or("Can't cast json as string")?;
-        let mut vec = BitVec::new();
+        let mut vec = Self::new();
         for (i, ch) in string.chars().enumerate() {
             let val = if ch == '1' {
                 true

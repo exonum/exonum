@@ -39,13 +39,6 @@ impl NodeHandler {
     }
 
     fn handle_network_event(&mut self, event: NetworkEvent) -> Result<(), ::failure::Error> {
-        if !self.is_enabled {
-            info!(
-                "Ignoring a network event {:?} because the node is disabled",
-                event
-            );
-            return Ok(());
-        }
         match event {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
@@ -61,23 +54,9 @@ impl NodeHandler {
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
             ExternalMessage::Transaction(tx) => {
-                if !self.is_enabled {
-                    info!(
-                        "Ignoring a transaction {:?} because the node is disabled",
-                        tx
-                    );
-                    return;
-                }
                 self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(info) => {
-                if !self.is_enabled {
-                    info!(
-                        "Ignoring a connect message to {} because the node is disabled",
-                        info
-                    );
-                    return;
-                }
                 info!("Send Connect message to {}", info);
                 self.state.add_peer_to_connect_list(info);
                 self.connect(&info.address);

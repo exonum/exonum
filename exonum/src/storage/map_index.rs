@@ -104,7 +104,7 @@ where
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        MapIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
@@ -138,7 +138,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        MapIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
@@ -565,7 +565,7 @@ mod tests {
 
         map_index.remove(&1u8);
         assert_eq!(
-            map_index.iter_from(&0u8).collect::<Vec<(u8, u8)>>(),
+            map_index.iter_from(&0_u8).collect::<Vec<(u8, u8)>>(),
             vec![(2, 2), (3, 3)]
         );
         assert_eq!(

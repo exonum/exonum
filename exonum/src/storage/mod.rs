@@ -106,6 +106,8 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
+pub(crate) use self::indexes_metadata::StorageMetadata;
+
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{

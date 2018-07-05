@@ -52,7 +52,7 @@ pub enum Error {
 }
 
 impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
+    fn from(e: io::Error) -> Self {
         Error::Io(e)
     }
 }
@@ -64,7 +64,7 @@ impl From<failure::Error> for Error {
 }
 
 impl From<storage::Error> for Error {
-    fn from(e: storage::Error) -> Error {
+    fn from(e: storage::Error) -> Self {
         Error::Storage(e)
     }
 }

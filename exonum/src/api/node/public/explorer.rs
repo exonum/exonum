@@ -73,7 +73,7 @@ pub struct BlockQuery {
 impl BlockQuery {
     /// Creates a new block query with the given height.
     pub fn new(height: Height) -> Self {
-        BlockQuery { height }
+        Self { height }
     }
 }
 
@@ -94,7 +94,7 @@ pub struct TransactionQuery {
 impl TransactionQuery {
     /// Creates a new transaction query with the given height.
     pub fn new(hash: Hash) -> Self {
-        TransactionQuery { hash }
+        Self { hash }
     }
 }
 
@@ -190,7 +190,7 @@ impl ExplorerApi {
 
 impl<'a> From<::explorer::BlockInfo<'a>> for BlockInfo {
     fn from(inner: ::explorer::BlockInfo<'a>) -> Self {
-        BlockInfo {
+        Self {
             block: inner.header().clone(),
             precommits: inner.precommits().to_vec(),
             txs: inner.transaction_hashes().to_vec(),

@@ -77,7 +77,7 @@ impl<'de> Deserialize<'de> for ProofPath {
                     return Err(de::Error::invalid_value(Unexpected::Str(value), &self));
                 }
 
-                let mut bytes = [0u8; KEY_SIZE];
+                let mut bytes = [0_u8; KEY_SIZE];
                 for (i, ch) in value.chars().enumerate() {
                     match ch {
                         '0' => {}
@@ -330,10 +330,10 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         0 => Ok(Hash::default()),
 
         1 => {
-            if !entries[0].path.is_leaf() {
-                Err(MapProofError::NonTerminalNode(entries[0].path))
-            } else {
+            if entries[0].path.is_leaf() {
                 Ok(hash_isolated_node(&entries[0].path, &entries[0].hash))
+            } else {
+                Err(MapProofError::NonTerminalNode(entries[0].path))
             }
         }
 
@@ -392,7 +392,7 @@ pub(super) struct MapProofBuilder<K, V> {
 impl<K, V> MapProofBuilder<K, V> {
     /// Creates a new builder.
     pub fn new() -> Self {
-        MapProofBuilder {
+        Self {
             entries: vec![],
             proof: vec![],
         }
@@ -667,20 +667,7 @@ where
                     ChildKind::Right => right_hashes.push(other_path_and_hash),
                 }
 
-                if !searched_path.matches_from(&node_path, next_height) {
-                    // Both children of `branch` do not fit
-
-                    let next_hash = *branch.child_hash(next_bit);
-                    match next_bit {
-                        ChildKind::Left => left_hashes.push((node_path, next_hash)),
-                        ChildKind::Right => right_hashes.push((node_path, next_hash)),
-                    }
-
-                    return MapProofBuilder::new()
-                        .add_missing(key)
-                        .add_proof_entries(combine(left_hashes, right_hashes))
-                        .create();
-                } else {
+                if searched_path.matches_from(&node_path, next_height) {
                     let node = lookup(&node_path);
                     match node {
                         Node::Branch(branch_) => branch = branch_,
@@ -694,6 +681,19 @@ where
                                 .create();
                         }
                     }
+                } else {
+                    // Both children of `branch` do not fit.
+
+                    let next_hash = *branch.child_hash(next_bit);
+                    match next_bit {
+                        ChildKind::Left => left_hashes.push((node_path, next_hash)),
+                        ChildKind::Right => right_hashes.push((node_path, next_hash)),
+                    }
+
+                    return MapProofBuilder::new()
+                        .add_missing(key)
+                        .add_proof_entries(combine(left_hashes, right_hashes))
+                        .create();
                 }
             }
         }
@@ -724,7 +724,7 @@ struct ContourNode {
 
 impl ContourNode {
     fn new(key: ProofPath, branch: BranchNode) -> Self {
-        ContourNode {
+        Self {
             key,
             branch,
             visited_left: false,
@@ -790,11 +790,7 @@ where
             let next_bit = proof_path.bit(next_height);
             let node_path = contour_tip.branch.child_path(next_bit);
 
-            if !proof_path.matches_from(&node_path, next_height) {
-                // Both children of `branch` do not fit; stop here
-                builder = builder.add_missing(key);
-                break 'traverse;
-            } else {
+            if proof_path.matches_from(&node_path, next_height) {
                 match next_bit {
                     ChildKind::Left => contour_tip.visited_left = true,
                     ChildKind::Right => {
@@ -809,6 +805,10 @@ where
                 }
 
                 node_path
+            } else {
+                // Both children of `branch` do not fit; stop here
+                builder = builder.add_missing(key);
+                break 'traverse;
             }
         };
 

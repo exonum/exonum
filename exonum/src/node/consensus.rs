@@ -513,8 +513,7 @@ impl NodeHandler {
             height,
             proposer,
             round
-                .map(|x| format!("{}", x))
-                .unwrap_or_else(|| "?".into()),
+                .map_or_else(|| "?".into(), |x| format!("{}", x)),
             committed_txs,
             pool_len,
             block_hash.to_hex(),

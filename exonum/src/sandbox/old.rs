@@ -21,7 +21,7 @@ use super::{
         ROUND_ONE, ROUND_THREE,
     },
 };
-use blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use blockchain::Block;
 use crypto::{CryptoHash, Hash};
 use helpers::{Height, Round};
 
@@ -98,7 +98,6 @@ fn test_get_lock_and_send_precommit() {
     );
 
     let block = Block::new(
-        SCHEMA_MAJOR_VERSION,
         VALIDATOR_2,
         HEIGHT_ONE,
         0,
@@ -159,7 +158,6 @@ fn test_commit() {
     );
 
     let block = Block::new(
-        SCHEMA_MAJOR_VERSION,
         VALIDATOR_2,
         HEIGHT_ONE,
         0,

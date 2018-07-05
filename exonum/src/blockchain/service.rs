@@ -246,7 +246,7 @@ impl<'a> ServiceContext<'a> {
         fork: Fork,
         service_id: u16,
         blockchain: &Blockchain,
-    ) -> ServiceContext {
+    ) -> Self {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
             let stored_configuration = schema.actual_configuration();
@@ -259,7 +259,7 @@ impl<'a> ServiceContext<'a> {
             .position(|validator| service_public_key == validator.service_key)
             .map(|id| ValidatorId(id as u16));
 
-        ServiceContext {
+        Self {
             validator_id,
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
@@ -349,7 +349,7 @@ pub struct ApiNodeState {
 }
 
 impl ApiNodeState {
-    fn new() -> ApiNodeState {
+    fn new() -> Self {
         Self {
             is_enabled: true,
             ..Default::default()
@@ -370,8 +370,8 @@ pub struct SharedNodeState {
 
 impl SharedNodeState {
     /// Creates a new `SharedNodeState` instance.
-    pub fn new(state_update_timeout: Milliseconds) -> SharedNodeState {
-        SharedNodeState {
+    pub fn new(state_update_timeout: Milliseconds) -> Self {
+        Self {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
         }
@@ -552,6 +552,6 @@ impl SharedNodeState {
 
 impl<'a, S: Service> From<S> for Box<dyn Service + 'a> {
     fn from(s: S) -> Self {
-        Box::new(s) as Box<dyn Service>
+        Box::new(s) as Self
     }
 }

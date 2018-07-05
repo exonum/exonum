@@ -164,8 +164,8 @@ pub struct NodeApiConfig {
 }
 
 impl Default for NodeApiConfig {
-    fn default() -> NodeApiConfig {
-        NodeApiConfig {
+    fn default() -> Self {
+        Self {
             state_update_timeout: 10_000,
             enable_blockchain_explorer: true,
             public_api_address: None,
@@ -190,8 +190,8 @@ pub struct EventsPoolCapacity {
 }
 
 impl Default for EventsPoolCapacity {
-    fn default() -> EventsPoolCapacity {
-        EventsPoolCapacity {
+    fn default() -> Self {
+        Self {
             network_requests_capacity: 512,
             network_events_capacity: 512,
             internal_events_capacity: 128,
@@ -211,8 +211,8 @@ pub struct MemoryPoolConfig {
 }
 
 impl Default for MemoryPoolConfig {
-    fn default() -> MemoryPoolConfig {
-        MemoryPoolConfig {
+    fn default() -> Self {
+        Self {
             tx_pool_capacity: 100_000,
             events_pool_capacity: EventsPoolCapacity::default(),
         }
@@ -423,7 +423,7 @@ impl NodeHandler {
 
         api_state.set_node_role(node_role);
 
-        NodeHandler {
+        Self {
             blockchain,
             api_state,
             system_state,
@@ -556,19 +556,16 @@ impl NodeHandler {
         trace!("Send to address: {}", address);
         let public_key = self.state.connect_list().find_key_by_address(&address);
 
-        match public_key {
-            Some(public_key) => {
-                trace!("Send to address: {}", address);
-                let request = NetworkRequest::SendMessage(*address, message.into(), *public_key);
-                self.channel.network_requests.send(request).log_error();
-            }
-            _ => {
-                warn!(
-                    "Attempt to connect to the peer with address {:?} which \
+        if let Some(public_key) = public_key {
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(*address, message.into(), *public_key);
+            self.channel.network_requests.send(request).log_error();
+        } else {
+            warn!(
+                "Attempt to connect to the peer with address {:?} which \
                      is not in the ConnectList",
-                    address
-                );
-            }
+                address
+            );
         }
     }
 
@@ -706,7 +703,7 @@ impl fmt::Debug for NodeHandler {
 
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> ApiSender {
+    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
     }
 
@@ -800,8 +797,8 @@ pub struct Node {
 
 impl NodeChannel {
     /// Creates `NodeChannel` with the given pool capacities.
-    pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
-        NodeChannel {
+    pub fn new(buffer_sizes: &EventsPoolCapacity) -> Self {
+        Self {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
@@ -874,7 +871,7 @@ impl Node {
             config,
             api_state,
         );
-        Node {
+        Self {
             api_options: node_cfg.api,
             handler,
             channel,
