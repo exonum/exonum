@@ -369,11 +369,9 @@ impl Listener {
             let network_tx = network_tx.clone();
 
             let handshake = NoiseHandshake::responder(&handshake_params);
-            let stream = handshake.listen(sock).map(|(sock, key)| {
-                sock
-            }).flatten_stream();
-
-            let connection_handler = stream
+            let connection_handler = handshake.listen(sock).and_then(move |(sock, key)| {
+                let (_, stream) = sock.split();
+                stream
                 .into_future()
                 .and_then(Ok)
                 .map_err(|e| e.0)
@@ -405,7 +403,9 @@ impl Listener {
                     // Ensure that holder lives until the stream ends.
                     let _holder = holder;
                 })
+            })
                 .map_err(log_error);
+
             handle.spawn(to_box(connection_handler));
             to_box(future::ok(()))
         });
