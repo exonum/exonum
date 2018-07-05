@@ -12,27 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::sync::{mpsc, mpsc::Sender};
-use futures::{future::Either, Future, Sink, Stream};
+use futures::{
+    future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
+};
 use snow::{types::Dh, NoiseBuilder};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Core,
+};
+use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::error::Error;
-use std::io::{self, Result as IoResult};
-use std::net::SocketAddr;
-use std::thread;
-use std::time::Duration;
+use std::{
+    error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
+};
 
 use crypto::{
     gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed, PUBLIC_KEY_LENGTH,
 };
-use events::error::into_other;
-use events::noise::{
-    sodium_resolver::SodiumDh25519, Handshake, HandshakeParams, HandshakeRawMessage,
-    HandshakeResult, NoiseHandshake,
+use events::{
+    error::into_other,
+    noise::{
+        sodium_resolver::SodiumDh25519, Handshake, HandshakeParams, HandshakeRawMessage,
+        HandshakeResult, NoiseHandshake,
+    },
 };
-use tokio_io::{AsyncRead, AsyncWrite};
 
 #[test]
 fn test_convert_ed_to_curve_dh() {

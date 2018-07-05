@@ -22,9 +22,9 @@ use std::io;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
-use events::noise::wrapper::MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{
-    codec::MessagesCodec, noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH},
+    codec::MessagesCodec,
+    noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH, MAX_HANDSHAKE_MESSAGE_LENGTH},
 };
 
 pub mod sodium_resolver;

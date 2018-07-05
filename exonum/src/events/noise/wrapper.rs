@@ -25,8 +25,7 @@ use std::{
     fmt::{self, Error, Formatter}, io,
 };
 
-use events::noise::sodium_resolver::SodiumResolver;
-use events::noise::HandshakeParams;
+use events::noise::{sodium_resolver::SodiumResolver, HandshakeParams};
 
 pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
