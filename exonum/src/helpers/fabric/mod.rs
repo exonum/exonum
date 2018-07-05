@@ -17,8 +17,7 @@
 pub use self::{
     builder::NodeBuilder, context_key::ContextKey,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
-    internal::Command,
-    maintenance::Maintenance,
+    internal::Command, maintenance::Maintenance,
     shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig},
 };
 

@@ -54,7 +54,7 @@ pub struct CollectedCommand {
 
 impl CollectedCommand {
     pub fn new(command: Box<dyn Command>) -> Self {
-            Self {
+        Self {
             args: command.args(),
             command,
             exts: Vec::new(),
@@ -81,11 +81,7 @@ impl CollectedCommand {
         }
     }
 
-    pub fn execute(
-        &self,
-        commands: &HashMap<CommandName, Self>,
-        context: Context,
-    ) -> Feedback {
+    pub fn execute(&self, commands: &HashMap<CommandName, Self>, context: Context) -> Feedback {
         self.command.execute(commands, context, &|context| {
             // TODO: Check duplicates, in services context keys. (ECR-164)
             let mut new_context = context.clone();
