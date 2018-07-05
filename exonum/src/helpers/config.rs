@@ -89,10 +89,16 @@ impl ConfigManager {
         let (tx, rx) = mpsc::channel();
         let handle = thread::spawn(move || {
             info!("ConfigManager started");
-            for command in rx {
-                match command {
+            for request in rx {
+                match request {
                     ConfigRequest::UpdateConnectList(connect_list) => {
-                        Self::update_connect_list(connect_list, &path)
+                        info!("Updating connect list. New value: {:?}", connect_list);
+
+                        let res = Self::update_connect_list(connect_list, &path);
+
+                        if let Err(ref error) = res {
+                            error!("Unable to update config: {}", error);
+                        }
                     }
                 }
             }
@@ -115,14 +121,11 @@ impl ConfigManager {
         self.handle.join().expect("Can't stop thread");
     }
 
-    fn update_connect_list(connect_list: ConnectListConfig, path: &str) {
-        info!("Updating connect list. New value: {:?}", connect_list);
-        // TODO: remove expect.
-        let mut current_config: NodeConfig =
-            ConfigFile::load(path).expect("Can't load node config file");
-
+    fn update_connect_list(connect_list: ConnectListConfig, path: &str) -> Result<(), Error> {
+        let mut current_config: NodeConfig = ConfigFile::load(path)?;
         current_config.connect_list = connect_list;
+        ConfigFile::save(&current_config, path)?;
 
-        ConfigFile::save(&current_config, path).expect("Can't save node config file");
+        Ok(())
     }
 }
