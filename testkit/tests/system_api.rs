@@ -19,7 +19,7 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::node::{
-        private::NodeInfo, public::system::{ConsensusStatus, ConnectivityStatus, HealthCheckInfo},
+        private::NodeInfo, public::system::{ConnectivityStatus, ConsensusStatus, HealthCheckInfo},
     },
     helpers::user_agent, messages::PROTOCOL_MAJOR_VERSION,
 };

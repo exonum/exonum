@@ -47,27 +47,27 @@ mock.onPost('/api/services/cryptocurrency/v1/wallets/transaction', {
   'tx_hash': '1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127'
 })
 
-mock.onGet('/api/explorer/v1/transactions/1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127').replyOnce(200, {
+mock.onGet('/api/explorer/v1/transactions?hash=1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127').replyOnce(200, {
   'type': 'in-pool'
 })
 
-mock.onGet('/api/explorer/v1/transactions/1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127').replyOnce(200, {
+mock.onGet('/api/explorer/v1/transactions?hash=1ef4ad31435588a8290a460d1bd0f57edce7ec2e34258693b25216818ed2b127').replyOnce(200, {
   'type': 'committed'
 })
 
-mock.onGet('/api/explorer/v1/transactions/8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596').replyOnce(200, {
+mock.onGet('/api/explorer/v1/transactions?hash=8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596').replyOnce(200, {
   'type': 'in-pool'
 })
 
-mock.onGet('/api/explorer/v1/transactions/8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596').replyOnce(200, {
+mock.onGet('/api/explorer/v1/transactions?hash=8055cd33cf11106f16321feb37777c3a92cbeaa23b9f7984a5b819ae51fee596').replyOnce(200, {
   'type': 'committed'
 })
 
-mock.onGet('/api/explorer/v1/transactions/0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc').replyOnce(200, {
+mock.onGet('/api/explorer/v1/transactions?hash=0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc').replyOnce(200, {
   'type': 'in-pool'
 })
 
-mock.onGet('/api/explorer/v1/transactions/0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc').replyOnce(200, {
+mock.onGet('/api/explorer/v1/transactions?hash=0728ebfd50515a572deed796b7e2ab55f879fe999f8f754ff36a4a25e1efcbcc').replyOnce(200, {
   'type': 'committed'
 })
 

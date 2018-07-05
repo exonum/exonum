@@ -62,7 +62,7 @@ impl StorageValue for SparseListSize {
         let buf = value.as_ref();
         let capacity = BigEndian::read_u64(&buf[0..8]);
         let length = BigEndian::read_u64(&buf[8..16]);
-        SparseListSize { capacity, length }
+        Self { capacity, length }
     }
 }
 
@@ -152,7 +152,7 @@ where
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        SparseListIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
@@ -189,7 +189,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        SparseListIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
@@ -317,7 +317,7 @@ where
     /// ```
     pub fn iter(&self) -> SparseListIndexIter<V> {
         SparseListIndexIter {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 
@@ -340,7 +340,7 @@ where
     /// ```
     pub fn indices(&self) -> SparseListIndexKeys {
         SparseListIndexKeys {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 
@@ -364,7 +364,7 @@ where
     /// ```
     pub fn values(&self) -> SparseListIndexValues<V> {
         SparseListIndexValues {
-            base_iter: self.base.iter_from(&(), &0u64),
+            base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
 
@@ -710,14 +710,14 @@ mod tests {
         let mut fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
-        list_index.extend(vec![1u8, 15, 25, 2, 3]);
+        list_index.extend(vec![1_u8, 15, 25, 2, 3]);
         assert_eq!(
             list_index.indices().collect::<Vec<u64>>(),
-            vec![0u64, 1, 2, 3, 4]
+            vec![0_u64, 1, 2, 3, 4]
         );
         assert_eq!(
             list_index.values().collect::<Vec<u8>>(),
-            vec![1u8, 15, 25, 2, 3]
+            vec![1_u8, 15, 25, 2, 3]
         );
 
         list_index.remove(1);
@@ -725,24 +725,27 @@ mod tests {
 
         assert_eq!(
             list_index.iter().collect::<Vec<(u64, u8)>>(),
-            vec![(0u64, 1u8), (3u64, 2u8), (4u64, 3u8)]
+            vec![(0_u64, 1_u8), (3_u64, 2_u8), (4_u64, 3_u8)]
         );
 
         assert_eq!(
             list_index.iter_from(0).collect::<Vec<(u64, u8)>>(),
-            vec![(0u64, 1u8), (3u64, 2u8), (4u64, 3u8)]
+            vec![(0_u64, 1_u8), (3_u64, 2_u8), (4_u64, 3_u8)]
         );
         assert_eq!(
             list_index.iter_from(1).collect::<Vec<(u64, u8)>>(),
-            vec![(3u64, 2u8), (4u64, 3u8)]
+            vec![(3_u64, 2_u8), (4_u64, 3_u8)]
         );
         assert_eq!(
             list_index.iter_from(5).collect::<Vec<(u64, u8)>>(),
             Vec::<(u64, u8)>::new()
         );
 
-        assert_eq!(list_index.indices().collect::<Vec<u64>>(), vec![0u64, 3, 4]);
-        assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1u8, 2, 3]);
+        assert_eq!(
+            list_index.indices().collect::<Vec<u64>>(),
+            vec![0_u64, 3, 4]
+        );
+        assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1_u8, 2, 3]);
     }
 
     mod memorydb_tests {

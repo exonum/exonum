@@ -34,7 +34,7 @@ impl<T> Copy for ContextKey<T> {}
 #[cfg_attr(feature = "cargo-clippy", allow(expl_impl_clone_on_copy))]
 impl<T> Clone for ContextKey<T> {
     fn clone(&self) -> Self {
-        ContextKey {
+        Self {
             __name: self.__name,
             __phantom: self.__phantom,
         }

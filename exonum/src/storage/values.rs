@@ -229,7 +229,7 @@ impl StorageValue for PublicKey {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        PublicKey::from_slice(value.as_ref()).unwrap()
+        Self::from_slice(value.as_ref()).unwrap()
     }
 }
 
@@ -248,7 +248,7 @@ impl StorageValue for Vec<u8> {
         self
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Vec<u8> {
         value.into_owned()
     }
 }
@@ -256,11 +256,11 @@ impl StorageValue for Vec<u8> {
 /// Uses UTF-8 string serialization.
 impl StorageValue for String {
     fn into_bytes(self) -> Vec<u8> {
-        String::into_bytes(self)
+        Self::into_bytes(self)
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        String::from_utf8(value.into_owned()).unwrap()
+        Self::from_utf8(value.into_owned()).unwrap()
     }
 }
 
@@ -279,16 +279,16 @@ impl StorageValue for DateTime<Utc> {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let secs = LittleEndian::read_i64(&value[0..8]);
         let nanos = LittleEndian::read_u32(&value[8..12]);
-        DateTime::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+        Self::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
     }
 }
 
 /// Uses little-endian encoding.
 impl StorageValue for Duration {
     fn into_bytes(self) -> Vec<u8> {
-        let mut buffer = vec![0; Duration::field_size() as usize];
+        let mut buffer = vec![0; Self::field_size() as usize];
         let from: Offset = 0;
-        let to: Offset = Duration::field_size();
+        let to: Offset = Self::field_size();
         self.write(&mut buffer, from, to);
         buffer
     }
@@ -296,8 +296,8 @@ impl StorageValue for Duration {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         #![allow(unsafe_code)]
         let from: Offset = 0;
-        let to: Offset = Duration::field_size();
-        unsafe { Duration::read(&value, from, to) }
+        let to: Offset = Self::field_size();
+        unsafe { Self::read(&value, from, to) }
     }
 }
 

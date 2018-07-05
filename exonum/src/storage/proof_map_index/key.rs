@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::cmp::{min, Ordering};
+use std::ops;
 
 use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
 use storage::StorageKey;
@@ -108,26 +109,26 @@ impl<T: HashedKey> ProofMapKey for T {
 }
 
 impl ProofMapKey for PublicKey {
-    type Output = PublicKey;
+    type Output = Self;
 
     fn write_key(&self, buffer: &mut [u8]) {
         StorageKey::write(self, buffer);
     }
 
-    fn read_key(raw: &[u8]) -> PublicKey {
-        <PublicKey as StorageKey>::read(raw)
+    fn read_key(raw: &[u8]) -> Self {
+        <Self as StorageKey>::read(raw)
     }
 }
 
 impl ProofMapKey for Hash {
-    type Output = Hash;
+    type Output = Self;
 
     fn write_key(&self, buffer: &mut [u8]) {
         StorageKey::write(self, buffer);
     }
 
-    fn read_key(raw: &[u8]) -> Hash {
-        <Hash as StorageKey>::read(raw)
+    fn read_key(raw: &[u8]) -> Self {
+        <Self as StorageKey>::read(raw)
     }
 }
 
@@ -151,10 +152,10 @@ pub enum ChildKind {
     Right,
 }
 
-impl ::std::ops::Not for ChildKind {
-    type Output = ChildKind;
+impl ops::Not for ChildKind {
+    type Output = Self;
 
-    fn not(self) -> ChildKind {
+    fn not(self) -> Self {
         match self {
             ChildKind::Left => ChildKind::Right,
             ChildKind::Right => ChildKind::Left,
@@ -187,12 +188,12 @@ pub struct ProofPath {
 
 impl ProofPath {
     /// Creates a path from the given key.
-    pub fn new<K: ProofMapKey>(key: &K) -> ProofPath {
+    pub fn new<K: ProofMapKey>(key: &K) -> Self {
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
         key.write_key(&mut data[1..KEY_SIZE + 1]);
         data[PROOF_PATH_LEN_POS] = 0;
-        ProofPath::from_raw(data)
+        Self::from_raw(data)
     }
 
     /// Checks if this is a path to a leaf `ProofMapIndex` node.
@@ -206,13 +207,13 @@ impl ProofPath {
     }
 
     /// Constructs the `ProofPath` from raw bytes.
-    fn from_raw(raw: [u8; PROOF_PATH_SIZE]) -> ProofPath {
+    fn from_raw(raw: [u8; PROOF_PATH_SIZE]) -> Self {
         debug_assert!(
             (raw[PROOF_PATH_KIND_POS] != LEAF_KEY_PREFIX) || (raw[PROOF_PATH_LEN_POS] == 0),
             "ProofPath is inconsistent"
         );
 
-        ProofPath {
+        Self {
             bytes: raw,
             start: 0,
         }
@@ -257,10 +258,10 @@ pub(crate) trait BitsRange {
         let chunk = self.raw_key()[(pos / 8) as usize];
         let bit = pos % 8;
         let value = (1 << bit) & chunk;
-        if value != 0 {
-            ChildKind::Right
-        } else {
+        if value == 0 {
             ChildKind::Left
+        } else {
+            ChildKind::Right
         }
     }
 
@@ -316,10 +317,10 @@ pub(crate) trait BitsRange {
     /// provided that they start from the same position.
     /// If start positions differ, returns 0.
     fn common_prefix_len(&self, other: &Self) -> u16 {
-        if self.start() != other.start() {
-            0
-        } else {
+        if self.start() == other.start() {
             self.match_len(other, self.start())
+        } else {
+            0
         }
     }
 }
@@ -340,7 +341,7 @@ impl BitsRange for ProofPath {
     fn start_from(&self, pos: u16) -> Self {
         debug_assert!(pos <= self.end());
 
-        let mut key = ProofPath::from_raw(self.bytes);
+        let mut key = Self::from_raw(self.bytes);
         key.start = pos;
         key
     }
@@ -350,7 +351,7 @@ impl BitsRange for ProofPath {
         let key_len = KEY_SIZE as u16 * 8;
         debug_assert!(end < key_len);
 
-        let mut key = ProofPath::from_raw(self.bytes);
+        let mut key = Self::from_raw(self.bytes);
         key.start = self.start;
         key.set_end(Some(end as u8));
         key
@@ -407,7 +408,7 @@ impl StorageKey for ProofPath {
         if !self.is_leaf() {
             let right = (self.end() as usize + 7) / 8;
             if self.end() % 8 != 0 {
-                buffer[right] &= !(255u8 << (self.end() % 8));
+                buffer[right] &= !(255_u8 << (self.end() % 8));
             }
             for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
                 *i = 0
@@ -419,7 +420,7 @@ impl StorageKey for ProofPath {
         debug_assert_eq!(buffer.len(), PROOF_PATH_SIZE);
         let mut data = [0; PROOF_PATH_SIZE];
         data.copy_from_slice(buffer);
-        ProofPath::from_raw(data)
+        Self::from_raw(data)
     }
 }
 
@@ -587,7 +588,7 @@ fn test_proof_path_storage_key_leaf() {
 
 #[test]
 fn test_proof_path_storage_key_branch() {
-    let mut key = ProofPath::new(&[255u8; 32]);
+    let mut key = ProofPath::new(&[255_u8; 32]);
     key = key.prefix(11);
     key = key.suffix(5);
 

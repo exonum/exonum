@@ -35,8 +35,8 @@ pub struct BranchNode {
 }
 
 impl BranchNode {
-    pub fn empty() -> BranchNode {
-        BranchNode {
+    pub fn empty() -> Self {
+        Self {
             raw: vec![0; BRANCH_NODE_SIZE],
         }
     }
@@ -93,7 +93,7 @@ impl StorageValue for BranchNode {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        BranchNode {
+        Self {
             raw: value.into_owned(),
         }
     }

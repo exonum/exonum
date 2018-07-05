@@ -83,7 +83,7 @@ pub struct ServiceApiScope {
 impl ServiceApiScope {
     /// Creates a new instance.
     pub fn new() -> Self {
-        ServiceApiScope::default()
+        Self::default()
     }
 
     /// Adds the given endpoint handler to the API scope.
@@ -217,7 +217,7 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
     pub fn new() -> Self {
-        ServiceApiBuilder::default()
+        Self::default()
     }
 
     /// Returns a mutable reference to the public API scope builder.
@@ -284,7 +284,7 @@ impl ApiAggregator {
             (prefix, builder)
         }));
 
-        ApiAggregator {
+        Self {
             inner,
             blockchain,
             node_state,

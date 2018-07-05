@@ -135,7 +135,7 @@ where
     /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &mut fork);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-        ProofMapIndex {
+        Self {
             base: BaseIndex::new(index_name, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
@@ -181,7 +181,7 @@ where
         index_id: &I,
         view: T,
     ) -> Self {
-        ProofMapIndex {
+        Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,

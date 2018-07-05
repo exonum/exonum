@@ -53,8 +53,8 @@ pub struct CollectedCommand {
 }
 
 impl CollectedCommand {
-    pub fn new(command: Box<dyn Command>) -> CollectedCommand {
-        CollectedCommand {
+    pub fn new(command: Box<dyn Command>) -> Self {
+            Self {
             args: command.args(),
             command,
             exts: Vec::new(),
@@ -83,7 +83,7 @@ impl CollectedCommand {
 
     pub fn execute(
         &self,
-        commands: &HashMap<CommandName, CollectedCommand>,
+        commands: &HashMap<CommandName, Self>,
         context: Context,
     ) -> Feedback {
         self.command.execute(commands, context, &|context| {

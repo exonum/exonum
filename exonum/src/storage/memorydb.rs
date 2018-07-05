@@ -39,8 +39,8 @@ struct MemoryDBIter {
 
 impl MemoryDB {
     /// Creates a new, empty database.
-    pub fn new() -> MemoryDB {
-        MemoryDB {
+    pub fn new() -> Self {
+        Self {
             map: RwLock::new(HashMap::new()),
         }
     }
@@ -48,7 +48,7 @@ impl MemoryDB {
 
 impl Database for MemoryDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
-        Box::new(MemoryDB {
+        Box::new(Self {
             map: RwLock::new(self.map.read().unwrap().clone()),
         })
     }

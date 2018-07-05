@@ -54,7 +54,7 @@ impl NoiseWrapper {
             let session = builder
                 .build_initiator()
                 .expect("Noise session initiator failed to initialize");
-            return NoiseWrapper { session };
+            return Self { session };
         } else {
             panic!("Remote public key is not specified")
         }
@@ -68,7 +68,7 @@ impl NoiseWrapper {
             .build_responder()
             .expect("Noise session responder failed to initialize");
 
-        NoiseWrapper { session }
+        Self { session }
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<Vec<u8>, NoiseError> {
@@ -87,7 +87,7 @@ impl NoiseWrapper {
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
         // Transition into transport mode after handshake is finished.
         let session = self.session.into_transport_mode()?;
-        Ok(NoiseWrapper { session })
+        Ok(Self { session })
     }
 
     /// Decrypts `msg` using Noise session.
@@ -135,7 +135,7 @@ impl NoiseWrapper {
             encoded_message.extend_from_slice(&written);
         }
 
-        let mut msg_len_buf = vec![0u8; NOISE_HEADER_LENGTH];
+        let mut msg_len_buf = vec![0_u8; NOISE_HEADER_LENGTH];
 
         LittleEndian::write_u32(&mut msg_len_buf, len as u32);
         let encoded_message = &encoded_message[0..len];
@@ -204,7 +204,7 @@ impl From<NoiseError> for io::Error {
             _ => format!("{:?}", e),
         };
 
-        io::Error::new(io::ErrorKind::Other, message)
+        Self::new(io::ErrorKind::Other, message)
     }
 }
 

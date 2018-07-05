@@ -126,19 +126,19 @@ check-request "Bob" 220 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
 TXID=57826186c1c3983ba77433790cc378e9e39bad78b8471494ee990568c5c1cc62
-RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions/$TXID 2>/dev/null`
+RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
 EXP=`cat tx-create-wallet-1.json`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving Bob's transaction info..."
 TXID=988b9861bc2758c2dfb3ab69f44557972cec85e13d55bef20fea8fb4e748ba7e
-RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions/$TXID 2>/dev/null`
+RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
 EXP=`cat tx-create-wallet-2.json`
 check-create-tx "Bob" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
 TXID=5f4a5e852743b37d46dffe5af3145519938784f2106374c5ed68597d3dce57aa
-RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions/$TXID 2>/dev/null`
+RESP=`curl http://127.0.0.1:8008/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
 EXP=`cat tx-transfer.json`
 check-transfer-tx "$EXP" "$RESP"
 

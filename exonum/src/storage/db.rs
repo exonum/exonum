@@ -22,7 +22,6 @@ use std::{
     iter::{Iterator as StdIterator, Peekable},
 };
 
-use self::NextIterValue::*;
 use super::Result;
 
 /// Map containing changes with a corresponding key.
@@ -537,30 +536,30 @@ impl<'a> ForkIter<'a> {
                 Some(&(k, change)) => match self.snapshot.peek() {
                     Some((key, ..)) => match *change {
                         Change::Put(..) => match k[..].cmp(key) {
-                            Equal => Replaced,
-                            Less => Inserted,
-                            Greater => Stored,
+                            Equal => NextIterValue::Replaced,
+                            Less => NextIterValue::Inserted,
+                            Greater => NextIterValue::Stored,
                         },
                         Change::Delete => match k[..].cmp(key) {
-                            Equal => Deleted,
-                            Less => MissDeleted,
-                            Greater => Stored,
+                            Equal => NextIterValue::Deleted,
+                            Less => NextIterValue::MissDeleted,
+                            Greater => NextIterValue::Stored,
                         },
                     },
                     None => match *change {
-                        Change::Put(..) => Inserted,
-                        Change::Delete => MissDeleted,
+                        Change::Put(..) => NextIterValue::Inserted,
+                        Change::Delete => NextIterValue::MissDeleted,
                     },
                 },
                 None => match self.snapshot.peek() {
-                    Some(..) => Stored,
-                    None => Finished,
+                    Some(..) => NextIterValue::Stored,
+                    None => NextIterValue::Finished,
                 },
             }
         } else {
             match self.snapshot.peek() {
-                Some(..) => Stored,
-                None => Finished,
+                Some(..) => NextIterValue::Stored,
+                None => NextIterValue::Finished,
             }
         }
     }
@@ -570,8 +569,8 @@ impl<'a> Iterator for ForkIter<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {
-                Stored => return self.snapshot.next(),
-                Replaced => {
+                NextIterValue::Stored => return self.snapshot.next(),
+                NextIterValue::Replaced => {
                     self.snapshot.next();
                     return self.changes.as_mut().unwrap().next().map(|(key, change)| {
                         (
@@ -583,7 +582,7 @@ impl<'a> Iterator for ForkIter<'a> {
                         )
                     });
                 }
-                Inserted => {
+                NextIterValue::Inserted => {
                     return self.changes.as_mut().unwrap().next().map(|(key, change)| {
                         (
                             key.as_slice(),
@@ -594,14 +593,14 @@ impl<'a> Iterator for ForkIter<'a> {
                         )
                     })
                 }
-                Deleted => {
+                NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();
                     self.snapshot.next();
                 }
-                MissDeleted => {
+                NextIterValue::MissDeleted => {
                     self.changes.as_mut().unwrap().next();
                 }
-                Finished => return None,
+                NextIterValue::Finished => return None,
             }
         }
     }
@@ -609,8 +608,8 @@ impl<'a> Iterator for ForkIter<'a> {
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {
-                Stored => return self.snapshot.peek(),
-                Replaced | Inserted => {
+                NextIterValue::Stored => return self.snapshot.peek(),
+                NextIterValue::Replaced | NextIterValue::Inserted => {
                     return self.changes.as_mut().unwrap().peek().map(|&(key, change)| {
                         (
                             key.as_slice(),
@@ -621,14 +620,14 @@ impl<'a> Iterator for ForkIter<'a> {
                         )
                     })
                 }
-                Deleted => {
+                NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();
                     self.snapshot.next();
                 }
-                MissDeleted => {
+                NextIterValue::MissDeleted => {
                     self.changes.as_mut().unwrap().next();
                 }
-                Finished => return None,
+                NextIterValue::Finished => return None,
             }
         }
     }
@@ -636,6 +635,6 @@ impl<'a> Iterator for ForkIter<'a> {
 
 impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
-        Box::new(db) as Box<dyn Database>
+        Box::new(db) as Self
     }
 }
