@@ -69,7 +69,7 @@ fn do_save<T: Serialize>(value: &T, path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-/// Structure that handles work with config file in runtime.
+/// Structure that handles work with config file at runtime.
 #[derive(Debug)]
 pub struct ConfigManager {
     handle: thread::JoinHandle<()>,
