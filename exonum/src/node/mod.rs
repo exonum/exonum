@@ -326,7 +326,7 @@ impl NodeRole {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 /// ConnectList representation in node's config file.
 pub struct ConnectListConfig {
     /// Peers to which we can connect.
@@ -768,7 +768,7 @@ impl fmt::Debug for ApiSender {
 }
 
 /// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct ConnectInfo {
     /// Peer address.
     pub address: SocketAddr,

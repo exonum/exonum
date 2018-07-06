@@ -124,7 +124,10 @@ impl ConfigManager {
         self.handle.join().expect("Can't stop thread");
     }
 
-    fn update_connect_list<P>(connect_list: ConnectListConfig, path: &P) -> Result<(), Error>
+    // Updates ConnectList on file system synchronously.
+    // This method is public only for testing and should not be used explicitly.
+    #[doc(hidden)]
+    pub fn update_connect_list<P>(connect_list: ConnectListConfig, path: &P) -> Result<(), Error>
     where
         P: AsRef<Path>,
     {

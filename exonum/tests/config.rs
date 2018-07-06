@@ -20,11 +20,18 @@ extern crate pretty_assertions;
 extern crate serde_derive;
 extern crate toml;
 
-use exonum::{api::backends::actix::AllowOrigin, helpers::fabric::NodeBuilder};
+use exonum::{
+    api::backends::actix::AllowOrigin, crypto::PublicKey,
+    helpers::{
+        config::{ConfigFile, ConfigManager}, fabric::NodeBuilder,
+    },
+    node::{ConnectInfo, ConnectListConfig, NodeConfig},
+};
 use toml::Value;
 
 use std::{
-    ffi::OsString, fs, fs::{File, OpenOptions}, io::{Read, Write}, panic, path::Path,
+    ffi::OsString, fs, fs::{File, OpenOptions}, io::{Read, Write}, net::SocketAddr, panic,
+    path::Path, str::FromStr,
 };
 
 const CONFIG_TMP_FOLDER: &str = "/tmp/";
@@ -318,4 +325,38 @@ fn allow_origin_toml() {
         r#"["http://a.org", "http://b.org"]"#,
         AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
     );
+}
+
+#[test]
+fn test_update_config() {
+    const TEST_DIR: &str = "config-update";
+    const TEST_CONFIG_FILE: &str = "config01.toml";
+
+    let full_test_dir = full_tmp_folder(TEST_DIR);
+    fs::create_dir_all(Path::new(&full_test_dir))
+        .expect("Expected test temp folder to be created.");
+
+    // Copy test config to the separate file.
+    let config_path = full_tmp_name(TEST_CONFIG_FILE, TEST_DIR);
+    let testdata_path = full_testdata_name(TEST_CONFIG_FILE);
+    fs::copy(testdata_path, config_path.clone()).unwrap();
+
+    // Test config update.
+    let peer = ConnectInfo {
+        address: SocketAddr::from_str("0.0.0.1:8080").unwrap(),
+        public_key: PublicKey::new([1; 32]),
+    };
+
+    let connect_list = ConnectListConfig { peers: vec![peer] };
+
+    ConfigManager::update_connect_list(connect_list.clone(), &config_path)
+        .expect("Unable to update connect list");
+    let config: NodeConfig =
+        ConfigFile::load(config_path.clone()).expect("Can't load node config file");
+
+    let new_connect_list = config.connect_list;
+    assert_eq!(new_connect_list.peers, connect_list.peers);
+
+    // Cleanup.
+    fs::remove_dir_all(Path::new(&full_test_dir)).unwrap();
 }
