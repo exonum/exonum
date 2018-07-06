@@ -76,7 +76,7 @@ pub struct ConfigManager {
     tx: mpsc::Sender<ConfigRequest>,
 }
 
-/// Messages for ConfigReader.
+/// Messages for ConfigManager.
 #[derive(Debug)]
 pub enum ConfigRequest {
     /// Request for connect list update in config file.
@@ -85,7 +85,10 @@ pub enum ConfigRequest {
 
 impl ConfigManager {
     /// Creates a new `ConfigManager` instance for the given path.
-    pub fn new(path: String) -> Self {
+    pub fn new<P>(path: P) -> Self
+    where
+        P: AsRef<Path> + Send + 'static,
+    {
         let (tx, rx) = mpsc::channel();
         let handle = thread::spawn(move || {
             info!("ConfigManager started");
@@ -108,11 +111,11 @@ impl ConfigManager {
         ConfigManager { handle, tx }
     }
 
-    /// Stores updated connect list in file system.
+    /// Stores updated connect list at file system.
     pub fn store_connect_list(&self, connect_list: ConnectListConfig) {
         self.tx
             .send(ConfigRequest::UpdateConnectList(connect_list))
-            .expect("Can't write");
+            .expect("Can't message to ConfigManager thread");
     }
 
     /// Stops `ConfigManager`.
@@ -121,7 +124,10 @@ impl ConfigManager {
         self.handle.join().expect("Can't stop thread");
     }
 
-    fn update_connect_list(connect_list: ConnectListConfig, path: &str) -> Result<(), Error> {
+    fn update_connect_list<P>(connect_list: ConnectListConfig, path: &P) -> Result<(), Error>
+    where
+        P: AsRef<Path>,
+    {
         let mut current_config: NodeConfig = ConfigFile::load(path)?;
         current_config.connect_list = connect_list;
         ConfigFile::save(&current_config, path)?;
