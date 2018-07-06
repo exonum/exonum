@@ -409,12 +409,8 @@ impl Blockchain {
         fork.checkpoint();
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let context = TransactionContext::new(
-                &mut *fork,
-                raw.service_id(),
-                raw.hash(),
-                *raw.author(),
-            );
+            let context =
+                TransactionContext::new(&mut *fork, raw.service_id(), raw.hash(), *raw.author());
             tx.execute(context)
         }));
 

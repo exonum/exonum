@@ -17,9 +17,7 @@ use bit_vec::BitVec;
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
-use super::{
-    sandbox::Sandbox, timestamping::TimestampingTxGenerator,
-};
+use super::{sandbox::Sandbox, timestamping::TimestampingTxGenerator};
 use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -537,7 +535,10 @@ pub fn add_one_height_with_transactions_from_other_validator(
     unreachable!("because at one of loops we should become a leader and return");
 }
 
-fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Message<Propose> {
+fn get_propose_with_transactions(
+    sandbox: &TimestampingSandbox,
+    transactions: &[Hash],
+) -> Message<Propose> {
     get_propose_with_transactions_for_validator(sandbox, transactions, VALIDATOR_0)
 }
 

@@ -17,7 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
-use serde::{Serialize, Serializer, Deserializer, Deserialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use std::{
     cell::{Ref, RefCell}, collections::Bound, fmt,
@@ -399,7 +399,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// }
 /// # impl Transaction for CreateWallet {
 /// #     fn verify(&self) -> bool { true }
-/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+/// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 ///
 /// # fn main() {
@@ -448,16 +448,16 @@ enum TxStatus<'a> {
 
 impl<'a> TxStatus<'a> {
     fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let status = TxStatus::from(result);
         status.serialize(serializer)
     }
 
     fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
-        where
-            D: Deserializer<'a>,
+    where
+        D: Deserializer<'a>,
     {
         let tx_status = <Self as Deserialize>::deserialize(deserializer)?;
         Ok(TransactionResult::from(tx_status))
@@ -569,7 +569,7 @@ impl CommittedTransaction {
 /// }
 /// # impl Transaction for CreateWallet {
 /// #     fn verify(&self) -> bool { true }
-/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+/// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 ///
 /// # fn main() {

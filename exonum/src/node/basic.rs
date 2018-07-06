@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{self, Rng};
 use failure;
+use rand::{self, Rng};
 
 use std::net::SocketAddr;
 

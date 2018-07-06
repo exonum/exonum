@@ -563,7 +563,7 @@ impl NodeHandler {
         } else {
             warn!(
                 "Attempt to connect to the peer with address {:?} which \
-                     is not in the ConnectList",
+                 is not in the ConnectList",
                 address
             );
         }
@@ -1027,7 +1027,7 @@ mod tests {
     use events::EventHandler;
     use helpers;
     use storage::{Database, MemoryDB};
-    const SERVICE_ID:u16 = 0;
+    const SERVICE_ID: u16 = 0;
     messages! {
 
         struct TxSimple {
@@ -1041,7 +1041,7 @@ mod tests {
             true
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -1056,7 +1056,11 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg);
 
-        let tx = Message::sign_tx(TxSimple::new(&p_key, "Hello, World!"), SERVICE_ID, (p_key, &s_key));
+        let tx = Message::sign_tx(
+            TxSimple::new(&p_key, "Hello, World!"),
+            SERVICE_ID,
+            (p_key, &s_key),
+        );
 
         // Create original transaction.
         let tx_orig = tx.clone();

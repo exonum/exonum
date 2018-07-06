@@ -42,7 +42,7 @@ use storage::{Database, MemoryDB, ProofListIndex};
 
 #[doc(hidden)]
 /// TransactionsResponse size with zero transactions inside.
-pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 0;
+pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 331;
 
 #[doc(hidden)]
 /// RawTransaction size with zero transactions payload.

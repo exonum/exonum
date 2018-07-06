@@ -26,7 +26,7 @@ use exonum::{
     messages::{Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
-pub const SERVICE_ID:u16 = 0;
+pub const SERVICE_ID: u16 = 0;
 
 transactions! {
     pub ExplorerTransactions {
@@ -48,7 +48,7 @@ impl Transaction for CreateWallet {
         true
     }
 
-    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, _: TransactionContext) -> ExecutionResult {
         if self.name().starts_with("Al") {
             Ok(())
         } else {
@@ -65,7 +65,7 @@ impl Transaction for Transfer {
         true
     }
 
-    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, _: TransactionContext) -> ExecutionResult {
         panic!("oops")
     }
 }

@@ -62,7 +62,7 @@ impl Transaction for TxTimestamp {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let time = TimeSchema::new(&tc.fork())
             .time()
             .get()

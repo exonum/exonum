@@ -91,7 +91,7 @@ impl Transaction for Transfer {
         (self.from() != self.to()) && self.verify_signature(self.from())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = CurrencySchema::new(tc.fork());
 
         let from = self.from();
@@ -119,7 +119,7 @@ impl Transaction for Issue {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = CurrencySchema::new(tc.fork());
         let pub_key = self.pub_key();
         let hash = self.hash();
@@ -139,7 +139,7 @@ impl Transaction for CreateWallet {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = CurrencySchema::new(tc.fork());
         let pub_key = self.pub_key();
         let hash = self.hash();

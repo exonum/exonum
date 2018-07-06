@@ -36,7 +36,7 @@ impl Transaction for TimestampTx {
         true
     }
 
-    fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, _: TransactionContext) -> ExecutionResult {
         Ok(())
     }
 }

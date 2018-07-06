@@ -18,15 +18,12 @@
 use serde_json::Value;
 
 use std::{
-    collections::{HashMap, HashSet}, net::SocketAddr,
-    sync::{Arc, RwLock},
+    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;
-use blockchain::{
-    ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys,
-};
+use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
@@ -95,12 +92,12 @@ use storage::{Fork, Snapshot};
 /// impl Transaction for TxA {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// impl Transaction for TxB {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// // Service
@@ -216,7 +213,6 @@ pub struct ServiceContext {
     height: Height,
     service_id: u16,
 }
-
 
 impl ServiceContext {
     /// Creates service context for the given node.

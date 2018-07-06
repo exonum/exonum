@@ -19,7 +19,7 @@ use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
-use messages::{Message, HexTransaction, RawTransaction};
+use messages::{HexTransaction, Message, RawTransaction};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -52,11 +52,11 @@ pub struct TransactionMessage {
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
         let mut debug = fmt.debug_struct("TransactionMessage");
-            debug.field("message", &self.message.to_hex_string());
+        debug.field("message", &self.message.to_hex_string());
         if let Some(ref tx) = self.transaction {
             debug.field("debug", tx);
         }
-            debug.finish()
+        debug.finish()
     }
 }
 
@@ -140,7 +140,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+    /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
     /// }
     /// # fn main() {}
     fn verify(&self) -> bool;
@@ -178,7 +178,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+    ///     fn execute(&self, _: TransactionContext) -> ExecutionResult {
     ///         // Read and/or write into storage.
     ///         // ...
     ///
@@ -521,12 +521,12 @@ pub trait TransactionSet:
 /// }
 /// # impl Transaction for Create {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 /// #
 /// # impl Transaction for Transfer {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 /// #
 /// # fn main() { }
@@ -919,8 +919,8 @@ mod tests {
             true
         }
 
-        fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
-            let mut entry = create_entry(tc.fork);
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let mut entry = create_entry(context.fork());
             entry.set(self.index());
             EXECUTION_STATUS.lock().unwrap().clone()
         }

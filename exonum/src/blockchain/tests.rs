@@ -63,7 +63,7 @@ impl Transaction for Tx {
         true
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         if self.value() == 42 {
             panic!(Error::new("42"))
         }
@@ -267,12 +267,12 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 }
 
 mod transactions_tests {
+    use super::TEST_SERVICE_ID;
     use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crypto::gen_keypair;
     use messages::{Message, RawTransaction};
     use serde::Serialize;
     use serde_json;
-    use super::TEST_SERVICE_ID;
 
     transactions! {
         MyTransactions {
@@ -296,7 +296,7 @@ mod transactions_tests {
             true
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -306,7 +306,7 @@ mod transactions_tests {
             true
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -316,7 +316,7 @@ mod transactions_tests {
             true
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -337,22 +337,50 @@ mod transactions_tests {
         round_trip(&b);
         round_trip(&c);
     }
-
+    /*
     #[test]
-    fn deserialize_from_raw() {
+    fn deserialize_from_raw_as_set() {
         fn round_trip(t: Message<RawTransaction>) {
             use std::ops::Deref;
             let raw: &RawTransaction = t.deref();
             let initial = serde_json::to_value(raw).unwrap();
-            let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
+            let parsed = MyTransactions::tx_from_raw(raw.clone()).unwrap();
             let round_tripped = serde_json::to_value(&parsed).unwrap();
             assert_eq!(initial, round_tripped);
         }
 
         let (pk, sec_key) = gen_keypair();
-        let a = Message::sign_tx(A::new(0), TEST_SERVICE_ID, (pk, &sec_key));
-        let b = Message::sign_tx(B::new(1, 2), TEST_SERVICE_ID, (pk, &sec_key));
-        let c = Message::sign_tx(C::new(0), TEST_SERVICE_ID, (pk, &sec_key));
+        let a = Message::sign_tx_set(MyTransactions::A(A::new(0)),
+                                     TEST_SERVICE_ID, (pk, &sec_key));
+        let b = Message::sign_tx_set(MyTransactions::B(B::new(1, 2)),
+                                     TEST_SERVICE_ID, (pk, &sec_key));
+        let c = Message::sign_tx_set(MyTransactions::C(C::new(0)),
+                                     TEST_SERVICE_ID, (pk, &sec_key));
+        round_trip(a);
+        round_trip(b);
+        round_trip(c);
+    }
+    */
+    #[test]
+    fn deserialize_from_raw_single() {
+        use messages::BinaryForm;
+
+        fn round_trip<T: BinaryForm + Transaction + Serialize>(t: T) {
+            let (pk, sec_key) = gen_keypair();
+            use std::ops::Deref;
+            let initial = serde_json::to_value(&t).unwrap();
+            let msg = Message::sign_tx(t, TEST_SERVICE_ID, (pk, &sec_key));
+            let raw: &RawTransaction = msg.deref();
+
+            println!("{:?}", raw.payload());
+            let parsed: T = BinaryForm::deserialize(raw.payload()).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
+        }
+
+        let a = A::new(0);
+        let b = B::new(1, 2);
+        let c = C::new(0);
         round_trip(a);
         round_trip(b);
         round_trip(c);

@@ -79,7 +79,7 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
             self.verify_signature(self.from())
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -152,7 +152,7 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
             self.verify_signature(self.from())
         }
 
-        fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
             let view = tc.fork();
             let mut index = ProofMapIndex::new("balances_txs", view);
             let from_balance = index.get(self.from()).unwrap_or(0_u64);

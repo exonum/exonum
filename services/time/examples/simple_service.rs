@@ -86,7 +86,7 @@ impl Transaction for TxMarker {
         self.verify_signature(self.from())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let view = tc.fork();
         let time = TimeSchema::new(&view).time().get();
         match time {

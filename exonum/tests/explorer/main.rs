@@ -23,11 +23,13 @@ extern crate serde_json;
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
-    crypto::{self, Hash}, explorer::*, helpers::Height, messages::{Message, RawTransaction},
+    blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation}, crypto::{self, Hash},
+    explorer::*, helpers::Height, messages::{Message, RawTransaction},
 };
 
-use blockchain::{create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer,SERVICE_ID};
+use blockchain::{
+    create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
+};
 
 mod blockchain;
 
@@ -43,7 +45,11 @@ fn test_explorer_basics() {
         SERVICE_ID,
         (pk_alice, &key_alice),
     );
-    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), SERVICE_ID, (pk_bob, &key_bob));
+    let tx_bob = Message::sign_tx(
+        CreateWallet::new(&pk_bob, "Bob"),
+        SERVICE_ID,
+        (pk_bob, &key_bob),
+    );
     let tx_transfer = Message::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
         SERVICE_ID,
@@ -344,7 +350,11 @@ fn test_transaction_iterator() {
         SERVICE_ID,
         (pk_alice, &key_alice),
     );
-    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), SERVICE_ID, (pk_bob, &key_bob));
+    let tx_bob = Message::sign_tx(
+        CreateWallet::new(&pk_bob, "Bob"),
+        SERVICE_ID,
+        (pk_bob, &key_bob),
+    );
     let tx_transfer = Message::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
         SERVICE_ID,

@@ -18,13 +18,13 @@ use std::ops::Deref;
 
 use failure::Error;
 
-use blockchain::Transaction;
+use blockchain::{Transaction, TransactionSet};
 use crypto::{hash, Hash, PublicKey, SecretKey};
 
 pub use self::authorization::SignedMessage;
 pub use self::helpers::BinaryForm;
-pub use self::protocol::*;
 pub(crate) use self::helpers::HexTransaction;
+pub use self::protocol::*;
 pub(crate) use self::raw::UncheckedBuffer;
 
 #[macro_use]
@@ -84,7 +84,6 @@ where
 }
 
 impl Message<Protocol> {
-
     /// Makes new instance of map from existing,
     /// trying convert internal payload to provided type U.
     pub fn map_into<U: ProtocolMessage>(self) -> Result<Message<U>, Error> {
@@ -94,7 +93,6 @@ impl Message<Protocol> {
 }
 
 impl Message<RawTransaction> {
-
     #[doc(hidden)]
     pub fn create_raw_tx(
         data: Vec<u8>,
@@ -118,10 +116,18 @@ impl Message<RawTransaction> {
         let data = tx.serialize().unwrap();
         Message::create_raw_tx(data, service_id, service_keypair)
     }
+    #[doc(hidden)]
+    pub fn sign_tx_set<X: TransactionSet + BinaryForm>(
+        tx: X,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction> {
+        let data = tx.serialize().unwrap();
+        Message::create_raw_tx(data, service_id, service_keypair)
+    }
 }
 
 impl<T: ProtocolMessage> Message<T> {
-
     /// Creates new instance of message
     pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
         let message =
@@ -183,8 +189,6 @@ impl<T: ProtocolMessage> Message<T> {
         &self.message.authorized_message.author
     }
 }
-
-
 
 impl fmt::Debug for RawTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -38,7 +38,6 @@ pub struct SignedMessage {
 }
 
 impl SignedMessage {
-
     pub(crate) fn new<T: Into<Protocol>>(
         value: T,
         author: PublicKey,
@@ -94,7 +93,7 @@ impl SignedMessage {
     pub fn into_message(self) -> Message {
         Message {
             payload: self.authorized_message.protocol.clone(),
-            message: self
+            message: self,
         }
     }
 

@@ -470,6 +470,8 @@ fn test_empty_block() {
 
 #[test]
 fn test_request_block() {
+    let (public_key, _secret_key) = gen_keypair();
+
     // write
     let request = BlockRequest::new(&public_key, Height(1));
     // read

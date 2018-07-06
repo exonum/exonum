@@ -36,16 +36,17 @@ transactions! {
 }
 
 impl TxConfig {
-    pub fn create_signed(from: &PublicKey,
-                     config: &[u8],
-                     actual_from: Height,
-                     signer:&SecretKey) -> Message<RawTransaction> {
-        Message::sign_tx(TxConfig::new(
-            from,
-            config,
-            actual_from,
-        ), CONFIG_SERVICE, (*from, signer))
-
+    pub fn create_signed(
+        from: &PublicKey,
+        config: &[u8],
+        actual_from: Height,
+        signer: &SecretKey,
+    ) -> Message<RawTransaction> {
+        Message::sign_tx(
+            TxConfig::new(from, config, actual_from),
+            CONFIG_SERVICE,
+            (*from, signer),
+        )
     }
 }
 #[derive(Default)]
@@ -62,7 +63,7 @@ impl Transaction for TxConfig {
         true
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = Schema::new(tc.fork());
         schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
         Ok(())

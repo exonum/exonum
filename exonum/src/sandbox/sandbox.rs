@@ -16,8 +16,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 use bit_vec::BitVec;
 
-use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 use chrono;
+use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
     cell::{Ref, RefCell, RefMut},
@@ -41,9 +41,9 @@ use events::{
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockResponse, Connect, Message, Precommit, Prevote, Propose, Protocol, ProtocolMessage,
-    RawTransaction, Status, TransactionsResponse, ProposeRequest, PrevotesRequest,
-    TransactionsRequest, BlockRequest
+    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, PrevotesRequest, Propose,
+    ProposeRequest, Protocol, ProtocolMessage, RawTransaction, Status, TransactionsRequest,
+    TransactionsResponse,
 };
 use node::ConnectInfo;
 use node::{
@@ -101,7 +101,9 @@ impl SandboxInner {
         let network_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
-                    NetworkRequest::SendMessage(peer, msg, _) => self.sent.push_back((peer, msg.into())),
+                    NetworkRequest::SendMessage(peer, msg, _) => {
+                        self.sent.push_back((peer, msg.into()))
+                    }
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
@@ -203,11 +205,7 @@ impl Sandbox {
         height: Height,
         secret_key: &SecretKey,
     ) -> Message<BlockRequest> {
-        Message::new(
-            BlockRequest::new(to, height),
-            *author,
-            secret_key,
-        )
+        Message::new(BlockRequest::new(to, height), *author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
@@ -216,13 +214,9 @@ impl Sandbox {
         author: &PublicKey,
         height: Height,
         last_hash: &Hash,
-        secret_key: &SecretKey
+        secret_key: &SecretKey,
     ) -> Message<Status> {
-        Message::new(
-            Status::new(height, last_hash),
-            *author,
-            secret_key,
-        )
+        Message::new(Status::new(height, last_hash), *author, secret_key)
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
@@ -236,9 +230,12 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Message<BlockResponse> {
         Message::new(
-            BlockResponse::new(to,
-                               block,
-                               precommits.into_iter().map(|x| x.into()).collect(), tx_hashes),
+            BlockResponse::new(
+                to,
+                block,
+                precommits.into_iter().map(|x| x.into()).collect(),
+                tx_hashes,
+            ),
             *public_key,
             secret_key,
         )
@@ -337,13 +334,7 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Message<PrevotesRequest> {
         Message::new(
-            PrevotesRequest::new(
-                to,
-                height,
-                round,
-                propose_hash,
-                validators
-            ),
+            PrevotesRequest::new(to, height, round, propose_hash, validators),
             *from,
             secret_key,
         )
@@ -358,13 +349,8 @@ impl Sandbox {
         propose_hash: &Hash,
         secret_key: &SecretKey,
     ) -> Message<ProposeRequest> {
-
         Message::new(
-            ProposeRequest::new(
-                to,
-                height,
-                propose_hash
-            ),
+            ProposeRequest::new(to, height, propose_hash),
             *author,
             secret_key,
         )
@@ -378,14 +364,7 @@ impl Sandbox {
         txs: &[Hash],
         secret_key: &SecretKey,
     ) -> Message<TransactionsRequest> {
-        Message::new(
-            TransactionsRequest::new(
-                to,
-                txs
-            ),
-            *author,
-            secret_key,
-        )
+        Message::new(TransactionsRequest::new(to, txs), *author, secret_key)
     }
 
     /// Creates a `TransactionsReponse` message signed by this validator.
@@ -397,10 +376,7 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Message<TransactionsResponse> {
         Message::new(
-            TransactionsResponse::new(
-                to,
-                txs.into_iter().map(|x| x.into()).collect()
-            ),
+            TransactionsResponse::new(to, txs.into_iter().map(|x| x.into()).collect()),
             *author,
             secret_key,
         )
@@ -1068,7 +1044,11 @@ mod tests {
     impl TxAfterCommit {
         pub fn new_with_height(height: Height) -> Message<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            Message::sign_tx(TxAfterCommit::new(height), SERVICE_ID, (keypair.0, &keypair.1))
+            Message::sign_tx(
+                TxAfterCommit::new(height),
+                SERVICE_ID,
+                (keypair.0, &keypair.1),
+            )
         }
     }
 
@@ -1077,7 +1057,7 @@ mod tests {
             true
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }

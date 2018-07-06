@@ -26,7 +26,9 @@ use exonum::{
     helpers::{Height, ValidatorId}, messages::{Message, RawTransaction},
 };
 
-use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID};
+use blockchain::{
+    consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
+};
 
 #[path = "../tests/explorer/blockchain.rs"]
 mod blockchain;
@@ -36,7 +38,11 @@ pub fn mempool_transaction() -> Message<RawTransaction> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    Message::sign_tx(CreateWallet::new(&pk_alex, "Alex"), SERVICE_ID, (pk_alex, &key_alex))
+    Message::sign_tx(
+        CreateWallet::new(&pk_alex, "Alex"),
+        SERVICE_ID,
+        (pk_alex, &key_alex),
+    )
 }
 
 /// Creates a sample blockchain for the example.
@@ -57,7 +63,11 @@ pub fn sample_blockchain() -> Blockchain {
         SERVICE_ID,
         (pk_alice, &key_alice),
     );
-    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), SERVICE_ID, (pk_bob, &key_bob));
+    let tx_bob = Message::sign_tx(
+        CreateWallet::new(&pk_bob, "Bob"),
+        SERVICE_ID,
+        (pk_bob, &key_bob),
+    );
     let tx_transfer = Message::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 100),
         SERVICE_ID,

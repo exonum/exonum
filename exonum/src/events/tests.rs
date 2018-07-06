@@ -156,13 +156,11 @@ impl TestEvents {
     }
 
     pub fn spawn(self) -> TestHandler {
-
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
             let (p, k) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
-            let handshake_params =
-                HandshakeParams::new(p, k, network_part.max_message_len);
+            let handshake_params = HandshakeParams::new(p, k, network_part.max_message_len);
             let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });
@@ -177,10 +175,7 @@ impl TestEvents {
         let network_requests_tx = channel.network_requests.0.clone();
         let (p, k) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
         let network_part = NetworkPart {
-            our_connect_message: connect_message(
-                self.listen_address,
-                (p, &k),
-            ),
+            our_connect_message: connect_message(self.listen_address, (p, &k)),
             listen_address: self.listen_address,
             network_config,
             max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,

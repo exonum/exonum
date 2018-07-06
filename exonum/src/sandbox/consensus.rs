@@ -27,9 +27,7 @@ use super::{
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
-use messages::{
-    Message, PeersRequest, Precommit, RawTransaction, UncheckedBuffer
-};
+use messages::{Message, PeersRequest, Precommit, RawTransaction, UncheckedBuffer};
 use node::{
     self,
     state::{
@@ -290,7 +288,7 @@ fn test_retrieve_block_and_precommits() {
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
         assert_eq!(expected_block_hash, *precommit.block_hash());
-        assert_eq!( precommit.author(), &sandbox.p(precommit.validator()));
+        assert_eq!(precommit.author(), &sandbox.p(precommit.validator()));
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
@@ -1116,12 +1114,9 @@ fn incorrect_tx_in_request() {
     let (public_key1, _) = gen_keypair();
     let (_, secret_key2) = gen_keypair();
 
+    let data = vec![0; 65];
     let buf = TimestampTx::new(&data);
-    let tx0 = Message::sign_tx(
-        buf,
-        TIMESTAMPING_SERVICE,
-        (public_key1, secret_key2),
-    );
+    let tx0 = Message::sign_tx(buf, TIMESTAMPING_SERVICE, (public_key1, &secret_key2));
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
@@ -1182,12 +1177,15 @@ fn response_size_larger_than_max_message_len() {
     let tx3 = gen_timestamping_tx();
     let (pub_key, sec_key) = gen_keypair();
     let data = vec![0; 65];
-    let tx4 = Message::sign_tx(TimestampTx::new(&data),
-                               TIMESTAMPING_SERVICE, (pub_key, &sec_key));
-    let tx1_unchecked:UncheckedBuffer = tx1.clone().into();
-    let tx2_unchecked:UncheckedBuffer = tx2.clone().into();
-    let tx3_unchecked:UncheckedBuffer = tx3.clone().into();
-    let tx4_unchecked:UncheckedBuffer = tx4.clone().into();
+    let tx4 = Message::sign_tx(
+        TimestampTx::new(&data),
+        TIMESTAMPING_SERVICE,
+        (pub_key, &sec_key),
+    );
+    let tx1_unchecked: UncheckedBuffer = tx1.clone().into();
+    let tx2_unchecked: UncheckedBuffer = tx2.clone().into();
+    let tx3_unchecked: UncheckedBuffer = tx3.clone().into();
+    let tx4_unchecked: UncheckedBuffer = tx4.clone().into();
     assert_eq!(
         tx1_unchecked.get_vec().len() + tx2_unchecked.get_vec().len() + 1,
         tx3_unchecked.get_vec().len() + tx4_unchecked.get_vec().len()
@@ -1197,17 +1195,20 @@ fn response_size_larger_than_max_message_len() {
     // that is exactly equal to the message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.consensus.max_message_len =
-            (TRANSACTION_RESPONSE_EMPTY_SIZE + TX_HEADER * 2
-                + tx1_unchecked.get_vec().len()
-                + tx2_unchecked.get_vec().len()) as u32;
+        consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
+            + TX_HEADER * 2
+            + tx1_unchecked.get_vec().len()
+            + tx2_unchecked.get_vec().len())
+            as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         TxConfig::create_signed(
             &sandbox.p(VALIDATOR_0),
             &consensus_cfg.clone().into_bytes(),
-            consensus_cfg.actual_from, sandbox.s(VALIDATOR_0))
+            consensus_cfg.actual_from,
+            sandbox.s(VALIDATOR_0),
+        )
     };
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
@@ -1491,11 +1492,12 @@ fn handle_tx_verify_signature() {
     let (public_key1, _) = gen_keypair();
     let (_, secret_key2) = gen_keypair();
 
+    let data = vec![0;65];
     let buf = TimestampTx::new(&data);
     let tx = Message::sign_tx(
         buf,
         TIMESTAMPING_SERVICE,
-        (public_key1, secret_key2),
+        (public_key1, &secret_key2),
     );
     sandbox.recv(&tx);
 

@@ -83,7 +83,7 @@ impl Transaction for TxIncrement {
 
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         if self.by() == 0 {
             Err(ExecutionError::with_description(
                 0,
@@ -109,7 +109,7 @@ impl Transaction for TxReset {
         self.verify_author() && self.verify_signature(self.author())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = CounterSchema::new(tc.fork());
         schema.set_count(0);
         Ok(())

@@ -115,7 +115,7 @@ impl Transaction for TxCreateWallet {
     }
 
     /// Apply logic to the storage when executing the transaction.
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let view = tc.fork();
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
@@ -136,7 +136,7 @@ impl Transaction for TxTransfer {
 
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let view = tc.fork();
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
