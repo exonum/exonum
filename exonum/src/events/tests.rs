@@ -27,9 +27,10 @@ use events::{
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, SignedMessage};
+use messages::{self, Connect, Message, SignedMessage};
 use node::{EventsPoolCapacity, NodeChannel};
 
+//TODO: Reduce crypto usage in tests.
 static FAKE_SEED: [u8; 32] = [1; 32];
 
 #[derive(Debug)]
@@ -143,25 +144,25 @@ pub struct TestEvents {
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub events_config: EventsPoolCapacity,
-    pub keypair: (PublicKey, SecretKey),
 }
 
 impl TestEvents {
-    pub fn with_addr(listen_address: SocketAddr, keypair: (PublicKey, SecretKey)) -> TestEvents {
-        TestEvents {
+    pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
+        Self {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
-            keypair,
         }
     }
 
     pub fn spawn(self) -> TestHandler {
+
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
+            let (p, k) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
             let handshake_params =
-                HandshakeParams::new(self.keypair.0, self.keypair.1, network_part.max_message_len);
+                HandshakeParams::new(p, k, network_part.max_message_len);
             let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });
@@ -174,10 +175,11 @@ impl TestEvents {
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
         let network_requests_tx = channel.network_requests.0.clone();
+        let (p, k) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
         let network_part = NetworkPart {
             our_connect_message: connect_message(
                 self.listen_address,
-                (self.keypair.0, &self.keypair.1),
+                (p, &k),
             ),
             listen_address: self.listen_address,
             network_config,
@@ -206,10 +208,8 @@ pub fn raw_message(id: u16, tx_len: usize, keypair: (PublicKey, &SecretKey)) -> 
 fn test_network_handshake() {
     let first = "127.0.0.1:17230".parse().unwrap();
     let second = "127.0.0.1:17231".parse().unwrap();
-    let keypair = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
-
-    let e1 = TestEvents::with_addr(first, keypair);
-    let e2 = TestEvents::with_addr(second, keypair);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
     let (p, s) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
     let c1 = connect_message(first, (p, &s));
@@ -239,9 +239,8 @@ fn test_network_big_message() {
     let keypair = (p, &s);
     let m1 = raw_message(15, 100000, keypair);
     let m2 = raw_message(16, 400, keypair);
-
-    let e1 = TestEvents::with_addr(first, (p, s));
-    let e2 = TestEvents::with_addr(second, (p, s));
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
     let mut e1 = e1.spawn();
     let mut e2 = e2.spawn();
@@ -285,12 +284,12 @@ fn test_network_max_message_len() {
     let (p, s) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
     let keypair = (p, &s);
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let max_payload_length = max_message_length - ::messages::RAW_TRANSACTION_EMPTY_SIZE;
+    let max_payload_length = max_message_length - messages::RAW_TRANSACTION_EMPTY_SIZE;
     let acceptable_message = raw_message(15, max_payload_length, keypair);
     let too_big_message = raw_message(16, max_payload_length + 1000, keypair);
 
-    let e1 = TestEvents::with_addr(first, (p, s));
-    let e2 = TestEvents::with_addr(second, (p, s));
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
     let mut e1 = e1.spawn();
     let mut e2 = e2.spawn();
@@ -317,11 +316,10 @@ fn test_network_reconnect() {
 
     let msg = raw_message(11, 1000, keypair);
     let c1 = connect_message(first, keypair);
-
-    let mut t1 = TestEvents::with_addr(first, (p, s)).spawn();
+    let mut t1 = TestEvents::with_addr(first).spawn();
 
     // First connect attempt.
-    let mut t2 = TestEvents::with_addr(second, (p, s)).spawn();
+    let mut t2 = TestEvents::with_addr(second).spawn();
 
     // Handle first attempt.
     t1.connect_with(second);
@@ -335,7 +333,7 @@ fn test_network_reconnect() {
     assert_eq!(t1.wait_for_disconnect(), second);
 
     // Handle second attempt.
-    let mut t2 = TestEvents::with_addr(second, (p, s)).spawn();
+    let mut t2 = TestEvents::with_addr(second).spawn();
 
     t1.connect_with(second);
     assert_eq!(t2.wait_for_connect(), c1);
@@ -350,23 +348,23 @@ fn test_network_reconnect() {
 #[test]
 fn test_network_multiple_connect() {
     let main = "127.0.0.1:19600".parse().unwrap();
-    let keypair = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
     let nodes = [
         "127.0.0.1:19601".parse().unwrap(),
         "127.0.0.1:19602".parse().unwrap(),
         "127.0.0.1:19603".parse().unwrap(),
     ];
 
-    let mut node = TestEvents::with_addr(main, keypair).spawn();
-
+    let mut node = TestEvents::with_addr(main).spawn();
+    let keypair = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
     let connect_messages: Vec<_> = nodes
         .iter()
         .cloned()
         .map(|a| connect_message(a, (keypair.0, &keypair.1)))
         .collect();
+
     let connectors: Vec<_> = nodes
         .iter()
-        .map(|addr| TestEvents::with_addr(*addr, keypair).spawn())
+        .map(|addr| TestEvents::with_addr(*addr).spawn())
         .collect();
 
     connectors[0].connect_with(main);
@@ -381,11 +379,10 @@ fn test_network_multiple_connect() {
 fn test_send_first_not_connect() {
     let main = "127.0.0.1:19500".parse().unwrap();
     let other = "127.0.0.1:19501".parse().unwrap();
+    let mut node = TestEvents::with_addr(main).spawn();
+    let other_node = TestEvents::with_addr(other).spawn();
+
     let keypair = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
-
-    let mut node = TestEvents::with_addr(main, keypair).spawn();
-    let other_node = TestEvents::with_addr(other, keypair).spawn();
-
     let message = raw_message(11, 1000, (keypair.0, &keypair.1));
     other_node.send_to(main, message.clone()); // should connect before send message
 

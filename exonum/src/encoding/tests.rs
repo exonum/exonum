@@ -23,7 +23,7 @@ use uuid::Uuid;
 use std::{net::SocketAddr, str::FromStr};
 
 use super::{CheckedOffset, Field, Offset};
-use blockchain::{self, Block};
+use blockchain::Block;
 use crypto::{gen_keypair, hash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{
@@ -384,7 +384,6 @@ fn test_connect_ipv6() {
 fn test_propose() {
     let prev_hash = hash(&[1, 2, 3]);
     let txs = vec![hash(&[1]), hash(&[2]), hash(&[2])];
-    let (public_key, secret_key) = gen_keypair();
 
     // write
     let propose = Propose::new(VALIDATOR, HEIGHT, ROUND, &prev_hash, &txs);
@@ -403,7 +402,6 @@ fn test_propose() {
 fn test_prevote() {
     let propose_hash = hash(&[1, 2, 3]);
     let locked_round = Round(654_345);
-    let (public_key, secret_key) = gen_keypair();
 
     // write
     let prevote = Prevote::new(VALIDATOR, HEIGHT, ROUND, &propose_hash, locked_round);
@@ -419,7 +417,6 @@ fn test_prevote() {
 fn test_precommit() {
     let propose_hash = hash(&[1, 2, 3]);
     let block_hash = hash(&[3, 2, 1]);
-    let (public_key, secret_key) = gen_keypair();
     let time = Utc::now();
 
     // write
@@ -440,7 +437,6 @@ fn test_precommit() {
 #[test]
 fn test_status() {
     let last_hash = hash(&[3, 2, 1]);
-    let (public_key, secret_key) = gen_keypair();
 
     // write
     let commit = Status::new(HEIGHT, &last_hash);
@@ -451,7 +447,7 @@ fn test_status() {
 
 #[test]
 fn test_empty_block() {
-    let (pub_key, secret_key) = gen_keypair();
+    let (pub_key, _secret_key) = gen_keypair();
 
     let content = Block::new(
         ValidatorId::zero(),
@@ -474,8 +470,6 @@ fn test_empty_block() {
 
 #[test]
 fn test_request_block() {
-    let (public_key, secret_key) = gen_keypair();
-
     // write
     let request = BlockRequest::new(&public_key, Height(1));
     // read

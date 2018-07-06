@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use rand::{self, Rng};
+use failure;
 
 use std::net::SocketAddr;
 
@@ -22,7 +23,7 @@ use messages::{Connect, Message, PeersRequest, Protocol, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, msg: Message<Protocol>) -> Result<(), ::failure::Error> {
+    pub fn handle_message(&mut self, msg: Message<Protocol>) -> Result<(), failure::Error> {
         let (payload, message) = msg.into_parts();
 
         match payload {

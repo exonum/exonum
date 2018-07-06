@@ -17,7 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserializer, Deserialize};
 
 use std::{
     cell::{Ref, RefCell}, collections::Bound, fmt,
@@ -265,11 +265,8 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
     }
 }
 
+//TODO: impl Deserialize
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
-///
-/// The type parameter corresponds to some representation of `Box<Transaction>`.
-/// This generalization is needed to deserialize the type, e.g.,
-/// by using `BlockWithTransactions<serde_json::Value>`.
 #[derive(Debug, Serialize)]
 pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
@@ -402,7 +399,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// }
 /// # impl Transaction for CreateWallet {
 /// #     fn verify(&self) -> bool { true }
-/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
+/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
 /// # }
 ///
 /// # fn main() {
@@ -431,7 +428,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
     content: TransactionMessage,
     location: TxLocation,
@@ -451,11 +448,19 @@ enum TxStatus<'a> {
 
 impl<'a> TxStatus<'a> {
     fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         let status = TxStatus::from(result);
         status.serialize(serializer)
+    }
+
+    fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
+        where
+            D: Deserializer<'a>,
+    {
+        let tx_status = <Self as Deserialize>::deserialize(deserializer)?;
+        Ok(TransactionResult::from(tx_status))
     }
 }
 
@@ -564,7 +569,7 @@ impl CommittedTransaction {
 /// }
 /// # impl Transaction for CreateWallet {
 /// #     fn verify(&self) -> bool { true }
-/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
+/// #     fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
 /// # }
 ///
 /// # fn main() {
@@ -589,7 +594,7 @@ impl CommittedTransaction {
 /// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
@@ -661,7 +666,10 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn new(blockchain: &'a Blockchain) -> Self {
         BlockchainExplorer {
             snapshot: blockchain.snapshot(),
-            transaction_parser: Box::new(move |raw| blockchain.tx_from_raw(raw)),
+            transaction_parser: Box::new(move |raw| {
+                let tx = blockchain.tx_from_raw(&raw)?;
+                Ok(TransactionMessage::new(raw, tx))
+            }),
         }
     }
 

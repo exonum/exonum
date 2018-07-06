@@ -28,8 +28,7 @@ use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
 use messages::{
-    BlockRequest, Message, PeersRequest, Precommit, PrevotesRequest, ProposeRequest,
-    RawTransaction, Status, TransactionsRequest, TransactionsResponse,
+    Message, PeersRequest, Precommit, RawTransaction, UncheckedBuffer
 };
 use node::{
     self,
@@ -291,11 +290,7 @@ fn test_retrieve_block_and_precommits() {
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
         assert_eq!(expected_block_hash, *precommit.block_hash());
-        assert!(
-            precommit
-                .raw()
-                .verify_signature(&sandbox.p(precommit.validator()),)
-        );
+        assert_eq!( precommit.author(), &sandbox.p(precommit.validator()));
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
@@ -482,7 +477,7 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
 
-    sandbox_restarted.recv(&sandbox.create_precommit(
+    sandbox_restarted.recv(&sandbox_restarted.create_precommit(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -492,7 +487,7 @@ fn should_save_precommit_to_consensus_cache() {
         sandbox_restarted.s(VALIDATOR_1),
     ));
 
-    sandbox_restarted.recv(&sandbox.create_precommit(
+    sandbox_restarted.recv(&sandbox_restarted.create_precommit(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -635,7 +630,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox_new.assert_state(HEIGHT_ONE, ROUND_TWO);
     sandbox_new.broadcast(&first_prevote);
 
-    let first_precommit_new_time = sandbox.create_precommit(
+    let first_precommit_new_time = sandbox_new.create_precommit(
         first_precommit.validator(),
         first_precommit.height(),
         first_precommit.round(),
@@ -667,7 +662,7 @@ fn should_restore_peers_after_restart() {
     let time = sandbox.time();
     let connect_from_0 = sandbox.create_connect(&p0, a0, time.into(), &user_agent::get(), &s0);
     let connect_from_1 = sandbox.create_connect(&p1, a1, time.into(), &user_agent::get(), &s1);
-    let peers_request = PeersRequest::new(&p1, &p0, &s1);
+    let peers_request = Message::new(PeersRequest::new(&p0), p1, &s1);
 
     // check that peers are absent
     sandbox.recv(&peers_request);
@@ -775,7 +770,7 @@ fn test_queue_propose_message_from_next_height() {
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let future_propose = sandbox.create_propose(
@@ -789,7 +784,7 @@ fn test_queue_propose_message_from_next_height() {
 
     sandbox.recv(&future_propose);
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
 
     info!(
         "last_block={:#?}, hash={:?}",
@@ -1025,7 +1020,7 @@ fn request_propose_when_get_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &ProposeRequest::new(
+        &sandbox.create_propose_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -1046,7 +1041,7 @@ fn response_to_request_txs() {
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
 
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
         &[tx.hash()],
@@ -1055,10 +1050,10 @@ fn response_to_request_txs() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_1),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_1),
-            vec![tx.raw().clone()],
+            vec![tx.clone()],
             sandbox.s(VALIDATOR_0),
         ),
     );
@@ -1068,7 +1063,7 @@ fn response_to_request_txs() {
 fn empty_tx_request() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
         &[],
@@ -1093,7 +1088,7 @@ fn duplicate_tx_in_pool() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx1.hash()],
@@ -1105,10 +1100,10 @@ fn duplicate_tx_in_pool() {
 
     sandbox.recv(&tx2);
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_2),
         &sandbox.p(VALIDATOR_0),
-        vec![tx1.raw().clone()],
+        vec![tx1.clone()],
         sandbox.s(VALIDATOR_2),
     ));
 }
@@ -1118,10 +1113,15 @@ fn duplicate_tx_in_pool() {
 fn incorrect_tx_in_request() {
     let sandbox = timestamping_sandbox();
 
-    let (pub_key, _) = gen_keypair();
-    let (_, sec_key) = gen_keypair();
-    let data = vec![0; 64];
-    let tx0 = TimestampTx::new(&pub_key, &data, &sec_key);
+    let (public_key1, _) = gen_keypair();
+    let (_, secret_key2) = gen_keypair();
+
+    let buf = TimestampTx::new(&data);
+    let tx0 = Message::sign_tx(
+        buf,
+        TIMESTAMPING_SERVICE,
+        (public_key1, secret_key2),
+    );
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
@@ -1134,7 +1134,7 @@ fn incorrect_tx_in_request() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx0.hash()],
@@ -1143,10 +1143,10 @@ fn incorrect_tx_in_request() {
     );
 
     // Receive response with invalid `tx0`.
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_2),
         &sandbox.p(VALIDATOR_0),
-        vec![tx0.raw().clone()],
+        vec![tx0.clone()],
         sandbox.s(VALIDATOR_2),
     ));
 
@@ -1168,18 +1168,13 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    unimplemented!();
-    /*
-    use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-    use messages::HEADER_LENGTH;
+    use messages::TRANSACTION_RESPONSE_EMPTY_SIZE;
     use storage::StorageValue;
-
-    const EMPTY_RESPONSE_SIZE: usize =
-        (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8);
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
+    const TX_HEADER: usize = 8 + 2;
     // Create 4 transactions.
     // The size of the fourth transactions is 1 more than size of the first three.
     let tx1 = gen_timestamping_tx();
@@ -1187,11 +1182,15 @@ fn response_size_larger_than_max_message_len() {
     let tx3 = gen_timestamping_tx();
     let (pub_key, sec_key) = gen_keypair();
     let data = vec![0; 65];
-    let tx4 = TimestampTx::new(&pub_key, &data, &sec_key);
-
+    let tx4 = Message::sign_tx(TimestampTx::new(&data),
+                               TIMESTAMPING_SERVICE, (pub_key, &sec_key));
+    let tx1_unchecked:UncheckedBuffer = tx1.clone().into();
+    let tx2_unchecked:UncheckedBuffer = tx2.clone().into();
+    let tx3_unchecked:UncheckedBuffer = tx3.clone().into();
+    let tx4_unchecked:UncheckedBuffer = tx4.clone().into();
     assert_eq!(
-        tx1.raw().len() + tx2.raw().len() + 1,
-        tx3.raw().len() + tx4.raw().len()
+        tx1_unchecked.get_vec().len() + tx2_unchecked.get_vec().len() + 1,
+        tx3_unchecked.get_vec().len() + tx4_unchecked.get_vec().len()
     );
 
     // Create new config. Set the size of the message to a size
@@ -1199,25 +1198,25 @@ fn response_size_larger_than_max_message_len() {
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.max_message_len =
-            (EMPTY_RESPONSE_SIZE + tx1.raw().len() + tx2.raw().len()) as u32;
+            (TRANSACTION_RESPONSE_EMPTY_SIZE + TX_HEADER * 2
+                + tx1_unchecked.get_vec().len()
+                + tx2_unchecked.get_vec().len()) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
-        TxConfig::new(
+        TxConfig::create_signed(
             &sandbox.p(VALIDATOR_0),
             &consensus_cfg.clone().into_bytes(),
-            consensus_cfg.actual_from,
-            sandbox.s(VALIDATOR_0),
-        )
+            consensus_cfg.actual_from, sandbox.s(VALIDATOR_0))
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
 
     sandbox.recv(&tx1);
     sandbox.recv(&tx2);
 
     // Send request with `tx1` and `tx2`.
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
         &[tx1.hash(), tx2.hash()],
@@ -1227,10 +1226,10 @@ fn response_size_larger_than_max_message_len() {
     // Receive response with `tx1` and `tx2`.
     sandbox.send(
         sandbox.a(VALIDATOR_1),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_1),
-            vec![tx1.raw().clone(), tx2.raw().clone()],
+            vec![tx1.clone(), tx2.clone()],
             sandbox.s(VALIDATOR_0),
         ),
     );
@@ -1239,7 +1238,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&tx4);
 
     // Send request with `tx3` and `tx4`.
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
         &[tx3.hash(), tx4.hash()],
@@ -1249,23 +1248,23 @@ fn response_size_larger_than_max_message_len() {
     // Receive separate responses with `tx3` and `tx4`.
     sandbox.send(
         sandbox.a(VALIDATOR_1),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_1),
-            vec![tx3.raw().clone()],
+            vec![tx3.clone()],
             sandbox.s(VALIDATOR_0),
         ),
     );
 
     sandbox.send(
         sandbox.a(VALIDATOR_1),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_1),
-            vec![tx4.raw().clone()],
+            vec![tx4.clone()],
             sandbox.s(VALIDATOR_0),
         ),
-    );*/
+    );
 }
 
 /// idea of the test is to
@@ -1299,7 +1298,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         .build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .with_tx_hash(&tx.hash())
         .build();
 
@@ -1329,7 +1328,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose
-        sandbox.recv(&ProposeRequest::new(
+        sandbox.recv(&sandbox.create_propose_request(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -1396,7 +1395,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestTransactions
-        sandbox.recv(&TransactionsRequest::new(
+        sandbox.recv(&sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_1),
             &sandbox.p(VALIDATOR_0),
             &[tx.hash()],
@@ -1405,10 +1404,10 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
         sandbox.send(
             sandbox.a(VALIDATOR_1),
-            &TransactionsResponse::new(
+            &sandbox.create_transactions_response(
                 &sandbox.p(VALIDATOR_0),
                 &sandbox.p(VALIDATOR_1),
-                vec![tx.raw().clone()],
+                vec![tx.clone()],
                 sandbox.s(VALIDATOR_0),
             ),
         );
@@ -1416,7 +1415,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose negative
-        sandbox.recv(&ProposeRequest::new(
+        sandbox.recv(&sandbox.create_propose_request(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -1492,8 +1491,12 @@ fn handle_tx_verify_signature() {
     let (public_key1, _) = gen_keypair();
     let (_, secret_key2) = gen_keypair();
 
-    let data = vec![0; 64]; // TODO: Find the way how to get rid of hard-coded value. (ECR-1627)
-    let tx = TimestampTx::new(&public_key1, &data, &secret_key2);
+    let buf = TimestampTx::new(&data);
+    let tx = Message::sign_tx(
+        buf,
+        TIMESTAMPING_SERVICE,
+        (public_key1, secret_key2),
+    );
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -1530,7 +1533,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx.hash()],
@@ -1553,7 +1556,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx.hash()],
@@ -1580,7 +1583,7 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &ProposeRequest::new(
+        &sandbox.create_propose_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -1903,7 +1906,7 @@ fn lock_to_propose_and_send_prevote() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.round_timeout() + PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     sandbox.recv(&propose);
@@ -2119,7 +2122,7 @@ fn handle_precommit_positive_scenario_commit() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -2514,7 +2517,7 @@ fn commit_using_unknown_propose_with_precommits() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -2809,7 +2812,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_duration_since_sandbox_time(2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     // this propose will be used during second commit
@@ -2826,7 +2829,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_height(HEIGHT_TWO)
         .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
         .with_prev_hash(&first_block.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -2860,7 +2863,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(&precommit_1); //early precommit from future height
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
     assert_eq!(first_block.hash(), sandbox.last_hash());
 
@@ -2951,7 +2954,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -3062,7 +3065,7 @@ fn handle_tx_handle_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx.hash()],
@@ -3099,7 +3102,7 @@ fn handle_block_response_tx_in_pool() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -3130,7 +3133,7 @@ fn handle_block_response_tx_in_pool() {
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3140,7 +3143,7 @@ fn handle_block_response_tx_in_pool() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3159,7 +3162,7 @@ fn handle_block_response_tx_in_pool() {
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -3189,7 +3192,7 @@ fn handle_block_response_with_unknown_tx() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -3220,7 +3223,7 @@ fn handle_block_response_with_unknown_tx() {
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3230,7 +3233,7 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3250,7 +3253,7 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx.hash()],
@@ -3258,15 +3261,15 @@ fn handle_block_response_with_unknown_tx() {
         ),
     );
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(VALIDATOR_3),
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -3295,7 +3298,7 @@ fn handle_block_response_with_invalid_txs_order() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -3326,7 +3329,7 @@ fn handle_block_response_with_invalid_txs_order() {
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3336,7 +3339,7 @@ fn handle_block_response_with_invalid_txs_order() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3377,7 +3380,7 @@ fn handle_block_response_with_invalid_precommits() {
     let block1 = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let block2 = BlockBuilder::new(&sandbox)
@@ -3413,7 +3416,7 @@ fn handle_block_response_with_invalid_precommits() {
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block1.hash(),
@@ -3423,7 +3426,7 @@ fn handle_block_response_with_invalid_precommits() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3470,7 +3473,7 @@ fn handle_block_response_with_known_transaction() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -3501,7 +3504,7 @@ fn handle_block_response_with_known_transaction() {
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3511,7 +3514,7 @@ fn handle_block_response_with_known_transaction() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3531,7 +3534,7 @@ fn handle_block_response_with_known_transaction() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx2.hash()],
@@ -3539,15 +3542,15 @@ fn handle_block_response_with_known_transaction() {
         ),
     );
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
-        vec![tx2.raw().clone()],
+        vec![tx2.clone()],
         sandbox.s(VALIDATOR_3),
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -3580,7 +3583,7 @@ fn handle_block_response_with_all_known_transactions() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -3611,7 +3614,7 @@ fn handle_block_response_with_all_known_transactions() {
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3621,7 +3624,7 @@ fn handle_block_response_with_all_known_transactions() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3639,7 +3642,7 @@ fn handle_block_response_with_all_known_transactions() {
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -3674,10 +3677,10 @@ fn received_block_while_there_is_full_propose() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3716,7 +3719,7 @@ fn received_block_while_there_is_full_propose() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3739,7 +3742,7 @@ fn received_block_while_there_is_full_propose() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx.hash()],
@@ -3749,7 +3752,7 @@ fn received_block_while_there_is_full_propose() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx.hash()],
@@ -3757,16 +3760,16 @@ fn received_block_while_there_is_full_propose() {
         ),
     );
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(VALIDATOR_3),
     ));
 
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -3797,10 +3800,10 @@ fn received_block_while_there_is_pending_block() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3839,7 +3842,7 @@ fn received_block_while_there_is_pending_block() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             HEIGHT_ONE,
@@ -3872,7 +3875,7 @@ fn received_block_while_there_is_pending_block() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx.hash()],
@@ -3880,15 +3883,15 @@ fn received_block_while_there_is_pending_block() {
         ),
     );
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(VALIDATOR_3),
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -3925,17 +3928,17 @@ fn transactions_request_to_multiple_nodes() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_2),
         HEIGHT_TWO,
         &block.hash(),
         sandbox.s(VALIDATOR_2),
     ));
 
-    sandbox.recv(&Status::new(
+    sandbox.recv(&sandbox.create_status(
         &sandbox.p(VALIDATOR_3),
         HEIGHT_TWO,
         &block.hash(),
@@ -3974,7 +3977,7 @@ fn transactions_request_to_multiple_nodes() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &BlockRequest::new(
+        &sandbox.create_block_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -3994,7 +3997,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx.hash()],
@@ -4005,7 +4008,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx.hash()],
@@ -4013,15 +4016,15 @@ fn transactions_request_to_multiple_nodes() {
         ),
     );
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(VALIDATOR_2),
         &sandbox.p(VALIDATOR_0),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(VALIDATOR_2),
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
         &block.hash(),
@@ -4077,7 +4080,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     // option: with transaction
     let tx = gen_timestamping_tx();
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // add rounds & become leader
@@ -4118,7 +4121,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -4355,7 +4358,7 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.actual_from = sandbox.current_height().next().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
-        TxConfig::new(
+        TxConfig::create_signed(
             &sandbox.p(VALIDATOR_0),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
@@ -4363,7 +4366,7 @@ fn test_exclude_validator_from_consensus() {
         )
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
     add_one_height(&sandbox, &sandbox_state);
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
@@ -4386,7 +4389,7 @@ fn test_schema_config_changes() {
         consensus_cfg.actual_from = sandbox.current_height().next().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
-        let tx = TxConfig::new(
+        let tx = TxConfig::create_signed(
             &sandbox.p(VALIDATOR_0),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
@@ -4407,7 +4410,7 @@ fn test_schema_config_changes() {
         prev_cfg
     );
     // Commit a new configuration
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
     // Check that following configuration is visible
     assert_eq!(
         Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),

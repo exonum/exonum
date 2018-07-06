@@ -2,7 +2,7 @@ use super::{
     BlockResponse, Message, Precommit, RawTransaction, SignedMessage, Status, TransactionsResponse,
     UncheckedBuffer, RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
-use blockchain::{self, Block, BlockProof};
+use blockchain::{Block, BlockProof};
 use chrono::Utc;
 use crypto::{gen_keypair, hash};
 use helpers::{Height, Round, ValidatorId};
@@ -11,14 +11,6 @@ use helpers::{Height, Round, ValidatorId};
 fn test_blockresponse_empty_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-
-    /*
-    use ::helpers::{ValidatorId, Height,},
-    use ::blockchain::Block;
-    let block = Block::new(0, ValidatorId(0), Height(0), 0, &Hash::zero(), &Hash::zero(), &Hash::zero())
-
-    let msg = BlockResponse::new(public_key, block, vec![], []);
-    */
     let msg = TransactionsResponse::new(&public_key, vec![]);
     let msg = Message::new(msg, public_key, &secret_key);
     assert_eq!(
@@ -48,7 +40,6 @@ fn test_block() {
     let tx_count = txs.len() as u32;
 
     let content = Block::new(
-        blockchain::SCHEMA_MAJOR_VERSION,
         ValidatorId::zero(),
         Height(500),
         tx_count,

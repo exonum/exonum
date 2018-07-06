@@ -146,14 +146,13 @@ impl Blockchain {
     /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(
         &self,
-        raw: Message<RawTransaction>,
-    ) -> Result<TransactionMessage, MessageError> {
+        raw: &Message<RawTransaction>,
+    ) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
             .ok_or_else(|| MessageError::from("Service not found."))?;
-        let tx = service.tx_from_raw(raw.deref().clone());
-        Ok(TransactionMessage::new(raw, tx?))
+        service.tx_from_raw(raw.deref().clone())
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -389,22 +388,22 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let (tx, service_name) = {
+        let (tx, raw, service_name) = {
             let schema = Schema::new(&fork);
 
-            let tx = schema
+            let raw = schema
                 .transactions()
                 .get(&tx_hash)
                 .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
             let service_name = self.service_map
-                .get(tx.service_id() as usize)
+                .get(raw.service_id() as usize)
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
 
-            let transaction_message = self.tx_from_raw(tx).map_err(into_failure)?;
+            let transaction = self.tx_from_raw(&raw).map_err(into_failure)?;
 
-            (transaction_message, service_name)
+            (transaction, raw, service_name)
         };
 
         fork.checkpoint();
@@ -412,11 +411,11 @@ impl Blockchain {
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let context = TransactionContext::new(
                 &mut *fork,
-                tx.raw().service_id(),
-                tx.raw().hash(),
-                *tx.raw().author(),
+                raw.service_id(),
+                raw.hash(),
+                *raw.author(),
             );
-            tx.transaction().execute(context)
+            tx.execute(context)
         }));
 
         let tx_result = match catch_result {
@@ -501,7 +500,6 @@ impl Blockchain {
                 self.api_sender.clone(),
                 self.fork(),
                 service_id as u16,
-                self,
             );
             service.after_commit(&context);
         }

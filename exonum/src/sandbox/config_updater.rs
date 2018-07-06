@@ -16,10 +16,10 @@ use blockchain::{
     ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
     TransactionSet,
 };
-use crypto::{Hash, PublicKey};
+use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::Height;
-use messages::RawTransaction;
+use messages::{Message, RawTransaction};
 use storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
@@ -35,6 +35,19 @@ transactions! {
     }
 }
 
+impl TxConfig {
+    pub fn create_signed(from: &PublicKey,
+                     config: &[u8],
+                     actual_from: Height,
+                     signer:&SecretKey) -> Message<RawTransaction> {
+        Message::sign_tx(TxConfig::new(
+            from,
+            config,
+            actual_from,
+        ), CONFIG_SERVICE, (*from, signer))
+
+    }
+}
 #[derive(Default)]
 pub struct ConfigUpdateService {}
 

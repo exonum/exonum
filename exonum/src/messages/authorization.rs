@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use bincode;
 use failure::Error;
 use serde::Serialize;
 
@@ -13,15 +14,15 @@ use super::PROTOCOL_MAJOR_VERSION;
 use encoding::serialize::encode_hex;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct AuthorisedMessage {
+pub struct AuthorizedMessage {
     pub version: u8,
     pub author: PublicKey,
     pub protocol: Protocol,
 }
 
-impl AuthorisedMessage {
+impl AuthorizedMessage {
     fn new<T: Into<Protocol>>(value: T, author: PublicKey) -> Result<Self, Error> {
-        Ok(AuthorisedMessage {
+        Ok(AuthorizedMessage {
             version: PROTOCOL_MAJOR_VERSION,
             author,
             protocol: value.into(),
@@ -32,21 +33,22 @@ impl AuthorisedMessage {
 /// Correct raw message that was deserialized and verifyied, from `UncheckedBuffer`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SignedMessage {
-    pub(crate) authorised_message: AuthorisedMessage,
+    pub(crate) authorized_message: AuthorizedMessage,
     pub(crate) signature: Signature,
 }
 
 impl SignedMessage {
+
     pub(crate) fn new<T: Into<Protocol>>(
         value: T,
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> Result<SignedMessage, Error> {
-        let authorised_message = AuthorisedMessage::new(value, author)?;
-        let signature = Self::sign(&authorised_message, secret_key)?;
+        let authorized_message = AuthorizedMessage::new(value, author)?;
+        let signature = Self::sign(&authorized_message, secret_key)?;
 
         Ok(SignedMessage {
-            authorised_message,
+            authorized_message,
             signature,
         })
     }
@@ -59,17 +61,17 @@ impl SignedMessage {
         // Sodium verify/sign api allows to work only with raw buffer.
         // This two factors lead to additional `serialize` inside verify
         let buffer = buffer.as_ref();
-        let message: SignedMessage = ::bincode::config().no_limit().deserialize(&buffer)?;
-        if message.authorised_message.version != PROTOCOL_MAJOR_VERSION {
+        let message: SignedMessage = bincode::config().no_limit().deserialize(&buffer)?;
+        if message.authorized_message.version != PROTOCOL_MAJOR_VERSION {
             bail!(
                 "Message version differ from our supported, msg_version = {}",
-                message.authorised_message.version
+                message.authorized_message.version
             )
         }
         Self::verify(
-            &message.authorised_message,
+            &message.authorized_message,
             &message.signature,
-            &message.authorised_message.author,
+            &message.authorized_message.author,
         )?;
 
         Ok(message)
@@ -77,13 +79,13 @@ impl SignedMessage {
 
     /// Serialize safe wrapper into unchecked byte array.
     pub fn to_vec(&self) -> Vec<u8> {
-        ::bincode::config()
+        bincode::config()
             .no_limit()
             .serialize(&self)
             .expect("Could not serialize SignedMessage.")
     }
 
-    /// Serialize message as hex encoded byte array
+    /// Serializes message as hex encoded byte array.
     pub fn to_hex_string(&self) -> String {
         encode_hex(&self.to_vec())
     }
@@ -91,14 +93,14 @@ impl SignedMessage {
     /// Converts signed message into root safe wrapper.
     pub fn into_message(self) -> Message {
         Message {
-            payload: self.authorised_message.protocol.clone(),
-            message: self,
+            payload: self.authorized_message.protocol.clone(),
+            message: self
         }
     }
 
     fn sign<T: Serialize>(val: &T, secret_key: &SecretKey) -> Result<Signature, Error> {
         // TODO: limit bincode max_message_length using config
-        let full_buffer = ::bincode::config().no_limit().serialize(&val)?;
+        let full_buffer = bincode::config().no_limit().serialize(&val)?;
         let signature = crypto::sign(&full_buffer, secret_key);
         Ok(signature)
     }
@@ -115,7 +117,7 @@ impl SignedMessage {
         signature: &Signature,
         public_key: &PublicKey,
     ) -> Result<(), Error> {
-        let full_buffer = ::bincode::config().no_limit().serialize(&val)?;
+        let full_buffer = bincode::config().no_limit().serialize(&val)?;
         if !crypto::verify(signature, &full_buffer, &public_key) {
             bail!("Can't verify message.");
         }
@@ -155,5 +157,11 @@ impl<T: ProtocolMessage> StorageValue for Message<T> {
 impl<T: ProtocolMessage> CryptoHash for Message<T> {
     fn hash(&self) -> Hash {
         self.hash()
+    }
+}
+
+impl Into<Message<Protocol>> for SignedMessage {
+    fn into(self) -> Message<Protocol> {
+        self.into_message()
     }
 }

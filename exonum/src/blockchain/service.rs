@@ -18,15 +18,14 @@
 use serde_json::Value;
 
 use std::{
-    collections::{HashMap, HashSet}, fmt::{Debug, Error, Formatter}, net::SocketAddr,
+    collections::{HashMap, HashSet}, net::SocketAddr,
     sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
 use api::ServiceApiBuilder;
 use blockchain::{
-    transaction::TransactionMessage, Blockchain, ConsensusConfig, Schema, StoredConfiguration,
-    ValidatorKeys,
+    ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys,
 };
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -96,12 +95,12 @@ use storage::{Fork, Snapshot};
 /// impl Transaction for TxA {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
+/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// impl Transaction for TxB {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  { Ok(()) }
+/// #   fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// // Service
@@ -207,7 +206,8 @@ pub trait Service: Send + Sync + 'static {
 /// execution context. This structure is passed to the `after_commit` method
 /// of the `Service` trait and is used for the interaction between service
 /// business logic and the current node state.
-pub struct ServiceContext<'a> {
+#[derive(Debug)]
+pub struct ServiceContext {
     validator_id: Option<ValidatorId>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
@@ -215,25 +215,10 @@ pub struct ServiceContext<'a> {
     stored_configuration: StoredConfiguration,
     height: Height,
     service_id: u16,
-    tx_parser:
-        Box<dyn 'a + Fn(Message<RawTransaction>) -> Result<TransactionMessage, ::encoding::Error>>,
 }
 
-impl<'a> Debug for ServiceContext<'a> {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
-        fmt.debug_struct("ServiceContext")
-            .field("validator_id", &self.validator_id)
-            .field("service_keypair", &self.service_keypair)
-            .field("api_sender", &self.api_sender)
-            .field("fork", &self.fork)
-            .field("stored_configuration", &self.stored_configuration)
-            .field("height", &self.height)
-            .field("service_id", &self.service_id)
-            .finish()
-    }
-}
 
-impl<'a> ServiceContext<'a> {
+impl ServiceContext {
     /// Creates service context for the given node.
     ///
     /// This method is necessary if you want to implement an alternative exonum node.
@@ -245,7 +230,6 @@ impl<'a> ServiceContext<'a> {
         api_sender: ApiSender,
         fork: Fork,
         service_id: u16,
-        blockchain: &Blockchain,
     ) -> Self {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
@@ -267,7 +251,6 @@ impl<'a> ServiceContext<'a> {
             stored_configuration,
             service_id,
             height,
-            tx_parser: Box::new(move |tx| blockchain.tx_from_raw(tx)),
         }
     }
 
@@ -313,7 +296,7 @@ impl<'a> ServiceContext<'a> {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Broadcast transaction to other nodes in the network.
+    /// Signs and broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction<T: Transaction + BinaryForm>(&self, tx: T) {
         let tx_process = move || -> Result<(), ::failure::Error> {
             let msg = Message::sign_tx(
@@ -325,6 +308,14 @@ impl<'a> ServiceContext<'a> {
         };
 
         if let Err(e) = tx_process() {
+            error!("Could't broadcast transaction {}.", e);
+        }
+    }
+
+    /// Broadcast transaction to other nodes in the network.
+    /// This transaction sould be signed externally.
+    pub fn broadcast_signed_transaction(&self, msg: Message<RawTransaction>) {
+        if let Err(e) = self.api_sender.broadcast_transaction(msg) {
             error!("Could't broadcast transaction {}.", e);
         }
     }

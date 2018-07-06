@@ -26,6 +26,8 @@ use exonum::{
     messages::{Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
+pub const SERVICE_ID:u16 = 0;
+
 transactions! {
     pub ExplorerTransactions {
         struct CreateWallet {

@@ -23,11 +23,11 @@ extern crate serde_json;
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{Schema, Transaction, TransactionErrorType, TransactionSet, TxLocation},
+    blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
     crypto::{self, Hash}, explorer::*, helpers::Height, messages::{Message, RawTransaction},
 };
 
-use blockchain::{create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer};
+use blockchain::{create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer,SERVICE_ID};
 
 mod blockchain;
 
@@ -40,13 +40,13 @@ fn test_explorer_basics() {
 
     let tx_alice = Message::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
-        0,
+        SERVICE_ID,
         (pk_alice, &key_alice),
     );
-    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
+    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), SERVICE_ID, (pk_bob, &key_bob));
     let tx_transfer = Message::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
-        0,
+        SERVICE_ID,
         (pk_alice, &key_alice),
     );
 
@@ -161,7 +161,7 @@ fn test_explorer_pool_transaction() {
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let tx_alice = Message::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
-        0,
+        SERVICE_ID,
         (pk_alice, &key_alice),
     );
     let tx_hash = tx_alice.hash();
@@ -190,7 +190,7 @@ fn tx_generator() -> Box<Iterator<Item = Message<RawTransaction>>> {
         let (pk, key) = crypto::gen_keypair();
         Message::sign_tx(
             CreateWallet::new(&pk, &format!("Alice #{}", i)),
-            0,
+            SERVICE_ID,
             (pk, &key),
         )
     }))
@@ -341,13 +341,13 @@ fn test_transaction_iterator() {
     let (pk_bob, key_bob) = crypto::gen_keypair();
     let tx_alice = Message::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
-        0,
+        SERVICE_ID,
         (pk_alice, &key_alice),
     );
-    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), 0, (pk_bob, &key_bob));
+    let tx_bob = Message::sign_tx(CreateWallet::new(&pk_bob, "Bob"), SERVICE_ID, (pk_bob, &key_bob));
     let tx_transfer = Message::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
-        0,
+        SERVICE_ID,
         (pk_alice, &key_alice),
     );
     create_block(

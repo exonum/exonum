@@ -95,6 +95,10 @@ mod test {
     fn decode_message_small_size_in_header() {
         let data = vec![0_u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
+        let (p,k) = gen_keypair_from_seed(&Seed::new([1; 32]));
+
+        let signed = raw_message(0, data, (p, &k));
+        let source = signed.to_vec();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         initiator.encode(signed, &mut bytes).unwrap();
 

@@ -127,7 +127,7 @@ impl Transaction for TxTime {
         true
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
         let view = tc.fork();
         self.check_signed_by_validator(view.as_ref())?;
         self.update_validator_time(view)?;

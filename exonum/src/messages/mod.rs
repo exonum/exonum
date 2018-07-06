@@ -21,14 +21,15 @@ use failure::Error;
 use blockchain::Transaction;
 use crypto::{hash, Hash, PublicKey, SecretKey};
 
-pub use self::authorisation::SignedMessage;
+pub use self::authorization::SignedMessage;
 pub use self::helpers::BinaryForm;
 pub use self::protocol::*;
+pub(crate) use self::helpers::HexTransaction;
 pub(crate) use self::raw::UncheckedBuffer;
 
 #[macro_use]
 mod spec;
-mod authorisation;
+mod authorization;
 mod helpers;
 mod protocol;
 mod raw;
@@ -71,15 +72,6 @@ impl RawTransaction {
     }
 }
 
-impl fmt::Debug for RawTransaction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Transaction")
-            .field("service_id", &self.service_id)
-            .field("payload_len", &self.payload.len())
-            .finish()
-    }
-}
-
 /// Wrappers around pair of deserialized message, and its binary form.
 // TODO: Rewrite using owning_ref
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -92,6 +84,7 @@ where
 }
 
 impl Message<Protocol> {
+
     /// Makes new instance of map from existing,
     /// trying convert internal payload to provided type U.
     pub fn map_into<U: ProtocolMessage>(self) -> Result<Message<U>, Error> {
@@ -101,6 +94,7 @@ impl Message<Protocol> {
 }
 
 impl Message<RawTransaction> {
+
     #[doc(hidden)]
     pub fn create_raw_tx(
         data: Vec<u8>,
@@ -110,6 +104,7 @@ impl Message<RawTransaction> {
         let raw = RawTransaction::new(service_id, data);
         Message::new(raw, service_keypair.0, &service_keypair.1)
     }
+
     /// Creates message for transaction.
     ///
     /// # Panics
@@ -126,11 +121,12 @@ impl Message<RawTransaction> {
 }
 
 impl<T: ProtocolMessage> Message<T> {
+
     /// Creates new instance of message
-    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Self {
+    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
         let message =
             SignedMessage::new(payload.clone(), author, secret_key).expect("Serialization error");
-        Self { payload, message }
+        Message { payload, message }
     }
 
     /// Makes new instance of map from existing,
@@ -142,7 +138,7 @@ impl<T: ProtocolMessage> Message<T> {
         F: Fn(T) -> U,
     {
         let (payload, message) = self.into_parts();
-        Self::from_parts(func(payload), message)
+        Message::from_parts(func(payload), message)
     }
 
     /// Split message into payload and signed raw parts
@@ -152,11 +148,12 @@ impl<T: ProtocolMessage> Message<T> {
 
     /// Trying to convert pair of payload and signed raw message into safe message wrapper.
     pub(crate) fn from_parts(payload: T, message: SignedMessage) -> Result<Message<T>, Error> {
-        if payload != message.authorised_message.protocol {
+        if payload != message.authorized_message.protocol {
             bail!("Type {:?} is not a part of exonum protocol", payload)
         }
-        Ok(Self { payload, message })
+        Ok(Message { payload, message })
     }
+
     /// Returns hahs of full message
     pub fn hash(&self) -> Hash {
         hash(&self.message.to_vec())
@@ -169,11 +166,12 @@ impl<T: ProtocolMessage> Message<T> {
 
     /// Downgrade `Message<T>` into root `Message<Protocol>`
     pub fn downgrade(self) -> Message<Protocol> {
-        Self {
-            payload: self.message.authorised_message.protocol.clone(),
+        Message {
+            payload: self.message.authorized_message.protocol.clone(),
             message: self.message,
         }
     }
+
     /// Clones payload and returns as result
     #[doc(hidden)]
     pub fn clone_child(&self) -> T {
@@ -182,7 +180,18 @@ impl<T: ProtocolMessage> Message<T> {
 
     /// Returns public key of message creator.
     pub fn author(&self) -> &PublicKey {
-        &self.message.authorised_message.author
+        &self.message.authorized_message.author
+    }
+}
+
+
+
+impl fmt::Debug for RawTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Transaction")
+            .field("service_id", &self.service_id)
+            .field("payload_len", &self.payload.len())
+            .finish()
     }
 }
 

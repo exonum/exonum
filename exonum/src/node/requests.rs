@@ -82,8 +82,6 @@ impl NodeHandler {
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: Message<TransactionsRequest>) {
         use std::mem;
-        const EMPTY_RESPONSE_SIZE: u32 =
-            (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);

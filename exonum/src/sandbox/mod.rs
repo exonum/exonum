@@ -19,6 +19,3 @@ mod requests;
 mod sandbox;
 mod sandbox_tests_helper;
 mod timestamping;
-
-use crypto::{PublicKey, SecretKey};
-use messages::{Message, RawTransaction};

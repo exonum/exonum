@@ -44,7 +44,7 @@ impl NodeHandler {
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => {
-                let msg = SignedMessage::verify_buffer(&raw.get_vec())?.into_message();
+                let msg = SignedMessage::verify_buffer(&raw.get_vec())?.into();
                 self.handle_message(msg)?;
             }
         }

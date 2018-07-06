@@ -1027,7 +1027,7 @@ mod tests {
     use events::EventHandler;
     use helpers;
     use storage::{Database, MemoryDB};
-
+    const SERVICE_ID:u16 = 0;
     messages! {
 
         struct TxSimple {
@@ -1056,7 +1056,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg);
 
-        let tx = Message::sign_tx(TxSimple::new(&p_key, "Hello, World!"), 0, (p_key, &s_key));
+        let tx = Message::sign_tx(TxSimple::new(&p_key, "Hello, World!"), SERVICE_ID, (p_key, &s_key));
 
         // Create original transaction.
         let tx_orig = tx.clone();

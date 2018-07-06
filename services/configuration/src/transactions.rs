@@ -236,7 +236,7 @@ impl Transaction for Propose {
         self.verify_signature(self.from())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
         let fork = tc.fork();
         let (cfg, cfg_hash) = self.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding propose {:?}: {}", self, err);
@@ -372,7 +372,7 @@ impl Transaction for Vote {
         self.verify_signature(self.from())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
         let fork = tc.fork();
         let vote = VotingDecisionRef::from(self);
         let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
@@ -398,7 +398,7 @@ impl Transaction for VoteAgainst {
         self.verify_signature(self.from())
     }
 
-    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult  {
+    fn execute<'a>(&self, mut tc: TransactionContext<'a>) -> ExecutionResult {
         let fork = tc.fork();
         let vote_against = VotingDecisionRef::from(self);
         vote_against.precheck(fork.as_ref()).map_err(|err| {

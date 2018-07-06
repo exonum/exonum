@@ -194,7 +194,7 @@ mod tests {
             self.verify_signature(self.from())
         }
 
-        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult  {
+        fn execute<'a>(&self, _: TransactionContext<'a>) -> ExecutionResult {
             Ok(())
         }
     }

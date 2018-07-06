@@ -100,7 +100,7 @@ impl ConnectionsPool {
         self.inner
             .borrow_mut()
             .remove(peer)
-            .ok_or("there is no sender in the connection pool")
+            .ok_or_else(|| format_err!("there is no sender in the connection pool"))
     }
 
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<SignedMessage>> {

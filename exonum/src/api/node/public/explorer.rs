@@ -79,7 +79,7 @@ impl BlockQuery {
 
 /// Raw Transaction in hex representation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TransactionDTO {
+pub struct TransactionHex {
     /// The hex value of the transaction to be broadcasted.
     pub tx_body: String,
 }
@@ -165,7 +165,7 @@ impl ExplorerApi {
     /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
     pub fn transaction_post(
         state: &ServiceApiState,
-        query: TransactionDTO,
+        query: TransactionHex,
     ) -> Result<(), ApiError> {
         use events::error::into_failure;
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
