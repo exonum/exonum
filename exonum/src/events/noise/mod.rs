@@ -14,18 +14,20 @@
 
 #[cfg(feature = "sodiumoxide-crypto")]
 #[doc(inline)]
-pub use self::wrappers::sodium_wrapper::{handshake::{HandshakeParams, NoiseHandshake},
-                                         wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH,
-                                                   NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
-                                                   NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH}};
+pub use self::wrappers::sodium_wrapper::{
+    handshake::{HandshakeParams, NoiseHandshake},
+    wrapper::{
+        NoiseWrapper, HANDSHAKE_HEADER_LENGTH, NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
+        NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH,
+    },
+};
 
 use byteorder::{ByteOrder, LittleEndian};
 use events::codec::MessagesCodec;
 use futures::future::Future;
-use tokio_io::{codec::Framed,
-               io::{read_exact, write_all},
-               AsyncRead,
-               AsyncWrite};
+use tokio_io::{
+    codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
+};
 
 use std::io;
 

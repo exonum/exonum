@@ -20,24 +20,19 @@
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
-#[cfg(feature = "sodiumoxide-crypto")]
-pub use self::crypto_lib::sodiumoxide::x25519;
 #[doc(inline)]
 pub use self::crypto_impl::{
-    HASH_SIZE,
-    PUBLIC_KEY_LENGTH,
-    SECRET_KEY_LENGTH,
-    SEED_LENGTH,
-    SIGNATURE_LENGTH,
+    HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
 };
-
+#[cfg(feature = "sodiumoxide-crypto")]
+pub use self::crypto_lib::sodiumoxide::x25519;
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
-use serde::{de::{self, Deserialize, Deserializer, Visitor},
-            Serialize,
-            Serializer};
+use serde::{
+    de::{self, Deserialize, Deserializer, Visitor}, Serialize, Serializer,
+};
 use uuid::Uuid;
 
 use std::{

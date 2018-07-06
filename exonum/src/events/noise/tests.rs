@@ -24,9 +24,7 @@ use std::net::SocketAddr;
 use std::thread;
 use std::time::Duration;
 
-use crypto::{
-    gen_keypair_from_seed, SEED_LENGTH, Seed, PUBLIC_KEY_LENGTH,
-};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::error::into_other;
 use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
 use tokio_io::{AsyncRead, AsyncWrite};
