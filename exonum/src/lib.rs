@@ -40,6 +40,7 @@
 extern crate actix;
 extern crate actix_web;
 extern crate atty;
+extern crate bincode;
 extern crate bit_vec;
 extern crate byteorder;
 extern crate bytes;
@@ -48,6 +49,7 @@ extern crate chrono;
 extern crate clap;
 extern crate colored;
 extern crate env_logger;
+extern crate erased_serde;
 extern crate exonum_rocksdb as rocksdb;
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]

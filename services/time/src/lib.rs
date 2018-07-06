@@ -115,12 +115,10 @@ impl Service for TimeService {
         }
         let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
         context
-            .transaction_sender()
-            .send(Box::new(TxTime::new(
+            .broadcast_transaction(TxTime::new(
                 self.time.current_time(),
                 &pub_key,
-                &sec_key,
-            )))
+            ))
             .unwrap();
     }
 

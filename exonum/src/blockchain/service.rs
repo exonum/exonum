@@ -27,8 +27,8 @@ use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
-use messages::RawTransaction;
-use node::{ApiSender, NodeRole, State, TransactionSend};
+use messages::{BinaryForm, Message, RawTransaction};
+use node::{ApiSender, NodeRole, State};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
@@ -46,9 +46,9 @@ use storage::{Fork, Snapshot};
 /// ```
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
+/// # use exonum::messages::{Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;
 ///
@@ -79,8 +79,6 @@ use storage::{Fork, Snapshot};
 /// // Transaction definitions
 /// transactions! {
 ///     MyTransactions {
-///         const SERVICE_ID = SERVICE_ID;
-///
 ///         struct TxA {
 ///             // Transaction fields
 ///         }
@@ -94,12 +92,12 @@ use storage::{Fork, Snapshot};
 /// impl Transaction for TxA {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// impl Transaction for TxB {
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// // Service
@@ -191,7 +189,7 @@ pub trait Service: Send + Sync + 'static {
     /// has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn after_commit(&self, context: &ServiceContext) {}
+    fn after_commit<'a>(&self, context: &ServiceContext) {}
 
     /// Extends API by handlers of this service. The request handlers are mounted on
     /// the `/api/services/{service_name}` path at the listen address of every
@@ -213,6 +211,7 @@ pub struct ServiceContext {
     fork: Fork,
     stored_configuration: StoredConfiguration,
     height: Height,
+    service_id: u16,
 }
 
 impl ServiceContext {
@@ -220,12 +219,13 @@ impl ServiceContext {
     ///
     /// This method is necessary if you want to implement an alternative exonum node.
     /// For example, you can implement a special node without consensus for regression
-    /// testing of services business logic.
+    /// testing of services business logic.`
     pub fn new(
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
         fork: Fork,
+        service_id: u16,
     ) -> Self {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
@@ -245,6 +245,7 @@ impl ServiceContext {
             api_sender,
             fork,
             stored_configuration,
+            service_id,
             height,
         }
     }
@@ -291,10 +292,28 @@ impl ServiceContext {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Returns a reference to the transaction sender, which can then be used
-    /// to broadcast a transaction to other nodes in the network.
-    pub fn transaction_sender(&self) -> &dyn TransactionSend {
-        &self.api_sender
+    /// Signs and broadcast transaction to other nodes in the network.
+    pub fn broadcast_transaction<T: Transaction + BinaryForm>(&self, tx: T) {
+        let tx_process = move || -> Result<(), ::failure::Error> {
+            let msg = Message::sign_tx(
+                tx,
+                self.service_id,
+                (self.service_keypair.0, &self.service_keypair.1),
+            );
+            self.api_sender.broadcast_transaction(msg)
+        };
+
+        if let Err(e) = tx_process() {
+            error!("Could't broadcast transaction {}.", e);
+        }
+    }
+
+    /// Broadcast transaction to other nodes in the network.
+    /// This transaction sould be signed externally.
+    pub fn broadcast_signed_transaction(&self, msg: Message<RawTransaction>) {
+        if let Err(e) = self.api_sender.broadcast_transaction(msg) {
+            error!("Could't broadcast transaction {}.", e);
+        }
     }
 
     /// Returns the actual blockchain global configuration.

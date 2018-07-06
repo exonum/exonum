@@ -70,32 +70,6 @@ pub enum Error {
         /// value that was parsed as size.
         value: Offset,
     },
-    /// `RawMessage` is too short
-    UnexpectedlyShortRawMessage {
-        /// position in buffer where error appears.
-        position: Offset,
-        /// size of raw message in buffer.
-        size: Offset,
-    },
-    /// Incorrect size of `RawMessage` found in buffer.
-    IncorrectSizeOfRawMessage {
-        /// position in buffer where error appears.
-        position: Offset,
-        /// parsed message size.
-        actual_size: Offset,
-        /// expected fixed part message size.
-        declared_size: Offset,
-    },
-    /// Incorrect `message_id` found in buffer.
-    IncorrectMessageType {
-        /// expected `message_id`
-        message_type: u16,
-    },
-    /// Incorrect `service_id` found in buffer.
-    IncorrectServiceId {
-        /// expected `service_id`.
-        service_id: u16,
-    },
     /// Unsupported message version.
     UnsupportedProtocolVersion {
         /// Actual message version.
@@ -155,10 +129,6 @@ impl StdError for Error {
             Error::IncorrectSocketAddrPadding { .. } => "Incorrect SocketAddr padding",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
             Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
-            Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
-            Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage",
-            Error::IncorrectMessageType { .. } => "Incorrect message type",
-            Error::IncorrectServiceId { .. } => "Incorrect service id",
             Error::UnsupportedProtocolVersion { .. } => "Unsupported protocol version",
             Error::OverlappingSegment { .. } => "Overlapping segments",
             Error::SpaceBetweenSegments { .. } => "Space between segments",
@@ -196,5 +166,11 @@ impl From<Cow<'static, str>> for Error {
 impl From<&'static str> for Error {
     fn from(t: &'static str) -> Self {
         Error::Basic(t.into())
+    }
+}
+
+impl From<Box<::bincode::ErrorKind>> for Error {
+    fn from(t: Box<::bincode::ErrorKind>) -> Error {
+        (t as Box<dyn StdError>).into()
     }
 }

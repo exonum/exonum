@@ -18,7 +18,8 @@
 
 //! Error module.
 
-use std::{error, io};
+use failure;
+use std::io;
 
 use storage;
 
@@ -43,7 +44,7 @@ pub enum Error {
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<error::Error + Send + Sync>),
+    InternalError(failure::Error),
 
     /// Unauthorized error.
     #[fail(display = "Unauthorized")]
@@ -53,6 +54,12 @@ pub enum Error {
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Error::Io(e)
+    }
+}
+
+impl From<failure::Error> for Error {
+    fn from(e: failure::Error) -> Error {
+        Error::InternalError(e)
     }
 }
 

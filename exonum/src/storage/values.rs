@@ -25,7 +25,6 @@ use super::UniqueHash;
 use crypto::{Hash, PublicKey};
 use encoding::{Field, Offset};
 use helpers::Round;
-use messages::{MessageBuffer, RawMessage};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -230,16 +229,6 @@ impl StorageValue for PublicKey {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         Self::from_slice(value.as_ref()).unwrap()
-    }
-}
-
-impl StorageValue for RawMessage {
-    fn into_bytes(self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::new(MessageBuffer::from_vec(value.into_owned()))
     }
 }
 

@@ -41,8 +41,6 @@
 //!
 //! transactions! {
 //!     TimestampingTransactions {
-//!         const SERVICE_ID = SERVICE_ID;
-//!
 //!         struct TxTimestamp {
 //!             from: &PublicKey,
 //!             msg: &str,
@@ -140,6 +138,7 @@ extern crate actix_web;
 extern crate assert_matches;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
+#[macro_use]
 extern crate failure;
 extern crate futures;
 #[macro_use]
@@ -168,9 +167,10 @@ use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
     },
-    blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
+    blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration},
     crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
-    helpers::{Height, ValidatorId}, messages::RawMessage,
+    helpers::{Height, ValidatorId},
+    messages::{RawTransaction, Message},
     node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
 };
 
@@ -424,7 +424,7 @@ impl TestKit {
                         ExternalMessage::Transaction(tx) => {
                             let hash = tx.hash();
                             if !schema.transactions().contains(&hash) {
-                                schema.add_transaction_into_pool(tx.raw().clone());
+                                schema.add_transaction_into_pool(tx.clone());
                             }
                         }
                         ExternalMessage::PeerAdd(_)
@@ -513,8 +513,6 @@ impl TestKit {
     /// #
     /// # transactions! {
     /// #     MyServiceTransactions {
-    /// #         const SERVICE_ID = 1;
-    /// #
     /// #         struct MyTransaction {
     /// #             from: &exonum::crypto::PublicKey,
     /// #             msg: &str,
@@ -560,7 +558,7 @@ impl TestKit {
     /// transactions included into one of previous blocks do not lead to any state changes.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
-        I: IntoIterator<Item = Box<dyn Transaction>>,
+        I: IntoIterator<Item = Message<RawTransaction>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -582,8 +580,8 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<dyn Snapshot> {
-        self.probe_all(vec![Box::new(transaction) as Box<dyn Transaction>])
+    pub fn probe(&mut self, transaction: Message<RawTransaction>) -> Box<dyn Snapshot> {
+        self.probe_all(vec![transaction])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
@@ -615,7 +613,7 @@ impl TestKit {
             .collect();
 
         self.blockchain
-            .commit(&patch, block_hash, precommits.iter())
+            .commit(&patch, block_hash, precommits.into_iter())
             .unwrap();
 
         self.poll_events();
@@ -679,7 +677,7 @@ impl TestKit {
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
-        I: IntoIterator<Item = Box<dyn Transaction>>,
+        I: IntoIterator<Item = Message<RawTransaction>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
@@ -688,9 +686,10 @@ impl TestKit {
                 let mut schema = CoreSchema::new(&mut fork);
 
                 txs.into_iter()
-                    .filter(|tx| tx.verify())
+                    .map(|tx| blockchain.tx_from_raw(tx).unwrap())
+                    .filter(|tx| tx.transaction().verify())
                     .map(|tx| {
-                        let tx_id = tx.hash();
+                        let tx_id = tx.raw().hash();
                         let tx_not_found = !schema.transactions().contains(&tx_id);
                         let tx_in_pool = schema.transactions_pool().contains(&tx_id);
                         assert!(
@@ -698,8 +697,9 @@ impl TestKit {
                             "Transaction is already committed: {:?}",
                             tx
                         );
-                        schema.add_transaction_into_pool(tx.raw().clone());
-
+                        if tx_not_found {
+                            schema.add_transaction_into_pool(tx.raw().clone());
+                        }
                         tx_id
                     })
                     .collect()
@@ -721,9 +721,9 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
-    pub fn create_block_with_transaction<T: Transaction>(
+    pub fn create_block_with_transaction(
         &mut self,
-        tx: T,
+        tx: Message<RawTransaction>,
     ) -> BlockWithTransactions {
         self.create_block_with_transactions(txvec![tx])
     }
@@ -776,7 +776,7 @@ impl TestKit {
     }
 
     /// Adds transaction into persistent pool.
-    pub fn add_tx(&mut self, transaction: RawMessage) {
+    pub fn add_tx(&mut self, transaction: Message<RawTransaction>) {
         let mut fork = self.blockchain.fork();
         let mut schema = CoreSchema::new(&mut fork);
         schema.add_transaction_into_pool(transaction)

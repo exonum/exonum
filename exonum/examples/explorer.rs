@@ -18,23 +18,31 @@
 extern crate exonum;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 use exonum::{
     blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
-    helpers::{Height, ValidatorId},
+    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction},
 };
 
-use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer};
+use blockchain::{
+    consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
+};
 
 #[path = "../tests/explorer/blockchain.rs"]
 mod blockchain;
 
 /// Creates a transaction for the mempool.
-pub fn mempool_transaction() -> Box<Transaction> {
+pub fn mempool_transaction() -> Message<RawTransaction> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    CreateWallet::new(&pk_alex, "Alex", &key_alex).into()
+    Message::sign_tx(
+        CreateWallet::new(&pk_alex, "Alex"),
+        SERVICE_ID,
+        (pk_alex, &key_alex),
+    )
 }
 
 /// Creates a sample blockchain for the example.
@@ -50,19 +58,28 @@ pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
-    let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
-    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
-
-    create_block(
-        &mut blockchain,
-        vec![tx_alice.into(), tx_bob.into(), tx_transfer.into()],
+    let tx_alice = Message::sign_tx(
+        CreateWallet::new(&pk_alice, "Alice"),
+        SERVICE_ID,
+        (pk_alice, &key_alice),
     );
+    let tx_bob = Message::sign_tx(
+        CreateWallet::new(&pk_bob, "Bob"),
+        SERVICE_ID,
+        (pk_bob, &key_bob),
+    );
+    let tx_transfer = Message::sign_tx(
+        Transfer::new(&pk_alice, &pk_bob, 100),
+        SERVICE_ID,
+        (pk_alice, &key_alice),
+    );
+
+    create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     let mut fork = blockchain.fork();
     {
         let mut schema = Schema::new(&mut fork);
-        schema.add_transaction_into_pool(mempool_transaction().raw().clone());
+        schema.add_transaction_into_pool(mempool_transaction().clone());
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
@@ -115,7 +132,7 @@ fn main() {
     assert_eq!(tx.location().position_in_block(), 0);
 
     // It is possible to access transaction content
-    let content: &Transaction = tx.content().as_ref();
+    let content: &dyn Transaction = tx.content().transaction().unwrap().as_ref();
     println!("{:?}", content);
     // ...and transaction status as well
     let status: Result<(), &TransactionError> = tx.status();
@@ -126,7 +143,7 @@ fn main() {
         serde_json::to_value(&tx).unwrap(),
         json!({
             // `Transaction` JSON presentation
-            "content": tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(tx.content()).unwrap(),
             // Position in block
             "location": {
                 "block_height": "1",
@@ -150,7 +167,7 @@ fn main() {
                 "description": "Not allowed",
             },
             // Other fields...
-            "content": erroneous_tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(erroneous_tx.content()).unwrap(),
             "location": erroneous_tx.location(),
             "location_proof": erroneous_tx.location_proof(),
         })
@@ -163,7 +180,7 @@ fn main() {
         json!({
             "status": { "type": "panic", "description": "oops" },
             // Other fields...
-            "content": panicked_tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(panicked_tx.content()).unwrap(),
             "location": panicked_tx.location(),
             "location_proof": panicked_tx.location_proof(),
         })
@@ -176,13 +193,15 @@ fn main() {
     println!("{:?}", tx.content());
 
     // JSON serialization for committed transactions
-    let committed_tx: TransactionInfo = explorer.transaction(&block[0].content().hash()).unwrap();
+    let committed_tx: TransactionInfo = explorer
+        .transaction(&block[0].content().raw().hash())
+        .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(
         serde_json::to_value(&committed_tx).unwrap(),
         json!({
             "type": "committed",
-            "content": committed_tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(committed_tx.content()).unwrap(),
             "status": { "type": "success" },
             "location": tx_ref.location(),
             "location_proof": tx_ref.location_proof(),
@@ -195,7 +214,7 @@ fn main() {
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({
             "type": "in-pool",
-            "content": tx_in_pool.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(tx_in_pool.content()).unwrap(),
         })
     );
 

@@ -13,255 +13,213 @@
 // limitations under the License.
 
 //! Consensus and other messages and related utilities.
-
-pub use self::{
-    protocol::*,
-    raw::{
-        Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage, HEADER_LENGTH,
-        PROTOCOL_MAJOR_VERSION,
-    },
-};
-
-use bit_vec::BitVec;
-
 use std::fmt;
+use std::ops::Deref;
 
-use crypto::PublicKey;
-use encoding::Error;
-use helpers::{Height, Round, ValidatorId};
+use failure::Error;
+
+use blockchain::{Transaction, TransactionSet};
+use crypto::{hash, Hash, PublicKey, SecretKey};
+
+pub use self::authorization::SignedMessage;
+pub use self::helpers::BinaryForm;
+pub(crate) use self::helpers::HexTransaction;
+pub use self::protocol::*;
+pub(crate) use self::raw::UncheckedBuffer;
 
 #[macro_use]
 mod spec;
+mod authorization;
+mod helpers;
 mod protocol;
 mod raw;
-
 #[cfg(test)]
-mod tests;
+mod test;
 
-// TODO: Implement common methods for enum types (hash, raw, from_raw, verify). (ECR-166)
-// TODO: Use macro for implementing enums. (ECR-166)
+/// Version of the protocol. Different versions are incompatible.
+pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 
-/// Raw transaction type.
-pub type RawTransaction = RawMessage;
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+/// Transaction raw buffer.
+/// This struct used to transfer transaction in network.
+pub struct RawTransaction {
+    service_id: u16,
+    payload: Vec<u8>,
+}
+
+impl RawTransaction {
+    /// Creates new instance of RawTransaction.
+    pub(crate) fn new(service_id: u16, payload: Vec<u8>) -> RawTransaction {
+        RawTransaction {
+            service_id,
+            payload,
+        }
+    }
+    /// Returns user defined data that should be used for deserialization.
+    pub fn payload(&self) -> &[u8] {
+        &self.payload
+    }
+    /// Returns service_id specified for current transaction.
+    pub fn service_id(&self) -> u16 {
+        self.service_id
+    }
+    /// Verify buffer and return safe message wrapper for it.
+    pub(crate) fn verify_transaction(
+        buffer: UncheckedBuffer,
+    ) -> Result<Message<RawTransaction>, ::failure::Error> {
+        let signed = SignedMessage::verify_buffer(buffer)?;
+        signed.into_message().map_into::<RawTransaction>()
+    }
+}
+
+/// Wrappers around pair of deserialized message, and its binary form.
+// TODO: Rewrite using owning_ref
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Message<T = Protocol>
+where
+    T: ProtocolMessage,
+{
+    payload: T,
+    message: SignedMessage,
+}
+
+impl Message<Protocol> {
+    /// Makes new instance of map from existing,
+    /// trying convert internal payload to provided type U.
+    pub fn map_into<U: ProtocolMessage>(self) -> Result<Message<U>, Error> {
+        let (payload, message) = self.into_parts();
+        Message::from_parts(U::try_from_protocol(payload)?, message)
+    }
+}
+
+impl Message<RawTransaction> {
+    #[doc(hidden)]
+    pub fn create_raw_tx(
+        data: Vec<u8>,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction> {
+        let raw = RawTransaction::new(service_id, data);
+        Message::new(raw, service_keypair.0, &service_keypair.1)
+    }
+
+    /// Creates message for transaction.
+    ///
+    /// # Panics
+    ///
+    /// On serialization fail this method can panic.
+    pub fn sign_tx<X: Transaction + BinaryForm>(
+        tx: X,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction> {
+        let data = tx.serialize().unwrap();
+        Message::create_raw_tx(data, service_id, service_keypair)
+    }
+    #[doc(hidden)]
+    pub fn sign_tx_set<X: TransactionSet + BinaryForm>(
+        tx: X,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction> {
+        let data = tx.serialize().unwrap();
+        Message::create_raw_tx(data, service_id, service_keypair)
+    }
+}
+
+impl<T: ProtocolMessage> Message<T> {
+    /// Creates new instance of message
+    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
+        let message =
+            SignedMessage::new(payload.clone(), author, secret_key).expect("Serialization error");
+        Message { payload, message }
+    }
+
+    /// Makes new instance of map from existing,
+    /// trying convert internal payload to provided type,
+    /// with helper converting method.
+    pub fn map<U, F>(self, func: F) -> Result<Message<U>, Error>
+    where
+        U: ProtocolMessage,
+        F: Fn(T) -> U,
+    {
+        let (payload, message) = self.into_parts();
+        Message::from_parts(func(payload), message)
+    }
+
+    /// Split message into payload and signed raw parts
+    pub(crate) fn into_parts(self) -> (T, SignedMessage) {
+        (self.payload, self.message)
+    }
+
+    /// Trying to convert pair of payload and signed raw message into safe message wrapper.
+    pub(crate) fn from_parts(payload: T, message: SignedMessage) -> Result<Message<T>, Error> {
+        if payload != message.authorized_message.protocol {
+            bail!("Type {:?} is not a part of exonum protocol", payload)
+        }
+        Ok(Message { payload, message })
+    }
+
+    /// Returns hahs of full message
+    pub fn hash(&self) -> Hash {
+        hash(&self.message.to_vec())
+    }
+
+    /// Returns hex representation of binary message form
+    pub fn to_hex_string(&self) -> String {
+        self.message.to_hex_string()
+    }
+
+    /// Downgrade `Message<T>` into root `Message<Protocol>`
+    pub fn downgrade(self) -> Message<Protocol> {
+        Message {
+            payload: self.message.authorized_message.protocol.clone(),
+            message: self.message,
+        }
+    }
+
+    /// Clones payload and returns as result
+    #[doc(hidden)]
+    pub fn clone_child(&self) -> T {
+        self.payload.clone()
+    }
+
+    /// Returns public key of message creator.
+    pub fn author(&self) -> &PublicKey {
+        &self.message.authorized_message.author
+    }
+}
 
 impl fmt::Debug for RawTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Transaction")
-            .field("version", &self.version())
-            .field("service_id", &self.service_id())
-            .field("message_type", &self.message_type())
-            .field("length", &self.len())
-            .field("hash", &self.hash())
+            .field("service_id", &self.service_id)
+            .field("payload_len", &self.payload.len())
             .finish()
     }
 }
 
-/// Any possible message.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Any {
-    /// `Connect` message.
-    Connect(Connect),
-    /// `Status` message.
-    Status(Status),
-    /// `Block` message.
-    Block(BlockResponse),
-    /// Consensus message.
-    Consensus(ConsensusMessage),
-    /// Request for the some data.
-    Request(RequestMessage),
-    /// Transaction.
-    Transaction(RawTransaction),
-    /// A batch of the transactions.
-    TransactionsBatch(TransactionsResponse),
-}
-
-/// Consensus message.
-#[derive(Clone, PartialEq)]
-pub enum ConsensusMessage {
-    /// `Propose` message.
-    Propose(Propose),
-    /// `Prevote` message.
-    Prevote(Prevote),
-    /// `Precommit` message.
-    Precommit(Precommit),
-}
-
-/// A request for the some data.
-#[derive(Clone, PartialEq)]
-pub enum RequestMessage {
-    /// Propose request.
-    Propose(ProposeRequest),
-    /// Transactions request.
-    Transactions(TransactionsRequest),
-    /// Prevotes request.
-    Prevotes(PrevotesRequest),
-    /// Peers request.
-    Peers(PeersRequest),
-    /// Block request.
-    Block(BlockRequest),
-}
-
-impl RequestMessage {
-    /// Returns public key of the message sender.
-    pub fn from(&self) -> &PublicKey {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.from(),
-            RequestMessage::Transactions(ref msg) => msg.from(),
-            RequestMessage::Prevotes(ref msg) => msg.from(),
-            RequestMessage::Peers(ref msg) => msg.from(),
-            RequestMessage::Block(ref msg) => msg.from(),
-        }
-    }
-
-    /// Returns public key of the message recipient.
-    pub fn to(&self) -> &PublicKey {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.to(),
-            RequestMessage::Transactions(ref msg) => msg.to(),
-            RequestMessage::Prevotes(ref msg) => msg.to(),
-            RequestMessage::Peers(ref msg) => msg.to(),
-            RequestMessage::Block(ref msg) => msg.to(),
-        }
-    }
-
-    /// Verifies the message signature with given public key.
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Transactions(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Prevotes(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Peers(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Block(ref msg) => msg.verify_signature(public_key),
-        }
-    }
-
-    /// Returns raw message.
-    pub fn raw(&self) -> &RawMessage {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.raw(),
-            RequestMessage::Transactions(ref msg) => msg.raw(),
-            RequestMessage::Prevotes(ref msg) => msg.raw(),
-            RequestMessage::Peers(ref msg) => msg.raw(),
-            RequestMessage::Block(ref msg) => msg.raw(),
-        }
+impl<T: ProtocolMessage> AsRef<SignedMessage> for Message<T> {
+    fn as_ref(&self) -> &SignedMessage {
+        &self.message
     }
 }
 
-impl fmt::Debug for RequestMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            RequestMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Transactions(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Prevotes(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
-        }
+impl<T: ProtocolMessage> AsRef<T> for Message<T> {
+    fn as_ref(&self) -> &T {
+        &self.payload
     }
 }
 
-impl ConsensusMessage {
-    /// Returns validator id of the message sender.
-    pub fn validator(&self) -> ValidatorId {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.validator(),
-            ConsensusMessage::Prevote(ref msg) => msg.validator(),
-            ConsensusMessage::Precommit(ref msg) => msg.validator(),
-        }
-    }
-
-    /// Returns height of the message.
-    pub fn height(&self) -> Height {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.height(),
-            ConsensusMessage::Prevote(ref msg) => msg.height(),
-            ConsensusMessage::Precommit(ref msg) => msg.height(),
-        }
-    }
-
-    /// Returns round of the message.
-    pub fn round(&self) -> Round {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.round(),
-            ConsensusMessage::Prevote(ref msg) => msg.round(),
-            ConsensusMessage::Precommit(ref msg) => msg.round(),
-        }
-    }
-
-    /// Returns raw message.
-    pub fn raw(&self) -> &RawMessage {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.raw(),
-            ConsensusMessage::Prevote(ref msg) => msg.raw(),
-            ConsensusMessage::Precommit(ref msg) => msg.raw(),
-        }
-    }
-
-    /// Verifies the message signature with given public key.
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.verify_signature(public_key),
-            ConsensusMessage::Prevote(ref msg) => msg.verify_signature(public_key),
-            ConsensusMessage::Precommit(ref msg) => msg.verify_signature(public_key),
-        }
+impl<T: ProtocolMessage> Into<SignedMessage> for Message<T> {
+    fn into(self) -> SignedMessage {
+        self.message
     }
 }
 
-impl fmt::Debug for ConsensusMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Prevote(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Precommit(ref msg) => write!(fmt, "{:?}", msg),
-        }
-    }
-}
-
-impl Any {
-    /// Converts the `RawMessage` to the `Any` message.
-    pub fn from_raw(raw: RawMessage) -> Result<Self, Error> {
-        // TODO: check input message size (ECR-166)
-        let msg = if raw.service_id() == CONSENSUS {
-            match raw.message_type() {
-                CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
-                STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-                BLOCK_RESPONSE_MESSAGE_ID => Any::Block(BlockResponse::from_raw(raw)?),
-                TRANSACTIONS_RESPONSE_MESSAGE_ID => {
-                    Any::TransactionsBatch(TransactionsResponse::from_raw(raw)?)
-                }
-
-                PROPOSE_MESSAGE_ID => {
-                    Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
-                }
-                PREVOTE_MESSAGE_ID => {
-                    Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?))
-                }
-                PRECOMMIT_MESSAGE_ID => {
-                    Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
-                }
-
-                PROPOSE_REQUEST_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Propose(ProposeRequest::from_raw(raw)?))
-                }
-                TRANSACTIONS_REQUEST_MESSAGE_ID => Any::Request(RequestMessage::Transactions(
-                    TransactionsRequest::from_raw(raw)?,
-                )),
-                PREVOTES_REQUEST_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Prevotes(PrevotesRequest::from_raw(raw)?))
-                }
-                PEERS_REQUEST_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Peers(PeersRequest::from_raw(raw)?))
-                }
-                BLOCK_REQUEST_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Block(BlockRequest::from_raw(raw)?))
-                }
-
-                message_type => {
-                    return Err(Error::IncorrectMessageType { message_type });
-                }
-            }
-        } else {
-            Any::Transaction(raw)
-        };
-        Ok(msg)
+impl<T: ProtocolMessage> Deref for Message<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.payload
     }
 }

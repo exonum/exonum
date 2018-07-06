@@ -15,7 +15,7 @@
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, CryptoHash}, helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Propose},
+    messages::{Precommit, Propose, Message},
 };
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -168,23 +168,26 @@ impl TestNode {
         height: Height,
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
-    ) -> Propose {
-        Propose::new(
+    ) -> Message<Propose> {
+        Message::new(Propose::new(
             self.validator_id
                 .expect("An attempt to create propose from a non-validator node."),
             height,
             Round::first(),
             last_hash,
             tx_hashes,
-            &self.consensus_secret_key,
-        )
+        ), self.consensus_public_key, &self.consensus_secret_key)
     }
 
     /// Creates a `Precommit` message signed by this validator.
-    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> Precommit {
+    pub fn create_precommit(
+        &self,
+        propose: &Propose,
+        block_hash: &crypto::Hash,
+    ) -> Message<Precommit> {
         use std::time::SystemTime;
 
-        Precommit::new(
+        Message::new(Precommit::new(
             self.validator_id
                 .expect("An attempt to create propose from a non-validator node."),
             propose.height(),
@@ -192,8 +195,7 @@ impl TestNode {
             &propose.hash(),
             block_hash,
             SystemTime::now().into(),
-            &self.consensus_secret_key,
-        )
+        ), self.consensus_public_key, &self.consensus_secret_key)
     }
 
     /// Returns public keys of the node.

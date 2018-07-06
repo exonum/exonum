@@ -16,7 +16,7 @@
 use exonum::{
     api, blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionSet},
     crypto::{Hash, PublicKey}, encoding, messages::{Message, RawTransaction},
-    node::TransactionSend, storage::{Entry, Fork, Snapshot},
+    storage::{Entry, Fork, Snapshot},
 };
 
 pub const SERVICE_ID: u16 = 1;
@@ -64,7 +64,6 @@ impl<'a> CounterSchema<&'a mut Fork> {
 
 transactions! {
     pub CounterTransactions {
-        const SERVICE_ID = SERVICE_ID;
 
         struct TxIncrement {
             author: &PublicKey,
@@ -84,7 +83,7 @@ impl Transaction for TxIncrement {
 
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         if self.by() == 0 {
             Err(ExecutionError::with_description(
                 0,
@@ -92,7 +91,7 @@ impl Transaction for TxIncrement {
             ))?;
         }
 
-        let mut schema = CounterSchema::new(fork);
+        let mut schema = CounterSchema::new(tc.fork());
         schema.inc_count(self.by());
         Ok(())
     }
@@ -110,8 +109,8 @@ impl Transaction for TxReset {
         self.verify_author() && self.verify_signature(self.author())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CounterSchema::new(fork);
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let mut schema = CounterSchema::new(tc.fork());
         schema.set_count(0);
         Ok(())
     }
