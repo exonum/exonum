@@ -45,8 +45,8 @@ pub trait SegmentField<'a>: Sized {
 }
 
 impl<'a, T> Field<'a> for T
-    where
-        T: SegmentField<'a>,
+where
+    T: SegmentField<'a>,
 {
     fn field_size() -> Offset {
         8

@@ -509,8 +509,7 @@ impl NodeHandler {
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
             height,
             proposer,
-            round
-                .map_or_else(|| "?".into(), |x| format!("{}", x)),
+            round.map_or_else(|| "?".into(), |x| format!("{}", x)),
             committed_txs,
             pool_len,
             block_hash.to_hex(),
