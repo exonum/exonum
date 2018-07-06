@@ -14,13 +14,10 @@
 
 use super::wrapper::NoiseWrapper;
 use crypto::{
-    x25519::{self, into_x25519_keypair, into_x25519_public_key},
-    PublicKey,
-    SecretKey
+    x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
 use events::{
-    codec::MessagesCodec,
-    noise::{read, write, Handshake, HandshakeResult}
+    codec::MessagesCodec, noise::{read, write, Handshake, HandshakeResult},
 };
 use futures::future::{done, Future};
 use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};

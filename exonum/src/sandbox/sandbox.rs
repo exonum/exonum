@@ -32,7 +32,7 @@ use blockchain::{
     Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
     SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
 };
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, SEED_LENGTH, Seed};
+use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use events::{
     network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
     NetworkEvent, NetworkRequest, TimeoutRequest,
