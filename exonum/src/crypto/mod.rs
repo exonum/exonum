@@ -16,51 +16,28 @@
 //! in this module are used for key generation, hashing, signing and signature
 //! verification.
 //!
-//! The SHA-256 function applied in Exonum splits the input data into blocks
-//! and runs each block through a cycle of 64 iterations. The result of the
-//! function is a cryptographic hash 256 bits or 32 bytes in length. This
-//! hash can later be used to verify the integrity of data without accessing the
-//! data itself.
-//!
-//! Exonum also makes use of Ed25519 keys. Ed25519 is a signature system that ensures
-//! fast signing and key generation, as well as security and collision
-//! resilience.
-//!
-//! [Sodium library](https://github.com/jedisct1/libsodium)
-//! is used under the hood through [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
-//! The constants in this module are imported from Sodium.
-//!
 //! The Crypto module makes it possible to potentially change the type of
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
-// spell-checker:disable
-pub use sodiumoxide::crypto::{
-    hash::sha256::DIGESTBYTES as HASH_SIZE,
-    sign::ed25519::{
-        PUBLICKEYBYTES as PUBLIC_KEY_LENGTH, SECRETKEYBYTES as SECRET_KEY_LENGTH,
-        SEEDBYTES as SEED_LENGTH, SIGNATUREBYTES as SIGNATURE_LENGTH,
-    },
+#[cfg(feature = "sodiumoxide-crypto")]
+pub use self::crypto_lib::sodiumoxide::x25519;
+#[doc(inline)]
+pub use self::crypto_impl::{
+    HASH_SIZE,
+    PUBLIC_KEY_LENGTH,
+    SECRET_KEY_LENGTH,
+    SEED_LENGTH,
+    SIGNATURE_LENGTH,
 };
-// spell-checker:enable
+
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
-use serde::{
-    de::{self, Deserialize, Deserializer, Visitor}, Serialize, Serializer,
-};
-use sodiumoxide::{
-    self,
-    crypto::{
-        hash::sha256::{hash as hash_sodium, Digest as DigestSodium, State as HashState},
-        sign::ed25519::{
-            gen_keypair as gen_keypair_sodium, keypair_from_seed, sign_detached, verify_detached,
-            PublicKey as PublicKeySodium, SecretKey as SecretKeySodium, Seed as SeedSodium,
-            Signature as SignatureSodium, State as SignState,
-        },
-    },
-};
+use serde::{de::{self, Deserialize, Deserializer, Visitor},
+            Serialize,
+            Serializer};
 use uuid::Uuid;
 
 use std::{
@@ -72,11 +49,14 @@ use encoding::{
     serialize::{encode_hex, FromHex, FromHexError, ToHex}, Field, Offset,
 };
 use helpers::Round;
+// A way to set an active cryptographic backend is to export it as `crypto_impl`.
+#[cfg(feature = "sodiumoxide-crypto")]
+use self::crypto_lib::sodiumoxide as crypto_impl;
 
 #[macro_use]
 mod macros;
 
-pub mod x25519;
+pub(crate) mod crypto_lib;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -101,8 +81,8 @@ const BYTES_IN_DEBUG: usize = 4;
 /// assert!(crypto::verify(&signature, &data, &public_key));
 /// ```
 pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
-    let sodium_signature = sign_detached(data, &secret_key.0);
-    Signature(sodium_signature)
+    let impl_signature = crypto_impl::sign(data, &secret_key.0);
+    Signature(impl_signature)
 }
 
 /// Computes a secret key and a corresponding public key from a `Seed`.
@@ -113,14 +93,14 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// Indicating the same seed value always results in the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, Seed};
+/// use exonum::crypto::{self, SEED_LENGTH, Seed};
 ///
 /// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
+/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
-    let (sod_pub_key, sod_secret_key) = keypair_from_seed(&seed.0);
-    (PublicKey(sod_pub_key), SecretKey(sod_secret_key))
+    let (impl_pub_key, impl_secret_key) = crypto_impl::gen_keypair_from_seed(&seed.0);
+    (PublicKey(impl_pub_key), SecretKey(impl_secret_key))
 }
 
 /// Generates a secret key and a corresponding public key using a cryptographically secure
@@ -137,7 +117,7 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// let (public_key, secret_key) = crypto::gen_keypair();
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
-    let (pubkey, secret_key) = gen_keypair_sodium();
+    let (pubkey, secret_key) = crypto_impl::gen_keypair();
     (PublicKey(pubkey), SecretKey(secret_key))
 }
 
@@ -160,10 +140,12 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// assert!(crypto::verify(&signature, &data, &public_key));
 /// ```
 pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
-    verify_detached(&sig.0, data, &pubkey.0)
+    crypto_impl::verify(&sig.0, data, &pubkey.0)
 }
 
-/// Calculates an SHA-256 hash of a bytes slice.
+/// Calculates a hash of a bytes slice.
+///
+/// Type of a hash depends on a chosen crypto backend (via `...-crypto` cargo feature).
 ///
 /// # Examples
 ///
@@ -177,7 +159,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// let hash = crypto::hash(&data);
 /// ```
 pub fn hash(data: &[u8]) -> Hash {
-    let dig = hash_sodium(data);
+    let dig = crypto_impl::hash(data);
     Hash(dig)
 }
 
@@ -191,12 +173,11 @@ pub trait CryptoHash {
     fn hash(&self) -> Hash;
 }
 
-/// Initializes the sodium library and automatically selects faster versions
-/// of the primitives, if possible.
+/// Initializes the cryptographic backend.
 ///
 /// # Panics
 ///
-/// Panics if sodium initialization is failed.
+/// Panics if backend initialization is failed.
 ///
 /// # Examples
 ///
@@ -206,12 +187,12 @@ pub trait CryptoHash {
 /// crypto::init();
 /// ```
 pub fn init() {
-    if !sodiumoxide::init() {
+    if !crypto_impl::init() {
         panic!("Cryptographic library hasn't initialized.");
     }
 }
 
-/// This structure provides a possibility to calculate an SHA-256 hash digest
+/// This structure provides a possibility to calculate a hash digest
 /// for a stream of data. Unlike the
 /// [`Hash` structure](https://docs.rs/exonum/0.7.0/exonum/crypto/struct.Hash.html),
 /// the given structure lets the code process several data chunks without
@@ -234,12 +215,12 @@ pub fn init() {
 /// let _ = hash_stream.hash();
 /// ```
 #[derive(Debug, Default)]
-pub struct HashStream(HashState);
+pub struct HashStream(crypto_impl::HashState);
 
 impl HashStream {
     /// Creates a new instance of `HashStream`.
     pub fn new() -> Self {
-        HashStream(HashState::init())
+        HashStream(crypto_impl::HashState::init())
     }
 
     /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
@@ -256,13 +237,10 @@ impl HashStream {
     }
 }
 
-/// This structure provides a possibility to create and/or verify Ed25519
+/// This structure provides a possibility to create and/or verify
 /// digital signatures for a stream of data. If the data are split into several
 /// chunks, the indicated chunks are added to the system and when adding is
 /// complete, the data is signed.
-///
-/// Ed25519 is a signature system that ensures fast signing and key generation,
-/// as well as security and collision resilience.
 ///
 /// # Examples
 ///
@@ -284,7 +262,7 @@ impl HashStream {
 /// assert!(verify_stream.verify(&file_sign, &public_key));
 /// ```
 #[derive(Debug, Default)]
-pub struct SignStream(SignState);
+pub struct SignStream(crypto_impl::SignState);
 
 impl SignStream {
     /// Creates a new instance of `SignStream`.
@@ -297,7 +275,7 @@ impl SignStream {
     /// let stream = SignStream::new();
     /// ```
     pub fn new() -> Self {
-        SignStream(SignState::init())
+        SignStream(crypto_impl::SignState::init())
     }
 
     /// Adds a new `chunk` to the message that will eventually be signed and/or verified.
@@ -367,7 +345,7 @@ impl SignStream {
     }
 }
 
-implement_public_sodium_wrapper! {
+implement_public_crypto_wrapper! {
 /// Ed25519 public key used to verify digital signatures.
 ///
 /// In public-key cryptography, the system uses a a mathematically related pair
@@ -389,10 +367,10 @@ implement_public_sodium_wrapper! {
 /// # crypto::init();
 /// let (public_key, _) = crypto::gen_keypair();
 /// ```
-    struct PublicKey, PublicKeySodium, PUBLIC_KEY_LENGTH
+    struct PublicKey, PUBLIC_KEY_LENGTH
 }
 
-implement_private_sodium_wrapper! {
+implement_private_crypto_wrapper! {
 /// Ed25519 secret key used to create digital signatures over messages.
 ///
 /// In public-key cryptography, the system uses a a mathematically related pair
@@ -414,10 +392,10 @@ implement_private_sodium_wrapper! {
 /// # crypto::init();
 /// let (_, secret_key) = crypto::gen_keypair();
 /// ```
-    struct SecretKey, SecretKeySodium, SECRET_KEY_LENGTH
+    struct SecretKey, SECRET_KEY_LENGTH
 }
 
-implement_public_sodium_wrapper! {
+implement_public_crypto_wrapper! {
 /// The result of applying the SHA-256 hash function to data.
 ///
 /// This function splits the input data into blocks and runs each block
@@ -435,10 +413,10 @@ implement_public_sodium_wrapper! {
 /// let hash_from_data = crypto::hash(&data);
 /// let default_hash = Hash::default();
 /// ```
-    struct Hash, DigestSodium, HASH_SIZE
+    struct Hash, HASH_SIZE
 }
 
-implement_public_sodium_wrapper! {
+implement_public_crypto_wrapper! {
 /// Ed25519 digital signature. This structure creates a signature over data
 /// using a secret key. Later it is possible to verify, using the corresponding
 /// public key, that the data have indeed been signed with that secret key.
@@ -461,10 +439,10 @@ implement_public_sodium_wrapper! {
 /// let signature = crypto::sign(&data, &secret_key);
 /// assert!(crypto::verify(&signature, &data, &public_key));
 /// ```
-    struct Signature, SignatureSodium, SIGNATURE_LENGTH
+    struct Signature, SIGNATURE_LENGTH
 }
 
-implement_private_sodium_wrapper! {
+implement_private_crypto_wrapper! {
 /// Ed25519 seed representing a succession of bytes that can be used for
 /// deterministic keypair generation. If the same seed is indicated in the
 /// generator multiple times, the generated keys will be the same each time.
@@ -481,12 +459,12 @@ implement_private_sodium_wrapper! {
 /// generation of the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, Seed};
+/// use exonum::crypto::{self, SEED_LENGTH, Seed};
 ///
 /// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
+/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
-    struct Seed, SeedSodium, SEED_LENGTH
+    struct Seed, SEED_LENGTH
 }
 
 implement_serde! {Hash}
@@ -574,14 +552,9 @@ impl CryptoHash for i64 {
     }
 }
 
-const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium([
-    227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228,
-    100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
-]));
-
 impl CryptoHash for () {
     fn hash(&self) -> Hash {
-        EMPTY_SLICE_HASH
+        Hash(crypto_impl::EMPTY_SLICE_HASH)
     }
 }
 
@@ -676,7 +649,7 @@ mod tests {
     #[test]
     fn zero_hash() {
         let hash = Hash::zero();
-        assert_eq!(hash.as_ref(), [0; 32]);
+        assert_eq!(hash.as_ref(), [0; HASH_SIZE]);
     }
 
     #[test]
@@ -692,48 +665,48 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_hash() {
-        assert_serialize_deserialize(&Hash::new([207; 32]));
+        assert_serialize_deserialize(&Hash::new([207; HASH_SIZE]));
     }
 
     #[test]
     fn serialize_deserialize_public_key() {
-        assert_serialize_deserialize(&PublicKey::new([208; 32]));
+        assert_serialize_deserialize(&PublicKey::new([208; PUBLIC_KEY_LENGTH]));
     }
 
     #[test]
     fn serialize_deserialize_signature() {
-        assert_serialize_deserialize(&Signature::new([209; 64]));
+        assert_serialize_deserialize(&Signature::new([209; SIGNATURE_LENGTH]));
     }
 
     #[test]
     fn serialize_deserialize_seed() {
-        assert_serialize_deserialize(&Seed::new([210; 32]));
+        assert_serialize_deserialize(&Seed::new([210; SEED_LENGTH]));
     }
 
     #[test]
     fn serialize_deserialize_secret_key() {
-        assert_serialize_deserialize(&SecretKey::new([211; 64]));
+        assert_serialize_deserialize(&SecretKey::new([211; SECRET_KEY_LENGTH]));
     }
 
     #[test]
     fn debug_format() {
         // Check zero padding
-        let hash = Hash::new([1; 32]);
+        let hash = Hash::new([1; HASH_SIZE]);
         assert_eq!(format!("{:?}", &hash), "Hash(01010101)");
 
-        let pk = PublicKey::new([15; 32]);
+        let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &pk), "PublicKey(0F0F0F0F)");
-        let sk = SecretKey::new([8; 64]);
+        let sk = SecretKey::new([8; SECRET_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &sk), "SecretKey(08080808...)");
-        let signature = Signature::new([10; 64]);
+        let signature = Signature::new([10; SIGNATURE_LENGTH]);
         assert_eq!(format!("{:?}", &signature), "Signature(0A0A0A0A)");
-        let seed = Seed::new([4; 32]);
+        let seed = Seed::new([4; SEED_LENGTH]);
         assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
 
         // Check no padding
-        let hash = Hash::new([128; 32]);
+        let hash = Hash::new([128; HASH_SIZE]);
         assert_eq!(format!("{:?}", &hash), "Hash(80808080)");
-        let sk = SecretKey::new([255; 64]);
+        let sk = SecretKey::new([255; SECRET_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &sk), "SecretKey(FFFFFFFF...)");
     }
 
@@ -741,10 +714,7 @@ mod tests {
     fn range_sodium() {
         let h = hash(&[]);
         let sub_range = &h[10..20];
-        assert_eq!(
-            &[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
-            sub_range
-        );
+        assert_eq!(&crypto_impl::EMPTY_SLICE_HASH[10..20], sub_range);
     }
 
     #[test]
@@ -785,7 +755,7 @@ mod tests {
 
     #[test]
     fn empty_slice_hash() {
-        assert_eq!(EMPTY_SLICE_HASH, hash(&[]));
+        assert_eq!(Hash(super::crypto_impl::EMPTY_SLICE_HASH), hash(&[]));
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)

@@ -18,19 +18,15 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure;
 use snow::{NoiseBuilder, Session};
 
 use std::{
     fmt::{self, Error, Formatter}, io,
 };
 
-use events::noise::sodium_resolver::SodiumResolver;
-use events::noise::HandshakeParams;
+use events::noise::{error::NoiseError, NOISE_HEADER_LENGTH, NOISE_MAX_MESSAGE_LENGTH, TAG_LENGTH};
+use super::{handshake::HandshakeParams, resolver::SodiumResolver};
 
-pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
-pub const TAG_LENGTH: usize = 16;
-pub const NOISE_HEADER_LENGTH: usize = 4;
 pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
 pub const NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
 pub const NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
@@ -83,7 +79,7 @@ impl NoiseWrapper {
 
     pub fn write_handshake_msg(&mut self) -> Result<(usize, Vec<u8>), NoiseError> {
         // Payload in handshake messages can be empty.
-        self.write(&[0_u8])
+        self.write(&[])
     }
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
@@ -169,34 +165,5 @@ impl fmt::Debug for NoiseWrapper {
             "NoiseWrapper {{ handshake finished: {} }}",
             self.session.is_handshake_finished()
         )
-    }
-}
-
-#[derive(Fail, Debug, Clone)]
-pub enum NoiseError {
-    #[fail(display = "Wrong handshake message length {}", _0)]
-    WrongMessageLength(usize),
-
-    #[fail(display = "Remote public key is not specified")]
-    MissingRemotePublicKey,
-
-    #[fail(display = "{}", _0)]
-    Other(String),
-}
-
-impl From<NoiseError> for io::Error {
-    fn from(e: NoiseError) -> Self {
-        let message = match e {
-            NoiseError::Other(message) => message,
-            _ => format!("{:?}", e),
-        };
-
-        Self::new(io::ErrorKind::Other, message)
-    }
-}
-
-impl From<failure::Error> for NoiseError {
-    fn from(e: failure::Error) -> Self {
-        NoiseError::Other(format!("{:?}", e))
     }
 }
