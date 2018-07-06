@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::future::{done, Future};
+use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
+
+use std::io;
+
 use super::wrapper::NoiseWrapper;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
 use events::{
-    codec::MessagesCodec, noise::{read, write, Handshake, HandshakeResult},
+    codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
-use futures::future::{done, Future};
-use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
-
-use std::io;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
@@ -77,8 +78,8 @@ impl NoiseHandshake {
         mut self,
         stream: S,
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        read(stream).and_then(move |(stream, msg)| {
-            self.noise.read_handshake_msg(&msg)?;
+        HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
+            self.noise.read_handshake_msg(&msg.0)?;
             Ok((stream, self))
         })
     }
@@ -89,7 +90,7 @@ impl NoiseHandshake {
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
         done(self.noise.write_handshake_msg())
             .map_err(|e| e.into())
-            .and_then(|(len, buf)| write(stream, &buf, len))
+            .and_then(|buf| HandshakeRawMessage(buf).write(stream))
             .map(move |(stream, _)| (stream, self))
     }
 

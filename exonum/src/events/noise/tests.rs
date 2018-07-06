@@ -26,11 +26,13 @@ use std::{
 };
 
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
-use events::error::into_other;
-use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
-use tokio_io::{AsyncRead, AsyncWrite};
-use events::noise::wrappers::sodium_wrapper::resolver::SodiumDh25519;
-use events::noise::HandshakeRawMessage;
+use events::{
+    error::into_other,
+    noise::{
+        wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
+        HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+    },
+};
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]

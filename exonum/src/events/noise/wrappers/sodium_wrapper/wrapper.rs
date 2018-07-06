@@ -18,7 +18,6 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure;
 use snow::{NoiseBuilder, Session};
 
 use std::{
@@ -26,15 +25,15 @@ use std::{
 };
 
 use super::{handshake::HandshakeParams, resolver::SodiumResolver};
-use events::noise::{error::NoiseError, NOISE_HEADER_LENGTH, NOISE_MAX_MESSAGE_LENGTH, TAG_LENGTH};
+use events::noise::{error::NoiseError, HEADER_LENGTH, MAX_MESSAGE_LENGTH, TAG_LENGTH};
 
-pub const NOISE_HEADER_LENGTH: usize = 4;
 pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
 pub const MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
 pub const MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 
-// We choose XX pattern since it provides mutual authentication and
-// transmission of static public keys.
+// We choose XK pattern since it provides mutual authentication,
+// transmission of static public keys and requires pre-defined remote public
+// key to establish connection.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
 static PARAMS: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
@@ -95,11 +94,11 @@ impl NoiseWrapper {
     /// 2. Then each packet is decrypted by selected noise algorithm.
     /// 3. Append all decrypted packets to `decoded_message`.
     pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
-        let data = buf.split_to(len + NOISE_HEADER_LENGTH).to_vec();
-        let data = &data[NOISE_HEADER_LENGTH..];
+        let data = buf.split_to(len + HEADER_LENGTH).to_vec();
+        let data = &data[HEADER_LENGTH..];
 
         let len = self.decrypted_msg_len(data.len());
-        let mut decoded_message = Vec::with_capacity(len);
+        let mut decrypted_message = Vec::with_capacity(len);
 
         for msg in data.chunks(MAX_MESSAGE_LENGTH) {
             let len_to_read = if msg.len() == MAX_MESSAGE_LENGTH {
@@ -109,11 +108,11 @@ impl NoiseWrapper {
             };
 
             let read_to = self.read(msg, len_to_read)?;
-            decoded_message.extend_from_slice(&read_to);
+            decrypted_message.extend_from_slice(&read_to);
         }
 
-        debug_assert_eq!(len, decoded_message.len());
-        Ok(BytesMut::from(decoded_message))
+        debug_assert_eq!(len, decrypted_message.len());
+        Ok(BytesMut::from(decrypted_message))
     }
 
     /// Encrypts `msg` using Noise session
@@ -126,17 +125,17 @@ impl NoiseWrapper {
     /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<Option<()>, io::Error> {
         let len = self.encrypted_msg_len(msg.len());
-        let mut encoded_message = Vec::with_capacity(len);
+        let mut encrypted_message = Vec::with_capacity(len);
 
         for msg in msg.chunks(MAX_MESSAGE_LENGTH - TAG_LENGTH) {
             let written = self.write(msg)?;
-            encoded_message.extend_from_slice(&written);
+            encrypted_message.extend_from_slice(&written);
         }
 
-        let mut msg_len_buf = vec![0_u8; NOISE_HEADER_LENGTH];
+        let mut msg_len_buf = vec![0_u8; HEADER_LENGTH];
 
         LittleEndian::write_u32(&mut msg_len_buf, len as u32);
-        let encoded_message = &encoded_message[0..len];
+        let encoded_message = &encrypted_message[0..len];
         msg_len_buf.extend_from_slice(encoded_message);
         buf.extend_from_slice(&msg_len_buf);
 
@@ -183,31 +182,5 @@ impl fmt::Debug for NoiseWrapper {
             "NoiseWrapper {{ handshake finished: {} }}",
             self.session.is_handshake_finished()
         )
-    }
-}
-
-#[derive(Fail, Debug, Clone)]
-pub enum NoiseError {
-    #[fail(display = "Wrong handshake message length {}", _0)]
-    WrongMessageLength(usize),
-
-    #[fail(display = "{}", _0)]
-    Other(String),
-}
-
-impl From<NoiseError> for io::Error {
-    fn from(e: NoiseError) -> Self {
-        let message = match e {
-            NoiseError::Other(message) => message,
-            _ => format!("{:?}", e),
-        };
-
-        Self::new(io::ErrorKind::Other, message)
-    }
-}
-
-impl From<failure::Error> for NoiseError {
-    fn from(e: failure::Error) -> Self {
-        NoiseError::Other(format!("{:?}", e))
     }
 }

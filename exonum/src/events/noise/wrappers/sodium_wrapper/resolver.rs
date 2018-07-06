@@ -19,13 +19,12 @@ use snow::{
     CryptoResolver, DefaultResolver,
 };
 
-use sodiumoxide::crypto::{
-    aead::chacha20poly1305 as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
-};
-
 use crypto::{
     x25519, PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
     SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+};
+use sodiumoxide::crypto::{
+    aead::chacha20poly1305 as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
 pub struct SodiumResolver {

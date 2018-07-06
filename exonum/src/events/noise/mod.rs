@@ -17,27 +17,20 @@
 pub use self::wrappers::sodium_wrapper::{
     handshake::{HandshakeParams, NoiseHandshake},
     wrapper::{
-        NoiseWrapper, HANDSHAKE_HEADER_LENGTH, NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
-        NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH,
+        NoiseWrapper, HANDSHAKE_HEADER_LENGTH, MAX_HANDSHAKE_MESSAGE_LENGTH,
+        MIN_HANDSHAKE_MESSAGE_LENGTH,
     },
 };
 
 use byteorder::{ByteOrder, LittleEndian};
-use events::codec::MessagesCodec;
 use futures::future::Future;
 use tokio_io::{
     codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
 };
 
-use crypto::{
-    x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
-};
-use events::{
-    codec::MessagesCodec,
-    noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH, MAX_HANDSHAKE_MESSAGE_LENGTH},
-};
-
 use std::io;
+
+use events::codec::MessagesCodec;
 
 pub mod error;
 pub mod wrappers;
@@ -45,9 +38,9 @@ pub mod wrappers;
 #[cfg(test)]
 mod tests;
 
-pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
+pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
-pub const NOISE_HEADER_LENGTH: usize = 4;
+pub const HEADER_LENGTH: usize = 4;
 
 type HandshakeResult<S> = Box<dyn Future<Item = Framed<S, MessagesCodec>, Error = io::Error>>;
 
@@ -56,46 +49,22 @@ pub trait Handshake {
     fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
 }
 
-fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
-    // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message is the payload length
-    // in little-endian, remaining bytes is the handshake payload. Therefore, we need to read
-    // `HANDSHAKE_HEADER_LENGTH` bytes as a little-endian integer and than we need to read
-    // remaining payload.
-    read_exact(sock, buf).and_then(|(stream, msg)| {
-        let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
-        read_exact(stream, vec![0_u8; len as usize])
-    })
-}
-
-fn write<S: AsyncWrite + 'static>(
-    sock: S,
-    buf: &[u8],
-    len: usize,
-) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
-
-    // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message
-    // is the payload length in little-endian.
-    let mut message = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
-    LittleEndian::write_uint(&mut message, len as u64, HANDSHAKE_HEADER_LENGTH);
-    message.extend_from_slice(&buf[0..len]);
-    write_all(sock, message)
-}
-
-
-pub struct HandshakeRawMessage(Vec<u8>);
+pub struct HandshakeRawMessage(pub Vec<u8>);
 
 impl HandshakeRawMessage {
     pub fn read<S: AsyncRead + 'static>(
         sock: S,
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
         let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
-        // First byte of handshake message is payload length, remaining bytes [1; len] is
-        // the handshake payload. Therefore, we need to read first byte and after that
+        // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message is the payload length
+        // in little-endian, remaining bytes is the handshake payload. Therefore, we need to read
+        // `HANDSHAKE_HEADER_LENGTH` bytes as a little-endian integer and than we need to read
         // remaining payload.
         read_exact(sock, buf)
-            .and_then(|(stream, msg)| read_exact(stream, vec![0_u8; msg[0] as usize]))
+            .and_then(|(stream, msg)| {
+                let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
+                read_exact(stream, vec![0_u8; len as usize])
+            })
             .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
     }
 
@@ -106,7 +75,11 @@ impl HandshakeRawMessage {
         let len = self.0.len();
         debug_assert!(len < MAX_HANDSHAKE_MESSAGE_LENGTH);
 
-        write_all(sock, vec![len as u8; HANDSHAKE_HEADER_LENGTH])
-            .and_then(move |(sock, _)| write_all(sock, self.0))
+        // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message
+        // is the payload length in little-endian.
+        let mut message = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
+        LittleEndian::write_uint(&mut message, len as u64, HANDSHAKE_HEADER_LENGTH);
+
+        write_all(sock, message).and_then(move |(sock, _)| write_all(sock, self.0))
     }
 }
