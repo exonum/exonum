@@ -56,15 +56,13 @@ impl<V: StorageValue> ListProof<V> {
                 &left.collect(key.left(), vec)?,
                 &right.collect(key.right(), vec)?,
             ),
-            ListProof::Left(ref left, Some(ref right)) => pair_hash(
-                &left.collect(key.left(), vec)?,
-                right
-            ),
+            ListProof::Left(ref left, Some(ref right)) => {
+                pair_hash(&left.collect(key.left(), vec)?, right)
+            }
             ListProof::Left(ref left, None) => hash(left.collect(key.left(), vec)?.as_ref()),
-            ListProof::Right(ref left, ref right) => pair_hash(
-                left,
-                &right.collect(key.right(), vec)?
-            ),
+            ListProof::Right(ref left, ref right) => {
+                pair_hash(left, &right.collect(key.right(), vec)?)
+            }
             ListProof::Leaf(ref value) => {
                 if key.height() > 1 {
                     return Err(ListProofError::UnexpectedLeaf);
@@ -182,9 +180,9 @@ where
                     })?;
                     ListProof::Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
-                    let right_proof: Self = from_value(right_value.clone()).map_err(
-                        |err| D::Error::custom(format_err_string("ListProof", right_value, &err)),
-                    )?;
+                    let right_proof: Self = from_value(right_value.clone()).map_err(|err| {
+                        D::Error::custom(format_err_string("ListProof", right_value, &err))
+                    })?;
                     let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", left_value, &err))
                     })?;

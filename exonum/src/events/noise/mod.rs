@@ -33,7 +33,8 @@ pub mod wrapper;
 #[cfg(test)]
 mod tests;
 
-type HandshakeResult<S> = Box<dyn Future<Item = (Framed<S, MessagesCodec>, x25519::PublicKey), Error = io::Error>>;
+type HandshakeResult<S> =
+    Box<dyn Future<Item = (Framed<S, MessagesCodec>, x25519::PublicKey), Error = io::Error>>;
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
