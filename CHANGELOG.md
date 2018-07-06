@@ -74,7 +74,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Node configuration file is now updated at `ConnectList` update. This is achieved
   via new `ConfigManager` entity. (#777)
 
-  Migration path (needed only if you're creating `Node` manually): 
+  Migration path (needed only if you're creating `Node` manually):
 
   If you need to update `ConnectList` on file system, pass `Some(path_to_node_config)`
   as the last argument of the `Node::new` method.
