@@ -402,7 +402,6 @@ impl Blockchain {
                 .service_name();
 
             let transaction = self.tx_from_raw(&raw).map_err(into_failure)?;
-
             (transaction, raw, service_name)
         };
 

@@ -27,7 +27,7 @@ pub fn log_error(err: Error) {
 }
 
 pub fn into_failure<E: StdError>(err: E) -> Error {
-    format_err!("An error occurred, {}", err.description())
+    format_err!("error converted from std: {}", err)
 }
 
 pub trait LogError {

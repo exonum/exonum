@@ -189,10 +189,10 @@ fn gen_tempdir_name() -> String {
 
 fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_tx(Tx::new(3), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_ok2 = Message::sign_tx(Tx::new(4), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_failed = Message::sign_tx(Tx::new(0), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_storage_error = Message::sign_tx(Tx::new(42), TEST_SERVICE_ID, (pk, &sec_key));
+    let tx_ok1 = Message::sign_tx_set(TestServiceTxs::Tx(Tx::new(3)), TEST_SERVICE_ID, (pk, &sec_key));
+    let tx_ok2 = Message::sign_tx_set(TestServiceTxs::Tx(Tx::new(4)), TEST_SERVICE_ID, (pk, &sec_key));
+    let tx_failed = Message::sign_tx_set(TestServiceTxs::Tx(Tx::new(0)), TEST_SERVICE_ID, (pk, &sec_key));
+    let tx_storage_error = Message::sign_tx_set(TestServiceTxs::Tx(Tx::new(42)), TEST_SERVICE_ID, (pk, &sec_key));
 
     let patch = {
         let mut fork = blockchain.fork();

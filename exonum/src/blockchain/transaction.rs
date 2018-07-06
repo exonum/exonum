@@ -647,7 +647,13 @@ macro_rules! transactions {
                 Ok($crate::encoding::serialize::reexport::bincode::config().no_limit().serialize(&self)?)
             }
         }
-
+        $(
+        impl Into<$transaction_set> for $name {
+            fn into(self) -> $transaction_set {
+                $transaction_set::$name(self)
+            }
+        }
+        )*
         impl Into<Box<dyn $crate::blockchain::Transaction>> for $transaction_set {
             fn into(self) -> Box<dyn $crate::blockchain::Transaction> {
                 match self {$(

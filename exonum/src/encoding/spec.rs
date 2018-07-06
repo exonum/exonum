@@ -240,11 +240,33 @@ macro_rules! encoding_struct {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::encoding::serialize::reexport::Deserializer<'de>
             {
-                use $crate::encoding::serialize::json::reexport::Value;
-                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
-                let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
-                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
+                use $crate::encoding::serialize::reexport::Deserialize;
+                let vec = <Vec<u8> as Deserialize>::deserialize(deserializer)?;
+                let latest_segment: $crate::encoding::CheckedOffset = $name::__ex_header_size().into();
+
+                if vec.len() < $name::__ex_header_size() as usize {
+                    return Err(
+                    $crate::encoding::serialize::reexport::DeError::custom(
+                        $crate::encoding::Error::UnexpectedlyShortPayload{
+                            actual_size: vec.len() as $crate::encoding::Offset,
+                            minimum_size:
+                            $name::__ex_header_size() as $crate::encoding::Offset
+                        }))
+                }
+
+                __ex_for_each_field!(
+                    __ex_struct_check_field_serde, (latest_segment, vec),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
+                if latest_segment.unchecked_offset() as usize != vec.len() {
+                return Err(
+                    $crate::encoding::serialize::reexport::DeError::custom(
+                        $crate::encoding::Error::UnexpectedlyShortPayload{
+                            actual_size: latest_segment.unchecked_offset() as $crate::encoding::Offset,
+                            minimum_size: vec.len() as $crate::encoding::Offset
+                        }))
+                }
+                Ok($name{raw:vec})
             }
         }
 
@@ -252,12 +274,7 @@ macro_rules! encoding_struct {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where S: $crate::encoding::serialize::reexport::Serializer
             {
-                use $crate::encoding::serialize::reexport::SerError;
-                use $crate::encoding::serialize::json::ExonumJson;
-                self.serialize_field()
-                    .map_err(|_| S::Error::custom(
-                                concat!("Can not serialize structure: ", stringify!($name))))?
-                    .serialize(serializer)
+                serializer.serialize_bytes(&self.raw)
             }
         }
     )
@@ -381,6 +398,26 @@ macro_rules! __ex_struct_check_field {
 
 #[doc(hidden)]
 #[macro_export]
+macro_rules! __ex_struct_check_field_serde {
+    (
+        ($latest_segment:ident, $vec:ident),
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
+    ) => {
+        let $latest_segment = <$field_type as $crate::encoding::Field>::check(
+            &$vec,
+            $from.into(),
+            $to.into(),
+            $latest_segment,
+        ).map_err( $crate::encoding::serialize::reexport::DeError::custom )?;
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! __ex_struct_write_field {
     (
         ($buf:ident),
@@ -428,3 +465,5 @@ macro_rules! __ex_deserialize_field {
         <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
     };
 }
+
+

@@ -116,6 +116,21 @@ impl Message<RawTransaction> {
         let data = tx.serialize().unwrap();
         Message::create_raw_tx(data, service_id, service_keypair)
     }
+
+    #[doc(hidden)]
+    pub fn sign_tx_test<U, X>(
+        tx: X,
+        service_id: u16,
+        service_keypair: (PublicKey, &SecretKey),
+    ) -> Message<RawTransaction>
+        where
+        X: Transaction + BinaryForm + Into<U>,
+        U: TransactionSet + BinaryForm,
+    {
+        let tx = tx.into();
+        let data = tx.serialize().unwrap();
+        Message::create_raw_tx(data, service_id, service_keypair)
+    }
     #[doc(hidden)]
     pub fn sign_tx_set<X: TransactionSet + BinaryForm>(
         tx: X,

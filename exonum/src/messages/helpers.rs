@@ -1,5 +1,5 @@
 use super::{Message, RawTransaction, SignedMessage};
-use encoding::{Error, Field};
+use encoding::Error;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 ///Transaction binary form, can be converted
@@ -13,23 +13,30 @@ pub trait BinaryForm: Sized {
 
 impl<T> BinaryForm for T
 where
-    T: for<'a> Field<'a>,
+    T: Serialize + de::DeserializeOwned,
 {
     fn serialize(self) -> Result<Vec<u8>, Error> {
-        let mut buf = vec![0; 8];
-        Field::write(&self, &mut buf, 0, 8);
-        Ok(buf)
+//        let mut buf = vec![0; 8];
+//        Field::write(&self, &mut buf, 0, 8);
+        Ok(::bincode::config()
+            .no_limit()
+            .serialize(&self)?)
     }
     #[allow(unsafe_code)]
     fn deserialize(buffer: &[u8]) -> Result<Self, Error> {
-        <Self as Field>::check(
-            buffer,
-            0.into(),
-            <Self as Field>::field_size().into(),
-            <Self as Field>::field_size().into(),
-        ).map(|_| unsafe { <Self as Field>::read(buffer, 0, <Self as Field>::field_size()) })
+//        <Self as Field>::check(
+//            buffer,
+//            0.into(),
+//            <Self as Field>::field_size().into(),
+//            <Self as Field>::field_size().into(),
+//        ).map(|_| unsafe { <Self as Field>::read(buffer, 0, <Self as Field>::field_size()) })
+        Ok(::bincode::config()
+            .no_limit()
+            .deserialize(buffer)?)
     }
 }
+
+
 
 /// Serializes `Message<RawTranasction>` as hex value.
 pub(crate) struct HexTransaction;
@@ -42,7 +49,7 @@ impl HexTransaction {
         S: Serializer,
     {
         let hex_string = message.to_hex_string();
-        hex_string.serialize(serializer)
+        <String as Serialize>::serialize(&hex_string, serializer)
     }
 
     pub(crate) fn deserialize<'a, D>(deserializer: D) -> Result<Message<RawTransaction>, D::Error>
