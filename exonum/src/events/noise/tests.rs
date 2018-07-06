@@ -25,19 +25,18 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{
-    gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed, PUBLIC_KEY_LENGTH,
-};
-use events::{
-    error::into_other,
-    noise::{
-        sodium_resolver::SodiumDh25519, Handshake, HandshakeParams, HandshakeRawMessage,
-        HandshakeResult, NoiseHandshake,
-    },
-};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use events::error::into_other;
+use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
+use tokio_io::{AsyncRead, AsyncWrite};
+use events::noise::wrappers::sodium_wrapper::resolver::SodiumDh25519;
+use events::noise::HandshakeRawMessage;
 
 #[test]
+#[cfg(feature = "sodiumoxide-crypto")]
 fn test_convert_ed_to_curve_dh() {
+    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+
     // Generate Ed25519 keys for initiator and responder.
     let (public_key_i, secret_key_i) = gen_keypair();
     let (public_key_r, secret_key_r) = gen_keypair();
@@ -61,7 +60,10 @@ fn test_convert_ed_to_curve_dh() {
 }
 
 #[test]
+#[cfg(feature = "sodiumoxide-crypto")]
 fn test_converted_keys_handshake() {
+    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+
     const MSG_SIZE: usize = 4096;
     static PATTERN: &'static str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
@@ -139,7 +141,7 @@ const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
     let mut params = HandshakeParams::new(public_key, secret_key, 1024);
     params.set_remote_key(public_key);
     params
@@ -242,7 +244,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = default_test_params();
-    let (remote_key, _) = gen_keypair();
+    let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
     params.set_remote_key(remote_key);
 
     let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);

@@ -12,12 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::future::{done, Future};
+#[cfg(feature = "sodiumoxide-crypto")]
+#[doc(inline)]
+pub use self::wrappers::sodium_wrapper::{
+    handshake::{HandshakeParams, NoiseHandshake},
+    wrapper::{
+        NoiseWrapper, HANDSHAKE_HEADER_LENGTH, NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH,
+        NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH,
+    },
+};
+
+use byteorder::{ByteOrder, LittleEndian};
+use events::codec::MessagesCodec;
+use futures::future::Future;
 use tokio_io::{
     codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
 };
-
-use std::io;
 
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
@@ -27,121 +37,52 @@ use events::{
     noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH, MAX_HANDSHAKE_MESSAGE_LENGTH},
 };
 
-pub mod sodium_resolver;
-pub mod wrapper;
+use std::io;
+
+pub mod error;
+pub mod wrappers;
 
 #[cfg(test)]
 mod tests;
 
+pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
+pub const TAG_LENGTH: usize = 16;
+pub const NOISE_HEADER_LENGTH: usize = 4;
+
 type HandshakeResult<S> = Box<dyn Future<Item = Framed<S, MessagesCodec>, Error = io::Error>>;
-
-#[derive(Debug, Clone)]
-/// Params needed to establish secured connection using Noise Protocol.
-pub struct HandshakeParams {
-    pub public_key: x25519::PublicKey,
-    pub secret_key: x25519::SecretKey,
-    pub max_message_len: u32,
-    pub remote_key: Option<x25519::PublicKey>,
-}
-
-impl HandshakeParams {
-    pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
-        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
-
-        Self {
-            public_key,
-            secret_key,
-            max_message_len,
-            remote_key: None,
-        }
-    }
-
-    pub fn set_remote_key(&mut self, remote_key: PublicKey) {
-        self.remote_key = Some(into_x25519_public_key(remote_key));
-    }
-}
 
 pub trait Handshake {
     fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
     fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
 }
 
-#[derive(Debug)]
-pub struct NoiseHandshake {
-    noise: NoiseWrapper,
-    max_message_len: u32,
+fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
+    let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
+    // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message is the payload length
+    // in little-endian, remaining bytes is the handshake payload. Therefore, we need to read
+    // `HANDSHAKE_HEADER_LENGTH` bytes as a little-endian integer and than we need to read
+    // remaining payload.
+    read_exact(sock, buf).and_then(|(stream, msg)| {
+        let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
+        read_exact(stream, vec![0_u8; len as usize])
+    })
 }
 
-impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams) -> Self {
-        let noise = NoiseWrapper::initiator(params);
-        Self {
-            noise,
-            max_message_len: params.max_message_len,
-        }
-    }
+fn write<S: AsyncWrite + 'static>(
+    sock: S,
+    buf: &[u8],
+    len: usize,
+) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
+    debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
 
-    pub fn responder(params: &HandshakeParams) -> Self {
-        let noise = NoiseWrapper::responder(params);
-        Self {
-            noise,
-            max_message_len: params.max_message_len,
-        }
-    }
-
-    fn read_handshake_msg<S: AsyncRead + 'static>(
-        mut self,
-        stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
-            self.noise.read_handshake_msg(&msg.0)?;
-            Ok((stream, self))
-        })
-    }
-
-    fn write_handshake_msg<S: AsyncWrite + 'static>(
-        mut self,
-        stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        done(self.noise.write_handshake_msg())
-            .map_err(|e| e.into())
-            .and_then(|buf| HandshakeRawMessage(buf).write(stream))
-            .map(move |(stream, _)| (stream, self))
-    }
-
-    fn finalize<S: AsyncRead + AsyncWrite + 'static>(
-        self,
-        stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
-        let noise = self.noise.into_transport_mode()?;
-        let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
-        Ok(framed)
-    }
+    // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message
+    // is the payload length in little-endian.
+    let mut message = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
+    LittleEndian::write_uint(&mut message, len as u64, HANDSHAKE_HEADER_LENGTH);
+    message.extend_from_slice(&buf[0..len]);
+    write_all(sock, message)
 }
 
-impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
-    where
-        S: AsyncRead + AsyncWrite + 'static,
-    {
-        let framed = self.read_handshake_msg(stream)
-            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
-        Box::new(framed)
-    }
-
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
-    where
-        S: AsyncRead + AsyncWrite + 'static,
-    {
-        let framed = self.write_handshake_msg(stream)
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
-        Box::new(framed)
-    }
-}
 
 pub struct HandshakeRawMessage(Vec<u8>);
 

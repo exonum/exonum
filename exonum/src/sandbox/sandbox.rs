@@ -32,7 +32,7 @@ use blockchain::{
     Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
     SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
 };
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
+use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use events::{
     network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
     NetworkEvent, NetworkRequest, TimeoutRequest,
@@ -704,16 +704,16 @@ pub fn sandbox_with_services(services: Vec<Box<dyn Service>>) -> Sandbox {
 /// Constructs an uninitialized instance of a `Sandbox`.
 pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
     let validators = vec![
-        gen_keypair_from_seed(&Seed::new([12; 32])),
-        gen_keypair_from_seed(&Seed::new([13; 32])),
-        gen_keypair_from_seed(&Seed::new([16; 32])),
-        gen_keypair_from_seed(&Seed::new([19; 32])),
+        gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
+        gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
+        gen_keypair_from_seed(&Seed::new([16; SEED_LENGTH])),
+        gen_keypair_from_seed(&Seed::new([19; SEED_LENGTH])),
     ];
     let service_keys = vec![
-        gen_keypair_from_seed(&Seed::new([20; 32])),
-        gen_keypair_from_seed(&Seed::new([21; 32])),
-        gen_keypair_from_seed(&Seed::new([22; 32])),
-        gen_keypair_from_seed(&Seed::new([23; 32])),
+        gen_keypair_from_seed(&Seed::new([20; SEED_LENGTH])),
+        gen_keypair_from_seed(&Seed::new([21; SEED_LENGTH])),
+        gen_keypair_from_seed(&Seed::new([22; SEED_LENGTH])),
+        gen_keypair_from_seed(&Seed::new([23; SEED_LENGTH])),
     ];
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
@@ -832,7 +832,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 mod tests {
     use super::*;
     use blockchain::{ExecutionResult, ServiceContext, TransactionSet};
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use encoding;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{
@@ -855,7 +855,7 @@ mod tests {
 
     impl TxAfterCommit {
         pub fn new_with_height(height: Height) -> TxAfterCommit {
-            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
+            let keypair = gen_keypair_from_seed(&Seed::new([22; SEED_LENGTH]));
             TxAfterCommit::new(height, &keypair.1)
         }
     }

@@ -120,13 +120,13 @@ impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ApiError::BadRequest(err) => HttpResponse::BadRequest().json(err),
+            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
             ApiError::InternalError(err) => {
-                HttpResponse::InternalServerError().json(err.to_string())
+                HttpResponse::InternalServerError().body(err.to_string())
             }
-            ApiError::Io(err) => HttpResponse::InternalServerError().json(err.to_string()),
-            ApiError::Storage(err) => HttpResponse::InternalServerError().json(err.to_string()),
-            ApiError::NotFound(err) => HttpResponse::NotFound().json(err),
+            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
             ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
         }
     }

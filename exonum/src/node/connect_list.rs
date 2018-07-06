@@ -71,7 +71,7 @@ mod test {
     use std::net::SocketAddr;
 
     use super::ConnectList;
-    use crypto::{gen_keypair, PublicKey};
+    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use node::ConnectInfo;
 
     static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
@@ -81,7 +81,9 @@ mod test {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
             .into_iter()
-            .map(|_| PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap())
+            .map(|_| {
+                PublicKey::from_slice(&<[u8; PUBLIC_KEY_LENGTH] as Rand>::rand(&mut rng)).unwrap()
+            })
             .collect()
     }
 

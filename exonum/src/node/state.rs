@@ -251,7 +251,6 @@ where
 impl RequestData {
     /// Returns timeout value of the data request.
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
             RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
@@ -471,7 +470,7 @@ impl State {
     pub fn is_leader(&self) -> bool {
         self.validator_state()
             .as_ref()
-            .map_or(false,|validator| self.leader(self.round()) == validator.id)
+            .map_or(false, |validator| self.leader(self.round()) == validator.id)
     }
 
     /// Returns node's ConnectList.

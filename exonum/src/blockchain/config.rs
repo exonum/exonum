@@ -246,7 +246,7 @@ mod tests {
     use toml;
 
     use super::*;
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
@@ -339,8 +339,8 @@ mod tests {
     fn create_test_configuration() -> StoredConfiguration {
         let validator_keys = (1..4)
             .map(|i| ValidatorKeys {
-                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
-                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
+                consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
+                service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
             })
             .collect();
 

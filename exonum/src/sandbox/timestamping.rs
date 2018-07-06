@@ -15,7 +15,7 @@
 use rand::{Rng, SeedableRng, XorShiftRng};
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
-use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
+use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use encoding::Error as MessageError;
 use messages::{Message, RawTransaction};
 use storage::{Fork, Snapshot};
@@ -100,7 +100,7 @@ impl Service for TimestampingService {
     }
 
     fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        vec![Hash::new([127; 32]), Hash::new([128; 32])]
+        vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {

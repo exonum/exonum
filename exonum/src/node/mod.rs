@@ -556,7 +556,7 @@ impl NodeHandler {
         } else {
             warn!(
                 "Attempt to connect to the peer with address {:?} which \
-                     is not in the ConnectList",
+                 is not in the ConnectList",
                 address
             );
         }

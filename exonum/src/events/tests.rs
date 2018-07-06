@@ -21,7 +21,7 @@ use std::{
 };
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature, SEED_LENGTH};
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
@@ -30,7 +30,7 @@ use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use node::{EventsPoolCapacity, NodeChannel};
 
-static FAKE_SEED: [u8; 32] = [1; 32];
+static FAKE_SEED: [u8; SEED_LENGTH] = [1; SEED_LENGTH];
 
 #[derive(Debug)]
 pub struct TestHandler {
