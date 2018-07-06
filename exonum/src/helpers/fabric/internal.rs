@@ -36,9 +36,9 @@ pub trait Command {
     /// Short information about the command.
     fn about(&self) -> &str;
     /// Performs command handling code.
-    /// 
+    ///
     /// # Arguments:
-    /// 
+    ///
     /// * `commands` - contains list of commands that can be performed on the node.
     /// * `context` - contains command parameters.
     /// * `exts` - allows to execute `CommandExtensions` for the command.
