@@ -471,7 +471,7 @@ impl State {
     pub fn is_leader(&self) -> bool {
         self.validator_state()
             .as_ref()
-            .map_or(false,|validator| self.leader(self.round()) == validator.id)
+            .map_or(false, |validator| self.leader(self.round()) == validator.id)
     }
 
     /// Returns node's ConnectList.
