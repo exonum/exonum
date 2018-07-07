@@ -64,6 +64,7 @@ fn main() {
         MemoryDB::new(),
         vec![Box::new(CurrencyService)],
         node_config(),
+        None,
     );
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");
