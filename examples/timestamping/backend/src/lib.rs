@@ -78,6 +78,7 @@ impl blockchain::Service for Service {
             debug!("Service worker started");
             while context.is_running() {
                 ::std::thread::sleep(::std::time::Duration::from_secs(5));
+                debug!("Long operation finished");
             }
             debug!("Service worker stopped");
             Ok(())
