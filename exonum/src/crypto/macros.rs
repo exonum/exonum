@@ -62,16 +62,14 @@ macro_rules! implement_public_crypto_wrapper {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:02X}", i)?
-            }
+            write_short_hex(f, &self[..])?;
             write!(f, ")")
         }
     }
 
     impl fmt::Display for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str(&self.to_hex())
+            write_short_hex(f, &self[..])
         }
     }
     )
@@ -112,10 +110,8 @@ macro_rules! implement_private_crypto_wrapper {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:02X}", i)?
-            }
-            write!(f, "...)")
+            write_short_hex(f, &self[..])?;
+            write!(f, ")")
         }
     }
 

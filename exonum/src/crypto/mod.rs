@@ -56,6 +56,16 @@ pub(crate) mod crypto_lib;
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
+fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
+    for byte in slice.iter().take(BYTES_IN_DEBUG) {
+        write!(f, "{:02x}", byte)?;
+    }
+    if slice.len() > BYTES_IN_DEBUG {
+        write!(f, "...")?;
+    }
+    Ok(())
+}
+
 /// Signs a slice of bytes using the signer's secret key and returns the
 /// resulting `Signature`.
 ///
@@ -687,22 +697,39 @@ mod tests {
     fn debug_format() {
         // Check zero padding
         let hash = Hash::new([1; HASH_SIZE]);
-        assert_eq!(format!("{:?}", &hash), "Hash(01010101)");
+        assert_eq!(format!("{:?}", &hash), "Hash(01010101...)");
 
         let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &pk), "PublicKey(0F0F0F0F)");
+        assert_eq!(format!("{:?}", &pk), "PublicKey(0f0f0f0f...)");
         let sk = SecretKey::new([8; SECRET_KEY_LENGTH]);
         assert_eq!(format!("{:?}", &sk), "SecretKey(08080808...)");
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
-        assert_eq!(format!("{:?}", &signature), "Signature(0A0A0A0A)");
+        assert_eq!(format!("{:?}", &signature), "Signature(0a0a0a0a...)");
         let seed = Seed::new([4; SEED_LENGTH]);
         assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
 
         // Check no padding
         let hash = Hash::new([128; HASH_SIZE]);
-        assert_eq!(format!("{:?}", &hash), "Hash(80808080)");
+        assert_eq!(format!("{:?}", &hash), "Hash(80808080...)");
         let sk = SecretKey::new([255; SECRET_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &sk), "SecretKey(FFFFFFFF...)");
+        assert_eq!(format!("{:?}", &sk), "SecretKey(ffffffff...)");
+    }
+
+    // Note that only public values have Display impl.
+    #[test]
+    fn display_format() {
+        // Check zero padding
+        let hash = Hash::new([1; HASH_SIZE]);
+        assert_eq!(format!("{}", &hash), "01010101...");
+
+        let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
+        assert_eq!(format!("{}", &pk), "0f0f0f0f...");
+        let signature = Signature::new([10; SIGNATURE_LENGTH]);
+        assert_eq!(format!("{}", &signature), "0a0a0a0a...");
+
+        // Check no padding
+        let hash = Hash::new([128; HASH_SIZE]);
+        assert_eq!(format!("{}", &hash), "80808080...");
     }
 
     #[test]
