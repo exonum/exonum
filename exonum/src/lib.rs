@@ -84,6 +84,8 @@ extern crate lazy_static;
 extern crate tempdir;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
+#[cfg(test)]
+extern crate regex;
 
 #[macro_use]
 pub mod encoding;

@@ -104,7 +104,7 @@ fn has_colors() -> bool {
 }
 
 fn format_time(time: SystemTime) -> String {
-    DateTime::<Local>::from(time).to_rfc2822()
+    DateTime::<Local>::from(time).format("%a, %e %b %Y %H:%M:%S%.3f %z").to_string()
 }
 
 fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
@@ -149,5 +149,28 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
             Level::Trace => "TRACE",
         };
         writeln!(buf, "{} {} {} {}", time, level, &source_path, record.args())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use regex::Regex;
+
+    use std::time;
+
+    use super::*;
+
+    #[test]
+    fn time_formatting() {
+        // Thu,  1 Jan 1970 00:00:00.000 +0000
+        let r = Regex::new(r"(?x)
+            \w+,\s+                     # weekday
+            \d{1,2}\s+                  # day
+            \w+\s+                      # month
+            \d{4,}\s+                   # year
+            \d{2}:\d{2}:\d{2}\.\d{3}\s+ # time
+            [+-]\d{4}                   # tz offset
+        ").unwrap();
+        assert!(r.is_match(&format_time(time::UNIX_EPOCH)));
     }
 }

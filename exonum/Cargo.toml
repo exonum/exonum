@@ -57,6 +57,7 @@ lazy_static = "1.0.1"
 proptest = "=0.7.0"
 criterion = "=0.2.3"
 num = "=0.1.42"
+regex = "1"
 
 [[bench]]
 name = "criterion"
