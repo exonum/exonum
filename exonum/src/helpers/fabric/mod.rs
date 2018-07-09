@@ -129,6 +129,10 @@ pub mod keys {
     /// Set by `finalize` and `run` commands.
     pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
 
+    /// Configuration file path for this node. If set, `ConfigManager` will be created.
+    /// Set by `run` command.
+    pub const NODE_CONFIG_PATH: ContextKey<String> = context_key!("node_config_path");
+
     /// Configurations for all nodes.
     /// Set by `generate-testnet` command.
     pub const CONFIGS: ContextKey<Vec<NodeConfig>> = context_key!("configs");
