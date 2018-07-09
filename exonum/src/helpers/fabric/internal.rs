@@ -35,12 +35,12 @@ pub trait Command {
     fn name(&self) -> CommandName;
     /// Short information about the command.
     fn about(&self) -> &str;
-    /// Performs command handling code.
+    /// Executes the command processing code.
     ///
     /// # Arguments:
     ///
-    /// * `commands` - contains list of commands that can be performed on the node.
-    /// * `context` - contains command parameters.
+    /// * `commands` - contains set of commands that can be performed on this node.
+    /// * `context` - contains global execution context.
     /// * `exts` - allows to execute `CommandExtensions` for the command.
     fn execute(
         &self,
