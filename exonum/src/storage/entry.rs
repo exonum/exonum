@@ -172,4 +172,56 @@ where
     pub fn remove(&mut self) {
         self.base.remove(&())
     }
+
+    /// Takes the value out of the entry, leaving a None in its place.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(name, &mut fork);
+    ///
+    /// index.set(10);
+    /// assert_eq!(Some(10), index.get());
+    ///
+    /// let value = index.take();
+    /// assert_eq!(Some(10), value);
+    /// assert_eq!(None, index.get());
+    /// ```
+    pub fn take(&mut self) -> Option<V> {
+        let value = self.get();
+        if value.is_some() {
+            self.remove();
+        }
+        value
+    }
+
+    /// Replaces the value in the entry with the given one, returning the previously stored value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(name, &mut fork);
+    ///
+    /// index.set(10);
+    /// assert_eq!(Some(10), index.get());
+    ///
+    /// let value = index.swap(20);
+    /// assert_eq!(Some(10), value);
+    /// assert_eq!(Some(20), index.get());
+    /// ```
+    pub fn swap(&mut self, value: V) -> Option<V> {
+        let previous = self.get();
+        self.set(value);
+        previous
+    }
 }
