@@ -13,8 +13,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   Migration path:
 
-  If you overrides `ServiceFactory::command` method and matches command name,
-  just add `use helpers::fabric::Command` import.
+  If you override `ServiceFactory::command` method and do a match on a
+  command name, just add `use helpers::fabric::Command` import.
 
 - `schema_version` field in `Block` has been removed. (#774)
 
