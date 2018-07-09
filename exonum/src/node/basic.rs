@@ -45,6 +45,7 @@ impl NodeHandler {
         info!("Received Connect message from peer: {:?}", info);
 
         let remote_key = x25519::into_x25519_public_key(*connect.pub_key());
+        // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
         if info.public_key == remote_key {
             self.handle_connect(connect);
         } else {
