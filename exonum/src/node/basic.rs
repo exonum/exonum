@@ -41,7 +41,7 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, info: network::ConnectInfo, connect: Connect) {
+    pub fn handle_connected(&mut self, info: &network::ConnectInfo, connect: Connect) {
         info!("Received Connect message from peer: {:?}", info);
 
         let remote_key = x25519::into_x25519_public_key(*connect.pub_key());

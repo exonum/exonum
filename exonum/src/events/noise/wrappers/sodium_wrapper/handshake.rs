@@ -135,4 +135,3 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 }
-
