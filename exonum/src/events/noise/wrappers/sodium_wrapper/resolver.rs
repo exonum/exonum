@@ -14,16 +14,17 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use rand::{thread_rng, Rng};
-use snow::params::{CipherChoice, DHChoice, HashChoice};
-use snow::types::{Cipher, Dh, Hash, Random};
-use snow::{CryptoResolver, DefaultResolver};
+use snow::{
+    params::{CipherChoice, DHChoice, HashChoice}, types::{Cipher, Dh, Hash, Random},
+    CryptoResolver, DefaultResolver,
+};
 
-use sodiumoxide::crypto::aead::chacha20poly1305_ietf as sodium_chacha20poly1305;
-use sodiumoxide::crypto::hash::sha256 as sodium_sha256;
-
-use crypto::x25519;
 use crypto::{
-    PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+    x25519, PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
+    SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+};
+use sodiumoxide::crypto::{
+    aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
 pub struct SodiumResolver {
