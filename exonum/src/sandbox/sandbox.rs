@@ -610,6 +610,7 @@ impl Sandbox {
             Box::new(system_state),
             config,
             inner.handler.api_state.clone(),
+            None,
         );
         handler.initialize();
 
@@ -794,6 +795,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         Box::new(system_state),
         config.clone(),
         SharedNodeState::new(5000),
+        None,
     );
     handler.initialize();
 

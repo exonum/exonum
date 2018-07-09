@@ -71,6 +71,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Healthcheck and consensus endpoints (`v1/healthcheck` and
   `v1/consensus_status`) have been merged to `v1/healthcheck`. (#736, #766)
 
+- Node configuration file is now updated at `ConnectList` update. This is achieved
+  via new `ConfigManager` entity. (#777)
+
+  Migration path (needed only if you're creating `Node` manually):
+
+  If you need to update `ConnectList` on file system, pass `Some(path_to_node_config)`
+  as the last argument of the `Node::new` method.
+  Otherwise, pass `None`.
+
 ### New features
 
 #### exonum
@@ -84,6 +93,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
   has been introduced. (#722)
+
+- `storage::Entry` has been extended with `take` and `swap` methods. (#781)
 
 ### Bug fixes
 

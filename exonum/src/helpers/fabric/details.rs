@@ -57,9 +57,12 @@ impl Run {
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }
 
-    fn node_config(ctx: &Context) -> NodeConfig {
-        let path = ctx.arg::<String>(NODE_CONFIG_PATH)
-            .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));
+    fn node_config_path(ctx: &Context) -> String {
+        ctx.arg::<String>(NODE_CONFIG_PATH)
+            .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH))
+    }
+
+    fn node_config(path: String) -> NodeConfig {
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
@@ -124,11 +127,14 @@ impl Command for Run {
         mut context: Context,
         exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
-        let config = Self::node_config(&context);
+        let config_path = Self::node_config_path(&context);
+
+        let config = Self::node_config(config_path.clone());
         let public_addr = Self::public_api_address(&context);
         let private_addr = Self::private_api_address(&context);
 
         context.set(keys::NODE_CONFIG, config);
+        context.set(keys::NODE_CONFIG_PATH, config_path);
         let mut new_context = exts(context);
         let mut config = new_context
             .get(keys::NODE_CONFIG)

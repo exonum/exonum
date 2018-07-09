@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 
 impl EventHandler for NodeHandler {
@@ -55,6 +55,16 @@ impl NodeHandler {
                 info!("Send Connect message to {}", info);
                 self.state.add_peer_to_connect_list(info);
                 self.connect(&info.address);
+
+                if self.config_manager.is_some() {
+                    let connect_list_config =
+                        ConnectListConfig::from_connect_list(self.state.connect_list());
+
+                    self.config_manager
+                        .as_ref()
+                        .unwrap()
+                        .store_connect_list(connect_list_config);
+                }
             }
             ExternalMessage::Enable(value) => {
                 if self.node_role.is_auditor() {
