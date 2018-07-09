@@ -96,7 +96,7 @@ function getWallet(publicKey) {
       return validator.consensus_key
     })
 
-    return axios.get(`/api/services/cryptocurrency/v1/wallets/info?pub_key=${publicKey}`)
+    return axios.get(`/api/services/cryptocurrency/v1/wallets/info/${publicKey}`)
       .then(response => response.data)
       .then(data => {
         if (!Exonum.verifyBlock(data.block_proof, validators)) {
@@ -225,8 +225,8 @@ module.exports = {
         TxCreateWallet.signature = signature
         const hash = TxCreateWallet.hash(data)
 
-        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
-          .then(() => { 
+        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => {
             return { data: { tx_hash : hash } }
           })
       },
@@ -244,10 +244,10 @@ module.exports = {
         TxIssue.signature = signature
         const hash = TxIssue.hash(data)
 
-        return TxIssue.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
+        return TxIssue.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
           .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
-        
+
       },
 
       transfer(keyPair, receiver, amountToTransfer, seed) {
@@ -264,7 +264,7 @@ module.exports = {
         TxTransfer.signature = signature
         const hash = TxTransfer.hash(data)
 
-        return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
+        return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
           .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
       },
@@ -277,11 +277,11 @@ module.exports = {
       },
 
       getBlock(height) {
-        return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
       },
 
       getTransaction(hash) {
-        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => response.data)
       }
     }
   }
