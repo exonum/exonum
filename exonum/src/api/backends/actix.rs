@@ -34,6 +34,7 @@ use std::{
 use api::{
     error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
     Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+    ServiceWorkerContext,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -304,6 +305,10 @@ pub struct SystemRuntime {
     system_thread: JoinHandle<result::Result<(), failure::Error>>,
     api_runtime_addresses: Vec<HttpServerAddr>,
     system_address: SystemAddr,
+    additional_workers: Vec<(
+        JoinHandle<result::Result<(), failure::Error>>,
+        mpsc::Sender<()>,
+    )>,
 }
 
 impl SystemRuntimeConfig {
@@ -319,6 +324,7 @@ impl SystemRuntime {
         let (system_address_tx, system_address_rx) = mpsc::channel();
         let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
         let api_runtimes = config.api_runtimes.clone();
+        let aggregator = config.api_aggregator.clone();
         let system_thread = thread::spawn(move || -> result::Result<(), failure::Error> {
             let system = System::new("http-server");
 
@@ -373,16 +379,38 @@ impl SystemRuntime {
             }
             api_runtime_addresses
         };
+        // Starts additional workers.
+        let blockchain = aggregator.blockchain().clone();
+        let additional_workers = aggregator
+            .additional_workers()
+            .into_iter()
+            .map(move |(name, worker)| {
+                let (cancel, context) = ServiceWorkerContext::new(blockchain.clone());
+                let thread_handle = thread::Builder::new()
+                    .name(format!("{}:additional_worker", name))
+                    .spawn(move || worker(context))
+                    .unwrap();
+                (thread_handle, cancel)
+            })
+            .collect();
 
         Ok(Self {
             system_thread,
             system_address,
             api_runtime_addresses,
+            additional_workers,
         })
     }
 
     /// Stops the actix system runtime along with all web runtimes.
     pub fn stop(self) -> result::Result<(), failure::Error> {
+        // Stop all additional workers.
+        for (handle, cancel) in self.additional_workers {
+            drop(cancel);
+            handle
+                .join()
+                .map_err(|_| format_err!("Unable to stop additional worker"))?;
+        }
         // Stop all actix web servers.
         for api_runtime_address in self.api_runtime_addresses {
             api_runtime_address
