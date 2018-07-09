@@ -20,6 +20,7 @@ pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 pub use self::worker::{ServiceWorker, ServiceWorkerContext};
 
 use serde::{de::DeserializeOwned, Serialize};
+use failure;
 
 use std::sync::Arc;
 use std::{collections::BTreeMap, fmt};
@@ -235,11 +236,13 @@ impl ServiceApiBuilder {
     }
 
     /// Sets additional worker which runs in separate thread and can be useful for oracles.
-    pub fn worker<W>(&mut self, worker: W) -> &mut Self
-    where
-        W: Into<Arc<ServiceWorker>>,
+    pub fn additional_worker<W>(
+        &mut self,
+        worker: W
+    ) -> &mut Self 
+     where W: Fn(ServiceWorkerContext) -> ::std::result::Result<(), failure::Error> + Send + Sync + 'static,
     {
-        self.additional_worker = Some(worker.into());
+        self.additional_worker = Some(Arc::new(worker) as Arc<ServiceWorker>);
         self
     }
 }

@@ -14,7 +14,7 @@
 
 use failure;
 
-use std::sync::mpsc;
+use std::sync::{mpsc};
 
 use blockchain::Blockchain;
 use node::ApiSender;

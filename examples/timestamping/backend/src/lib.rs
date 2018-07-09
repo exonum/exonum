@@ -32,7 +32,7 @@ pub mod schema;
 pub mod transactions;
 
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    api::{ServiceApiBuilder, ServiceWorkerContext}, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
     encoding::Error as StreamStructError, helpers::fabric, messages::RawTransaction,
     storage::Snapshot,
 };
@@ -74,6 +74,14 @@ impl blockchain::Service for Service {
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         PublicApi::wire(builder);
+        builder.additional_worker(|context: ServiceWorkerContext| {
+            debug!("Service worker started");
+            while context.is_running() {
+                ::std::thread::sleep(::std::time::Duration::from_secs(5));
+            }
+            debug!("Service worker stopped");
+            Ok(())
+        });
     }
 }
 

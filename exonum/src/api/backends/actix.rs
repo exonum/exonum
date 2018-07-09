@@ -409,7 +409,7 @@ impl SystemRuntime {
             drop(cancel);
             handle
                 .join()
-                .map_err(|_| format_err!("Unable to stop additional worker"))?;
+                .map_err(|_| format_err!("Unable to stop additional worker"))??;
         }
         // Stop all actix web servers.
         for api_runtime_address in self.api_runtime_addresses {
