@@ -9,6 +9,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `Command` trait in `helpers::fabric` module became public. (#778)
+
+  Migration path:
+
+  If you overrides `ServiceFactory::command` method and matches command name,
+  just add `use helpers::fabric::Command` import.
+
 - `schema_version` field in `Block` has been removed. (#774)
 
 - Storage in exonum is now versioned. Old databases will not work with this
