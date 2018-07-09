@@ -221,7 +221,7 @@ where
     /// ```
     pub fn swap(&mut self, value: V) -> Option<V> {
         let previous = self.get();
-        self.set(val);
+        self.set(value);
         previous
     }
 }
