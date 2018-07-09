@@ -96,10 +96,19 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+    ) -> Result<(Framed<S, MessagesCodec>, x25519::PublicKey), io::Error> {
         let noise = self.noise.into_transport_mode()?;
+        let remote_static_key = {
+            let rs = noise.session.get_remote_static().unwrap_or_else(|| {
+                // Panic because with selected handshake pattern we must have
+                // `remote_static_key` on final step of handshake.
+                panic!("Remote static key is not present!")
+            });
+            x25519::PublicKey::from_slice(rs).unwrap()
+        };
+
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
-        Ok(framed)
+        Ok((framed, remote_static_key))
     }
 }
 
@@ -126,3 +135,4 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 }
+
