@@ -62,6 +62,38 @@ where
         }
     }
 
+    /// Creates a new index representation based on the name, index ID in family
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
+    /// available.
+    ///
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let index_id = vec![01];
+    /// let snapshot = db.snapshot();
+    /// let index: ListIndex<_, u8> = Entry::new_in_family(name, &index_id, &snapshot);
+    /// ```
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
+        Self {
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::Entry, view),
+            _v: PhantomData,
+        }
+    }
+
     /// Returns a value of the entry or `None` if does not exist.
     ///
     /// # Examples
