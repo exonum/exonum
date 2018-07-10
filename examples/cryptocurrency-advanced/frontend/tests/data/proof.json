@@ -1,0 +1,122 @@
+{
+  "block_proof": {
+    "block": {
+      "height": "1966",
+      "prev_hash": "5401485e3019dae35b445aa5d53c108e52cd6f60a1ea5c042461b13af65fcffa",
+      "proposer_id": 3,
+      "state_hash": "c4bfe8907e01dba164ba7086a2f2c1dedaa63d32772e8cf88cb6cfa7e60676ca",
+      "tx_count": 0,
+      "tx_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "precommits": [
+      {
+        "body": {
+          "block_hash": "1d0b2f1a4fcaabf82650a56698ea2f1e3d36976e4936d35c677ce605ceece827",
+          "height": "1966",
+          "propose_hash": "3aba2042d38c57d5517bc47497df868924aa87e18bfdb311fddba776b641f0d7",
+          "round": 1,
+          "time": {
+            "nanos": 940068000,
+            "secs": "1531164380"
+          },
+          "validator": 1
+        },
+        "message_id": 4,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "37f12cc1955f008cb6a3800c6bfef2f3b65495f99720d6d9e33c21197f4fdc58585440a213921f9fb47fe813a6e339877e0e2c31712bb2ed9417c6dd1c59a30a"
+      },
+      {
+        "body": {
+          "block_hash": "1d0b2f1a4fcaabf82650a56698ea2f1e3d36976e4936d35c677ce605ceece827",
+          "height": "1966",
+          "propose_hash": "3aba2042d38c57d5517bc47497df868924aa87e18bfdb311fddba776b641f0d7",
+          "round": 1,
+          "time": {
+            "nanos": 939410000,
+            "secs": "1531164380"
+          },
+          "validator": 2
+        },
+        "message_id": 4,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "7daf0961903c0a1d4793f7e13abc9a4b20ba14b7737891173bb1079c568f9045567fe4df1dc39ff41fc0abc196d0fdd0e068d8079a142e8c95362cb6cc31310b"
+      },
+      {
+        "body": {
+          "block_hash": "1d0b2f1a4fcaabf82650a56698ea2f1e3d36976e4936d35c677ce605ceece827",
+          "height": "1966",
+          "propose_hash": "3aba2042d38c57d5517bc47497df868924aa87e18bfdb311fddba776b641f0d7",
+          "round": 1,
+          "time": {
+            "nanos": 939512000,
+            "secs": "1531164380"
+          },
+          "validator": 0
+        },
+        "message_id": 4,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "b898a81527dfe40c72ba40cb98eaca518b916dce5473c959553d71250cbd91b2e6e0944b12e074efb2ab04253937b2bce24d10a5122ad408b7e201d694719e00"
+      }
+    ]
+  },
+  "wallet_proof": {
+    "to_table": {
+      "entries": [
+        {
+          "key": "50c8ba3a6170f0a2fb6736ece8a603576ef6309a35e810911599bc6211b554a9",
+          "value": "d254680aa08527c76c66bc330207aba007364615877f7ae68fadf15ec7d06003"
+        }
+      ],
+      "proof": [
+        {
+          "path": "0000101010101110110000001010110110011000000001100011001110110111000101011001101100100100000010011111001000011101110010101110111001111111101111101110100011111110000111011111101111110011011010100100110101110010101000101110101000100110011100100010101101100001",
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "11",
+          "hash": "68adb3be1a114e85af9f8c96d761470c83ccad3d7f62fc8a3f9a7b7f640f631a"
+        }
+      ]
+    },
+    "to_wallet": {
+      "entries": [
+        {
+          "key": "ba78f4566a075958770ffd514cde99ed56bdb349fd95464a0b3ee1fb2459c600",
+          "value": {
+            "balance": "100",
+            "history_hash": "473fab385340f46b1e89f03124d05d849d7948ef11bc20ae569c96a15052704c",
+            "history_len": "1",
+            "name": "John Doe",
+            "pub_key": "ba78f4566a075958770ffd514cde99ed56bdb349fd95464a0b3ee1fb2459c600"
+          }
+        }
+      ],
+      "proof": [
+        {
+          "path": "1011011100001010011011001100100100100001110010001000010101001110011000010111101100000101000111000101011110110100100110000101000110000001100010001101110101101010011111100111001000001110011101110011000001000000010010001000111010000010111000100111111100000101",
+          "hash": "3b71f0f2655e0425bee267094be55f2327319498fecd9f039c0ba015b8ecd83c"
+        }
+      ]
+    }
+  },
+  "wallet_history": {
+    "proof": {
+      "val": "473fab385340f46b1e89f03124d05d849d7948ef11bc20ae569c96a15052704c"
+    },
+    "transactions": [
+      {
+        "body": {
+          "name": "John Doe",
+          "pub_key": "ba78f4566a075958770ffd514cde99ed56bdb349fd95464a0b3ee1fb2459c600"
+        },
+        "message_id": 2,
+        "protocol_version": 0,
+        "service_id": 128,
+        "signature": "c28cc03f7b2bb41cac2c83896be31a293594100e8fdced2d439165f7e9227b271b464408c694df887548971db70b2cf4f287f0781f1a0e9dfe9bfa0f0b80b70a"
+      }
+    ]
+  }
+}

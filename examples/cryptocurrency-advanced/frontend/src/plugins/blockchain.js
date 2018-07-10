@@ -226,7 +226,7 @@ module.exports = {
         const hash = TxCreateWallet.hash(data)
 
         return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
-          .then(() => { 
+          .then(() => {
             return { data: { tx_hash : hash } }
           })
       },
@@ -247,7 +247,6 @@ module.exports = {
         return TxIssue.send(TX_URL, '/api/explorer/v1/transactions?hash=', data, signature)
           .then(() => waitForAcceptance(keyPair.publicKey, hash)
         )
-        
       },
 
       transfer(keyPair, receiver, amountToTransfer, seed) {
