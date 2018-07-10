@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
+use futures::{
+    future, future::Either, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture, Poll,
+    Sink, Stream,
+};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Handle,
 };
@@ -47,7 +50,7 @@ pub enum NetworkRequest {
     Shutdown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConnectInfo {
     /// Peer address.
     pub address: SocketAddr,
@@ -385,35 +388,19 @@ impl Listener {
                         .into_future()
                         .and_then(Ok)
                         .map_err(|e| e.0)
-                        .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
-                            Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                            Some(Ok(other)) => Err(other_error(&format!(
-                                "First message is not Connect, got={:?}",
-                                other
-                            ))),
-                            Some(Err(e)) => Err(into_other(e)),
-                            None => Err(other_error("Incoming socket closed")),
-                        })
+                        .and_then(move |(raw, stream)| Self::parse_connect_msg(raw, stream))
                         .and_then(move |(connect, stream)| {
                             trace!("Received handshake message={:?}", connect);
-                            let event = NetworkEvent::PeerConnected(
+
+                            Self::process_incoming_messages(
+                                stream,
+                                network_tx,
+                                connect,
                                 ConnectInfo {
                                     address: addr,
                                     public_key: key,
                                 },
-                                connect,
-                            );
-                            let stream = network_tx
-                                .clone()
-                                .send(event)
-                                .map_err(into_other)
-                                .and_then(move |_| Ok(stream))
-                                .flatten_stream();
-
-                            stream.for_each(move |raw| {
-                                let event = NetworkEvent::MessageReceived(addr, raw);
-                                network_tx.clone().send(event).map_err(into_other).map(drop)
-                            })
+                            )
                         })
                         .map(|_| {
                             // Ensure that holder lives until the stream ends.
@@ -427,6 +414,43 @@ impl Listener {
         });
 
         Ok(Listener(to_box(server)))
+    }
+
+    fn parse_connect_msg<S>(raw: Option<RawMessage>, stream: S) -> Result<(Connect, S), io::Error> {
+        match raw.map(Any::from_raw) {
+            Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
+            Some(Ok(other)) => Err(other_error(&format!(
+                "First message is not Connect, got={:?}",
+                other
+            ))),
+            Some(Err(e)) => Err(into_other(e)),
+            None => Err(other_error("Incoming socket closed")),
+        }
+    }
+
+    fn process_incoming_messages<S>(
+        stream: SplitStream<S>,
+        network_tx: mpsc::Sender<NetworkEvent>,
+        connect: Connect,
+        info: ConnectInfo,
+    ) -> impl Future<Item = (), Error = io::Error>
+    where
+        S: Stream<Item = RawMessage, Error = io::Error>,
+    {
+        let address = info.address.clone();
+        let event = NetworkEvent::PeerConnected(info, connect);
+
+        let stream = network_tx
+            .clone()
+            .send(event)
+            .map_err(into_other)
+            .and_then(move |_| Ok(stream))
+            .flatten_stream();
+
+        stream.for_each(move |raw| {
+            let event = NetworkEvent::MessageReceived(address, raw);
+            network_tx.clone().send(event).map_err(into_other).map(drop)
+        })
     }
 }
 

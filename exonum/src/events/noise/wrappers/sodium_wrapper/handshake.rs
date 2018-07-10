@@ -105,7 +105,8 @@ impl NoiseHandshake {
                 // `remote_static_key` on final step of handshake.
                 panic!("Remote static key is not present!")
             });
-            x25519::PublicKey::from_slice(rs).unwrap()
+            x25519::PublicKey::from_slice(rs)
+                .unwrap_or_else(|| panic!("Remote static key is not valid x25519 key!"))
         };
 
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
