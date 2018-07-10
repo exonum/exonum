@@ -19,8 +19,8 @@ pub use self::state::ServiceApiState;
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 pub use self::worker::{ServiceWorker, ServiceWorkerContext};
 
-use serde::{de::DeserializeOwned, Serialize};
 use failure;
+use serde::{de::DeserializeOwned, Serialize};
 
 use std::sync::Arc;
 use std::{collections::BTreeMap, fmt};
@@ -216,7 +216,7 @@ impl ServiceApiScope {
 pub struct ServiceApiBuilder {
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
-    additional_worker: Option<Arc<ServiceWorker>>,
+    additional_worker: Option<ServiceWorker>,
 }
 
 impl ServiceApiBuilder {
@@ -236,13 +236,14 @@ impl ServiceApiBuilder {
     }
 
     /// Sets additional worker which runs in separate thread and can be useful for oracles.
-    pub fn additional_worker<W>(
-        &mut self,
-        worker: W
-    ) -> &mut Self 
-     where W: Fn(ServiceWorkerContext) -> ::std::result::Result<(), failure::Error> + Send + Sync + 'static,
+    pub fn additional_worker<W>(&mut self, worker: W) -> &mut Self
+    where
+        W: Fn(ServiceWorkerContext) -> ::std::result::Result<(), failure::Error>
+            + Send
+            + Sync
+            + 'static,
     {
-        self.additional_worker = Some(Arc::new(worker) as Arc<ServiceWorker>);
+        self.additional_worker = Some(Arc::new(worker) as ServiceWorker);
         self
     }
 }
@@ -343,7 +344,7 @@ impl ApiAggregator {
         self.inner.insert(prefix.into(), builder);
     }
 
-    pub(crate) fn additional_workers(self) -> Vec<(String, Arc<ServiceWorker>)> {
+    pub(crate) fn additional_workers(self) -> Vec<(String, ServiceWorker)> {
         let mut workers = Vec::default();
         for (name, builder) in self.inner {
             if let Some(worker) = builder.additional_worker {

@@ -14,16 +14,16 @@
 
 use failure;
 
-use std::sync::{mpsc};
+use std::sync::{mpsc, Arc};
 
 use blockchain::Blockchain;
 use node::ApiSender;
 
 /// Type definition for additional workers.
 pub type ServiceWorker =
-    dyn Fn(ServiceWorkerContext) -> Result<(), failure::Error> + 'static + Send + Sync;
+    Arc<dyn Fn(ServiceWorkerContext) -> Result<(), failure::Error> + 'static + Send + Sync>;
 
-/// TODO
+/// Provides the current blockchain and node state to the service worker.
 #[derive(Debug)]
 pub struct ServiceWorkerContext {
     blockchain: Blockchain,
@@ -55,8 +55,7 @@ impl ServiceWorkerContext {
     /// Returns true if node is already running.
     pub fn is_running(&self) -> bool {
         match self.cancellation_handler.try_recv() {
-            Ok(_) => false,
-            Err(mpsc::TryRecvError::Disconnected) => false,
+            Ok(_) | Err(mpsc::TryRecvError::Disconnected) => false,
             Err(mpsc::TryRecvError::Empty) => true,
         }
     }

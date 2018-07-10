@@ -28,7 +28,7 @@ use serde::{
 };
 
 use std::{
-    fmt, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc}, thread::{self, JoinHandle},
+    fmt, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc}, thread,
 };
 
 use api::{
@@ -42,7 +42,7 @@ pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Err
 /// Type alias for the concrete `actix-web` HTTP request.
 pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
+pub type RawHandler = Arc<dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync>;
 /// Type alias for the `actix-web::App` with the `ServiceApiState`.
 pub type App = actix_web::App<ServiceApiState>;
 /// Type alias for the `actix-web::App` configuration.
@@ -52,6 +52,8 @@ pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
 type HttpServerAddr = Addr<Syn, HttpServer<<App as IntoHttpHandler>::Handler>>;
 /// Type alias for the `actix` system runtime address.
 type SystemAddr = Addr<Syn, System>;
+/// Type alias for the `JoinHandle` with the specific result type.
+type JoinHandle = thread::JoinHandle<result::Result<(), failure::Error>>;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -61,7 +63,7 @@ pub struct RequestHandler {
     /// Endpoint http method.
     pub method: actix_web::http::Method,
     /// Inner handler.
-    pub inner: Arc<RawHandler>,
+    pub inner: RawHandler,
 }
 
 impl fmt::Debug for RequestHandler {
@@ -154,7 +156,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -184,7 +186,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::POST,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -211,7 +213,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -241,7 +243,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::POST,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -276,7 +278,7 @@ impl ApiRuntimeConfig {
         Self {
             listen_address,
             access,
-            app_config: Default::default(),
+            app_config: None,
         }
     }
 }
@@ -302,13 +304,10 @@ pub struct SystemRuntimeConfig {
 
 /// Actix system runtime handle.
 pub struct SystemRuntime {
-    system_thread: JoinHandle<result::Result<(), failure::Error>>,
+    system_thread: JoinHandle,
     api_runtime_addresses: Vec<HttpServerAddr>,
     system_address: SystemAddr,
-    additional_workers: Vec<(
-        JoinHandle<result::Result<(), failure::Error>>,
-        mpsc::Sender<()>,
-    )>,
+    additional_workers: Vec<(JoinHandle, mpsc::Sender<()>)>,
 }
 
 impl SystemRuntimeConfig {
