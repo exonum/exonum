@@ -24,7 +24,7 @@ use crypto::{
     SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
 };
 use sodiumoxide::crypto::{
-    aead::chacha20poly1305 as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
+    aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
 pub struct SodiumResolver {
@@ -164,6 +164,15 @@ pub struct SodiumChaChaPoly {
     key: sodium_chacha20poly1305::Key,
 }
 
+impl SodiumChaChaPoly {
+    // In IETF version of `chacha20poly1305` nonce has 12 bytes instead of 8.
+    fn get_ietf_nonce(nonce: u64) -> sodium_chacha20poly1305::Nonce {
+        let mut nonce_bytes = [0_u8; 12];
+        LittleEndian::write_u64(&mut nonce_bytes[4..], nonce);
+        sodium_chacha20poly1305::Nonce(nonce_bytes)
+    }
+}
+
 impl Default for SodiumChaChaPoly {
     fn default() -> Self {
         Self {
@@ -189,9 +198,7 @@ impl Cipher for SodiumChaChaPoly {
             "Can't encrypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0_u8; 8];
-        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
-        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+        let nonce = Self::get_ietf_nonce(nonce);
 
         let buf = sodium_chacha20poly1305::seal(plaintext, Some(authtext), &nonce, &self.key);
 
@@ -212,9 +219,7 @@ impl Cipher for SodiumChaChaPoly {
             "Can't dectypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0_u8; 8];
-        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
-        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+        let nonce = Self::get_ietf_nonce(nonce);
 
         let result = sodium_chacha20poly1305::open(ciphertext, Some(authtext), &nonce, &self.key);
 
