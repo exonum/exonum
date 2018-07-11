@@ -71,8 +71,8 @@ where
     /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
+    /// [`&Snapshot`]: trait.Snapshot.html
+    /// [`&mut Fork`]: struct.Fork.html
     ///
     /// # Examples
     ///
