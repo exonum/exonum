@@ -112,6 +112,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `handle_consensus` now does not write warning for message from previous
   height. (#729)
 
+- `new_in_family` constructor has been added to the `Entry` index. (#790)
+
 ### Internal improvements
 
 - `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
