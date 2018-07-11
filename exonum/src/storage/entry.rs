@@ -16,7 +16,9 @@
 
 use std::marker::PhantomData;
 
-use super::{base_index::BaseIndex, indexes_metadata::IndexType, Fork, Snapshot, StorageValue};
+use super::{
+    base_index::BaseIndex, indexes_metadata::IndexType, Fork, Snapshot, StorageKey, StorageValue,
+};
 use crypto::Hash;
 
 /// An index that may only contain one element.
@@ -58,6 +60,38 @@ where
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
             base: BaseIndex::new(index_name.as_ref(), IndexType::Entry, view),
+            _v: PhantomData,
+        }
+    }
+
+    /// Creates a new index representation based on the name, index ID in family
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
+    /// available.
+    ///
+    /// [`&Snapshot`]: trait.Snapshot.html
+    /// [`&mut Fork`]: struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let index_id = vec![01];
+    /// let snapshot = db.snapshot();
+    /// let index: Entry<_, u8> = Entry::new_in_family(name, &index_id, &snapshot);
+    /// ```
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
+        Self {
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::Entry, view),
             _v: PhantomData,
         }
     }
