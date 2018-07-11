@@ -1,0 +1,148 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Websockets
+
+mod server;
+
+use actix::*;
+use actix_web::{
+    http::{HeaderMap, Method, Uri, Version}, ws, HttpRequest,
+};
+
+use std::str::FromStr;
+use std::time::Instant;
+
+use api::{ServiceApiScope, ServiceApiState};
+use blockchain::SharedNodeState;
+use std::rc::Rc;
+
+pub use self::server::Message;
+
+#[derive(Clone)]
+struct WsSessionState {
+    addr: Addr<Syn, server::BlockCommitWs>,
+}
+
+struct WsSession {
+    id: usize,
+    hb: Instant,
+    shared_api_state: SharedNodeState,
+}
+
+impl Actor for WsSession {
+    type Context = ws::WebsocketContext<Self, WsSessionState>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        let addr: Addr<Syn, _> = ctx.address();
+        ctx.state()
+            .addr
+            .send(server::Subscribe {
+                addr: addr.clone().recipient(),
+            })
+            .into_actor(self)
+            .then(|res, act, ctx| {
+                match res {
+                    Ok(res) => {
+                        act.id = res;
+                    }
+                    _ => ctx.stop(),
+                }
+                fut::ok(())
+            })
+            .wait(ctx);
+
+        self.shared_api_state
+            .add_subscriber(self.id, addr.recipient())
+    }
+
+    fn stopping(&mut self, ctx: &mut <Self as Actor>::Context) -> Running {
+        ctx.state()
+            .addr
+            .do_send(server::Unsubscribe { id: self.id });
+        self.shared_api_state.remove_subscriber(self.id);
+        Running::Stop
+    }
+}
+
+impl Handler<server::Message> for WsSession {
+    type Result = ();
+
+    fn handle(&mut self, msg: server::Message, ctx: &mut Self::Context) {
+        ctx.text(msg.0);
+    }
+}
+
+impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
+    fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
+        match msg {
+            ws::Message::Ping(msg) => ctx.pong(&msg),
+            ws::Message::Pong(_) => self.hb = Instant::now(),
+            ws::Message::Text(_) => {}
+            ws::Message::Binary(_) => {}
+            ws::Message::Close(_) => {
+                ctx.stop();
+            }
+        }
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct WebSocketsApi;
+
+impl WebSocketsApi {
+    #[doc(hidden)]
+    fn handle_subscribe(
+        self,
+        api_scope: &mut ServiceApiScope,
+        shared_api_state: SharedNodeState,
+    ) -> Self {
+        let server = Arbiter::start(|_| server::BlockCommitWs::default());
+
+        let state = WsSessionState { addr: server };
+
+        api_scope.endpoint("/ws/", move |_state: &ServiceApiState, _query: ()| {
+            let req = HttpRequest::new(
+                Method::GET,
+                Uri::from_str("/ws/").unwrap(),
+                Version::HTTP_11,
+                HeaderMap::new(),
+                None,
+            ).change_state(Rc::new(state.clone()));
+
+            let _ = ws::start(
+                req,
+                WsSession {
+                    id: 0,
+                    hb: Instant::now(),
+                    shared_api_state: shared_api_state.clone(),
+                },
+            );
+            Ok(())
+        });
+
+        self
+    }
+
+    #[doc(hidden)]
+    pub fn wire(
+        self,
+        api_scope: &mut ServiceApiScope,
+        shared_api_state: SharedNodeState,
+    ) -> &mut ServiceApiScope {
+        self.handle_subscribe(api_scope, shared_api_state);
+        api_scope
+    }
+}

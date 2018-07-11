@@ -15,14 +15,15 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
+use actix::{Recipient, Syn};
 use serde_json::Value;
 
 use std::{
-    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
+    collections::{HashMap, HashSet}, fmt, net::SocketAddr, sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
-use api::ServiceApiBuilder;
+use api::{node::websockets::Message, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -303,7 +304,7 @@ impl ServiceContext {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ApiNodeState {
     incoming_connections: HashSet<SocketAddr>,
     outgoing_connections: HashSet<SocketAddr>,
@@ -314,6 +315,23 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
+    subscribers: HashMap<usize, Recipient<Syn, Message>>,
+}
+
+impl fmt::Debug for ApiNodeState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut builder = f.debug_struct("ApiNodeState");
+        let _ = builder.field("incoming_connections", &self.incoming_connections);
+        let _ = builder.field("outgoing_connections", &self.outgoing_connections);
+        let _ = builder.field("reconnects_timeout", &self.reconnects_timeout);
+        let _ = builder.field("peers_info", &self.peers_info);
+        let _ = builder.field("is_enabled", &self.is_enabled);
+        let _ = builder.field("node_role", &self.node_role);
+        let _ = builder.field("majority_count", &self.majority_count);
+        let _ = builder.field("validators", &self.validators);
+        let _ = builder.field("subscribers", &self.subscribers.keys().collect::<Vec<_>>());
+        builder.finish()
+    }
 }
 
 impl ApiNodeState {
@@ -515,6 +533,36 @@ impl SharedNodeState {
             .expect("Expected write lock")
             .reconnects_timeout
             .remove(addr)
+    }
+
+    /// Adds an address of new subscriber.
+    pub fn add_subscriber(&self, id: usize, addr: Recipient<Syn, Message>) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .subscribers
+            .insert(id, addr);
+    }
+
+    /// Removes an address by id
+    pub fn remove_subscriber(&self, id: usize) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .subscribers
+            .remove(&id);
+    }
+
+    /// Broadcast message to all subscribers
+    pub fn broadcast(&self, msg: String) {
+        for addr in self.state
+            .read()
+            .expect("Expected read lock")
+            .subscribers
+            .values()
+        {
+            let _ = addr.do_send(Message(msg.clone()));
+        }
     }
 }
 

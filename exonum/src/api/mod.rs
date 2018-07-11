@@ -275,6 +275,10 @@ impl ApiAggregator {
             Self::system_api(&blockchain, node_state.clone()),
         );
         inner.insert("explorer".to_owned(), Self::explorer_api());
+        inner.insert(
+            "websockets".to_owned(),
+            Self::websockets_api(node_state.clone()),
+        );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
             let mut builder = ServiceApiBuilder::new();
@@ -331,6 +335,12 @@ impl ApiAggregator {
         self::node::private::SystemApi::new(node_info, shared_api_state.clone())
             .wire(builder.private_scope());
         self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+        builder
+    }
+
+    fn websockets_api(shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+        let mut builder = ServiceApiBuilder::new();
+        self::node::websockets::WebSocketsApi.wire(builder.public_scope(), shared_api_state);
         builder
     }
 }
