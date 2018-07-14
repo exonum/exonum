@@ -16,13 +16,13 @@
 
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
-pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
+pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Resource, Result, With};
 
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
-use self::backends::actix;
+use self::backends::actix::{self, HttpRequest};
 use blockchain::{Blockchain, SharedNodeState};
 
 pub mod backends;
@@ -61,6 +61,19 @@ pub trait ServiceApiBackend: Sized {
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
+    {
+        let named_with = NamedWith::new(name, endpoint);
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
+    /// Adds the given resource endpoint handler to backend.
+    fn resource<N, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    where
+        N: Into<String>,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, HttpRequest) -> R + 'static + Clone,
+        E: Into<With<HttpRequest, I, R, F>>,
+        Self::Handler: From<NamedWith<HttpRequest, I, R, F, Resource>>,
     {
         let named_with = NamedWith::new(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
@@ -120,6 +133,23 @@ impl ServiceApiScope {
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
         self.actix_backend.endpoint_mut(name, endpoint);
+        self
+    }
+
+    /// Adds the given resource endpoint handler to the API scope.
+    ///
+    /// For now there is only web backend and it has the following requirements:
+    ///
+    /// - Query parameters should be decodable via `serde_json`.
+    /// - Response items also should be encodable via `serde_json` crate.
+    pub fn resource<I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, HttpRequest) -> R + 'static + Clone,
+        E: Into<With<HttpRequest, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<HttpRequest, I, R, F, Resource>>,
+    {
+        self.actix_backend.resource(name, endpoint);
         self
     }
 

@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Websockets
+//! WebSockets
 
 mod server;
 
 use actix::*;
-use actix_web::{
-    http::{HeaderMap, Method, Uri, Version}, ws, HttpRequest,
-};
+use actix_web::ws;
 
-use std::str::FromStr;
 use std::time::Instant;
 
-use api::{ServiceApiScope, ServiceApiState};
+use api::{backends::actix::HttpRequest, ServiceApiScope, ServiceApiState};
 use blockchain::SharedNodeState;
-use std::rc::Rc;
 
 pub use self::server::Message;
 
@@ -39,15 +35,26 @@ struct WsSession {
     id: usize,
     hb: Instant,
     shared_api_state: SharedNodeState,
+    server_addr: Addr<Syn, server::BlockCommitWs>,
+}
+
+impl WsSession {
+    fn new(shared_api_state: SharedNodeState, server_state: WsSessionState) -> Self {
+        Self {
+            id: 0,
+            hb: Instant::now(),
+            shared_api_state,
+            server_addr: server_state.addr,
+        }
+    }
 }
 
 impl Actor for WsSession {
-    type Context = ws::WebsocketContext<Self, WsSessionState>;
+    type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let addr: Addr<Syn, _> = ctx.address();
-        ctx.state()
-            .addr
+        self.server_addr
             .send(server::Subscribe {
                 addr: addr.clone().recipient(),
             })
@@ -67,9 +74,8 @@ impl Actor for WsSession {
             .add_subscriber(self.id, addr.recipient())
     }
 
-    fn stopping(&mut self, ctx: &mut <Self as Actor>::Context) -> Running {
-        ctx.state()
-            .addr
+    fn stopping(&mut self, _ctx: &mut <Self as Actor>::Context) -> Running {
+        self.server_addr
             .do_send(server::Unsubscribe { id: self.id });
         self.shared_api_state.remove_subscriber(self.id);
         Running::Stop
@@ -89,8 +95,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         match msg {
             ws::Message::Ping(msg) => ctx.pong(&msg),
             ws::Message::Pong(_) => self.hb = Instant::now(),
-            ws::Message::Text(_) => {}
-            ws::Message::Binary(_) => {}
+            ws::Message::Text(_) | ws::Message::Binary(_) => {}
             ws::Message::Close(_) => {
                 ctx.stop();
             }
@@ -99,7 +104,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
 }
 
 #[doc(hidden)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct WebSocketsApi;
 
 impl WebSocketsApi {
@@ -109,27 +114,12 @@ impl WebSocketsApi {
         api_scope: &mut ServiceApiScope,
         shared_api_state: SharedNodeState,
     ) -> Self {
-        let server = Arbiter::start(|_| server::BlockCommitWs::default());
+        let server_addr = Arbiter::start(|_| server::BlockCommitWs::default());
 
-        let state = WsSessionState { addr: server };
+        let state = WsSessionState { addr: server_addr };
 
-        api_scope.endpoint("/ws/", move |_state: &ServiceApiState, _query: ()| {
-            let req = HttpRequest::new(
-                Method::GET,
-                Uri::from_str("/ws/").unwrap(),
-                Version::HTTP_11,
-                HeaderMap::new(),
-                None,
-            ).change_state(Rc::new(state.clone()));
-
-            let _ = ws::start(
-                req,
-                WsSession {
-                    id: 0,
-                    hb: Instant::now(),
-                    shared_api_state: shared_api_state.clone(),
-                },
-            );
+        api_scope.resource("ws", move |_state: &ServiceApiState, req: HttpRequest| {
+            let _ = ws::start(req, WsSession::new(shared_api_state.clone(), state.clone()));
             Ok(())
         });
 

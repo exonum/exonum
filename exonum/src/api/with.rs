@@ -53,6 +53,10 @@ pub struct Immutable;
 #[derive(Debug)]
 pub struct Mutable;
 
+/// Resource endpoint marker. With it possible to create resource kind of `NamedWith`.
+#[derive(Debug)]
+pub struct Resource;
+
 /// API Endpoint extractor that also contains endpoint name and its kind.
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F, K> {
