@@ -10,6 +10,7 @@ license = "Apache-2.0"
 keywords = ["database", "distributed", "blockchain", "framework", "exonum"]
 categories = ["cryptography", "database-implementations"]
 description = "An extensible framework for blockchain software projects."
+autobenches = false
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
