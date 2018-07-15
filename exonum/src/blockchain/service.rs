@@ -320,17 +320,17 @@ pub struct ApiNodeState {
 
 impl fmt::Debug for ApiNodeState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut builder = f.debug_struct("ApiNodeState");
-        let _ = builder.field("incoming_connections", &self.incoming_connections);
-        let _ = builder.field("outgoing_connections", &self.outgoing_connections);
-        let _ = builder.field("reconnects_timeout", &self.reconnects_timeout);
-        let _ = builder.field("peers_info", &self.peers_info);
-        let _ = builder.field("is_enabled", &self.is_enabled);
-        let _ = builder.field("node_role", &self.node_role);
-        let _ = builder.field("majority_count", &self.majority_count);
-        let _ = builder.field("validators", &self.validators);
-        let _ = builder.field("subscribers", &self.subscribers.keys().collect::<Vec<_>>());
-        builder.finish()
+        f.debug_struct("ApiNodeState")
+            .field("incoming_connections", &self.incoming_connections)
+            .field("outgoing_connections", &self.outgoing_connections)
+            .field("reconnects_timeout", &self.reconnects_timeout)
+            .field("peers_info", &self.peers_info)
+            .field("is_enabled", &self.is_enabled)
+            .field("node_role", &self.node_role)
+            .field("majority_count", &self.majority_count)
+            .field("validators", &self.validators)
+            .field("subscribers", &self.subscribers.keys().collect::<Vec<_>>())
+            .finish()
     }
 }
 
