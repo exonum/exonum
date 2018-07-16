@@ -81,11 +81,11 @@ extern crate vec_map;
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]
+extern crate regex;
+#[cfg(test)]
 extern crate tempdir;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
-#[cfg(test)]
-extern crate regex;
 
 #[macro_use]
 pub mod encoding;
