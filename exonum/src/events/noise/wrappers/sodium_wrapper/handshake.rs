@@ -100,13 +100,13 @@ impl NoiseHandshake {
     ) -> Result<(Framed<S, MessagesCodec>, x25519::PublicKey), io::Error> {
         let noise = self.noise.into_transport_mode()?;
         let remote_static_key = {
-            let rs = noise.session.get_remote_static().unwrap_or_else(|| {
-                // Panic because with selected handshake pattern we must have
-                // `remote_static_key` on final step of handshake.
-                panic!("Remote static key is not present!")
-            });
-            x25519::PublicKey::from_slice(rs)
-                .unwrap_or_else(|| panic!("Remote static key is not valid x25519 key!"))
+            // Panic because with selected handshake pattern we must have
+            // `remote_static_key` on final step of handshake.
+            let rs = noise
+                .session
+                .get_remote_static()
+                .expect("Remote static key is not present!");
+            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
