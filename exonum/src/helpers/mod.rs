@@ -37,6 +37,12 @@ use node::{ConnectListConfig, NodeConfig};
 
 mod types;
 
+/// Format for timestamps in logs.
+///
+/// It is similar to date/time format of RFC 2822, but with milliseconds:
+/// "Mon, 16 Jul 2018 13:37:18.594 +0100"
+const LOG_TIMESTAMP_FORMAT: &str = "%a, %e %b %Y %H:%M:%S%.3f %z";
+
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let mut builder = Builder::new();
@@ -105,7 +111,7 @@ fn has_colors() -> bool {
 
 fn format_time(time: SystemTime) -> String {
     DateTime::<Local>::from(time)
-        .format("%a, %e %b %Y %H:%M:%S%.3f %z")
+        .format(LOG_TIMESTAMP_FORMAT)
         .to_string()
 }
 
