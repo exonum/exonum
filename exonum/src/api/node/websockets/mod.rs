@@ -103,12 +103,11 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     }
 }
 
-#[doc(hidden)]
+/// WebSockets API.
 #[derive(Clone, Copy, Debug)]
 pub struct WebSocketsApi;
 
 impl WebSocketsApi {
-    #[doc(hidden)]
     fn handle_subscribe(
         self,
         api_scope: &mut ServiceApiScope,
@@ -126,7 +125,7 @@ impl WebSocketsApi {
         self
     }
 
-    #[doc(hidden)]
+    /// Adds WebSockets API endpoints to corresponding scope.
     pub fn wire(
         self,
         api_scope: &mut ServiceApiScope,

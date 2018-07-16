@@ -18,7 +18,7 @@ use rand::{self, Rng, ThreadRng};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-#[doc(hidden)]
+/// WebSocket Message for communication inside websockets part.
 #[derive(Message, Debug)]
 pub struct Message(pub String);
 
