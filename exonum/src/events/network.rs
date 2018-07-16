@@ -386,7 +386,6 @@ impl Listener {
                     let (_, stream) = sock.split();
                     stream
                         .into_future()
-                        .and_then(Ok)
                         .map_err(|e| e.0)
                         .and_then(|(raw, stream)| (Self::parse_connect_msg(raw), Ok(stream)))
                         .and_then(move |(connect, stream)| {
