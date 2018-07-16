@@ -115,7 +115,9 @@ impl NoiseHandshake {
 }
 
 impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    type Result = x25519::PublicKey;
+
+    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -126,7 +128,7 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
