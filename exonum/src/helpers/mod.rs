@@ -168,6 +168,9 @@ mod tests {
 
     #[test]
     fn time_formatting() {
-        assert_eq!(format_time(time::UNIX_EPOCH), "Thu,  1 Jan 1970 00:00:00.000 +0000");
+        assert_eq!(
+            format_time(time::UNIX_EPOCH),
+            "Thu,  1 Jan 1970 00:00:00.000 +0000"
+        );
     }
 }
