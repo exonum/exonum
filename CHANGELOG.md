@@ -103,6 +103,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `storage::Entry` has been extended with `take` and `swap` methods. (#781)
 
+- Added remote public key validation when handling incoming `Connect` message. (#786)
+
 ### Bug fixes
 
 #### exonum
