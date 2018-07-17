@@ -32,6 +32,8 @@ use messages::{
 use node::connect_list::ConnectList;
 use node::ConnectInfo;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
+use std::sync::Arc;
+use std::sync::RwLock;
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 
@@ -56,7 +58,7 @@ pub struct State {
     service_secret_key: SecretKey,
 
     config: StoredConfiguration,
-    connect_list: ConnectList,
+    connect_list: SharedConnectList,
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
@@ -380,6 +382,16 @@ impl IncompleteBlock {
     }
 }
 
+pub struct SharedConnectList {
+    connect_list: Arc<RwLock<ConnectList>>,
+}
+
+impl SharedConnectList {
+    pub fn from_connect_list(connect_list: ConnectList) -> Self {
+        SharedConnectList { connect_list: Arc::new(RwLock::new(connect_list)) }
+    }
+}
+
 impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -405,7 +417,7 @@ impl State {
             service_public_key,
             service_secret_key,
             tx_pool_capacity,
-            connect_list,
+            connect_list: SharedConnectList::from_connect_list(connect_list),
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -475,7 +487,14 @@ impl State {
 
     /// Returns node's ConnectList.
     pub fn connect_list(&self) -> &ConnectList {
-        &self.connect_list
+        let list = self.connect_list.clone();
+
+//        &list.read().unwrap()
+        unimplemented!()
+    }
+
+    pub fn connect_list2(&self) -> Arc<RwLock<ConnectList>> {
+        self.connect_list.clone()
     }
 
     /// Returns public (consensus and service) keys of known validators.
@@ -1131,6 +1150,9 @@ impl State {
 
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
-        self.connect_list.add(peer);
+
+        let mut list = self.connect_list.write().unwrap();
+
+        list.add(peer);
     }
 }

@@ -28,7 +28,8 @@ use events::{
 };
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
-use node::{EventsPoolCapacity, NodeChannel};
+use node::{EventsPoolCapacity, NodeChannel, ConnectList};
+use std::sync::{Arc, RwLock};
 
 static FAKE_SEED: [u8; SEED_LENGTH] = [1; SEED_LENGTH];
 
@@ -157,7 +158,9 @@ impl TestEvents {
             let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
             let handshake_params =
                 HandshakeParams::new(public_key, secret_key, network_part.max_message_len);
-            let fut = network_part.run(&core.handle(), &handshake_params);
+
+            let connect_list = Arc::new(RwLock::new(ConnectList::default()));
+            let fut = network_part.run(&core.handle(), &handshake_params, connect_list);
             core.run(fut).map_err(log_error).unwrap();
         });
         handler_part.handle = Some(handle);

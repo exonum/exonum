@@ -32,6 +32,9 @@ use crypto::{x25519, PublicKey};
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
+use std::sync::Arc;
+use std::sync::RwLock;
+use node::ConnectList;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -218,6 +221,7 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
+        connect_list: Arc<RwLock<ConnectList>>,
     ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancellation token
@@ -233,12 +237,14 @@ impl NetworkPart {
             handshake_params,
         );
         // TODO Don't use unwrap here! (ECR-1633)
+
         let server = Listener::bind(
             network_config,
             self.listen_address,
             handle.clone(),
             &self.network_tx,
             handshake_params,
+            connect_list,
         ).unwrap();
 
         let cancel_handler = cancel_handler.or_else(|e| {
@@ -355,6 +361,7 @@ impl Listener {
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
         handshake_params: &HandshakeParams,
+        connect_list: Arc<RwLock<ConnectList>>,
     ) -> Result<Self, io::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
@@ -378,6 +385,7 @@ impl Listener {
             }
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
+            let connect_list = connect_list.clone();
 
             let handshake = NoiseHandshake::responder(&handshake_params);
             let connection_handler = handshake
@@ -389,6 +397,20 @@ impl Listener {
                         .map_err(|e| e.0)
                         .and_then(|(raw, stream)| (Self::parse_connect_msg(raw), Ok(stream)))
                         .and_then(move |(connect, stream)| {
+                            let remote_key = x25519::into_x25519_public_key(*connect.pub_key());
+                            let connect_list = connect_list.read().map_err(into_other)?;
+
+                            if !connect_list.is_peer_allowed(connect.pub_key()) {
+                                return Err(other_error("Peer is not in ConnectList"));
+                            }
+
+                            if key != remote_key {
+                                return Err(other_error("Malicious connect message"))
+                            }
+
+                            Ok((connect, stream, key))
+                        })
+                        .and_then(move |(connect, stream, key)| {
                             trace!("Received handshake message={:?}", connect);
 
                             Self::process_incoming_messages(
