@@ -162,8 +162,6 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use regex::Regex;
-
     use std::time;
 
     use super::*;
