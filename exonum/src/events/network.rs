@@ -364,7 +364,7 @@ impl Listener {
         let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
         let handshake_params = handshake_params.clone();
-        let server = listener.incoming().for_each(move |(sock, addr)| {
+        let server = listener.incoming().for_each(move |(sock, address)| {
             let holder = Rc::downgrade(&incoming_connections_counter);
             // Check incoming connections count
             let connections_count = Rc::weak_count(&incoming_connections_counter);
@@ -372,17 +372,17 @@ impl Listener {
                 warn!(
                     "Rejected incoming connection with peer={}, \
                      connections limit reached.",
-                    addr
+                    address
                 );
                 return to_box(future::ok(()));
             }
-            trace!("Accepted incoming connection with peer={}", addr);
+            trace!("Accepted incoming connection with peer={}", address);
             let network_tx = network_tx.clone();
 
             let handshake = NoiseHandshake::responder(&handshake_params);
             let connection_handler = handshake
                 .listen(sock)
-                .and_then(move |(sock, key)| {
+                .and_then(move |(sock, public_key)| {
                     let (_, stream) = sock.split();
                     stream
                         .into_future()
@@ -396,8 +396,8 @@ impl Listener {
                                 network_tx,
                                 connect,
                                 ConnectInfo {
-                                    address: addr,
-                                    public_key: key,
+                                    address,
+                                    public_key,
                                 },
                             )
                         })
@@ -421,7 +421,7 @@ impl Listener {
         match message {
             Any::Connect(connect) => Ok(connect),
             other => Err(other_error(&format!(
-                "First message is not Connect, got={:?}",
+                "First message from a remote peer is not Connect, got={:?}",
                 other
             ))),
         }
