@@ -695,7 +695,7 @@ mod tests {
 
     #[test]
     fn debug_format() {
-        // Check zero padding
+        // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
         assert_eq!(format!("{:?}", &hash), "Hash(01010101...)");
 
@@ -708,7 +708,7 @@ mod tests {
         let seed = Seed::new([4; SEED_LENGTH]);
         assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
 
-        // Check no padding
+        // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
         assert_eq!(format!("{:?}", &hash), "Hash(80808080...)");
         let sk = SecretKey::new([255; SECRET_KEY_LENGTH]);
@@ -718,7 +718,7 @@ mod tests {
     // Note that only public values have Display impl.
     #[test]
     fn display_format() {
-        // Check zero padding
+        // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
         assert_eq!(format!("{}", &hash), "01010101...");
 
@@ -727,7 +727,7 @@ mod tests {
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
         assert_eq!(format!("{}", &signature), "0a0a0a0a...");
 
-        // Check no padding
+        // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
         assert_eq!(format!("{}", &hash), "80808080...");
     }
