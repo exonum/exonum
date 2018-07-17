@@ -95,7 +95,7 @@ impl SandboxInner {
         let network_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
-                    NetworkRequest::SendMessage(peer, msg, _) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
@@ -684,7 +684,10 @@ impl ConnectList {
     pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
-        ConnectList { peers }
+        ConnectList {
+            peers,
+            x25519_keys: Vec::new(),
+        }
     }
 }
 

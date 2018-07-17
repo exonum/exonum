@@ -21,9 +21,12 @@ use super::wrapper::NoiseWrapper;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
+use events::error::into_other;
+use events::error::other_error;
 use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
+use node::state::SharedConnectList;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
@@ -55,22 +58,25 @@ impl HandshakeParams {
 pub struct NoiseHandshake {
     noise: NoiseWrapper,
     max_message_len: u32,
+    connect_list: SharedConnectList,
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams) -> Self {
+    pub fn initiator(params: &HandshakeParams, connect_list: SharedConnectList) -> Self {
         let noise = NoiseWrapper::initiator(params);
         NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
+            connect_list,
         }
     }
 
-    pub fn responder(params: &HandshakeParams) -> Self {
+    pub fn responder(params: &HandshakeParams, connect_list: SharedConnectList) -> Self {
         let noise = NoiseWrapper::responder(params);
         NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
+            connect_list,
         }
     }
 
@@ -108,6 +114,10 @@ impl NoiseHandshake {
                 .expect("Remote static key is not present!");
             x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
+
+        if !self.connect_list.is_peer_allowed_x25519(&remote_static_key) {
+            return Err(other_error("Peer is not in ConnectList"));
+        }
 
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
         Ok((framed, remote_static_key))

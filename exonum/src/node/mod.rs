@@ -52,6 +52,7 @@ use helpers::{
     ValidatorId,
 };
 use messages::{Connect, Message, RawMessage};
+use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -361,17 +362,10 @@ impl ConnectListConfig {
     }
 
     /// Creates `ConnectListConfig` from `ConnectList`.
-    pub fn from_connect_list(connect_list: &ConnectList) -> Self {
-        let peers = connect_list
-            .peers
-            .iter()
-            .map(|(pk, a)| ConnectInfo {
-                address: *a,
-                public_key: *pk,
-            })
-            .collect();
-
-        ConnectListConfig { peers }
+    pub fn from_connect_list(connect_list: SharedConnectList) -> Self {
+        ConnectListConfig {
+            peers: connect_list.peers(),
+        }
     }
 
     /// `ConnectListConfig` peers addresses.
@@ -573,19 +567,9 @@ impl NodeHandler {
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        let public_key = self.state.connect_list().find_key_by_address(&address);
-
-        if let Some(public_key) = public_key {
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
-            self.channel.network_requests.send(request).log_error();
-        } else {
-            warn!(
-                "Attempt to connect to the peer with address {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        trace!("Send to address: {}", address);
+        let request = NetworkRequest::SendMessage(*address, message.clone());
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
@@ -918,7 +902,7 @@ impl Node {
     /// This may be used if you want to customize api with the `ApiContext`.
     pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
         self.handler.initialize();
-        let connect_list = self.handler.state.connect_list2();
+        let connect_list = self.handler.state.connect_list();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();

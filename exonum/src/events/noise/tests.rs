@@ -33,6 +33,9 @@ use events::{
         HandshakeRawMessage, HandshakeResult, NoiseHandshake,
     },
 };
+use node::{state::SharedConnectList, ConnectList};
+use std::sync::Arc;
+use std::sync::RwLock;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -300,7 +303,14 @@ fn run_handshake_listener(
                         Some(message) => Either::A(
                             NoiseErrorHandshake::responder(&params, message).listen(stream),
                         ),
-                        None => Either::B(NoiseHandshake::responder(&params).listen(stream)),
+                        None => {
+                            let connect_list = SharedConnectList {
+                                connect_list: Arc::new(RwLock::new(ConnectList::default())),
+                            };
+                            Either::B(
+                                NoiseHandshake::responder(&params, connect_list).listen(stream),
+                            )
+                        }
                     };
 
                     handshake
@@ -324,7 +334,12 @@ fn send_handshake(
 
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params).send(sock),
+            None => {
+                let connect_list = SharedConnectList {
+                    connect_list: Arc::new(RwLock::new(ConnectList::default())),
+                };
+                NoiseHandshake::initiator(&params, connect_list).send(sock)
+            }
             Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
@@ -343,18 +358,24 @@ struct NoiseErrorHandshake {
 
 impl NoiseErrorHandshake {
     fn initiator(params: &HandshakeParams, bogus_message: BogusMessage) -> Self {
+        let connect_list = SharedConnectList {
+            connect_list: Arc::new(RwLock::new(ConnectList::default())),
+        };
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::initiator(params)),
+            inner: Some(NoiseHandshake::initiator(params, connect_list)),
         }
     }
 
     fn responder(params: &HandshakeParams, bogus_message: BogusMessage) -> Self {
+        let connect_list = SharedConnectList {
+            connect_list: Arc::new(RwLock::new(ConnectList::default())),
+        };
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::responder(params)),
+            inner: Some(NoiseHandshake::responder(params, connect_list)),
         }
     }
 

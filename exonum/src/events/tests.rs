@@ -21,15 +21,18 @@ use std::{
 };
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature, SEED_LENGTH};
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, Signature, SEED_LENGTH};
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
-use node::{EventsPoolCapacity, NodeChannel, ConnectList};
+use node::state::SharedConnectList;
+use node::{ConnectList, EventsPoolCapacity, NodeChannel};
 use std::sync::{Arc, RwLock};
+use node::ConnectInfo;
+use env_logger;
 
 static FAKE_SEED: [u8; SEED_LENGTH] = [1; SEED_LENGTH];
 
@@ -64,14 +67,9 @@ impl TestHandler {
 
     pub fn connect_with(&self, addr: SocketAddr) {
         let connect = connect_message(self.listen_address);
-        let (public_key, _) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(
-                addr,
-                connect.raw().clone(),
-                public_key,
-            ))
+            .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
             .wait()
             .unwrap();
     }
@@ -84,11 +82,18 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
-        let (public_key, _) = gen_keypair_from_seed(&Seed::new(FAKE_SEED));
+    pub fn connect_with2(&self, addr: SocketAddr, connect: Connect) {
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(addr, raw, public_key))
+            .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
+            .wait()
+            .unwrap();
+    }
+
+    pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::SendMessage(addr, raw))
             .wait()
             .unwrap();
     }
@@ -159,7 +164,19 @@ impl TestEvents {
             let handshake_params =
                 HandshakeParams::new(public_key, secret_key, network_part.max_message_len);
 
-            let connect_list = Arc::new(RwLock::new(ConnectList::default()));
+            let connect_list = SharedConnectList::from_connect_list(ConnectList::default());
+            let fut = network_part.run(&core.handle(), &handshake_params, connect_list);
+            core.run(fut).map_err(log_error).unwrap();
+        });
+        handler_part.handle = Some(handle);
+        handler_part
+    }
+
+    pub fn spawn2(self, connect_list: SharedConnectList, handshake_params: &HandshakeParams, connect: Connect) -> TestHandler {
+        let (mut handler_part, network_part) = self.into_reactor2(connect);
+        let handshake_params = handshake_params.clone();
+        let handle = thread::spawn(move || {
+            let mut core = Core::new().unwrap();
             let fut = network_part.run(&core.handle(), &handshake_params, connect_list);
             core.run(fut).map_err(log_error).unwrap();
         });
@@ -185,6 +202,25 @@ impl TestEvents {
         let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
         (handler_part, network_part)
     }
+
+    fn into_reactor2(self, connect: Connect) -> (TestHandler, NetworkPart) {
+        let channel = NodeChannel::new(&self.events_config);
+        let network_config = self.network_config;
+        let (network_tx, network_rx) = channel.network_events;
+        let network_requests_tx = channel.network_requests.0.clone();
+
+        let network_part = NetworkPart {
+            our_connect_message: connect,
+            listen_address: self.listen_address,
+            network_config,
+            max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
+            network_requests: channel.network_requests,
+            network_tx: network_tx.clone(),
+        };
+
+        let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
+        (handler_part, network_part)
+    }
 }
 
 pub fn connect_message(addr: SocketAddr) -> Connect {
@@ -198,6 +234,17 @@ pub fn connect_message(addr: SocketAddr) -> Connect {
     )
 }
 
+pub fn connect_message2(addr: SocketAddr, public_key: &PublicKey, secret_key: &SecretKey) -> Connect {
+    let time = time::UNIX_EPOCH;
+    Connect::new(
+        public_key,
+        addr,
+        time.into(),
+        &user_agent::get(),
+        secret_key,
+    )
+}
+
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
     let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, 0, id, len);
     RawMessage::new(writer.sign(&gen_keypair().1))
@@ -205,22 +252,34 @@ pub fn raw_message(id: u16, len: usize) -> RawMessage {
 
 #[test]
 fn test_network_handshake() {
+    env_logger::init();
     let first = "127.0.0.1:17230".parse().unwrap();
     let second = "127.0.0.1:17231".parse().unwrap();
+
+    let mut connect_list = ConnectList::default();
+
+    let (public_key, secret_key) = gen_keypair();
+    let c1 = connect_message2(first, &public_key, &secret_key);
+    let hadshake_params_first = HandshakeParams::new(public_key, secret_key,  ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN);
+    connect_list.add( ConnectInfo { address: first, public_key});
+
+    let (public_key, secret_key) = gen_keypair();
+    let c2 = connect_message2(second, &public_key, &secret_key);
+    let hadshake_params_second = HandshakeParams::new(public_key, secret_key,  ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN);
+    connect_list.add( ConnectInfo { address: second, public_key});
+
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
 
-    let c1 = connect_message(first);
-    let c2 = connect_message(second);
+    let mut e1 = e1.spawn2(connect_list.clone(), &hadshake_params_first, c1.clone());
+    let mut e2 = e2.spawn2(connect_list, &hadshake_params_second, c2.clone());
 
-    let mut e1 = e1.spawn();
-    let mut e2 = e2.spawn();
-
-    e1.connect_with(second);
+    e1.connect_with2(second, c1.clone());
     assert_eq!(e2.wait_for_connect(), c1);
 
-    e2.connect_with(first);
+    e2.connect_with2(first, c2.clone());
     assert_eq!(e1.wait_for_connect(), c2);
 
     e1.disconnect_with(second);

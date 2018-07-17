@@ -24,6 +24,7 @@ use std::{
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
+use crypto::x25519;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
@@ -31,9 +32,9 @@ use messages::{
 };
 use node::connect_list::ConnectList;
 use node::ConnectInfo;
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use std::sync::Arc;
 use std::sync::RwLock;
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 
@@ -382,13 +383,58 @@ impl IncompleteBlock {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+/// Shared
 pub struct SharedConnectList {
-    connect_list: Arc<RwLock<ConnectList>>,
+    ///
+    pub connect_list: Arc<RwLock<ConnectList>>,
 }
 
 impl SharedConnectList {
+    ///
     pub fn from_connect_list(connect_list: ConnectList) -> Self {
-        SharedConnectList { connect_list: Arc::new(RwLock::new(connect_list)) }
+        SharedConnectList {
+            connect_list: Arc::new(RwLock::new(connect_list)),
+        }
+    }
+
+    ///
+    pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
+        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        return connect_list.is_peer_allowed(public_key);
+    }
+
+    ///
+    pub fn is_address_allowed(&self, address: &SocketAddr) -> bool {
+        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        return connect_list.is_address_allowed(address);
+    }
+
+    ///
+    pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
+        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        let list = connect_list.clone();
+        list.find_key_by_address(address).map(|k| *k)
+    }
+
+    ///
+    pub fn is_peer_allowed_x25519(&self, public_key: &x25519::PublicKey) -> bool {
+        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        return connect_list.is_peer_allowed_x25519(public_key)
+    }
+
+    ///
+    pub fn peers(&self) -> Vec<ConnectInfo> {
+        self.connect_list
+            .read()
+            .expect("ConnectList read lock")
+            .peers
+            .iter()
+            .map(|(pk, a)| ConnectInfo {
+                address: *a,
+                public_key: *pk,
+            })
+            .collect()
     }
 }
 
@@ -486,14 +532,7 @@ impl State {
     }
 
     /// Returns node's ConnectList.
-    pub fn connect_list(&self) -> &ConnectList {
-        let list = self.connect_list.clone();
-
-//        &list.read().unwrap()
-        unimplemented!()
-    }
-
-    pub fn connect_list2(&self) -> Arc<RwLock<ConnectList>> {
+    pub fn connect_list(&self) -> SharedConnectList {
         self.connect_list.clone()
     }
 
@@ -1150,9 +1189,7 @@ impl State {
 
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
-
-        let mut list = self.connect_list.write().unwrap();
-
+        let mut list = self.connect_list.connect_list.write().unwrap();
         list.add(peer);
     }
 }
