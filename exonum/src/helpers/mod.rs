@@ -22,7 +22,7 @@ pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use colored::*;
 use env_logger::{Builder, Formatter};
 use log::{Level, Record, SetLoggerError};
@@ -110,7 +110,7 @@ fn has_colors() -> bool {
 }
 
 fn format_time(time: SystemTime) -> String {
-    DateTime::<Local>::from(time)
+    DateTime::<Utc>::from(time)
         .format(LOG_TIMESTAMP_FORMAT)
         .to_string()
 }
@@ -170,17 +170,6 @@ mod tests {
 
     #[test]
     fn time_formatting() {
-        // Thu,  1 Jan 1970 00:00:00.000 +0000
-        let r = Regex::new(
-            r"(?x)
-            \w+,\s+                     # weekday
-            \d{1,2}\s+                  # day
-            \w+\s+                      # month
-            \d{4,}\s+                   # year
-            \d{2}:\d{2}:\d{2}\.\d{3}\s+ # time
-            [+-]\d{4}                   # tz offset
-        ",
-        ).unwrap();
-        assert!(r.is_match(&format_time(time::UNIX_EPOCH)));
+        assert_eq!(format_time(time::UNIX_EPOCH), "Thu,  1 Jan 1970 00:00:00.000 +0000");
     }
 }
