@@ -19,6 +19,7 @@ mod server;
 use actix::*;
 use actix_web::ws;
 
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use api::{backends::actix::HttpRequest, ServiceApiScope, ServiceApiState};
@@ -113,11 +114,17 @@ impl WebSocketsApi {
         api_scope: &mut ServiceApiScope,
         shared_api_state: SharedNodeState,
     ) -> Self {
-        let server_addr = Arbiter::start(|_| server::BlockCommitWs::default());
-
-        let state = WsSessionState { addr: server_addr };
+        let server_addr = Arc::new(Mutex::new(None));
 
         api_scope.resource("ws", move |_state: &ServiceApiState, req: HttpRequest| {
+            let server= server_addr.clone();
+            let mut addr = server.lock().unwrap();
+            if addr.is_none() {
+                *addr = Some(Arbiter::start(|_| server::BlockCommitWs::default()));
+            }
+
+            let state = WsSessionState { addr: addr.to_owned().unwrap() };
+
             let _ = ws::start(req, WsSession::new(shared_api_state.clone(), state.clone()));
             Ok(())
         });
