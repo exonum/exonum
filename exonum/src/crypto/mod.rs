@@ -36,7 +36,7 @@ use serde::{
 use uuid::Uuid;
 
 use std::{
-    default::Default, fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo}, str::FromStr,
+    default::Default, fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     time::{SystemTime, UNIX_EPOCH},
 };
 

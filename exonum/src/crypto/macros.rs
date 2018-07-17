@@ -51,13 +51,6 @@ macro_rules! implement_public_crypto_wrapper {
         }
     }
 
-    impl FromStr for $name {
-        type Err = FromHexError;
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            $name::from_hex(s)
-        }
-    }
-
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
