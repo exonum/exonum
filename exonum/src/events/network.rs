@@ -156,15 +156,6 @@ impl ConnectionsPool {
         let handshake_params = handshake_params.clone();
         let connect_list = connect_list.clone();
 
-        if !connect_list.is_address_allowed(&peer) {
-            warn!(
-                "Attempt to connect to the peer {:?} which \
-                 is not in the ConnectList",
-                peer
-            );
-            return None;
-        }
-
         let action = move || TcpStream::connect(&peer, &handle_cloned);
         let connect_handle = Retry::spawn(handle.clone(), strategy, action)
             .map_err(into_other)

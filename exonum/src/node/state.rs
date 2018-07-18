@@ -403,12 +403,6 @@ impl SharedConnectList {
         return connect_list.is_peer_allowed(public_key);
     }
 
-    /// Check if we allow to connect to `address`.
-    pub fn is_address_allowed(&self, address: &SocketAddr) -> bool {
-        let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        return connect_list.is_address_allowed(address);
-    }
-
     /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
