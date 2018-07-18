@@ -80,7 +80,6 @@ impl NodeHandler {
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO Add spam protection. (ECR-170)
-        // TODO: drop connection if checks have failed. (ECR-1837)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
             trace!("Received Connect with same address as our external_address.");

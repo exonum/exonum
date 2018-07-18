@@ -480,7 +480,6 @@ impl Listener {
             NetworkEvent::MessageReceived(address, raw)
         });
 
-        // TODO: drop connection if handshake have failed. (ECR-1837)
         network_tx
             .send(event)
             .map_err(into_other)
