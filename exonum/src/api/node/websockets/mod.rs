@@ -138,12 +138,7 @@ impl WebSocketsApi {
                 WsSession::new(shared_api_state.clone(), state.clone()),
             );
 
-            let future = Ok(req)
-                .and_then(|_req| Ok(()))
-                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
-                .into_future();
-
-            Box::new(future)
+            Box::new(Ok(HttpResponse::Ok().json(())).into_future())
         };
 
         backend.raw_handler(RequestHandler {
