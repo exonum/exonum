@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use blockchain::{
+    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionSet,
+};
 use crypto::{Hash, PublicKey};
-use blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
+use encoding::Error as MessageError;
+use helpers::Height;
 use messages::{Message, RawTransaction};
 use storage::{Fork, Snapshot};
-use encoding::Error as MessageError;
-use blockchain::StoredConfiguration;
-use helpers::Height;
 
 pub const CONFIG_SERVICE: u16 = 1;
 
@@ -64,11 +65,11 @@ impl Service for ConfigUpdateService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

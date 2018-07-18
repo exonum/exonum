@@ -23,10 +23,13 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::api::public::BlocksRange;
+//! use serde_json::Value;
+//!
+//! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::encoding;
+//! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
@@ -109,41 +112,45 @@
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
-//!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let explorer_api = api.public(ApiKind::Explorer);
+//!     let response: BlocksRange = explorer_api
+//!         .query(&BlocksQuery {
+//!             count: 10,
+//!             ..Default::default()
+//!         })
+//!         .get("v1/blocks")
+//!         .unwrap();
 //!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
 //!     assert_eq!(range.start, Height(0));
 //!     assert_eq!(range.end, Height(3));
 //!
-//!     api.get::<serde_json::Value>(
-//!         ApiKind::Explorer,
-//!         &format!("v1/transactions/{}", tx1.hash().to_string()),
-//!     );
+//!     let info = explorer_api
+//!         .query(&TransactionQuery::new(tx1.hash()))
+//!         .get::<TransactionInfo<Value>>("v1/transactions")
+//!         .unwrap();
 //! }
 //! ```
 
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
-extern crate bodyparser;
+extern crate actix_web;
+#[cfg_attr(test, macro_use)]
+#[cfg(test)]
+extern crate assert_matches;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
+extern crate failure;
 extern crate futures;
-extern crate iron;
-extern crate iron_test;
 #[macro_use]
 extern crate log;
-extern crate mount;
-extern crate router;
+extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-#[cfg_attr(test, macro_use)]
 extern crate serde_json;
+extern crate serde_urlencoded;
 extern crate tokio_core;
-
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
 
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
@@ -151,36 +158,32 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
 
-use futures::{Future, Stream};
-use futures::sync::mpsc;
-use iron::Iron;
+use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
-use std::fmt;
-use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
-use std::thread;
+use std::{fmt, net::SocketAddr};
 
-use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
-                         Transaction};
-use exonum::crypto::{self, Hash};
-use exonum::explorer::{BlockWithTransactions, BlockchainExplorer};
-use exonum::helpers::{Height, ValidatorId};
-use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState};
-use exonum::storage::{MemoryDB, Patch, Snapshot};
-use exonum::messages::RawMessage;
+use exonum::{
+    api::{
+        backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
+    },
+    blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
+    crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
+    helpers::{Height, ValidatorId}, messages::RawMessage,
+    node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
+};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use handler::create_testkit_handler;
 use poll_events::poll_events;
 
 #[macro_use]
 mod macros;
 mod api;
 mod checkpoint_db;
-mod handler;
 mod network;
 mod poll_events;
+mod server;
 
 /// Builder for `TestKit`.
 ///
@@ -203,7 +206,7 @@ mod poll_events;
 ///
 /// ## Create block
 ///
-/// POST `{baseURL}/v1/blocks`
+/// POST `{baseURL}/v1/blocks/create`
 ///
 /// Creates a new block in the testkit blockchain. If the
 /// JSON body of the request is an empty object, the call is functionally equivalent
@@ -215,12 +218,12 @@ mod poll_events;
 ///
 /// ## Roll back
 ///
-/// DELETE `{baseURL}/v1/blocks/:height`
+/// POST `{baseURL}/v1/blocks/rollback`
 ///
 /// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
-/// at the specified `height` (a positive integer), so that after the request the blockchain height
-/// is equal to `height - 1`. If the specified height is greater than the blockchain height,
-/// the request performs no action.
+/// at the specified in JSON body `height` value (a positive integer), so that after the request
+/// the blockchain height is equal to `height - 1`. If the specified height is greater than the
+/// blockchain height, the request performs no action.
 ///
 /// Returns the latest block from the blockchain on success.
 ///
@@ -267,7 +270,7 @@ mod poll_events;
 pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     validator_count: Option<u16>,
-    services: Vec<Box<Service>>,
+    services: Vec<Box<dyn Service>>,
     logger: bool,
 }
 
@@ -326,7 +329,7 @@ impl TestKitBuilder {
     /// Adds a service to the testkit.
     pub fn with_service<S>(mut self, service: S) -> Self
     where
-        S: Into<Box<Service>>,
+        S: Into<Box<dyn Service>>,
     {
         self.services.push(service.into());
         self
@@ -368,11 +371,10 @@ impl TestKitBuilder {
 pub struct TestKit {
     blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
-    events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync>,
+    events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
-    api_config: NodeApiConfig,
 }
 
 impl fmt::Debug for TestKit {
@@ -389,12 +391,12 @@ impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given service.
     pub fn for_service<S>(service: S) -> Self
     where
-        S: Into<Box<Service>>,
+        S: Into<Box<dyn Service>>,
     {
         TestKitBuilder::validator().with_service(service).create()
     }
 
-    fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
+    fn assemble(services: Vec<Box<dyn Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
@@ -412,7 +414,7 @@ impl TestKit {
         let genesis = network.genesis_config();
         blockchain.initialize(genesis.clone()).unwrap();
 
-        let events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync> = {
+        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
             let mut blockchain = blockchain.clone();
             Box::new(api_channel.1.and_then(move |event| {
                 let mut fork = blockchain.fork();
@@ -442,7 +444,6 @@ impl TestKit {
             events_stream,
             network,
             cfg_proposal: None,
-            api_config: Default::default(),
         }
     }
 
@@ -458,7 +459,7 @@ impl TestKit {
     }
 
     /// Returns a snapshot of the current blockchain state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.blockchain.snapshot()
     }
 
@@ -557,9 +558,9 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
-    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
+    pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
-        I: IntoIterator<Item = Box<Transaction>>,
+        I: IntoIterator<Item = Box<dyn Transaction>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -581,8 +582,8 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<Snapshot> {
-        self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
+    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<dyn Snapshot> {
+        self.probe_all(vec![Box::new(transaction) as Box<dyn Transaction>])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
@@ -678,7 +679,7 @@ impl TestKit {
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
-        I: IntoIterator<Item = Box<Transaction>>,
+        I: IntoIterator<Item = Box<dyn Transaction>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
@@ -766,7 +767,6 @@ impl TestKit {
         let schema = CoreSchema::new(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
-        //TODO: every block should contain two merges (ECR-975)
         {
             let blockchain = self.blockchain_mut();
             let fork = blockchain.fork();
@@ -937,29 +937,24 @@ impl TestKit {
     }
 
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let api = self.api();
         let events_stream = self.remove_events_stream();
+        // Creates complete actix web server with the testkit extensions.
         let testkit_ref = Arc::new(RwLock::new(self));
-        let (public_handler, private_handler) =
-            api.into_handlers(create_testkit_handler(&testkit_ref));
-
-        let public_api_thread = thread::spawn(move || {
-            Iron::new(public_handler).http(public_api_address).unwrap();
-        });
-        let private_api_thread = thread::spawn(move || {
-            Iron::new(private_handler)
-                .http(private_api_address)
-                .unwrap();
-        });
-
+        let system_runtime_config = SystemRuntimeConfig {
+            api_runtimes: vec![
+                ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
+                ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
+            ],
+            api_aggregator: server::create_testkit_api_aggregator(&testkit_ref),
+        };
+        let system_runtime = system_runtime_config.start().unwrap();
         // Run the event stream in a separate thread in order to put transactions to mempool
         // when they are received. Otherwise, a client would need to call a `poll_events` analogue
         // each time after a transaction is posted.
         let mut core = Core::new().unwrap();
         core.run(events_stream).unwrap();
 
-        public_api_thread.join().unwrap();
-        private_api_thread.join().unwrap();
+        system_runtime.stop().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -970,7 +965,7 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
+    fn remove_events_stream(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
         let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
         Box::new(stream.for_each(|_| Ok(())))
     }

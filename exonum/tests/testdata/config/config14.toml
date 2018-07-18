@@ -2,7 +2,6 @@ consensus_public_key = "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c7
 consensus_secret_key = "44ea40ec4dd4cf8baa3c2cc0d3537fd33d03880816964f049e4db16bded17d11924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e"
 external_address = "127.0.0.1:6333"
 listen_address = "0.0.0.0:6333"
-peers = ["127.0.0.1:6333", "127.0.0.1:6333", "127.0.0.1:6333", "127.0.0.1:6333"]
 service_public_key = "7413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
 service_secret_key = "4897e0ce97c47514a29bf37606622bbcb30550bbbd469ab059606865418456b27413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
 
@@ -28,10 +27,9 @@ peers_timeout = 10000
 round_timeout = 3000
 status_timeout = 5000
 txs_block_limit = 1000
-
-[genesis.consensus.timeout_adjuster]
-type = "Constant"
-timeout = 500
+min_propose_timeout = 10
+max_propose_timeout = 200
+propose_timeout_threshold = 500
 
 [mempool]
 tx_pool_capacity = 100000
@@ -54,6 +52,18 @@ tcp_connect_max_retries = 10
 [database]
 create_if_missing = true
 
-[whitelist]
-whitelist_enabled = false
-whitelisted_peers = []
+[[connect_list.peers]]
+address = "127.0.0.1:6333"
+public_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
+
+[[connect_list.peers]]
+address = "127.0.0.1:6333"
+public_key = "41dd7940903ca3102c041222a4c51f9f7978499b082833c733c3b15165202f80"
+
+[[connect_list.peers]]
+address = "127.0.0.1:6333"
+public_key = "648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3"
+
+[[connect_list.peers]]
+address = "127.0.0.1:6333"
+public_key = "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e"

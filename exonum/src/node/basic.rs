@@ -14,22 +14,15 @@
 
 use rand::{self, Rng};
 
-use std::net::SocketAddr;
-use std::error::Error;
+use std::{error::Error, net::SocketAddr};
 
-use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
+use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use super::{NodeHandler, RequestData};
+use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, raw: RawMessage) {
-        // TODO: check message headers (network id, protocol version)
-        // FIXME: call message.verify method
-        //     if !raw.verify() {
-        //         return;
-        //     }
-
         match Any::from_raw(raw) {
             Ok(Any::Connect(msg)) => self.handle_connect(msg),
             Ok(Any::Status(msg)) => self.handle_status(&msg),
@@ -77,28 +70,27 @@ impl NodeHandler {
 
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Connect) {
-        // TODO add spam protection (ECR-170)
+        // TODO Add spam protection. (ECR-170)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
             trace!("Received Connect with same address as our external_address.");
             return;
         }
 
-        let pub_key = *message.pub_key();
-        if pub_key == *self.state.our_connect_message().pub_key() {
+        let public_key = *message.pub_key();
+        if public_key == *self.state.our_connect_message().pub_key() {
             trace!("Received Connect with same pub_key as ours.");
             return;
         }
 
-        if !self.state.whitelist().allow(message.pub_key()) {
+        if !self.state.connect_list().is_peer_allowed(&public_key) {
             error!(
-                "Received connect message from {:?} peer which not in whitelist.",
+                "Received connect message from {:?} peer which not in ConnectList.",
                 message.pub_key()
             );
             return;
         }
 
-        let public_key = *message.pub_key();
         if !message.verify_signature(&public_key) {
             error!(
                 "Received connect-message with incorrect signature, msg={:?}",
@@ -129,7 +121,6 @@ impl NodeHandler {
         );
         self.blockchain.save_peer(&public_key, message);
         if need_connect {
-            // TODO: reduce double sending of connect message
             info!("Send Connect message to {}", address);
             self.connect(&address);
         }
@@ -145,9 +136,9 @@ impl NodeHandler {
             msg.height()
         );
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
-                "Received status message from peer = {:?} which not in whitelist.",
+                "Received status message from peer = {:?} which not in ConnectList.",
                 msg.from()
             );
             return;
@@ -225,9 +216,10 @@ impl NodeHandler {
         self.add_peer_exchange_timeout();
     }
     /// Handles `NodeTimeout::UpdateApiState`.
-    /// Node update internal `ApiState`.
+    /// Node update internal `ApiState` and `NodeRole`.
     pub fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
+        self.node_role = NodeRole::new(self.state.validator_id());
         self.add_update_api_state_timeout();
     }
 

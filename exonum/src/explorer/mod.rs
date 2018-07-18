@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,22 +19,23 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use std::cell::{Ref, RefCell};
-use std::collections::Bound;
-use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::slice;
+use std::{
+    cell::{Ref, RefCell}, collections::Bound, fmt,
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo}, slice,
+};
 
+use blockchain::{
+    Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+    TransactionResult, TxLocation,
+};
 use crypto::{CryptoHash, Hash};
-use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
-                 TransactionResult, TxLocation};
 use encoding;
 use helpers::Height;
 use messages::{Precommit, RawMessage};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<Box<Transaction>, encoding::Error>;
+type ParseResult = Result<Box<dyn Transaction>, encoding::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -119,10 +120,10 @@ impl<'a> BlockInfo<'a> {
 
             let block_hash = hashes
                 .get(height.0)
-                .expect(&format!("Block not found, height: {:?}", height));
+                .unwrap_or_else(|| panic!("Block not found, height: {:?}", height));
             blocks
                 .get(&block_hash)
-                .expect(&format!("Block not found, hash: {:?}", block_hash))
+                .unwrap_or_else(|| panic!("Block not found, hash: {:?}", block_hash))
         };
 
         BlockInfo {
@@ -271,7 +272,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// by using `BlockWithTransactions<serde_json::Value>`.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: SerializeContent"))]
-pub struct BlockWithTransactions<T = Box<Transaction>> {
+pub struct BlockWithTransactions<T = Box<dyn Transaction>> {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
     pub header: Block,
@@ -314,10 +315,12 @@ impl<T> Index<usize> for BlockWithTransactions<T> {
     type Output = CommittedTransaction<T>;
 
     fn index(&self, index: usize) -> &CommittedTransaction<T> {
-        self.transactions.get(index).expect(&format!(
-            "Index exceeds number of transactions in block {}",
-            self.len()
-        ))
+        self.transactions.get(index).unwrap_or_else(|| {
+            panic!(
+                "Index exceeds number of transactions in block {}",
+                self.len()
+            )
+        })
     }
 }
 
@@ -434,7 +437,7 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "T: SerializeContent"))]
-pub struct CommittedTransaction<T = Box<Transaction>> {
+pub struct CommittedTransaction<T = Box<dyn Transaction>> {
     #[serde(serialize_with = "SerializeContent::serialize_content")]
     content: T,
     location: TxLocation,
@@ -605,7 +608,7 @@ impl<T> CommittedTransaction<T> {
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: SerializeContent"))]
-pub enum TransactionInfo<T = Box<Transaction>> {
+pub enum TransactionInfo<T = Box<dyn Transaction>> {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
@@ -649,7 +652,7 @@ impl<T: Serialize> SerializeContent for T {
     }
 }
 
-impl SerializeContent for Box<Transaction> {
+impl SerializeContent for Box<dyn Transaction> {
     fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -707,8 +710,8 @@ impl<T> TransactionInfo<T> {
 ///
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
-    snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
+    snapshot: Box<dyn Snapshot>,
+    transaction_parser: Box<dyn Fn(RawMessage) -> ParseResult + 'a>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -766,17 +769,14 @@ impl<'a> BlockchainExplorer<'a> {
     fn committed_transaction(
         &self,
         tx_hash: &Hash,
-        maybe_content: Option<Box<Transaction>>,
+        maybe_content: Option<Box<dyn Transaction>>,
     ) -> CommittedTransaction {
         let schema = Schema::new(&self.snapshot);
 
         let location = schema
             .transactions_locations()
             .get(tx_hash)
-            .expect(&format!(
-                "Location not found for transaction hash {:?}",
-                tx_hash
-            ));
+            .unwrap_or_else(|| panic!("Location not found for transaction hash {:?}", tx_hash));
 
         let location_proof = schema
             .block_transactions(location.block_height())

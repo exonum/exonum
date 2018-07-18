@@ -22,21 +22,20 @@ extern crate exonum;
 extern crate exonum_time;
 extern crate exonum_timestamping;
 
-use exonum::crypto::{gen_keypair, hash, Hash};
-use exonum::helpers::{init_logger, Height};
-use exonum::crypto::CryptoHash;
-use exonum::blockchain::Transaction;
+use exonum::{
+    api::node::public::explorer::TransactionQuery, blockchain::Transaction,
+    crypto::{gen_keypair, hash, CryptoHash, Hash}, helpers::Height,
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
-use exonum_time::{TimeService, time_provider::MockTimeProvider};
+use exonum_time::{time_provider::MockTimeProvider, TimeService};
 
 use std::time::SystemTime;
 
-use exonum_timestamping::Service;
-use exonum_timestamping::transactions::TxTimestamp;
-use exonum_timestamping::schema::{Timestamp, TimestampEntry};
+use exonum_timestamping::{
+    api::TimestampQuery, schema::{Timestamp, TimestampEntry}, transactions::TxTimestamp, Service,
+};
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
-    let _ = init_logger();
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let mut testkit = TestKitBuilder::validator()
         .with_service(Service::new())
@@ -48,10 +47,11 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
 
 /// Assert transaction status
 fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &serde_json::Value) {
-    let info: serde_json::Value = api.get(
-        ApiKind::Explorer,
-        &format!("v1/transactions/{}", &tx.hash().to_string()),
-    );
+    let info: serde_json::Value = api.public(ApiKind::Explorer)
+        .query(&TransactionQuery::new(tx.hash()))
+        .get("v1/transactions")
+        .unwrap();
+
     if let serde_json::Value::Object(mut info) = info {
         let tx_status = info.remove("status").unwrap();
         assert_eq!(tx_status, *expected_status);
@@ -64,10 +64,11 @@ fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &serde_jso
 fn test_api_get_timestamp_nothing() {
     let (testkit, _) = init_testkit();
     let api = testkit.api();
-    let entry: Option<TimestampEntry> = api.get(
-        ApiKind::Service("timestamping"),
-        &format!("/v1/timestamps/value/{}", Hash::zero().to_hex()),
-    );
+    let entry: Option<TimestampEntry> = api.public(ApiKind::Service("timestamping"))
+        .query(&TimestampQuery::new(Hash::zero()))
+        .get("v1/timestamps/value")
+        .unwrap();
+
     assert!(entry.is_none());
 }
 
@@ -80,11 +81,12 @@ fn test_api_post_timestamp() {
     let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
 
     let api = testkit.api();
-    let tx_hash: Hash = api.post(ApiKind::Service("timestamping"), "/v1/timestamps", &tx);
-    let tx2 = tx.clone();
+    let tx_hash: Hash = api.public(ApiKind::Service("timestamping"))
+        .query(&tx)
+        .post("v1/timestamps")
+        .unwrap();
 
-    assert_eq!(tx2, tx);
-    assert_eq!(tx2.hash(), tx_hash);
+    assert_eq!(tx.hash(), tx_hash);
 }
 
 #[test]
@@ -100,12 +102,12 @@ fn test_api_get_timestamp_proof() {
 
     // get proof
     let api = testkit.api();
-    let _: serde_json::Value = api.get(
-        ApiKind::Service("timestamping"),
-        &format!("/v1/timestamps/proof/{}", Hash::zero().to_hex()),
-    );
+    let _: serde_json::Value = api.public(ApiKind::Service("timestamping"))
+        .query(&TimestampQuery::new(Hash::zero()))
+        .get("v1/timestamps/proof")
+        .unwrap();
 
-    // TODO implement proof validation
+    // TODO: Implement proof validation. (ECR-1639)
 }
 
 #[test]
@@ -120,10 +122,10 @@ fn test_api_get_timestamp_entry() {
     testkit.create_block_with_transactions(txvec![tx.clone()]);
 
     let api = testkit.api();
-    let entry: Option<TimestampEntry> = api.get(
-        ApiKind::Service("timestamping"),
-        &format!("/v1/timestamps/value/{}", Hash::zero().to_hex()),
-    );
+    let entry: Option<TimestampEntry> = api.public(ApiKind::Service("timestamping"))
+        .query(&TimestampQuery::new(Hash::zero()))
+        .get("v1/timestamps/value")
+        .unwrap();
 
     let entry = entry.unwrap();
     assert_eq!(entry.timestamp(), info);

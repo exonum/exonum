@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
-               RequestMessage, TransactionsRequest, TransactionsResponse, HEADER_LENGTH};
+use super::NodeHandler;
 use blockchain::Schema;
 use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use super::NodeHandler;
+use messages::{
+    BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, RequestMessage,
+    TransactionsRequest, TransactionsResponse, HEADER_LENGTH,
+};
 
-// TODO: height should be updated after any message, not only after status (if signature is correct)
-// TODO: Request propose makes sense only if we know that node is on our height.
-// (ECR-171)
+// TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
+// TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
@@ -30,9 +31,9 @@ impl NodeHandler {
             return;
         }
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(
-                "Received request message from peer = {:?} which not in whitelist.",
+                "Received request message from peer = {:?} which not in ConnectList.",
                 msg.from()
             );
             return;
@@ -163,10 +164,7 @@ impl NodeHandler {
             msg.from(),
             block,
             precommits.iter().collect(),
-            transactions
-                .iter()
-                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
-                .collect(),
+            &transactions.iter().collect::<Vec<_>>(),
             self.state.consensus_secret_key(),
         );
         self.send_to_peer(*msg.from(), block_msg.raw());

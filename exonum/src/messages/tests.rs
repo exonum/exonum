@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use crypto::{gen_keypair, PublicKey, SecretKey, Signature};
-use messages::raw::MessageBuffer;
-use messages::{Message, RawMessage, RawTransaction};
 use encoding::serialize::FromHex;
+use messages::{raw::MessageBuffer, Message, RawMessage, RawTransaction};
 
 messages! {
     const SERVICE_ID = 0;

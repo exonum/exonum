@@ -16,13 +16,13 @@
 
 use std::marker::PhantomData;
 
+use super::{base_index::BaseIndex, indexes_metadata::IndexType, Fork, Snapshot, StorageValue};
 use crypto::Hash;
-use super::{BaseIndex, Fork, Snapshot, StorageValue};
-use super::indexes_metadata::IndexType;
 
 /// An index that may only contain one element.
 ///
-/// A value should implement [`StorageValue`] trait.
+/// You can add an element to this index and check whether it exists. A value
+/// should implement [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: trait.StorageValue.html
 #[derive(Debug)]
@@ -33,13 +33,13 @@ pub struct Entry<T, V> {
 
 impl<T, V> Entry<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: trait.Snapshot.html

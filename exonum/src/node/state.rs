@@ -14,23 +14,26 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
 use bit_vec::BitVec;
 use failure;
+use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
-use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
+    time::{Duration, SystemTime},
+};
 
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
-use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use node::whitelist::Whitelist;
-use node::timeout_adjuster::{Constant, Dynamic, MovingAverage, TimeoutAdjuster};
+use messages::{
+    BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
+};
+use node::connect_list::ConnectList;
+use node::ConnectInfo;
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
-// TODO: move request timeouts into node configuration (ECR-171)
+// TODO: Move request timeouts into node configuration. (ECR-171)
 
 /// Timeout value for the `ProposeRequest` message.
 pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
@@ -53,7 +56,7 @@ pub struct State {
     service_secret_key: SecretKey,
 
     config: StoredConfiguration,
-    whitelist: Whitelist,
+    connect_list: ConnectList,
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
@@ -66,7 +69,7 @@ pub struct State {
     locked_propose: Option<Hash>,
     last_hash: Hash,
 
-    // messages
+    // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
@@ -80,13 +83,12 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node height in consensus messages
+    // Maximum of node height in consensus messages.
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
-    timeout_adjuster: Box<TimeoutAdjuster>,
-    propose_timeout: Milliseconds,
+    incomplete_block: Option<IncompleteBlock>,
 }
 
 /// State of a validator-node.
@@ -103,8 +105,10 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
-    /// Represents `TransactionsRequest` message.
-    Transactions(Hash),
+    /// Represents `TransactionsRequest` message for `Propose`.
+    ProposeTransactions(Hash),
+    /// Represents `TransactionsRequest` message for `BlockResponse`.
+    BlockTransactions,
     /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
@@ -138,6 +142,13 @@ pub struct BlockState {
     patch: Patch,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
+}
+
+/// Incomplete block.
+#[derive(Clone, Debug)]
+pub struct IncompleteBlock {
+    msg: BlockResponse,
+    unknown_txs: HashSet<Hash>,
 }
 
 /// `VoteMessage` trait represents voting messages such as `Precommit` and `Prevote`.
@@ -243,7 +254,9 @@ impl RequestData {
         #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::Transactions(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
+                TRANSACTIONS_REQUEST_TIMEOUT
+            }
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -351,6 +364,23 @@ impl BlockState {
     }
 }
 
+impl IncompleteBlock {
+    /// Returns `BlockResponse` message.
+    pub fn message(&self) -> &BlockResponse {
+        &self.msg
+    }
+
+    /// Returns unknown transactions of the block.
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
+        &self.unknown_txs
+    }
+
+    /// Returns `true` if there are unknown transactions in the block.
+    pub fn has_unknown_txs(&self) -> bool {
+        !self.unknown_txs.is_empty()
+    }
+}
+
 impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -361,7 +391,7 @@ impl State {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         tx_pool_capacity: usize,
-        whitelist: Whitelist,
+        connect_list: ConnectList,
         stored: StoredConfiguration,
         connect: Connect,
         peers: HashMap<PublicKey, Connect>,
@@ -376,7 +406,7 @@ impl State {
             service_public_key,
             service_secret_key,
             tx_pool_capacity,
-            whitelist,
+            connect_list,
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -403,9 +433,9 @@ impl State {
 
             requests: HashMap::new(),
 
-            timeout_adjuster: make_timeout_adjuster(&stored.consensus),
-            propose_timeout: 0,
             config: stored,
+
+            incomplete_block: None,
         }
     }
 
@@ -445,9 +475,9 @@ impl State {
             .unwrap_or(false)
     }
 
-    /// Returns node's whitelist.
-    pub fn whitelist(&self) -> &Whitelist {
-        &self.whitelist
+    /// Returns node's ConnectList.
+    pub fn connect_list(&self) -> &ConnectList {
+        &self.connect_list
     }
 
     /// Returns public (consensus and service) keys of known validators.
@@ -491,24 +521,13 @@ impl State {
             .iter()
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
-        self.whitelist
-            .set_validators(config.validator_keys.iter().map(|x| x.consensus_key));
+
+        // TODO: update connect list (ECR-1745)
+
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
-        self.timeout_adjuster = make_timeout_adjuster(&config.consensus);
         self.config = config;
-    }
-
-    /// Adjusts propose timeout (see `TimeoutAdjuster` for the details).
-    pub fn adjust_timeout(&mut self, snapshot: &Snapshot) {
-        let timeout = self.timeout_adjuster.adjust_timeout(snapshot);
-        self.propose_timeout = timeout;
-    }
-
-    /// Returns adjusted (see `TimeoutAdjuster` for the details) value of the propose timeout.
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.propose_timeout
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
@@ -532,6 +551,11 @@ impl State {
     /// Returns the keys of known peers with their `Connect` messages.
     pub fn peers(&self) -> &HashMap<PublicKey, Connect> {
         &self.peers
+    }
+
+    /// Returns the addresses of known connections with public keys of its' validators.
+    pub fn connections(&self) -> &HashMap<SocketAddr, PublicKey> {
+        &self.connections
     }
 
     /// Returns public key of a validator identified by id.
@@ -568,9 +592,10 @@ impl State {
     }
 
     /// Updates known round for a validator and returns
-    /// a new actual round if at least one non byzantine validators are on a higher round.
+    /// a new actual round if at least one non byzantine validators is guaranteed to be on a higher round.
     /// Otherwise returns None.
-    pub fn get_actual_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+    pub fn update_validator_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+        // Update known round.
         {
             let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
             if round <= *known_round {
@@ -586,7 +611,11 @@ impl State {
             }
             *known_round = round;
         }
-        let max_byzantine_count = self.validators().len() / 3;
+
+        // Find highest non-byzantine round.
+        // At max we can have (N - 1) / 3 byzantine nodes.
+        // It is calculated via rounded up integer division.
+        let max_byzantine_count = (self.validators().len() + 2) / 3 - 1;
         if self.validators_rounds.len() <= max_byzantine_count {
             trace!("Count of validators, lower then max byzantine count.");
             return None;
@@ -595,7 +624,7 @@ impl State {
         let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
         rounds.sort_unstable_by(|a, b| b.cmp(a));
 
-        if rounds[max_byzantine_count] > &self.round {
+        if *rounds[max_byzantine_count] > self.round {
             Some(*rounds[max_byzantine_count])
         } else {
             None
@@ -700,8 +729,12 @@ impl State {
         self.round.increment();
     }
 
+    /// Return incomplete block.
+    pub fn incomplete_block(&self) -> Option<&IncompleteBlock> {
+        self.incomplete_block.as_ref()
+    }
+
     /// Increments the node height by one and resets previous height data.
-    // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height.increment();
         self.height_start_time = height_start_time;
@@ -709,7 +742,7 @@ impl State {
         self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
-        // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
+        // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
         self.prevotes.clear();
@@ -718,7 +751,8 @@ impl State {
         if let Some(ref mut validator_state) = self.validator_state {
             validator_state.clear();
         }
-        self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
+        self.requests.clear(); // FIXME: Clear all timeouts. (ECR-171)
+        self.incomplete_block = None;
     }
 
     /// Returns a list of queued consensus messages.
@@ -750,6 +784,23 @@ impl State {
         }
 
         full_proposes
+    }
+
+    /// Checks if there is an incomplete block that waits for this transaction.
+    /// Returns a block that don't contain unknown transactions.
+    ///
+    /// Transaction is ignored if the following criteria are fulfilled:
+    ///
+    /// - transaction isn't contained in the unknown transactions list of block
+    /// - transaction isn't a part of block
+    pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
+        if let Some(ref mut incomplete_block) = self.incomplete_block {
+            incomplete_block.unknown_txs.remove(&tx_hash);
+            if incomplete_block.unknown_txs.is_empty() {
+                return Some(incomplete_block.clone());
+            }
+        }
+        None
     }
 
     /// Returns pre-votes for the specified round and propose hash.
@@ -792,8 +843,9 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
-                // TODO:: for the moment it's true because this code gets called immediately after
-                // saving a propose to the cache. Think about making this approach less error-prone
+                // TODO: For the moment it's true because this code gets called immediately after
+                // saving a propose to the cache. Think about making this approach less error-prone.
+                // (ECR-1635)
                 is_saved: true,
             },
         );
@@ -802,11 +854,11 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(
+    pub fn add_propose<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: &Propose,
-        transactions: &MapIndex<&&Snapshot, Hash, RawMessage>,
-        transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
+        transactions: &MapIndex<S, Hash, RawMessage>,
+        transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
         match self.proposes.entry(propose_hash) {
@@ -861,6 +913,43 @@ impl State {
                 proposer_id,
             })),
         }
+    }
+
+    /// Finds unknown transactions in the block and persists transactions along
+    /// with other info as a pending block.
+    ///
+    ///  # Panics
+    ///
+    /// - Already there is an incomplete block.
+    /// - Received block has already committed transaction.
+    pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
+        &mut self,
+        msg: &BlockResponse,
+        txs: &MapIndex<S, Hash, RawMessage>,
+        txs_pool: &KeySetIndex<S, Hash>,
+    ) -> &IncompleteBlock {
+        assert!(self.incomplete_block().is_none());
+
+        let mut unknown_txs = HashSet::new();
+        for hash in msg.transactions() {
+            if txs.get(hash).is_some() {
+                if !txs_pool.contains(hash) {
+                    panic!(
+                        "Received block with already \
+                         committed transaction"
+                    )
+                }
+            } else {
+                unknown_txs.insert(*hash);
+            }
+        }
+
+        self.incomplete_block = Some(IncompleteBlock {
+            msg: msg.clone(),
+            unknown_txs,
+        });
+
+        self.incomplete_block().unwrap()
     }
 
     /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.
@@ -989,7 +1078,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: inefficient (ECR-171)
+                        // TODO: Inefficient. (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }
@@ -1045,27 +1134,9 @@ impl State {
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
     }
-}
 
-fn make_timeout_adjuster(config: &ConsensusConfig) -> Box<TimeoutAdjuster> {
-    match config.timeout_adjuster {
-        TimeoutAdjusterConfig::Constant { timeout } => Box::new(Constant::new(timeout)),
-        TimeoutAdjusterConfig::Dynamic {
-            min,
-            max,
-            threshold,
-        } => Box::new(Dynamic::new(min, max, threshold)),
-        TimeoutAdjusterConfig::MovingAverage {
-            min,
-            max,
-            adjustment_speed,
-            optimal_block_load,
-        } => Box::new(MovingAverage::new(
-            min,
-            max,
-            adjustment_speed,
-            config.txs_block_limit,
-            optimal_block_load,
-        )),
+    /// Add peer to node's `ConnectList`.
+    pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
+        self.connect_list.add(peer);
     }
 }

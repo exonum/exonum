@@ -162,8 +162,8 @@ macro_rules! __ex_message {
                                                                 from,
                                                                 count,
                                                                 latest_segment)?;
-                // TODO: remove this allocation,
-                // by allowing creating message from borrowed data (ECR-156)
+                // TODO: Remove this allocation,
+                // by allowing creating message from borrowed data. (ECR-156)
                 let raw_message: $crate::messages::RawMessage =
                                     unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
@@ -292,7 +292,7 @@ macro_rules! __ex_message {
                 buffer: & mut B,
                 from: $crate::encoding::Offset,
                 to: $crate::encoding::Offset,
-            ) -> ::std::result::Result<(), Box<::std::error::Error>>
+            ) -> ::std::result::Result<(), Box<dyn (::std::error::Error)>>
             where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::ExonumJsonDeserialize;
@@ -307,7 +307,7 @@ macro_rules! __ex_message {
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> ::std::result::Result<$crate::encoding::serialize::json::reexport::Value,
-                            Box<::std::error::Error + Send + Sync>>
+                            Box<dyn (::std::error::Error) + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::json::reexport::Map;
@@ -333,7 +333,7 @@ macro_rules! __ex_message {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             #[allow(unused_imports, unused_variables, unused_mut)]
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> ::std::result::Result<Self, Box<::std::error::Error>>
+                -> ::std::result::Result<Self, Box<dyn (::std::error::Error)>>
             {
                 use $crate::encoding::serialize::json::ExonumJson;
                 use $crate::encoding::serialize::json::reexport::from_value;
@@ -377,7 +377,7 @@ macro_rules! __ex_message {
             }
         }
 
-        // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
+        // TODO: Rewrite Deserialize and Serialize implementation. (ECR-156)
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             #[allow(unused_mut)]
             fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
@@ -439,10 +439,14 @@ macro_rules! __ex_message_mk_field {
 macro_rules! __ex_message_write_field {
     (
         ($writer:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
         $writer.write($field_name, $from, $to);
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -450,12 +454,13 @@ macro_rules! __ex_message_write_field {
 macro_rules! __ex_message_check_field {
     (
         ($latest_segment:ident, $raw_message:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
-        let $latest_segment = $raw_message.check::<$field_type>(
-            $from.into(),
-            $to.into(),
-            $latest_segment
-        )?;
-    }
+        let $latest_segment =
+            $raw_message.check::<$field_type>($from.into(), $to.into(), $latest_segment)?;
+    };
 }

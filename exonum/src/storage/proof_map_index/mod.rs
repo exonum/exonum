@@ -14,34 +14,38 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-pub use self::key::{HashedKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, ProofPath};
-pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
+pub use self::{
+    key::{HashedKey, ProofMapKey, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
+    proof::{CheckedMapProof, MapProof, MapProofError},
+};
 
-use std::marker::PhantomData;
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
+use self::{
+    key::{BitsRange, ChildKind, LEAF_KEY_PREFIX}, node::{BranchNode, Node},
+    proof::{create_multiproof, create_proof},
+};
+use super::{
+    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
+    StorageKey, StorageValue,
+};
 use crypto::{CryptoHash, Hash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
-use super::indexes_metadata::IndexType;
-use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
-use self::node::{BranchNode, Node};
-use self::proof::{create_multiproof, create_proof};
 
-#[cfg(test)]
-mod tests;
 mod key;
 mod node;
 mod proof;
+#[cfg(test)]
+mod tests;
 
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
 ///
-/// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
-/// `ProofMapIndex` requires that the keys implement [`ProofMapKey`] and values implement the
-/// [`StorageValue`] trait.
+/// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
+/// `ProofMapIndex` requires that keys implement the [`ProofMapKey`] trait and
+/// values implement the [`StorageValue`] trait.
 ///
 /// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
-/// distribution.** Usually [`Hash`] and [`PublicKey`] are used as types of proof map keys.
+/// distribution.** Usually, [`Hash`] and [`PublicKey`] are used as types of proof map keys.
 ///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
@@ -56,7 +60,7 @@ pub struct ProofMapIndex<T, K, V> {
 /// An iterator over the entries of a `ProofMapIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.ProofMapIndex.html#method.iter
 /// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
@@ -70,7 +74,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// An iterator over the keys of a `ProofMapIndex`.
 ///
 /// This struct is created by the [`keys`] or
-/// [`keys_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+/// [`keys_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
 /// [`keys`]: struct.ProofMapIndex.html#method.keys
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
@@ -84,7 +88,7 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// An iterator over the values of a `ProofMapIndex`.
 ///
 /// This struct is created by the [`values`] or
-/// [`values_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+/// [`values_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
 /// [`values`]: struct.ProofMapIndex.html#method.values
 /// [`values_from`]: struct.ProofMapIndex.html#method.values_from
@@ -103,14 +107,14 @@ enum RemoveResult {
 
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -141,8 +145,8 @@ where
     /// Creates a new index representation based on the name, common prefix of its keys
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -199,7 +203,7 @@ where
     }
 
     fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
-        // TODO: unwraps (ECR-84)?
+        // TODO: Unwraps? (ECR-84)
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
         } else {
@@ -208,6 +212,7 @@ where
     }
 
     /// Returns the root hash of the proof map or default hash value if it is empty.
+    /// The default hash consists solely of zeroes.
     ///
     /// # Examples
     ///
@@ -490,8 +495,8 @@ where
         hash
     }
 
-    // Inserts a new node as child of current branch and returns updated hash
-    // or if a new node has more short key returns a new key length
+    // Inserts a new node of the current branch and returns the updated hash
+    // or, if a new node has a shorter key, returns a new key length.
     fn insert_branch(
         &mut self,
         parent: &BranchNode,
@@ -670,7 +675,7 @@ where
         RemoveResult::KeyNotFound
     }
 
-    /// Removes the key from the proof map.
+    /// Removes a key from the proof map.
     ///
     /// # Examples
     ///
@@ -728,8 +733,8 @@ where
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples
@@ -757,7 +762,7 @@ where
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
@@ -807,7 +812,7 @@ where
 
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
     V: StorageValue + fmt::Debug,
 {
@@ -821,7 +826,7 @@ where
 
         impl<'a, T, K, V> Entry<'a, T, K, V>
         where
-            T: AsRef<Snapshot>,
+            T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
             V: StorageValue,
         {
@@ -845,7 +850,7 @@ where
 
         impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
         where
-            T: AsRef<Snapshot>,
+            T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
             V: StorageValue + fmt::Debug,
         {

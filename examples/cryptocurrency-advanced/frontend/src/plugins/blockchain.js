@@ -96,7 +96,7 @@ function getWallet(publicKey) {
       return validator.consensus_key
     })
 
-    return axios.get(`/api/services/cryptocurrency/v1/wallets/info/${publicKey}`)
+    return axios.get(`/api/services/cryptocurrency/v1/wallets/info?pub_key=${publicKey}`)
       .then(response => response.data)
       .then(data => {
         if (!Exonum.verifyBlock(data.block_proof, validators)) {
@@ -205,9 +205,15 @@ function waitForAcceptance(publicKey, hash) {
 module.exports = {
   install(Vue) {
     Vue.prototype.$blockchain = {
-      createWallet(name) {
-        const keyPair = Exonum.keyPair()
+      generateKeyPair() {
+        return Exonum.keyPair()
+      },
 
+      generateSeed() {
+        return Exonum.randomUint64()
+      },
+
+      createWallet(keyPair, name) {
         const TxCreateWallet = getTransaction(TX_WALLET_ID)
 
         const data = {
@@ -216,55 +222,51 @@ module.exports = {
         }
 
         const signature = TxCreateWallet.sign(keyPair.secretKey, data)
+        TxCreateWallet.signature = signature
+        const hash = TxCreateWallet.hash(data)
 
-        return axios.post(TX_URL, {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_WALLET_ID,
-          signature: signature,
-          body: data
-        }).then(() => keyPair)
+        return TxCreateWallet.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => { 
+            return { data: { tx_hash : hash } }
+          })
       },
 
-      addFunds(keyPair, amountToAdd) {
+      addFunds(keyPair, amountToAdd, seed) {
         const TxIssue = getTransaction(TX_ISSUE_ID)
 
         const data = {
           pub_key: keyPair.publicKey,
           amount: amountToAdd.toString(),
-          seed: Exonum.randomUint64()
+          seed: seed
         }
 
         const signature = TxIssue.sign(keyPair.secretKey, data)
+        TxIssue.signature = signature
+        const hash = TxIssue.hash(data)
 
-        return axios.post(TX_URL, {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_ISSUE_ID,
-          signature: signature,
-          body: data
-        }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
+        return TxIssue.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => waitForAcceptance(keyPair.publicKey, hash)
+        )
+        
       },
 
-      transfer(keyPair, receiver, amountToTransfer) {
+      transfer(keyPair, receiver, amountToTransfer, seed) {
         const TxTransfer = getTransaction(TX_TRANSFER_ID)
 
         const data = {
           from: keyPair.publicKey,
           to: receiver,
           amount: amountToTransfer,
-          seed: Exonum.randomUint64()
+          seed: seed
         }
 
         const signature = TxTransfer.sign(keyPair.secretKey, data)
+        TxTransfer.signature = signature
+        const hash = TxTransfer.hash(data)
 
-        return axios.post(TX_URL, {
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_TRANSFER_ID,
-          signature: signature,
-          body: data
-        }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
+        return TxTransfer.send(TX_URL, '/api/explorer/v1/transactions/', data, signature)
+          .then(() => waitForAcceptance(keyPair.publicKey, hash)
+        )
       },
 
       getWallet: getWallet,
@@ -275,11 +277,11 @@ module.exports = {
       },
 
       getBlock(height) {
-        return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
       },
 
       getTransaction(hash) {
-        return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
       }
     }
   }

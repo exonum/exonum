@@ -16,24 +16,24 @@
 
 pub use self::types::{Height, Milliseconds, Round, ValidatorId};
 
-pub mod fabric;
 pub mod config;
+pub mod fabric;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
-use log::{Level, Record, SetLoggerError};
-use env_logger::{Builder, Formatter};
-use colored::*;
 use chrono::{DateTime, Local};
+use colored::*;
+use env_logger::{Builder, Formatter};
+use log::{Level, Record, SetLoggerError};
 
-use std::env;
-use std::io::{self, Write};
-use std::time::SystemTime;
+use std::{
+    env, io::{self, Write}, time::SystemTime,
+};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
-use node::NodeConfig;
 use crypto::gen_keypair;
+use node::{ConnectListConfig, NodeConfig};
 
 mod types;
 
@@ -76,13 +76,12 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
             listen_address: peers[idx],
             external_address: Some(peers[idx]),
             network: Default::default(),
-            peers: peers.clone(),
             consensus_public_key: validator.0,
             consensus_secret_key: validator.1,
             service_public_key: service.0,
             service_secret_key: service.1,
             genesis: genesis.clone(),
-            whitelist: Default::default(),
+            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),
@@ -92,10 +91,10 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
 }
 
 fn has_colors() -> bool {
+    use atty;
+    use std::io;
     use term::terminfo::TerminfoTerminal;
     use term::Terminal;
-    use std::io;
-    use atty;
 
     let out = io::stderr();
     match TerminfoTerminal::new(out) {

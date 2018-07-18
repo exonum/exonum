@@ -14,26 +14,29 @@
 
 //! Command line commands utilities.
 
-pub use self::builder::NodeBuilder;
-pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
-pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
-pub use self::context_key::ContextKey;
+pub use self::{
+    builder::NodeBuilder, context_key::ContextKey,
+    details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
+    maintenance::Maintenance,
+    shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig},
+};
 
 use clap;
-use toml::Value;
-use serde::{Deserialize, Serialize};
 use failure;
+use serde::{Deserialize, Serialize};
+use toml::Value;
 
-use std::str::FromStr;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use blockchain::Service;
 
-mod shared;
 mod builder;
-mod details;
-mod internal;
 mod clap_backend;
+mod details;
+mod info;
+mod internal;
+mod maintenance;
+mod shared;
 #[macro_use]
 mod context_key;
 
@@ -118,9 +121,9 @@ pub mod keys {
 
     use toml;
 
-    use node::NodeConfig;
     use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
     use super::ContextKey;
+    use node::NodeConfig;
 
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.
@@ -287,17 +290,14 @@ pub trait CommandExtension {
 ///
 /// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
-    //TODO: we could move
-    // `service_name` and `service_id` from `Service` trait into this one
-    //fn name() -> &'static str;
-    // ECR-76?
-
+    /// Returns name of the service.
+    fn service_name(&self) -> &str;
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
-    fn command(&mut self, command: CommandName) -> Option<Box<CommandExtension>> {
+    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
         None
     }
 
     /// Creates a new service instance from the context returned by the `Run` command.
-    fn make_service(&mut self, run_context: &Context) -> Box<Service>;
+    fn make_service(&mut self, run_context: &Context) -> Box<dyn Service>;
 }

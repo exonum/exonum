@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::error::Error as StdError;
-use std::fmt;
-use std::borrow::Cow;
+use std::{borrow::Cow, error::Error as StdError, fmt};
 
 use super::Offset;
 
@@ -22,19 +20,19 @@ use super::Offset;
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    // TODO: Check this message after refactor buffer (ECR-156).
+    // TODO: Check this message after refactor buffer. (ECR-156)
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
-        /// real message size
+        /// real message size.
         actual_size: Offset,
-        /// expected size of fixed part
+        /// expected size of fixed part.
         minimum_size: Offset,
     },
-    /// Boolean value is incorrect
+    /// Boolean value is incorrect.
     IncorrectBoolean {
         /// position in buffer where error appears.
         position: Offset,
-        /// value that was parsed as bool
+        /// value that was parsed as bool.
         value: u8,
     },
     /// Unsupported floating point value (Infinity, NaN or signaling NaN).
@@ -58,34 +56,34 @@ pub enum Error {
         /// Padding value.
         value: [u8; 12],
     },
-    /// Segment reference is incorrect
+    /// Segment reference is incorrect.
     IncorrectSegmentReference {
         /// position in buffer where error appears.
         position: Offset,
-        /// value that was parsed as segment reference
+        /// value that was parsed as segment reference.
         value: Offset,
     },
-    /// Segment size is incorrect
+    /// Segment size is incorrect.
     IncorrectSegmentSize {
         /// position in buffer where error appears.
         position: Offset,
-        /// value that was parsed as size
+        /// value that was parsed as size.
         value: Offset,
     },
-    /// `RawMessage` is to short
+    /// `RawMessage` is too short
     UnexpectedlyShortRawMessage {
         /// position in buffer where error appears.
         position: Offset,
-        /// size of raw message in buffer
+        /// size of raw message in buffer.
         size: Offset,
     },
-    /// Incorrect size of `RawMessage` found in buffer
+    /// Incorrect size of `RawMessage` found in buffer.
     IncorrectSizeOfRawMessage {
         /// position in buffer where error appears.
         position: Offset,
-        /// parsed message size
+        /// parsed message size.
         actual_size: Offset,
-        /// expected fixed part message size
+        /// expected fixed part message size.
         declared_size: Offset,
     },
     /// Incorrect `message_id` found in buffer.
@@ -95,7 +93,7 @@ pub enum Error {
     },
     /// Incorrect `service_id` found in buffer.
     IncorrectServiceId {
-        /// expected `service_id`
+        /// expected `service_id`.
         service_id: u16,
     },
     /// Unsupported message version.
@@ -103,28 +101,28 @@ pub enum Error {
         /// Actual message version.
         version: u8,
     },
-    /// Different segments overlaps
+    /// Different segments overlaps.
     OverlappingSegment {
-        /// last segment ended position
+        /// last segment ended position.
         last_end: Offset,
-        /// start of new segment
+        /// start of new segment.
         start: Offset,
     },
-    /// Spaces found between segments
+    /// Spaces found between segments.
     SpaceBetweenSegments {
-        /// last segment ended position
+        /// last segment ended position.
         last_end: Offset,
-        /// start of new segment
+        /// start of new segment.
         start: Offset,
     },
-    /// Error in parsing `Utf8` `String`
+    /// Error in parsing `Utf8` `String`.
     Utf8 {
         /// position in buffer where error appears.
         position: Offset,
-        /// what error exact was
+        /// what error exact was.
         error: ::std::str::Utf8Error,
     },
-    /// Overflow in Offsets
+    /// Overflow in Offsets.
     OffsetOverflow,
     /// Overflow in Duration.
     DurationOverflow,
@@ -137,8 +135,8 @@ pub enum Error {
     },
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
-    /// Other error for custom fields
-    Other(Box<StdError>),
+    /// Other error for custom fields.
+    Other(Box<dyn StdError>),
 }
 
 impl fmt::Display for Error {
@@ -173,7 +171,7 @@ impl StdError for Error {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         use std::ops::Deref;
         if let Error::Other(ref error) = *self {
             Some(error.deref())
@@ -183,8 +181,8 @@ impl StdError for Error {
     }
 }
 
-impl From<Box<StdError>> for Error {
-    fn from(t: Box<StdError>) -> Error {
+impl From<Box<dyn StdError>> for Error {
+    fn from(t: Box<dyn StdError>) -> Error {
         Error::Other(t)
     }
 }

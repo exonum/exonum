@@ -18,22 +18,19 @@ extern crate futures;
 extern crate serde_json;
 extern crate tokio_timer;
 
-use futures::Future;
-use futures::sync::oneshot;
-use tokio_timer::Timer;
+use futures::{sync::oneshot, Future};
 use serde_json::Value;
+use tokio_timer::Timer;
 
-use std::thread::{self, JoinHandle};
-use std::time::Duration;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
+};
 
-use exonum::blockchain::{Service, ServiceContext, Transaction};
-use exonum::encoding::Error as EncodingError;
-use exonum::messages::RawTransaction;
-use exonum::node::{ApiSender, ExternalMessage, Node};
-use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
-use exonum::helpers;
-use exonum::crypto::Hash;
+use exonum::{
+    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash,
+    encoding::Error as EncodingError, helpers, messages::RawTransaction,
+    node::{ApiSender, ExternalMessage, Node}, storage::{Database, Fork, MemoryDB, Snapshot},
+};
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 
@@ -54,7 +51,7 @@ impl Service for CommitWatcherService {
         unreachable!("An unknown transaction received");
     }
 
-    fn handle_commit(&self, _context: &ServiceContext) {
+    fn after_commit(&self, _context: &ServiceContext) {
         if let Some(oneshot) = self.0.lock().unwrap().take() {
             oneshot.send(()).unwrap();
         }
@@ -122,32 +119,6 @@ fn test_node_run() {
     }
 
     for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        handle.node_thread.join().unwrap();
-    }
-}
-
-// See ECR-907 for the details.
-#[test]
-#[ignore]
-fn test_node_shutdown_twice() {
-    let (nodes, commit_rxs) = run_nodes(1, 16_400);
-
-    let timer = Timer::default();
-    let duration = Duration::from_secs(60);
-    for rx in commit_rxs {
-        let rx = timer.timeout(rx.map_err(drop), duration);
-        rx.wait().unwrap();
-    }
-
-    for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
         handle
             .api_tx
             .send_external_message(ExternalMessage::Shutdown)

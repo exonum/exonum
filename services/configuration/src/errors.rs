@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::blockchain::{ExecutionError, StoredConfiguration};
-use exonum::crypto::Hash;
-use exonum::encoding::serialize::json::reexport::Error as JsonError;
-use exonum::helpers::Height;
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
+
+use exonum::{
+    blockchain::{ExecutionError, StoredConfiguration}, crypto::Hash,
+    encoding::serialize::json::reexport::Error as JsonError, helpers::Height,
+};
 
 use transactions::Propose;
 
@@ -85,8 +89,9 @@ pub(crate) enum Error {
     #[fail(display = "Cannot parse configuration: {}", _0)]
     InvalidConfig(#[cause] JsonError),
 
-    #[fail(display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min,
-           max)]
+    #[fail(
+        display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min, max
+    )]
     InvalidMajorityCount {
         min: usize,
         max: usize,
@@ -120,6 +125,6 @@ impl Error {
 
 impl From<Error> for ExecutionError {
     fn from(value: Error) -> ExecutionError {
-        ExecutionError::new(value.code() as u8)
+        ExecutionError::with_description(value.code() as u8, value.to_string())
     }
 }

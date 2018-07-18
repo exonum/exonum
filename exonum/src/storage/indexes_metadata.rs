@@ -14,22 +14,30 @@
 
 #![allow(unsafe_code)]
 
-use std::borrow::Cow;
-use std::error::Error;
+use serde_json::{self, Error as JsonError};
 
-use storage::{BaseIndex, Fork, Snapshot, StorageValue};
-use crypto::{CryptoHash, Hash};
-use encoding::{CheckedOffset, Error as EncodingError, Field, Offset};
-use encoding::serialize::{json, WriteBufferWrapper};
+use std::{borrow::Cow, error::Error, fmt};
+
+use crypto::{self, CryptoHash, Hash};
+use encoding::{
+    serialize::{json, WriteBufferWrapper}, CheckedOffset, Error as EncodingError, Field, Offset,
+};
+use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
-encoding_struct!(
+// Storage metadata of a current Exonum version.
+// Value of this constant is to be changed manually
+// upon the introduction of breaking changes to the storage.
+const CORE_STORAGE_METADATA: StorageMetadata = StorageMetadata { version: 0 };
+const CORE_STORAGE_METADATA_KEY: &str = "__STORAGE_METADATA__";
+
+encoding_struct! {
     struct IndexMetadata {
         index_type: IndexType,
         is_family: bool,
     }
-);
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
@@ -77,7 +85,7 @@ impl StorageValue for IndexType {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        u8::from_bytes(value).into()
+        <u8 as StorageValue>::from_bytes(value).into()
     }
 }
 
@@ -110,7 +118,7 @@ impl json::ExonumJson for IndexType {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>>
+    ) -> Result<(), Box<dyn Error>>
     where
         Self: Sized,
     {
@@ -119,12 +127,12 @@ impl json::ExonumJson for IndexType {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<json::reexport::Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<json::reexport::Value, Box<dyn Error + Send + Sync>> {
         Ok(json::reexport::Value::from(*self as u8))
     }
 }
 
-pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &Snapshot) {
+pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &dyn Snapshot) {
     let metadata = BaseIndex::indexes_metadata(view);
     if let Some(value) = metadata.get::<_, IndexMetadata>(name) {
         let stored_type = value.index_type();
@@ -154,8 +162,71 @@ pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, vie
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct StorageMetadata {
+    version: u32,
+}
+
+impl StorageMetadata {
+    pub fn current() -> Self {
+        CORE_STORAGE_METADATA
+    }
+
+    pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
+        serde_json::to_vec(&self)
+    }
+
+    pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        serde_json::from_slice(serialized)
+    }
+
+    pub fn write_current(view: &mut Fork) {
+        let mut metadata = BaseIndex::indexes_metadata(view);
+        metadata.put(&CORE_STORAGE_METADATA_KEY.to_owned(), Self::current());
+    }
+
+    pub fn read<T: AsRef<dyn Snapshot>>(view: T) -> Result<Self, super::Error> {
+        let metadata = BaseIndex::indexes_metadata(view);
+        match metadata.get::<_, Self>(CORE_STORAGE_METADATA_KEY) {
+            Some(ref ver) if *ver == CORE_STORAGE_METADATA => Ok(ver.clone()),
+            Some(ref ver) => Err(super::Error::new(format!(
+                "Unsupported storage version: [{}]. Current storage version: [{}].",
+                ver,
+                StorageMetadata::current(),
+            ))),
+            None => Err(super::Error::new(format!(
+                "Storage version is not specified. Current storage version: [{}].",
+                StorageMetadata::current()
+            ))),
+        }
+    }
+}
+
+impl CryptoHash for StorageMetadata {
+    fn hash(&self) -> Hash {
+        let vec_bytes = self.try_serialize().unwrap();
+        crypto::hash(&vec_bytes)
+    }
+}
+
+impl StorageValue for StorageMetadata {
+    fn into_bytes(self) -> Vec<u8> {
+        self.try_serialize().unwrap()
+    }
+
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
+        StorageMetadata::try_deserialize(v.as_ref()).unwrap()
+    }
+}
+
+impl fmt::Display for StorageMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.version)
+    }
+}
+
 pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: &mut Fork) {
-    if name == INDEXES_METADATA_TABLE_NAME {
+    if name == INDEXES_METADATA_TABLE_NAME || name == CORE_STORAGE_METADATA_KEY {
         panic!("Attempt to access an internal storage infrastructure");
     }
     let mut metadata = BaseIndex::indexes_metadata(view);
@@ -166,16 +237,19 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexMetadata, IndexType, INDEXES_METADATA_TABLE_NAME};
+    use super::{
+        IndexMetadata, IndexType, StorageMetadata, CORE_STORAGE_METADATA,
+        CORE_STORAGE_METADATA_KEY, INDEXES_METADATA_TABLE_NAME,
+    };
     use crypto::{Hash, PublicKey};
-    use storage::{Database, MapIndex, MemoryDB, ProofMapIndex};
+    use storage::{base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
 
     #[test]
     fn index_metadata_roundtrip() {
         use self::IndexType::*;
 
         let index_types = [
-            Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet
+            Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet,
         ];
         let is_family = [true, true, false, false, true, false, true, false];
         for (t, f) in index_types.iter().zip(&is_family) {
@@ -205,8 +279,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
-                               while said index was initially created with type ProofMap")]
+    #[should_panic(
+        expected = "Attempt to access index 'test_index' of type Map, \
+                    while said index was initially created with type ProofMap"
+    )]
     fn invalid_index_type() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -231,8 +307,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access index family 'test_index' \
-                               while it's an ordinary index")]
+    #[should_panic(
+        expected = "Attempt to access index family 'test_index' \
+                    while it's an ordinary index"
+    )]
     fn ordinary_index_as_index_family() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -247,8 +325,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
-                               while it's index family")]
+    #[should_panic(
+        expected = "Attempt to access an ordinary index 'test_index' \
+                    while it's index family"
+    )]
     fn index_family_as_ordinary_index() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -276,8 +356,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
-                               while said index was initially created with type ProofMap")]
+    #[should_panic(
+        expected = "Attempt to access index 'test_index' of type Map, \
+                    while said index was initially created with type ProofMap"
+    )]
     fn multiple_read_before_write() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -306,5 +388,55 @@ mod tests {
         // Make sure we're unable to read with different type now
         let mut index = MapIndex::new("test_index", &mut fork);
         index.put(&Hash::zero(), 43);
+    }
+
+    #[test]
+    fn test_storage_version_write_current() {
+        let database = MemoryDB::new();
+
+        let mut fork = database.fork();
+        StorageMetadata::write_current(&mut fork);
+        database.merge(fork.into_patch()).unwrap();
+
+        let snap = database.snapshot();
+
+        let core_ver = StorageMetadata::current();
+
+        let read = StorageMetadata::read(snap);
+        assert!(read.is_ok());
+        assert_eq!(read.unwrap(), core_ver);
+    }
+
+    #[test]
+    fn test_storage_version_read() {
+        let database = MemoryDB::new();
+        {
+            let ver = StorageMetadata { version: 1337 };
+            let mut fork = database.fork();
+            set_storage_version(&mut fork, ver);
+
+            assert!(StorageMetadata::read(fork).is_err());
+        }
+
+        {
+            let ver = CORE_STORAGE_METADATA;
+            let mut fork = database.fork();
+            set_storage_version(&mut fork, ver.clone());
+
+            let read = StorageMetadata::read(fork);
+            assert!(read.is_ok());
+            assert_eq!(read.unwrap(), ver)
+        }
+
+        {
+            let snap = database.snapshot();
+
+            assert!(StorageMetadata::read(snap).is_err());
+        }
+    }
+
+    fn set_storage_version(view: &mut Fork, ver: StorageMetadata) {
+        let mut metadata = BaseIndex::indexes_metadata(view);
+        metadata.put(&CORE_STORAGE_METADATA_KEY.to_owned(), ver);
     }
 }

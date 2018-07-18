@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
 // Suppress a warning in `transactions!` macro call:
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
-use exonum::storage::Fork;
-use exonum::blockchain::{ExecutionError, ExecutionResult, Transaction};
-use exonum::messages::Message;
-use exonum::crypto::{CryptoHash, PublicKey};
+use exonum::{
+    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
+    messages::Message, storage::Fork,
+};
 use exonum_time::schema::TimeSchema;
 
 use schema::{Schema, Timestamp, TimestampEntry};

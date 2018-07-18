@@ -19,7 +19,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.25.0
+  - 1.27.0
 
 cache:
   directories:
@@ -34,7 +34,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.187
+  - CLIPPY_VERS=0.0.209
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
@@ -71,25 +71,16 @@ jobs:
     - rustup component add rustfmt-preview
     - rustfmt -V
     - nvm install 8 && nvm use 8
-    - npm install cspell
+    - npm install cspell@"=2.1.12" # last working version
     - ./node_modules/.bin/cspell --version
     - npm install markdownlint-cli
     - ./node_modules/.bin/markdownlint --version
     script:
     - cargo fmt --all -- --write-mode=diff
-    - ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
-    - ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
-    - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
-    - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell examples/cryptocurrency-advanced/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell examples/timestamping/{src,examples,tests}/**/*.rs
-    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
-    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
+    - npm run cspell
+    - npm run md
     - cargo doc --no-deps
-    # TODO: a tmp hack to ignore warnings about missing pages [ECR-703]
+    # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
     - mkdir -p target/std/string
     - touch target/std/primitive.usize.html
     - touch target/std/string/struct.String.html
@@ -102,7 +93,7 @@ jobs:
 
   # Clippy linting
   - env: FEATURE=clippy
-    rust: nightly-2018-03-06
+    rust: nightly-2018-06-20
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
@@ -130,7 +121,7 @@ jobs:
         - powershell
     install:
     - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm install && cd $TRAVIS_BUILD_DIR
+    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -139,11 +130,12 @@ jobs:
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm run test:unix
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
-    rust: nightly-2018-03-06
+    rust: nightly-2018-05-26
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
 

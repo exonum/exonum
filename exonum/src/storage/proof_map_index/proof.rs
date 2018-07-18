@@ -12,12 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::{
+    key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE}, node::{BranchNode, Node},
+};
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
-use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
-use super::node::{BranchNode, Node};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -47,8 +52,8 @@ impl<'de> Deserialize<'de> for ProofPath {
     where
         D: Deserializer<'de>,
     {
-        use std::fmt;
         use serde::de::{self, Unexpected, Visitor};
+        use std::fmt;
 
         struct ProofPathVisitor;
 
@@ -81,7 +86,11 @@ impl<'de> Deserialize<'de> for ProofPath {
                     }
                 }
 
-                Ok(ProofPath::new(&bytes).prefix(len as u16))
+                Ok(if len == 8 * KEY_SIZE {
+                    ProofPath::new(&bytes)
+                } else {
+                    ProofPath::new(&bytes).prefix(len as u16)
+                })
             }
         }
 
@@ -122,7 +131,7 @@ struct MapProofEntry {
 }
 
 // Used instead of `(K, Option<V>)` only for the purpose of clearer (de)serialization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 enum OptionalEntry<K, V> {
     Missing { missing: K },
@@ -179,8 +188,9 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 }
 
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
-/// which jointly allow to restore the `merkle_root()` of the index. Besides existing elements,
-/// `MapProof` can assert absence of certain keys from the underlying index.
+/// which jointly allow restoring the `merkle_root()` of the index. Apart from the
+/// existing elements, `MapProof` can assert absence of certain keys from the underlying
+/// index.
 ///
 /// # Workflow
 ///
@@ -258,7 +268,7 @@ pub struct MapProof<K, V> {
 /// See [`MapProof`] for an example of usage.
 ///
 /// [`MapProof`]: struct.MapProof.html#workflow
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CheckedMapProof<K, V> {
     entries: Vec<(K, Option<V>)>,
     hash: Hash,
@@ -344,9 +354,9 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
                 let new_prefix_len = new_prefix.len();
 
                 while contour.len() > 1 && new_prefix_len < last_prefix.len() {
-                    fold(&mut contour, last_prefix).map(|prefix| {
+                    if let Some(prefix) = fold(&mut contour, last_prefix) {
                         last_prefix = prefix;
-                    });
+                    }
                 }
 
                 contour.push(*entry);
@@ -354,9 +364,9 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
             }
 
             while contour.len() > 1 {
-                fold(&mut contour, last_prefix).map(|prefix| {
+                if let Some(prefix) = fold(&mut contour, last_prefix) {
                     last_prefix = prefix;
-                });
+                }
             }
 
             Ok(contour[0].hash)
@@ -366,7 +376,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
 /// Builder for [`MapProof`]s.
 ///
-/// This struct is rarely needs to be used explicitly (except for testing purposes). Instead,
+/// This struct rarely needs to be used explicitly (except for testing purposes). Instead,
 /// `MapProof`s can be created using [`get_proof()`] and [`get_multiproof()`] methods, or
 /// deserialized using `serde`.
 ///
@@ -458,8 +468,8 @@ where
     V: StorageValue,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
-        use std::cmp::Ordering;
         use self::MapProofError::*;
+        use std::cmp::Ordering;
 
         // Check that entries in proof are in increasing order
         for w in self.proof.windows(2) {

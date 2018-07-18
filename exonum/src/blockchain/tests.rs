@@ -14,16 +14,16 @@
 
 #![allow(dead_code, unsafe_code)]
 
+use chrono::{DateTime, TimeZone, Utc};
 use rand::{thread_rng, Rng};
 use serde_json;
-use chrono::{DateTime, TimeZone, Utc};
 
-use blockchain::{Blockchain, ExecutionResult, Schema, Service, Snapshot, Transaction};
+use blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction};
 use crypto::{gen_keypair, CryptoHash, Hash};
-use storage::{Error, Fork, ListIndex};
-use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
+use messages::{Message, RawTransaction};
+use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -39,11 +39,11 @@ impl Service for TestService {
         "test service"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         Ok(Box::new(Tx::from_raw(raw)?))
     }
 }
@@ -132,7 +132,7 @@ encoding_struct! {
 #[test]
 fn test_correct_encoding_struct() {
     let dat: Vec<u8> = vec![
-        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2
+        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2,
     ];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0; 8];
@@ -269,10 +269,10 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 
 mod transactions_tests {
     use blockchain::{ExecutionResult, Transaction, TransactionSet};
-    use storage::Fork;
     use crypto::gen_keypair;
     use serde::Serialize;
     use serde_json;
+    use storage::Fork;
 
     transactions! {
         MyTransactions {
@@ -361,25 +361,127 @@ mod transactions_tests {
     }
 }
 
+struct ServiceGood;
+
+impl Service for ServiceGood {
+    fn service_id(&self) -> u16 {
+        1
+    }
+
+    fn service_name(&self) -> &'static str {
+        "some_service"
+    }
+
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        unimplemented!()
+    }
+
+    fn before_commit(&self, fork: &mut Fork) {
+        let mut index = ListIndex::new(IDX_NAME, fork);
+        index.push(1);
+    }
+}
+
+struct ServicePanic;
+
+impl Service for ServicePanic {
+    fn service_id(&self) -> u16 {
+        1
+    }
+
+    fn service_name(&self) -> &'static str {
+        "some_service"
+    }
+
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        unimplemented!()
+    }
+
+    fn before_commit(&self, _fork: &mut Fork) {
+        panic!("42");
+    }
+}
+
+struct ServicePanicStorageError;
+
+impl Service for ServicePanicStorageError {
+    fn service_id(&self) -> u16 {
+        1
+    }
+
+    fn service_name(&self) -> &'static str {
+        "some_service"
+    }
+
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        unimplemented!()
+    }
+
+    fn before_commit(&self, _fork: &mut Fork) {
+        panic!(Error::new("42"));
+    }
+}
+
+fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    db.merge(patch).unwrap();
+    let snapshot = db.snapshot();
+    let index = ListIndex::new(IDX_NAME, &snapshot);
+    assert_eq!(index.len(), 1);
+    assert_eq!(index.get(0), Some(1));
+}
+
+fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
+    db.merge(patch).unwrap();
+    let snapshot = db.snapshot();
+    let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
+    assert!(index.is_empty());
+}
+
 mod memorydb_tests {
-    use futures::sync::mpsc;
-    use std::path::Path;
-    use tempdir::TempDir;
-    use storage::{Database, MemoryDB};
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
+    use futures::sync::mpsc;
     use node::ApiSender;
+    use storage::{Database, MemoryDB};
 
-    fn create_database(_: &Path) -> Box<Database> {
+    use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
+
+    fn create_database() -> Box<dyn Database> {
         Box::new(MemoryDB::new())
     }
 
-    fn create_blockchain(_: &Path) -> Blockchain {
+    fn create_blockchain() -> Blockchain {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
-            vec![Box::new(super::TestService) as Box<Service>],
+            vec![Box::new(super::TestService) as Box<dyn Service>],
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
+        )
+    }
+
+    fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
+        let service_keypair = gen_keypair();
+        let api_channel = mpsc::channel(1);
+        Blockchain::new(
+            MemoryDB::new(),
+            vec![service],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
@@ -388,32 +490,52 @@ mod memorydb_tests {
 
     #[test]
     fn test_handling_tx_panic() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let mut blockchain = create_blockchain(path);
+        let mut blockchain = create_blockchain();
         super::handling_tx_panic(&mut blockchain);
     }
 
     #[test]
     #[should_panic]
     fn test_handling_tx_panic_storage_error() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let mut blockchain = create_blockchain(path);
+        let mut blockchain = create_blockchain();
         super::handling_tx_panic_storage_error(&mut blockchain);
+    }
+
+    #[test]
+    fn test_service_execute() {
+        let blockchain = create_blockchain_with_service(Box::new(ServiceGood));
+        let mut db = create_database();
+        super::assert_service_execute(&blockchain, &mut db);
+    }
+
+    #[test]
+    fn test_service_execute_panic() {
+        let blockchain = create_blockchain_with_service(Box::new(ServicePanic));
+        let mut db = create_database();
+        super::assert_service_execute_panic(&blockchain, &mut db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_service_execute_panic_storage_error() {
+        let blockchain = create_blockchain_with_service(Box::new(ServicePanicStorageError));
+        let mut db = create_database();
+        super::assert_service_execute(&blockchain, &mut db);
     }
 }
 
 mod rocksdb_tests {
-    use futures::sync::mpsc;
-    use std::path::Path;
-    use tempdir::TempDir;
-    use storage::{Database, DbOptions, RocksDB};
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
+    use futures::sync::mpsc;
     use node::ApiSender;
+    use std::path::Path;
+    use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
-    fn create_database(path: &Path) -> Box<Database> {
+    use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
+
+    fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
@@ -424,27 +546,71 @@ mod rocksdb_tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             db,
-            vec![Box::new(super::TestService) as Box<Service>],
+            vec![Box::new(super::TestService) as Box<dyn Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
         )
     }
 
+    fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
+        let db = create_database(path);
+        let service_keypair = gen_keypair();
+        let api_channel = mpsc::channel(1);
+        Blockchain::new(
+            db,
+            vec![service],
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
+        )
+    }
+
+    fn create_temp_dir() -> TempDir {
+        TempDir::new(super::gen_tempdir_name().as_str()).unwrap()
+    }
+
     #[test]
     fn test_handling_tx_panic() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let mut blockchain = create_blockchain(path);
+        let dir = create_temp_dir();
+        let mut blockchain = create_blockchain(dir.path());
         super::handling_tx_panic(&mut blockchain);
     }
 
     #[test]
     #[should_panic]
     fn test_handling_tx_panic_storage_error() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let mut blockchain = create_blockchain(path);
+        let dir = create_temp_dir();
+        let mut blockchain = create_blockchain(dir.path());
         super::handling_tx_panic_storage_error(&mut blockchain);
+    }
+
+    #[test]
+    fn test_service_execute() {
+        let dir = create_temp_dir();
+        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServiceGood));
+        let dir = create_temp_dir();
+        let mut db = create_database(dir.path());
+        super::assert_service_execute(&blockchain, &mut db);
+    }
+
+    #[test]
+    fn test_service_execute_panic() {
+        let dir = create_temp_dir();
+        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanic));
+        let dir = create_temp_dir();
+        let mut db = create_database(dir.path());
+        super::assert_service_execute_panic(&blockchain, &mut db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_service_execute_panic_storage_error() {
+        let dir = create_temp_dir();
+        let blockchain =
+            create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
+        let dir = create_temp_dir();
+        let mut db = create_database(dir.path());
+        super::assert_service_execute(&blockchain, &mut db);
     }
 }

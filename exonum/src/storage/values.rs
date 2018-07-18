@@ -16,16 +16,16 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use std::mem;
-use std::borrow::Cow;
+use std::{borrow::Cow, mem};
 
+use super::UniqueHash;
 use crypto::{Hash, PublicKey};
 use encoding::{Field, Offset};
-use messages::{MessageBuffer, RawMessage};
 use helpers::Round;
-use super::UniqueHash;
+use messages::{MessageBuffer, RawMessage};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -307,7 +307,7 @@ impl StorageValue for Round {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        Round(u32::from_bytes(value))
+        Round(<u32 as StorageValue>::from_bytes(value))
     }
 }
 
@@ -321,98 +321,92 @@ impl StorageValue for Uuid {
     }
 }
 
+impl StorageValue for Decimal {
+    fn into_bytes(self) -> Vec<u8> {
+        self.serialize().to_vec()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        let mut buf: [u8; 16] = [0; 16];
+        buf.copy_from_slice(&value);
+        Self::deserialize(buf)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Debug;
+    use std::str::FromStr;
 
     #[test]
     fn u8_round_trip() {
         let values = [u8::min_value(), 1, u8::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, u8::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn i8_round_trip() {
         let values = [i8::min_value(), -1, 0, 1, i8::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, i8::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn u16_round_trip() {
         let values = [u16::min_value(), 1, u16::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, u16::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn i16_round_trip() {
         let values = [i16::min_value(), -1, 0, 1, i16::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, i16::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn u32_round_trip() {
         let values = [u32::min_value(), 1, u32::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, u32::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn i32_round_trip() {
         let values = [i32::min_value(), -1, 0, 1, i32::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, i32::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn u64_round_trip() {
         let values = [u64::min_value(), 1, u64::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, u64::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn i64_round_trip() {
         let values = [i64::min_value(), -1, 0, 1, i64::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, i64::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn bool_round_trip() {
         let values = [false, true];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, bool::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
     fn vec_round_trip() {
         let values = [vec![], vec![1], vec![1, 2, 3], vec![255; 100]];
-        for value in values.iter() {
-            let bytes = value.clone().into_bytes();
-            assert_eq!(*value, Vec::<u8>::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
@@ -421,10 +415,8 @@ mod tests {
             .iter()
             .map(|v| v.to_string())
             .collect();
-        for value in values.iter() {
-            let bytes = value.clone().into_bytes();
-            assert_eq!(*value, String::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
@@ -440,10 +432,7 @@ mod tests {
             Utc.timestamp(0, 1_500_000_000), // leap second
         ];
 
-        for time in times.iter() {
-            let buffer = time.into_bytes();
-            assert_eq!(*time, DateTime::from_bytes(Cow::Borrowed(&buffer)));
-        }
+        assert_round_trip_eq(&times);
     }
 
     #[test]
@@ -458,10 +447,7 @@ mod tests {
             Duration::seconds(-42) + Duration::nanoseconds(-15),
         ];
 
-        for duration in durations.iter() {
-            let buffer = duration.into_bytes();
-            assert_eq!(*duration, Duration::from_bytes(Cow::Borrowed(&buffer)));
-        }
+        assert_round_trip_eq(&durations);
     }
 
     #[test]
@@ -472,10 +458,8 @@ mod tests {
             Round(100),
             Round(u32::max_value()),
         ];
-        for value in values.iter() {
-            let bytes = value.clone().into_bytes();
-            assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
@@ -486,11 +470,28 @@ mod tests {
             Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
         ];
 
-        for value in values.iter() {
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    fn decimal_round_trip() {
+        let values = [
+            Decimal::from_str("3.14").unwrap(),
+            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
+            Decimal::new(9497628354687268, 12),
+            Decimal::from_str("0").unwrap(),
+            Decimal::from_str("-0.000000000000000000019").unwrap(),
+        ];
+
+        assert_round_trip_eq(&values);
+    }
+
+    fn assert_round_trip_eq<T: StorageValue + Clone + PartialEq + Debug>(values: &[T]) {
+        for value in values.into_iter() {
             let bytes = value.clone().into_bytes();
             assert_eq!(
                 *value,
-                <Uuid as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
+                <T as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
             );
         }
     }

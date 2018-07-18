@@ -11,7 +11,7 @@ then
     curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets
 elif [[ $1 == "--key" ]];
 then
-    curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallet/$2
+    curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallet?pub_key=$2
 else
     print_help
     exit

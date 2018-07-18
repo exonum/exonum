@@ -14,9 +14,13 @@
 
 //! Consensus and other messages and related utilities.
 
-pub use self::raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage,
-                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION};
-pub use self::protocol::*;
+pub use self::{
+    protocol::*,
+    raw::{
+        Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage, HEADER_LENGTH,
+        PROTOCOL_MAJOR_VERSION,
+    },
+};
 
 use bit_vec::BitVec;
 
@@ -28,14 +32,14 @@ use helpers::{Height, Round, ValidatorId};
 
 #[macro_use]
 mod spec;
-mod raw;
 mod protocol;
+mod raw;
 
 #[cfg(test)]
 mod tests;
 
-// TODO: implement common methods for enum types (hash, raw, from_raw, verify)
-// TODO: use macro for implementing enums (ECR-166)
+// TODO: Implement common methods for enum types (hash, raw, from_raw, verify). (ECR-166)
+// TODO: Use macro for implementing enums. (ECR-166)
 
 /// Raw transaction type.
 pub type RawTransaction = RawMessage;
@@ -121,7 +125,6 @@ impl RequestMessage {
     }
 
     /// Verifies the message signature with given public key.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
             RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),

@@ -14,11 +14,11 @@
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
-use messages::{Message, RawTransaction};
-use encoding::Error as MessageError;
-use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
-use storage::{Fork, Snapshot};
 use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
+use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
+use encoding::Error as MessageError;
+use messages::{Message, RawTransaction};
+use storage::{Fork, Snapshot};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 
@@ -99,11 +99,11 @@ impl Service for TimestampingService {
         TIMESTAMPING_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         vec![Hash::new([127; 32]), Hash::new([128; 32])]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         let tx = TimestampingTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

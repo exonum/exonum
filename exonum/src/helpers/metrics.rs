@@ -38,9 +38,9 @@ use chrono::offset::Utc;
 /// ```
 #[macro_export]
 macro_rules! metric {
-    ($name:expr, $value:expr) => ({
+    ($name:expr, $value:expr) => {{
         $crate::helpers::metrics::add_metric($name, $value as i64);
-    })
+    }};
 }
 
 // Do not use directly, use `metric!` macro instead.

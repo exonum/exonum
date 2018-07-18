@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::collections::btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range};
-use std::collections::hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter};
-use std::collections::Bound::*;
-use std::cmp::Ordering::*;
-use std::iter::{Iterator as StdIterator, Peekable};
+use std::{
+    cmp::Ordering::{Equal, Greater, Less},
+    collections::{
+        btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range},
+        hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter},
+        Bound::{Included, Unbounded}, HashMap,
+    },
+    iter::{Iterator as StdIterator, Peekable},
+};
 
-use super::Result;
 use self::NextIterValue::*;
+use super::Result;
 
-/// Map containing changes with corresponding key.
+/// Map containing changes with a corresponding key.
 #[derive(Debug, Clone)]
 pub struct Changes {
     data: BTreeMap<Vec<u8>, Change>,
@@ -36,7 +39,7 @@ impl Changes {
         }
     }
 
-    /// Returns iterator over changes.
+    /// Returns an iterator over the changes.
     pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
         self.data.iter()
     }
@@ -68,6 +71,10 @@ impl IntoIterator for Changes {
 }
 
 /// A set of serial changes that should be applied to a storage atomically.
+///
+/// This set can contain changes from multiple tables. When a block is added to
+/// the blockchain, changes are first collected into a patch and then applied to
+/// the storage.
 #[derive(Debug, Clone)]
 pub struct Patch {
     changes: HashMap<String, Changes>,
@@ -145,9 +152,9 @@ impl IntoIterator for Patch {
 }
 
 /// A generalized iterator over the storage views.
-pub type Iter<'a> = Box<Iterator + 'a>;
+pub type Iter<'a> = Box<dyn Iterator + 'a>;
 
-/// An enum that represents a kind of change to some key in the storage.
+/// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Change {
     /// Put the specified value into the storage for the corresponding key.
@@ -160,17 +167,17 @@ pub enum Change {
 ///
 /// A `Fork` provides both immutable and mutable operations over the database. Like [`Snapshot`],
 /// `Fork` provides read isolation. When mutable operations ([`put`], [`remove`] and
-/// [`remove_by_prefix`]) are performed to a fork, the subsequent reads act as if the changes
+/// [`remove_by_prefix`]) are applied to a fork, the subsequent reads act as if the changes
 /// are applied to the database; in reality, these changes are accumulated in memory.
 ///
 /// To apply changes to the database, you need to convert a `Fork` into a [`Patch`] using
 /// [`into_patch`] and then atomically [`merge`] it into the database. If two
 /// conflicting forks are merged into a database, this can lead to an inconsistent state. If you
-/// need to consistently apply several sets of changes for the same data, the next fork should be
+/// need to consistently apply several sets of changes to the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
 /// `Fork` also supports checkpoints ([`checkpoint`], [`commit`] and
-/// [`rollback`] methods), which allows to rollback some of the latest changes (e.g., after
+/// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
 /// a runtime error).
 ///
 /// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
@@ -190,9 +197,10 @@ pub enum Change {
 /// [`checkpoint`]: #method.checkpoint
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
-// FIXME: make &mut Fork "unwind safe" (ECR-176)
+
+// FIXME: make &mut Fork "unwind safe". (ECR-176)
 pub struct Fork {
-    snapshot: Box<Snapshot>,
+    snapshot: Box<dyn Snapshot>,
     patch: Patch,
     changelog: Vec<(String, Vec<u8>, Option<Change>)>,
     logged: bool,
@@ -242,7 +250,7 @@ enum NextIterValue {
 /// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
-    fn snapshot(&self) -> Box<Snapshot>;
+    fn snapshot(&self) -> Box<dyn Snapshot>;
 
     /// Creates a new fork of the database from its current state.
     fn fork(&self) -> Fork {
@@ -262,7 +270,7 @@ pub trait Database: Send + Sync + 'static {
     /// # Errors
     ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
-    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge(&self, patch: Patch) -> Result<()>;
 
@@ -274,7 +282,7 @@ pub trait Database: Send + Sync + 'static {
     /// # Errors
     ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
-    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
@@ -304,12 +312,14 @@ pub trait Snapshot: 'static {
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
 }
 
-/// A trait that defines streaming iterator over storage view entries.
+/// A trait that defines a streaming iterator over storage view entries. Unlike
+/// the standard [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
+/// trait, `Iterator` in Exonum is low-level and, therefore, operates with bytes.
 pub trait Iterator {
-    /// Advances the iterator and returns the next key and value.
+    /// Advances the iterator and returns a reference to the next key and value.
     fn next(&mut self) -> Option<(&[u8], &[u8])>;
 
-    /// Returns references to the current key and value of the iterator.
+    /// Returns a reference to the current key and value without advancing the iterator.
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
@@ -354,6 +364,9 @@ impl Snapshot for Fork {
 
 impl Fork {
     /// Creates a new checkpoint.
+    ///
+    /// In Exonum checkpoints are created before applying each transaction to
+    /// the database.
     ///
     /// # Panics
     ///
@@ -416,7 +429,7 @@ impl Fork {
         }
     }
 
-    /// Removes the key from the fork.
+    /// Removes a key from the fork.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
         let changes = self.patch
             .changes_entry(name.to_string())
@@ -463,24 +476,25 @@ impl Fork {
         }
     }
 
-    /// Converts the fork into `Patch`.
+    /// Converts the fork into `Patch` consuming the fork instance.
     pub fn into_patch(self) -> Patch {
         self.patch
     }
 
-    /// Returns reference to the inner `Patch`.
+    /// Returns a reference to the list of changes made in this fork.
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Merges patch from another fork to this fork.
+    /// Merges a patch from another fork to this fork.
     ///
     /// If both forks have changed the same data, this can lead to an inconsistent state. Hence,
     /// this method is useful only if you are sure that forks interacted with different indices.
     ///
     /// # Panics
     ///
-    /// Panics if checkpoint was created before and it was not committed or rolled back yet.
+    /// Panics if a checkpoint has been created before and has not been committed
+    /// or rolled back yet.
     pub fn merge(&mut self, patch: Patch) {
         if self.logged {
             panic!("call merge before commit or rollback");
@@ -498,14 +512,14 @@ impl Fork {
     }
 }
 
-impl AsRef<Snapshot> for Snapshot + 'static {
-    fn as_ref(&self) -> &Snapshot {
+impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
+    fn as_ref(&self) -> &dyn Snapshot {
         self
     }
 }
 
-impl AsRef<Snapshot> for Fork {
-    fn as_ref(&self) -> &Snapshot {
+impl AsRef<dyn Snapshot> for Fork {
+    fn as_ref(&self) -> &dyn Snapshot {
         self
     }
 }
@@ -620,8 +634,8 @@ impl<'a> Iterator for ForkIter<'a> {
     }
 }
 
-impl<T: Database> From<T> for Box<Database> {
+impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
-        Box::new(db) as Box<Database>
+        Box::new(db) as Box<dyn Database>
     }
 }

@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::blockchain::{ExecutionError, ExecutionResult, Transaction};
-use exonum::crypto::{CryptoHash, PublicKey};
-use exonum::messages::Message;
-use exonum::storage::Fork;
+// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
+// ECR-1771 for the details.
+#![allow(bare_trait_objects)]
 
-use CRYPTOCURRENCY_SERVICE_ID;
+use exonum::{
+    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
+    messages::Message, storage::Fork,
+};
+
 use schema::CurrencySchema;
+use CRYPTOCURRENCY_SERVICE_ID;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -85,7 +89,7 @@ transactions! {
 
 impl Transaction for Transfer {
     fn verify(&self) -> bool {
-        self.verify_signature(self.from())
+        (self.from() != self.to()) && self.verify_signature(self.from())
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {

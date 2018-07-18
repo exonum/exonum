@@ -14,12 +14,13 @@
 
 use rand::{thread_rng, Rng};
 
-use crypto::{hash, CryptoHash, Hash};
-use storage::Database;
-use encoding::serialize::json::reexport::{from_str, to_string};
-use encoding::serialize::reexport::Serialize;
-use super::{pair_hash, ListProof, ProofListIndex};
 use self::ListProof::*;
+use super::{pair_hash, ListProof, ProofListIndex};
+use crypto::{hash, CryptoHash, Hash};
+use encoding::serialize::{
+    json::reexport::{from_str, to_string}, reexport::Serialize,
+};
+use storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -45,7 +46,7 @@ fn gen_tempdir_name() -> String {
     thread_rng().gen_ascii_chars().take(10).collect()
 }
 
-fn list_methods(db: Box<Database>) {
+fn list_methods(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -66,7 +67,7 @@ fn list_methods(db: Box<Database>) {
     assert_eq!(index.get(2), Some(vec![3]));
 }
 
-fn height(db: Box<Database>) {
+fn height(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -92,7 +93,7 @@ fn height(db: Box<Database>) {
     assert_eq!(index.get(1), Some(vec![10]));
 }
 
-fn iter(db: Box<Database>) {
+fn iter(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut list_index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -107,7 +108,7 @@ fn iter(db: Box<Database>) {
     );
 }
 
-fn list_index_proof(db: Box<Database>) {
+fn list_index_proof(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -245,7 +246,7 @@ fn list_index_proof(db: Box<Database>) {
     );
 }
 
-fn randomly_generate_proofs(db: Box<Database>) {
+fn randomly_generate_proofs(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     let num_values = 100;
@@ -289,7 +290,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
     }
 }
 
-fn index_and_proof_roots(db: Box<Database>) {
+fn index_and_proof_roots(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.merkle_root(), Hash::zero());
@@ -417,14 +418,14 @@ fn index_and_proof_roots(db: Box<Database>) {
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
-fn proof_illegal_lower_bound(db: Box<Database>) {
+fn proof_illegal_lower_bound(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     index.get_range_proof(0, 1);
     index.push(vec![1]);
 }
 
-fn proof_illegal_bound_empty(db: Box<Database>) {
+fn proof_illegal_bound_empty(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     for i in 0u8..8 {
@@ -433,7 +434,7 @@ fn proof_illegal_bound_empty(db: Box<Database>) {
     index.get_range_proof(8, 9);
 }
 
-fn proof_illegal_range(db: Box<Database>) {
+fn proof_illegal_range(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     for i in 0u8..4 {
@@ -442,7 +443,7 @@ fn proof_illegal_range(db: Box<Database>) {
     index.get_range_proof(2, 2);
 }
 
-fn proof_structure(db: Box<Database>) {
+fn proof_structure(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.merkle_root(), Hash::zero());
@@ -473,6 +474,10 @@ fn proof_structure(db: Box<Database>) {
         *(range_proof.validate(h12345, 5).unwrap()[0].1)
     );
 
+    let serialized_proof = to_string(&range_proof).unwrap();
+    let deserialized_proof: ListProof<Vec<u8>> = from_str(&serialized_proof).unwrap();
+    assert_eq!(deserialized_proof, range_proof);
+
     if let ListProof::Right(left_hash1, right_proof1) = range_proof {
         assert_eq!(left_hash1, h1234);
         let unboxed_proof = *right_proof1;
@@ -492,7 +497,7 @@ fn proof_structure(db: Box<Database>) {
     }
 }
 
-fn simple_merkle_root(db: Box<Database>) {
+fn simple_merkle_root(db: Box<dyn Database>) {
     let h1 = hash(&[1]);
     let h2 = hash(&[2]);
 
@@ -506,7 +511,7 @@ fn simple_merkle_root(db: Box<Database>) {
     assert_eq!(index.merkle_root(), h2);
 }
 
-fn same_merkle_root(db1: Box<Database>, db2: Box<Database>) {
+fn same_merkle_root(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut fork1 = db1.fork();
 
     let mut i1 = ProofListIndex::new(IDX_NAME, &mut fork1);
@@ -542,10 +547,10 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 
 mod memorydb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, MemoryDB};
+    use tempdir::TempDir;
 
-    fn create_database(_: &Path) -> Box<Database> {
+    fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
     }
 
@@ -654,10 +659,10 @@ mod memorydb_tests {
 
 mod rocksdb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
-    fn create_database(path: &Path) -> Box<Database> {
+    fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }

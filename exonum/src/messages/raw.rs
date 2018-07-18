@@ -16,12 +16,11 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use std::{convert, mem, sync};
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{convert, fmt::Debug, ops::Deref, sync};
 
-use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
-             SIGNATURE_LENGTH};
+use crypto::{
+    hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH,
+};
 use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
@@ -64,10 +63,9 @@ impl AsRef<[u8]> for RawMessage {
     }
 }
 
-// TODO: reduce `to` argument from `write`, `read` and `check` methods
-// TODO: payload_length as a first value into message header
-// TODO: make sure that message length is enough when using mem::transmute
-// (ECR-166)
+// TODO: Reduce `to` argument from `write`, `read` and `check` methods. (ECR-166)
+// TODO: Payload_length as a first value into message header. (ECR-166)
+// TODO: Make sure that message length is enough when using mem::transmute. (ECR-166)
 
 /// A raw message represented by the bytes buffer.
 #[derive(Debug, PartialEq)]
@@ -87,9 +85,8 @@ impl MessageBuffer {
     /// assert!(!message_buffer.is_empty());
     /// ```
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
-        // TODO: check that size >= HEADER_LENGTH
-        // TODO: check that payload_length == raw.len()
-        // ECR-166
+        // TODO: Check that size >= HEADER_LENGTH. (ECR-166)
+        // TODO: Check that payload_length == raw.len(). (ECR-166)
         MessageBuffer { raw }
     }
 
@@ -145,7 +142,7 @@ impl MessageBuffer {
     /// Returns signature of the message.
     pub fn signature(&self) -> &Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
-        unsafe { mem::transmute(&self.raw[sign_idx]) }
+        unsafe { &*(&self.raw[sign_idx] as *const u8 as *const Signature) }
     }
 
     /// Checks that `Field` can be safely got with specified `from` and `to` offsets.

@@ -12,28 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
 pub use self::internal::InternalPart;
+pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
 
 pub mod codec;
 pub mod error;
-pub mod network;
 pub mod internal;
+pub mod network;
+pub mod noise;
 
-use futures::{Async, Future, Poll, Stream};
-use futures::sink::Wait;
-use futures::sync::mpsc::{self, Sender};
+use futures::{
+    sink::Wait, sync::mpsc::{self, Sender}, Async, Future, Poll, Stream,
+};
 
-use std::time::SystemTime;
-use std::cmp::Ordering;
+use std::{cmp::Ordering, time::SystemTime};
 
-use node::{ExternalMessage, NodeTimeout};
 use helpers::{Height, Round};
+use node::{ExternalMessage, NodeTimeout};
 
-#[cfg(test)]
-mod tests;
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
+#[cfg(test)]
+mod tests;
 
 pub type SyncSender<T> = Wait<Sender<T>>;
 
@@ -79,7 +79,7 @@ pub struct HandlerPart<H: EventHandler> {
 }
 
 impl<H: EventHandler + 'static> HandlerPart<H> {
-    pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
+    pub fn run(self) -> Box<dyn Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
         let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
@@ -215,6 +215,6 @@ where
     }
 }
 
-fn to_box<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
+fn to_box<F: Future + 'static>(f: F) -> Box<dyn Future<Item = (), Error = F::Error>> {
     Box::new(f.map(drop))
 }

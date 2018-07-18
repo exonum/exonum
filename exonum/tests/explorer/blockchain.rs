@@ -17,13 +17,13 @@
 extern crate futures;
 
 use self::futures::sync::mpsc;
-use exonum::blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema, Service,
-                         Transaction, TransactionSet};
-use exonum::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use exonum::encoding::Error as EncodingError;
-use exonum::messages::RawTransaction;
-use exonum::node::ApiSender;
-use exonum::storage::{Fork, MemoryDB, Snapshot};
+use exonum::{
+    blockchain::{
+        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionSet,
+    },
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+    messages::RawTransaction, node::ApiSender, storage::{Fork, MemoryDB, Snapshot},
+};
 
 transactions! {
     Transactions {
@@ -125,9 +125,9 @@ pub fn create_blockchain() -> Blockchain {
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
 pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>) {
-    use std::time::SystemTime;
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};
+    use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(|tx| tx.hash()).collect();
     let height = blockchain.last_block().height().next();

@@ -16,11 +16,10 @@
 
 use std::borrow::Cow;
 
+use super::{
+    super::{StorageKey, StorageValue}, key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
+};
 use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
-use super::super::{StorageKey, StorageValue};
-use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
-
-// TODO: implement Field for ProofPath and define BranchNode as StorageValue (ECR-22)
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -48,7 +47,7 @@ impl BranchNode {
                 ChildKind::Right => HASH_SIZE,
                 ChildKind::Left => 0,
             };
-            ::std::mem::transmute(&self.raw[from])
+            &*(&self.raw[from] as *const u8 as *const Hash)
         }
     }
 

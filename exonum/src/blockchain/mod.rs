@@ -16,7 +16,7 @@
 //! the Exonum framework.
 //!
 //! Services are the main extension point for the Exonum framework. To create
-//! your service on top of Exonum blockchain you need to do the following:
+//! your service on top of Exonum blockchain you need to perform the following steps:
 //!
 //! - Define your own information schema.
 //! - Create one or more transaction types using the [`transactions!`] macro and
@@ -24,66 +24,67 @@
 //! - Create a data structure implementing the [`Service`] trait.
 //! - Write API handlers for the service, if required.
 //!
-//! You may consult [the service creation tutorial][doc:create-service] for a more detailed
-//! manual on how to create services.
+//! You may consult [the service creation tutorial][doc:create-service] for a detailed
+//! instruction on how to create services.
 //!
 //! [`transactions!`]: ../macro.transactions.html
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{Schema, TxLocation};
-pub use self::genesis::GenesisConfig;
-pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
-                            TransactionErrorType, TransactionResult, TransactionSet};
+pub use self::{
+    block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
+    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys}, genesis::GenesisConfig,
+    schema::{Schema, TxLocation}, service::{Service, ServiceContext, SharedNodeState},
+    transaction::{
+        ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
+        TransactionResult, TransactionSet,
+    },
+};
 
 pub mod config;
 
-use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
-use mount::Mount;
 use failure;
+use vec_map::VecMap;
 
-use std::{fmt, iter, mem, panic};
-use std::sync::Arc;
-use std::collections::{BTreeMap, HashMap};
-use std::net::SocketAddr;
-use std::error::Error as StdError;
+use std::{
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
+    panic, sync::Arc,
+};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
-use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, Round, ValidatorId};
-use node::ApiSender;
 use encoding::Error as MessageError;
+use helpers::{Height, Round, ValidatorId};
+use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
+use node::ApiSender;
+use storage::{self, Database, Error, Fork, Patch, Snapshot};
 
 mod block;
-mod schema;
 mod genesis;
+mod schema;
 mod service;
 #[macro_use]
 mod transaction;
 #[cfg(test)]
 mod tests;
 
-/// Exonum blockchain instance with the concrete services set and data storage.
-/// Only blockchains with the identical set of services and genesis block can be combined
-/// into the single network.
+/// Exonum blockchain instance with a certain services set and data storage.
+///
+/// Only nodes with an identical set of services and genesis block can be combined
+/// into a single network.
 pub struct Blockchain {
-    db: Arc<Database>,
-    service_map: Arc<VecMap<Box<Service>>>,
-    service_keypair: (PublicKey, SecretKey),
-    api_sender: ApiSender,
+    db: Arc<dyn Database>,
+    service_map: Arc<VecMap<Box<dyn Service>>>,
+    pub(crate) service_keypair: (PublicKey, SecretKey),
+    pub(crate) api_sender: ApiSender,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new<D: Into<Arc<Database>>>(
+    pub fn new<D: Into<Arc<dyn Database>>>(
         storage: D,
-        services: Vec<Box<Service>>,
+        services: Vec<Box<dyn Service>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
@@ -117,29 +118,31 @@ impl Blockchain {
         }
     }
 
-    /// Returns service `VecMap` for all our services.
-    pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
+    /// Returns the `VecMap` for all services. This is a map which
+    /// contains service identifiers and service interfaces. The VecMap
+    /// allows proceeding from the service identifier to the service itself.
+    pub fn service_map(&self) -> &Arc<VecMap<Box<dyn Service>>> {
         &self.service_map
     }
 
-    /// Creates a readonly snapshot of the current storage state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    /// Creates a read-only snapshot of the current storage state.
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
     }
 
-    /// Creates snapshot of the current storage state that can be later committed into storage
-    /// via `merge` method.
+    /// Creates a snapshot of the current storage state that can be later committed into the storage
+    /// via the `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
     }
 
     /// Tries to create a `Transaction` object from the given raw message.
-    /// Raw message can be converted into `Transaction` object only
-    /// if following conditions are met.
+    /// A raw message can be converted into a `Transaction` object only
+    /// if the following conditions are met:
     ///
-    /// - Blockchain has service with the `service_id` of given raw message.
-    /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
+    /// - Blockchain has a service with the `service_id` of the given raw message.
+    /// - Service can deserialize the given raw message.
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -153,11 +156,11 @@ impl Blockchain {
         self.db.merge(patch)
     }
 
-    /// Returns the hash of latest committed block.
+    /// Returns the hash of the latest committed block.
     ///
     /// # Panics
     ///
-    /// - If the genesis block was not committed.
+    /// If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
             .block_hashes_by_height()
@@ -166,27 +169,57 @@ impl Blockchain {
     }
 
     /// Returns the latest committed block.
-    ///
-    /// # Panics
-    ///
-    /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    /// Creates and commits the genesis block for the given genesis configuration
-    /// if the blockchain was not initialized.
+    /// Creates and commits the genesis block with the given genesis configuration
+    /// if the blockchain has not been initialized.
+    ///
+    /// # Panics
+    ///
+    /// * If the genesis block was not committed.
+    /// * If storage version is not specified or not supported.
     pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let has_genesis_block = !Schema::new(&self.snapshot())
             .block_hashes_by_height()
             .is_empty();
-        if !has_genesis_block {
+        if has_genesis_block {
+            self.assert_storage_version();
+        } else {
+            self.initialize_metadata();
             self.create_genesis_block(cfg)?;
         }
         Ok(())
     }
 
-    /// Creates and commits the genesis block for the given genesis configuration.
+    /// Initialized node-local metadata.
+    fn initialize_metadata(&mut self) {
+        let mut fork = self.db.fork();
+        storage::StorageMetadata::write_current(&mut fork);
+        if self.merge(fork.into_patch()).is_ok() {
+            info!(
+                "Storage version successfully initialized with value [{}].",
+                storage::StorageMetadata::read(&self.db.snapshot()).unwrap(),
+            )
+        } else {
+            panic!("Could not set database version.")
+        }
+    }
+
+    /// Checks if storage version is supported.
+    ///
+    /// # Panics
+    ///
+    /// Panics if version is not supported or is not specified.
+    fn assert_storage_version(&self) {
+        match storage::StorageMetadata::read(self.db.snapshot()) {
+            Ok(ver) => info!("Storage version is supported with value [{}].", ver),
+            Err(e) => panic!("{}", e),
+        }
+    }
+
+    /// Creates and commits the genesis block with the given genesis configuration.
     fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
@@ -215,7 +248,7 @@ impl Blockchain {
             {
                 let mut schema = Schema::new(&mut fork);
                 if schema.block_hash_by_height(Height::zero()).is_some() {
-                    // TODO create genesis block for MemoryDB and compare in hash with zero block
+                    // TODO create genesis block for MemoryDB and compare it hash with zero block. (ECR-1630)
                     return Ok(());
                 }
                 schema.commit_configuration(config_propose);
@@ -228,15 +261,15 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Helper function to map tuple (`u16`, `u16`) of service table coordinates
-    /// to 32 byte value for use as `MerklePatriciaTable` key (it currently
-    /// supports only fixed size keys). `hash` function is used to distribute
+    /// Helper function to map a tuple (`u16`, `u16`) of service table coordinates
+    /// to a 32-byte value to be used as the `ProofMapIndex` key (it currently
+    /// supports only fixed size keys). The `hash` function is used to distribute
     /// keys uniformly (compared to padding).
     /// # Arguments
     ///
     /// * `service_id` - `service_id` as returned by instance of type of
     /// `Service` trait
-    /// * `table_idx` - index of service table in `Vec`, returned by
+    /// * `table_idx` - index of service table in `Vec`, returned by the
     /// `state_hash` method of instance of type of `Service` trait
     // also, it was the first idea around, to use `hash`
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
@@ -248,9 +281,9 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
-    /// Executes the given transactions from pool.
-    /// Then it collects the resulting changes from the current storage state and returns them
-    /// with the hash of resulting block.
+    /// Executes the given transactions from the pool.
+    /// Then collects the resulting changes from the current storage state and returns them
+    /// with the hash of the resulting block.
     pub fn create_patch(
         &self,
         proposer_id: ValidatorId,
@@ -269,6 +302,14 @@ impl Blockchain {
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
                     .expect("Transaction not found in the database.");
+            }
+
+            // Invoke execute method for all services.
+            for service in self.service_map.values() {
+                // Skip execution for genesis block.
+                if height > Height(0) {
+                    before_commit(service.as_ref(), &mut fork);
+                }
             }
 
             // Get tx & state hash.
@@ -343,7 +384,7 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let tx = {
+        let (tx, service_name) = {
             let schema = Schema::new(&fork);
 
             let tx = schema
@@ -351,13 +392,21 @@ impl Blockchain {
                 .get(&tx_hash)
                 .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
-            self.tx_from_raw(tx).or_else(|error| {
+            let service_name = self.service_map
+                .get(tx.service_id() as usize)
+                .ok_or_else(|| failure::err_msg("Service not found."))?
+                .service_name();
+
+            let tx = self.tx_from_raw(tx).or_else(|error| {
                 Err(failure::err_msg(format!(
-                    "{}, tx: {:?}",
+                    "Service <{}>: {}, tx: {:?}",
+                    service_name,
                     error.description(),
                     tx_hash
                 )))
-            })?
+            })?;
+
+            (tx, service_name)
         };
 
         fork.checkpoint();
@@ -373,7 +422,10 @@ impl Blockchain {
                     Err(ref e) => {
                         // Unlike panic, transaction failure isn't that rare, so logging the
                         // whole transaction body is an overkill: it can be relatively big.
-                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                        info!(
+                            "Service <{}>: {:?} transaction execution failed: {:?}",
+                            service_name, tx_hash, e
+                        );
                         fork.rollback();
                     }
                 }
@@ -385,7 +437,10 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                error!(
+                    "Service <{}>: {:?} transaction execution panicked: {:?}",
+                    service_name, tx, err
+                );
                 Err(TransactionError::from_panic(&err))
             }
         };
@@ -399,10 +454,9 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Commits to the storage block that proposes by node `State`.
-    /// After that invokes `handle_commit` for each service in order of their identifiers
-    /// and returns the list of transactions which were created by the `handle_commit` event.
-    #[cfg_attr(feature = "flame_profile", flame)]
+    /// Commits to the blockchain a new block with the indicated changes (patch),
+    /// hash and Precommit messages. After that invokes `after_commit`
+    /// for each service in the increasing order of their identifiers.
     pub fn commit<'a, I>(
         &mut self,
         patch: &Patch,
@@ -415,7 +469,7 @@ impl Blockchain {
         let patch = {
             let mut fork = {
                 let mut fork = self.db.fork();
-                fork.merge(patch.clone()); // FIXME: avoid cloning here
+                fork.merge(patch.clone()); // FIXME: Avoid cloning here. (ECR-1631)
                 fork
             };
 
@@ -439,47 +493,14 @@ impl Blockchain {
             self.api_sender.clone(),
             self.fork(),
         );
-        // Invokes `handle_commit` for each service in order of their identifiers
+        // Invokes `after_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
-            service.handle_commit(&context);
+            service.after_commit(&context);
         }
         Ok(())
     }
 
-    /// Returns `Mount` object that aggregates public api handlers.
-    pub fn mount_public_api(&self) -> Mount {
-        let context = self.api_context();
-        let mut mount = Mount::new();
-        for service in self.service_map.values() {
-            if let Some(handler) = service.public_api_handler(&context) {
-                mount.mount(service.service_name(), handler);
-            }
-        }
-        mount
-    }
-
-    /// Returns `Mount` object that aggregates private api handlers.
-    pub fn mount_private_api(&self) -> Mount {
-        let context = self.api_context();
-        let mut mount = Mount::new();
-        for service in self.service_map.values() {
-            if let Some(handler) = service.private_api_handler(&context) {
-                mount.mount(service.service_name(), handler);
-            }
-        }
-        mount
-    }
-
-    fn api_context(&self) -> ApiContext {
-        ApiContext::from_parts(
-            self,
-            self.api_sender.clone(),
-            &self.service_keypair.0,
-            &self.service_keypair.1,
-        )
-    }
-
-    /// Saves peer to the peers cache
+    /// Saves the `Connect` message from a peer to the cache.
     pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
         let mut fork = self.fork();
 
@@ -492,7 +513,7 @@ impl Blockchain {
             .expect("Unable to save peer to the peers cache");
     }
 
-    /// Removes peer from the peers cache
+    /// Removes from the cache the `Connect` message from a peer.
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
         let mut fork = self.fork();
 
@@ -509,7 +530,7 @@ impl Blockchain {
             .expect("Unable to remove peer from the peers cache");
     }
 
-    /// Recover cached peers if any.
+    /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
@@ -538,6 +559,25 @@ impl Blockchain {
 
         self.merge(fork.into_patch())
             .expect("Unable to save messages to the consensus cache");
+    }
+}
+
+fn before_commit(service: &dyn Service, fork: &mut Fork) {
+    fork.checkpoint();
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
+        Ok(..) => fork.commit(),
+        Err(err) => {
+            if err.is::<Error>() {
+                // Continue panic unwind if the reason is StorageError.
+                panic::resume_unwind(err);
+            }
+            fork.rollback();
+            error!(
+                "{} service before_commit failed with error: {:?}",
+                service.service_name(),
+                err
+            );
+        }
     }
 }
 

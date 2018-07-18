@@ -33,7 +33,7 @@
   }
 
   .spinner:after {
-    background-image: url(images/spinner.gif);
+    background-image: url(/images/spinner.gif);
     background-size: 100%;
     content: '';
     display: block;
