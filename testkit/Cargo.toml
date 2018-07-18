@@ -1,6 +1,6 @@
 [package]
 name = "exonum-testkit"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -19,11 +19,11 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix-web = "=0.6.13"
-exonum = { version = "0.8.0", path = "../exonum" }
+actix-web = "=0.6.15"
+exonum = { version = "0.9.0", path = "../exonum" }
 failure = "=0.1.1"
-futures = "=0.1.21"
-log = "=0.4.1"
+futures = "=0.1.23"
+log = "=0.4.3"
 reqwest = "=0.8.6"
 serde = "1.0.10"
 serde_derive = "1.0.10"
