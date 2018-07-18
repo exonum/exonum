@@ -314,6 +314,7 @@ mod tests {
     use std::{fmt::Debug, str::FromStr};
 
     use chrono::{Duration, TimeZone};
+    use encoding::serialize::FromHex;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -582,7 +583,7 @@ mod tests {
 
     #[test]
     fn hash_round_trip() {
-        let hashes = [Hash::from_str(
+        let hashes = [Hash::from_hex(
             "326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78",
         ).unwrap()];
         assert_round_trip_eq(&hashes);
@@ -590,7 +591,7 @@ mod tests {
 
     #[test]
     fn public_key_round_trip() {
-        let hashes = [PublicKey::from_str(
+        let hashes = [PublicKey::from_hex(
             "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
         ).unwrap()];
         assert_round_trip_eq(&hashes);
@@ -598,7 +599,7 @@ mod tests {
 
     #[test]
     fn signature_round_trip() {
-        let hashes = [Signature::from_str("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
+        let hashes = [Signature::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
         assert_round_trip_eq(&hashes);
     }
 

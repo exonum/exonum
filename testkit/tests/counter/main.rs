@@ -590,7 +590,7 @@ fn test_explorer_transaction_info() {
     };
 
     let info = api.public(ApiKind::Explorer)
-        .get::<Value>(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .get::<Value>(&format!("v1/transactions?hash={}", &tx.hash().to_hex()))
         .unwrap_err();
     let error_body = json!({ "type": "unknown" });
     assert_matches!(
@@ -602,7 +602,7 @@ fn test_explorer_transaction_info() {
     testkit.poll_events();
 
     let info: Value = api.public(ApiKind::Explorer)
-        .get(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .get(&format!("v1/transactions?hash={}", &tx.hash().to_hex()))
         .unwrap();
     assert_eq!(
         info,
@@ -614,7 +614,7 @@ fn test_explorer_transaction_info() {
 
     testkit.create_block();
     let info: TransactionInfo<Value> = api.public(ApiKind::Explorer)
-        .get(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .get(&format!("v1/transactions?hash={}", &tx.hash().to_hex()))
         .unwrap();
     assert!(info.is_committed());
     let committed = info.as_committed().unwrap();
