@@ -32,9 +32,8 @@ use std::net::SocketAddr;
 
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
-use crypto::{Hash, PublicKey};
+use crypto::{self, Hash, HashStream, PublicKey};
 use helpers::{Height, Round, ValidatorId};
-use storage::{Database, MemoryDB, ProofListIndex};
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
@@ -366,11 +365,104 @@ messages! {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
+        *self.block().tx_hash() == merkle_root(self.transactions())
+    }
+}
+
+fn merkle_root(hashes: &[Hash]) -> Hash {
+    if hashes.is_empty() {
+        return Hash::zero();
+    }
+    let mut current_hashes = hashes.to_vec();
+    while current_hashes.len() > 1 {
+        current_hashes = combine_hash_list(&current_hashes);
+    }
+    current_hashes[0]
+}
+
+fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
+    hashes
+        .chunks(2)
+        .map(|pair|
+            // Keep hash combination consistent with ProofListIndex.
+            if pair.len() == 2 {
+                hash_pair(&pair[0], &pair[1])
+            } else {
+                hash_one(&pair[0])
+            }
+        )
+        .collect()
+}
+
+fn hash_one(lhs: &Hash) -> Hash {
+    crypto::hash(lhs.as_ref())
+}
+
+fn hash_pair(lhs: &Hash, rhs: &Hash) -> Hash {
+    HashStream::new()
+        .update(lhs.as_ref())
+        .update(rhs.as_ref())
+        .hash()
+}
+
+#[cfg(test)]
+mod tests {
+    use crypto::{self, Hash};
+    use encoding::serialize::FromHex;
+    use storage::{Database, MemoryDB, ProofListIndex};
+
+    use super::*;
+
+    /// Cross-verify `merkle_root()` with `ProofListIndex` against expected root hash value.
+    fn assert_root_hash_eq(hashes: &[Hash], expected: &str) {
+        let root_actual = merkle_root(hashes);
+        let root_index = proof_list_index_root(hashes);
+        let root_expected = Hash::from_hex(expected).expect("hex hash");
+        assert_eq!(root_actual, root_expected);
+        assert_eq!(root_actual, root_index);
+    }
+
+    fn proof_list_index_root(hashes: &[Hash]) -> Hash {
         let db = MemoryDB::new();
         let mut fork = db.fork();
-        let mut index = ProofListIndex::new("verify_tx_hash", &mut fork);
-        index.extend(self.transactions().iter().cloned());
-        let tx_hashes = index.merkle_root();
-        tx_hashes == *self.block().tx_hash()
+        let mut index = ProofListIndex::new("merkle_root", &mut fork);
+        index.extend(hashes.iter().cloned());
+        index.merkle_root()
+    }
+
+    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+        bytes.iter().map(|chunk| crypto::hash(chunk)).collect()
+    }
+
+    #[test]
+    fn root_hash_single() {
+        assert_root_hash_eq(
+            &hash_list(&[b"1"]),
+            "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+        );
+    }
+
+    #[test]
+    fn root_hash_even() {
+        assert_root_hash_eq(
+            &hash_list(&[b"1", b"2", b"3", b"4"]),
+            "cd53a2ce68e6476c29512ea53c395c7f5d8fbcb4614d89298db14e2a5bdb5456",
+        );
+    }
+
+    #[test]
+    fn root_hash_odd() {
+        assert_root_hash_eq(
+            &hash_list(&[b"1", b"2", b"3", b"4", b"5"]),
+            "9d6f6f12f390c2f281beacc79fd527f2355f555aa6f47682de41cbaf7756e187",
+        );
+    }
+
+    #[test]
+    fn root_hash_empty() {
+        assert_root_hash_eq(
+            &hash_list(&[]),
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        );
     }
 }
