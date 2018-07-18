@@ -169,9 +169,16 @@ pub trait Service: Send + Sync + 'static {
     /// [the `Service` example above](#examples).
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError>;
 
-    /// Initializes the information schema of the service
-    /// and generates an initial service configuration.
-    /// This method is called on genesis block creation.
+    /// Invoked for all deployed services during the blockchain initialization
+    /// on genesis block creation each time a node is started.
+    /// During the handling of the method the service is able to perform the following activities:
+    /// - store its own initial state to the storage [`&mut Fork`]
+    /// - return an initial [global configuration][doc:global_cfg] of the service in the JSON
+    /// format, if service has global configuration parameters. This configuration is used
+    /// to create a genesis block.
+    ///
+    /// [doc:global_cfg]: https://exonum.com/doc/architecture/services/#global-configuration.
+    /// [`&mut Fork`]: https://exonum.com/doc/architecture/storage/#forks
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
