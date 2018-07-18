@@ -554,6 +554,7 @@ impl SharedNodeState {
     }
 
     /// Broadcast message to all subscribers
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn broadcast(&self, msg: String) {
         for addr in self.state
             .read()
