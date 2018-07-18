@@ -118,7 +118,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added remote public key validation when handling incoming `Connect` message. (#786)
 
-### Bug fixes
 ### Bug Fixes
 
 #### exonum
