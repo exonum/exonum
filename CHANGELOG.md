@@ -7,7 +7,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking Changes
 
-#### Exonum
+#### exonum
 
 - `Command` trait in `helpers::fabric` module became public. (#778)
 
@@ -18,7 +18,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `schema_version` field in `Block` has been removed. (#774)
 
-- Storage in Exonum is now versioned. Old databases will not work with this
+- Storage in exonum is now versioned. Old databases will not work with this
   update. (#707)
 
 - `Iron`-based web API has been replaced by the new implementation based
@@ -91,7 +91,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New Features
 
-#### Exonum
+#### exonum
 
 - New kind of CLI commands has been added: `info` command that can be used for
   getting various information from a node that has not been started yet. (#731)
@@ -107,7 +107,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Bug Fixes
 
-#### Exonum
+#### exonum
 
 - Fixed bug with incorrect peer status for a turned-off node. (#730)
 
