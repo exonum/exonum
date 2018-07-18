@@ -23,7 +23,7 @@ use exonum::{blockchain::{Blockchain, ExecutionError, ExecutionResult, Schema, S
              encoding::Error as EncodingError,
              messages::RawTransaction,
              node::ApiSender,
-             storage::{Fork, MemoryDB, Snapshot}};
+             storage::{Fork, MemoryDB, DbView}};
 
 transactions! {
     Transactions {
@@ -80,7 +80,7 @@ impl Service for MyService {
         "my-service"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         vec![]
     }
 

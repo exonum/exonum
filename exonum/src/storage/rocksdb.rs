@@ -16,14 +16,16 @@
 
 //! An implementation of `RocksDB` database.
 
-pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
+pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions,
+                  IteratorMode};
 
 use exonum_profiler::ProfilerSpan;
-use rocksdb::{self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch};
+use rocksdb::{self, utils::get_cf_names, ColumnFamily, Direction, DBIterator,
+              Options as RocksDbOptions, WriteBatch};
 
 use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
+use storage::{self, Change, Database, DbOptions, Iter, Iterator, Patch, DbView, DbViewMut};
 
 impl From<rocksdb::Error> for storage::Error {
     fn from(err: rocksdb::Error) -> storage::Error {
@@ -76,12 +78,7 @@ impl RocksDB {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
         for (cf_name, changes) in patch {
-            let cf = match self.db.cf_handle(&cf_name) {
-                Some(cf) => cf,
-                None => self.db
-                    .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
-                    .unwrap(),
-            };
+            let cf = self.get_or_create_cf(&cf_name);
             for (key, change) in changes {
                 match change {
                     Change::Put(ref value) => batch.put_cf(cf, key.as_ref(), value)?,
@@ -91,15 +88,28 @@ impl RocksDB {
         }
         self.db.write_opt(batch, w_opts).map_err(Into::into)
     }
+
+    fn get_or_create_cf(&self, cf_name: &str) -> ColumnFamily {
+        match self.db.cf_handle(&cf_name) {
+            Some(cf) => cf,
+            None => self.db
+                .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
+                .unwrap(),
+        }
+    }
 }
 
 impl Database for RocksDB {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<DbView> {
         let _p = ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: Arc::clone(&self.db),
         })
+    }
+
+    fn view(&self) -> Box<DbView> {
+        Box::new(RocksDB { db: self.db.clone() })
     }
 
     fn merge(&self, patch: Patch) -> storage::Result<()> {
@@ -114,7 +124,72 @@ impl Database for RocksDB {
     }
 }
 
-impl Snapshot for RocksDBSnapshot {
+impl DbView for RocksDB {
+    fn get(&self, cf_name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        if let Some(cf) = self.db.cf_handle(cf_name) {
+            match self.db.get_cf(cf, &key) {
+                Ok(value) => value.map(|v| v.to_vec()),
+                Err(e) => panic!(e),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn iter<'a>(&'a self, cf_name: &str, from: &[u8]) -> Iter<'a> {
+        let iter = match self.db.cf_handle(cf_name) {
+            Some(cf) => self.db
+                .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward))
+                .unwrap(),
+            None => self.db.iterator(IteratorMode::Start),
+        };
+        Box::new(RocksDBIterator {
+            iter: iter.peekable(),
+            key: None,
+            value: None,
+        })
+    }
+}
+
+impl AsRef<DbView> for RocksDB {
+    fn as_ref(&self) -> &DbView {
+        self
+    }
+}
+
+impl DbViewMut for RocksDB {
+    fn put(&mut self, cf_name: &str, key: Vec<u8>, value: Vec<u8>) -> storage::Result<()> {
+        let cf = self.get_or_create_cf(&cf_name);
+        self.db.put_cf(cf, key.as_ref(), value.as_ref()).map_err(|e| storage::Error::from(e))
+    }
+
+    fn remove(&mut self, cf_name: &str, key: Vec<u8>) -> storage::Result<()> {
+        let cf = self.get_or_create_cf(&cf_name);
+        self.db.delete_cf(cf, key.as_ref()).map_err(|e| storage::Error::from(e))
+    }
+
+    fn remove_by_prefix(&mut self, cf_name: &str, prefix: Option<&Vec<u8>>) -> storage::Result<()> {
+        let cf = self.get_or_create_cf(&cf_name);
+        let mut batch = WriteBatch::default();
+        let iter = self.db
+            .iterator_cf(cf, IteratorMode::Start)
+            .unwrap()
+            .map(|(key, _)| key.to_vec())
+            .filter(|  key| key.starts_with(prefix.unwrap_or(&Vec::new())));
+        for key in iter {
+            batch.delete_cf(cf, &key)?;
+        }
+        self.db.write(batch).map_err(|e| storage::Error::from(e))
+    }
+}
+
+impl AsMut<DbViewMut> for RocksDB {
+    fn as_mut(&mut self) -> &mut DbViewMut {
+        self
+    }
+}
+
+impl DbView for RocksDBSnapshot {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
         let _p = ProfilerSpan::new("RocksDBSnapshot::get");
         if let Some(cf) = self._db.cf_handle(name) {

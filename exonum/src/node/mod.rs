@@ -61,6 +61,7 @@ use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
+mod auxiliary_storage;
 mod basic;
 mod consensus;
 mod events;

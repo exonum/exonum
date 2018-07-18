@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use exonum::{crypto::{Hash, PublicKey},
-             storage::{Entry, Fork, ProofMapIndex, Snapshot}};
+             storage::{Entry, Fork, ProofMapIndex, DbView}};
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
@@ -8,19 +8,19 @@ pub struct TimeSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<Snapshot>> TimeSchema<T> {
+impl<T: AsRef<DbView>> TimeSchema<T> {
     /// Constructs schema for the given `snapshot`.
     pub fn new(view: T) -> Self {
         TimeSchema { view }
     }
 
     /// Returns the table that stores `DateTime` for every validator.
-    pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, DateTime<Utc>> {
+    pub fn validators_times(&self) -> ProofMapIndex<&DbView, PublicKey, DateTime<Utc>> {
         ProofMapIndex::new("exonum_time.validators_times", self.view.as_ref())
     }
 
     /// Returns stored time.
-    pub fn time(&self) -> Entry<&Snapshot, DateTime<Utc>> {
+    pub fn time(&self) -> Entry<&DbView, DateTime<Utc>> {
         Entry::new("exonum_time.time", self.view.as_ref())
     }
 

@@ -16,10 +16,12 @@
 
 use std::{cell::Cell, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
+use super::{base_index::{BaseIndex, BaseIndexForked, BaseIndexMut, BaseIndexIter},
             indexes_metadata::IndexType,
             Fork,
-            Snapshot,
+            DbView,
+            DbViewMut,
+            Result,
             StorageKey,
             StorageValue};
 
@@ -34,6 +36,48 @@ pub struct ListIndex<T, V> {
     base: BaseIndex<T>,
     length: Cell<Option<u64>>,
     _v: PhantomData<V>,
+}
+
+pub trait ListIndexMut<V>
+where
+    V: StorageValue,
+{
+    fn set_len(&mut self, len: u64) -> Result<()>;
+
+    fn push(&mut self, value: V) -> Result<()>;
+
+    fn pop(&mut self) -> Result<Option<V>>;
+
+    fn extend<I>(&mut self, iter: I) -> Result<()>
+    where
+        I: IntoIterator<Item = V>;
+
+    fn truncate(&mut self, len: u64) -> Result<()>;
+
+    fn set(&mut self, index: u64, value: V) -> Result<()>;
+
+    fn clear(&mut self) -> Result<()>;
+}
+
+pub trait ListIndexForked<V>
+where
+    V: StorageValue,
+{
+    fn set_len(&mut self, len: u64);
+
+    fn push(&mut self, value: V);
+
+    fn pop(&mut self) -> Option<V>;
+
+    fn extend<I>(&mut self, iter: I)
+        where
+            I: IntoIterator<Item = V>;
+
+    fn truncate(&mut self, len: u64);
+
+    fn set(&mut self, index: u64, value: V);
+
+    fn clear(&mut self);
 }
 
 /// An iterator over the items of a `ListIndex`.
@@ -51,7 +95,7 @@ pub struct ListIndexIter<'a, V> {
 
 impl<T, V> ListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -255,7 +299,78 @@ where
     }
 }
 
-impl<'a, V> ListIndex<&'a mut Fork, V>
+impl<T, V> ListIndexMut<V> for ListIndex<T, V>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    V: StorageValue,
+{
+    fn set_len(&mut self, len: u64) -> Result<()> {
+        self.base.put(&(), len)?;
+        self.length.set(Some(len));
+        Ok(())
+    }
+
+    fn push(&mut self, value: V) -> Result<()> {
+        let len = self.len();
+        self.base.put(&len, value)?;
+        self.set_len(len + 1);
+        Ok(())
+    }
+
+    fn pop(&mut self) -> Result<Option<V>> {
+        match self.len() {
+            0 => Ok(None),
+            l => {
+                let v = self.base.get(&(l - 1));
+                self.base.remove(&(l - 1))?;
+                self.set_len(l - 1);
+                Ok(v)
+            }
+        }
+    }
+
+    fn extend<I>(&mut self, iter: I) -> Result<()>
+        where
+            I: IntoIterator<Item = V>,
+    {
+        let mut len = self.len();
+        for value in iter {
+            self.base.put(&len, value)?;
+            len += 1;
+        }
+        self.base.put(&(), len)?;
+        self.set_len(len)
+    }
+
+    fn truncate(&mut self, len: u64) -> Result<()> {
+        // TODO: Optimize this. (ECR-175)
+        while self.len() > len {
+            self.pop()?;
+        }
+        Ok(())
+    }
+
+    fn set(&mut self, index: u64, value: V) -> Result<()> {
+        if index >= self.len() {
+            panic!(
+                "index out of bounds: \
+                 the len is {} but the index is {}",
+                self.len(),
+                index
+            );
+        }
+        self.base.put(&index, value)
+    }
+
+
+    fn clear(&mut self) -> Result<()> {
+        self.length.set(Some(0));
+        self.base.clear()
+    }
+}
+
+impl<'a, V> ListIndexForked<V> for ListIndex<&'a mut Fork, V>
 where
     V: StorageValue,
 {
@@ -279,10 +394,10 @@ where
     /// index.push(1);
     /// assert!(!index.is_empty());
     /// ```
-    pub fn push(&mut self, value: V) {
+    fn push(&mut self, value: V) {
         let len = self.len();
         self.base.put(&len, value);
-        self.set_len(len + 1)
+        self.set_len(len + 1);
     }
 
     /// Removes the last element from the list and returns it, or None if it is empty.
@@ -301,7 +416,7 @@ where
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
     /// ```
-    pub fn pop(&mut self) -> Option<V> {
+    fn pop(&mut self) -> Option<V> {
         match self.len() {
             0 => None,
             l => {
@@ -329,7 +444,7 @@ where
     /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.len());
     /// ```
-    pub fn extend<I>(&mut self, iter: I)
+    fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = V>,
     {
@@ -362,7 +477,7 @@ where
     /// index.truncate(3);
     /// assert_eq!(3, index.len());
     /// ```
-    pub fn truncate(&mut self, len: u64) {
+    fn truncate(&mut self, len: u64) {
         // TODO: Optimize this. (ECR-175)
         while self.len() > len {
             self.pop();
@@ -391,7 +506,7 @@ where
     /// index.set(0, 10);
     /// assert_eq!(Some(10), index.get(0));
     /// ```
-    pub fn set(&mut self, index: u64, value: V) {
+    fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
             panic!(
                 "index out of bounds: \
@@ -400,7 +515,7 @@ where
                 index
             );
         }
-        self.base.put(&index, value)
+        self.base.put(&index, value);
     }
 
     /// Clears the list, removing all values.
@@ -427,15 +542,15 @@ where
     /// index.clear();
     /// assert!(index.is_empty());
     /// ```
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         self.length.set(Some(0));
-        self.base.clear()
+        self.base.clear();
     }
 }
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     type Item = V;

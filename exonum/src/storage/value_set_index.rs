@@ -16,10 +16,12 @@
 
 use std::marker::PhantomData;
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
+use super::{base_index::{BaseIndex, BaseIndexForked, BaseIndexMut, BaseIndexIter},
             indexes_metadata::IndexType,
             Fork,
-            Snapshot,
+            DbView,
+            DbViewMut,
+            Result,
             StorageKey,
             StorageValue};
 use crypto::Hash;
@@ -34,6 +36,32 @@ use crypto::Hash;
 pub struct ValueSetIndex<T, V> {
     base: BaseIndex<T>,
     _v: PhantomData<V>,
+}
+
+pub trait ValueSetIndexMut<V>
+where
+    V: StorageValue,
+{
+    fn insert(&mut self, item: V) -> Result<()>;
+
+    fn remove(&mut self, item: &V) -> Result<()>;
+
+    fn remove_by_hash(&mut self, hash: &Hash) -> Result<()>;
+
+    fn clear(&mut self) -> Result<()>;
+}
+
+pub trait ValueSetIndexForked<V>
+where
+    V: StorageValue,
+{
+    fn insert(&mut self, item: V);
+
+    fn remove(&mut self, item: &V);
+
+    fn remove_by_hash(&mut self, hash: &Hash);
+
+    fn clear(&mut self);
 }
 
 /// An iterator over the items of a `ValueSetIndex`.
@@ -64,7 +92,7 @@ pub struct ValueSetIndexHashes<'a> {
 
 impl<T, V> ValueSetIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -266,7 +294,7 @@ where
     }
 }
 
-impl<'a, V> ValueSetIndex<&'a mut Fork, V>
+impl<'a, V> ValueSetIndexForked<V> for ValueSetIndex<&'a mut Fork, V>
 where
     V: StorageValue,
 {
@@ -285,8 +313,8 @@ where
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn insert(&mut self, item: V) {
-        self.base.put(&item.hash(), item)
+    fn insert(&mut self, item: V) {
+        self.base.put(&item.hash(), item);
     }
 
     /// Removes a value from the set.
@@ -307,8 +335,8 @@ where
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     /// ```
-    pub fn remove(&mut self, item: &V) {
-        self.remove_by_hash(&item.hash())
+    fn remove(&mut self, item: &V) {
+        self.remove_by_hash(&item.hash());
     }
 
     /// Removes a value from the set by the specified hash.
@@ -331,8 +359,8 @@ where
     ///
     /// index.remove_by_hash(&data_hash);
     /// assert!(!index.contains_by_hash(&data_hash));
-    pub fn remove_by_hash(&mut self, hash: &Hash) {
-        self.base.remove(hash)
+    fn remove_by_hash(&mut self, hash: &Hash) {
+        self.base.remove(hash);
     }
 
     /// Clears the set, removing all values.
@@ -358,14 +386,37 @@ where
     /// index.clear();
     /// assert!(!index.contains(&1));
     /// ```
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
+        self.base.clear();
+    }
+}
+
+impl<T, V> ValueSetIndexMut<V> for ValueSetIndex<T, V>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    V: StorageValue,
+{
+    fn insert(&mut self, item: V) -> Result<()> {
+        self.base.put(&item.hash(), item)
+    }
+
+    fn remove(&mut self, item: &V) -> Result<()> {
+        self.remove_by_hash(&item.hash())
+    }
+
+    fn remove_by_hash(&mut self, hash: &Hash) -> Result<()> {
+        self.base.remove(hash)
+    }
+
+    fn clear(&mut self) -> Result<()> {
         self.base.clear()
     }
 }
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     type Item = (Hash, V);

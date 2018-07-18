@@ -18,7 +18,7 @@ use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use messages::{Message, RawTransaction};
-use storage::{Fork, Snapshot};
+use storage::{Fork, DbView};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 
@@ -99,7 +99,7 @@ impl Service for TimestampingService {
         TIMESTAMPING_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         vec![Hash::new([127; 32]), Hash::new([128; 32])]
     }
 

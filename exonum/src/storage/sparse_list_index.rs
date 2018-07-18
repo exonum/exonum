@@ -21,10 +21,12 @@ use byteorder::{BigEndian, ByteOrder};
 
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
+use super::{base_index::{BaseIndex, BaseIndexForked, BaseIndexMut, BaseIndexIter},
             indexes_metadata::IndexType,
             Fork,
-            Snapshot,
+            DbView,
+            DbViewMut,
+            Result,
             StorageKey,
             StorageValue};
 use crypto::{hash, CryptoHash, Hash};
@@ -82,6 +84,44 @@ pub struct SparseListIndex<T, V> {
     _v: PhantomData<V>,
 }
 
+pub trait SparseListIndexMut<V>
+where
+    V: StorageValue,
+{
+    fn push(&mut self, value: V) -> Result<()>;
+
+    fn remove(&mut self, index: u64) -> Result<Option<V>>;
+
+    fn extend<I>(&mut self, iter: I) -> Result<()>
+    where
+        I: IntoIterator<Item = V>;
+
+    fn set(&mut self, index: u64, value: V) -> Result<Option<V>>;
+
+    fn clear(&mut self) -> Result<()>;
+
+    fn pop(&mut self) -> Result<Option<V>>;
+}
+
+pub trait SparseListIndexForked<V>
+where
+    V: StorageValue,
+{
+    fn push(&mut self, value: V);
+
+    fn remove(&mut self, index: u64) -> Option<V>;
+
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = V>;
+
+    fn set(&mut self, index: u64, value: V) -> Option<V>;
+
+    fn clear(&mut self);
+
+    fn pop(&mut self) -> Option<V>;
+}
+
 /// An iterator over the items of a `SparseListIndex`.
 ///
 /// This struct is created by the [`iter`] method on [`SparseListIndex`].
@@ -120,7 +160,7 @@ pub struct SparseListIndexValues<'a, V> {
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -384,15 +424,104 @@ where
     }
 }
 
-impl<'a, V> SparseListIndex<&'a mut Fork, V>
+fn set_size_mut<T, V>(index: &mut SparseListIndex<T, V>, size: SparseListSize) -> Result<()>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    V: StorageValue,
+{
+    index.base.put(&(), size)?;
+    index.size.set(Some(size));
+    Ok(())
+}
+
+impl<T, V> SparseListIndexMut<V> for SparseListIndex<T, V>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    V: StorageValue,
+{
+    fn push(&mut self, value: V) -> Result<()> {
+        let mut size = self.size();
+        self.base.put(&size.capacity, value)?;
+        size.capacity += 1;
+        size.length += 1;
+        set_size_mut(self, size)
+    }
+
+    fn remove(&mut self, index: u64) -> Result<Option<V>> {
+        let mut size = self.size();
+        if index >= size.capacity {
+            return Ok(None);
+        }
+        let v = self.base.get(&index);
+        if v.is_some() {
+            self.base.remove(&index)?;
+            size.length -= 1;
+            set_size_mut(self, size)?;
+        }
+        Ok(v)
+    }
+
+    fn extend<I>(&mut self, iter: I) -> Result<()>
+        where
+            I: IntoIterator<Item = V>,
+    {
+        let mut size = self.size();
+        for value in iter {
+            self.base.put(&size.capacity, value)?;
+            size.capacity += 1;
+            size.length += 1;
+        }
+        set_size_mut(self, size)
+    }
+
+    fn set(&mut self, index: u64, value: V) -> Result<Option<V>> {
+        let mut size = self.size();
+        // Update items count
+        let old_value = self.base.get::<u64, V>(&index);
+        if old_value.is_none() {
+            size.length += 1;
+            if index >= size.capacity {
+                size.capacity = index + 1;
+            }
+            set_size_mut(self, size)?;
+        }
+        self.base.put(&index, value)?;
+        Ok(old_value)
+    }
+
+    fn clear(&mut self) -> Result<()> {
+        self.size.set(Some(SparseListSize::default()));
+        self.base.clear()
+    }
+
+    fn pop(&mut self) -> Result<Option<V>> {
+        let first_item = { self.iter().next() };
+
+        if let Some((first_index, first_elem)) = first_item {
+            let mut size = self.size();
+            self.base.remove(&first_index)?;
+            size.length -= 1;
+            set_size_mut(self, size)?;
+            return Ok(Some(first_elem));
+        }
+        Ok(None)
+    }
+}
+
+fn set_size_forked<'a, V>(index: &mut SparseListIndex<&'a mut Fork, V>, size: SparseListSize)
 where
     V: StorageValue,
 {
-    fn set_size(&mut self, size: SparseListSize) {
-        self.base.put(&(), size);
-        self.size.set(Some(size));
-    }
+    index.base.put(&(), size);
+    index.size.set(Some(size));
+}
 
+impl<'a, V> SparseListIndexForked<V> for SparseListIndex<&'a mut Fork, V>
+where
+    V: StorageValue,
+{
     /// Appends an element to the back of the 'SparseListIndex'.
     ///
     /// # Examples
@@ -407,12 +536,12 @@ where
     /// index.push(1);
     /// assert!(!index.is_empty());
     /// ```
-    pub fn push(&mut self, value: V) {
+    fn push(&mut self, value: V) {
         let mut size = self.size();
         self.base.put(&size.capacity, value);
         size.capacity += 1;
         size.length += 1;
-        self.set_size(size);
+        set_size_forked(self, size);
     }
 
     /// Removes the element with the given index from the list and returns it,
@@ -439,7 +568,7 @@ where
     /// assert_eq!(Some(12), index.remove(1));
     /// assert_eq!(2, index.capacity());
     /// ```
-    pub fn remove(&mut self, index: u64) -> Option<V> {
+    fn remove(&mut self, index: u64) -> Option<V> {
         let mut size = self.size();
         if index >= size.capacity {
             return None;
@@ -448,7 +577,7 @@ where
         if v.is_some() {
             self.base.remove(&index);
             size.length -= 1;
-            self.set_size(size);
+            set_size_forked(self, size);
         }
         v
     }
@@ -468,7 +597,7 @@ where
     /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.capacity());
     /// ```
-    pub fn extend<I>(&mut self, iter: I)
+    fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = V>,
     {
@@ -478,7 +607,7 @@ where
             size.capacity += 1;
             size.length += 1;
         }
-        self.set_size(size);
+        set_size_forked(self, size);
     }
 
     /// Changes a value at the specified position. If the position contains empty value it
@@ -503,7 +632,7 @@ where
     /// index.set(0, 10);
     /// assert_eq!(Some(10), index.get(0));
     /// ```
-    pub fn set(&mut self, index: u64, value: V) -> Option<V> {
+    fn set(&mut self, index: u64, value: V) -> Option<V> {
         let mut size = self.size();
         // Update items count
         let old_value = self.base.get::<u64, V>(&index);
@@ -512,7 +641,7 @@ where
             if index >= size.capacity {
                 size.capacity = index + 1;
             }
-            self.set_size(size);
+            set_size_forked(self, size);
         }
         self.base.put(&index, value);
         old_value
@@ -542,9 +671,9 @@ where
     /// index.clear();
     /// assert!(index.is_empty());
     /// ```
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         self.size.set(Some(SparseListSize::default()));
-        self.base.clear()
+        self.base.clear();
     }
 
     /// Removes the first element from the 'SparseListIndex' and returns it, or None if it is empty.
@@ -562,14 +691,14 @@ where
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
     /// ```
-    pub fn pop(&mut self) -> Option<V> {
+    fn pop(&mut self) -> Option<V> {
         let first_item = { self.iter().next() };
 
         if let Some((first_index, first_elem)) = first_item {
             let mut size = self.size();
             self.base.remove(&first_index);
             size.length -= 1;
-            self.set_size(size);
+            set_size_forked(self, size);
             return Some(first_elem);
         }
         None
@@ -578,7 +707,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     type Item = (u64, V);

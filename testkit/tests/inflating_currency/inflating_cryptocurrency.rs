@@ -26,7 +26,7 @@ use exonum::{api::{Api, ApiError},
              helpers::Height,
              messages::{Message, RawTransaction},
              node::{ApiSender, TransactionSend},
-             storage::{Fork, MapIndex, Snapshot}};
+             storage::{Fork, MapIndex, DbView}};
 
 use self::{iron::{headers::ContentType, prelude::*, status::Status, Handler, IronError},
            router::Router};
@@ -72,12 +72,12 @@ pub struct CurrencySchema<S> {
     view: S,
 }
 
-impl<S: AsRef<Snapshot>> CurrencySchema<S> {
+impl<S: AsRef<DbView>> CurrencySchema<S> {
     pub fn new(view: S) -> Self {
         CurrencySchema { view }
     }
 
-    pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+    pub fn wallets(&self) -> MapIndex<&DbView, PublicKey, Wallet> {
         MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
     }
 
@@ -254,7 +254,7 @@ impl Service for CurrencyService {
         "cryptocurrency"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         Vec::new()
     }
 

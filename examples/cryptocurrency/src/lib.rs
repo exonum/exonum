@@ -40,7 +40,7 @@ extern crate serde_json;
 /// Persistent data.
 pub mod schema {
     use exonum::{crypto::PublicKey,
-                 storage::{Fork, MapIndex, Snapshot}};
+                 storage::{Fork, MapIndex, DbView}};
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
@@ -85,14 +85,14 @@ pub mod schema {
     ///
     /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: AsRef<Snapshot>> CurrencySchema<T> {
+    impl<T: AsRef<DbView>> CurrencySchema<T> {
         /// Creates a new schema instance.
         pub fn new(view: T) -> Self {
             CurrencySchema { view }
         }
 
         /// Returns an immutable version of the wallets table.
-        pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+        pub fn wallets(&self) -> MapIndex<&DbView, PublicKey, Wallet> {
             MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
         }
 
@@ -396,7 +396,7 @@ pub mod service {
                  crypto::Hash,
                  encoding,
                  messages::RawTransaction,
-                 storage::Snapshot};
+                 storage::DbView};
     use iron::Handler;
     use router::Router;
 
@@ -466,7 +466,7 @@ pub mod service {
         // for now, so we return an empty vector.
         //
         // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &DbView) -> Vec<Hash> {
             vec![]
         }
 

@@ -18,7 +18,7 @@ use crypto::{Hash, PublicKey};
 use encoding::Error as MessageError;
 use helpers::Height;
 use messages::{Message, RawTransaction};
-use storage::{Fork, Snapshot};
+use storage::{Fork, DbView};
 
 pub const CONFIG_SERVICE: u16 = 1;
 
@@ -64,7 +64,7 @@ impl Service for ConfigUpdateService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         vec![]
     }
 

@@ -656,7 +656,7 @@ mod tests {
     use encoding;
     use helpers::{Height, ValidatorId};
     use node::ApiSender;
-    use storage::{Database, Entry, MemoryDB, Snapshot};
+    use storage::{Database, Entry, MemoryDB, DbView};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 
@@ -865,7 +865,7 @@ mod tests {
             "test service"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &DbView) -> Vec<Hash> {
             vec![]
         }
 

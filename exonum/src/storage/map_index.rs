@@ -16,10 +16,12 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
+use super::{base_index::{BaseIndex, BaseIndexForked, BaseIndexMut, BaseIndexIter},
             indexes_metadata::IndexType,
             Fork,
-            Snapshot,
+            DbView,
+            DbViewMut,
+            Result,
             StorageKey,
             StorageValue};
 
@@ -35,6 +37,36 @@ pub struct MapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
+}
+
+pub trait MapIndexMut<K, V>
+where
+    K: StorageKey,
+    V: StorageValue,
+{
+    fn put(&mut self, key: &K, value: V) -> Result<()>;
+
+    fn remove<Q>(&mut self, key: &Q) -> Result<()>
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ?Sized;
+
+    fn clear(&mut self) -> Result<()>;
+}
+
+pub trait MapIndexForked<K, V>
+where
+    K: StorageKey,
+    V: StorageValue,
+{
+    fn put(&mut self, key: &K, value: V);
+
+    fn remove<Q>(&mut self, key: &Q)
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ?Sized;
+
+    fn clear(&mut self);
 }
 
 /// An iterator over the entries of a `MapIndex`.
@@ -78,7 +110,7 @@ pub struct MapIndexValues<'a, V> {
 
 impl<T, K, V> MapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     K: StorageKey,
     V: StorageValue,
 {
@@ -340,7 +372,31 @@ where
     }
 }
 
-impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
+impl<T, K, V> MapIndexMut<K, V> for MapIndex<T, K, V>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    K: StorageKey,
+    V: StorageValue,
+{
+    fn put(&mut self, key: &K, value: V) -> Result<()> {
+        self.base.put(key, value)
+    }
+
+    fn remove<Q>(&mut self, key: &Q) -> Result<()>
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ?Sized,
+    {
+        self.base.remove(key)
+    }
+
+    fn clear(&mut self) -> Result<()> {
+        self.base.clear()
+    }
+}
+
+impl<'a, K, V> MapIndexForked<K, V> for MapIndex<&'a mut Fork, K, V>
 where
     K: StorageKey,
     V: StorageValue,
@@ -359,8 +415,8 @@ where
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
-    pub fn put(&mut self, key: &K, value: V) {
-        self.base.put(key, value)
+    fn put(&mut self, key: &K, value: V) {
+        self.base.put(key, value);
     }
 
     /// Removes the key from the map.
@@ -380,12 +436,12 @@ where
     ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
-    pub fn remove<Q>(&mut self, key: &Q)
+    fn remove<Q>(&mut self, key: &Q)
     where
         K: Borrow<Q>,
         Q: StorageKey + ?Sized,
     {
-        self.base.remove(key)
+        self.base.remove(key);
     }
 
     /// Clears the map, removing all entries.
@@ -410,14 +466,14 @@ where
     ///
     /// index.clear();
     /// assert!(!index.contains(&1));
-    pub fn clear(&mut self) {
-        self.base.clear()
+    fn clear(&mut self) {
+        self.base.clear();
     }
 }
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     K: StorageKey,
     V: StorageValue,
 {

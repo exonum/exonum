@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{Database, Fork, Snapshot};
+use super::{Database, Fork, DbView};
 
 const IDX_NAME: &'static str = "idx_name";
 

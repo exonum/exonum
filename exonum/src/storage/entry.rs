@@ -16,7 +16,11 @@
 
 use std::marker::PhantomData;
 
-use super::{base_index::BaseIndex, indexes_metadata::IndexType, Fork, Snapshot, StorageValue};
+use super::{
+    base_index::{BaseIndex, BaseIndexForked, BaseIndexMut},
+    indexes_metadata::IndexType, Fork, DbView, DbViewMut, Result,
+    StorageValue
+};
 use crypto::Hash;
 
 /// An index that may only contain one element.
@@ -30,9 +34,27 @@ pub struct Entry<T, V> {
     _v: PhantomData<V>,
 }
 
+pub trait EntryMut<V>
+where
+    V: StorageValue,
+{
+    fn set(&mut self, value: V) -> Result<()>;
+
+    fn remove(&mut self) -> Result<()>;
+}
+
+pub trait EntryForked<V>
+where
+    V: StorageValue,
+{
+    fn set(&mut self, value: V);
+
+    fn remove(&mut self);
+}
+
 impl<T, V> Entry<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -127,7 +149,22 @@ where
     }
 }
 
-impl<'a, V> Entry<&'a mut Fork, V>
+impl<T, V> EntryMut<V> for Entry<T, V>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    V: StorageValue,
+{
+    fn set(&mut self, value: V) -> Result<()> {
+        self.base.put(&(), value)
+    }
+
+    fn remove(&mut self) -> Result<()> {
+        self.base.remove(&())
+    }
+}
+
+impl<'a, V> EntryForked<V> for Entry<&'a mut Fork, V>
 where
     V: StorageValue,
 {
@@ -146,8 +183,8 @@ where
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
     /// ```
-    pub fn set(&mut self, value: V) {
-        self.base.put(&(), value)
+    fn set(&mut self, value: V) {
+        self.base.put(&(), value);
     }
 
     /// Removes a value of the entry.
@@ -168,7 +205,7 @@ where
     /// index.remove();
     /// assert_eq!(None, index.get());
     /// ```
-    pub fn remove(&mut self) {
-        self.base.remove(&())
+    fn remove(&mut self) {
+        self.base.remove(&());
     }
 }

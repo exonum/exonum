@@ -107,22 +107,22 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
 #[doc(no_inline)]
-pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
-                    PatchIterator, Snapshot},
-               entry::Entry,
+                    PatchIterator, DbView, DbViewMut},
+               entry::{Entry, EntryForked, EntryMut},
                error::Error,
                hash::UniqueHash,
-               key_set_index::KeySetIndex,
+               key_set_index::{KeySetIndex, KeySetIndexForked, KeySetIndexMut},
                keys::StorageKey,
-               list_index::ListIndex,
-               map_index::MapIndex,
+               list_index::{ListIndex, ListIndexForked, ListIndexMut},
+               map_index::{MapIndex, MapIndexForked, MapIndexMut},
                memorydb::MemoryDB,
                options::DbOptions,
-               proof_list_index::{ListProof, ProofListIndex},
+               proof_list_index::{ListProof, ProofListIndex, ProofListIndexForked},
+               proof_map_index::{HashedKey, MapProof, ProofMapIndex, ProofMapIndexForked},
                rocksdb::RocksDB,
-               sparse_list_index::SparseListIndex,
-               value_set_index::ValueSetIndex,
+               sparse_list_index::{SparseListIndex, SparseListIndexForked, SparseListIndexMut},
+               value_set_index::{ValueSetIndex, ValueSetIndexForked, ValueSetIndexMut},
                values::StorageValue};
 
 /// A specialized `Result` type for I/O operations with storage.

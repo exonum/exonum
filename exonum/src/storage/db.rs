@@ -193,7 +193,7 @@ pub enum Change {
 
 // FIXME: make &mut Fork "unwind safe". (ECR-176)
 pub struct Fork {
-    snapshot: Box<Snapshot>,
+    snapshot: Box<DbView>,
     patch: Patch,
     changelog: Vec<(String, Vec<u8>, Option<Change>)>,
     logged: bool,
@@ -243,7 +243,10 @@ enum NextIterValue {
 /// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
-    fn snapshot(&self) -> Box<Snapshot>;
+    fn snapshot(&self) -> Box<DbView>;
+
+    /// Creates a new mutable view.
+    fn view(&self) -> Box<DbView>;
 
     /// Creates a new fork of the database from its current state.
     fn fork(&self) -> Fork {
@@ -288,7 +291,7 @@ pub trait Database: Send + Sync + 'static {
 ///
 /// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
 /// to a full key (a string column family name + key as an array of bytes within the family).
-pub trait Snapshot: 'static {
+pub trait DbView: 'static {
     /// Returns a value corresponding to the specified key as a raw vector of bytes,
     /// or `None` if it does not exist.
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
@@ -305,6 +308,14 @@ pub trait Snapshot: 'static {
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
 }
 
+pub trait DbViewMut: DbView {
+    fn put(&mut self, cf_name: &str, key: Vec<u8>, value: Vec<u8>) -> Result<()>;
+
+    fn remove(&mut self, cf_name: &str, key: Vec<u8>) -> Result<()>;
+
+    fn remove_by_prefix(&mut self, cf_name: &str, prefix: Option<&Vec<u8>>) -> Result<()>;
+}
+
 /// A trait that defines streaming iterator over storage view entries.
 pub trait Iterator {
     /// Advances the iterator and returns the next key and value.
@@ -314,7 +325,7 @@ pub trait Iterator {
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
-impl Snapshot for Fork {
+impl DbView for Fork {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
         if let Some(changes) = self.patch.changes(name) {
             if let Some(change) = changes.data.get(key) {
@@ -499,14 +510,14 @@ impl Fork {
     }
 }
 
-impl AsRef<Snapshot> for Snapshot + 'static {
-    fn as_ref(&self) -> &Snapshot {
+impl AsRef<DbView> for DbView + 'static {
+    fn as_ref(&self) -> &DbView {
         self
     }
 }
 
-impl AsRef<Snapshot> for Fork {
-    fn as_ref(&self) -> &Snapshot {
+impl AsRef<DbView> for Fork {
+    fn as_ref(&self) -> &DbView {
         self
     }
 }

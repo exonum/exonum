@@ -90,7 +90,7 @@ use exonum::{api::Api,
              encoding::Error as EncodingError,
              helpers::fabric::{self, Context},
              messages::RawTransaction,
-             storage::Snapshot};
+             storage::DbView};
 use iron::Handler;
 use router::Router;
 
@@ -119,7 +119,7 @@ impl blockchain::Service for Service {
         SERVICE_ID
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &DbView) -> Vec<Hash> {
         let schema = Schema::new(snapshot);
         schema.state_hash()
     }

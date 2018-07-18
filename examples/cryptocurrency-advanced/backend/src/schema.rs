@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{crypto::{Hash, PublicKey},
-             storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot}};
+             storage::{Fork, ProofListIndex, ProofMapIndex, DbView}};
 
 use wallet::Wallet;
 use INITIAL_BALANCE;
@@ -32,7 +32,7 @@ impl<T> AsMut<T> for CurrencySchema<T> {
 
 impl<T> CurrencySchema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
 {
     /// Constructs schema from the database view.
     pub fn new(view: T) -> Self {

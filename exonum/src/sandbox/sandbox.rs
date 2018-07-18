@@ -790,7 +790,7 @@ mod tests {
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
                                         VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
-    use storage::{Fork, Snapshot};
+    use storage::{Fork, DbView};
 
     const SERVICE_ID: u16 = 1;
 
@@ -832,7 +832,7 @@ mod tests {
             SERVICE_ID
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &DbView) -> Vec<Hash> {
             Vec::new()
         }
 

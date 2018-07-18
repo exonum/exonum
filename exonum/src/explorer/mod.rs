@@ -31,7 +31,7 @@ use crypto::{CryptoHash, Hash};
 use encoding;
 use helpers::Height;
 use messages::{Precommit, RawMessage};
-use storage::{ListProof, Snapshot};
+use storage::{ListProof, DbView};
 
 /// Transaction parsing result.
 type ParseResult = Result<Box<Transaction>, encoding::Error>;
@@ -707,7 +707,7 @@ impl<T> TransactionInfo<T> {
 ///
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
-    snapshot: Box<Snapshot>,
+    snapshot: Box<DbView>,
     transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
 }
 

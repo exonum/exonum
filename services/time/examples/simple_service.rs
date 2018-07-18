@@ -29,7 +29,7 @@ use exonum::{blockchain::{ExecutionResult, Service, Transaction, TransactionSet}
              encoding,
              helpers::Height,
              messages::{Message, RawTransaction},
-             storage::{Fork, ProofMapIndex, Snapshot}};
+             storage::{Fork, ProofMapIndex, DbView}};
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
 
@@ -44,14 +44,14 @@ pub struct MarkerSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<Snapshot>> MarkerSchema<T> {
+impl<T: AsRef<DbView>> MarkerSchema<T> {
     /// Constructs schema for the given `snapshot`.
     pub fn new(view: T) -> Self {
         MarkerSchema { view }
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
-    pub fn marks(&self) -> ProofMapIndex<&Snapshot, PublicKey, i32> {
+    pub fn marks(&self) -> ProofMapIndex<&DbView, PublicKey, i32> {
         ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view.as_ref())
     }
 
@@ -108,7 +108,7 @@ impl Service for MarkerService {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &DbView) -> Vec<Hash> {
         let schema = MarkerSchema::new(snapshot);
         schema.state_hash()
     }

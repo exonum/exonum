@@ -16,7 +16,7 @@
 
 use exonum::{crypto::{self, CryptoHash, Hash, PublicKey, Signature},
              messages::{RawMessage, ServiceMessage},
-             storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue}};
+             storage::{Fork, ProofListIndex, ProofMapIndex, DbView, StorageValue}};
 
 use std::{borrow::Cow, ops::Deref};
 
@@ -180,7 +180,7 @@ pub struct Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
 {
     /// Creates a new schema.
     pub fn new(snapshot: T) -> Schema<T> {
@@ -192,18 +192,18 @@ where
     ///
     /// Consult [the crate-level docs](index.html) for details how hashes of the configuration
     /// are calculated.
-    pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&Snapshot, Hash, ProposeData> {
+    pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&DbView, Hash, ProposeData> {
         ProofMapIndex::new(PROPOSES, self.view.as_ref())
     }
 
     /// Returns a table of hashes of proposed configurations in the commit order.
-    pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&Snapshot, Hash> {
+    pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&DbView, Hash> {
         ProofListIndex::new(PROPOSE_HASHES, self.view.as_ref())
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
-    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, MaybeVote> {
+    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&DbView, MaybeVote> {
         ProofListIndex::new_in_family(VOTES, config_hash, self.view.as_ref())
     }
 

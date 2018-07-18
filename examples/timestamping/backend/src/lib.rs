@@ -39,7 +39,7 @@ use exonum::{api::Api,
              encoding::Error as StreamStructError,
              helpers::fabric,
              messages::RawTransaction,
-             storage::Snapshot};
+             storage::DbView};
 use iron::Handler;
 use router::Router;
 
@@ -68,7 +68,7 @@ impl blockchain::Service for Service {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, view: &DbView) -> Vec<Hash> {
         let schema = Schema::new(view);
         schema.state_hash()
     }

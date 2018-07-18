@@ -23,7 +23,7 @@ use exonum::{api::public::BlocksRange,
              crypto::{gen_keypair, CryptoHash, Hash, PublicKey},
              encoding,
              messages::{Message, RawTransaction},
-             storage::{Fork, Snapshot}};
+             storage::{Fork, DbView}};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 // Simple service implementation.
@@ -58,7 +58,7 @@ impl Service for TimestampingService {
         "timestamping"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         Vec::new()
     }
 

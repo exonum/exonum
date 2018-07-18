@@ -19,7 +19,7 @@ use exonum::{blockchain::{ExecutionResult, Service, ServiceContext, Transaction,
              encoding,
              helpers::Height,
              messages::RawTransaction,
-             storage::{Fork, Snapshot}};
+             storage::{Fork, DbView}};
 
 const SERVICE_ID: u16 = 512;
 
@@ -50,7 +50,7 @@ impl Service for AfterCommitService {
         "after_commit"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         Vec::new()
     }
 

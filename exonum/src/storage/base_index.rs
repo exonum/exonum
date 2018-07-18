@@ -17,8 +17,8 @@
 
 use std::{borrow::Cow, marker::PhantomData};
 
-use super::{Fork, Iter, Snapshot, StorageKey, StorageValue};
-use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
+use super::{DbView, DbViewMut, Fork, Iter, Result, StorageKey, StorageValue};
+use storage::indexes_metadata::{self, IndexType, IndexMetadata, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -41,6 +41,32 @@ pub struct BaseIndex<T> {
     view: T,
 }
 
+pub trait BaseIndexMut {
+    fn put<K, V>(&mut self, key: &K, value: V) -> Result<()>
+    where
+        K: StorageKey,
+        V: StorageValue;
+
+    fn remove<K>(&mut self, key: &K) -> Result<()>
+        where
+            K: StorageKey + ?Sized;
+
+    fn clear(&mut self) -> Result<()>;
+}
+
+pub trait BaseIndexForked {
+    fn put<K, V>(&mut self, key: &K, value: V)
+        where
+            K: StorageKey,
+            V: StorageValue;
+
+    fn remove<K>(&mut self, key: &K)
+        where
+            K: StorageKey + ?Sized;
+
+    fn clear(&mut self);
+}
+
 /// An iterator over the entries of a `BaseIndex`.
 ///
 /// This struct is created by the [`iter`] or
@@ -58,9 +84,76 @@ pub struct BaseIndexIter<'a, K, V> {
     _v: PhantomData<V>,
 }
 
+impl<T> BaseIndex<T> {
+    fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
+        match self.index_id {
+            Some(ref prefix) => {
+                let mut v = vec![0; prefix.len() + key.size()];
+                v[..prefix.len()].copy_from_slice(prefix);
+                key.write(&mut v[prefix.len()..]);
+                v
+            }
+            None => {
+                let mut v = vec![0; key.size()];
+                key.write(&mut v);
+                v
+            }
+        }
+    }
+
+    pub(crate) fn indexes_metadata(view: T) -> Self {
+        BaseIndex {
+            name: INDEXES_METADATA_TABLE_NAME.to_string(),
+            is_family: false,
+            index_id: None,
+            is_mutable: true,
+            index_type: IndexType::Map,
+            view,
+        }
+    }
+}
+
+fn set_mut_index_metadata<T>(index: &mut BaseIndex<T>)
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+{
+    if !index.is_mutable {
+        if index.name == INDEXES_METADATA_TABLE_NAME {
+            panic!("Attempt to access an internal storage infrastructure");
+        }
+        let mut metadata = BaseIndex::indexes_metadata(&mut index.view);
+        if metadata.get::<_, IndexMetadata>(&index.name).is_none() {
+            metadata.put(
+                &index.name.to_owned(),
+                IndexMetadata::new(index.index_type, index.is_family),
+            );
+        }
+
+        index.is_mutable = true;
+    }
+}
+
+fn set_forked_index_metadata<'a>(index: &mut BaseIndex<&'a mut Fork>) {
+    if !index.is_mutable {
+        if index.name == INDEXES_METADATA_TABLE_NAME {
+            panic!("Attempt to access an internal storage infrastructure");
+        }
+        let mut metadata = BaseIndex::<&'a mut Fork>::indexes_metadata(index.view);
+        if metadata.get::<_, IndexMetadata>(&index.name).is_none() {
+            metadata.put(
+                &index.name.to_owned(),
+                IndexMetadata::new(index.index_type, index.is_family),
+            );
+        }
+
+        index.is_mutable = true;
+    }
+}
+
 impl<T> BaseIndex<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -130,33 +223,6 @@ where
         }
     }
 
-    pub(crate) fn indexes_metadata(view: T) -> Self {
-        BaseIndex {
-            name: INDEXES_METADATA_TABLE_NAME.to_string(),
-            is_family: false,
-            index_id: None,
-            is_mutable: true,
-            index_type: IndexType::Map,
-            view,
-        }
-    }
-
-    fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
-        match self.index_id {
-            Some(ref prefix) => {
-                let mut v = vec![0; prefix.len() + key.size()];
-                v[..prefix.len()].copy_from_slice(prefix);
-                key.write(&mut v[prefix.len()..]);
-                v
-            }
-            None => {
-                let mut v = vec![0; key.size()];
-                key.write(&mut v);
-                v
-            }
-        }
-    }
-
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
@@ -223,36 +289,70 @@ where
     }
 }
 
-impl<'a> BaseIndex<&'a mut Fork> {
-    fn set_index_type(&mut self) {
-        if !self.is_mutable {
-            indexes_metadata::set_index_type(
-                &self.name,
-                self.index_type,
-                self.is_family,
-                &mut self.view,
-            );
-            self.is_mutable = true;
-        }
+impl<T> BaseIndexMut for BaseIndex<T>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+{
+    /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
+    fn put<K, V>(&mut self, key: &K, value: V) -> Result<()>
+        where
+            K: StorageKey,
+            V: StorageValue,
+    {
+        set_mut_index_metadata(self);
+        let key = self.prefixed_key(key);
+        self.view
+            .as_mut()
+            .put(&self.name, key, value.into_bytes())
     }
 
+    /// Removes the key of *any* type from the index.
+    fn remove<K>(&mut self, key: &K) -> Result<()>
+        where
+            K: StorageKey + ?Sized,
+    {
+        set_mut_index_metadata(self);
+        let key = self.prefixed_key(key);
+        self.view
+            .as_mut()
+            .remove(&self.name, key)
+    }
+
+    /// Clears the index, removing entries with keys that starts with a prefix or all entries
+    /// if `prefix` is `None`.
+    ///
+    /// # Notes
+    ///
+    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// in the index.
+    fn clear(&mut self) -> Result<()> {
+        set_mut_index_metadata(self);
+        self.view
+            .as_mut()
+            .remove_by_prefix(&self.name, self.index_id.as_ref())
+    }
+}
+
+impl<'a> BaseIndexForked for BaseIndex<&'a mut Fork> {
     /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
-    pub fn put<K, V>(&mut self, key: &K, value: V)
+    fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: StorageKey,
         V: StorageValue,
     {
-        self.set_index_type();
+        set_forked_index_metadata(self);
         let key = self.prefixed_key(key);
         self.view.put(&self.name, key, value.into_bytes());
     }
 
     /// Removes the key of *any* type from the index.
-    pub fn remove<K>(&mut self, key: &K)
+    fn remove<K>(&mut self, key: &K)
     where
         K: StorageKey + ?Sized,
     {
-        self.set_index_type();
+        set_forked_index_metadata(self);
         let key = self.prefixed_key(key);
         self.view.remove(&self.name, key);
     }
@@ -265,10 +365,9 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
-    pub fn clear(&mut self) {
-        self.set_index_type();
-        self.view
-            .remove_by_prefix(&self.name, self.index_id.as_ref());
+    fn clear(&mut self) {
+        set_forked_index_metadata(self);
+        self.view.remove_by_prefix(&self.name, self.index_id.as_ref());
     }
 }
 

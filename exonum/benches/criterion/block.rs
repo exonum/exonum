@@ -19,7 +19,7 @@ use exonum::{blockchain::{Blockchain, ExecutionResult, Schema, Service, Transact
              helpers::{Height, ValidatorId},
              messages::{Message, RawTransaction},
              node::ApiSender,
-             storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, Snapshot}};
+             storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, DbView}};
 use futures::sync::mpsc;
 use tempdir::TempDir;
 
@@ -61,7 +61,7 @@ fn execute_timestamping(db: Box<Database>, auxiliary_db: Box<Database>, c: &mut 
             "timestamping"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &DbView) -> Vec<Hash> {
             Vec::new()
         }
 
@@ -135,7 +135,7 @@ fn execute_cryptocurrency(db: Box<Database>, auxiliary_db: Box<Database>, c: &mu
             "cryptocurrency"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &DbView) -> Vec<Hash> {
             Vec::new()
         }
 

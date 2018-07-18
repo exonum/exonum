@@ -22,7 +22,7 @@ use encoding::{serialize::{json, WriteBufferWrapper},
                Error as EncodingError,
                Field,
                Offset};
-use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
+use storage::{base_index::BaseIndex, DbView, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -126,7 +126,7 @@ impl json::ExonumJson for IndexType {
     }
 }
 
-pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &Snapshot) {
+pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &DbView) {
     let metadata = BaseIndex::indexes_metadata(view);
     if let Some(value) = metadata.get::<_, IndexMetadata>(name) {
         let stored_type = value.index_type();
@@ -153,16 +153,6 @@ pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, vie
                 "an ordinary index"
             }
         );
-    }
-}
-
-pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: &mut Fork) {
-    if name == INDEXES_METADATA_TABLE_NAME {
-        panic!("Attempt to access an internal storage infrastructure");
-    }
-    let mut metadata = BaseIndex::indexes_metadata(view);
-    if metadata.get::<_, IndexMetadata>(name).is_none() {
-        metadata.put(&name.to_owned(), IndexMetadata::new(index_type, is_family));
     }
 }
 

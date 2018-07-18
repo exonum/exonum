@@ -16,11 +16,15 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{base_index::{BaseIndex, BaseIndexIter},
-            indexes_metadata::IndexType,
-            Fork,
-            Snapshot,
-            StorageKey};
+use super::{
+    base_index::{BaseIndex, BaseIndexForked, BaseIndexMut, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork,
+    DbView,
+    DbViewMut,
+    Result,
+    StorageKey,
+};
 
 /// A set of items that implement `StorageKey` trait.
 ///
@@ -32,6 +36,28 @@ use super::{base_index::{BaseIndex, BaseIndexIter},
 pub struct KeySetIndex<T, K> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
+}
+
+pub trait KeySetIndexMut<K> {
+    fn insert(&mut self, item: K) -> Result<()>;
+
+    fn remove<Q>(&mut self, item: &Q) -> Result<()>
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized;
+
+    fn clear(&mut self) -> Result<()>;
+}
+
+pub trait KeySetIndexForked<K> {
+    fn insert(&mut self, item: K);
+
+    fn remove<Q>(&mut self, item: &Q)
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ?Sized;
+
+    fn clear(&mut self);
 }
 
 /// An iterator over the items of a `KeySetIndex`.
@@ -49,7 +75,7 @@ pub struct KeySetIndexIter<'a, K> {
 
 impl<T, K> KeySetIndex<T, K>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     K: StorageKey,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -180,7 +206,31 @@ where
     }
 }
 
-impl<'a, K> KeySetIndex<&'a mut Fork, K>
+impl<T, K> KeySetIndexMut<K> for KeySetIndex<T, K>
+where
+    T: AsRef<DbView>,
+    T: AsMut<DbViewMut>,
+    K: StorageKey,
+{
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    fn insert(&mut self, item: K) -> Result<()> {
+        self.base.put(&item, ())
+    }
+
+    fn remove<Q>(&mut self, item: &Q) -> Result<()>
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ?Sized,
+    {
+        self.base.remove(item)
+    }
+
+    fn clear(&mut self) -> Result<()> {
+        self.base.clear()
+    }
+}
+
+impl<'a, K> KeySetIndexForked<K> for KeySetIndex<&'a mut Fork, K>
 where
     K: StorageKey,
 {
@@ -200,8 +250,8 @@ where
     /// assert!(index.contains(&1));
     /// ```
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-    pub fn insert(&mut self, item: K) {
-        self.base.put(&item, ())
+    fn insert(&mut self, item: K) {
+        self.base.put(&item, ());
     }
 
     /// Removes a value from the set.
@@ -222,12 +272,12 @@ where
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     /// ```
-    pub fn remove<Q>(&mut self, item: &Q)
+    fn remove<Q>(&mut self, item: &Q)
     where
         K: Borrow<Q>,
         Q: StorageKey + ?Sized,
     {
-        self.base.remove(item)
+        self.base.remove(item);
     }
 
     /// Clears the set, removing all values.
@@ -253,14 +303,14 @@ where
     /// index.clear();
     /// assert!(!index.contains(&1));
     /// ```
-    pub fn clear(&mut self) {
-        self.base.clear()
+    fn clear(&mut self) {
+        self.base.clear();
     }
 }
 
 impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     K: StorageKey,
 {
     type Item = K::Owned;

@@ -167,7 +167,7 @@ use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfi
              helpers::{Height, ValidatorId},
              messages::RawMessage,
              node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState},
-             storage::{MemoryDB, Patch, Snapshot}};
+             storage::{MemoryDB, Patch, DbView}};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use handler::create_testkit_handler;
@@ -458,7 +458,7 @@ impl TestKit {
     }
 
     /// Returns a snapshot of the current blockchain state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Box<DbView> {
         self.blockchain.snapshot()
     }
 
@@ -557,7 +557,7 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
-    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
+    pub fn probe_all<I>(&mut self, transactions: I) -> Box<DbView>
     where
         I: IntoIterator<Item = Box<Transaction>>,
     {
@@ -581,7 +581,7 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<Snapshot> {
+    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<DbView> {
         self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
     }
 

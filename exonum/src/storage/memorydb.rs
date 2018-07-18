@@ -18,7 +18,8 @@ use std::{clone::Clone,
           collections::{BTreeMap, HashMap},
           sync::{Arc, RwLock}};
 
-use super::{db::Change, Database, Iter, Iterator, Patch, Result, Snapshot};
+use storage;
+use super::{db::Change, Database, Error, DbView, DbViewMut, Iter, Iterator, Patch, Result};
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
@@ -27,7 +28,11 @@ type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 /// It's mainly used for testing and not designed to be efficient.
 #[derive(Default, Debug)]
 pub struct MemoryDB {
-    map: RwLock<DB>,
+    map: Arc<RwLock<DB>>,
+}
+
+pub struct MemoryDBSnapshot {
+    map: Arc<RwLock<DB>>,
 }
 
 /// An iterator over the entries of a `MemoryDB`.
@@ -40,15 +45,21 @@ impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
         MemoryDB {
-            map: RwLock::new(HashMap::new()),
+            map: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
 impl Database for MemoryDB {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<DbView> {
         Box::new(MemoryDB {
-            map: RwLock::new(self.map.read().unwrap().clone()),
+            map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
+        })
+    }
+
+    fn view(&self) -> Box<DbView> {
+        Box::new(MemoryDB {
+            map: self.map.clone(),
         })
     }
 
@@ -78,7 +89,93 @@ impl Database for MemoryDB {
     }
 }
 
-impl Snapshot for MemoryDB {
+impl DbView for MemoryDB {
+    fn get(&self, cf_name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        self.map
+            .read()
+            .unwrap()
+            .get(cf_name)
+            .and_then(|table| table.get(&key.to_vec()).cloned())
+    }
+
+    fn contains(&self, cf_name: &str, key: &[u8]) -> bool {
+        self.map
+            .read()
+            .unwrap()
+            .get(cf_name)
+            .map_or(false, |table| table.contains_key(&key.to_vec()))
+    }
+
+    fn iter<'a>(&'a self, cf_name: &str, from: &[u8]) -> Iter<'a> {
+        let map_guard = self.map.read().unwrap();
+        let data = match map_guard.get(cf_name) {
+            Some(table) => table
+                .iter()
+                .skip_while(|&(k, _)| k.as_slice() < from)
+                .map(|(k, v)| (k.to_vec(), v.to_vec()))
+                .collect(),
+            None => Vec::new(),
+        };
+
+        Box::new(MemoryDBIter { data, index: 0 })
+    }
+}
+
+impl DbViewMut for MemoryDB {
+    fn put(&mut self, cf_name: &str, key: Vec<u8>, value: Vec<u8>) -> storage::Result<()> {
+        self.map
+            .write()
+            .unwrap()
+            .entry(cf_name.to_string())
+            .or_insert(BTreeMap::new())
+            .insert(key, value);
+        Ok(())
+    }
+
+    fn remove(&mut self, cf_name: &str, key: Vec<u8>) -> storage::Result<()> {
+        let mut map = self.map
+            .write()
+            .unwrap();
+        let mut column_family = map.get_mut(cf_name);
+        match column_family {
+            Some(ref mut cf) => {
+                cf.remove(&key);
+                Ok(())
+            },
+            None => Err(Error::new(format!(
+                "There is no column family with such name: {}",
+                cf_name,
+            )))
+        }
+    }
+
+    fn remove_by_prefix(&mut self, cf_name: &str, prefix: Option<&Vec<u8>>) -> storage::Result<()> {
+        let mut map = self.map
+            .write()
+            .unwrap();
+        let column_family = map.remove(cf_name);
+        match column_family {
+            Some(cf) => {
+                let cf = match prefix {
+                    Some(prefix) => {
+                        cf.into_iter()
+                            .filter(|(k, _)| !k.starts_with(prefix))
+                            .collect::<BTreeMap<_, _>>()
+                    },
+                    None => BTreeMap::new(),
+                };
+                map.insert(cf_name.to_string(), cf);
+                Ok(())
+            },
+            None => Err(Error::new(format!(
+                "There is no column family with such name: {}",
+                cf_name,
+            )))
+        }
+    }
+}
+
+impl DbView for MemoryDBSnapshot {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
         self.map
             .read()

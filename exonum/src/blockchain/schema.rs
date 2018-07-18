@@ -16,8 +16,22 @@ use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, Transact
 use crypto::{CryptoHash, Hash, PublicKey};
 use helpers::{Height, Round};
 use messages::{Connect, Precommit, RawMessage};
-use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
-              ProofMapIndex, Snapshot};
+use storage::{
+    Entry,
+    EntryForked,
+    Fork,
+    KeySetIndex,
+    KeySetIndexForked,
+    ListIndex,
+    ListIndexForked,
+    MapIndex,
+    MapIndexForked,
+    MapProof,
+    ProofListIndex,
+    ProofMapIndex,
+    ProofMapIndexForked,
+    DbView,
+};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -81,7 +95,7 @@ pub struct Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
 {
     /// Constructs information schema for the given `snapshot`.
     pub fn new(snapshot: T) -> Schema<T> {
@@ -543,7 +557,7 @@ pub struct ServiceSchema<T> {
 }
 
 impl<T> ServiceSchema<T> where
-    T: AsRef<Snapshot>
+    T: AsRef<DbView>
 {
     /// Constructs information schema for the given `snapshot`.
     pub fn new(snapshot: T) -> ServiceSchema<T> {

@@ -14,7 +14,7 @@
 
 //! Routines for comparison between 2 states.
 
-use exonum::storage::Snapshot;
+use exonum::storage::DbView;
 
 /// Facilitation of comparison between 2 states.
 #[derive(Debug)]
@@ -215,11 +215,11 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
 /// method with a signature like `fn<S: AsRef<Snapshot>>(view: S) -> Self`.
 pub trait ComparableSnapshot<S> {
     /// Compares this snapshot with an older one.
-    fn compare(self, old: S) -> Comparison<Box<Snapshot>>;
+    fn compare(self, old: S) -> Comparison<Box<DbView>>;
 }
 
-impl ComparableSnapshot<Box<Snapshot>> for Box<Snapshot> {
-    fn compare(self, old: Box<Snapshot>) -> Comparison<Box<Snapshot>> {
+impl ComparableSnapshot<Box<DbView>> for Box<DbView> {
+    fn compare(self, old: Box<DbView>) -> Comparison<Box<DbView>> {
         Comparison::new(old, self)
     }
 }

@@ -23,7 +23,7 @@ use crypto::{gen_keypair, CryptoHash, Hash};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
 use messages::{Message, RawTransaction};
-use storage::{Database, Error, Fork, ListIndex, Snapshot};
+use storage::{Database, Error, Fork, ListIndex, DbView};
 
 const IDX_NAME: &'static str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -39,7 +39,7 @@ impl Service for TestService {
         "test service"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         vec![]
     }
 
@@ -372,7 +372,7 @@ impl Service for ServiceGood {
         "some_service"
     }
 
-    fn state_hash(&self, _snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _snapshot: &DbView) -> Vec<Hash> {
         vec![]
     }
 
@@ -397,7 +397,7 @@ impl Service for ServicePanic {
         "some_service"
     }
 
-    fn state_hash(&self, _snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _snapshot: &DbView) -> Vec<Hash> {
         vec![]
     }
 
@@ -421,7 +421,7 @@ impl Service for ServicePanicStorageError {
         "some_service"
     }
 
-    fn state_hash(&self, _snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _snapshot: &DbView) -> Vec<Hash> {
         vec![]
     }
 

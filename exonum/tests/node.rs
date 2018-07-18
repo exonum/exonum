@@ -32,7 +32,7 @@ use exonum::{blockchain::{Service, ServiceContext, Transaction},
              helpers,
              messages::RawTransaction,
              node::{ApiSender, ExternalMessage, Node},
-             storage::{Database, Fork, MemoryDB, Snapshot}};
+             storage::{Database, Fork, MemoryDB, DbView}};
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 
@@ -45,7 +45,7 @@ impl Service for CommitWatcherService {
         "commit_watcher"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -71,7 +71,7 @@ impl Service for InitializeCheckerService {
         "initialize_checker"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         Vec::new()
     }
 

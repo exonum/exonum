@@ -170,7 +170,7 @@ mod tests {
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction};
-    use exonum::storage::{Fork, Snapshot};
+    use exonum::storage::{Fork, DbView};
     use iron::headers::{ContentType, Headers};
     use iron::Handler;
     use iron_test::{request, response};
@@ -222,7 +222,7 @@ mod tests {
                 "sample"
             }
 
-            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            fn state_hash(&self, _: &DbView) -> Vec<Hash> {
                 Vec::new()
             }
 

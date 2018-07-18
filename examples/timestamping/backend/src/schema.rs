@@ -14,7 +14,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{crypto::Hash,
-             storage::{Fork, ProofMapIndex, Snapshot}};
+             storage::{Fork, ProofMapIndex, DbView}};
 
 encoding_struct! {
     /// Stores content's hash and some metadata about it.
@@ -55,7 +55,7 @@ impl<T> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
 {
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &self.view)

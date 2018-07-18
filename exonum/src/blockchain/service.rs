@@ -30,7 +30,7 @@ use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
 use node::{ApiSender, Node, State, TransactionSend};
-use storage::{Fork, Snapshot};
+use storage::{Fork, DbView};
 
 /// A trait that describes the business logic of a certain service.
 ///
@@ -148,7 +148,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, snapshot: &DbView) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
     ///
@@ -269,7 +269,7 @@ impl ServiceContext {
 
     /// Returns the current database snapshot. This snapshot is used to
     /// retrieve schema information from the database.
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn snapshot(&self) -> &DbView {
         self.fork.as_ref()
     }
 

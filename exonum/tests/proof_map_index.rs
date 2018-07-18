@@ -31,7 +31,7 @@ use exonum::storage::{proof_map_index::{ProofMapKey, ProofPath},
                       MapProof,
                       MemoryDB,
                       ProofMapIndex,
-                      Snapshot,
+                      DbView,
                       StorageValue};
 use proptest::{num::u8::BinarySearch as U8BinarySearch, prelude::*, test_runner::Config};
 
@@ -43,7 +43,7 @@ const INDEX_NAME: &str = "index";
 
 fn check_map_proof<T, K, V>(proof: MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     K: ProofMapKey + PartialEq + Debug,
     V: StorageValue + PartialEq + Debug,
 {
@@ -68,7 +68,7 @@ fn check_map_multiproof<T, K, V>(
     keys: BTreeSet<K>,
     table: &ProofMapIndex<T, K, V>,
 ) where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     K: ProofMapKey + Clone + PartialEq + Debug,
     V: StorageValue + PartialEq + Debug,
 {

@@ -38,7 +38,7 @@ use exonum::{blockchain::{ApiContext, Service, Transaction, TransactionSet},
              encoding::Error as EncodingError,
              helpers::fabric::{self, Context},
              messages::RawTransaction,
-             storage::Snapshot};
+             storage::DbView};
 use iron::Handler;
 use router::Router;
 
@@ -64,7 +64,7 @@ impl Service for CurrencyService {
         CRYPTOCURRENCY_SERVICE_ID
     }
 
-    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, view: &DbView) -> Vec<Hash> {
         let schema = CurrencySchema::new(view);
         schema.state_hash()
     }

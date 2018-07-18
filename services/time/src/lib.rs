@@ -50,7 +50,7 @@ use exonum::{api::Api,
              encoding::{self, serialize::json::reexport::Value},
              helpers::fabric::{Context, ServiceFactory},
              messages::RawTransaction,
-             storage::{Fork, Snapshot}};
+             storage::{Fork, DbView}};
 use iron::Handler;
 use router::Router;
 use schema::TimeSchema;
@@ -97,7 +97,7 @@ impl Service for TimeService {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &DbView) -> Vec<Hash> {
         let schema = TimeSchema::new(snapshot);
         schema.state_hash()
     }

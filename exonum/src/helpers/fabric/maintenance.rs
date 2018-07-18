@@ -23,7 +23,7 @@ use super::{internal::{CollectedCommand, Command, Feedback},
 use blockchain::Schema;
 use helpers::config::ConfigFile;
 use node::NodeConfig;
-use storage::{Database, DbOptions, RocksDB};
+use storage::{Database, DbOptions, RocksDB, ListIndexForked};
 
 // Context entry for the path to the node config.
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";

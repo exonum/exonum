@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
+use exonum::storage::{Database, DbView, Patch, Result as StorageResult, DbView};
 
 use std::sync::{Arc, RwLock};
 
@@ -44,11 +44,18 @@ impl<T: Database> CheckpointDb<T> {
 }
 
 impl<T: Database> Database for CheckpointDb<T> {
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<DbView> {
         self.inner
             .read()
             .expect("Cannot lock CheckpointDb for snapshot")
             .snapshot()
+    }
+
+    fn view(&self) -> Box<DbView> {
+        self.inner
+            .write()
+            .expect("Cannot lock CheckpointDb for view")
+            .view()
     }
 
     fn merge(&self, patch: Patch) -> StorageResult<()> {
@@ -113,8 +120,12 @@ impl<T: Database> CheckpointDbInner<T> {
         }
     }
 
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Box<DbView> {
         self.db.snapshot()
+    }
+
+    fn view(&self) -> Box<DbView> {
+        self.db.view()
     }
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {

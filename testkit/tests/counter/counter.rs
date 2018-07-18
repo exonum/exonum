@@ -25,7 +25,7 @@ use exonum::{api::{Api, ApiError},
              encoding,
              messages::{Message, RawTransaction},
              node::{ApiSender, TransactionSend},
-             storage::{Entry, Fork, Snapshot}};
+             storage::{Entry, Fork, DbView}};
 use serde_json;
 
 use self::{iron::{prelude::*, Handler},
@@ -42,12 +42,12 @@ pub struct CounterSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<Snapshot>> CounterSchema<T> {
+impl<T: AsRef<DbView>> CounterSchema<T> {
     pub fn new(view: T) -> Self {
         CounterSchema { view }
     }
 
-    fn entry(&self) -> Entry<&Snapshot, u64> {
+    fn entry(&self) -> Entry<&DbView, u64> {
         Entry::new("counter.count", self.view.as_ref())
     }
 
@@ -217,7 +217,7 @@ impl Service for CounterService {
         "counter"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &DbView) -> Vec<Hash> {
         Vec::new()
     }
 

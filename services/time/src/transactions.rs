@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use exonum::{blockchain::{ExecutionError, ExecutionResult, Schema, Transaction},
              crypto::PublicKey,
              messages::Message,
-             storage::{Fork, Snapshot}};
+             storage::{Fork, DbView}};
 
 use schema::TimeSchema;
 
@@ -44,7 +44,7 @@ transactions! {
 }
 
 impl TxTime {
-    fn check_signed_by_validator(&self, snapshot: &Snapshot) -> ExecutionResult {
+    fn check_signed_by_validator(&self, snapshot: &DbView) -> ExecutionResult {
         let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
         let signed = keys.iter().any(|k| k.service_key == *self.pub_key());
         if !signed {

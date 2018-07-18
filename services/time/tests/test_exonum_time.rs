@@ -24,14 +24,14 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{blockchain::{Schema, Transaction, TransactionErrorType},
              crypto::{gen_keypair, CryptoHash, PublicKey},
              helpers::{Height, ValidatorId},
-             storage::Snapshot};
+             storage::DbView};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider,
                   transactions::Error, transactions::TxTime, TimeService};
 
 use std::{collections::HashMap, iter::FromIterator};
 
-fn assert_storage_times_eq<T: AsRef<Snapshot>>(
+fn assert_storage_times_eq<T: AsRef<DbView>>(
     snapshot: T,
     validators: &[TestNode],
     expected_current_time: Option<DateTime<Utc>>,
@@ -52,7 +52,7 @@ fn assert_storage_times_eq<T: AsRef<Snapshot>>(
     }
 }
 
-fn assert_transaction_result<S: AsRef<Snapshot>, T: Transaction>(
+fn assert_transaction_result<S: AsRef<DbView>, T: Transaction>(
     snapshot: S,
     transaction: &T,
     expected_code: u8,
@@ -302,7 +302,7 @@ fn test_mock_provider() {
         .create();
 
     let validators = testkit.network().validators().to_vec();
-    let assert_storage_times = |snapshot: Box<Snapshot>| {
+    let assert_storage_times = |snapshot: Box<DbView>| {
         assert_storage_times_eq(
             snapshot,
             &validators,

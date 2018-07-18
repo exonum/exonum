@@ -19,10 +19,10 @@ pub use self::proof::{ListProof, ListProofError};
 use std::{cell::Cell, marker::PhantomData};
 
 use self::key::ProofListKey;
-use super::{base_index::{BaseIndex, BaseIndexIter},
+use super::{base_index::{BaseIndex, BaseIndexForked, BaseIndexIter},
             indexes_metadata::IndexType,
             Fork,
-            Snapshot,
+            DbView,
             StorageKey,
             StorageValue};
 use crypto::{hash, Hash, HashStream};
@@ -47,6 +47,18 @@ pub struct ProofListIndex<T, V> {
     _v: PhantomData<V>,
 }
 
+pub trait ProofListIndexForked<K, V> {
+    fn push(&mut self, value: V);
+
+    fn extend<I>(&mut self, iter: I)
+        where
+            I: IntoIterator<Item = V>;
+
+    fn set(&mut self, index: u64, value: V);
+
+    fn clear(&mut self);
+}
+
 /// An iterator over the items of a `ProofListIndex`.
 ///
 /// This struct is created by the [`iter`] or
@@ -69,7 +81,7 @@ fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
 
 impl<T, V> ProofListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -439,21 +451,21 @@ where
     }
 }
 
+fn set_len<'a, V>(index: &mut ProofListIndex<&'a mut Fork, V>, len: u64) {
+    index.base.put(&(), len);
+    index.length.set(Some(len));
+}
+
+fn set_branch<'a, V>(index: &mut ProofListIndex<&'a mut Fork, V>, key: ProofListKey, hash: Hash) {
+    debug_assert!(key.height() > 0);
+
+    index.base.put(&key, hash)
+}
+
 impl<'a, V> ProofListIndex<&'a mut Fork, V>
 where
     V: StorageValue,
 {
-    fn set_len(&mut self, len: u64) {
-        self.base.put(&(), len);
-        self.length.set(Some(len));
-    }
-
-    fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
-        debug_assert!(key.height() > 0);
-
-        self.base.put(&key, hash)
-    }
-
     /// Appends an element to the back of the proof list.
     ///
     /// # Examples
@@ -471,7 +483,7 @@ where
     /// ```
     pub fn push(&mut self, value: V) {
         let len = self.len();
-        self.set_len(len + 1);
+        set_len(self, len + 1);
         let mut key = ProofListKey::new(1, len);
         self.base.put(&key, value.hash());
         self.base.put(&ProofListKey::leaf(len), value);
@@ -485,7 +497,7 @@ where
                 )
             };
             key = key.parent();
-            self.set_branch(key, hash);
+            set_branch(self, key, hash);
         }
     }
 
@@ -557,7 +569,7 @@ where
                 hash(self.get_branch_unchecked(left).as_ref())
             };
             key = key.parent();
-            self.set_branch(key, hash);
+            set_branch(self, key, hash);
         }
     }
 
@@ -593,7 +605,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<DbView>,
     V: StorageValue,
 {
     type Item = V;

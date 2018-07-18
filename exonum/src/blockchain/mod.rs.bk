@@ -61,17 +61,7 @@ use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
 use node::ApiSender;
-use storage::{
-    Database,
-    DbView,
-    EntryForked,
-    Error,
-    Fork,
-    ListIndexForked,
-    MapIndexForked,
-    Patch,
-    ProofMapIndexForked,
-};
+use storage::{Database, Error, Fork, Patch, Snapshot};
 
 mod block;
 mod genesis;
@@ -88,7 +78,6 @@ mod tests;
 /// into a single network.
 pub struct Blockchain {
     blockchain_db: Arc<Database>,
-    auxiliary_db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
@@ -118,7 +107,6 @@ impl Blockchain {
 
         Blockchain {
             blockchain_db: blockchain_storage.into(),
-            auxiliary_db: auxiliary_storage.into(),
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
@@ -142,7 +130,7 @@ impl Blockchain {
     }
 
     /// Creates a read-only snapshot of the current storage state.
-    pub fn snapshot(&self) -> Box<DbView> {
+    pub fn snapshot(&self) -> Box<Snapshot> {
         self.blockchain_db.snapshot()
     }
 
@@ -328,7 +316,7 @@ impl Blockchain {
                 let state_hash = {
                     let mut sum_table = schema.state_hash_aggregator_mut();
                     for (key, hash) in state_hashes {
-                        sum_table.put(&key, hash);
+                        sum_table.put(&key, hash)
                     }
                     sum_table.merkle_root()
                 };
@@ -611,7 +599,6 @@ impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
             blockchain_db: Arc::clone(&self.blockchain_db),
-            auxiliary_db: Arc::clone(&self.auxiliary_db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),
