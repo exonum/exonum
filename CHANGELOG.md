@@ -87,6 +87,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   as the last argument of the `Node::new` method.
   Otherwise, pass `None`.
 
+- `exonum::crypto` types now have truncated `Display`/`Debug` representations. (#797)
+
+  Migration path:
+
+  Use `encoding::serialize::ToHex` instead of `Display` to produce full hexadecimal
+  representation. You have to manually check if you need to switch or can keep using
+  the truncated representation.
+
+  Use `encoding::serialize::FromHex` instead of `FromStr` for reverse conversion.
+  `FromStr` implementation has been removed from crypto types to avoid errors.
+
 ### New features
 
 #### exonum

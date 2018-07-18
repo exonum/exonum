@@ -32,8 +32,6 @@ use crypto;
 pub const PUBLIC_KEY_LENGTH: usize = 32;
 /// Length of the secret Curve25519 key.
 pub const SECRET_KEY_LENGTH: usize = 32;
-/// The size to crop the string in debug messages.
-pub const BYTES_IN_DEBUG: usize = 4;
 
 /// Converts Ed25519 keys to Curve25519.
 ///
@@ -137,9 +135,7 @@ macro_rules! implement_x25519_type {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            for i in &self.0[0..BYTES_IN_DEBUG] {
-                write!(f, "{:02X}", i)?
-            }
+            crypto::write_short_hex(f, &self.0[..])?;
             write!(f, ")")
         }
     }
