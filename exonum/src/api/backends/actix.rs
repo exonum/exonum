@@ -33,7 +33,7 @@ use std::{
 
 use api::{
     error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
-    Mutable, NamedWith, Resource, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+    Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -158,30 +158,6 @@ where
     }
 }
 
-impl<I, F> From<NamedWith<HttpRequest, I, Result<I>, F, Resource>> for RequestHandler
-where
-    F: for<'r> Fn(&'r ServiceApiState, HttpRequest) -> Result<I> + 'static + Send + Sync + Clone,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<HttpRequest, I, Result<I>, F, Resource>) -> Self {
-        let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let context = request.state().clone();
-            let future = Ok(request)
-                .and_then(|req| handler(&context, req).map_err(From::from))
-                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
-                .into_future();
-            Box::new(future)
-        };
-
-        Self {
-            name: f.name,
-            method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        }
-    }
-}
-
 impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Mutable>> for RequestHandler
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I> + 'static + Send + Sync + Clone,
@@ -227,35 +203,6 @@ where
                 .map(move |query: Query<Q>| query.into_inner())
                 .into_future()
                 .and_then(move |query| handler(&context, query).map_err(From::from))
-                .map(|value| HttpResponse::Ok().json(value))
-                .responder()
-        };
-
-        Self {
-            name: f.name,
-            method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        }
-    }
-}
-
-impl<I, F> From<NamedWith<HttpRequest, I, FutureResult<I>, F, Resource>> for RequestHandler
-where
-    F: for<'r> Fn(&'r ServiceApiState, HttpRequest) -> FutureResult<I>
-        + 'static
-        + Clone
-        + Send
-        + Sync,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<HttpRequest, I, FutureResult<I>, F, Resource>) -> Self {
-        let handler = f.inner.handler;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let handler = handler.clone();
-            let context = request.state().clone();
-            Ok(request)
-                .into_future()
-                .and_then(move |req| handler(&context, req).map_err(From::from))
                 .map(|value| HttpResponse::Ok().json(value))
                 .responder()
         };

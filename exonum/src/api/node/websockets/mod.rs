@@ -17,12 +17,17 @@
 mod server;
 
 use actix::*;
-use actix_web::ws;
+use actix_web::{http, ws, HttpResponse};
 
-use std::sync::{Arc, Mutex};
+use futures::IntoFuture;
+
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use api::{backends::actix::HttpRequest, ServiceApiScope, ServiceApiState};
+use api::{
+    backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
+    ServiceApiBackend, ServiceApiState,
+};
 use blockchain::SharedNodeState;
 
 pub use self::server::Message;
@@ -111,34 +116,47 @@ pub struct WebSocketsApi;
 impl WebSocketsApi {
     fn handle_subscribe(
         self,
-        api_scope: &mut ServiceApiScope,
+        backend: &mut actix::ApiBuilder,
         shared_api_state: SharedNodeState,
     ) -> Self {
-        let server_addr = Arc::new(Mutex::new(None));
+        let server_addr = Arc::new(RwLock::new(None));
 
-        api_scope.resource("ws", move |_state: &ServiceApiState, req: HttpRequest| {
-            let server= server_addr.clone();
-            let mut addr = server.lock().unwrap();
+        let index = move |req: HttpRequest| -> FutureResponse {
+            let server = server_addr.clone();
+            let addr = server.read().unwrap();
             if addr.is_none() {
+                let mut addr = server.write().unwrap();
                 *addr = Some(Arbiter::start(|_| server::BlockCommitWs::default()));
             }
 
-            let state = WsSessionState { addr: addr.to_owned().unwrap() };
+            let state = WsSessionState {
+                addr: addr.to_owned().unwrap(),
+            };
 
-            let _ = ws::start(req, WsSession::new(shared_api_state.clone(), state.clone()));
-            Ok(())
+            let _ = ws::start(
+                req.clone(),
+                WsSession::new(shared_api_state.clone(), state.clone()),
+            );
+
+            let future = Ok(req)
+                .and_then(|_req| Ok(()))
+                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
+                .into_future();
+
+            Box::new(future)
+        };
+
+        backend.raw_handler(RequestHandler {
+            name: "ws".to_owned(),
+            method: http::Method::GET,
+            inner: Arc::from(index) as Arc<RawHandler>,
         });
 
         self
     }
 
     /// Adds WebSockets API endpoints to corresponding scope.
-    pub fn wire(
-        self,
-        api_scope: &mut ServiceApiScope,
-        shared_api_state: SharedNodeState,
-    ) -> &mut ServiceApiScope {
-        self.handle_subscribe(api_scope, shared_api_state);
-        api_scope
+    pub fn wire(self, backend: &mut actix::ApiBuilder, shared_api_state: SharedNodeState) {
+        self.handle_subscribe(backend, shared_api_state);
     }
 }
