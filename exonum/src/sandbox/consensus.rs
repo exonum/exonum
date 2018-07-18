@@ -2798,13 +2798,16 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
+    let block_1_delay = 2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1;
+    let block_2_delay = 2 * sandbox.round_timeout() + 2 * PROPOSE_TIMEOUT + 1;
+
     // create some tx
     let tx = gen_timestamping_tx();
 
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1)
+        .with_duration_since_sandbox_time(block_1_delay)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
@@ -2814,7 +2817,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let height_one_propose = ProposeBuilder::new(&sandbox)
         .with_validator(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
+        .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
         .build();
 
@@ -2822,7 +2825,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let second_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
+        .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
