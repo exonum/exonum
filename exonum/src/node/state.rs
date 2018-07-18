@@ -384,46 +384,45 @@ impl IncompleteBlock {
 }
 
 #[derive(Clone, Debug, Default)]
-/// Shared
+/// Shared `ConnectList` representation to be used in network.
 pub struct SharedConnectList {
-    ///
-    pub connect_list: Arc<RwLock<ConnectList>>,
+    connect_list: Arc<RwLock<ConnectList>>,
 }
 
 impl SharedConnectList {
-    ///
+    /// Creates `SharedConnectList` from `ConnectList`.
     pub fn from_connect_list(connect_list: ConnectList) -> Self {
         SharedConnectList {
             connect_list: Arc::new(RwLock::new(connect_list)),
         }
     }
 
-    ///
+    /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
         return connect_list.is_peer_allowed(public_key);
     }
 
-    ///
+    /// Check if we allow to connect to `address`.
     pub fn is_address_allowed(&self, address: &SocketAddr) -> bool {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
         return connect_list.is_address_allowed(address);
     }
 
-    ///
+    /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
         let list = connect_list.clone();
         list.find_key_by_address(address).map(|k| *k)
     }
 
-    ///
+    /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed_x25519(&self, public_key: &x25519::PublicKey) -> bool {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
         return connect_list.is_peer_allowed_x25519(public_key);
     }
 
-    ///
+    /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
         self.connect_list
             .read()
