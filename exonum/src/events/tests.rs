@@ -202,7 +202,7 @@ pub fn raw_message(id: u16, len: usize) -> RawMessage {
 }
 
 #[derive(Debug, Clone)]
-struct TestInfo {
+struct ConnectionParams {
     connect: Connect,
     address: SocketAddr,
     public_key: PublicKey,
@@ -211,7 +211,7 @@ struct TestInfo {
     connect_info: ConnectInfo,
 }
 
-impl TestInfo {
+impl ConnectionParams {
     fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
         let connect = connect_message(address, &public_key, &secret_key);
@@ -225,7 +225,7 @@ impl TestInfo {
             public_key,
         };
 
-        TestInfo {
+        ConnectionParams {
             connect,
             address,
             public_key,
@@ -242,36 +242,36 @@ impl TestInfo {
 
 #[test]
 fn test_network_handshake() {
-    let first_address = "127.0.0.1:17230".parse().unwrap();
-    let second_address = "127.0.0.1:17231".parse().unwrap();
+    let first = "127.0.0.1:17230".parse().unwrap();
+    let second = "127.0.0.1:17231".parse().unwrap();
 
     let mut connect_list = ConnectList::default();
 
-    let first = TestInfo::from_address(first_address);
-    connect_list.add(first.connect_info);
+    let t1 = ConnectionParams::from_address(first);
+    connect_list.add(t1.connect_info);
 
-    let second = TestInfo::from_address(second_address);
-    connect_list.add(second.connect_info);
+    let t2 = ConnectionParams::from_address(second);
+    connect_list.add(t2.connect_info);
 
     let connect_list = SharedConnectList::from_connect_list(connect_list);
 
-    let e1 = TestEvents::with_addr(first_address);
-    let e2 = TestEvents::with_addr(second_address);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
-    let mut e1 = first.spawn(e1, connect_list.clone());
-    let mut e2 = second.spawn(e2, connect_list);
+    let mut e1 = t1.spawn(e1, connect_list.clone());
+    let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second_address, first.connect.clone());
-    assert_eq!(e2.wait_for_connect(), first.connect.clone());
+    e1.connect_with(second, t1.connect.clone());
+    assert_eq!(e2.wait_for_connect(), t1.connect.clone());
 
-    e2.connect_with(first_address, second.connect.clone());
-    assert_eq!(e1.wait_for_connect(), second.connect.clone());
+    e2.connect_with(first, t2.connect.clone());
+    assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
-    e1.disconnect_with(second_address);
-    assert_eq!(e1.wait_for_disconnect(), second_address);
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
 
-    e2.disconnect_with(first_address);
-    assert_eq!(e2.wait_for_disconnect(), first_address);
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
 }
 
 #[test]
@@ -284,10 +284,10 @@ fn test_network_big_message() {
 
     let mut connect_list = ConnectList::default();
 
-    let t1 = TestInfo::from_address(first);
+    let t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info);
 
-    let t2 = TestInfo::from_address(second);
+    let t2 = ConnectionParams::from_address(second);
     connect_list.add(t2.connect_info);
 
     let connect_list = SharedConnectList::from_connect_list(connect_list);
@@ -341,9 +341,9 @@ fn test_network_max_message_len() {
     let too_big_message = raw_message(16, max_payload_length + 1000);
 
     let mut connect_list = ConnectList::default();
-    let t1 = TestInfo::from_address(first);
+    let t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info);
-    let t2 = TestInfo::from_address(second);
+    let t2 = ConnectionParams::from_address(second);
     connect_list.add(t2.connect_info);
     let connect_list = SharedConnectList::from_connect_list(connect_list);
 
@@ -374,9 +374,9 @@ fn test_network_reconnect() {
     let msg = raw_message(11, 1000);
 
     let mut connect_list = ConnectList::default();
-    let t1 = TestInfo::from_address(first);
+    let t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info);
-    let t2 = TestInfo::from_address(second);
+    let t2 = ConnectionParams::from_address(second);
     connect_list.add(t2.connect_info);
     let connect_list = SharedConnectList::from_connect_list(connect_list);
 
@@ -429,14 +429,14 @@ fn test_network_multiple_connect() {
     let test_infos: Vec<_> = nodes
         .iter()
         .cloned()
-        .map(|addr| TestInfo::from_address(addr))
+        .map(|addr| ConnectionParams::from_address(addr))
         .collect();
 
     for info in test_infos.iter().cloned() {
         connect_list.add(info.connect_info);
     }
 
-    let t1 = TestInfo::from_address(main);
+    let t1 = ConnectionParams::from_address(main);
     let events = TestEvents::with_addr(t1.address);
 
     connect_list.add(t1.connect_info);
@@ -466,9 +466,9 @@ fn test_send_first_not_connect() {
     let other = "127.0.0.1:19501".parse().unwrap();
 
     let mut connect_list = ConnectList::default();
-    let t1 = TestInfo::from_address(main);
+    let t1 = ConnectionParams::from_address(main);
     connect_list.add(t1.connect_info);
-    let t2 = TestInfo::from_address(other);
+    let t2 = ConnectionParams::from_address(other);
     connect_list.add(t2.connect_info);
     let connect_list = SharedConnectList::from_connect_list(connect_list);
 
