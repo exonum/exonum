@@ -23,7 +23,7 @@ use std::{
 };
 
 use super::transaction::Transaction;
-use api::{node::websockets::Message, ServiceApiBuilder};
+use api::{ServiceApiBuilder, WsMessage};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -315,7 +315,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    subscribers: HashMap<usize, Recipient<Syn, Message>>,
+    subscribers: HashMap<usize, Recipient<Syn, WsMessage>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -536,7 +536,7 @@ impl SharedNodeState {
     }
 
     /// Adds an address of new subscriber.
-    pub fn add_subscriber(&self, id: usize, addr: Recipient<Syn, Message>) {
+    pub fn add_subscriber(&self, id: usize, addr: Recipient<Syn, WsMessage>) {
         self.state
             .write()
             .expect("Expected write lock")
@@ -561,7 +561,7 @@ impl SharedNodeState {
             .subscribers
             .values()
         {
-            let _ = addr.do_send(Message(msg.clone()));
+            let _ = addr.do_send(WsMessage(msg.clone()));
         }
     }
 }

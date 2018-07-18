@@ -17,35 +17,29 @@
 mod server;
 
 use actix::*;
-use actix_web::{http, ws, HttpResponse};
+use actix_web::ws;
 
-use futures::IntoFuture;
-
-use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use api::{
-    backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    ServiceApiBackend, ServiceApiState,
-};
+use api::ServiceApiState;
 use blockchain::SharedNodeState;
 
-pub use self::server::Message;
+pub use self::server::{BlockCommitWs, Message};
 
 #[derive(Clone)]
-struct WsSessionState {
-    addr: Addr<Syn, server::BlockCommitWs>,
+pub struct WsSessionState {
+    pub addr: Addr<Syn, server::BlockCommitWs>,
 }
 
-struct WsSession {
-    id: usize,
-    hb: Instant,
-    shared_api_state: SharedNodeState,
-    server_addr: Addr<Syn, server::BlockCommitWs>,
+pub struct WsSession {
+    pub id: usize,
+    pub hb: Instant,
+    pub shared_api_state: SharedNodeState,
+    pub server_addr: Addr<Syn, server::BlockCommitWs>,
 }
 
 impl WsSession {
-    fn new(shared_api_state: SharedNodeState, server_state: WsSessionState) -> Self {
+    pub fn new(shared_api_state: SharedNodeState, server_state: WsSessionState) -> Self {
         Self {
             id: 0,
             hb: Instant::now(),
@@ -106,52 +100,5 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 ctx.stop();
             }
         }
-    }
-}
-
-/// WebSockets API.
-#[derive(Clone, Copy, Debug)]
-pub struct WebSocketsApi;
-
-impl WebSocketsApi {
-    fn handle_subscribe(
-        self,
-        backend: &mut actix::ApiBuilder,
-        shared_api_state: SharedNodeState,
-    ) -> Self {
-        let server_addr = Arc::new(RwLock::new(None));
-
-        let index = move |req: HttpRequest| -> FutureResponse {
-            let server = server_addr.clone();
-            let addr = server.read().unwrap();
-            if addr.is_none() {
-                let mut addr = server.write().unwrap();
-                *addr = Some(Arbiter::start(|_| server::BlockCommitWs::default()));
-            }
-
-            let state = WsSessionState {
-                addr: addr.to_owned().unwrap(),
-            };
-
-            let _ = ws::start(
-                req.clone(),
-                WsSession::new(shared_api_state.clone(), state.clone()),
-            );
-
-            Box::new(Ok(HttpResponse::Ok().json(())).into_future())
-        };
-
-        backend.raw_handler(RequestHandler {
-            name: "ws".to_owned(),
-            method: http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        });
-
-        self
-    }
-
-    /// Adds WebSockets API endpoints to corresponding scope.
-    pub fn wire(self, backend: &mut actix::ApiBuilder, shared_api_state: SharedNodeState) {
-        self.handle_subscribe(backend, shared_api_state);
     }
 }

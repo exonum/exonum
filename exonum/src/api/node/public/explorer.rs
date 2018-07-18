@@ -14,12 +14,20 @@
 
 //! Exonum blockchain explorer API.
 
+use actix::Arbiter;
+use actix_web::{http, ws, HttpResponse};
+use futures::IntoFuture;
 use serde_json;
 
 use std::ops::Range;
+use std::sync::{Arc, RwLock};
 
-use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
-use blockchain::Block;
+use api::{
+    backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
+    websockets::{BlockCommitWs, WsSession, WsSessionState}, Error as ApiError, ServiceApiBackend,
+    ServiceApiScope, ServiceApiState,
+};
+use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
@@ -156,8 +164,51 @@ impl ExplorerApi {
             })
     }
 
+    /// Subscribes to block commits events.
+    pub fn subscribe(
+        name: &'static str,
+        backend: &mut actix::ApiBuilder,
+        shared_api_state: SharedNodeState,
+    ) {
+        let server_addr = Arc::new(RwLock::new(None));
+
+        let index = move |req: HttpRequest| -> FutureResponse {
+            let server = server_addr.clone();
+            let addr = server.read().unwrap();
+            if addr.is_none() {
+                let mut addr = server.write().unwrap();
+                *addr = Some(Arbiter::start(|_| BlockCommitWs::default()));
+            }
+
+            let state = WsSessionState {
+                addr: addr.to_owned().unwrap(),
+            };
+
+            let _ = ws::start(
+                req.clone(),
+                WsSession::new(shared_api_state.clone(), state.clone()),
+            );
+
+            Box::new(Ok(HttpResponse::Ok().json(())).into_future())
+        };
+
+        backend.raw_handler(RequestHandler {
+            name: name.to_owned(),
+            method: http::Method::GET,
+            inner: Arc::from(index) as Arc<RawHandler>,
+        });
+    }
+
     /// Adds explorer API endpoints to the corresponding scope.
-    pub fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
+    pub fn wire(
+        api_scope: &mut ServiceApiScope,
+        shared_api_state: SharedNodeState,
+    ) -> &mut ServiceApiScope {
+        Self::subscribe(
+            "v1/blocks/subscribe",
+            api_scope.web_backend(),
+            shared_api_state,
+        );
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)

@@ -16,6 +16,7 @@
 
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
+pub use self::websockets::Message as WsMessage;
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -29,6 +30,7 @@ pub mod backends;
 pub mod error;
 pub mod node;
 mod state;
+mod websockets;
 mod with;
 
 /// Defines object that could be used as an API backend.
@@ -274,10 +276,9 @@ impl ApiAggregator {
             "system".to_owned(),
             Self::system_api(&blockchain, node_state.clone()),
         );
-        inner.insert("explorer".to_owned(), Self::explorer_api());
         inner.insert(
-            "websockets".to_owned(),
-            Self::websockets_api(node_state.clone()),
+            "explorer".to_owned(),
+            Self::explorer_api(node_state.clone()),
         );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
@@ -321,9 +322,9 @@ impl ApiAggregator {
         self.inner.insert(prefix.into(), builder);
     }
 
-    fn explorer_api() -> ServiceApiBuilder {
+    fn explorer_api(shared_api_state: SharedNodeState) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        self::node::public::ExplorerApi::wire(builder.public_scope());
+        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_api_state);
         builder
     }
 
@@ -335,13 +336,6 @@ impl ApiAggregator {
         self::node::private::SystemApi::new(node_info, shared_api_state.clone())
             .wire(builder.private_scope());
         self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
-        builder
-    }
-
-    fn websockets_api(shared_api_state: SharedNodeState) -> ServiceApiBuilder {
-        let mut builder = ServiceApiBuilder::new();
-        self::node::websockets::WebSocketsApi
-            .wire(builder.public_scope().web_backend(), shared_api_state);
         builder
     }
 }
