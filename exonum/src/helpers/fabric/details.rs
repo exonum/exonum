@@ -431,6 +431,7 @@ impl Command for GenerateNodeConfig {
 
         let private_config = NodePrivateConfig {
             listen_addr: addr.1,
+            external_addr: addr.0,
             consensus_public_key,
             consensus_secret_key,
             service_public_key,
@@ -608,7 +609,7 @@ impl Command for Finalize {
         let config = {
             NodeConfig {
                 listen_address: secret_config.listen_addr,
-                external_address: our.map(|o| o.addr),
+                external_address: Some(secret_config.external_addr),
                 network: Default::default(),
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
