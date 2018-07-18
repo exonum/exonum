@@ -1188,7 +1188,7 @@ impl State {
 
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
-        let mut list = self.connect_list.connect_list.write().unwrap();
+        let mut list = self.connect_list.connect_list.write().expect("ConnectList write lock");
         list.add(peer);
     }
 }
