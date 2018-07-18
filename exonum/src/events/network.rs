@@ -471,14 +471,7 @@ impl Listener {
     {
         let address = info.address;
         let event = NetworkEvent::PeerConnected(info, connect);
-        let stream = stream.map(move |raw| {
-            println!(
-                "received message {:#?}, len {}",
-                Any::from_raw(raw.clone()),
-                raw.len()
-            );
-            NetworkEvent::MessageReceived(address, raw)
-        });
+        let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx
             .send(event)

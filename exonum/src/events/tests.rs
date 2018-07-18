@@ -426,14 +426,14 @@ fn test_network_multiple_connect() {
 
     let mut connect_list = ConnectList::default();
 
-    let test_infos: Vec<_> = nodes
+    let connection_params: Vec<_> = nodes
         .iter()
         .cloned()
         .map(|addr| ConnectionParams::from_address(addr))
         .collect();
 
-    for info in test_infos.iter().cloned() {
-        connect_list.add(info.connect_info);
+    for params in connection_params.iter().cloned() {
+        connect_list.add(params.connect_info);
     }
 
     let t1 = ConnectionParams::from_address(main);
@@ -444,20 +444,29 @@ fn test_network_multiple_connect() {
     let connect_list = SharedConnectList::from_connect_list(connect_list);
     let mut node = t1.spawn(events, connect_list.clone());
 
-    let connectors: Vec<_> = test_infos
+    let connectors: Vec<_> = connection_params
         .iter()
-        .map(|info| {
-            let events = TestEvents::with_addr(info.address);
-            info.spawn(events, connect_list.clone())
+        .map(|params| {
+            let events = TestEvents::with_addr(params.address);
+            params.spawn(events, connect_list.clone())
         })
         .collect();
 
-    connectors[0].connect_with(main, test_infos[0].connect.clone());
-    assert_eq!(node.wait_for_connect(), test_infos[0].connect.clone());
-    connectors[1].connect_with(main, test_infos[1].connect.clone());
-    assert_eq!(node.wait_for_connect(), test_infos[1].connect.clone());
-    connectors[2].connect_with(main, test_infos[2].connect.clone());
-    assert_eq!(node.wait_for_connect(), test_infos[2].connect.clone());
+    connectors[0].connect_with(main, connection_params[0].connect.clone());
+    assert_eq!(
+        node.wait_for_connect(),
+        connection_params[0].connect.clone()
+    );
+    connectors[1].connect_with(main, connection_params[1].connect.clone());
+    assert_eq!(
+        node.wait_for_connect(),
+        connection_params[1].connect.clone()
+    );
+    connectors[2].connect_with(main, connection_params[2].connect.clone());
+    assert_eq!(
+        node.wait_for_connect(),
+        connection_params[2].connect.clone()
+    );
 }
 
 #[test]

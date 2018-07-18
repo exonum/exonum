@@ -30,10 +30,8 @@ use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
 };
-use node::connect_list::ConnectList;
-use node::ConnectInfo;
-use std::sync::Arc;
-use std::sync::RwLock;
+use node::{connect_list::ConnectList, ConnectInfo};
+use std::sync::{Arc, RwLock};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
