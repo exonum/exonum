@@ -127,7 +127,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `new_in_family` constructor has been added to the `Entry` index. (#790)
 
-### Internal Improvements
+- Added missing `external_address` field during the auditor config finalization. (#805)
+
+### Internal improvements
 
 - `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
   If the node does not have some transactions, requests are created
