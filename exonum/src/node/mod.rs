@@ -588,16 +588,7 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-
-        if self.state.connect_list().is_address_allowed(&address) {
-            self.send_to_addr(address, connect.raw());
-        } else {
-            warn!(
-                "Attempt to connect to the peer {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        self.send_to_addr(address, connect.raw());
     }
 
     /// Add timeout request.

@@ -420,7 +420,7 @@ impl SharedConnectList {
     ///
     pub fn is_peer_allowed_x25519(&self, public_key: &x25519::PublicKey) -> bool {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        return connect_list.is_peer_allowed_x25519(public_key)
+        return connect_list.is_peer_allowed_x25519(public_key);
     }
 
     ///

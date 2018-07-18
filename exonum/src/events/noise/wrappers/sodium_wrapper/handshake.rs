@@ -21,7 +21,6 @@ use super::wrapper::NoiseWrapper;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
-use events::error::into_other;
 use events::error::other_error;
 use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},

@@ -29,16 +29,13 @@ use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time
 use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
 };
-use crypto::{x25519, PublicKey};
-use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
+use crypto::x25519;
 use events::codec::MessagesCodec;
+use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use futures::future::err;
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
 use node::state::SharedConnectList;
-use node::ConnectList;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -156,15 +153,16 @@ impl ConnectionsPool {
             .map(jitter)
             .take(max_tries);
         let handle_cloned = handle.clone();
-        let mut handshake_params = handshake_params.clone();
+        let handshake_params = handshake_params.clone();
         let connect_list = connect_list.clone();
 
         if !connect_list.is_address_allowed(&peer) {
             warn!(
-                "Rejected outgoing connection with peer={}, \
-                 connections limit reached.",
+                "Attempt to connect to the peer {:?} which \
+                 is not in the ConnectList",
                 peer
             );
+            return None;
         }
 
         let action = move || TcpStream::connect(&peer, &handle_cloned);
@@ -234,8 +232,8 @@ impl ConnectionsPool {
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
         connect_list: SharedConnectList,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, x25519::PublicKey), Error = io::Error> {
-        let remote_public_key = connect_list.find_key_by_address(&peer);
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, x25519::PublicKey), Error = io::Error>
+    {
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
@@ -483,7 +481,11 @@ impl Listener {
         let address = info.address;
         let event = NetworkEvent::PeerConnected(info, connect);
         let stream = stream.map(move |raw| {
-            println!("received message {:#?}, len {}", Any::from_raw(raw.clone()), raw.len());
+            println!(
+                "received message {:#?}, len {}",
+                Any::from_raw(raw.clone()),
+                raw.len()
+            );
             NetworkEvent::MessageReceived(address, raw)
         });
 
