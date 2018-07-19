@@ -155,7 +155,7 @@ impl ConsensusConfig {
 
         if self.max_message_len < Self::DEFAULT_MAX_MESSAGE_LEN {
             warn!(
-                "It is recommended that max_message_len ({}) be at least {}.",
+                "It is recommended that max_message_len ({}) is at least {}.",
                 self.max_message_len,
                 Self::DEFAULT_MAX_MESSAGE_LEN
             );
