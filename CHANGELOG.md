@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.9.0 - 2018-07-19
+
 ### Breaking Changes
 
 #### exonum
@@ -13,16 +15,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   Migration path:
 
-  If you override `ServiceFactory::command` method and do a match by a
-  command name, just add `use helpers::fabric::Command` import.
+  If you override `ServiceFactory::command` method and do a match by a command
+  name, just add `use helpers::fabric::Command` import.
 
 - `schema_version` field in `Block` has been removed. (#774)
 
 - Storage in exonum is now versioned. Old databases will not work with this
   update. (#707)
 
-- `Iron`-based web API has been replaced by the new implementation based
-  on `actix-web`. (#727)
+- `Iron`-based web API has been replaced by the new implementation based on
+  `actix-web`. (#727)
 
   Migration path:
 
@@ -103,6 +105,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### New Features
 
 #### exonum
+
+- Existing sodiumoxide-based cryptographic backend behind opt-out
+  sodiumoxide-crypto feature. It also allows to use your own cryptographic
+  library with exonum. (#756)
 
 - New kind of CLI commands has been added: `info` command that can be used for
   getting various information from a node that has not been started yet. (#731)
