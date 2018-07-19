@@ -43,7 +43,7 @@ impl InternalPart {
         // Buffer in a channel wouldn't do anything except clutter the memory.
         let (pool_tx, pool_rx) = mpsc::channel::<Box<Transaction>>(0);
         let internal_tx = self.internal_tx.clone();
-        thread_pool.spawn(futures::lazy(move || {
+        thread_pool.spawn(
             pool_rx.for_each(move |tx| {
                 if tx.verify() {
                     internal_tx
@@ -54,9 +54,7 @@ impl InternalPart {
                 }
                 Ok(())
             })
-        }));
-
-        let mut txs_in_verification = HashSet::<Hash>::new();
+        );
 
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
@@ -100,15 +98,8 @@ impl InternalPart {
                         to_box(f)
                     }
                     InternalRequest::VerifyTx(tx) => {
-                        if txs_in_verification.insert(tx.raw().hash()) {
-                            let f = futures::lazy(move || {
-                                pool_tx.send(tx).map(drop).map_err(into_other)
-                            }).map_err(log_error);
-                            to_box(f)
-                        } else {
-                            let f = future::ok::<(), ()>(());
-                            to_box(f)
-                        }
+                        let f = pool_tx.send(tx).map(drop).map_err(log_error);
+                        to_box(f)
                     }
                 };
 
