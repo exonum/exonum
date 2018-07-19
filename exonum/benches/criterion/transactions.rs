@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const TRANSACTIONS_COUNT: usize = 100_000;
-const SAMPLE_SIZE: usize = 2;
+const TRANSACTIONS_COUNT: usize = 40_000;
+const SAMPLE_SIZE: usize = 3;
 
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
@@ -334,7 +334,7 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
 
     let parameters = (7..12).map(|i| pow(2, i)).collect::<Vec<_>>();
     c.bench(
-        "transactions simple",
+        "transactions/simple",
         ParameterizedBenchmark::new(
             "size",
             bench_verify_transactions_simple,
@@ -344,7 +344,7 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
             .sample_size(SAMPLE_SIZE),
     );
     c.bench(
-        "transactions event loop",
+        "transactions/event_loop",
         ParameterizedBenchmark::new(
             "size",
             bench_verify_transactions_event_loop,
