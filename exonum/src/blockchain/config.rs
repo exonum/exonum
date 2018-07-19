@@ -189,6 +189,13 @@ impl StoredConfiguration {
     /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        use crypto::SIGNATURE_LENGTH;
+        use messages::HEADER_LENGTH;
+
+        const MINIMAL_BODY_SIZE: usize = 1024;
+        const MINIMAL_MESSAGE_LENGTH: u32 =
+            (HEADER_LENGTH + MINIMAL_BODY_SIZE + SIGNATURE_LENGTH) as u32;
+
         let config: Self = serde_json::from_slice(serialized)?;
 
         // Check that there are no duplicated keys.
@@ -226,6 +233,14 @@ impl StoredConfiguration {
             return Err(JsonError::custom(
                 "txs_block_limit should not be equal to zero",
             ));
+        }
+
+        // Check maximum message length for sanity.
+        if config.consensus.max_message_len < MINIMAL_MESSAGE_LENGTH {
+            return Err(JsonError::custom(format!(
+                "max_message_len ({}) must be at least {}",
+                config.consensus.max_message_len, MINIMAL_MESSAGE_LENGTH
+            )));
         }
 
         Ok(config)
