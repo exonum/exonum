@@ -336,7 +336,7 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
     c.bench(
         "transactions simple",
         ParameterizedBenchmark::new(
-            "transactions",
+            "size",
             bench_verify_transactions_simple,
             parameters.clone(),
         ).throughput(|_| Throughput::Elements(TRANSACTIONS_COUNT as u32))
@@ -346,7 +346,7 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
     c.bench(
         "transactions event loop",
         ParameterizedBenchmark::new(
-            "transactions",
+            "size",
             bench_verify_transactions_event_loop,
             parameters.clone(),
         ).throughput(|_| Throughput::Elements(TRANSACTIONS_COUNT as u32))
