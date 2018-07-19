@@ -357,6 +357,14 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
+    #[test]
+    #[should_panic(expected = "max_message_len (128) must be at least 330")]
+    fn too_small_max_message_len() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.max_message_len = 128;
+        serialize_deserialize(&configuration);
+    }
+
     fn create_test_configuration() -> StoredConfiguration {
         let validator_keys = (1..4)
             .map(|i| ValidatorKeys {
