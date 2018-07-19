@@ -152,6 +152,14 @@ impl ConsensusConfig {
                 self.txs_block_limit, MIN_TXS_BLOCK_LIMIT, MAX_TXS_BLOCK_LIMIT
             );
         }
+
+        if self.max_message_len < Self::DEFAULT_MAX_MESSAGE_LEN {
+            warn!(
+                "It is recommended that max_message_len ({}) be at least {}.",
+                self.max_message_len,
+                Self::DEFAULT_MAX_MESSAGE_LEN
+            );
+        }
     }
 }
 
