@@ -106,6 +106,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Existing sodiumoxide-based cryptographic backend behind opt-out
+  sodiumoxide-crypto feature. It also allows to use your own cryptographic
+  library with exonum. (#756)
+
 - New kind of CLI commands has been added: `info` command that can be used for
   getting various information from a node that has not been started yet. (#731)
   Currently supported sub-commands:
