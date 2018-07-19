@@ -26,8 +26,9 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
+use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
 use helpers::{Height, Milliseconds};
+use messages::HEADER_LENGTH;
 use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -189,9 +190,6 @@ impl StoredConfiguration {
     /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
-        use crypto::SIGNATURE_LENGTH;
-        use messages::HEADER_LENGTH;
-
         const MINIMAL_BODY_SIZE: usize = 256;
         const MINIMAL_MESSAGE_LENGTH: u32 =
             (HEADER_LENGTH + MINIMAL_BODY_SIZE + SIGNATURE_LENGTH) as u32;
