@@ -452,11 +452,6 @@ impl SharedNodeState {
         state.is_enabled = is_enabled;
     }
 
-    pub(crate) fn node_role(&self) -> NodeRole {
-        let state = self.state.read().expect("Expected read lock.");
-        state.node_role
-    }
-
     pub(crate) fn set_node_role(&self, role: NodeRole) {
         let mut state = self.state.write().expect("Expected write lock.");
         state.node_role = role;

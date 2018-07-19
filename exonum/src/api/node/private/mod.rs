@@ -198,12 +198,6 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, query: ConsensusEnabledQuery| {
-                if self.shared_api_state.node_role().is_auditor() {
-                    let message = "Trying to enable consensus, but the current node is auditor\
-                                   and cannot affect consensus process";
-                    return Err(ApiError::BadRequest(message.to_owned()));
-                }
-
                 state
                     .sender()
                     .send_external_message(ExternalMessage::Enable(query.enabled))

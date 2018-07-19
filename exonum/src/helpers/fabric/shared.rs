@@ -72,6 +72,8 @@ pub struct CommonConfigTemplate {
 pub struct NodePrivateConfig {
     /// Listen address.
     pub listen_addr: SocketAddr,
+    /// External address.
+    pub external_addr: SocketAddr,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.
