@@ -42,18 +42,16 @@ impl InternalPart {
         // Buffer in a channel wouldn't do anything except clutter the memory.
         let (pool_tx, pool_rx) = mpsc::channel::<Box<dyn Transaction>>(0);
         let internal_tx = self.internal_tx.clone();
-        thread_pool.spawn(
-            pool_rx.for_each(move |tx| {
-                if tx.verify() {
-                    internal_tx
-                        .clone()
-                        .wait()
-                        .send(InternalEvent::TxVerified(tx))
-                        .expect("Cannot send TxVerified event.");
-                }
-                Ok(())
-            })
-        );
+        thread_pool.spawn(pool_rx.for_each(move |tx| {
+            if tx.verify() {
+                internal_tx
+                    .clone()
+                    .wait()
+                    .send(InternalEvent::TxVerified(tx))
+                    .expect("Cannot send TxVerified event.");
+            }
+            Ok(())
+        }));
 
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
