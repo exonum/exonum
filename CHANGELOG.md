@@ -127,6 +127,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `new_in_family` constructor has been added to the `Entry` index. (#790)
 
+- Added missing `external_address` field to the auditor final configuration. (#805)
+
 ### Internal Improvements
 
 - `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
@@ -136,7 +138,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.8.1 - 2018-06-15
 
-### New features
+### New Features
 
 #### exonum
 
@@ -144,7 +146,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `RunDev` command now generates default values for api addresses in the config.
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -154,7 +156,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.8 - 2018-05-31
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
@@ -193,7 +195,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
   `ValidatorTime` to `exonum_time::api`. (#604)
 
-### New features
+### New Features
 
 #### exonum
 
@@ -233,7 +235,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Advanced cryptocurrency example becomes a public library (is published on
   crates.io). (#709)
 
-### Bug fixes
+### Bug Fixes
 
 #### exonum
 
@@ -258,7 +260,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -273,7 +275,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.7 - 2018-04-11
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
@@ -390,7 +392,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
   more predictable behavior on all systems. (#557)
 
-### New features
+### New Features
 
 #### exonum
 
@@ -439,7 +441,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - A more complex example has been added featuring best practices for service
   writing. (#595)
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -464,7 +466,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.6 - 2018-03-06
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
@@ -595,7 +597,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Renamed methods `validators_time`/`validators_time_mut` to
   `validators_times`/`validators_times_mut` in `Schema`. (#20)
 
-### New features
+### New Features
 
 #### exonum
 
@@ -630,7 +632,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Implemented error handling based on error codes (#496).
 
-### Bug fixes
+### Bug Fixes
 
 #### exonum
 
@@ -642,7 +644,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Fixed panic "can't cancel routine" during node shutdown. (#530)
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -653,13 +655,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.5.1 - 2018-02-01
 
-### Bug fixes
+### Bug Fixes
 
 - Fixed logger output. (#451)
 
 ## 0.5 - 2018-01-30
 
-### Breaking changes
+### Breaking Changes
 
 - The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became
   consistent. (#419)
@@ -701,7 +703,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Renamed `DBKey` to `ProofPath` and moved a part of its functionality
   to the `BitsRange` trait. (#420)
 
-### New features
+### New Features
 
 - Added `patch` method to the `Fork` structure. (#393)
 - Added a public `healthcheck` endpoint. (#405)
@@ -714,13 +716,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `run-dev` command that performs a simplified node launch
   for testing purposes. (#423)
 
-### Bug fixes
+### Bug Fixes
 
 - Fixed consensus on the threshold of 1/3 sleeping validators. (#388)
 - Fixed a bunch of inconsistencies and mistakes in the docs. (#439)
 - Fixed a bug with message header validation. (#430)
 
-### Internal improvements
+### Internal Improvements
 
 - The list of peer connections is now restored to the latest state
   after the process is restarted. (#378)
