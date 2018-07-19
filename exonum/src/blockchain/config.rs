@@ -192,7 +192,7 @@ impl StoredConfiguration {
         use crypto::SIGNATURE_LENGTH;
         use messages::HEADER_LENGTH;
 
-        const MINIMAL_BODY_SIZE: usize = 1024;
+        const MINIMAL_BODY_SIZE: usize = 256;
         const MINIMAL_MESSAGE_LENGTH: u32 =
             (HEADER_LENGTH + MINIMAL_BODY_SIZE + SIGNATURE_LENGTH) as u32;
 
