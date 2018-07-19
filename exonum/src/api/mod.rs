@@ -17,9 +17,12 @@
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
+pub use self::worker::{ServiceWorker, ServiceWorkerContext};
 
+use failure;
 use serde::{de::DeserializeOwned, Serialize};
 
+use std::sync::Arc;
 use std::{collections::BTreeMap, fmt};
 
 use self::backends::actix;
@@ -30,6 +33,7 @@ pub mod error;
 pub mod node;
 mod state;
 mod with;
+mod worker;
 
 /// Defines object that could be used as an API backend.
 pub trait ServiceApiBackend: Sized {
@@ -208,10 +212,11 @@ impl ServiceApiScope {
 /// builder.private_scope()
 ///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct ServiceApiBuilder {
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
+    additional_worker: Option<ServiceWorker>,
 }
 
 impl ServiceApiBuilder {
@@ -228,6 +233,28 @@ impl ServiceApiBuilder {
     /// Returns a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
+    }
+
+    /// Sets additional worker which runs in separate thread and can be useful for oracles.
+    pub fn additional_worker<W>(&mut self, worker: W) -> &mut Self
+    where
+        W: Fn(ServiceWorkerContext) -> ::std::result::Result<(), failure::Error>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.additional_worker = Some(Arc::new(worker) as ServiceWorker);
+        self
+    }
+}
+
+impl fmt::Debug for ServiceApiBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ServiceApiBuilder")
+            .field("public_scope", &self.public_scope)
+            .field("private_scope", &self.private_scope)
+            .field("additional_worker", &self.additional_worker.is_some())
+            .finish()
     }
 }
 
@@ -315,6 +342,16 @@ impl ApiAggregator {
     /// Adds API factory with given prefix to the aggregator.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
         self.inner.insert(prefix.into(), builder);
+    }
+
+    pub(crate) fn additional_workers(self) -> Vec<(String, ServiceWorker)> {
+        let mut workers = Vec::default();
+        for (name, builder) in self.inner {
+            if let Some(worker) = builder.additional_worker {
+                workers.push((name.to_owned(), worker));
+            }
+        }
+        workers
     }
 
     fn explorer_api() -> ServiceApiBuilder {

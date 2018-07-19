@@ -28,12 +28,13 @@ use serde::{
 };
 
 use std::{
-    fmt, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc}, thread::{self, JoinHandle},
+    fmt, net::SocketAddr, result, str::FromStr, sync::{mpsc, Arc}, thread,
 };
 
 use api::{
     error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
     Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+    ServiceWorkerContext,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -41,7 +42,7 @@ pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Err
 /// Type alias for the concrete `actix-web` HTTP request.
 pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
+pub type RawHandler = Arc<dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync>;
 /// Type alias for the `actix-web::App` with the `ServiceApiState`.
 pub type App = actix_web::App<ServiceApiState>;
 /// Type alias for the `actix-web::App` configuration.
@@ -51,6 +52,8 @@ pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
 type HttpServerAddr = Addr<Syn, HttpServer<<App as IntoHttpHandler>::Handler>>;
 /// Type alias for the `actix` system runtime address.
 type SystemAddr = Addr<Syn, System>;
+/// Type alias for the `JoinHandle` with the specific result type.
+type JoinHandle = thread::JoinHandle<result::Result<(), failure::Error>>;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -60,7 +63,7 @@ pub struct RequestHandler {
     /// Endpoint http method.
     pub method: actix_web::http::Method,
     /// Inner handler.
-    pub inner: Arc<RawHandler>,
+    pub inner: RawHandler,
 }
 
 impl fmt::Debug for RequestHandler {
@@ -153,7 +156,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -183,7 +186,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::POST,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -210,7 +213,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -240,7 +243,7 @@ where
         Self {
             name: f.name,
             method: actix_web::http::Method::POST,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(index) as RawHandler,
         }
     }
 }
@@ -275,7 +278,7 @@ impl ApiRuntimeConfig {
         Self {
             listen_address,
             access,
-            app_config: Default::default(),
+            app_config: None,
         }
     }
 }
@@ -301,9 +304,10 @@ pub struct SystemRuntimeConfig {
 
 /// Actix system runtime handle.
 pub struct SystemRuntime {
-    system_thread: JoinHandle<result::Result<(), failure::Error>>,
+    system_thread: JoinHandle,
     api_runtime_addresses: Vec<HttpServerAddr>,
     system_address: SystemAddr,
+    additional_workers: Vec<(JoinHandle, mpsc::Sender<()>)>,
 }
 
 impl SystemRuntimeConfig {
@@ -319,6 +323,7 @@ impl SystemRuntime {
         let (system_address_tx, system_address_rx) = mpsc::channel();
         let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
         let api_runtimes = config.api_runtimes.clone();
+        let aggregator = config.api_aggregator.clone();
         let system_thread = thread::spawn(move || -> result::Result<(), failure::Error> {
             let system = System::new("http-server");
 
@@ -373,16 +378,38 @@ impl SystemRuntime {
             }
             api_runtime_addresses
         };
+        // Starts additional workers.
+        let blockchain = aggregator.blockchain().clone();
+        let additional_workers = aggregator
+            .additional_workers()
+            .into_iter()
+            .map(move |(name, worker)| {
+                let (cancel, context) = ServiceWorkerContext::new(blockchain.clone());
+                let thread_handle = thread::Builder::new()
+                    .name(format!("{}:additional_worker", name))
+                    .spawn(move || worker(context))
+                    .unwrap();
+                (thread_handle, cancel)
+            })
+            .collect();
 
         Ok(Self {
             system_thread,
             system_address,
             api_runtime_addresses,
+            additional_workers,
         })
     }
 
     /// Stops the actix system runtime along with all web runtimes.
     pub fn stop(self) -> result::Result<(), failure::Error> {
+        // Stop all additional workers.
+        for (handle, cancel) in self.additional_workers {
+            drop(cancel);
+            handle
+                .join()
+                .map_err(|_| format_err!("Unable to stop additional worker"))??;
+        }
         // Stop all actix web servers.
         for api_runtime_address in self.api_runtime_addresses {
             api_runtime_address
