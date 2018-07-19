@@ -19,7 +19,7 @@ use crypto::{self, Hash, HashStream};
 /// Computes Merkle root hash for a given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
-pub fn root_hash<'a, I: IntoIterator<Item=&'a Hash>>(hashes: I) -> Hash {
+pub fn root_hash<'a, I: IntoIterator<Item = &'a Hash>>(hashes: I) -> Hash {
     let mut current_hashes: Vec<Hash> = hashes.into_iter().cloned().collect();
     if current_hashes.is_empty() {
         return Hash::zero();
