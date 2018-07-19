@@ -29,9 +29,9 @@ use futures::{
 
 use std::{cmp::Ordering, time::SystemTime};
 
+use blockchain::Transaction;
 use helpers::{Height, Round};
 use node::{ExternalMessage, NodeTimeout};
-use blockchain::Transaction;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
