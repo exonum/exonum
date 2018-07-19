@@ -14,7 +14,7 @@
 
 // spell-checker:ignore threadpool
 
-use futures::{self, sync::mpsc, Future, Sink, Stream, future};
+use futures::{self, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -26,7 +26,6 @@ use super::{
     error::{into_other, other_error}, to_box, InternalEvent, InternalRequest, TimeoutRequest,
 };
 use blockchain::Transaction;
-use crypto::Hash;
 use events::error::log_error;
 
 #[derive(Debug)]
@@ -41,7 +40,7 @@ impl InternalPart {
         let thread_pool = ThreadPoolBuilder::new().build();
 
         // Buffer in a channel wouldn't do anything except clutter the memory.
-        let (pool_tx, pool_rx) = mpsc::channel::<Box<Transaction>>(0);
+        let (pool_tx, pool_rx) = mpsc::channel::<Box<dyn Transaction>>(0);
         let internal_tx = self.internal_tx.clone();
         thread_pool.spawn(
             pool_rx.for_each(move |tx| {
