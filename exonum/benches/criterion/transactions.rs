@@ -31,7 +31,7 @@ use exonum::{
         TransactionSet, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey}, encoding,
-    events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent},
+    events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent, InternalEvent},
     messages::{Message, RawTransaction},
     node::{
         ApiSender, Configuration, ConnectList, DefaultSystemState, ListenerConfig, NodeApiConfig,
