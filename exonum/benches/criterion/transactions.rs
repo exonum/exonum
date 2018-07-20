@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const TRANSACTIONS_COUNT: usize = 40_000;
+const TRANSACTIONS_COUNT: usize = 100_000;
 const SAMPLE_SIZE: usize = 3;
 
 use criterion::{
@@ -30,8 +30,12 @@ use exonum::{
         Blockchain, ExecutionResult, GenesisConfig, Service, SharedNodeState, Transaction,
         TransactionSet, ValidatorKeys,
     },
-    crypto::{self, Hash, PublicKey}, encoding,
-    events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent, InternalEvent},
+    crypto::{self, Hash, PublicKey},
+    encoding,
+    events::{
+        error::other_error, Event, EventHandler, HandlerPart, InternalEvent, InternalPart,
+        NetworkEvent,
+    },
     messages::{Message, RawTransaction},
     node::{
         ApiSender, Configuration, ConnectList, DefaultSystemState, ListenerConfig, NodeApiConfig,
@@ -193,20 +197,27 @@ impl TransactionsBenchmarkRunner {
             network_rx: self.channel.network_events.1,
             api_rx: self.channel.api_requests.1,
         };
+        let internal_part = InternalPart {
+            internal_tx: self.channel.internal_events.0,
+            internal_requests_rx: self.channel.internal_requests.1,
+        };
         // Emulates transactions from the network.
         let socket_addr = handler_part.handler.inner().system_state.listen_address();
-        let transactions = self.transactions
+        let transactions = self
+            .transactions
             .into_iter()
             .map(|raw| NetworkEvent::MessageReceived(socket_addr, raw))
             .collect::<Vec<_>>();
         let network_thread = thread::spawn(move || {
-            Core::new()?
-                .run(
-                    tx_sender
-                        .send_all(stream::iter_ok(transactions))
-                        .map(drop)
-                        .map_err(drop),
-                )
+            let mut core = Core::new()?;
+            let handle = core.handle();
+            core.handle().spawn(
+                tx_sender
+                    .send_all(stream::iter_ok(transactions))
+                    .map(drop)
+                    .map_err(drop),
+            );
+            core.run(internal_part.run(handle))
                 .map_err(|_| other_error("An error in the `Network` thread occurred"))
         });
         // Drops unused channels.
@@ -215,7 +226,10 @@ impl TransactionsBenchmarkRunner {
         let mut core = Core::new()?;
         core.run(handler_part.run())
             .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
-        network_thread.join().unwrap()
+        // Drops internal part.
+        drop(self.channel.internal_requests.0);
+        network_thread.join().unwrap()?;
+        Ok(())
     }
 
     fn node_config() -> NodeConfig {
