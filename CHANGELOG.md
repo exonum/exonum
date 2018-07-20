@@ -61,6 +61,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Now nodes will switch to `min_propose_timeout` for block proposal timeout
   faster if they receive more than `propose_timeout_threshold` transactions
   during `max_propose_timeout`. (#844)
+### Internal Improvements
+
+#### exonum
+- Transactions are now verified in a thread pool. (#673)
 
 - Custom log formatting (along with `colored` and `term` dependencies) has been
   removed in favor of `env_logger`. (#857).
@@ -297,7 +301,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Maintenance CLI command for node management has been added. Currently the only
   supported command is `clear-cache` which clears node message cache. (#676)
-- Transactions are now verified in a thread pool. (#673)
 
 - `StoredConfiguration` validation has been extended with `txs_block_limit`
   parameter check. (#690)
