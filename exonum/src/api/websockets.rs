@@ -24,7 +24,6 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use api::ServiceApiState;
-use blockchain::SharedNodeState;
 use crypto::Hash;
 
 /// WebSocket Message for communication inside websockets part.
@@ -47,12 +46,12 @@ pub(crate) struct Broadcast {
     pub block_hash: Hash,
 }
 
-pub(crate) struct BlockCommitWs {
+pub(crate) struct WsServer {
     pub(crate) subscribers: HashMap<usize, Recipient<Syn, Message>>,
     rng: RefCell<ThreadRng>,
 }
 
-impl Default for BlockCommitWs {
+impl Default for WsServer {
     fn default() -> Self {
         Self {
             subscribers: HashMap::new(),
@@ -61,11 +60,11 @@ impl Default for BlockCommitWs {
     }
 }
 
-impl Actor for BlockCommitWs {
+impl Actor for WsServer {
     type Context = Context<Self>;
 }
 
-impl Handler<Subscribe> for BlockCommitWs {
+impl Handler<Subscribe> for WsServer {
     type Result = usize;
 
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> usize {
@@ -76,7 +75,7 @@ impl Handler<Subscribe> for BlockCommitWs {
     }
 }
 
-impl Handler<Unsubscribe> for BlockCommitWs {
+impl Handler<Unsubscribe> for WsServer {
     type Result = ();
 
     fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) {
@@ -85,7 +84,7 @@ impl Handler<Unsubscribe> for BlockCommitWs {
     }
 }
 
-impl Handler<Broadcast> for BlockCommitWs {
+impl Handler<Broadcast> for WsServer {
     type Result = ();
 
     fn handle(&mut self, msg: Broadcast, _ctx: &mut Self::Context) {
@@ -96,25 +95,18 @@ impl Handler<Broadcast> for BlockCommitWs {
     }
 }
 
-#[derive(Clone)]
-pub struct WsSessionState {
-    pub(crate) addr: Addr<Syn, BlockCommitWs>,
-}
-
 pub struct WsSession {
     pub id: usize,
     pub hb: Instant,
-    pub shared_api_state: SharedNodeState,
-    pub(crate) server_addr: Addr<Syn, BlockCommitWs>,
+    pub(crate) server_addr: Addr<Syn, WsServer>,
 }
 
 impl WsSession {
-    pub fn new(shared_api_state: SharedNodeState, server_state: WsSessionState) -> Self {
+    pub(crate) fn new(server_addr: Addr<Syn, WsServer>) -> Self {
         Self {
             id: 0,
             hb: Instant::now(),
-            shared_api_state,
-            server_addr: server_state.addr,
+            server_addr,
         }
     }
 }

@@ -24,8 +24,8 @@ use std::sync::{Arc, RwLock};
 
 use api::{
     backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websockets::{BlockCommitWs, WsSession, WsSessionState}, Error as ApiError, ServiceApiBackend,
-    ServiceApiScope, ServiceApiState,
+    websockets::{WsServer, WsSession}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
+    ServiceApiState,
 };
 use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
@@ -177,19 +177,12 @@ impl ExplorerApi {
             let addr = server.read().unwrap();
             if addr.is_none() {
                 let mut addr = server.write().unwrap();
-                *addr = Some(Arbiter::start(|_| BlockCommitWs::default()));
+                *addr = Some(Arbiter::start(|_| WsServer::default()));
 
                 shared_api_state.set_server_addr(addr.to_owned().unwrap());
             }
 
-            let state = WsSessionState {
-                addr: addr.to_owned().unwrap(),
-            };
-
-            let _ = ws::start(
-                req.clone(),
-                WsSession::new(shared_api_state.clone(), state.clone()),
-            );
+            let _ = ws::start(req.clone(), WsSession::new(addr.to_owned().unwrap()));
 
             Box::new(Ok(HttpResponse::Ok().json(())).into_future())
         };

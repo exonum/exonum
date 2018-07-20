@@ -16,7 +16,7 @@
 
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
-pub(crate) use self::websockets::{BlockCommitWs, Broadcast};
+pub(crate) use self::websockets::{Broadcast, WsServer};
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
 use serde::{de::DeserializeOwned, Serialize};

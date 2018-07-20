@@ -23,7 +23,7 @@ use std::{
 };
 
 use super::transaction::Transaction;
-use api::{BlockCommitWs, Broadcast, ServiceApiBuilder};
+use api::{Broadcast, ServiceApiBuilder, WsServer};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -315,7 +315,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    server_addr: Option<Addr<Syn, BlockCommitWs>>,
+    server_addr: Option<Addr<Syn, WsServer>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -536,7 +536,7 @@ impl SharedNodeState {
     }
 
     /// Sets an address of ws server.
-    pub(crate) fn set_server_addr(&self, addr: Addr<Syn, BlockCommitWs>) {
+    pub(crate) fn set_server_addr(&self, addr: Addr<Syn, WsServer>) {
         let mut state = self.state.write().expect("Expected write lock");
         state.server_addr = Some(addr);
     }
