@@ -5,6 +5,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking Changes
+
+#### exonum
+
+- `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
+  and `external_addr` to `external_address`. (#809)
+  
+- `NodePublicConfig` `addr` field has been renamed to `address` (#809).
+
+### Internal Improvements
+
+- Transactions (signature) verification benchmark has been added. (#808)
+
 ## 0.9.0 - 2018-07-19
 
 ### Breaking Changes
