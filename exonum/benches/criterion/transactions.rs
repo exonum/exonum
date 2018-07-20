@@ -31,10 +31,7 @@ use exonum::{
         TransactionSet, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey}, encoding,
-    events::{
-        error::{log_error, other_error}, noise::HandshakeParams, Event, EventHandler, HandlerPart,
-        InternalPart, NetworkConfiguration, NetworkEvent, NetworkPart,
-    },
+    events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent},
     messages::{Message, RawTransaction},
     node::{
         ApiSender, Configuration, ConnectList, DefaultSystemState, ListenerConfig, NodeApiConfig,
@@ -130,8 +127,6 @@ impl EventHandler for TransactionsHandler {
 struct TransactionsBenchmarkRunner {
     handler: TransactionsHandler,
     channel: NodeChannel,
-    network_config: NetworkConfiguration,
-    max_message_len: u32,
     transactions: Vec<RawTransaction>,
 }
 
@@ -166,10 +161,9 @@ impl TransactionsBenchmarkRunner {
             peer_discovery: peers,
         };
 
+        let transactions = transactions.into_iter().collect::<Vec<_>>();
         let api_state = SharedNodeState::new(node_config.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_config.listen_address));
-        let network_config = config.network;
-        let transactions = transactions.into_iter().collect::<Vec<_>>();
         let handler = TransactionsHandler {
             inner: Some(NodeHandler::new(
                 blockchain,
@@ -187,72 +181,37 @@ impl TransactionsBenchmarkRunner {
             handler,
             channel,
             transactions,
-            network_config,
-            max_message_len: node_config.genesis.consensus.max_message_len,
         }
     }
 
-    fn into_reactor(self) -> (HandlerPart<TransactionsHandler>, NetworkPart, InternalPart) {
-        let connect_message = self.handler.inner().state.our_connect_message().clone();
-        let (network_tx, network_rx) = self.channel.network_events;
-        let internal_requests_rx = self.channel.internal_requests.1;
-        let network_part = NetworkPart {
-            our_connect_message: connect_message,
-            listen_address: self.handler.inner().system_state.listen_address(),
-            network_requests: self.channel.network_requests,
-            network_tx,
-            network_config: self.network_config,
-            max_message_len: self.max_message_len,
-        };
-
-        let (internal_tx, internal_rx) = self.channel.internal_events;
+    fn run(self) -> io::Result<()> {
+        // Creates node handler part.
+        let tx_sender = self.channel.network_events.0.clone();
         let handler_part = HandlerPart {
             handler: self.handler,
-            internal_rx,
-            network_rx,
+            internal_rx: self.channel.internal_events.1,
+            network_rx: self.channel.network_events.1,
             api_rx: self.channel.api_requests.1,
         };
-
-        let timeouts_part = InternalPart {
-            internal_tx,
-            internal_requests_rx,
-        };
-        (handler_part, network_part, timeouts_part)
-    }
-
-    fn run(mut self) -> io::Result<()> {
-        // Runs NodeHandler.
-        let handshake_params = HandshakeParams::new(
-            *self.handler.inner().state().consensus_public_key(),
-            self.handler.inner().state().consensus_secret_key().clone(),
-            self.max_message_len,
-        );
-        let tx_sender = self.channel.network_events.0.clone();
-        let socket_addr = self.handler.inner().system_state.listen_address();
+        // Emulates transactions from the network.
+        let socket_addr = handler_part.handler.inner().system_state.listen_address();
         let transactions = self.transactions
-            .drain(..)
+            .into_iter()
             .map(|raw| NetworkEvent::MessageReceived(socket_addr, raw))
             .collect::<Vec<_>>();
-        let (handler_part, network_part, timeouts_part) = self.into_reactor();
-
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new()?;
-            let handle = core.handle();
-            core.handle()
-                .spawn(timeouts_part.run(handle).map_err(log_error));
-            // Send transactions from network thread.
-            core.handle().spawn(
-                tx_sender
-                    .send_all(stream::iter_ok(transactions))
-                    .map(drop)
-                    .map_err(drop),
-            );
-            let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occurred: {}", e))
-            })
+            Core::new()?
+                .run(
+                    tx_sender
+                        .send_all(stream::iter_ok(transactions))
+                        .map(drop)
+                        .map_err(drop),
+                )
+                .map_err(|_| other_error("An error in the `Network` thread occurred"))
         });
-
+        // Drops unused channels.
+        drop(self.channel.api_requests.0);
+        // Runs handler part.
         let mut core = Core::new()?;
         core.run(handler_part.run())
             .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
@@ -268,26 +227,19 @@ impl TransactionsBenchmarkRunner {
             service_key: service_public_key,
         };
         let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
-
-        let api_address = "0.0.0.0:8000".parse().unwrap();
-        let api_cfg = NodeApiConfig {
-            public_api_address: Some(api_address),
-            ..Default::default()
-        };
-
         let peer_address = "0.0.0.0:2000".parse().unwrap();
 
         NodeConfig {
             listen_address: peer_address,
+            external_address: Some(peer_address),
             service_public_key,
             service_secret_key,
             consensus_public_key,
             consensus_secret_key,
             genesis,
-            external_address: Some(peer_address),
             network: Default::default(),
             connect_list: Default::default(),
-            api: api_cfg,
+            api: NodeApiConfig::default(),
             mempool: Default::default(),
             services_configs: Default::default(),
             database: Default::default(),
@@ -335,11 +287,8 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
     let parameters = (7..12).map(|i| pow(2, i)).collect::<Vec<_>>();
     c.bench(
         "transactions/simple",
-        ParameterizedBenchmark::new(
-            "size",
-            bench_verify_transactions_simple,
-            parameters.clone(),
-        ).throughput(|_| Throughput::Elements(TRANSACTIONS_COUNT as u32))
+        ParameterizedBenchmark::new("size", bench_verify_transactions_simple, parameters.clone())
+            .throughput(|_| Throughput::Elements(TRANSACTIONS_COUNT as u32))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),
     );
