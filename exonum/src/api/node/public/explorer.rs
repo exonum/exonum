@@ -165,7 +165,7 @@ impl ExplorerApi {
     }
 
     /// Subscribes to block commits events.
-    pub fn subscribe(
+    pub fn handle_subscribe(
         name: &'static str,
         backend: &mut actix::ApiBuilder,
         shared_api_state: SharedNodeState,
@@ -178,6 +178,8 @@ impl ExplorerApi {
             if addr.is_none() {
                 let mut addr = server.write().unwrap();
                 *addr = Some(Arbiter::start(|_| BlockCommitWs::default()));
+
+                shared_api_state.set_server_addr(addr.to_owned().unwrap());
             }
 
             let state = WsSessionState {
@@ -204,7 +206,7 @@ impl ExplorerApi {
         api_scope: &mut ServiceApiScope,
         shared_api_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
-        Self::subscribe(
+        Self::handle_subscribe(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
             shared_api_state,

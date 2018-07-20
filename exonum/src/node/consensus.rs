@@ -482,8 +482,7 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
-        self.api_state
-            .broadcast(format!("Committed block {:?}", block_hash));
+        self.api_state.broadcast(&block_hash);
 
         // Merge changes into storage
         let (committed_txs, proposer) = {

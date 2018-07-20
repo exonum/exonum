@@ -14,28 +14,98 @@
 
 //! WebSockets
 
-mod server;
-
 use actix::*;
 use actix_web::ws;
 
+use rand::{self, Rng, ThreadRng};
+
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::time::Instant;
 
 use api::ServiceApiState;
 use blockchain::SharedNodeState;
+use crypto::Hash;
 
-pub use self::server::{BlockCommitWs, Message};
+/// WebSocket Message for communication inside websockets part.
+#[derive(Message, Debug)]
+pub struct Message(pub String);
+
+#[derive(Message)]
+#[rtype(usize)]
+pub(crate) struct Subscribe {
+    pub addr: Recipient<Syn, Message>,
+}
+
+#[derive(Message)]
+pub(crate) struct Unsubscribe {
+    pub id: usize,
+}
+
+#[derive(Message)]
+pub(crate) struct Broadcast {
+    pub block_hash: Hash,
+}
+
+pub(crate) struct BlockCommitWs {
+    pub(crate) subscribers: HashMap<usize, Recipient<Syn, Message>>,
+    rng: RefCell<ThreadRng>,
+}
+
+impl Default for BlockCommitWs {
+    fn default() -> Self {
+        Self {
+            subscribers: HashMap::new(),
+            rng: RefCell::new(rand::thread_rng()),
+        }
+    }
+}
+
+impl Actor for BlockCommitWs {
+    type Context = Context<Self>;
+}
+
+impl Handler<Subscribe> for BlockCommitWs {
+    type Result = usize;
+
+    fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> usize {
+        let id = self.rng.borrow_mut().gen::<usize>();
+        self.subscribers.insert(id, msg.addr);
+
+        id
+    }
+}
+
+impl Handler<Unsubscribe> for BlockCommitWs {
+    type Result = ();
+
+    fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) {
+        let Unsubscribe { id } = msg;
+        self.subscribers.remove(&id);
+    }
+}
+
+impl Handler<Broadcast> for BlockCommitWs {
+    type Result = ();
+
+    fn handle(&mut self, msg: Broadcast, _ctx: &mut Self::Context) {
+        let Broadcast { block_hash } = msg;
+        for addr in self.subscribers.values() {
+            let _ = addr.do_send(Message(format!("Committed new block {:?}", block_hash)));
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct WsSessionState {
-    pub addr: Addr<Syn, server::BlockCommitWs>,
+    pub(crate) addr: Addr<Syn, BlockCommitWs>,
 }
 
 pub struct WsSession {
     pub id: usize,
     pub hb: Instant,
     pub shared_api_state: SharedNodeState,
-    pub server_addr: Addr<Syn, server::BlockCommitWs>,
+    pub(crate) server_addr: Addr<Syn, BlockCommitWs>,
 }
 
 impl WsSession {
@@ -55,7 +125,7 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         let addr: Addr<Syn, _> = ctx.address();
         self.server_addr
-            .send(server::Subscribe {
+            .send(Subscribe {
                 addr: addr.clone().recipient(),
             })
             .into_actor(self)
@@ -69,23 +139,18 @@ impl Actor for WsSession {
                 fut::ok(())
             })
             .wait(ctx);
-
-        self.shared_api_state
-            .add_subscriber(self.id, addr.recipient())
     }
 
     fn stopping(&mut self, _ctx: &mut <Self as Actor>::Context) -> Running {
-        self.server_addr
-            .do_send(server::Unsubscribe { id: self.id });
-        self.shared_api_state.remove_subscriber(self.id);
+        self.server_addr.do_send(Unsubscribe { id: self.id });
         Running::Stop
     }
 }
 
-impl Handler<server::Message> for WsSession {
+impl Handler<Message> for WsSession {
     type Result = ();
 
-    fn handle(&mut self, msg: server::Message, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: Message, ctx: &mut Self::Context) {
         ctx.text(msg.0);
     }
 }

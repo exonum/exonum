@@ -15,7 +15,7 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use actix::{Recipient, Syn};
+use actix::{Addr, Syn};
 use serde_json::Value;
 
 use std::{
@@ -23,7 +23,7 @@ use std::{
 };
 
 use super::transaction::Transaction;
-use api::{ServiceApiBuilder, WsMessage};
+use api::{BlockCommitWs, Broadcast, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -315,7 +315,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    subscribers: HashMap<usize, Recipient<Syn, WsMessage>>,
+    server_addr: Option<Addr<Syn, BlockCommitWs>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -329,7 +329,7 @@ impl fmt::Debug for ApiNodeState {
             .field("node_role", &self.node_role)
             .field("majority_count", &self.majority_count)
             .field("validators", &self.validators)
-            .field("subscribers", &self.subscribers.keys().collect::<Vec<_>>())
+//            .field("server_addr", &self.server_addr)
             .finish()
     }
 }
@@ -535,35 +535,24 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// Adds an address of new subscriber.
-    pub fn add_subscriber(&self, id: usize, addr: Recipient<Syn, WsMessage>) {
+    /// Sets an address of ws server.
+    pub(crate) fn set_server_addr(&self, addr: Addr<Syn, BlockCommitWs>) {
+        let mut state = self.state.write().expect("Expected write lock");
+        state.server_addr = Some(addr);
+    }
+
+    /// Broadcast message to all subscribers.
+    pub(crate) fn broadcast(&self, block_hash: &Hash) {
         self.state
             .write()
             .expect("Expected write lock")
-            .subscribers
-            .insert(id, addr);
-    }
-
-    /// Removes an address by id
-    pub fn remove_subscriber(&self, id: usize) {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .subscribers
-            .remove(&id);
-    }
-
-    /// Broadcast message to all subscribers
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-    pub fn broadcast(&self, msg: String) {
-        for addr in self.state
-            .read()
-            .expect("Expected read lock")
-            .subscribers
-            .values()
-        {
-            let _ = addr.do_send(WsMessage(msg.clone()));
-        }
+            .server_addr
+            .clone()
+            .map(|addr| {
+                addr.do_send(Broadcast {
+                    block_hash: block_hash.to_owned(),
+                })
+            });
     }
 }
 
