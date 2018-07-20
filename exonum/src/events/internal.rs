@@ -14,12 +14,13 @@
 
 // spell-checker:ignore threadpool
 
-use futures::{self, sync::mpsc, Future, Sink, Stream};
+use futures::{self, sync::mpsc, Future, Sink, Stream, future};
 use tokio_core::reactor::{Handle, Timeout};
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     io, time::{Duration, SystemTime},
+    rc::Rc,
 };
 
 use super::{
@@ -36,27 +37,11 @@ pub struct InternalPart {
 
 impl InternalPart {
     pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = io::Error>> {
-        // Default number of threads = number of cores.
-        let thread_pool = ThreadPoolBuilder::new().build();
-
-        // Buffer in a channel wouldn't do anything except clutter the memory.
-        let (pool_tx, pool_rx) = mpsc::channel::<Box<dyn Transaction>>(0);
-        let internal_tx = self.internal_tx.clone();
-        thread_pool.spawn(pool_rx.for_each(move |tx| {
-            if tx.verify() {
-                internal_tx
-                    .clone()
-                    .wait()
-                    .send(InternalEvent::TxVerified(tx))
-                    .expect("Cannot send TxVerified event.");
-            }
-            Ok(())
-        }));
+        let thread_pool = Rc::new(ThreadPoolBuilder::new().build());
 
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
             .for_each(move |request| {
-                let pool_tx = pool_tx.clone();
                 let event = match request {
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
                         let duration = time.duration_since(SystemTime::now())
@@ -95,7 +80,20 @@ impl InternalPart {
                         to_box(f)
                     }
                     InternalRequest::VerifyTx(tx) => {
-                        let f = pool_tx.send(tx).map(drop).map_err(log_error);
+                        let internal_tx = internal_tx.clone();
+                        let thread_pool = Rc::clone(&thread_pool);
+                        let f = future::lazy(move || {
+                            thread_pool.spawn(future::lazy(move || {
+                                if tx.verify() {
+                                    internal_tx
+                                        .wait()
+                                        .send(InternalEvent::TxVerified(tx))
+                                        .expect("Cannot send TxVerified event.");
+                                }
+                                Ok(())
+                            }));
+                            Ok(())
+                        });
                         to_box(f)
                     }
                 };

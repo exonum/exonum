@@ -108,7 +108,7 @@ impl TransactionsHandler {
 
 impl EventHandler for TransactionsHandler {
     fn handle_event(&mut self, event: Event) {
-        let is_transaction = if let Event::Network(NetworkEvent::MessageReceived(..)) = event {
+        let is_transaction = if let Event::Internal(InternalEvent::TxVerified(_)) = event {
             true
         } else {
             false
