@@ -64,6 +64,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Internal Improvements
 
 #### exonum
+
 - Transactions are now verified in a thread pool. (#673)
 
 - Custom log formatting (along with `colored` and `term` dependencies) has been
