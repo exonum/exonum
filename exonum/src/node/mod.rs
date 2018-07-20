@@ -339,7 +339,7 @@ impl ConnectListConfig {
         let peers = list.iter()
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
-                address: config.addr,
+                address: config.address,
             })
             .collect();
 

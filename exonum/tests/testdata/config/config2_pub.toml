@@ -14,7 +14,7 @@ validators_count = 1
 [common.services_config]
 
 [node]
-addr = "127.0.0.1:6333"
+address = "127.0.0.1:6333"
 
 [node.services_public_configs]
 
