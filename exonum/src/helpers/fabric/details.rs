@@ -337,7 +337,10 @@ impl GenerateNodeConfig {
 
         let external_address = address_str.parse::<SocketAddr>().unwrap_or_else(|_| {
             let ip = address_str.parse::<IpAddr>().unwrap_or_else(|_| {
-                panic!("Expected an ip address in {}: {:?}", PEER_ADDRESS, address_str)
+                panic!(
+                    "Expected an ip address in {}: {:?}",
+                    PEER_ADDRESS, address_str
+                )
             });
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
