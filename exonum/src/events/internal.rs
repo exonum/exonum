@@ -14,20 +14,17 @@
 
 // spell-checker:ignore threadpool
 
-use futures::{self, sync::mpsc, Future, Sink, Stream, future};
+use futures::{self, future, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
-    io, time::{Duration, SystemTime},
-    rc::Rc,
+    io, rc::Rc, time::{Duration, SystemTime},
 };
 
 use super::{
     error::{into_other, other_error}, to_box, InternalEvent, InternalRequest, TimeoutRequest,
 };
-use blockchain::Transaction;
-use events::error::log_error;
 
 #[derive(Debug)]
 pub struct InternalPart {
