@@ -86,7 +86,7 @@ mod test {
     use std::net::SocketAddr;
 
     use super::ConnectList;
-    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH, x25519::into_x25519_public_key};
+    use crypto::{gen_keypair, x25519::into_x25519_public_key, PublicKey, PUBLIC_KEY_LENGTH};
     use node::ConnectInfo;
 
     static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];

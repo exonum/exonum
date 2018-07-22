@@ -21,8 +21,9 @@ use super::wrapper::NoiseWrapper;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
-use events::{error::other_error,
-    codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+use events::{
+    codec::MessagesCodec, error::other_error,
+    noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
 use node::state::SharedConnectList;
 

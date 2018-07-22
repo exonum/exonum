@@ -19,9 +19,8 @@ use failure;
 use serde_json::Value;
 
 use std::{
-    sync::{Arc, RwLock},
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
-    time::{Duration, SystemTime},
+    sync::{Arc, RwLock}, time::{Duration, SystemTime},
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};

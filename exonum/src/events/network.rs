@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use futures::{
-    future, future::{Either, err}, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture, Poll,
-    Sink, Stream,
+    future, future::{err, Either}, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture,
+    Poll, Sink, Stream,
 };
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Handle,
@@ -30,7 +30,9 @@ use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
 };
 use crypto::x25519;
-use events::{codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake}};
+use events::{
+    codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake},
+};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
 use node::state::SharedConnectList;
