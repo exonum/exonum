@@ -19,19 +19,18 @@ use failure;
 use serde_json::Value;
 
 use std::{
+    sync::{Arc, RwLock},
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
     time::{Duration, SystemTime},
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crypto::x25519;
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{x25519, CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
 };
 use node::{connect_list::ConnectList, ConnectInfo};
-use std::sync::{Arc, RwLock};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)

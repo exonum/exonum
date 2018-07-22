@@ -17,7 +17,6 @@ use rand::{self, Rng};
 use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
-use crypto::x25519;
 use events::network;
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};

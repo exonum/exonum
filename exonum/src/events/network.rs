@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use futures::{
-    future, future::Either, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture, Poll,
+    future, future::{Either, err}, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture, Poll,
     Sink, Stream,
 };
 use tokio_core::{
@@ -30,9 +30,7 @@ use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
 };
 use crypto::x25519;
-use events::codec::MessagesCodec;
-use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
-use futures::future::err;
+use events::{codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake}};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
 use node::state::SharedConnectList;
@@ -410,12 +408,11 @@ impl Listener {
             }
             trace!("Accepted incoming connection with peer={}", address);
             let network_tx = network_tx.clone();
-            let connect_list = connect_list.clone();
 
             let handshake = NoiseHandshake::responder(&handshake_params, connect_list.clone());
             let connection_handler = handshake
                 .listen(sock)
-                .and_then(move |(sock, key)| {
+                .and_then(move |(sock, public_key)| {
                     let (_, stream) = sock.split();
                     stream
                         .into_future()
@@ -429,8 +426,8 @@ impl Listener {
                                 network_tx,
                                 connect,
                                 ConnectInfo {
-                                    address: addr,
-                                    public_key: key,
+                                    address,
+                                    public_key,
                                 },
                             )
                         })

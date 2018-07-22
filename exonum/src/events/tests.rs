@@ -29,9 +29,7 @@ use events::{
 };
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
-use node::state::SharedConnectList;
-use node::ConnectInfo;
-use node::{ConnectList, EventsPoolCapacity, NodeChannel};
+use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
 pub struct TestHandler {

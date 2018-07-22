@@ -86,7 +86,7 @@ mod test {
     use std::net::SocketAddr;
 
     use super::ConnectList;
-    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
+    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH, x25519::into_x25519_public_key};
     use node::ConnectInfo;
 
     static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
@@ -192,4 +192,22 @@ mod test {
         });
         assert!(connect_list.is_address_allowed(&address));
     }
+
+    #[test]
+    fn test_handshake_key() {
+        let (public_key, _) = gen_keypair();
+        let public_key_x25519 = into_x25519_public_key(public_key);
+        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
+
+        let mut connect_list = ConnectList::default();
+        assert!(!connect_list.is_peer_allowed_x25519(&public_key_x25519));
+
+        connect_list.add(ConnectInfo {
+            public_key,
+            address: address.clone(),
+        });
+
+        assert!(connect_list.is_peer_allowed_x25519(&public_key_x25519));
+    }
+
 }
