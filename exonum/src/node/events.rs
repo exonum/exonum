@@ -67,10 +67,6 @@ impl NodeHandler {
                 }
             }
             ExternalMessage::Enable(value) => {
-                if self.node_role.is_auditor() {
-                    error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
-                    return;
-                }
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
                     info!("Node is already {}", s);

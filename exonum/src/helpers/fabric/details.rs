@@ -332,23 +332,26 @@ impl Command for GenerateCommonConfig {
 pub struct GenerateNodeConfig;
 
 impl GenerateNodeConfig {
-    fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
-        let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+    fn addresses(context: &Context) -> (SocketAddr, SocketAddr) {
+        let address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
 
-        let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            let ip = addr_str.parse::<IpAddr>().unwrap_or_else(|_| {
-                panic!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str)
+        let external_address = address_str.parse::<SocketAddr>().unwrap_or_else(|_| {
+            let ip = address_str.parse::<IpAddr>().unwrap_or_else(|_| {
+                panic!(
+                    "Expected an ip address in {}: {:?}",
+                    PEER_ADDRESS, address_str
+                )
             });
             SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
 
-        let listen_ip = match external_addr {
+        let listen_ip = match external_address {
             SocketAddr::V4(_) => "0.0.0.0".parse().unwrap(),
             SocketAddr::V6(_) => "::".parse().unwrap(),
         };
-        let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
+        let listen_address = SocketAddr::new(listen_ip, external_address.port());
 
-        (external_addr, listen_addr)
+        (external_address, listen_address)
     }
 }
 
@@ -393,7 +396,7 @@ impl Command for GenerateNodeConfig {
             .arg::<String>("SEC_CONFIG")
             .expect("expected secret config path");
 
-        let addr = Self::addr(&context);
+        let addresses = Self::addresses(&context);
         let common: CommonConfigTemplate =
             ConfigFile::load(&common_config_path).expect("Could not load common config");
         context.set(keys::COMMON_CONFIG, common.clone());
@@ -417,7 +420,7 @@ impl Command for GenerateNodeConfig {
             service_key: service_public_key,
         };
         let node_pub_config = NodePublicConfig {
-            addr: addr.0,
+            address: addresses.0,
             validator_keys,
             services_public_configs,
         };
@@ -430,7 +433,8 @@ impl Command for GenerateNodeConfig {
             .expect("Could not write public config file.");
 
         let private_config = NodePrivateConfig {
-            listen_addr: addr.1,
+            listen_address: addresses.1,
+            external_address: addresses.0,
             consensus_public_key,
             consensus_secret_key,
             service_public_key,
@@ -607,8 +611,8 @@ impl Command for Finalize {
 
         let config = {
             NodeConfig {
-                listen_address: secret_config.listen_addr,
-                external_address: our.map(|o| o.addr),
+                listen_address: secret_config.listen_address,
+                external_address: Some(secret_config.external_address),
                 network: Default::default(),
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,

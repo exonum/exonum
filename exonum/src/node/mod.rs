@@ -340,7 +340,7 @@ impl ConnectListConfig {
         let peers = list.iter()
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
-                address: config.addr,
+                address: config.address,
             })
             .collect();
 
@@ -427,14 +427,7 @@ impl NodeHandler {
         );
 
         let node_role = NodeRole::new(validator_id);
-
-        if node_role.is_auditor() && api_state.is_enabled() {
-            error!("Consensus is enabled but current node is auditor");
-            api_state.set_enabled(false);
-        }
-
         let is_enabled = api_state.is_enabled();
-
         api_state.set_node_role(node_role);
 
         let config_manager = match config_file_path {
