@@ -76,6 +76,7 @@ jobs:
     - npm install markdownlint-cli
     - ./node_modules/.bin/markdownlint --version
     script:
+    - cargo audit
     - cargo fmt --all -- --write-mode=check
     - npm run cspell
     - npm run md
