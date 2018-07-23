@@ -26,8 +26,9 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
+use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
 use helpers::{Height, Milliseconds};
+use messages::HEADER_LENGTH;
 use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -152,6 +153,14 @@ impl ConsensusConfig {
                 self.txs_block_limit, MIN_TXS_BLOCK_LIMIT, MAX_TXS_BLOCK_LIMIT
             );
         }
+
+        if self.max_message_len < Self::DEFAULT_MAX_MESSAGE_LEN {
+            warn!(
+                "It is recommended that max_message_len ({}) is at least {}.",
+                self.max_message_len,
+                Self::DEFAULT_MAX_MESSAGE_LEN
+            );
+        }
     }
 }
 
@@ -181,6 +190,10 @@ impl StoredConfiguration {
     /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        const MINIMAL_BODY_SIZE: usize = 256;
+        const MINIMAL_MESSAGE_LENGTH: u32 =
+            (HEADER_LENGTH + MINIMAL_BODY_SIZE + SIGNATURE_LENGTH) as u32;
+
         let config: Self = serde_json::from_slice(serialized)?;
 
         // Check that there are no duplicated keys.
@@ -218,6 +231,14 @@ impl StoredConfiguration {
             return Err(JsonError::custom(
                 "txs_block_limit should not be equal to zero",
             ));
+        }
+
+        // Check maximum message length for sanity.
+        if config.consensus.max_message_len < MINIMAL_MESSAGE_LENGTH {
+            return Err(JsonError::custom(format!(
+                "max_message_len ({}) must be at least {}",
+                config.consensus.max_message_len, MINIMAL_MESSAGE_LENGTH
+            )));
         }
 
         Ok(config)
@@ -333,6 +354,14 @@ mod tests {
     fn invalid_txs_block_limit() {
         let mut configuration = create_test_configuration();
         configuration.consensus.txs_block_limit = 0;
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "max_message_len (128) must be at least 330")]
+    fn too_small_max_message_len() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.max_message_len = 128;
         serialize_deserialize(&configuration);
     }
 
