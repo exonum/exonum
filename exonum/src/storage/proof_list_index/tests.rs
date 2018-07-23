@@ -795,29 +795,21 @@ mod root_hash_tests {
 
     #[test]
     fn root_hash_single() {
-        assert_root_hash_correct(
-            &hash_list(&[b"1"]),
-        );
+        assert_root_hash_correct(&hash_list(&[b"1"]));
     }
 
     #[test]
     fn root_hash_even() {
-        assert_root_hash_correct(
-            &hash_list(&[b"1", b"2", b"3", b"4"]),
-        );
+        assert_root_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4"]));
     }
 
     #[test]
     fn root_hash_odd() {
-        assert_root_hash_correct(
-            &hash_list(&[b"1", b"2", b"3", b"4", b"5"]),
-        );
+        assert_root_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4", b"5"]));
     }
 
     #[test]
     fn root_hash_empty() {
-        assert_root_hash_correct(
-            &hash_list(&[]),
-        );
+        assert_root_hash_correct(&hash_list(&[]));
     }
 }
