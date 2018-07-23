@@ -48,17 +48,14 @@ fn combine_hash_list(hashes: &mut Vec<Hash>) {
 #[cfg(test)]
 mod tests {
     use crypto::{self, Hash};
-    use encoding::serialize::FromHex;
     use storage::{Database, MemoryDB, ProofListIndex};
 
     use super::*;
 
     /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
-    fn assert_root_hash_eq(hashes: &[Hash], expected: &str) {
+    fn assert_root_hash_correct(hashes: &[Hash]) {
         let root_actual = root_hash(hashes);
         let root_index = proof_list_index_root(hashes);
-        let root_expected = Hash::from_hex(expected).expect("hex hash");
-        assert_eq!(root_actual, root_expected);
         assert_eq!(root_actual, root_index);
     }
 
@@ -76,33 +73,29 @@ mod tests {
 
     #[test]
     fn root_hash_single() {
-        assert_root_hash_eq(
+        assert_root_hash_correct(
             &hash_list(&[b"1"]),
-            "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
         );
     }
 
     #[test]
     fn root_hash_even() {
-        assert_root_hash_eq(
+        assert_root_hash_correct(
             &hash_list(&[b"1", b"2", b"3", b"4"]),
-            "cd53a2ce68e6476c29512ea53c395c7f5d8fbcb4614d89298db14e2a5bdb5456",
         );
     }
 
     #[test]
     fn root_hash_odd() {
-        assert_root_hash_eq(
+        assert_root_hash_correct(
             &hash_list(&[b"1", b"2", b"3", b"4", b"5"]),
-            "9d6f6f12f390c2f281beacc79fd527f2355f555aa6f47682de41cbaf7756e187",
         );
     }
 
     #[test]
     fn root_hash_empty() {
-        assert_root_hash_eq(
+        assert_root_hash_correct(
             &hash_list(&[]),
-            "0000000000000000000000000000000000000000000000000000000000000000",
         );
     }
 }
