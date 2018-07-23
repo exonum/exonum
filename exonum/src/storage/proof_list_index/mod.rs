@@ -623,14 +623,17 @@ where
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
 pub fn root_hash(hashes: &[Hash]) -> Hash {
-    if hashes.is_empty() {
-        return Hash::zero();
+    match hashes.len() {
+        0 => Hash::zero(),
+        1 => hashes[0],
+        _ => {
+            let mut current_hashes = combine_hash_list(hashes);
+            while current_hashes.len() > 1 {
+                current_hashes = combine_hash_list(&current_hashes);
+            }
+            current_hashes[0]
+        }
     }
-    let mut current_hashes = hashes.to_vec();
-    while current_hashes.len() > 1 {
-        current_hashes = combine_hash_list(&current_hashes);
-    }
-    current_hashes[0]
 }
 
 fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
