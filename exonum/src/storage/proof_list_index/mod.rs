@@ -628,21 +628,20 @@ pub fn root_hash(hashes: &[Hash]) -> Hash {
     }
     let mut current_hashes = hashes.to_vec();
     while current_hashes.len() > 1 {
-        combine_hash_list(&mut current_hashes);
+        current_hashes = combine_hash_list(&current_hashes);
     }
     current_hashes[0]
 }
 
-fn combine_hash_list(hashes: &mut Vec<Hash>) {
-    let old_len = hashes.len();
-    let new_len = (old_len + 1) / 2;
-
-    for i in 0..old_len / 2 {
-        hashes[i] = hash_pair(&hashes[i * 2], &hashes[i * 2 + 1]);
-    }
-    if old_len % 2 == 1 {
-        hashes[new_len - 1] = hash_one(&hashes[old_len - 1]);
-    }
-
-    hashes.resize(new_len, Hash::zero());
+fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
+    hashes
+        .chunks(2)
+        .map(|pair|
+            if pair.len() == 2 {
+                hash_pair(&pair[0], &pair[1])
+            } else {
+                hash_one(&pair[0])
+            }
+        )
+        .collect()
 }
