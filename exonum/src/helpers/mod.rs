@@ -21,7 +21,6 @@ pub mod fabric;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
-pub mod merkle;
 
 use chrono::{DateTime, Utc};
 use colored::*;

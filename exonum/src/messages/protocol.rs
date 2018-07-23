@@ -33,7 +33,8 @@ use std::net::SocketAddr;
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};
-use helpers::{merkle, Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId};
+use storage::proof_list_index::root_hash;
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
@@ -365,6 +366,6 @@ messages! {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
-        *self.block().tx_hash() == merkle::root_hash(self.transactions())
+        *self.block().tx_hash() == root_hash(self.transactions())
     }
 }

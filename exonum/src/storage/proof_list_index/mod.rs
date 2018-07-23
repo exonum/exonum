@@ -58,11 +58,11 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-pub(crate) fn hash_one(h: &Hash) -> Hash {
+fn hash_one(h: &Hash) -> Hash {
     hash(h.as_ref())
 }
 
-pub(crate) fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
+fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
     HashStream::new()
         .update(h1.as_ref())
         .update(h2.as_ref())
@@ -617,4 +617,32 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
     }
+}
+
+/// Computes Merkle root hash for a given list of hashes.
+///
+/// If `hashes` are empty then `Hash::zero()` value is returned.
+pub fn root_hash(hashes: &[Hash]) -> Hash {
+    if hashes.is_empty() {
+        return Hash::zero();
+    }
+    let mut current_hashes = hashes.to_vec();
+    while current_hashes.len() > 1 {
+        combine_hash_list(&mut current_hashes);
+    }
+    current_hashes[0]
+}
+
+fn combine_hash_list(hashes: &mut Vec<Hash>) {
+    let old_len = hashes.len();
+    let new_len = (old_len + 1) / 2;
+
+    for i in 0..old_len / 2 {
+        hashes[i] = hash_pair(&hashes[i * 2], &hashes[i * 2 + 1]);
+    }
+    if old_len % 2 == 1 {
+        hashes[new_len - 1] = hash_one(&hashes[old_len - 1]);
+    }
+
+    hashes.resize(new_len, Hash::zero());
 }

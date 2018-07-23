@@ -15,7 +15,7 @@
 use rand::{thread_rng, Rng};
 
 use self::ListProof::*;
-use super::{hash_one, hash_pair, ListProof, ProofListIndex};
+use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
 use crypto::{hash, CryptoHash, Hash};
 use encoding::serialize::{
     json::reexport::{from_str, to_string}, reexport::Serialize,
@@ -767,5 +767,57 @@ mod rocksdb_tests {
         let path2 = dir2.path();
         let db2 = create_database(path2);
         super::same_merkle_root(db1, db2);
+    }
+}
+
+mod root_hash_tests {
+    use crypto::{self, Hash};
+    use storage::{Database, MemoryDB, ProofListIndex};
+
+    /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
+    fn assert_root_hash_correct(hashes: &[Hash]) {
+        let root_actual = super::root_hash(hashes);
+        let root_index = proof_list_index_root(hashes);
+        assert_eq!(root_actual, root_index);
+    }
+
+    fn proof_list_index_root(hashes: &[Hash]) -> Hash {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        let mut index = ProofListIndex::new("merkle_root", &mut fork);
+        index.extend(hashes.iter().cloned());
+        index.merkle_root()
+    }
+
+    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+        bytes.iter().map(|chunk| crypto::hash(chunk)).collect()
+    }
+
+    #[test]
+    fn root_hash_single() {
+        assert_root_hash_correct(
+            &hash_list(&[b"1"]),
+        );
+    }
+
+    #[test]
+    fn root_hash_even() {
+        assert_root_hash_correct(
+            &hash_list(&[b"1", b"2", b"3", b"4"]),
+        );
+    }
+
+    #[test]
+    fn root_hash_odd() {
+        assert_root_hash_correct(
+            &hash_list(&[b"1", b"2", b"3", b"4", b"5"]),
+        );
+    }
+
+    #[test]
+    fn root_hash_empty() {
+        assert_root_hash_correct(
+            &hash_list(&[]),
+        );
     }
 }
