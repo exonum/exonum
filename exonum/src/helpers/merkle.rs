@@ -14,7 +14,8 @@
 
 //! Merkle tree utilities.
 
-use crypto::{self, Hash, HashStream};
+use crypto::Hash;
+use storage::proof_list_index::{hash_one, hash_pair};
 
 /// Computes Merkle root hash for a given list of hashes.
 ///
@@ -42,17 +43,6 @@ fn combine_hash_list(hashes: &mut Vec<Hash>) {
     }
 
     hashes.resize(new_len, Hash::zero());
-}
-
-fn hash_one(lhs: &Hash) -> Hash {
-    crypto::hash(lhs.as_ref())
-}
-
-fn hash_pair(lhs: &Hash, rhs: &Hash) -> Hash {
-    HashStream::new()
-        .update(lhs.as_ref())
-        .update(rhs.as_ref())
-        .hash()
 }
 
 #[cfg(test)]

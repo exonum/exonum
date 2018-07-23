@@ -15,7 +15,7 @@
 use rand::{thread_rng, Rng};
 
 use self::ListProof::*;
-use super::{pair_hash, ListProof, ProofListIndex};
+use super::{hash_one, hash_pair, ListProof, ProofListIndex};
 use crypto::{hash, CryptoHash, Hash};
 use encoding::serialize::{
     json::reexport::{from_str, to_string}, reexport::Serialize,
@@ -115,9 +115,9 @@ fn list_index_proof(db: Box<dyn Database>) {
     let h0 = 2u64.hash();
     let h1 = 4u64.hash();
     let h2 = 6u64.hash();
-    let h01 = pair_hash(&h0, &h1);
-    let h22 = hash(h2.as_ref());
-    let h012 = pair_hash(&h01, &h22);
+    let h01 = hash_pair(&h0, &h1);
+    let h22 = hash_one(&h2);
+    let h012 = hash_pair(&h01, &h22);
 
     assert_eq!(index.merkle_root(), Hash::default());
 

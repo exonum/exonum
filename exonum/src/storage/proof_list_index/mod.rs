@@ -58,7 +58,11 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
+pub(crate) fn hash_one(h: &Hash) -> Hash {
+    hash(h.as_ref())
+}
+
+pub(crate) fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
     HashStream::new()
         .update(h1.as_ref())
         .update(h2.as_ref())
@@ -477,9 +481,9 @@ where
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
-                hash(self.get_branch_unchecked(key).as_ref())
+                hash_one(&self.get_branch_unchecked(key))
             } else {
-                pair_hash(
+                hash_pair(
                     &self.get_branch_unchecked(key.as_left()),
                     &self.get_branch_unchecked(key),
                 )
@@ -549,12 +553,12 @@ where
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
             let hash = if self.has_branch(right) {
-                pair_hash(
+                hash_pair(
                     &self.get_branch_unchecked(left),
                     &self.get_branch_unchecked(right),
                 )
             } else {
-                hash(self.get_branch_unchecked(left).as_ref())
+                hash_one(&self.get_branch_unchecked(left))
             };
             key = key.parent();
             self.set_branch(key, hash);
