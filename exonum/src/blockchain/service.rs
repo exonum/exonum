@@ -537,9 +537,9 @@ impl SharedNodeState {
     }
 
     /// Sets an address of WebSocket server.
-    pub(crate) fn set_server_address(&self, addr: Addr<Syn, WsServer>) {
+    pub(crate) fn set_server_address(&self, address: Addr<Syn, WsServer>) {
         let mut state = self.state.write().expect("Expected write lock");
-        state.server_address = Some(addr);
+        state.server_address = Some(address);
     }
 
     /// Broadcast message to all subscribers.

@@ -150,11 +150,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Ping(msg) => ctx.pong(&msg),
-            ws::Message::Pong(_) => {}
-            ws::Message::Text(_) | ws::Message::Binary(_) => {}
             ws::Message::Close(_) => {
                 ctx.stop();
             }
+            _ => {}
         }
     }
 }
