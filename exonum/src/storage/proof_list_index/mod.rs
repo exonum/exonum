@@ -639,12 +639,10 @@ pub fn root_hash(hashes: &[Hash]) -> Hash {
 fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
     hashes
         .chunks(2)
-        .map(|pair| {
-            match pair {
-                [first, second] => hash_pair(first, second),
-                [single] => hash_one(single),
-                _ => unreachable!(),
-            }
+        .map(|pair| match pair {
+            [first, second] => hash_pair(first, second),
+            [single] => hash_one(single),
+            _ => unreachable!(),
         })
         .collect()
 }
