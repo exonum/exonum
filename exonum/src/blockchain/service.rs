@@ -322,7 +322,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    server_address: Option<Addr<Syn, WsServer>>,
+    broadcast_server_address: Option<Addr<Syn, WsServer>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -536,10 +536,9 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// Sets an address of WebSocket server.
-    pub(crate) fn set_server_address(&self, address: Addr<Syn, WsServer>) {
+    pub(crate) fn set_broadcast_server_address(&self, address: Addr<Syn, WsServer>) {
         let mut state = self.state.write().expect("Expected write lock");
-        state.server_address = Some(address);
+        state.broadcast_server_address = Some(address);
     }
 
     /// Broadcast message to all subscribers.
@@ -547,7 +546,7 @@ impl SharedNodeState {
         if let Some(ref address) = self.state
             .write()
             .expect("Expected write lock")
-            .server_address
+            .broadcast_server_address
         {
             address.do_send(Broadcast {
                 block_hash: *block_hash,

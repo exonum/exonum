@@ -178,12 +178,12 @@ impl ExplorerApi {
             if address.is_none() {
                 *address = Some(Arbiter::start(|_| WsServer::default()));
 
-                shared_api_state.set_server_address(address.to_owned().unwrap());
+                shared_api_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
 
             let _ = ws::start(req.clone(), WsSession::new(address.to_owned().unwrap()));
 
-            Box::new(Ok(HttpResponse::Ok().json(())).into_future())
+            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
         };
 
         backend.raw_handler(RequestHandler {
