@@ -11,12 +11,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
-  
+
 - `NodePublicConfig` `addr` field has been renamed to `address` (#809).
 
 ### Internal Improvements
 
 - Transactions (signature) verification benchmark has been added. (#808)
+
+- A new function `storage::proof_list_index::root_hash()` has been added
+  to efficiently compute Merkle root hash from a list of hashes without
+  an intermediate `ProofListIndex`. Verification of block root hashes
+  has been optimized as well. (#802)
 
 ## 0.9.0 - 2018-07-19
 
