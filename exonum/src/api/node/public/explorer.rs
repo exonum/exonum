@@ -15,7 +15,7 @@
 //! Exonum blockchain explorer API.
 
 use actix::Arbiter;
-use actix_web::{http, ws, HttpResponse};
+use actix_web::{http, ws};
 use futures::IntoFuture;
 use serde_json;
 
@@ -181,9 +181,9 @@ impl ExplorerApi {
                 shared_api_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
 
-            let _ = ws::start(req.clone(), WsSession::new(address.to_owned().unwrap()));
-
-            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
+            Box::new(
+                ws::start(req.clone(), WsSession::new(address.to_owned().unwrap())).into_future(),
+            )
         };
 
         backend.raw_handler(RequestHandler {
