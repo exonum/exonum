@@ -20,7 +20,7 @@ use futures::IntoFuture;
 use serde_json;
 
 use std::ops::Range;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use api::{
     backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
@@ -170,19 +170,18 @@ impl ExplorerApi {
         backend: &mut actix::ApiBuilder,
         shared_api_state: SharedNodeState,
     ) {
-        let server_addr = Arc::new(RwLock::new(None));
+        let server_address = Arc::new(Mutex::new(None));
 
         let index = move |req: HttpRequest| -> FutureResponse {
-            let server = server_addr.clone();
-            let addr = server.read().unwrap();
-            if addr.is_none() {
-                let mut addr = server.write().unwrap();
-                *addr = Some(Arbiter::start(|_| WsServer::default()));
+            let server = server_address.clone();
+            let mut address = server.lock().expect("Expected mutex lock");
+            if address.is_none() {
+                *address = Some(Arbiter::start(|_| WsServer::default()));
 
-                shared_api_state.set_server_addr(addr.to_owned().unwrap());
+                shared_api_state.set_server_address(address.to_owned().unwrap());
             }
 
-            let _ = ws::start(req.clone(), WsSession::new(addr.to_owned().unwrap()));
+            let _ = ws::start(req.clone(), WsSession::new(address.to_owned().unwrap()));
 
             Box::new(Ok(HttpResponse::Ok().json(())).into_future())
         };
