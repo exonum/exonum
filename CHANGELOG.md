@@ -12,7 +12,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
   
-- `NodePublicConfig` `addr` field has been renamed to `address` (#809).
+- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
+
+### New features
+
+- Added possibility to use domain names instead of IP addresses as a peer's 
+  address. (#826)
 
 ### Internal Improvements
 

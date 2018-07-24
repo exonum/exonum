@@ -34,9 +34,11 @@ use tokio_core::reactor::Core;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
+
+use serde::de::{self, Deserialize, Deserializer};
 
 use blockchain::{
     Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
@@ -760,10 +762,28 @@ impl fmt::Debug for ApiSender {
     }
 }
 
+fn deserialize_socket_address<'de, D>(value: D) -> Result<SocketAddr, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let address_str: String = Deserialize::deserialize(value)?;
+    address_str
+        .to_socket_addrs()
+        .map_err(de::Error::custom)?
+        .next()
+        .ok_or_else(|| {
+            de::Error::custom(&format!(
+                "no one ip belongs to the hostname: {}",
+                address_str
+            ))
+        })
+}
+
 /// Data needed to add peer into `ConnectList`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct ConnectInfo {
     /// Peer address.
+    #[serde(deserialize_with = "deserialize_socket_address")]
     pub address: SocketAddr,
     /// Peer public key.
     pub public_key: PublicKey,
