@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 
 use api::{
     backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websockets::{WsServer, WsSession}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
+    websocket::{WsServer, WsSession}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
     ServiceApiState,
 };
 use blockchain::{Block, SharedNodeState};

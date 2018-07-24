@@ -16,7 +16,7 @@
 
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
-pub(crate) use self::websockets::{Broadcast, WsServer};
+pub(crate) use self::websocket::{Broadcast, WsServer};
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -30,7 +30,7 @@ pub mod backends;
 pub mod error;
 pub mod node;
 mod state;
-mod websockets;
+mod websocket;
 mod with;
 
 /// Defines object that could be used as an API backend.

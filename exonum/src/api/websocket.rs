@@ -67,9 +67,9 @@ impl Actor for WsServer {
 impl Handler<Subscribe> for WsServer {
     type Result = usize;
 
-    fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> usize {
+    fn handle(&mut self, Subscribe { address }: Subscribe, _ctx: &mut Self::Context) -> usize {
         let id = self.rng.borrow_mut().gen::<usize>();
-        self.subscribers.insert(id, msg.address);
+        self.subscribers.insert(id, address);
 
         id
     }
@@ -78,8 +78,7 @@ impl Handler<Subscribe> for WsServer {
 impl Handler<Unsubscribe> for WsServer {
     type Result = ();
 
-    fn handle(&mut self, msg: Unsubscribe, _ctx: &mut Self::Context) {
-        let Unsubscribe { id } = msg;
+    fn handle(&mut self, Unsubscribe { id }: Unsubscribe, _ctx: &mut Self::Context) {
         self.subscribers.remove(&id);
     }
 }
@@ -87,8 +86,7 @@ impl Handler<Unsubscribe> for WsServer {
 impl Handler<Broadcast> for WsServer {
     type Result = ();
 
-    fn handle(&mut self, msg: Broadcast, _ctx: &mut Self::Context) {
-        let Broadcast { block_hash } = msg;
+    fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
         for address in self.subscribers.values() {
             let _ = address.do_send(Message(format!("Committed new block {:?}", block_hash)));
         }
