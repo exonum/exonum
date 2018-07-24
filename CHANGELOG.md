@@ -16,7 +16,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New features
 
-- Added possibility to use domain names instead of IP addresses as a peer's 
+- Added possibility to use domain names instead of IP addresses as a peer's
   address. (#826)
 
 ### Internal Improvements
