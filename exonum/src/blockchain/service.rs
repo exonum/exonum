@@ -322,7 +322,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    server_addr: Option<Addr<Syn, WsServer>>,
+    server_address: Option<Addr<Syn, WsServer>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -336,7 +336,6 @@ impl fmt::Debug for ApiNodeState {
             .field("node_role", &self.node_role)
             .field("majority_count", &self.majority_count)
             .field("validators", &self.validators)
-//            .field("server_addr", &self.server_addr)
             .finish()
     }
 }
@@ -537,21 +536,21 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// Sets an address of ws server.
-    pub(crate) fn set_server_addr(&self, addr: Addr<Syn, WsServer>) {
+    /// Sets an address of WebSocket server.
+    pub(crate) fn set_server_address(&self, addr: Addr<Syn, WsServer>) {
         let mut state = self.state.write().expect("Expected write lock");
-        state.server_addr = Some(addr);
+        state.server_address = Some(addr);
     }
 
     /// Broadcast message to all subscribers.
     pub(crate) fn broadcast(&self, block_hash: &Hash) {
-        if let Some(addr) = self.state
+        if let Some(address) = self.state
             .write()
             .expect("Expected write lock")
-            .server_addr
+            .server_address
             .clone()
         {
-            addr.do_send(Broadcast {
+            address.do_send(Broadcast {
                 block_hash: block_hash.to_owned(),
             })
         }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! WebSockets
+//! WebSocket API.
 
 use actix::*;
 use actix_web::ws;
@@ -21,19 +21,18 @@ use rand::{self, Rng, ThreadRng};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::time::Instant;
 
 use api::ServiceApiState;
 use crypto::Hash;
 
-/// WebSocket Message for communication inside websockets part.
+/// WebSocket Message for communication between Clients(`WsSession`) and Server(`WsServer`).
 #[derive(Message, Debug)]
-pub struct Message(pub String);
+pub(crate) struct Message(pub String);
 
 #[derive(Message)]
 #[rtype(usize)]
 pub(crate) struct Subscribe {
-    pub addr: Recipient<Syn, Message>,
+    pub address: Recipient<Syn, Message>,
 }
 
 #[derive(Message)]
@@ -46,8 +45,9 @@ pub(crate) struct Broadcast {
     pub block_hash: Hash,
 }
 
+/// WebSocket server.
 pub(crate) struct WsServer {
-    pub(crate) subscribers: HashMap<usize, Recipient<Syn, Message>>,
+    pub subscribers: HashMap<usize, Recipient<Syn, Message>>,
     rng: RefCell<ThreadRng>,
 }
 
@@ -69,7 +69,7 @@ impl Handler<Subscribe> for WsServer {
 
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> usize {
         let id = self.rng.borrow_mut().gen::<usize>();
-        self.subscribers.insert(id, msg.addr);
+        self.subscribers.insert(id, msg.address);
 
         id
     }
@@ -89,24 +89,23 @@ impl Handler<Broadcast> for WsServer {
 
     fn handle(&mut self, msg: Broadcast, _ctx: &mut Self::Context) {
         let Broadcast { block_hash } = msg;
-        for addr in self.subscribers.values() {
-            let _ = addr.do_send(Message(format!("Committed new block {:?}", block_hash)));
+        for address in self.subscribers.values() {
+            let _ = address.do_send(Message(format!("Committed new block {:?}", block_hash)));
         }
     }
 }
 
-pub struct WsSession {
+/// WebSocket session.
+pub(crate) struct WsSession {
     pub id: usize,
-    pub hb: Instant,
-    pub(crate) server_addr: Addr<Syn, WsServer>,
+    pub server_address: Addr<Syn, WsServer>,
 }
 
 impl WsSession {
-    pub(crate) fn new(server_addr: Addr<Syn, WsServer>) -> Self {
+    pub fn new(server_address: Addr<Syn, WsServer>) -> Self {
         Self {
             id: 0,
-            hb: Instant::now(),
-            server_addr,
+            server_address,
         }
     }
 }
@@ -115,18 +114,18 @@ impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let addr: Addr<Syn, _> = ctx.address();
-        self.server_addr
+        let address: Addr<Syn, _> = ctx.address();
+        self.server_address
             .send(Subscribe {
-                addr: addr.clone().recipient(),
+                address: address.clone().recipient(),
             })
             .into_actor(self)
-            .then(|res, act, ctx| {
-                match res {
-                    Ok(res) => {
-                        act.id = res;
+            .then(|response, actor, context| {
+                match response {
+                    Ok(result) => {
+                        actor.id = result;
                     }
-                    _ => ctx.stop(),
+                    _ => context.stop(),
                 }
                 fut::ok(())
             })
@@ -134,7 +133,7 @@ impl Actor for WsSession {
     }
 
     fn stopping(&mut self, _ctx: &mut <Self as Actor>::Context) -> Running {
-        self.server_addr.do_send(Unsubscribe { id: self.id });
+        self.server_address.do_send(Unsubscribe { id: self.id });
         Running::Stop
     }
 }
@@ -151,7 +150,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Ping(msg) => ctx.pong(&msg),
-            ws::Message::Pong(_) => self.hb = Instant::now(),
+            ws::Message::Pong(_) => {}
             ws::Message::Text(_) | ws::Message::Binary(_) => {}
             ws::Message::Close(_) => {
                 ctx.stop();
