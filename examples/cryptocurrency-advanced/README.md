@@ -68,8 +68,6 @@ exonum-cryptocurrency-advanced generate-template example/common.toml --validator
 
 Generate public and secrets keys for each node:
 
-<!-- markdownlint-disable MD013 -->
-
 ```sh
 exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
 
@@ -134,8 +132,9 @@ Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 
 ## Tutorials
 
-- Read the [frontend tutorial](tutorial/frontend.md) to get detailed
-  information about the interaction of the client with Exonum blockchain.
+- Read the
+  [frontend tutorial](https://github.com/exonum/exonum/blob/master/examples/cryptocurrency-advanced/tutorial/frontend.md)
+  to get detailed information about the interaction of the client with Exonum blockchain.
 
 ## License
 

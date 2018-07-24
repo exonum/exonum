@@ -19,7 +19,7 @@ use tokio_io::codec::{Decoder, Encoder};
 use std::io;
 
 use super::error::other_error;
-use events::noise::{NoiseWrapper, NOISE_HEADER_LENGTH};
+use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
 use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 #[derive(Debug)]

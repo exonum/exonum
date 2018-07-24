@@ -39,7 +39,7 @@ impl NodeHandler {
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
         match event {
-            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
+            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
@@ -67,10 +67,6 @@ impl NodeHandler {
                 }
             }
             ExternalMessage::Enable(value) => {
-                if self.node_role.is_auditor() {
-                    error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
-                    return;
-                }
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
                     info!("Node is already {}", s);

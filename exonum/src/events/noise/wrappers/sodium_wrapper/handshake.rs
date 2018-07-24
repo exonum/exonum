@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::future::{done, Future};
+use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
+
+use std::io;
+
 use super::wrapper::NoiseWrapper;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
 use events::{
-    codec::MessagesCodec, noise::{read, write, Handshake, HandshakeResult},
+    codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
-use futures::future::{done, Future};
-use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
-
-use std::io;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
@@ -77,8 +78,8 @@ impl NoiseHandshake {
         mut self,
         stream: S,
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        read(stream).and_then(move |(stream, msg)| {
-            self.noise.read_handshake_msg(&msg)?;
+        HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
+            self.noise.read_handshake_msg(&msg.0)?;
             Ok((stream, self))
         })
     }
@@ -89,22 +90,34 @@ impl NoiseHandshake {
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
         done(self.noise.write_handshake_msg())
             .map_err(|e| e.into())
-            .and_then(|(len, buf)| write(stream, &buf, len))
+            .and_then(|buf| HandshakeRawMessage(buf).write(stream))
             .map(move |(stream, _)| (stream, self))
     }
 
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+    ) -> Result<(Framed<S, MessagesCodec>, x25519::PublicKey), io::Error> {
         let noise = self.noise.into_transport_mode()?;
+        let remote_static_key = {
+            // Panic because with selected handshake pattern we must have
+            // `remote_static_key` on final step of handshake.
+            let rs = noise
+                .session
+                .get_remote_static()
+                .expect("Remote static key is not present!");
+            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+        };
+
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
-        Ok(framed)
+        Ok((framed, remote_static_key))
     }
 }
 
 impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    type Result = x25519::PublicKey;
+
+    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -115,7 +128,7 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
