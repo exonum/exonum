@@ -640,10 +640,10 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
     hashes
         .chunks(2)
         .map(|pair| {
-            if pair.len() == 2 {
-                hash_pair(&pair[0], &pair[1])
-            } else {
-                hash_one(&pair[0])
+            match pair {
+                [first, second] => hash_pair(first, second),
+                [single] => hash_one(single),
+                _ => unreachable!(),
             }
         })
         .collect()
