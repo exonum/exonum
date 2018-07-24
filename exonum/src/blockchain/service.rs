@@ -543,16 +543,16 @@ impl SharedNodeState {
 
     /// Broadcast message to all subscribers.
     pub(crate) fn broadcast(&self, block_hash: &Hash) {
-        self.state
+        if let Some(addr) = self.state
             .write()
             .expect("Expected write lock")
             .server_addr
             .clone()
-            .map(|addr| {
-                addr.do_send(Broadcast {
-                    block_hash: block_hash.to_owned(),
-                })
-            });
+        {
+            addr.do_send(Broadcast {
+                block_hash: block_hash.to_owned(),
+            })
+        }
     }
 }
 
