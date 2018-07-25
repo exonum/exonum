@@ -545,7 +545,7 @@ impl SharedNodeState {
     pub(crate) fn broadcast(&self, block_hash: &Hash) {
         if let Some(ref address) = self.state
             .read()
-            .expect("Expected write lock")
+            .expect("Expected read lock")
             .broadcast_server_address
         {
             address.do_send(websocket::Broadcast {
