@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use api::ServiceApiState;
 use crypto::Hash;
 
-/// WebSocket Message for communication between Clients(`WsSession`) and Server(`WsServer`).
+/// WebSocket message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]
 pub(crate) struct Message(pub String);
 
@@ -45,13 +45,12 @@ pub(crate) struct Broadcast {
     pub block_hash: Hash,
 }
 
-/// WebSocket server.
-pub(crate) struct WsServer {
+pub(crate) struct Server {
     pub subscribers: HashMap<usize, Recipient<Syn, Message>>,
     rng: RefCell<ThreadRng>,
 }
 
-impl Default for WsServer {
+impl Default for Server {
     fn default() -> Self {
         Self {
             subscribers: HashMap::new(),
@@ -60,11 +59,11 @@ impl Default for WsServer {
     }
 }
 
-impl Actor for WsServer {
+impl Actor for Server {
     type Context = Context<Self>;
 }
 
-impl Handler<Subscribe> for WsServer {
+impl Handler<Subscribe> for Server {
     type Result = usize;
 
     fn handle(&mut self, Subscribe { address }: Subscribe, _ctx: &mut Self::Context) -> usize {
@@ -75,7 +74,7 @@ impl Handler<Subscribe> for WsServer {
     }
 }
 
-impl Handler<Unsubscribe> for WsServer {
+impl Handler<Unsubscribe> for Server {
     type Result = ();
 
     fn handle(&mut self, Unsubscribe { id }: Unsubscribe, _ctx: &mut Self::Context) {
@@ -83,7 +82,7 @@ impl Handler<Unsubscribe> for WsServer {
     }
 }
 
-impl Handler<Broadcast> for WsServer {
+impl Handler<Broadcast> for Server {
     type Result = ();
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
@@ -93,14 +92,13 @@ impl Handler<Broadcast> for WsServer {
     }
 }
 
-/// WebSocket session.
-pub(crate) struct WsSession {
+pub(crate) struct Session {
     pub id: usize,
-    pub server_address: Addr<Syn, WsServer>,
+    pub server_address: Addr<Syn, Server>,
 }
 
-impl WsSession {
-    pub fn new(server_address: Addr<Syn, WsServer>) -> Self {
+impl Session {
+    pub fn new(server_address: Addr<Syn, Server>) -> Self {
         Self {
             id: 0,
             server_address,
@@ -108,7 +106,7 @@ impl WsSession {
     }
 }
 
-impl Actor for WsSession {
+impl Actor for Session {
     type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -136,7 +134,7 @@ impl Actor for WsSession {
     }
 }
 
-impl Handler<Message> for WsSession {
+impl Handler<Message> for Session {
     type Result = ();
 
     fn handle(&mut self, msg: Message, ctx: &mut Self::Context) {
@@ -144,7 +142,7 @@ impl Handler<Message> for WsSession {
     }
 }
 
-impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
+impl StreamHandler<ws::Message, ws::ProtocolError> for Session {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Ping(msg) => ctx.pong(&msg),

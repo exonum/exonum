@@ -23,7 +23,7 @@ use std::{
 };
 
 use super::transaction::Transaction;
-use api::{Broadcast, ServiceApiBuilder, WsServer};
+use api::{websocket, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -322,7 +322,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    broadcast_server_address: Option<Addr<Syn, WsServer>>,
+    broadcast_server_address: Option<Addr<Syn, websocket::Server>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -536,7 +536,7 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    pub(crate) fn set_broadcast_server_address(&self, address: Addr<Syn, WsServer>) {
+    pub(crate) fn set_broadcast_server_address(&self, address: Addr<Syn, websocket::Server>) {
         let mut state = self.state.write().expect("Expected write lock");
         state.broadcast_server_address = Some(address);
     }
@@ -544,11 +544,11 @@ impl SharedNodeState {
     /// Broadcast message to all subscribers.
     pub(crate) fn broadcast(&self, block_hash: &Hash) {
         if let Some(ref address) = self.state
-            .write()
+            .read()
             .expect("Expected write lock")
             .broadcast_server_address
         {
-            address.do_send(Broadcast {
+            address.do_send(websocket::Broadcast {
                 block_hash: *block_hash,
             })
         }

@@ -16,7 +16,6 @@
 
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
-pub(crate) use self::websocket::{Broadcast, WsServer};
 pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -30,7 +29,7 @@ pub mod backends;
 pub mod error;
 pub mod node;
 mod state;
-mod websocket;
+pub(crate) mod websocket;
 mod with;
 
 /// Defines object that could be used as an API backend.
@@ -322,9 +321,9 @@ impl ApiAggregator {
         self.inner.insert(prefix.into(), builder);
     }
 
-    fn explorer_api(shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+    fn explorer_api(shared_node_state: SharedNodeState) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_api_state);
+        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_node_state);
         builder
     }
 

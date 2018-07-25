@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 
 use api::{
     backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websocket::{WsServer, WsSession}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
+    websocket::{Server, Session}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
     ServiceApiState,
 };
 use blockchain::{Block, SharedNodeState};
@@ -168,21 +168,21 @@ impl ExplorerApi {
     pub fn handle_subscribe(
         name: &'static str,
         backend: &mut actix::ApiBuilder,
-        shared_api_state: SharedNodeState,
+        shared_node_state: SharedNodeState,
     ) {
-        let server_address = Arc::new(Mutex::new(None));
+        let server = Arc::new(Mutex::new(None));
 
         let index = move |req: HttpRequest| -> FutureResponse {
-            let server = server_address.clone();
+            let server = server.clone();
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| WsServer::default()));
+                *address = Some(Arbiter::start(|_| Server::default()));
 
-                shared_api_state.set_broadcast_server_address(address.to_owned().unwrap());
+                shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
 
             Box::new(
-                ws::start(req.clone(), WsSession::new(address.to_owned().unwrap())).into_future(),
+                ws::start(req.clone(), Session::new(address.to_owned().unwrap())).into_future(),
             )
         };
 
@@ -196,12 +196,12 @@ impl ExplorerApi {
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(
         api_scope: &mut ServiceApiScope,
-        shared_api_state: SharedNodeState,
+        shared_node_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
         Self::handle_subscribe(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
-            shared_api_state,
+            shared_node_state,
         );
         api_scope
             .endpoint("v1/blocks", Self::blocks)
