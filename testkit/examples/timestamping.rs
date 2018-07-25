@@ -32,8 +32,6 @@ const SERVICE_ID: u16 = 512;
 
 transactions! {
     TimestampingServiceTransactions {
-        const SERVICE_ID = SERVICE_ID;
-
         struct TxTimestamp {
             from: &PublicKey,
             msg: &str,

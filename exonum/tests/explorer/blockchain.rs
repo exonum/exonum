@@ -15,20 +15,21 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 extern crate futures;
-
 use self::futures::sync::mpsc;
+
 use exonum::{
     blockchain::{
-        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionSet,
+        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
+        TransactionContext, TransactionSet,
     },
-    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::RawTransaction, node::ApiSender, storage::{Fork, MemoryDB, Snapshot},
+    crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+    messages::{Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
-transactions! {
-    Transactions {
-        const SERVICE_ID = 10_000;
+pub const SERVICE_ID: u16 = 0;
 
+transactions! {
+    pub ExplorerTransactions {
         struct CreateWallet {
             pubkey: &PublicKey,
             name: &str,
@@ -47,7 +48,7 @@ impl Transaction for CreateWallet {
         true
     }
 
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
+    fn execute(&self, _: TransactionContext) -> ExecutionResult {
         if self.name().starts_with("Al") {
             Ok(())
         } else {
@@ -64,7 +65,7 @@ impl Transaction for Transfer {
         true
     }
 
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
+    fn execute(&self, _: TransactionContext) -> ExecutionResult {
         panic!("oops")
     }
 }
@@ -85,7 +86,7 @@ impl Service for MyService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-        Transactions::tx_from_raw(raw).map(Transactions::into)
+        ExplorerTransactions::tx_from_raw(raw).map(ExplorerTransactions::into)
     }
 }
 
@@ -124,7 +125,7 @@ pub fn create_blockchain() -> Blockchain {
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
-pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>) {
+pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTransaction>>) {
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
@@ -136,33 +137,39 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transacti
     {
         let mut schema = Schema::new(&mut fork);
         for tx in transactions {
-            schema.add_transaction_into_pool(tx.raw().clone())
+            schema.add_transaction_into_pool(tx.clone())
         }
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
     let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
-    let (_, consensus_secret_key) = consensus_keys();
+    let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
-    let propose = Propose::new(
-        ValidatorId(0),
-        height,
-        Round::first(),
-        &blockchain.last_hash(),
-        &tx_hashes,
+    let propose = Message::new(
+        Propose::new(
+            ValidatorId(0),
+            height,
+            Round::first(),
+            &blockchain.last_hash(),
+            &tx_hashes,
+        ),
+        consensus_public_key,
         &consensus_secret_key,
     );
-    let precommit = Precommit::new(
-        ValidatorId(0),
-        propose.height(),
-        propose.round(),
-        &propose.hash(),
-        &block_hash,
-        SystemTime::now().into(),
+    let precommit = Message::new(
+        Precommit::new(
+            ValidatorId(0),
+            propose.height(),
+            propose.round(),
+            &propose.hash(),
+            &block_hash,
+            SystemTime::now().into(),
+        ),
+        consensus_public_key,
         &consensus_secret_key,
     );
 
     blockchain
-        .commit(&patch, block_hash, [precommit].into_iter())
+        .commit(&patch, block_hash, vec![precommit].into_iter())
         .unwrap();
 }

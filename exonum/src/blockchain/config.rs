@@ -27,6 +27,7 @@ use serde_json::{self, Error as JsonError};
 use std::collections::{BTreeMap, HashSet};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
+use messages::{HexStringRepresentation};
 use helpers::{Height, Milliseconds};
 use storage::StorageValue;
 
@@ -36,9 +37,11 @@ use storage::StorageValue;
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
+    #[serde(with = "HexStringRepresentation")]
     pub consensus_key: PublicKey,
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
+    #[serde(with = "HexStringRepresentation")]
     pub service_key: PublicKey,
 }
 
@@ -52,6 +55,7 @@ pub struct StoredConfiguration {
     /// Hash of the previous configuration, which can be used to find that
     /// configuration. For the configuration in the genesis block,
     /// `hash` is just an array of zeros.
+    #[serde(with = "HexStringRepresentation")]
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual. Note
     /// that this height should be big enough for the nodes to accept the new

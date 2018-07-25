@@ -25,7 +25,7 @@ extern crate serde_json;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{ExecutionResult, Service, Transaction, TransactionSet},
+    blockchain::{ExecutionResult, Service, Transaction, TransactionSet, TransactionContext},
     crypto::{gen_keypair, Hash, PublicKey}, encoding, helpers::Height,
     messages::{Message, RawTransaction}, storage::{Fork, ProofMapIndex, Snapshot},
 };
@@ -71,7 +71,6 @@ impl<'a> MarkerSchema<&'a mut Fork> {
 
 transactions! {
     MarkerTransactions {
-        const SERVICE_ID = SERVICE_ID;
 
         /// Transaction, which must be executed no later than the specified time (field `time`).
         struct TxMarker {
@@ -87,7 +86,8 @@ impl Transaction for TxMarker {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let view = tc.fork();
         let time = TimeSchema::new(&view).time().get();
         match time {
             Some(current_time) if current_time <= self.time() => {

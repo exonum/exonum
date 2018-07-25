@@ -28,27 +28,25 @@ use api::{
     backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
     ApiAccess, ApiAggregator,
 };
-use failure;
+use failure::{self, Error};
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, net::SocketAddr, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 
-use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
-};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
-    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
-    NetworkRequest, SyncSender, TimeoutRequest,
+    error::{into_failure, log_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
+    SyncSender, TimeoutRequest,
 };
 use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Connect, Message, RawMessage};
+use messages::{Connect, Message, ProtocolMessage, RawTransaction, SignedMessage, HexStringRepresentation};
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -63,7 +61,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Box<dyn Transaction>),
+    Transaction(Message<RawTransaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -133,8 +131,10 @@ pub struct ServiceConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
     /// Public key.
+    #[serde(with = "HexStringRepresentation")]
     pub consensus_public_key: PublicKey,
     /// Secret key.
+    #[serde(with = "HexStringRepresentation")]
     pub consensus_secret_key: SecretKey,
     /// ConnectList.
     pub connect_list: ConnectList,
@@ -387,11 +387,13 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Connect::new(
-            &config.listener.consensus_public_key,
-            external_address,
-            system_state.current_time().into(),
-            &user_agent::get(),
+        let connect = Message::new(
+            Connect::new(
+                external_address,
+                system_state.current_time().into(),
+                &user_agent::get(),
+            ),
+            config.listener.consensus_public_key,
             &config.listener.consensus_secret_key,
         );
 
@@ -433,6 +435,14 @@ impl NodeHandler {
             is_enabled,
             node_role,
         }
+    }
+
+    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Message<T> {
+        Message::new(
+            message,
+            *self.state.consensus_public_key(),
+            self.state.consensus_secret_key(),
+        )
     }
 
     /// Return internal `SharedNodeState`
@@ -486,7 +496,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(Connect::addr);
+            let it = self.state.peers().values().map(|s| s.addr());
             let it = it.chain(self.peer_discovery.iter().cloned());
             let it = it.filter(|&address| address != listen_address);
             it.collect()
@@ -514,22 +524,16 @@ impl NodeHandler {
         // the start of event processing.
         let messages = schema.consensus_messages_cache();
         for msg in messages.iter() {
-            self.handle_message(msg);
-        }
-    }
-
-    /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
-        if id as usize >= self.state.validators().len() {
-            error!("Invalid validator id: {}", id);
-        } else {
-            let public_key = self.state.validators()[id as usize].consensus_key;
-            self.send_to_peer(public_key, message);
+            self.handle_message(msg).log_error();
         }
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
+    pub(crate) fn send_to_peer<M: Into<SignedMessage>>(
+        &mut self,
+        public_key: PublicKey,
+        message: M,
+    ) {
         let address = {
             if let Some(conn) = self.state.peers().get(&public_key) {
                 conn.addr()
@@ -545,33 +549,38 @@ impl NodeHandler {
         self.send_to_addr(&address, message);
     }
 
-    /// Sends `RawMessage` to the specified address.
-    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
+    /// Sends `SignedMessage` to the specified address.
+    pub(crate) fn send_to_addr<M: Into<SignedMessage>>(
+        &mut self,
+        address: &SocketAddr,
+        message: M,
+    ) {
+        trace!("Send to address: {}", address);
         let public_key = self.state.connect_list().find_key_by_address(&address);
 
         if let Some(public_key) = public_key {
             trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+            let request = NetworkRequest::SendMessage(*address, message.into(), *public_key);
             self.channel.network_requests.send(request).log_error();
         } else {
             warn!(
                 "Attempt to connect to the peer with address {:?} which \
-                     is not in the ConnectList",
+                 is not in the ConnectList",
                 address
             );
         }
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast(&mut self, message: &RawMessage) {
+    pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
         let peers: Vec<SocketAddr> = self.state
             .peers()
             .values()
             .map(|conn| conn.addr())
             .collect();
-
+        let message = message.into();
         for address in peers {
-            self.send_to_addr(&address, message);
+            self.send_to_addr(&address, message.clone());
         }
     }
 
@@ -580,7 +589,7 @@ impl NodeHandler {
         let connect = self.state.our_connect_message().clone();
 
         if self.state.connect_list().is_address_allowed(&address) {
-            self.send_to_addr(address, connect.raw());
+            self.send_to_addr(address, connect.clone());
         } else {
             warn!(
                 "Attempt to connect to the peer {:?} which \
@@ -694,13 +703,6 @@ impl fmt::Debug for NodeHandler {
     }
 }
 
-/// `TransactionSend` represents interface for sending transactions. For details see `ApiSender`
-/// implementation.
-pub trait TransactionSend: Send + Sync {
-    /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()>;
-}
-
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
@@ -708,28 +710,22 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: ConnectInfo) -> io::Result<()> {
+    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), Error> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
 
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
         self.0
             .clone()
             .send(message)
             .wait()
             .map(drop)
-            .map_err(into_other)
+            .map_err(into_failure)
     }
-}
-
-impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()> {
-        if !tx.verify() {
-            let msg = "Unable to verify transaction";
-            return Err(io::Error::new(io::ErrorKind::Other, msg));
-        }
+    /// Broadcast transaction to other node.
+    pub fn broadcast_transaction(&self, tx: Message<RawTransaction>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
@@ -888,26 +884,26 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new()?;
+            let mut core = Core::new().map_err(into_failure)?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
             let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occurred: {}", e))
-            })
+            core.run(network_handler)
+                .map(drop)
+                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
         });
 
-        let mut core = Core::new()?;
+        let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
-            .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
+            .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
         network_thread.join().unwrap()
     }
 
@@ -1028,18 +1024,18 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, Schema, Transaction};
+    use blockchain::{ExecutionResult, Schema, Transaction, TransactionContext};
     use crypto::gen_keypair;
     use events::EventHandler;
     use helpers;
-    use storage::{Database, Fork, MemoryDB};
-
-    messages! {
-        const SERVICE_ID = 0;
-
-        struct TxSimple {
-            public_key: &PublicKey,
-            msg: &str,
+    use storage::{Database, MemoryDB};
+    const SERVICE_ID: u16 = 0;
+    transactions! {
+        SimpleTransactions {
+            struct TxSimple {
+                public_key: &PublicKey,
+                msg: &str,
+            }
         }
     }
 
@@ -1048,7 +1044,7 @@ mod tests {
             true
         }
 
-        fn execute(&self, _view: &mut Fork) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -1063,10 +1059,14 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg);
 
-        let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+        let tx = Message::sign_tx_set::<SimpleTransactions>(
+            TxSimple::new(&p_key, "Hello, World!").into(),
+            SERVICE_ID,
+            (p_key, &s_key),
+        );
 
         // Create original transaction.
-        let tx_orig = Box::new(tx.clone());
+        let tx_orig = tx.clone();
         let event = ExternalMessage::Transaction(tx_orig);
         node.handler.handle_event(event.into());
 
@@ -1076,7 +1076,7 @@ mod tests {
         assert_eq!(schema.transactions_pool_len(), 1);
 
         // Create duplicated transaction.
-        let tx_copy = Box::new(tx.clone());
+        let tx_copy = tx.clone();
         let event = ExternalMessage::Transaction(tx_copy);
         node.handler.handle_event(event.into());
 

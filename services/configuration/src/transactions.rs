@@ -15,7 +15,7 @@
 //! Transaction definitions for the configuration service.
 
 use exonum::{
-    blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
+    blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext},
     crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
     storage::{Fork, Snapshot},
 };
@@ -26,8 +26,6 @@ use schema::{MaybeVote, ProposeData, Schema};
 transactions! {
     /// Configuration Service transactions.
     pub ConfigurationTransactions {
-        const SERVICE_ID = super::SERVICE_ID;
-
         /// Propose a new configuration.
         ///
         /// # Notes
@@ -238,7 +236,8 @@ impl Transaction for Propose {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let fork = tc.fork();
         let (cfg, cfg_hash) = self.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding propose {:?}: {}", self, err);
             err
@@ -373,7 +372,8 @@ impl Transaction for Vote {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let fork = tc.fork();
         let vote = VotingDecisionRef::from(self);
         let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote {:?}: {}", self, err);
@@ -398,7 +398,8 @@ impl Transaction for VoteAgainst {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let fork = tc.fork();
         let vote_against = VotingDecisionRef::from(self);
         vote_against.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote against {:?}: {}", self, err);

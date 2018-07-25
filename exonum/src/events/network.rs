@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Handle,
@@ -20,29 +21,29 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
 
 use super::{
-    error::{into_other, log_error, other_error, result_ok}, to_box,
+    error::{into_failure, log_error, result_ok}, to_box,
 };
 use crypto::PublicKey;
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
-use messages::{Any, Connect, Message, RawMessage};
+use messages::{Connect, Message, Protocol, SignedMessage, UncheckedBuffer};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(SocketAddr, Connect),
+    MessageReceived(SocketAddr, UncheckedBuffer),
+    PeerConnected(SocketAddr, Message<Connect>),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    SendMessage(SocketAddr, RawMessage, PublicKey),
+    SendMessage(SocketAddr, SignedMessage, PublicKey),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
@@ -73,7 +74,7 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
-    pub our_connect_message: Connect,
+    pub our_connect_message: Message<Connect>,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
@@ -83,7 +84,7 @@ pub struct NetworkPart {
 
 #[derive(Debug, Default, Clone)]
 struct ConnectionsPool {
-    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
+    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<SignedMessage>>>>,
 }
 
 impl ConnectionsPool {
@@ -91,18 +92,18 @@ impl ConnectionsPool {
         Self::default()
     }
 
-    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<RawMessage>) {
+    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<SignedMessage>) {
         self.inner.borrow_mut().insert(peer, sender.clone());
     }
 
-    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
+    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<SignedMessage>, failure::Error> {
         self.inner
             .borrow_mut()
             .remove(peer)
-            .ok_or("there is no sender in the connection pool")
+            .ok_or_else(|| format_err!("there is no sender in the connection pool"))
     }
 
-    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
+    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<SignedMessage>> {
         self.inner.borrow_mut().get(&peer).cloned()
     }
 
@@ -117,7 +118,7 @@ impl ConnectionsPool {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> Option<mpsc::Sender<RawMessage>> {
+    ) -> Option<mpsc::Sender<SignedMessage>> {
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
             warn!(
@@ -141,7 +142,7 @@ impl ConnectionsPool {
 
         let action = move || TcpStream::connect(&peer, &handle_clonned);
         let connect_handle = Retry::spawn(handle.clone(), strategy, action)
-            .map_err(into_other)
+            .map_err(into_failure)
             // Configure socket
             .and_then(move |sock| {
                 sock.set_nodelay(network_config.tcp_nodelay)?;
@@ -159,13 +160,13 @@ impl ConnectionsPool {
                 let (sink, stream) = stream.split();
 
                 let writer = conn_rx
-                    .map_err(|_| other_error("Can't send data into socket"))
+                    .map_err(|_| format_err!("Can't send data into socket"))
                     .forward(sink);
                 let reader = stream.for_each(result_ok);
 
                 reader
                     .select2(writer)
-                    .map_err(|_| other_error("Socket error"))
+                    .map_err(|_| format_err!("Socket error"))
                     .and_then(|res| match res {
                         Either::A((_, _reader)) => Ok("by reader"),
                         Either::B((_, _writer)) => Ok("by writer"),
@@ -188,14 +189,13 @@ impl ConnectionsPool {
         &self,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let fut = self.remove(&peer)
             .into_future()
-            .map_err(other_error)
             .and_then(move |_| {
                 network_tx
                     .send(NetworkEvent::PeerDisconnected(peer))
-                    .map_err(|_| other_error("can't send disconnect"))
+                    .map_err(|_| format_err!("can't send disconnect"))
             })
             .map(drop);
         to_box(fut)
@@ -207,7 +207,7 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -244,13 +244,13 @@ impl NetworkPart {
 }
 
 struct RequestHandler(
-    // TODO: Replace with concrete type. (ECR-1634)
-    Box<dyn Future<Item = (), Error = io::Error>>,
+    // TODO: Replace with concrete type
+    Box<dyn Future<Item = (), Error = failure::Error>>,
 );
 
 impl RequestHandler {
     fn new(
-        connect_message: Connect,
+        connect_message: Message<Connect>,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
@@ -262,7 +262,7 @@ impl RequestHandler {
         let outgoing_connections = ConnectionsPool::new();
         let handshake_params = handshake_params.clone();
         let requests_handler = receiver
-            .map_err(|_| other_error("no network requests"))
+            .map_err(|_| format_err!("no network requests"))
             .for_each(move |request| {
                 match request {
                     NetworkRequest::SendMessage(peer, msg, remote_key) => {
@@ -284,20 +284,23 @@ impl RequestHandler {
                                     )
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
-                                        if &msg == connect_message.raw() {
+                                        if &msg != connect_message.as_ref()
+                                        {
                                             conn_fut(Ok(conn_tx).into_future())
-                                        } else {
-                                            conn_fut(conn_tx.send(connect_message.raw().clone())
-                                                .map_err(|_| {
-                                                    other_error("can't send message to a connection")
-                                                }))
+                                        }
+                                        else
+                                        {
+                                            conn_fut(conn_tx.send(connect_message.clone().into())
+                                            .map_err(|_|
+                                            format_err!("can't send message to a connection")
+                                        ))
                                         })
                             });
                         if let Some(conn_tx) = conn_tx {
                             let fut = conn_tx.and_then(|conn_tx| {
                                 conn_tx
                                     .send(msg)
-                                    .map_err(|_| other_error("can't send message to a connection"))
+                                    .map_err(|_| format_err!("can't send message to a connection"))
                             });
                             to_box(fut)
                         } else {
@@ -305,7 +308,7 @@ impl RequestHandler {
                             let fut = network_tx
                                 .clone()
                                 .send(event)
-                                .map_err(|_| other_error("can't send network event"))
+                                .map_err(|_| format_err!("can't send network event"))
                                 .into_future();
                             to_box(fut)
                         }
@@ -317,7 +320,7 @@ impl RequestHandler {
                     NetworkRequest::Shutdown => to_box(
                         cancel_sender
                             .take()
-                            .ok_or_else(|| other_error("shutdown twice"))
+                            .ok_or_else(|| format_err!("shutdown twice"))
                             .into_future(),
                     ),
                 }
@@ -328,14 +331,14 @@ impl RequestHandler {
 
 impl Future for RequestHandler {
     type Item = ();
-    type Error = io::Error;
+    type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.0.poll()
     }
 }
 
-struct Listener(Box<dyn Future<Item = (), Error = io::Error>>);
+struct Listener(Box<dyn Future<Item = (), Error = failure::Error>>);
 
 impl Listener {
     fn bind(
@@ -344,7 +347,7 @@ impl Listener {
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
         handshake_params: &HandshakeParams,
-    ) -> Result<Self, io::Error> {
+    ) -> Result<Self, failure::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
         // The reference counter is used to automatically count the number of the open connections.
@@ -353,60 +356,74 @@ impl Listener {
         let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
         let handshake_params = handshake_params.clone();
-        let server = listener.incoming().for_each(move |(sock, addr)| {
-            let holder = Rc::downgrade(&incoming_connections_counter);
-            // Check incoming connections count
-            let connections_count = Rc::weak_count(&incoming_connections_counter);
-            if connections_count > incoming_connections_limit {
-                warn!(
-                    "Rejected incoming connection with peer={}, \
-                     connections limit reached.",
-                    addr
-                );
-                return to_box(future::ok(()));
-            }
-            trace!("Accepted incoming connection with peer={}", addr);
-            let network_tx = network_tx.clone();
+        let server = listener
+            .incoming()
+            .for_each(move |(sock, addr)| {
+                let holder = Rc::downgrade(&incoming_connections_counter);
+                // Check incoming connections count
+                let connections_count = Rc::weak_count(&incoming_connections_counter);
+                if connections_count > incoming_connections_limit {
+                    warn!(
+                        "Rejected incoming connection with peer={}, \
+                         connections limit reached.",
+                        addr
+                    );
+                    return to_box(future::ok(()));
+                }
+                trace!("Accepted incoming connection with peer={}", addr);
+                let network_tx = network_tx.clone();
 
-            let handshake = NoiseHandshake::responder(&handshake_params);
-            let stream = handshake.listen(sock).flatten_stream();
+                let handshake = NoiseHandshake::responder(&handshake_params);
+                let stream = handshake.listen(sock).flatten_stream();
 
-            let connection_handler = stream
-                .into_future()
-                .and_then(Ok)
-                .map_err(|e| e.0)
-                .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
-                    Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                    Some(Ok(other)) => Err(other_error(&format!(
-                        "First message is not Connect, got={:?}",
-                        other
-                    ))),
-                    Some(Err(e)) => Err(into_other(e)),
-                    None => Err(other_error("Incoming socket closed")),
-                })
-                .and_then(move |(connect, stream)| {
-                    trace!("Received handshake message={:?}", connect);
-                    let event = NetworkEvent::PeerConnected(addr, connect);
-                    let stream = network_tx
-                        .clone()
-                        .send(event)
-                        .map_err(into_other)
-                        .and_then(move |_| Ok(stream))
-                        .flatten_stream();
-
-                    stream.for_each(move |raw| {
-                        let event = NetworkEvent::MessageReceived(addr, raw);
-                        network_tx.clone().send(event).map_err(into_other).map(drop)
+                let connection_handler = stream
+                    .into_future()
+                    .and_then(Ok)
+                    .map_err(|e| e.0)
+                    .and_then(move |(raw, stream)| {
+                        let raw = raw.ok_or_else(|| {
+                            format_err!("Connection closed before first message.")
+                        })?;
+                        let signed = SignedMessage::verify_buffer(raw)?;
+                        let (payload, signed) = signed.into_message().into_parts();
+                        let payload = match payload {
+                            Protocol::Connect(c) => c,
+                            _ => bail!(
+                                "Received first message different\
+                                 from Connect msg = {:?}.",
+                                payload
+                            ),
+                        };
+                        Ok((Message::from_parts(payload, signed)?, stream))
                     })
-                })
-                .map(|_| {
-                    // Ensure that holder lives until the stream ends.
-                    let _holder = holder;
-                })
-                .map_err(log_error);
-            handle.spawn(to_box(connection_handler));
-            to_box(future::ok(()))
-        });
+                    .and_then(move |(connect, stream)| {
+                        trace!("Received handshake message={:?}", connect);
+                        let event = NetworkEvent::PeerConnected(addr, connect);
+                        let stream = network_tx
+                            .clone()
+                            .send(event)
+                            .map_err(into_failure)
+                            .and_then(move |_| Ok(stream))
+                            .flatten_stream();
+
+                        stream.for_each(move |raw| {
+                            let event = NetworkEvent::MessageReceived(addr, raw);
+                            network_tx
+                                .clone()
+                                .send(event)
+                                .map_err(into_failure)
+                                .map(drop)
+                        })
+                    })
+                    .map(|_| {
+                        // Ensure that holder lives until the stream ends.
+                        let _holder = holder;
+                    })
+                    .map_err(log_error);
+                handle.spawn(to_box(connection_handler));
+                to_box(future::ok(()))
+            })
+            .map_err(into_failure);
 
         Ok(Listener(to_box(server)))
     }
@@ -414,16 +431,18 @@ impl Listener {
 
 impl Future for Listener {
     type Item = ();
-    type Error = io::Error;
+    type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.0.poll()
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
+fn conn_fut<F>(
+    fut: F,
+) -> Box<dyn Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error>>
 where
-    F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
+    F: Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error> + 'static,
 {
     Box::new(fut)
 }

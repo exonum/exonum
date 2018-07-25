@@ -47,9 +47,7 @@ pub use sodiumoxide::crypto::{
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
-use serde::{
-    de::{self, Deserialize, Deserializer, Visitor}, Serialize, Serializer,
-};
+
 use sodiumoxide::{
     self,
     crypto::{
@@ -489,12 +487,6 @@ implement_private_sodium_wrapper! {
     struct Seed, SeedSodium, SEED_LENGTH
 }
 
-implement_serde! {Hash}
-implement_serde! {PublicKey}
-implement_serde! {SecretKey}
-implement_serde! {Seed}
-implement_serde! {Signature}
-
 implement_index_traits! {Hash}
 implement_index_traits! {PublicKey}
 implement_index_traits! {SecretKey}
@@ -661,7 +653,7 @@ impl CryptoHash for Decimal {
 mod tests {
     use super::*;
 
-    use serde::de::DeserializeOwned;
+    use serde::{ Serialize, de::DeserializeOwned};
     use serde_json;
 
     use encoding::serialize::FromHex;

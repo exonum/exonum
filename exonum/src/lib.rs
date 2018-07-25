@@ -15,6 +15,7 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
+#![feature(trace_macros)]
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
@@ -37,9 +38,14 @@
     )
 )]
 
+
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 extern crate actix;
 extern crate actix_web;
 extern crate atty;
+extern crate bincode;
 extern crate bit_vec;
 extern crate byteorder;
 extern crate bytes;
@@ -48,6 +54,7 @@ extern crate chrono;
 extern crate clap;
 extern crate colored;
 extern crate env_logger;
+extern crate erased_serde;
 extern crate exonum_rocksdb as rocksdb;
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
@@ -90,11 +97,11 @@ pub mod encoding;
 pub mod messages;
 #[macro_use]
 pub mod helpers;
+#[macro_use]
+pub mod blockchain;
 pub mod crypto;
 pub mod node;
 pub mod storage;
-#[macro_use]
-pub mod blockchain;
 pub mod api;
 pub mod explorer;
 

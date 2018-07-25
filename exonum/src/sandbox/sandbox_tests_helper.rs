@@ -17,9 +17,7 @@ use bit_vec::BitVec;
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
-use super::{
-    sandbox::Sandbox, timestamping::{TimestampTx, TimestampingTxGenerator},
-};
+use super::{sandbox::Sandbox, timestamping::TimestampingTxGenerator};
 use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -193,8 +191,8 @@ impl<'a> ProposeBuilder<'a> {
         self
     }
 
-    pub fn build(&self) -> Propose {
-        Propose::new(
+    pub fn build(&self) -> Message<Propose> {
+        self.sandbox.create_propose(
             self.validator_id
                 .unwrap_or_else(|| self.sandbox.current_leader()),
             self.height.unwrap_or_else(|| self.sandbox.current_height()),
@@ -249,7 +247,7 @@ pub fn add_round_with_transactions(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Option<Propose> {
+) -> Option<Message<Propose>> {
     try_add_round_with_transactions(sandbox, sandbox_state, transactions).unwrap()
 }
 
@@ -257,7 +255,7 @@ pub fn try_add_round_with_transactions(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Result<Option<Propose>, String> {
+) -> Result<Option<Message<Propose>>, String> {
     let mut res = None;
     let round_timeout = sandbox.round_timeout(); //use local var to save long code call
 
@@ -291,7 +289,7 @@ pub fn try_add_round_with_transactions(
     Ok(res)
 }
 
-pub fn gen_timestamping_tx() -> TimestampTx {
+pub fn gen_timestamping_tx() -> Message<RawTransaction> {
     let mut tx_gen = TimestampingTxGenerator::new(64);
     tx_gen.next().unwrap()
 }
@@ -299,7 +297,7 @@ pub fn gen_timestamping_tx() -> TimestampTx {
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
     // gen some tx
     let tx = gen_timestamping_tx();
-    add_one_height_with_transactions(sandbox, sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(sandbox, sandbox_state, &[tx.clone()]);
 }
 
 pub fn add_one_height_with_transactions<'a, I>(
@@ -308,7 +306,7 @@ pub fn add_one_height_with_transactions<'a, I>(
     txs: I,
 ) -> Vec<Hash>
 where
-    I: IntoIterator<Item = &'a RawTransaction>,
+    I: IntoIterator<Item = &'a Message<RawTransaction>>,
 {
     try_add_one_height_with_transactions(sandbox, sandbox_state, txs).unwrap()
 }
@@ -319,7 +317,7 @@ pub fn try_add_one_height(
 ) -> Result<(), String> {
     // gen some tx
     let tx = gen_timestamping_tx();
-    let result = try_add_one_height_with_transactions(sandbox, sandbox_state, &[tx.raw().clone()]);
+    let result = try_add_one_height_with_transactions(sandbox, sandbox_state, &[tx.clone()]);
     match result {
         Ok(_) => Ok(()),
         Err(msg) => Err(msg),
@@ -332,14 +330,14 @@ pub fn try_add_one_height_with_transactions<'a, I>(
     txs: I,
 ) -> Result<Vec<Hash>, String>
 where
-    I: IntoIterator<Item = &'a RawTransaction>,
+    I: IntoIterator<Item = &'a Message<RawTransaction>>,
 {
     // sort transaction in order accordingly their hashes
     let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[RawTransaction] = raw_txs.as_ref();
+    let txs: &[Message<RawTransaction>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
@@ -357,7 +355,7 @@ where
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
-    let mut propose: Option<Propose>;
+    let mut propose: Option<Message<Propose>>;
 
     let n_validators = sandbox.n_validators();
     for _ in 0..n_validators {
@@ -375,7 +373,7 @@ where
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Prevote::new(
+                sandbox.recv(&sandbox.create_prevote(
                     val_idx,
                     initial_height,
                     round,
@@ -401,7 +399,7 @@ where
                 *sandbox_state.accepted_block_hash.borrow_mut() = block.hash();
             }
 
-            sandbox.broadcast(&Precommit::new(
+            sandbox.broadcast(&sandbox.create_precommit(
                 VALIDATOR_0,
                 initial_height,
                 round,
@@ -414,7 +412,7 @@ where
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Precommit::new(
+                sandbox.recv(&sandbox.create_precommit(
                     val_idx,
                     initial_height,
                     round,
@@ -446,13 +444,13 @@ where
 pub fn add_one_height_with_transactions_from_other_validator(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
-    txs: &[RawTransaction],
+    txs: &[Message<RawTransaction>],
 ) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[RawTransaction] = raw_txs.as_ref();
+    let txs: &[Message<RawTransaction>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
@@ -487,7 +485,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.recv(&propose);
             for val_idx in 0..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Prevote::new(
+                sandbox.recv(&sandbox.create_prevote(
                     val_idx,
                     initial_height,
                     round,
@@ -512,7 +510,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 
             for val_idx in 0..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Precommit::new(
+                sandbox.recv(&sandbox.create_precommit(
                     val_idx,
                     initial_height,
                     round,
@@ -537,7 +535,10 @@ pub fn add_one_height_with_transactions_from_other_validator(
     unreachable!("because at one of loops we should become a leader and return");
 }
 
-fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Propose {
+fn get_propose_with_transactions(
+    sandbox: &TimestampingSandbox,
+    transactions: &[Hash],
+) -> Message<Propose> {
     get_propose_with_transactions_for_validator(sandbox, transactions, VALIDATOR_0)
 }
 
@@ -545,9 +546,9 @@ fn get_propose_with_transactions_for_validator(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
     validator: ValidatorId,
-) -> Propose {
+) -> Message<Propose> {
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
-    Propose::new(
+    sandbox.create_propose(
         validator,
         sandbox.current_height(),
         sandbox.current_round(),
@@ -565,7 +566,7 @@ fn check_and_broadcast_propose_and_prevote(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Option<Propose> {
+) -> Option<Message<Propose>> {
     try_check_and_broadcast_propose_and_prevote(sandbox, sandbox_state, transactions).unwrap()
 }
 
@@ -573,7 +574,7 @@ fn try_check_and_broadcast_propose_and_prevote(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
-) -> Result<Option<Propose>, String> {
+) -> Result<Option<Message<Propose>>, String> {
     if *sandbox_state.time_millis_since_round_start.borrow() > PROPOSE_TIMEOUT {
         return Ok(None);
     }
@@ -603,7 +604,7 @@ fn try_check_and_broadcast_propose_and_prevote(
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
     sandbox.try_broadcast(&propose)?;
 
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         VALIDATOR_0,
         sandbox.current_height(),
         sandbox.current_round(),
@@ -619,8 +620,8 @@ fn try_check_and_broadcast_propose_and_prevote(
 pub fn receive_valid_propose_with_transactions(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
-) -> Propose {
-    let propose = Propose::new(
+) -> Message<Propose> {
+    let propose = sandbox.create_propose(
         sandbox.current_leader(),
         sandbox.current_height(),
         sandbox.current_round(),
@@ -635,8 +636,8 @@ pub fn receive_valid_propose_with_transactions(
 pub fn make_request_propose_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> ProposeRequest {
-    ProposeRequest::new(
+) -> Message<ProposeRequest> {
+    sandbox.create_propose_request(
         &sandbox.p(VALIDATOR_0),
         &sandbox.p(precommit.validator()),
         precommit.height(),
@@ -648,9 +649,9 @@ pub fn make_request_propose_from_precommit(
 pub fn make_request_prevote_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> PrevotesRequest {
+) -> Message<PrevotesRequest> {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
-    PrevotesRequest::new(
+    sandbox.create_prevote_request(
         &sandbox.p(VALIDATOR_0),
         &sandbox.p(precommit.validator()),
         precommit.height(),
@@ -663,8 +664,11 @@ pub fn make_request_prevote_from_precommit(
 
 /// idea of the method is to return valid Prevote using provided Propose.
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
-pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Prevote {
-    Prevote::new(
+pub fn make_prevote_from_propose(
+    sandbox: &TimestampingSandbox,
+    propose: &Message<Propose>,
+) -> Message<Prevote> {
+    sandbox.create_prevote(
         VALIDATOR_0,
         propose.height(),
         propose.round(),

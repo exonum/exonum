@@ -23,7 +23,7 @@ use blockchain::Block;
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
-use messages::Precommit;
+use messages::{Message, Precommit, RawTransaction, SignedMessage};
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -44,7 +44,7 @@ pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
     pub block: Block,
     /// Precommits authorizing the block.
-    pub precommits: Vec<Precommit>,
+    pub precommits: Vec<Message<Precommit>>,
     /// Hashes of transactions in the block.
     pub txs: Vec<Hash>,
 }
@@ -75,6 +75,13 @@ impl BlockQuery {
     pub fn new(height: Height) -> Self {
         Self { height }
     }
+}
+
+/// Raw Transaction in hex representation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TransactionHex {
+    /// The hex value of the transaction to be broadcasted.
+    pub tx_body: String,
 }
 
 /// Transaction query parameters.
@@ -155,13 +162,29 @@ impl ExplorerApi {
                 ApiError::NotFound(description)
             })
     }
+    /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
+    pub fn add_transaction(
+        state: &ServiceApiState,
+        query: TransactionHex,
+    ) -> Result<(), ApiError> {
+        use events::error::into_failure;
+        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
+        let signed = SignedMessage::verify_buffer(buf)?
+            .into_message()
+            .map_into::<RawTransaction>()?;
+        state
+            .sender()
+            .broadcast_transaction(signed)
+            .map_err(ApiError::from)
+    }
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
-            .endpoint("v1/transactions", Self::transaction_info)
+            .endpoint("v1/transaction", Self::transaction_info)
+            .endpoint_mut("v1/transaction", Self::add_transaction)
     }
 }
 

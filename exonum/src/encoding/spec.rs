@@ -234,7 +234,6 @@ macro_rules! encoding_struct {
                 Ok($name { raw: buf })
             }
         }
-
         // TODO: Rewrite Deserialize and Serialize implementation. (ECR-156)
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -258,6 +257,40 @@ macro_rules! encoding_struct {
                     .map_err(|_| S::Error::custom(
                                 concat!("Can not serialize structure: ", stringify!($name))))?
                     .serialize(serializer)
+            }
+        }
+
+        impl $crate::messages::BinaryForm for $name
+        {
+            fn serialize(&self) -> Result<Vec<u8>, $crate::encoding::Error> {
+                Ok(self.raw.clone())
+            }
+
+            fn deserialize(buffer: &[u8]) -> Result<Self, $crate::encoding::Error> {
+                let vec: Vec<u8> = buffer.to_vec(); // TODO: Remove to_vec() (which clones data).
+                let latest_segment: $crate::encoding::CheckedOffset = $name::__ex_header_size().into();
+
+                if vec.len() < $name::__ex_header_size() as usize {
+                    return Err(
+                        $crate::encoding::Error::UnexpectedlyShortPayload{
+                            actual_size: vec.len() as $crate::encoding::Offset,
+                            minimum_size:
+                            $name::__ex_header_size() as $crate::encoding::Offset
+                        })
+                }
+
+                __ex_for_each_field!(
+                    __ex_struct_check_field, (latest_segment, vec),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
+                if latest_segment.unchecked_offset() as usize != vec.len() {
+                return Err(
+                        $crate::encoding::Error::UnexpectedlyShortPayload{
+                            actual_size: latest_segment.unchecked_offset() as $crate::encoding::Offset,
+                            minimum_size: vec.len() as $crate::encoding::Offset
+                        })
+                }
+                Ok($name{raw:vec})
             }
         }
     )
@@ -428,3 +461,5 @@ macro_rules! __ex_deserialize_field {
         <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
     };
 }
+
+

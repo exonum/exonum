@@ -17,9 +17,10 @@
 use bit_vec::BitVec;
 use byteorder::{ByteOrder, LittleEndian};
 
+use messages::UncheckedBuffer;
+
 use super::{CheckedOffset, Error, Field, Offset, Result};
 use crypto::Hash;
-use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 /// Trait for fields, that has unknown `compile-time` size.
 /// Usually important for arrays,
@@ -45,8 +46,8 @@ pub trait SegmentField<'a>: Sized {
 }
 
 impl<'a, T> Field<'a> for T
-    where
-        T: SegmentField<'a>,
+where
+    T: SegmentField<'a>,
 {
     fn field_size() -> Offset {
         8
@@ -150,23 +151,21 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
-impl<'a> SegmentField<'a> for RawMessage {
+impl<'a> SegmentField<'a> for UncheckedBuffer {
     fn item_size() -> Offset {
         1
     }
 
     fn count(&self) -> Offset {
-        self.as_ref().len() as Offset
+        self.as_ref().count()
     }
 
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let to = from + to * Self::item_size();
-        let slice = &buffer[from as usize..to as usize];
-        Self::new(MessageBuffer::from_vec(Vec::from(slice)))
+        Self::new(<Vec<u8> as SegmentField>::from_buffer(buffer, from, to))
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(self.as_ref())
+        self.as_ref().extend_buffer(buffer)
     }
 
     fn check_data(
@@ -175,25 +174,7 @@ impl<'a> SegmentField<'a> for RawMessage {
         count: CheckedOffset,
         latest_segment: CheckedOffset,
     ) -> Result {
-        let size: CheckedOffset = (count * Self::item_size())?;
-        let to: CheckedOffset = (from + size)?;
-        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
-        if slice.len() < HEADER_LENGTH {
-            return Err(Error::UnexpectedlyShortRawMessage {
-                position: from.unchecked_offset(),
-                size: slice.len() as Offset,
-            });
-        }
-        let actual_size = slice.len() as Offset;
-        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
-        if actual_size != declared_size {
-            return Err(Error::IncorrectSizeOfRawMessage {
-                position: from.unchecked_offset(),
-                actual_size: slice.len() as Offset,
-                declared_size,
-            });
-        }
-        Ok(latest_segment)
+        <Vec<u8> as SegmentField>::check_data(buffer, from, count, latest_segment)
     }
 }
 

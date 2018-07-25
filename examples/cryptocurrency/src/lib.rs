@@ -115,13 +115,9 @@ pub mod schema {
 pub mod transactions {
     use exonum::crypto::PublicKey;
 
-    use service::SERVICE_ID;
-
     transactions! {
         /// Transaction group.
         pub CurrencyTransactions {
-            const SERVICE_ID = SERVICE_ID;
-
             /// Transaction type for creating a new wallet.
             ///
             /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
@@ -201,7 +197,7 @@ pub mod errors {
 /// Contracts.
 pub mod contracts {
     use exonum::{
-        blockchain::{ExecutionResult, Transaction}, messages::Message, storage::Fork,
+        blockchain::{ExecutionResult, Transaction, TransactionContext},
     };
 
     use errors::Error;
@@ -215,13 +211,14 @@ pub mod contracts {
         /// Verifies integrity of the transaction by checking the transaction
         /// signature.
         fn verify(&self) -> bool {
-            self.verify_signature(self.pub_key())
+            true
         }
 
         /// If a wallet with the specified public key is not registered, then creates a new wallet
         /// with the specified public key and name, and an initial balance of 100.
         /// Otherwise, performs no op.
-        fn execute(&self, view: &mut Fork) -> ExecutionResult {
+        fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+            let view = tc.fork();
             let mut schema = CurrencySchema::new(view);
             if schema.wallet(self.pub_key()).is_none() {
                 let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
@@ -238,7 +235,7 @@ pub mod contracts {
         /// Checks if the sender is not the receiver, and checks correctness of the
         /// sender's signature.
         fn verify(&self) -> bool {
-            (*self.from() != *self.to()) && self.verify_signature(self.from())
+            (*self.from() != *self.to())
         }
 
         /// Retrieves two wallets to apply the transfer; they should be previously registered
@@ -247,7 +244,8 @@ pub mod contracts {
         /// is sufficient. Otherwise, performs no op.
         ///
         /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
-        fn execute(&self, view: &mut Fork) -> ExecutionResult {
+        fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+            let view = tc.fork();
             let mut schema = CurrencySchema::new(view);
 
             let sender = match schema.wallet(self.from()) {
@@ -279,12 +277,11 @@ pub mod contracts {
 /// REST API.
 pub mod api {
     use exonum::{
-        api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::Transaction,
-        crypto::{Hash, PublicKey}, node::TransactionSend,
+        api::{self, ServiceApiBuilder, ServiceApiState},
+        crypto::{Hash, PublicKey},
     };
 
     use schema::{CurrencySchema, Wallet};
-    use transactions::CurrencyTransactions;
 
     /// Public service API description.
     #[derive(Debug, Clone)]
@@ -322,7 +319,7 @@ pub mod api {
             let wallets = idx.values().collect();
             Ok(wallets)
         }
-
+/*
         /// Common processing for transaction-accepting endpoints.
         pub fn post_transaction(
             state: &ServiceApiState,
@@ -333,6 +330,7 @@ pub mod api {
             state.sender().send(transaction)?;
             Ok(TransactionResponse { tx_hash })
         }
+*/
 
         /// 'ServiceApiBuilder' facilitates conversion between transactions/read requests and REST
         /// endpoints; for example, it parses `POST`ed JSON into the binary transaction
@@ -342,9 +340,9 @@ pub mod api {
             builder
                 .public_scope()
                 .endpoint("v1/wallet", Self::get_wallet)
-                .endpoint("v1/wallets", Self::get_wallets)
-                .endpoint_mut("v1/wallets", Self::post_transaction)
-                .endpoint_mut("v1/wallets/transfer", Self::post_transaction);
+                .endpoint("v1/wallets", Self::get_wallets);
+                //.endpoint_mut("v1/wallets", Self::post_transaction)
+                //.endpoint_mut("v1/wallets/transfer", Self::post_transaction);
         }
     }
 }

@@ -16,7 +16,7 @@
 
 macro_rules! implement_public_sodium_wrapper {
     ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
-    #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
+    #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash, Serialize, Deserialize)]
     $(#[$attr])*
     pub struct $name($name_from);
 
@@ -74,12 +74,13 @@ macro_rules! implement_public_sodium_wrapper {
             f.write_str(&self.to_hex())
         }
     }
+    implement_from_hex!($name);
     )
 }
 
 macro_rules! implement_private_sodium_wrapper {
     ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
-    #[derive(Clone, PartialEq, Eq)]
+    #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
     $(#[$attr])*
     pub struct $name($name_from);
 
@@ -128,10 +129,11 @@ macro_rules! implement_private_sodium_wrapper {
             (self.0).0.as_ref().write_hex_upper(w)
         }
     }
+    implement_from_hex!($name);
     )
 }
 
-macro_rules! implement_serde {
+macro_rules! implement_from_hex {
     ($name:ident) => {
         impl FromHex for $name {
             type Error = FromHexError;
@@ -143,39 +145,6 @@ macro_rules! implement_serde {
                 } else {
                     Err(FromHexError::InvalidStringLength)
                 }
-            }
-        }
-
-        impl Serialize for $name {
-            fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                let hex_string = encode_hex(&self[..]);
-                ser.serialize_str(&hex_string)
-            }
-        }
-
-        impl<'de> Deserialize<'de> for $name {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                struct HexVisitor;
-
-                impl<'v> Visitor<'v> for HexVisitor {
-                    type Value = $name;
-                    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-                        write!(fmt, "expecting str.")
-                    }
-                    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-                    where
-                        E: de::Error,
-                    {
-                        $name::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))
-                    }
-                }
-                deserializer.deserialize_str(HexVisitor)
             }
         }
     };
