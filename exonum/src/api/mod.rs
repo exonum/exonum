@@ -12,18 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-<<<<<<< HEAD
-//! `RESTful` API and corresponding utilities. This module does not describe
-//! the API itself, but rather the entities which the service author needs to
-//! add private and public API endpoints to the service.
-//!
-//! The REST architectural style encompasses a list of constrains and properties
-//! based on HTTP. The most common operations available are GET, POST, PUT and
-//! DELETE. The requests are placed to a URL which represents a resource. The
-//! requests either retrieve information or define a change that is to be made.
-=======
 //! API and corresponding utilities.
->>>>>>> master
 
 pub use self::error::Error;
 pub use self::state::ServiceApiState;
@@ -43,46 +32,9 @@ mod state;
 pub(crate) mod websocket;
 mod with;
 
-<<<<<<< HEAD
-/// List of possible API errors, which can be returned when processing an API
-/// request.
-#[derive(Fail, Debug)]
-pub enum ApiError {
-    /// Storage error. This error is returned, for example, if the requested data
-    /// do not exist in the database; or if the requested data exists in the
-    /// database but additional permissions are required to access it.
-    #[fail(display = "Storage error: {}", _0)]
-    Storage(#[cause] storage::Error),
-
-    /// Input/output error.
-    #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] ::std::io::Error),
-
-    /// Bad request. This error is returned when the submitted request contains an
-    /// invalid parameter.
-    #[fail(display = "Bad request: {}", _0)]
-    BadRequest(String),
-
-    /// Not found. This error is returned when the path in the URL of the request
-    /// is incorrect.
-    #[fail(display = "Not found: {}", _0)]
-    NotFound(String),
-
-    /// Internal error. This this type of error can be defined
-    #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<::std::error::Error + Send + Sync>),
-
-    /// Unauthorized error. This error is returned when a user is not authorized
-    /// in the system and does not have permissions to perform the API request.
-    #[fail(display = "Unauthorized")]
-    Unauthorized,
-}
-
-impl From<io::Error> for ApiError {
-    fn from(e: io::Error) -> ApiError {
-        ApiError::Io(e)
-=======
-/// Defines object that could be used as an API backend.
+/// Defines an object that could be used as an API backend.
+///
+/// This trait is used to implement an API backend for Exonum.
 pub trait ServiceApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
@@ -101,7 +53,6 @@ pub trait ServiceApiBackend: Sized {
     {
         let named_with = NamedWith::new(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
->>>>>>> master
     }
 
     /// Adds the given mutable endpoint handler to the backend.
@@ -127,6 +78,9 @@ pub trait ServiceApiBackend: Sized {
 
 /// Service API builder for the concrete API scope or in other words
 /// access level (public or private).
+///
+/// Endpoints cannot be declared to the builder directly, first you need to
+/// indicate the scope the endpoint(s) will belong to.
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiScope {
     pub(crate) actix_backend: actix::ApiBuilder,
@@ -138,7 +92,8 @@ impl ServiceApiScope {
         Self::default()
     }
 
-    /// Adds the given endpoint handler to the API scope.
+    /// Adds the given endpoint handler to the API scope. These endpoints
+    /// are designed for reading operations.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
@@ -157,7 +112,8 @@ impl ServiceApiScope {
         self
     }
 
-    /// Adds the given mutable endpoint handler to the API scope.
+    /// Adds the given mutable endpoint handler to the API scope. These endpoints
+    /// are designed for modification operations.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
@@ -205,13 +161,13 @@ impl ServiceApiScope {
 ///
 /// // Declares structures for requests and responses.
 ///
-/// // For the web backend `MyQuery` will be deserialized from the `block_height={number}` string.
+/// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
 ///     pub block_height: u64
 /// }
 ///
-/// // For the web backend `BlockInfo` will be serialized into the JSON string.
+/// // For the web backend, `BlockInfo` will be serialized into a JSON string.
 /// #[derive(Serialize, Clone, Copy)]
 /// pub struct BlockInfo {
 ///     pub hash: Hash,
@@ -228,18 +184,18 @@ impl ServiceApiScope {
 ///         )
 ///     }
 ///
-///     // Mutable handler which removes peer with the given address from the cache.
+///     // Mutable handler which removes the peer with the given address from the cache.
 ///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
 ///         let mut blockchain = state.blockchain().clone();
 ///         Ok(blockchain.remove_peer_with_addr(&query))
 ///     }
 ///
-///     // Simple handler without any params.
+///     // Simple handler without any parameters.
 ///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
 ///
-///     // You may also creates an asynchronous handlers for the long requests.
+///     // You may also create asynchronous handlers for long requests.
 ///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
 ///      -> api::FutureResult<Option<Hash>> {
 ///         let blockchain = state.blockchain().clone();
@@ -283,43 +239,7 @@ impl ServiceApiBuilder {
     }
 }
 
-<<<<<<< HEAD
-/// `Api` trait defines `RESTful` API.
-pub trait Api {
-    /// Deserializes a URL fragment as `T`.
-    fn url_fragment<T>(&self, request: &Request, name: &str) -> Result<T, ApiError>
-    where
-        T: FromStr,
-        T::Err: fmt::Display,
-    {
-        let params = request.extensions.get::<Router>().unwrap();
-        let fragment = params.find(name).ok_or_else(|| {
-            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
-        })?;
-        let value = T::from_str(fragment)
-            .map_err(|e| ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e)))?;
-        Ok(value)
-    }
-
-    /// Deserializes an optional parameter from a request body or `GET` parameters.
-    fn optional_param<T>(&self, request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
-    where
-        T: FromStr,
-        T::Err: fmt::Display,
-    {
-        let map = request.get_ref::<params::Params>().unwrap();
-        let value = match map.find(&[name]) {
-            Some(&params::Value::String(ref param)) => {
-                let value = T::from_str(param).map_err(|e| {
-                    ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
-                })?;
-                Some(value)
-            }
-            _ => None,
-        };
-        Ok(value)
-=======
-/// Exonum API access level.
+/// Exonum API access level, either private or public.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiAccess {
     /// Public API for end users.
@@ -334,54 +254,22 @@ impl fmt::Display for ApiAccess {
             ApiAccess::Public => f.write_str("public"),
             ApiAccess::Private => f.write_str("private"),
         }
->>>>>>> master
     }
 }
 
-<<<<<<< HEAD
-    /// Deserializes a required parameter from a request body or `GET` parameters.
-    fn required_param<T>(&self, request: &mut Request, name: &str) -> Result<T, ApiError>
-=======
 /// API backend extender.
+///
+/// This trait enables implementing additional API scopes, besides the built-in
+/// private and public scopes.
 pub trait ExtendApiBackend {
     /// Extends API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
->>>>>>> master
     where
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
 }
 
-<<<<<<< HEAD
-    /// Deserializes a request body as a structure of type `T`.
-    fn parse_body<T: 'static>(&self, req: &mut Request) -> Result<T, ApiError>
-    where
-        T: Clone + for<'de> Deserialize<'de>,
-    {
-        match req.get::<bodyparser::Struct<T>>() {
-            Ok(Some(param)) => Ok(param),
-            Ok(None) => Err(ApiError::BadRequest("Body is empty".into())),
-            Err(e) => Err(ApiError::BadRequest(format!("Invalid struct: {}", e))),
-        }
-    }
-
-    /// Loads a hex value from the cookies.
-    fn load_hex_value_from_cookie<'a>(
-        &self,
-        request: &'a Request,
-        key: &str,
-    ) -> storage::Result<Vec<u8>> {
-        if let Some(&Cookie(ref cookies)) = request.headers.get() {
-            for cookie in cookies.iter() {
-                if let Ok(c) = CookiePair::parse(cookie.as_str()) {
-                    if c.name() == key {
-                        if let Ok(value) = FromHex::from_hex(c.value()) {
-                            return Ok(value);
-                        }
-                    }
-                }
-            }
-=======
-/// Exonum node API aggregator. Currently only HTTP v1 backend is available.
+/// Exonum node API aggregator. This structure enables several API backends to
+/// operate simultaneously. Currently, only HTTP v1 backend is available.
 #[derive(Debug, Clone)]
 pub struct ApiAggregator {
     blockchain: Blockchain,
@@ -415,7 +303,6 @@ impl ApiAggregator {
             inner,
             blockchain,
             node_state,
->>>>>>> master
         }
     }
 
@@ -424,23 +311,7 @@ impl ApiAggregator {
         &self.blockchain
     }
 
-<<<<<<< HEAD
-    //TODO: Remove duplicate code
-    /// Returns NotFound and a certain with cookies.
-    fn not_found_response_with_cookies(
-        &self,
-        json: &serde_json::Value,
-        cookies: Option<Vec<String>>,
-    ) -> IronResult<Response> {
-        let mut resp = Response::with((
-            status::NotFound,
-            serde_json::to_string_pretty(json).unwrap(),
-        ));
-        resp.headers.set(ContentType::json());
-        if let Some(cookies) = cookies {
-            resp.headers.set(SetCookie(cookies));
-=======
-    /// Extends given API backend by the handlers with the given access level.
+    /// Extends the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         match access {
             ApiAccess::Public => backend.extend(
@@ -453,38 +324,10 @@ impl ApiAggregator {
                     .iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
             ),
->>>>>>> master
         }
     }
 
-<<<<<<< HEAD
-    /// Returns OK and a certain response with cookies.
-    fn ok_response_with_cookies(
-        &self,
-        json: &serde_json::Value,
-        cookies: Option<Vec<String>>,
-    ) -> IronResult<Response> {
-        let mut resp = Response::with((status::Ok, serde_json::to_string_pretty(json).unwrap()));
-        resp.headers.set(ContentType::json());
-        if let Some(cookies) = cookies {
-            resp.headers.set(SetCookie(cookies));
-        }
-        Ok(resp)
-    }
-
-    /// Returns OK and a certain response.
-    fn ok_response(&self, json: &serde_json::Value) -> IronResult<Response> {
-        self.ok_response_with_cookies(json, None)
-    }
-    /// Returns NotFound and a certain response.
-    fn not_found_response(&self, json: &serde_json::Value) -> IronResult<Response> {
-        self.not_found_response_with_cookies(json, None)
-    }
-
-    /// Defines the URL through which certain internal methods can be applied.
-    fn wire<'b>(&self, router: &'b mut Router);
-=======
-    /// Adds API factory with given prefix to the aggregator.
+    /// Adds API factory with the given prefix to the aggregator.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
         self.inner.insert(prefix.into(), builder);
     }
@@ -505,5 +348,4 @@ impl ApiAggregator {
         self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
         builder
     }
->>>>>>> master
 }
