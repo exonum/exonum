@@ -101,6 +101,7 @@ roadmap
 rocksdb
 roughtime
 roundtrip
+rtype
 runtimes
 rustfmt
 rustup
@@ -146,5 +147,6 @@ uuids
 validator
 validator's
 validators
+websockets
 whitelisted
 writeln
