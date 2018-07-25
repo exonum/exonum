@@ -14,10 +14,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   
 - `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
 
+- Config parameter `external_address` is not optional. (#826)
+
 ### New features
 
 - Added possibility to use domain names instead of IP addresses as a peer's
-  address. `external_address` is not optional. (#826)
+  addresses. (#826)
 
 ### Internal Improvements
 

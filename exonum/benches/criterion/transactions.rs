@@ -231,7 +231,7 @@ impl TransactionsBenchmarkRunner {
 
         NodeConfig {
             listen_address: peer_address,
-            external_address: "127.0.0.1:2000".parse().unwrap(),
+            external_address: peer_address,
             service_public_key,
             service_secret_key,
             consensus_public_key,
