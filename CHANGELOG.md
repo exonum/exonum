@@ -11,8 +11,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
-  
+
 - `NodePublicConfig` `addr` field has been renamed to `address` (#809).
+
+### New Features
+
+#### exonum
+
+- Added `/v1/blocks/subscribe` endpoint for following block commit events
+  through WebSockets (#792).
 
 ### Internal Improvements
 
