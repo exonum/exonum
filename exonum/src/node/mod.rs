@@ -47,7 +47,10 @@ use events::{
     InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
     NetworkRequest, SyncSender, TimeoutRequest,
 };
-use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{
+    config::ConfigManager, fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round,
+    ValidatorId,
+};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
@@ -118,6 +121,8 @@ pub struct NodeHandler {
     is_enabled: bool,
     /// Node role.
     node_role: NodeRole,
+    /// Configuration file manager.
+    config_manager: Option<ConfigManager>,
 }
 
 /// Service configuration.
@@ -166,8 +171,8 @@ pub struct NodeApiConfig {
 }
 
 impl Default for NodeApiConfig {
-    fn default() -> NodeApiConfig {
-        NodeApiConfig {
+    fn default() -> Self {
+        Self {
             state_update_timeout: 10_000,
             enable_blockchain_explorer: true,
             public_api_address: None,
@@ -192,8 +197,8 @@ pub struct EventsPoolCapacity {
 }
 
 impl Default for EventsPoolCapacity {
-    fn default() -> EventsPoolCapacity {
-        EventsPoolCapacity {
+    fn default() -> Self {
+        Self {
             network_requests_capacity: 512,
             network_events_capacity: 512,
             internal_events_capacity: 128,
@@ -213,8 +218,8 @@ pub struct MemoryPoolConfig {
 }
 
 impl Default for MemoryPoolConfig {
-    fn default() -> MemoryPoolConfig {
-        MemoryPoolConfig {
+    fn default() -> Self {
+        Self {
             tx_pool_capacity: 100_000,
             events_pool_capacity: EventsPoolCapacity::default(),
         }
@@ -321,7 +326,7 @@ impl NodeRole {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 /// ConnectList representation in node's config file.
 pub struct ConnectListConfig {
     /// Peers to which we can connect.
@@ -329,19 +334,19 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectList` from validators public configs.
+    /// Creates `ConnectListConfig` from validators public configs.
     pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
         let peers = list.iter()
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
-                address: config.addr,
+                address: config.address,
             })
             .collect();
 
         ConnectListConfig { peers }
     }
 
-    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
+    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
         let peers = peers
             .iter()
@@ -349,6 +354,20 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: *a,
                 public_key: v.consensus_key,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// Creates `ConnectListConfig` from `ConnectList`.
+    pub fn from_connect_list(connect_list: &ConnectList) -> Self {
+        let peers = connect_list
+            .peers
+            .iter()
+            .map(|(pk, a)| ConnectInfo {
+                address: *a,
+                public_key: *pk,
             })
             .collect();
 
@@ -370,6 +389,7 @@ impl NodeHandler {
         system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
+        config_file_path: Option<String>,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -413,17 +433,15 @@ impl NodeHandler {
         );
 
         let node_role = NodeRole::new(validator_id);
-
-        if node_role.is_auditor() && api_state.is_enabled() {
-            error!("Consensus is enabled but current node is auditor");
-            api_state.set_enabled(false);
-        }
-
         let is_enabled = api_state.is_enabled();
-
         api_state.set_node_role(node_role);
 
-        NodeHandler {
+        let config_manager = match config_file_path {
+            Some(path) => Some(ConfigManager::new(path)),
+            None => None,
+        };
+
+        Self {
             blockchain,
             api_state,
             system_state,
@@ -432,6 +450,7 @@ impl NodeHandler {
             peer_discovery: config.peer_discovery,
             is_enabled,
             node_role,
+            config_manager,
         }
     }
 
@@ -549,19 +568,16 @@ impl NodeHandler {
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         let public_key = self.state.connect_list().find_key_by_address(&address);
 
-        match public_key {
-            Some(public_key) => {
-                trace!("Send to address: {}", address);
-                let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
-                self.channel.network_requests.send(request).log_error();
-            }
-            _ => {
-                warn!(
-                    "Attempt to connect to the peer with address {:?} which \
-                     is not in the ConnectList",
-                    address
-                );
-            }
+        if let Some(public_key) = public_key {
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
+            self.channel.network_requests.send(request).log_error();
+        } else {
+            warn!(
+                "Attempt to connect to the peer with address {:?} which \
+                 is not in the ConnectList",
+                address
+            );
         }
     }
 
@@ -706,7 +722,7 @@ pub trait TransactionSend: Send + Sync {
 
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> ApiSender {
+    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
     }
 
@@ -745,7 +761,7 @@ impl fmt::Debug for ApiSender {
 }
 
 /// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct ConnectInfo {
     /// Peer address.
     pub address: SocketAddr,
@@ -806,8 +822,8 @@ pub struct Node {
 
 impl NodeChannel {
     /// Creates `NodeChannel` with the given pool capacities.
-    pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
-        NodeChannel {
+    pub fn new(buffer_sizes: &EventsPoolCapacity) -> Self {
+        Self {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
@@ -832,6 +848,7 @@ impl Node {
         db: D,
         services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
+        config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
 
@@ -879,8 +896,9 @@ impl Node {
             system_state,
             config,
             api_state,
+            config_file_path,
         );
-        Node {
+        Self {
             api_options: node_cfg.api,
             handler,
             channel,
@@ -1064,7 +1082,7 @@ mod tests {
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg);
+        let mut node = Node::new(db, services, node_cfg, None);
 
         let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
 

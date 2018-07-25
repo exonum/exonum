@@ -250,7 +250,7 @@ mod small_index {
     proof_map_tests!(
         cases = Config::default().cases,
         sizes = 10..100,
-        bytes = 0u8..
+        bytes = 0_u8..
     );
 }
 
@@ -260,7 +260,7 @@ mod small_index_skewed {
     proof_map_tests!(
         cases = Config::default().cases,
         sizes = 10..100,
-        bytes = 0u8..3
+        bytes = 0_u8..3
     );
 }
 
@@ -270,7 +270,7 @@ mod large_index {
     proof_map_tests!(
         cases = Config::default().cases >> 5,
         sizes = 5_000..10_000,
-        bytes = 0u8..
+        bytes = 0_u8..
     );
 }
 
@@ -280,6 +280,6 @@ mod large_index_skewed {
     proof_map_tests!(
         cases = Config::default().cases >> 5,
         sizes = 5_000..10_000,
-        bytes = 0u8..3
+        bytes = 0_u8..3
     );
 }

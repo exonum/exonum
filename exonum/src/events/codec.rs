@@ -19,7 +19,7 @@ use tokio_io::codec::{Decoder, Encoder};
 use std::io;
 
 use super::error::other_error;
-use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
+use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
 use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 #[derive(Debug)]
@@ -31,8 +31,8 @@ pub struct MessagesCodec {
 }
 
 impl MessagesCodec {
-    pub fn new(max_message_len: u32, session: NoiseWrapper) -> MessagesCodec {
-        MessagesCodec {
+    pub fn new(max_message_len: u32, session: NoiseWrapper) -> Self {
+        Self {
             max_message_len,
             session,
         }
@@ -105,15 +105,14 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, Seed};
-    use events::noise::wrapper::NoiseWrapper;
-    use events::noise::HandshakeParams;
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+    use events::noise::{HandshakeParams, NoiseWrapper};
     use messages::{MessageBuffer, RawMessage};
     use tokio_io::codec::{Decoder, Encoder};
 
     #[test]
     fn decode_message_valid_header_size() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let data = vec![0_u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         let raw = RawMessage::new(MessageBuffer::from_vec(data.clone()));
@@ -127,7 +126,7 @@ mod test {
 
     #[test]
     fn decode_message_small_size_in_header() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let data = vec![0_u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         let raw = RawMessage::new(MessageBuffer::from_vec(data));
@@ -148,26 +147,32 @@ mod test {
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let mut params = HandshakeParams::new(public_key, secret_key, 1024);
         params.set_remote_key(public_key);
 
         let mut initiator = NoiseWrapper::initiator(&params).session;
         let mut responder = NoiseWrapper::responder(&params).session;
 
-        let mut buffer_msg = vec![0u8; 1024];
-        let mut buffer_out = [0u8; 1024];
+        let mut buffer_msg = vec![0_u8; 1024];
+        let mut buffer_out = [0_u8; 1024];
 
         // Simple handshake for testing.
-        let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        let len = initiator
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = responder.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        let len = responder
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         initiator
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+        let len = initiator
+            .write_message(&[0_u8; 0], &mut buffer_msg)
+            .unwrap();
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();

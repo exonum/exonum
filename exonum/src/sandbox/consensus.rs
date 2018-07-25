@@ -25,7 +25,7 @@ use super::{
     timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE},
 };
 use blockchain::{Blockchain, Schema};
-use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
+use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{user_agent, Height, Round};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
@@ -203,7 +203,8 @@ fn test_disable_and_enable() {
 
     // A fail is expected here as the node is disabled.
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    let result = try_add_one_height(&sandbox, &sandbox_state);
+    // TODO: use try_add_one_height (ECR-1817)
+    let result = try_add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     assert!(result.is_err());
 
     // Re-enable the node.
@@ -250,7 +251,7 @@ fn test_query_state_hash() {
         assert_eq!(proof.merkle_root(), state_hash);
         assert_eq!(
             proof.entries(),
-            vec![(&timestamp_t1_key, &Hash::new([127; 32]))]
+            vec![(&timestamp_t1_key, &Hash::new([127; HASH_SIZE]))]
         );
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
@@ -258,7 +259,7 @@ fn test_query_state_hash() {
         assert_eq!(proof.merkle_root(), state_hash);
         assert_eq!(
             proof.entries(),
-            vec![(&timestamp_t2_key, &Hash::new([128; 32]))]
+            vec![(&timestamp_t2_key, &Hash::new([128; HASH_SIZE]))]
         );
 
         add_one_height(&sandbox, &sandbox_state)
@@ -695,10 +696,10 @@ fn test_store_txs_positions() {
     let data_size = 20;
     let generator = TimestampingTxGenerator::with_keypair(
         data_size,
-        gen_keypair_from_seed(&Seed::new([11; 32])),
+        gen_keypair_from_seed(&Seed::new([11; SEED_LENGTH])),
     );
 
-    let committed_height = Height(rng.gen_range(2, 30u64));
+    let committed_height = Height(rng.gen_range(2, 30_u64));
     {
         for _ in 1..committed_height.0 {
             add_one_height(&sandbox, &sandbox_state)
@@ -2797,13 +2798,16 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
+    let block_1_delay = 2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1;
+    let block_2_delay = 2 * sandbox.round_timeout() + 2 * PROPOSE_TIMEOUT + 1;
+
     // create some tx
     let tx = gen_timestamping_tx();
 
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1)
+        .with_duration_since_sandbox_time(block_1_delay)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
@@ -2813,7 +2817,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let height_one_propose = ProposeBuilder::new(&sandbox)
         .with_validator(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
+        .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
         .build();
 
@@ -2821,7 +2825,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let second_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
+        .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();

@@ -145,8 +145,8 @@ pub struct CheckedOffset {
 
 impl CheckedOffset {
     /// create checked value
-    pub fn new(offset: Offset) -> CheckedOffset {
-        CheckedOffset { offset }
+    pub fn new(offset: Offset) -> Self {
+        Self { offset }
     }
 
     /// return unchecked offset
@@ -184,7 +184,7 @@ implement_default_ops_checked!{Mul mul checked_mul }
 implement_default_ops_checked!{Div div checked_div }
 
 impl From<Offset> for CheckedOffset {
-    fn from(offset: Offset) -> CheckedOffset {
-        CheckedOffset::new(offset)
+    fn from(offset: Offset) -> Self {
+        Self::new(offset)
     }
 }

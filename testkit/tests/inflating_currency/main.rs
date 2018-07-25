@@ -59,7 +59,7 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
 
 fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
     api.public(ApiKind::Service("cryptocurrency"))
-        .get(&format!("v1/balance?pub_key={}", pubkey.to_string()))
+        .get(&format!("v1/balance?pub_key={}", pubkey.to_hex()))
         .unwrap()
 }
 

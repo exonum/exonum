@@ -66,7 +66,7 @@ module.exports = {
         const signature = TxTimestamp.sign(keyPair.secretKey, data)
 
         // Send transaction into blockchain
-        return TxTimestamp.send('/api/services/timestamping/v1/timestamps', 'api/explorer/v1/transactions/', data, signature)
+        return TxTimestamp.send('/api/services/timestamping/v1/timestamps', 'api/explorer/v1/transactions?hash=', data, signature)
       },
 
       getTimestamp: hash => {

@@ -22,7 +22,7 @@ pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Utc};
 use colored::*;
 use env_logger::{Builder, Formatter};
 use log::{Level, Record, SetLoggerError};
@@ -36,6 +36,12 @@ use crypto::gen_keypair;
 use node::{ConnectListConfig, NodeConfig};
 
 mod types;
+
+/// Format for timestamps in logs.
+///
+/// It is similar to date/time format of RFC 2822, but with milliseconds:
+/// "Mon, 16 Jul 2018 13:37:18.594 +0100"
+const LOG_TIMESTAMP_FORMAT: &str = "%a, %e %b %Y %H:%M:%S%.3f %z";
 
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
@@ -104,7 +110,9 @@ fn has_colors() -> bool {
 }
 
 fn format_time(time: SystemTime) -> String {
-    DateTime::<Local>::from(time).to_rfc2822()
+    DateTime::<Utc>::from(time)
+        .format(LOG_TIMESTAMP_FORMAT)
+        .to_string()
 }
 
 fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
@@ -149,5 +157,20 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
             Level::Trace => "TRACE",
         };
         writeln!(buf, "{} {} {} {}", time, level, &source_path, record.args())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time;
+
+    use super::*;
+
+    #[test]
+    fn time_formatting() {
+        assert_eq!(
+            format_time(time::UNIX_EPOCH),
+            "Thu,  1 Jan 1970 00:00:00.000 +0000"
+        );
     }
 }

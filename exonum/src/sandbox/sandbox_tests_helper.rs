@@ -20,7 +20,7 @@ use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 use super::{
     sandbox::Sandbox, timestamping::{TimestampTx, TimestampingTxGenerator},
 };
-use blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
@@ -122,7 +122,6 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn build(&self) -> Block {
         Block::new(
-            SCHEMA_MAJOR_VERSION,
             self.proposer_id
                 .unwrap_or_else(|| self.sandbox.current_leader()),
             self.height.unwrap_or_else(|| self.sandbox.current_height()),

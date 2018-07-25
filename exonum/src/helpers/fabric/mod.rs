@@ -17,7 +17,7 @@
 pub use self::{
     builder::NodeBuilder, context_key::ContextKey,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
-    maintenance::Maintenance,
+    internal::Command, maintenance::Maintenance,
     shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig},
 };
 
@@ -88,11 +88,11 @@ impl Argument {
         short_name: T,
         long_name: &'static str,
         multiple: bool,
-    ) -> Argument
+    ) -> Self
     where
         T: Into<Option<&'static str>>,
     {
-        Argument {
+        Self {
             argument_type: ArgumentType::Named(NamedArgument {
                 short_name: short_name.into(),
                 long_name,
@@ -105,8 +105,8 @@ impl Argument {
     }
 
     /// Creates a new positional argument.
-    pub fn new_positional(name: &'static str, required: bool, help: &'static str) -> Argument {
-        Argument {
+    pub fn new_positional(name: &'static str, required: bool, help: &'static str) -> Self {
+        Self {
             argument_type: ArgumentType::Positional,
             name,
             help,
@@ -128,6 +128,10 @@ pub mod keys {
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.
     pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
+
+    /// Configuration file path for this node. If set, `ConfigManager` will be created.
+    /// Set by `run` command.
+    pub const NODE_CONFIG_PATH: ContextKey<String> = context_key!("node_config_path");
 
     /// Configurations for all nodes.
     /// Set by `generate-testnet` command.
@@ -183,8 +187,8 @@ pub struct Context {
 }
 
 impl Context {
-    fn new_from_args(args: &[Argument], matches: &clap::ArgMatches) -> Context {
-        let mut context = Context::default();
+    fn new_from_args(args: &[Argument], matches: &clap::ArgMatches) -> Self {
+        let mut context = Self::default();
         for arg in args {
             // processing multiple value arguments make code ugly =(
             match arg.argument_type {

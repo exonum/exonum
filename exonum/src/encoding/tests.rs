@@ -23,7 +23,7 @@ use uuid::Uuid;
 use std::{net::SocketAddr, str::FromStr};
 
 use super::{CheckedOffset, Field, Offset};
-use blockchain::{self, Block, BlockProof};
+use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, CryptoHash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{
@@ -331,7 +331,7 @@ where
 
 #[test]
 fn test_segments_of_raw_buffers() {
-    let buf = vec![255u8; 1];
+    let buf = vec![255_u8; 1];
 
     let input = vec![buf.clone(), buf.clone(), buf.clone()];
     assert_write_check_read(input, 8);
@@ -496,7 +496,6 @@ fn test_block() {
     let tx_count = txs.len() as u32;
 
     let content = Block::new(
-        blockchain::SCHEMA_MAJOR_VERSION,
         ValidatorId::zero(),
         Height(500),
         tx_count,
@@ -574,7 +573,6 @@ fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
     let content = Block::new(
-        blockchain::SCHEMA_MAJOR_VERSION,
         ValidatorId::zero(),
         Height(200),
         1,

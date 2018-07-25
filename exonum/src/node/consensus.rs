@@ -76,21 +76,18 @@ impl NodeHandler {
             return;
         }
 
-        let key = match self.state.consensus_public_key_of(msg.validator()) {
-            Some(public_key) => {
-                if !msg.verify(&public_key) {
-                    error!(
-                        "Received consensus message with incorrect signature, msg={:?}",
-                        msg
-                    );
-                    return;
-                }
-                public_key
-            }
-            None => {
-                error!("Received message from incorrect validator, msg={:?}", msg);
+        let key = if let Some(public_key) = self.state.consensus_public_key_of(msg.validator()) {
+            if !msg.verify(&public_key) {
+                error!(
+                    "Received consensus message with incorrect signature, msg={:?}",
+                    msg
+                );
                 return;
             }
+            public_key
+        } else {
+            error!("Received message from incorrect validator, msg={:?}", msg);
+            return;
         };
 
         trace!("Handle message={:?}", msg);
@@ -485,6 +482,8 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
+        self.api_state.broadcast(&block_hash);
+
         // Merge changes into storage
         let (committed_txs, proposer) = {
             // FIXME: Avoid of clone here. (ECR-171)
@@ -512,9 +511,7 @@ impl NodeHandler {
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
             height,
             proposer,
-            round
-                .map(|x| format!("{}", x))
-                .unwrap_or_else(|| "?".into()),
+            round.map_or_else(|| "?".into(), |x| format!("{}", x)),
             committed_txs,
             pool_len,
             block_hash.to_hex(),

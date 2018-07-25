@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(missing_debug_implementations, missing_docs)]
+
 pub use self::internal::InternalPart;
 pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
 
@@ -156,8 +158,8 @@ where
     S2: Stream,
     S3: Stream,
 {
-    pub fn new(internal: S1, network: S2, api: S3) -> EventsAggregator<S1, S2, S3> {
-        EventsAggregator {
+    pub fn new(internal: S1, network: S2, api: S3) -> Self {
+        Self {
             done: false,
             network,
             internal,

@@ -65,7 +65,6 @@ jobs:
   # Formatting & other lints that do not require compilation
   - env: FEATURE=lints
     install:
-    - cargo-audit -V || cargo install cargo-audit --force
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
     - rustup component add rustfmt-preview
@@ -76,7 +75,7 @@ jobs:
     - npm install markdownlint-cli
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cargo fmt --all -- --write-mode=diff
+    - cargo fmt --all -- --write-mode=check
     - npm run cspell
     - npm run md
     - cargo doc --no-deps
@@ -130,7 +129,6 @@ jobs:
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
 
   # Benchmarks (compilation only)

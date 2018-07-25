@@ -26,7 +26,7 @@ pub struct ServiceApiState {
 impl ServiceApiState {
     /// Constructs state for the given blockchain.
     pub fn new(blockchain: Blockchain) -> Self {
-        ServiceApiState { blockchain }
+        Self { blockchain }
     }
 
     /// Returns a reference to the blockchain of this node.

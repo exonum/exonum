@@ -33,9 +33,9 @@
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 pub use self::{
-    block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
-    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys}, genesis::GenesisConfig,
-    schema::{Schema, TxLocation}, service::{Service, ServiceContext, SharedNodeState},
+    block::{Block, BlockProof}, config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    genesis::GenesisConfig, schema::{Schema, TxLocation},
+    service::{Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
         TransactionResult, TransactionSet,
@@ -88,7 +88,7 @@ impl Blockchain {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
-    ) -> Blockchain {
+    ) -> Self {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
@@ -101,7 +101,7 @@ impl Blockchain {
             service_map.insert(id, service);
         }
 
-        Blockchain {
+        Self {
             db: storage.into(),
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
@@ -111,8 +111,8 @@ impl Blockchain {
 
     /// Recreates the blockchain to reuse with a sandbox.
     #[doc(hidden)]
-    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Blockchain {
-        Blockchain {
+    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Self {
+        Self {
             api_sender,
             ..self.clone()
         }
@@ -321,7 +321,7 @@ impl Blockchain {
                     let mut state_hashes = Vec::new();
 
                     for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                        let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
+                        let key = Self::service_table_unique_key(CORE_SERVICE, idx);
                         state_hashes.push((key, core_table_hash));
                     }
 
@@ -329,7 +329,7 @@ impl Blockchain {
                         let service_id = service.service_id();
                         let vec_service_state = service.state_hash(&fork);
                         for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                            let key = Blockchain::service_table_unique_key(service_id, idx);
+                            let key = Self::service_table_unique_key(service_id, idx);
                             state_hashes.push((key, service_table_hash));
                         }
                     }
@@ -354,7 +354,6 @@ impl Blockchain {
 
             // Create block.
             let block = Block::new(
-                SCHEMA_MAJOR_VERSION,
                 proposer_id,
                 height,
                 tx_hashes.len() as u32,
@@ -588,8 +587,8 @@ impl fmt::Debug for Blockchain {
 }
 
 impl Clone for Blockchain {
-    fn clone(&self) -> Blockchain {
-        Blockchain {
+    fn clone(&self) -> Self {
+        Self {
             db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),

@@ -40,6 +40,7 @@ pub mod backends;
 pub mod error;
 pub mod node;
 mod state;
+pub(crate) mod websocket;
 mod with;
 
 <<<<<<< HEAD
@@ -134,7 +135,7 @@ pub struct ServiceApiScope {
 impl ServiceApiScope {
     /// Creates a new instance.
     pub fn new() -> Self {
-        ServiceApiScope::default()
+        Self::default()
     }
 
     /// Adds the given endpoint handler to the API scope.
@@ -268,7 +269,7 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
     pub fn new() -> Self {
-        ServiceApiBuilder::default()
+        Self::default()
     }
 
     /// Returns a mutable reference to the public API scope builder.
@@ -397,7 +398,10 @@ impl ApiAggregator {
             "system".to_owned(),
             Self::system_api(&blockchain, node_state.clone()),
         );
-        inner.insert("explorer".to_owned(), Self::explorer_api());
+        inner.insert(
+            "explorer".to_owned(),
+            Self::explorer_api(node_state.clone()),
+        );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
             let mut builder = ServiceApiBuilder::new();
@@ -407,7 +411,7 @@ impl ApiAggregator {
             (prefix, builder)
         }));
 
-        ApiAggregator {
+        Self {
             inner,
             blockchain,
             node_state,
@@ -485,9 +489,9 @@ impl ApiAggregator {
         self.inner.insert(prefix.into(), builder);
     }
 
-    fn explorer_api() -> ServiceApiBuilder {
+    fn explorer_api(shared_node_state: SharedNodeState) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        self::node::public::ExplorerApi::wire(builder.public_scope());
+        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_node_state);
         builder
     }
 

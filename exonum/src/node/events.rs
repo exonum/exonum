@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 
 impl EventHandler for NodeHandler {
@@ -38,15 +38,8 @@ impl NodeHandler {
     }
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
-        if !self.is_enabled {
-            info!(
-                "Ignoring a network event {:?} because the node is disabled",
-                event
-            );
-            return;
-        }
         match event {
-            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
+            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
@@ -56,32 +49,24 @@ impl NodeHandler {
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
             ExternalMessage::Transaction(tx) => {
-                if !self.is_enabled {
-                    info!(
-                        "Ignoring a transaction {:?} because the node is disabled",
-                        tx
-                    );
-                    return;
-                }
                 self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(info) => {
-                if !self.is_enabled {
-                    info!(
-                        "Ignoring a connect message to {} because the node is disabled",
-                        info
-                    );
-                    return;
-                }
                 info!("Send Connect message to {}", info);
                 self.state.add_peer_to_connect_list(info);
                 self.connect(&info.address);
+
+                if self.config_manager.is_some() {
+                    let connect_list_config =
+                        ConnectListConfig::from_connect_list(self.state.connect_list());
+
+                    self.config_manager
+                        .as_ref()
+                        .unwrap()
+                        .store_connect_list(connect_list_config);
+                }
             }
             ExternalMessage::Enable(value) => {
-                if self.node_role.is_auditor() {
-                    error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
-                    return;
-                }
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
                     info!("Node is already {}", s);

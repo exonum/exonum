@@ -26,8 +26,9 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
+use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
 use helpers::{Height, Milliseconds};
+use messages::HEADER_LENGTH;
 use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -134,6 +135,9 @@ impl ConsensusConfig {
     /// method, but some values can decrease consensus performance.
     #[doc(hidden)]
     pub fn warn_if_nonoptimal(&self) {
+        const MIN_TXS_BLOCK_LIMIT: u32 = 100;
+        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
+
         if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
@@ -142,9 +146,6 @@ impl ConsensusConfig {
             );
         }
 
-        const MIN_TXS_BLOCK_LIMIT: u32 = 100;
-        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
-
         if self.txs_block_limit < MIN_TXS_BLOCK_LIMIT || self.txs_block_limit > MAX_TXS_BLOCK_LIMIT
         {
             warn!(
@@ -152,12 +153,20 @@ impl ConsensusConfig {
                 self.txs_block_limit, MIN_TXS_BLOCK_LIMIT, MAX_TXS_BLOCK_LIMIT
             );
         }
+
+        if self.max_message_len < Self::DEFAULT_MAX_MESSAGE_LEN {
+            warn!(
+                "It is recommended that max_message_len ({}) is at least {}.",
+                self.max_message_len,
+                Self::DEFAULT_MAX_MESSAGE_LEN
+            );
+        }
     }
 }
 
 impl Default for ConsensusConfig {
     fn default() -> Self {
-        ConsensusConfig {
+        Self {
             round_timeout: 3000,
             status_timeout: 5000,
             peers_timeout: 10_000,
@@ -180,8 +189,12 @@ impl StoredConfiguration {
     /// Tries to deserialize `StorageConfiguration` from the given UTF-8 encoded
     /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
-    pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
-        let config: StoredConfiguration = serde_json::from_slice(serialized)?;
+    pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        const MINIMAL_BODY_SIZE: usize = 256;
+        const MINIMAL_MESSAGE_LENGTH: u32 =
+            (HEADER_LENGTH + MINIMAL_BODY_SIZE + SIGNATURE_LENGTH) as u32;
+
+        let config: Self = serde_json::from_slice(serialized)?;
 
         // Check that there are no duplicated keys.
         {
@@ -220,6 +233,14 @@ impl StoredConfiguration {
             ));
         }
 
+        // Check maximum message length for sanity.
+        if config.consensus.max_message_len < MINIMAL_MESSAGE_LENGTH {
+            return Err(JsonError::custom(format!(
+                "max_message_len ({}) must be at least {}",
+                config.consensus.max_message_len, MINIMAL_MESSAGE_LENGTH
+            )));
+        }
+
         Ok(config)
     }
 }
@@ -237,7 +258,7 @@ impl StorageValue for StoredConfiguration {
     }
 
     fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
+        Self::try_deserialize(v.as_ref()).unwrap()
     }
 }
 
@@ -246,7 +267,7 @@ mod tests {
     use toml;
 
     use super::*;
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
@@ -336,11 +357,19 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
+    #[test]
+    #[should_panic(expected = "max_message_len (128) must be at least 330")]
+    fn too_small_max_message_len() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.max_message_len = 128;
+        serialize_deserialize(&configuration);
+    }
+
     fn create_test_configuration() -> StoredConfiguration {
         let validator_keys = (1..4)
             .map(|i| ValidatorKeys {
-                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
-                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
+                consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
+                service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
             })
             .collect();
 

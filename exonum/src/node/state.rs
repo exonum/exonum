@@ -180,7 +180,7 @@ pub struct Votes<T: VoteMessage> {
 impl ValidatorState {
     /// Creates new `ValidatorState` with given validator id.
     pub fn new(id: ValidatorId) -> Self {
-        ValidatorState {
+        Self {
             id,
             our_precommits: HashMap::new(),
             our_prevotes: HashMap::new(),
@@ -214,8 +214,8 @@ where
     T: VoteMessage,
 {
     /// Creates a new `Votes` instance with a specified validators number.
-    pub fn new(validators_len: usize) -> Votes<T> {
-        Votes {
+    pub fn new(validators_len: usize) -> Self {
+        Self {
             messages: Vec::new(),
             validators: BitVec::from_elem(validators_len, false),
             count: 0,
@@ -251,7 +251,6 @@ where
 impl RequestData {
     /// Returns timeout value of the data request.
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
             RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
@@ -266,7 +265,7 @@ impl RequestData {
 
 impl RequestState {
     fn new() -> Self {
-        RequestState {
+        Self {
             retries: 0,
             known_nodes: HashSet::new(),
         }
@@ -335,7 +334,7 @@ impl ProposeState {
 impl BlockState {
     /// Creates a new `BlockState` instance with the given parameters.
     pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
-        BlockState {
+        Self {
             hash,
             patch,
             txs,
@@ -399,7 +398,7 @@ impl State {
         last_height: Height,
         height_start_time: SystemTime,
     ) -> Self {
-        State {
+        Self {
             validator_state: validator_id.map(ValidatorState::new),
             consensus_public_key,
             consensus_secret_key,
@@ -471,8 +470,7 @@ impl State {
     pub fn is_leader(&self) -> bool {
         self.validator_state()
             .as_ref()
-            .map(|validator| self.leader(self.round()) == validator.id)
-            .unwrap_or(false)
+            .map_or(false, |validator| self.leader(self.round()) == validator.id)
     }
 
     /// Returns node's ConnectList.
@@ -654,7 +652,7 @@ impl State {
 
     /// Returns sufficient number of votes for current validators number.
     pub fn majority_count(&self) -> usize {
-        State::byzantine_majority_count(self.validators().len())
+        Self::byzantine_majority_count(self.validators().len())
     }
 
     /// Returns sufficient number of votes for the given validators number.
@@ -807,16 +805,14 @@ impl State {
     pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
         self.prevotes
             .get(&(round, propose_hash))
-            .map(|votes| votes.messages().as_slice())
-            .unwrap_or_else(|| &[])
+            .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns pre-commits for the specified round and propose hash.
     pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
         self.precommits
             .get(&(round, propose_hash))
-            .map(|votes| votes.messages().as_slice())
-            .unwrap_or_else(|| &[])
+            .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns `true` if this node has pre-vote for the specified round.
@@ -998,8 +994,7 @@ impl State {
         let len = self.validators().len();
         self.prevotes
             .get(&(round, *propose_hash))
-            .map(|x| x.validators().clone())
-            .unwrap_or_else(|| BitVec::from_elem(len, false))
+            .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
     /// Returns ids of validators that that sent pre-commits for the specified propose.
@@ -1007,8 +1002,7 @@ impl State {
         let len = self.validators().len();
         self.precommits
             .get(&(round, *propose_hash))
-            .map(|x| x.validators().clone())
-            .unwrap_or_else(|| BitVec::from_elem(len, false))
+            .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
     /// Adds pre-commit. Returns `true` there are +2/3 pre-commits.

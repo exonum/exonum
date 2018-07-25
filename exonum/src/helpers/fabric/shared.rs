@@ -28,7 +28,7 @@ pub type AbstractConfig = BTreeMap<String, toml::Value>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodePublicConfig {
     /// Socket address.
-    pub addr: SocketAddr,
+    pub address: SocketAddr,
     /// Public keys of a validator.
     pub validator_keys: ValidatorKeys,
     /// Services configurations.
@@ -45,8 +45,8 @@ pub struct SharedConfig {
 
 impl NodePublicConfig {
     /// Returns address.
-    pub fn addr(&self) -> SocketAddr {
-        self.addr
+    pub fn address(&self) -> SocketAddr {
+        self.address
     }
 
     /// Returns services configurations.
@@ -71,7 +71,9 @@ pub struct CommonConfigTemplate {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodePrivateConfig {
     /// Listen address.
-    pub listen_addr: SocketAddr,
+    pub listen_address: SocketAddr,
+    /// External address.
+    pub external_address: SocketAddr,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.

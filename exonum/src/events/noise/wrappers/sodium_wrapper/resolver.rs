@@ -1,15 +1,30 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use byteorder::{ByteOrder, LittleEndian};
 use rand::{thread_rng, Rng};
-use snow::params::{CipherChoice, DHChoice, HashChoice};
-use snow::types::{Cipher, Dh, Hash, Random};
-use snow::{CryptoResolver, DefaultResolver};
+use snow::{
+    params::{CipherChoice, DHChoice, HashChoice}, types::{Cipher, Dh, Hash, Random},
+    CryptoResolver, DefaultResolver,
+};
 
-use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
-use sodiumoxide::crypto::hash::sha256 as sodium_sha256;
-
-use crypto::x25519;
 use crypto::{
-    PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+    x25519, PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
+    SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+};
+use sodiumoxide::crypto::{
+    aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
 pub struct SodiumResolver {
@@ -18,9 +33,15 @@ pub struct SodiumResolver {
 
 impl SodiumResolver {
     pub fn new() -> Self {
-        SodiumResolver {
+        Self {
             parent: DefaultResolver,
         }
+    }
+}
+
+impl Default for SodiumResolver {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -55,8 +76,8 @@ impl CryptoResolver for SodiumResolver {
 struct SodiumRandom;
 
 impl Default for SodiumRandom {
-    fn default() -> SodiumRandom {
-        SodiumRandom {}
+    fn default() -> Self {
+        Self {}
     }
 }
 
@@ -74,8 +95,8 @@ pub struct SodiumDh25519 {
 }
 
 impl Default for SodiumDh25519 {
-    fn default() -> SodiumDh25519 {
-        SodiumDh25519 {
+    fn default() -> Self {
+        Self {
             privkey: x25519::SecretKey::zero(),
             pubkey: x25519::PublicKey::zero(),
         }
@@ -143,9 +164,18 @@ pub struct SodiumChaChaPoly {
     key: sodium_chacha20poly1305::Key,
 }
 
+impl SodiumChaChaPoly {
+    // In IETF version of `chacha20poly1305` nonce has 12 bytes instead of 8.
+    fn get_ietf_nonce(nonce: u64) -> sodium_chacha20poly1305::Nonce {
+        let mut nonce_bytes = [0_u8; 12];
+        LittleEndian::write_u64(&mut nonce_bytes[4..], nonce);
+        sodium_chacha20poly1305::Nonce(nonce_bytes)
+    }
+}
+
 impl Default for SodiumChaChaPoly {
-    fn default() -> SodiumChaChaPoly {
-        SodiumChaChaPoly {
+    fn default() -> Self {
+        Self {
             key: sodium_chacha20poly1305::Key([0; 32]),
         }
     }
@@ -164,13 +194,11 @@ impl Cipher for SodiumChaChaPoly {
     fn encrypt(&self, nonce: u64, authtext: &[u8], plaintext: &[u8], out: &mut [u8]) -> usize {
         assert_ne!(
             self.key,
-            SodiumChaChaPoly::default().key,
+            Self::default().key,
             "Can't encrypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0u8; 8];
-        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
-        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+        let nonce = Self::get_ietf_nonce(nonce);
 
         let buf = sodium_chacha20poly1305::seal(plaintext, Some(authtext), &nonce, &self.key);
 
@@ -187,13 +215,11 @@ impl Cipher for SodiumChaChaPoly {
     ) -> Result<usize, ()> {
         assert_ne!(
             self.key,
-            SodiumChaChaPoly::default().key,
+            Self::default().key,
             "Can't dectypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0u8; 8];
-        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
-        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+        let nonce = Self::get_ietf_nonce(nonce);
 
         let result = sodium_chacha20poly1305::open(ciphertext, Some(authtext), &nonce, &self.key);
 
@@ -271,7 +297,7 @@ mod tests {
         let public = Vec::<u8>::from_hex(
             "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
         ).unwrap();
-        let mut output = [0u8; 32];
+        let mut output = [0_u8; 32];
         keypair.dh(&public, &mut output);
 
         assert_eq!(
@@ -294,10 +320,10 @@ mod tests {
         keypair_b.generate(&mut rng);
 
         // Create shared secrets with public keys of each other.
-        let mut our_shared_secret = [0u8; 32];
+        let mut our_shared_secret = [0_u8; 32];
         keypair_a.dh(keypair_b.pubkey(), &mut our_shared_secret);
 
-        let mut remote_shared_secret = [0u8; 32];
+        let mut remote_shared_secret = [0_u8; 32];
         keypair_b.dh(keypair_a.pubkey(), &mut remote_shared_secret);
 
         // Results are expected to be the same.

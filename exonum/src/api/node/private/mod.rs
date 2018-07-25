@@ -49,7 +49,7 @@ impl NodeInfo {
         I: IntoIterator<Item = &'a Box<dyn Service>>,
     {
         let core_version = option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned());
-        NodeInfo {
+        Self {
             core_version,
             protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
@@ -76,7 +76,7 @@ enum IncomingConnectionState {
 }
 
 impl Default for IncomingConnectionState {
-    fn default() -> IncomingConnectionState {
+    fn default() -> Self {
         IncomingConnectionState::Active
     }
 }
@@ -108,7 +108,7 @@ pub struct SystemApi {
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
     pub fn new(info: NodeInfo, shared_api_state: SharedNodeState) -> Self {
-        SystemApi {
+        Self {
             info,
             shared_api_state,
         }
@@ -198,12 +198,6 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, query: ConsensusEnabledQuery| {
-                if self.shared_api_state.node_role().is_auditor() {
-                    let message = "Trying to enable consensus, but the current node is auditor\
-                                   and cannot affect consensus process";
-                    return Err(ApiError::BadRequest(message.to_owned()));
-                }
-
                 state
                     .sender()
                     .send_external_message(ExternalMessage::Enable(query.enabled))

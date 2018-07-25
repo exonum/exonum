@@ -14,11 +14,11 @@
 
 //! Common macros for crypto module.
 
-macro_rules! implement_public_sodium_wrapper {
-    ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
+macro_rules! implement_public_crypto_wrapper {
+    ($(#[$attr:meta])* struct $name:ident, $size:expr) => (
     #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
     $(#[$attr])*
-    pub struct $name($name_from);
+    pub struct $name($crate::crypto::crypto_impl::$name);
 
     impl $name {
         /// Creates a new instance filled with zeros.
@@ -30,12 +30,12 @@ macro_rules! implement_public_sodium_wrapper {
     impl $name {
         /// Creates a new instance from bytes array.
         pub fn new(bytes_array: [u8; $size]) -> Self {
-            $name($name_from(bytes_array))
+            $name($crate::crypto::crypto_impl::$name(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bytes_slice).map($name)
+            $crate::crypto::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
         /// Returns a hex representation of binary data.
@@ -51,37 +51,28 @@ macro_rules! implement_public_sodium_wrapper {
         }
     }
 
-    impl FromStr for $name {
-        type Err = FromHexError;
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            $name::from_hex(s)
-        }
-    }
-
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:02X}", i)?
-            }
+            write_short_hex(f, &self[..])?;
             write!(f, ")")
         }
     }
 
     impl fmt::Display for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str(&self.to_hex())
+            write_short_hex(f, &self[..])
         }
     }
     )
 }
 
-macro_rules! implement_private_sodium_wrapper {
-    ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
+macro_rules! implement_private_crypto_wrapper {
+    ($(#[$attr:meta])* struct $name:ident, $size:expr) => (
     #[derive(Clone, PartialEq, Eq)]
     $(#[$attr])*
-    pub struct $name($name_from);
+    pub struct $name($crate::crypto::crypto_impl::$name);
 
     impl $name {
         /// Creates a new instance filled with zeros.
@@ -93,12 +84,12 @@ macro_rules! implement_private_sodium_wrapper {
     impl $name {
         /// Creates a new instance from bytes array.
         pub fn new(bytes_array: [u8; $size]) -> Self {
-            $name($name_from(bytes_array))
+            $name($crate::crypto::crypto_impl::$name(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bytes_slice).map($name)
+            $crate::crypto::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
         /// Returns a hex representation of binary data.
@@ -112,10 +103,8 @@ macro_rules! implement_private_sodium_wrapper {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:02X}", i)?
-            }
-            write!(f, "...)")
+            write_short_hex(f, &self[..])?;
+            write!(f, ")")
         }
     }
 

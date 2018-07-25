@@ -36,14 +36,14 @@ pub struct NodeBuilder {
 impl NodeBuilder {
     /// Creates a new empty `NodeBuilder`.
     pub fn new() -> Self {
-        NodeBuilder {
+        Self {
             commands: Self::commands(),
             service_factories: Vec::new(),
         }
     }
 
     /// Appends service to the `NodeBuilder` context.
-    pub fn with_service(mut self, mut factory: Box<dyn ServiceFactory>) -> NodeBuilder {
+    pub fn with_service(mut self, mut factory: Box<dyn ServiceFactory>) -> Self {
         //TODO: Take endpoints, etc... (ECR-164)
 
         for (name, command) in &mut self.commands {
@@ -67,6 +67,7 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
+                let config_file_path = ctx.get(keys::NODE_CONFIG_PATH).ok();
                 let config = ctx.get(keys::NODE_CONFIG)
                     .expect("could not find node_config");
                 let db = Run::db_helper(ctx, &config.database);
@@ -74,7 +75,7 @@ impl NodeBuilder {
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
                     .collect();
-                let node = Node::new(db, services, config);
+                let node = Node::new(db, services, config, config_file_path);
                 Some(node)
             }
             _ => None,

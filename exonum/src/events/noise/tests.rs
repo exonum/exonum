@@ -12,27 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::sync::{mpsc, mpsc::Sender};
-use futures::{future::Either, Future, Sink, Stream};
-use snow::{types::Dh, wrappers::crypto_wrapper::Dh25519, NoiseBuilder};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
-
-use std::error::Error;
-use std::io::{self, Result as IoResult};
-use std::net::SocketAddr;
-use std::thread;
-use std::time::Duration;
-
-use crypto::{
-    gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed, PUBLIC_KEY_LENGTH,
+use futures::{
+    future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
-use events::error::into_other;
-use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
+use snow::{types::Dh, NoiseBuilder};
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Core,
+};
 use tokio_io::{AsyncRead, AsyncWrite};
 
+use std::{
+    error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
+};
+
+use crypto::{gen_keypair_from_seed, x25519, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use events::{
+    error::into_other,
+    noise::{
+        wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
+        HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+    },
+};
+
 #[test]
+#[cfg(feature = "sodiumoxide-crypto")]
 fn test_convert_ed_to_curve_dh() {
+    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+
     // Generate Ed25519 keys for initiator and responder.
     let (public_key_i, secret_key_i) = gen_keypair();
     let (public_key_r, secret_key_r) = gen_keypair();
@@ -42,21 +48,24 @@ fn test_convert_ed_to_curve_dh() {
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
     // Do DH.
-    let mut keypair_i: Dh25519 = Default::default();
+    let mut keypair_i: SodiumDh25519 = Default::default();
     keypair_i.set(secret_key_i.as_ref());
-    let mut output_i = [0u8; PUBLIC_KEY_LENGTH];
+    let mut output_i = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_i.dh(public_key_r.as_ref(), &mut output_i);
 
-    let mut keypair_r: Dh25519 = Default::default();
+    let mut keypair_r: SodiumDh25519 = Default::default();
     keypair_r.set(secret_key_r.as_ref());
-    let mut output_r = [0u8; PUBLIC_KEY_LENGTH];
+    let mut output_r = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_r.dh(public_key_i.as_ref(), &mut output_r);
 
     assert_eq!(output_i, output_r);
 }
 
 #[test]
+#[cfg(feature = "sodiumoxide-crypto")]
 fn test_converted_keys_handshake() {
+    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+
     const MSG_SIZE: usize = 4096;
     static PATTERN: &'static str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
@@ -80,16 +89,16 @@ fn test_converted_keys_handshake() {
         .build_responder()
         .expect("Unable to create responder");
 
-    let mut buffer_msg = [0u8; MSG_SIZE * 2];
-    let mut buffer_out = [0u8; MSG_SIZE * 2];
+    let mut buffer_msg = [0_u8; MSG_SIZE * 2];
+    let mut buffer_out = [0_u8; MSG_SIZE * 2];
 
-    let len = h_i.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
     h_r.read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
-    let len = h_r.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+    let len = h_r.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
     h_i.read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
-    let len = h_i.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
+    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
     h_r.read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
 
@@ -134,7 +143,7 @@ const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
     let mut params = HandshakeParams::new(public_key, secret_key, 1024);
     params.set_remote_key(public_key);
     params
@@ -237,7 +246,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = default_test_params();
-    let (remote_key, _) = gen_keypair();
+    let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
     params.set_remote_key(remote_key);
 
     let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);
@@ -370,12 +379,16 @@ impl NoiseErrorHandshake {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 
-            Either::A(write(stream, msg, msg.len()).map(move |(stream, _)| {
-                self.current_step = self.current_step
-                    .next()
-                    .expect("Extra handshake step taken");
-                (stream, self)
-            }))
+            Either::A(
+                HandshakeRawMessage(msg.to_vec())
+                    .write(stream)
+                    .map(move |(stream, _)| {
+                        self.current_step = self.current_step
+                            .next()
+                            .expect("Extra handshake step taken");
+                        (stream, self)
+                    }),
+            )
         } else {
             let inner = self.inner.take().unwrap();
 
@@ -395,7 +408,9 @@ impl NoiseErrorHandshake {
 }
 
 impl Handshake for NoiseErrorHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    type Result = x25519::PublicKey;
+
+    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -406,7 +421,7 @@ impl Handshake for NoiseErrorHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {

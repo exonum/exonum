@@ -29,9 +29,19 @@ pub enum Feedback {
 
 /// `Command` trait is used to create sub-command for `NodeBuilder`.
 pub trait Command {
+    /// List of command arguments.
     fn args(&self) -> Vec<Argument>;
+    /// Command name.
     fn name(&self) -> CommandName;
+    /// Short information about the command.
     fn about(&self) -> &str;
+    /// Executes the command processing code.
+    ///
+    /// # Arguments:
+    ///
+    /// * `commands` - contains set of commands that can be performed on this node.
+    /// * `context` - contains global execution context.
+    /// * `exts` - allows to execute `CommandExtensions` for the command.
     fn execute(
         &self,
         commands: &HashMap<CommandName, CollectedCommand>,
@@ -53,8 +63,8 @@ pub struct CollectedCommand {
 }
 
 impl CollectedCommand {
-    pub fn new(command: Box<dyn Command>) -> CollectedCommand {
-        CollectedCommand {
+    pub fn new(command: Box<dyn Command>) -> Self {
+        Self {
             args: command.args(),
             command,
             exts: Vec::new(),
@@ -81,11 +91,7 @@ impl CollectedCommand {
         }
     }
 
-    pub fn execute(
-        &self,
-        commands: &HashMap<CommandName, CollectedCommand>,
-        context: Context,
-    ) -> Feedback {
+    pub fn execute(&self, commands: &HashMap<CommandName, Self>, context: Context) -> Feedback {
         self.command.execute(commands, context, &|context| {
             // TODO: Check duplicates, in services context keys. (ECR-164)
             let mut new_context = context.clone();
