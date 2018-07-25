@@ -236,7 +236,8 @@ pub struct NodeConfig {
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
-    pub external_address: Option<SocketAddr>,
+    #[serde(deserialize_with = "deserialize_socket_address")]
+    pub external_address: SocketAddr,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Consensus public key.
@@ -900,18 +901,12 @@ impl Node {
             peer_discovery: peers,
         };
 
-        let external_address = if let Some(v) = node_cfg.external_address {
-            v
-        } else {
-            warn!("Could not find 'external_address' in the config, using 'listen_address'");
-            node_cfg.listen_address
-        };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
-            external_address,
+            node_cfg.external_address,
             channel.node_sender(),
             system_state,
             config,
