@@ -31,10 +31,10 @@ use super::{
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
 use api::backends::actix::AllowOrigin;
-use blockchain::{config::ValidatorKeys, GenesisConfig};
+use blockchain::{config::ValidatorKeys, GenesisConfig, ConsensusConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
-use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
+use node::{ConnectListConfig, NodeApiConfig, NodeConfig, State};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -285,6 +285,14 @@ impl Command for GenerateCommonConfig {
                 "validators-count",
                 false,
             ),
+            Argument::new_named(
+                "MAJORITY_COUNT",
+                false,
+                "Number of votes required to commit new configuration",
+                None,
+                "majority-count",
+                false,
+            ),
         ]
     }
 
@@ -309,6 +317,18 @@ impl Command for GenerateCommonConfig {
         let validators_count = context
             .arg::<u8>("VALIDATORS_COUNT")
             .expect("VALIDATORS_COUNT not found");
+        
+        let majority_count = match context.arg::<u16>("MAJORITY_COUNT").ok() {
+            Some(v) => {
+                if (v as u8) > validators_count || (v as u8) < State::byzantine_majority_count(validators_count as usize) as u8 {
+                    panic!(
+                        "Majority count should be greater than 2/3 and less or equal to the validators count"
+                    )
+                }
+                v
+            },
+            None => 0
+        };
 
         context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
@@ -317,10 +337,15 @@ impl Command for GenerateCommonConfig {
         let mut general_config = AbstractConfig::default();
         general_config.insert(String::from("validators_count"), validators_count.into());
 
+        let mut consensus_config = ConsensusConfig::default();
+        if majority_count > 0 {
+            consensus_config.majority_count = Some(majority_count);
+        }
+
         let template = CommonConfigTemplate {
             services_config,
             general_config,
-            ..CommonConfigTemplate::default()
+            consensus_config,
         };
 
         ConfigFile::save(&template, template_path).expect("Could not write template file.");

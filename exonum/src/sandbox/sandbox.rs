@@ -738,6 +738,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         min_propose_timeout: PROPOSE_TIMEOUT,
         max_propose_timeout: PROPOSE_TIMEOUT,
         propose_timeout_threshold: 0,
+        majority_count: None
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,

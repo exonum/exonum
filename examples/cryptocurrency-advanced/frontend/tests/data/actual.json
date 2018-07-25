@@ -29,9 +29,9 @@
       "max_message_len": 1048576,
       "min_propose_timeout": 10,
       "max_propose_timeout": 200,
-      "propose_timeout_threshold": 500
+      "propose_timeout_threshold": 500,
+      "majority_count": null
     },
-    "majority_count": null,
     "services": {
       "configuration": null,
       "cryptocurrency": null

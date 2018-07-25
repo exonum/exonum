@@ -64,10 +64,6 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Number of votes required to commit the new configuration.
-    /// This value should be greater than 2/3 and less or equal to the
-    /// validators count.
-    pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
     #[serde(default)]
@@ -123,6 +119,10 @@ pub struct ConsensusConfig {
     /// in a block if the transaction pool is almost empty, and create blocks faster when there are
     /// enough transactions in the pool.
     pub propose_timeout_threshold: u32,
+    /// Number of votes required to commit the new configuration.
+    /// This value should be greater than 2/3 and less or equal to the
+    /// validators count.
+    pub majority_count: Option<u16>,
 }
 
 impl ConsensusConfig {
@@ -175,6 +175,7 @@ impl Default for ConsensusConfig {
             min_propose_timeout: 10,
             max_propose_timeout: 200,
             propose_timeout_threshold: 500,
+            majority_count: None
         }
     }
 }
@@ -378,8 +379,7 @@ mod tests {
             actual_from: Height(42),
             validator_keys,
             consensus: ConsensusConfig::default(),
-            services: BTreeMap::new(),
-            majority_count: None,
+            services: BTreeMap::new()
         }
     }
 
