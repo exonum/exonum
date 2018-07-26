@@ -31,7 +31,7 @@ use super::{
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
 use api::backends::actix::AllowOrigin;
-use blockchain::{config::ValidatorKeys, GenesisConfig, ConsensusConfig};
+use blockchain::{config::ValidatorKeys, ConsensusConfig, GenesisConfig};
 use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig, State};
@@ -317,29 +317,32 @@ impl Command for GenerateCommonConfig {
         let validators_count = context
             .arg::<u16>("VALIDATORS_COUNT")
             .expect("VALIDATORS_COUNT not found");
-        
-        let majority_count = context
-            .arg::<u16>("MAJORITY_COUNT")
-            .ok();
+
+        let majority_count = context.arg::<u16>("MAJORITY_COUNT").ok();
 
         context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
         let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
         let mut general_config = AbstractConfig::default();
-        general_config.insert(String::from("validators_count"), (validators_count as u32).into());
+        general_config.insert(
+            String::from("validators_count"),
+            (validators_count as u32).into(),
+        );
 
         let mut consensus_config = ConsensusConfig::default();
 
         match majority_count {
             Some(v) => {
-                if v > validators_count || v < State::byzantine_majority_count(validators_count as usize) as u16 {
+                if v > validators_count
+                    || v < State::byzantine_majority_count(validators_count as usize) as u16
+                {
                     panic!(
                         "Majority count should be greater than 2/3 and less or equal to the validators count"
                     )
                 }
-            },
-            None => ()
+            }
+            None => (),
         }
 
         consensus_config.majority_count = majority_count;
@@ -737,19 +740,19 @@ impl Command for GenerateTestnet {
             panic!("Can't generate testnet with zero nodes count.");
         }
 
-        let majority_count = context
-            .arg::<u16>("MAJORITY_COUNT")
-            .ok();
-        
+        let majority_count = context.arg::<u16>("MAJORITY_COUNT").ok();
+
         match majority_count {
             Some(v) => {
-                if v > validators_count || v < State::byzantine_majority_count(validators_count as usize) as u16 {
+                if v > validators_count
+                    || v < State::byzantine_majority_count(validators_count as usize) as u16
+                {
                     panic!(
                         "Majority count should be greater than 2/3 and less or equal to the validators count"
                     )
                 }
-            },
-            None => ()
+            }
+            None => (),
         }
 
         let dir = Path::new(&dir);

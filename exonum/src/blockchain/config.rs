@@ -29,8 +29,8 @@ use std::collections::{BTreeMap, HashSet};
 use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
 use helpers::{Height, Milliseconds};
 use messages::HEADER_LENGTH;
+use node::State;
 use storage::StorageValue;
-use node::{State};
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.
@@ -175,7 +175,7 @@ impl Default for ConsensusConfig {
             min_propose_timeout: 10,
             max_propose_timeout: 200,
             propose_timeout_threshold: 500,
-            majority_count: None
+            majority_count: None,
         }
     }
 }
@@ -253,9 +253,9 @@ impl StoredConfiguration {
                         v, validators_count, byzantine_majority_count
                     )));
                 }
-            },
-            None => ()    
-        } 
+            }
+            None => (),
+        }
 
         Ok(config)
     }
@@ -410,7 +410,7 @@ mod tests {
             actual_from: Height(42),
             validator_keys,
             consensus: ConsensusConfig::default(),
-            services: BTreeMap::new()
+            services: BTreeMap::new(),
         }
     }
 

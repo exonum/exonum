@@ -31,7 +31,7 @@ use std::{
     env, io::{self, Write}, time::SystemTime,
 };
 
-use blockchain::{GenesisConfig, ConsensusConfig, ValidatorKeys};
+use blockchain::{ConsensusConfig, GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;
 use node::{ConnectListConfig, NodeConfig};
 
@@ -56,18 +56,26 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 }
 
 /// Generates testnet configuration.
-pub fn generate_testnet_config(count: u16, start_port: u16, majority_count: Option<u16>) -> Vec<NodeConfig> {
+pub fn generate_testnet_config(
+    count: u16,
+    start_port: u16,
+    majority_count: Option<u16>,
+) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
     let mut consensus_config = ConsensusConfig::default();
     consensus_config.majority_count = majority_count;
-    let genesis = GenesisConfig::new_with_consensus(consensus_config,validators.iter().zip(services.iter()).map(|x| {
-        ValidatorKeys {
-            consensus_key: (x.0).0,
-            service_key: (x.1).0,
-        }
-    }));
+    let genesis = GenesisConfig::new_with_consensus(
+        consensus_config,
+        validators
+            .iter()
+            .zip(services.iter())
+            .map(|x| ValidatorKeys {
+                consensus_key: (x.0).0,
+                service_key: (x.1).0,
+            }),
+    );
     let peers = (0..validators.len())
         .map(|x| {
             format!("127.0.0.1:{}", start_port + x as u16)

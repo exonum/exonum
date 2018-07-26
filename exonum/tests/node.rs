@@ -88,7 +88,11 @@ struct RunHandle {
     api_tx: ApiSender,
 }
 
-fn run_nodes(count: u16, start_port: u16, majority_count: Option<u16>) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(
+    count: u16,
+    start_port: u16,
+    majority_count: Option<u16>,
+) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, start_port, majority_count) {
