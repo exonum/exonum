@@ -16,7 +16,7 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
-//! The set of errors for the Exonum's API module.
+//! The set of errors for the Exonum API module.
 
 use std::{error, io};
 
