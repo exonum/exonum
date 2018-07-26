@@ -14,7 +14,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   
 - `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
 
-- Config parameter `external_address` is not optional. (#826)
+- Config parameter `external_address` is now a required value. (#826)
 
 ### New features
 
