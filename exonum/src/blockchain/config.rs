@@ -30,7 +30,7 @@ use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
 use helpers::{Height, Milliseconds};
 use messages::HEADER_LENGTH;
 use storage::StorageValue;
-
+use node::{State};
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.
@@ -242,6 +242,21 @@ impl StoredConfiguration {
             )));
         }
 
+        // Check majority count
+        let validators_count = config.validator_keys.len();
+        let byzantine_majority_count = State::byzantine_majority_count(validators_count);
+        match config.consensus.majority_count {
+            Some(v) => {
+                if v > validators_count as u16 || v < byzantine_majority_count as u16 {
+                    return Err(JsonError::custom(format!(
+                        "Invalid majority count: {}, it should be <= {} and >= {}",
+                        v, validators_count, byzantine_majority_count
+                    )));
+                }
+            },
+            None => ()    
+        } 
+
         Ok(config)
     }
 }
@@ -363,6 +378,22 @@ mod tests {
     fn too_small_max_message_len() {
         let mut configuration = create_test_configuration();
         configuration.consensus.max_message_len = 128;
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid majority count: 2, it should be <= 3 and >= 3")]
+    fn too_small_majority_count() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.majority_count = Some(2);
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid majority count: 4, it should be <= 3 and >= 3")]
+    fn too_big_majority_count() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.majority_count = Some(4);
         serialize_deserialize(&configuration);
     }
 

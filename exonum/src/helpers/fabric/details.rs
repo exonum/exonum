@@ -315,32 +315,34 @@ impl Command for GenerateCommonConfig {
             .expect("COMMON_CONFIG not found");
 
         let validators_count = context
-            .arg::<u8>("VALIDATORS_COUNT")
+            .arg::<u16>("VALIDATORS_COUNT")
             .expect("VALIDATORS_COUNT not found");
         
-        let majority_count = match context.arg::<u16>("MAJORITY_COUNT").ok() {
-            Some(v) => {
-                if (v as u8) > validators_count || (v as u8) < State::byzantine_majority_count(validators_count as usize) as u8 {
-                    panic!(
-                        "Majority count should be greater than 2/3 and less or equal to the validators count"
-                    )
-                }
-                v
-            },
-            None => 0
-        };
+        let majority_count = context
+            .arg::<u16>("MAJORITY_COUNT")
+            .ok();
 
         context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
         let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
         let mut general_config = AbstractConfig::default();
-        general_config.insert(String::from("validators_count"), validators_count.into());
+        general_config.insert(String::from("validators_count"), (validators_count as u32).into());
 
         let mut consensus_config = ConsensusConfig::default();
-        if majority_count > 0 {
-            consensus_config.majority_count = Some(majority_count);
+
+        match majority_count {
+            Some(v) => {
+                if v > validators_count || v < State::byzantine_majority_count(validators_count as usize) as u16 {
+                    panic!(
+                        "Majority count should be greater than 2/3 and less or equal to the validators count"
+                    )
+                }
+            },
+            None => ()
         }
+
+        consensus_config.majority_count = majority_count;
 
         let template = CommonConfigTemplate {
             services_config,
@@ -700,6 +702,14 @@ impl Command for GenerateTestnet {
                 false,
             ),
             Argument::new_positional("COUNT", true, "Count of validators in testnet."),
+            Argument::new_named(
+                "MAJORITY_COUNT",
+                false,
+                "Number of votes required to commit new configuration",
+                None,
+                "majority-count",
+                false,
+            ),
         ]
     }
 
@@ -718,13 +728,28 @@ impl Command for GenerateTestnet {
         exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
-        let count: u8 = context.arg("COUNT").expect("count as int");
+        let validators_count: u16 = context.arg("COUNT").expect("count as int");
         let start_port = context
             .arg::<u16>("START_PORT")
             .unwrap_or(DEFAULT_EXONUM_LISTEN_PORT);
 
-        if count == 0 {
+        if validators_count == 0 {
             panic!("Can't generate testnet with zero nodes count.");
+        }
+
+        let majority_count = context
+            .arg::<u16>("MAJORITY_COUNT")
+            .ok();
+        
+        match majority_count {
+            Some(v) => {
+                if v > validators_count || v < State::byzantine_majority_count(validators_count as usize) as u16 {
+                    panic!(
+                        "Majority count should be greater than 2/3 and less or equal to the validators count"
+                    )
+                }
+            },
+            None => ()
         }
 
         let dir = Path::new(&dir);
@@ -733,7 +758,7 @@ impl Command for GenerateTestnet {
             fs::create_dir_all(&dir).unwrap();
         }
 
-        let configs = generate_testnet_config(count, start_port);
+        let configs = generate_testnet_config(validators_count, start_port, majority_count);
         context.set(keys::CONFIGS, configs);
         let new_context = exts(context);
         let configs = new_context

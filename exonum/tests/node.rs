@@ -88,10 +88,10 @@ struct RunHandle {
     api_tx: ApiSender,
 }
 
-fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(count: u16, start_port: u16, majority_count: Option<u16>) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
-    for node_cfg in helpers::generate_testnet_config(count, start_port) {
+    for node_cfg in helpers::generate_testnet_config(count, start_port, majority_count) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
         let node = Node::new(MemoryDB::new(), vec![service], node_cfg, None);
@@ -109,7 +109,7 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
 
 #[test]
 fn test_node_run() {
-    let (nodes, commit_rxs) = run_nodes(4, 16_300);
+    let (nodes, commit_rxs) = run_nodes(4, 16_300, None);
 
     let timer = Timer::default();
     let duration = Duration::from_secs(60);
@@ -144,7 +144,7 @@ fn test_node_restart_regression() {
     };
 
     let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
-    let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
+    let node_cfg = helpers::generate_testnet_config(1, 3600, None)[0].clone();
 
     let init_times = Arc::new(Mutex::new(0));
     // First launch
