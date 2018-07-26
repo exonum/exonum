@@ -21,6 +21,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added possibility to use domain names instead of IP addresses as a peer's
   addresses. (#826)
 
+### New Features
+
+#### exonum
+
+- Added `/v1/blocks/subscribe` endpoint for following block commit events
+  through WebSockets (#792).
+
 ### Internal Improvements
 
 - Transactions (signature) verification benchmark has been added. (#808)
