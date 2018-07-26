@@ -245,16 +245,15 @@ impl StoredConfiguration {
         // Check majority count
         let validators_count = config.validator_keys.len();
         let byzantine_majority_count = State::byzantine_majority_count(validators_count);
-        match config.consensus.majority_count {
-            Some(v) => {
-                if v > validators_count as u16 || v < byzantine_majority_count as u16 {
-                    return Err(JsonError::custom(format!(
-                        "Invalid majority count: {}, it should be <= {} and >= {}",
-                        v, validators_count, byzantine_majority_count
-                    )));
-                }
+        if let Some(majority_count) = config.consensus.majority_count {
+            if majority_count > validators_count as u16
+                || majority_count < byzantine_majority_count as u16
+            {
+                return Err(JsonError::custom(format!(
+                    "Invalid majority count: {}, it should be <= {} and >= {}",
+                    majority_count, validators_count, byzantine_majority_count
+                )));
             }
-            None => (),
         }
 
         Ok(config)

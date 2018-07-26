@@ -332,17 +332,15 @@ impl Command for GenerateCommonConfig {
 
         let mut consensus_config = ConsensusConfig::default();
 
-        match majority_count {
-            Some(v) => {
-                if v > validators_count
-                    || v < State::byzantine_majority_count(validators_count as usize) as u16
-                {
-                    panic!(
+        if let Some(majority_count) = majority_count {
+            if majority_count > validators_count
+                || majority_count
+                    < State::byzantine_majority_count(validators_count as usize) as u16
+            {
+                panic!(
                         "Majority count should be greater than 2/3 and less or equal to the validators count"
                     )
-                }
             }
-            None => (),
         }
 
         consensus_config.majority_count = majority_count;
@@ -742,17 +740,15 @@ impl Command for GenerateTestnet {
 
         let majority_count = context.arg::<u16>("MAJORITY_COUNT").ok();
 
-        match majority_count {
-            Some(v) => {
-                if v > validators_count
-                    || v < State::byzantine_majority_count(validators_count as usize) as u16
-                {
-                    panic!(
+        if let Some(majority_count) = majority_count {
+            if majority_count > validators_count
+                || majority_count
+                    < State::byzantine_majority_count(validators_count as usize) as u16
+            {
+                panic!(
                         "Majority count should be greater than 2/3 and less or equal to the validators count"
                     )
-                }
             }
-            None => (),
         }
 
         let dir = Path::new(&dir);
