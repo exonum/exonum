@@ -382,6 +382,13 @@ mod tests {
     }
 
     #[test]
+    fn set_correct_majority_count() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.majority_count = Some(3);
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
     #[should_panic(expected = "Invalid majority count: 2, it should be <= 3 and >= 3")]
     fn too_small_majority_count() {
         let mut configuration = create_test_configuration();
