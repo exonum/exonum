@@ -14,9 +14,9 @@
           "propose_timeout_threshold": 99,
           "round_timeout": 3000,
           "status_timeout": 5000,
-          "txs_block_limit": 100,
-          "majority_count": null
+          "txs_block_limit": 100
         },
+        "majority_count": null,
         "previous_cfg_hash": "b5273e3b5180db238f51d8317b27daac29d1bc162e0b75294e5e0b27677d3242",
         "services": {
           "configuration": null,
@@ -79,9 +79,9 @@
           "propose_timeout_threshold": 100,
           "round_timeout": 3000,
           "status_timeout": 5000,
-          "txs_block_limit": 100,
-          "majority_count": null
+          "txs_block_limit": 100
         },
+        "majority_count": null,
         "previous_cfg_hash": "4fb39c965624edbec7dbf9ddd902662539c594b082ee957ab92614d0867b87e2",
         "services": {
           "configuration": null,
@@ -102,7 +102,7 @@
         "num_validators": "2",
         "tx_propose": {
           "body": {
-            "cfg": "{\"previous_cfg_hash\":\"4fb39c965624edbec7dbf9ddd902662539c594b082ee957ab92614d0867b87e2\",\"actual_from\":12000,\"validator_keys\":[{\"consensus_key\":\"0af291925e899454cbc7fb5a258371ef48dc6b33f5f66281d40bf73d43b1f78f\",\"service_key\":\"8b097c60926490c746f39c2fbbc55c10341d1d8160b84c1c4d6c5a777a2a704d\"},{\"consensus_key\":\"eef70a7473051bb2c994a6b21438e786e41e33fc97c82394c7e5d1221656bf2c\",\"service_key\":\"7ed8d1b21f6d44b09cd3062526eeeca1495338c37f4d3774a46f61ab3849215b\"}],\"consensus\":{\"round_timeout\":3000,\"status_timeout\":5000,\"peers_timeout\":10000,\"txs_block_limit\":100,\"max_message_len\":1048576,\"min_propose_timeout\":100,\"max_propose_timeout\":1000,\"propose_timeout_threshold\":100, \"majority_count\":null},\"services\":{\"configuration\":null,\"cryptocurrency\":null}}",
+            "cfg": "{\"previous_cfg_hash\":\"4fb39c965624edbec7dbf9ddd902662539c594b082ee957ab92614d0867b87e2\",\"actual_from\":12000,\"validator_keys\":[{\"consensus_key\":\"0af291925e899454cbc7fb5a258371ef48dc6b33f5f66281d40bf73d43b1f78f\",\"service_key\":\"8b097c60926490c746f39c2fbbc55c10341d1d8160b84c1c4d6c5a777a2a704d\"},{\"consensus_key\":\"eef70a7473051bb2c994a6b21438e786e41e33fc97c82394c7e5d1221656bf2c\",\"service_key\":\"7ed8d1b21f6d44b09cd3062526eeeca1495338c37f4d3774a46f61ab3849215b\"}],\"consensus\":{\"round_timeout\":3000,\"status_timeout\":5000,\"peers_timeout\":10000,\"txs_block_limit\":100,\"max_message_len\":1048576,\"min_propose_timeout\":100,\"max_propose_timeout\":1000,\"propose_timeout_threshold\":100},\"majority_count\":null,\"services\":{\"configuration\":null,\"cryptocurrency\":null}}",
             "from": "8b097c60926490c746f39c2fbbc55c10341d1d8160b84c1c4d6c5a777a2a704d"
           },
           "message_id": 0,
@@ -159,9 +159,9 @@
             "propose_timeout_threshold": 500,
             "round_timeout": 3000,
             "status_timeout": 5000,
-            "txs_block_limit": 1000,
-            "majority_count": null
+            "txs_block_limit": 1000
           },
+          "majority_count": null,
           "previous_cfg_hash": "0000000000000000000000000000000000000000000000000000000000000000",
           "services": {
             "configuration": null,
@@ -193,9 +193,9 @@
             "propose_timeout_threshold": 100,
             "round_timeout": 3000,
             "status_timeout": 5000,
-            "txs_block_limit": 1000,
-            "majority_count": null
+            "txs_block_limit": 1000
           },
+          "majority_count": null,
           "previous_cfg_hash": "9e7ec0fc3f5bf8e747b272525bcaf3869fb0b865eb2c196e6c7d95bcb742415e",
           "services": {
             "configuration": null,
@@ -252,7 +252,7 @@
           "num_validators": "2",
           "tx_propose": {
             "body": {
-              "cfg": "{\"previous_cfg_hash\":\"4fb39c965624edbec7dbf9ddd902662539c594b082ee957ab92614d0867b87e2\",\"actual_from\":12000,\"validator_keys\":[{\"consensus_key\":\"0af291925e899454cbc7fb5a258371ef48dc6b33f5f66281d40bf73d43b1f78f\",\"service_key\":\"8b097c60926490c746f39c2fbbc55c10341d1d8160b84c1c4d6c5a777a2a704d\"},{\"consensus_key\":\"eef70a7473051bb2c994a6b21438e786e41e33fc97c82394c7e5d1221656bf2c\",\"service_key\":\"7ed8d1b21f6d44b09cd3062526eeeca1495338c37f4d3774a46f61ab3849215b\"}],\"consensus\":{\"round_timeout\":3000,\"status_timeout\":5000,\"peers_timeout\":10000,\"txs_block_limit\":100,\"max_message_len\":1048576,\"min_propose_timeout\":100,\"max_propose_timeout\":1000,\"propose_timeout_threshold\":100, \"majority_count\":null},\"services\":{\"configuration\":null,\"cryptocurrency\":null}}",
+              "cfg": "{\"previous_cfg_hash\":\"4fb39c965624edbec7dbf9ddd902662539c594b082ee957ab92614d0867b87e2\",\"actual_from\":12000,\"validator_keys\":[{\"consensus_key\":\"0af291925e899454cbc7fb5a258371ef48dc6b33f5f66281d40bf73d43b1f78f\",\"service_key\":\"8b097c60926490c746f39c2fbbc55c10341d1d8160b84c1c4d6c5a777a2a704d\"},{\"consensus_key\":\"eef70a7473051bb2c994a6b21438e786e41e33fc97c82394c7e5d1221656bf2c\",\"service_key\":\"7ed8d1b21f6d44b09cd3062526eeeca1495338c37f4d3774a46f61ab3849215b\"}],\"consensus\":{\"round_timeout\":3000,\"status_timeout\":5000,\"peers_timeout\":10000,\"txs_block_limit\":100,\"max_message_len\":1048576,\"min_propose_timeout\":100,\"max_propose_timeout\":1000,\"propose_timeout_threshold\":100},\"majority_count\":null,\"services\":{\"configuration\":null,\"cryptocurrency\":null}}",
               "from": "8b097c60926490c746f39c2fbbc55c10341d1d8160b84c1c4d6c5a777a2a704d"
             },
             "message_id": 0,

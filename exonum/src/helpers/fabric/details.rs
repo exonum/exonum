@@ -31,7 +31,7 @@ use super::{
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
 use api::backends::actix::AllowOrigin;
-use blockchain::{config::ValidatorKeys, ConsensusConfig, GenesisConfig};
+use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
 use helpers::{
     config::{validate_majority_count, ConfigFile}, generate_testnet_config,
@@ -332,18 +332,23 @@ impl Command for GenerateCommonConfig {
             (validators_count as u32).into(),
         );
 
-        let mut consensus_config = ConsensusConfig::default();
         let byzantine_majority_count =
             State::byzantine_majority_count(validators_count as usize) as u16;
+
         validate_majority_count(majority_count, validators_count, byzantine_majority_count)
             .unwrap();
 
-        consensus_config.majority_count = majority_count;
+        if let Some(majority_count) = majority_count {
+            general_config.insert(
+                String::from("majority_count"),
+                (majority_count as u32).into(),
+            );
+        }
 
         let template = CommonConfigTemplate {
             services_config,
             general_config,
-            consensus_config,
+            ..CommonConfigTemplate::default()
         };
 
         ConfigFile::save(&template, template_path).expect("Could not write template file.");
