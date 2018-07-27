@@ -67,7 +67,7 @@ pub enum ExternalMessage {
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<dyn Transaction>),
-    /// Enable or disable the node.
+    /// Enable or disable network connections of the node.
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
@@ -117,8 +117,8 @@ pub struct NodeHandler {
     pub blockchain: Blockchain,
     /// Known peer addresses.
     pub peer_discovery: Vec<SocketAddr>,
-    /// Does this node participate in the consensus?
-    is_enabled: bool,
+    /// Are network connections enabled for this node?
+    is_network_enabled: bool,
     /// Node role.
     node_role: NodeRole,
     /// Configuration file manager.
@@ -433,7 +433,7 @@ impl NodeHandler {
         );
 
         let node_role = NodeRole::new(validator_id);
-        let is_enabled = api_state.is_enabled();
+        let is_enabled = api_state.is_network_enabled();
         api_state.set_node_role(node_role);
 
         let config_manager = match config_file_path {
@@ -448,7 +448,7 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            is_enabled,
+            is_network_enabled: is_enabled,
             node_role,
             config_manager,
         }

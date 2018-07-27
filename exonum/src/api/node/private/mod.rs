@@ -119,8 +119,8 @@ impl SystemApi {
         self.handle_peers_info("v1/peers", api_scope)
             .handle_peer_add("v1/peers", api_scope)
             .handle_network_info("v1/network", api_scope)
-            .handle_is_consensus_enabled("v1/consensus_enabled", api_scope)
-            .handle_set_consensus_enabled("v1/consensus_enabled", api_scope)
+            .handle_is_network_enabled("v1/consensus_enabled", api_scope)
+            .handle_set_network_enabled("v1/consensus_enabled", api_scope)
             .handle_shutdown("v1/shutdown", api_scope);
         api_scope
     }
@@ -177,19 +177,19 @@ impl SystemApi {
         self_
     }
 
-    fn handle_is_consensus_enabled(
+    fn handle_is_network_enabled(
         self,
         name: &'static str,
         api_scope: &mut ServiceApiScope,
     ) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
-            Ok(self.shared_api_state.is_enabled())
+            Ok(self.shared_api_state.is_network_enabled())
         });
         self_
     }
 
-    fn handle_set_consensus_enabled(
+    fn handle_set_network_enabled(
         self,
         name: &'static str,
         api_scope: &mut ServiceApiScope,

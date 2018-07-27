@@ -68,14 +68,22 @@ impl NodeHandler {
             }
             ExternalMessage::Enable(value) => {
                 let s = if value { "enabled" } else { "disabled" };
-                if self.is_enabled == value {
+                if self.is_network_enabled == value {
                     info!("Node is already {}", s);
                 } else {
-                    self.is_enabled = value;
-                    self.api_state().set_enabled(value);
+                    self.is_network_enabled = value;
+                    self.api_state().set_network_enabled(value);
                     info!("The node is {} now", s);
-                    if self.is_enabled {
+                    if self.is_network_enabled {
+                        for address in self.state.connect_list().clone().peers.values() {
+                            self.connect(address);
+                        }
                         self.add_round_timeout();
+                    } else {
+                        for address in self.state.connections().clone().keys() {
+                            self.state.remove_peer_with_addr(address);
+                            self.blockchain.remove_peer_with_addr(address);
+                        }
                     }
                 }
             }
@@ -84,13 +92,6 @@ impl NodeHandler {
     }
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
-        if !self.is_enabled {
-            info!(
-                "Ignoring a timeout {:?} because the node is disabled",
-                timeout
-            );
-            return;
-        }
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),

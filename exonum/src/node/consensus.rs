@@ -29,14 +29,6 @@ use storage::Patch;
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
-        if !self.is_enabled {
-            info!(
-                "Ignoring a consensus message {:?} because the node is disabled",
-                msg
-            );
-            return;
-        }
-
         // Warning for messages from previous and future height
         if msg.height() < self.state.height().previous()
             || msg.height() > self.state.height().next()

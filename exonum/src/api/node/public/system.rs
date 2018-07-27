@@ -116,7 +116,7 @@ impl SystemApi {
     }
 
     fn get_consensus_status(&self) -> ConsensusStatus {
-        if self.shared_api_state.is_enabled() {
+        if self.shared_api_state.is_network_enabled() {
             if self.shared_api_state.consensus_status() {
                 ConsensusStatus::Active
             } else {
