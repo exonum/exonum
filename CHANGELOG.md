@@ -12,6 +12,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
 
 ## 0.9.1 - 2018-08-02
+- `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
+  and `external_addr` to `external_address`. (#809)
+  
+- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
+
+- Config parameter `external_address` is now a required value. (#826)
+
+### New features
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. (#826)
 
 ### Bug Fixes
 
