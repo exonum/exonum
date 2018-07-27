@@ -27,10 +27,11 @@ use serde_json::{self, Error as JsonError};
 use std::collections::{BTreeMap, HashSet};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
-use helpers::{Height, Milliseconds};
+use helpers::{config::validate_majority_count, Height, Milliseconds};
 use messages::HEADER_LENGTH;
 use node::State;
 use storage::StorageValue;
+
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.
@@ -243,19 +244,16 @@ impl StoredConfiguration {
         }
 
         // Check majority count
-        let validators_count = config.validator_keys.len();
-        let byzantine_majority_count = State::byzantine_majority_count(validators_count);
-        if let Some(majority_count) = config.consensus.majority_count {
-            if majority_count > validators_count as u16
-                || majority_count < byzantine_majority_count as u16
-            {
-                return Err(JsonError::custom(format!(
-                    "Invalid majority count: {}, it should be <= {} and >= {}",
-                    majority_count, validators_count, byzantine_majority_count
-                )));
-            }
+        let validators_count = config.validator_keys.len() as u16;
+        let byzantine_majority_count =
+            State::byzantine_majority_count(validators_count as usize) as u16;
+        if let Err(e) = validate_majority_count(
+            config.consensus.majority_count,
+            validators_count,
+            byzantine_majority_count,
+        ) {
+            return Err(JsonError::custom(e));
         }
-
         Ok(config)
     }
 }

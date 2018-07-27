@@ -138,3 +138,20 @@ impl ConfigManager {
         Ok(())
     }
 }
+
+/// Validate majority count
+pub fn validate_majority_count(
+    majority_count: Option<u16>,
+    validators_count: u16,
+    byzantine_majority_count: u16,
+) -> Result<(), String> {
+    if let Some(majority_count) = majority_count {
+        if majority_count > validators_count || majority_count < byzantine_majority_count {
+            Err(format!(
+                "Invalid majority count: {}, it should be <= {} and >= {}",
+                majority_count, validators_count, byzantine_majority_count
+            ))?
+        }
+    }
+    Ok(())
+}

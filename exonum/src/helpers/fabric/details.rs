@@ -33,7 +33,9 @@ use super::{
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, ConsensusConfig, GenesisConfig};
 use crypto;
-use helpers::{config::ConfigFile, generate_testnet_config};
+use helpers::{
+    config::{validate_majority_count, ConfigFile}, generate_testnet_config,
+};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig, State};
 use storage::{Database, DbOptions, RocksDB};
 
@@ -331,17 +333,10 @@ impl Command for GenerateCommonConfig {
         );
 
         let mut consensus_config = ConsensusConfig::default();
-
-        if let Some(majority_count) = majority_count {
-            if majority_count > validators_count
-                || majority_count
-                    < State::byzantine_majority_count(validators_count as usize) as u16
-            {
-                panic!(
-                        "Majority count should be greater than 2/3 and less or equal to the validators count"
-                    )
-            }
-        }
+        let byzantine_majority_count =
+            State::byzantine_majority_count(validators_count as usize) as u16;
+        validate_majority_count(majority_count, validators_count, byzantine_majority_count)
+            .unwrap();
 
         consensus_config.majority_count = majority_count;
 
@@ -740,16 +735,10 @@ impl Command for GenerateTestnet {
 
         let majority_count = context.arg::<u16>("MAJORITY_COUNT").ok();
 
-        if let Some(majority_count) = majority_count {
-            if majority_count > validators_count
-                || majority_count
-                    < State::byzantine_majority_count(validators_count as usize) as u16
-            {
-                panic!(
-                        "Majority count should be greater than 2/3 and less or equal to the validators count"
-                    )
-            }
-        }
+        let byzantine_majority_count =
+            State::byzantine_majority_count(validators_count as usize) as u16;
+        validate_majority_count(majority_count, validators_count, byzantine_majority_count)
+            .unwrap();
 
         let dir = Path::new(&dir);
         let dir = dir.join("validators");
