@@ -44,7 +44,7 @@ failure = "=0.1.1"
 os_info = "1.0.1"
 chrono = { version = "=0.4.4", features = ["serde"] }
 uuid = { version = "=0.6.5", features = ["serde"] }
-snow = "=0.2.1"
+snow = "=0.3.0"
 rust_decimal = "=0.9.1"
 
 exonum_rocksdb = "0.7.4"
