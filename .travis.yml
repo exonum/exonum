@@ -65,7 +65,6 @@ jobs:
   # Formatting & other lints that do not require compilation
   - env: FEATURE=lints
     install:
-    - cargo-audit -V || cargo install cargo-audit --force
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
     - rustup component add rustfmt-preview

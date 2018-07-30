@@ -58,7 +58,11 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
+fn hash_one(h: &Hash) -> Hash {
+    hash(h.as_ref())
+}
+
+fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
     HashStream::new()
         .update(h1.as_ref())
         .update(h2.as_ref())
@@ -477,9 +481,9 @@ where
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
-                hash(self.get_branch_unchecked(key).as_ref())
+                hash_one(&self.get_branch_unchecked(key))
             } else {
-                pair_hash(
+                hash_pair(
                     &self.get_branch_unchecked(key.as_left()),
                     &self.get_branch_unchecked(key),
                 )
@@ -549,12 +553,12 @@ where
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
             let hash = if self.has_branch(right) {
-                pair_hash(
+                hash_pair(
                     &self.get_branch_unchecked(left),
                     &self.get_branch_unchecked(right),
                 )
             } else {
-                hash(self.get_branch_unchecked(left).as_ref())
+                hash_one(&self.get_branch_unchecked(left))
             };
             key = key.parent();
             self.set_branch(key, hash);
@@ -613,4 +617,32 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
     }
+}
+
+/// Computes Merkle root hash for a given list of hashes.
+///
+/// If `hashes` are empty then `Hash::zero()` value is returned.
+pub fn root_hash(hashes: &[Hash]) -> Hash {
+    match hashes.len() {
+        0 => Hash::zero(),
+        1 => hashes[0],
+        _ => {
+            let mut current_hashes = combine_hash_list(hashes);
+            while current_hashes.len() > 1 {
+                current_hashes = combine_hash_list(&current_hashes);
+            }
+            current_hashes[0]
+        }
+    }
+}
+
+fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
+    hashes
+        .chunks(2)
+        .map(|pair| match pair {
+            [first, second] => hash_pair(first, second),
+            [single] => hash_one(single),
+            _ => unreachable!(),
+        })
+        .collect()
 }

@@ -12,11 +12,30 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
   
-- `NodePublicConfig` `addr` field has been renamed to `address` (#809).
+- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
+
+- Config parameter `external_address` is now a required value. (#826)
+
+### New features
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. (#826)
+
+### New Features
+
+#### exonum
+
+- Added `/v1/blocks/subscribe` endpoint for following block commit events
+  through WebSockets (#792).
 
 ### Internal Improvements
 
 - Transactions (signature) verification benchmark has been added. (#808)
+
+- A new function `storage::proof_list_index::root_hash()` has been added
+  to efficiently compute Merkle root hash from a list of hashes without
+  an intermediate `ProofListIndex`. Verification of block root hashes
+  has been optimized as well. (#802)
 
 ## 0.9.0 - 2018-07-19
 

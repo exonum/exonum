@@ -15,7 +15,7 @@
 use rand::{thread_rng, Rng};
 
 use self::ListProof::*;
-use super::{pair_hash, ListProof, ProofListIndex};
+use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
 use crypto::{hash, CryptoHash, Hash};
 use encoding::serialize::{
     json::reexport::{from_str, to_string}, reexport::Serialize,
@@ -115,9 +115,9 @@ fn list_index_proof(db: Box<dyn Database>) {
     let h0 = 2u64.hash();
     let h1 = 4u64.hash();
     let h2 = 6u64.hash();
-    let h01 = pair_hash(&h0, &h1);
-    let h22 = hash(h2.as_ref());
-    let h012 = pair_hash(&h01, &h22);
+    let h01 = hash_pair(&h0, &h1);
+    let h22 = hash_one(&h2);
+    let h012 = hash_pair(&h01, &h22);
 
     assert_eq!(index.merkle_root(), Hash::default());
 
@@ -767,5 +767,49 @@ mod rocksdb_tests {
         let path2 = dir2.path();
         let db2 = create_database(path2);
         super::same_merkle_root(db1, db2);
+    }
+}
+
+mod root_hash_tests {
+    use crypto::{self, Hash};
+    use storage::{Database, MemoryDB, ProofListIndex};
+
+    /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
+    fn assert_root_hash_correct(hashes: &[Hash]) {
+        let root_actual = super::root_hash(hashes);
+        let root_index = proof_list_index_root(hashes);
+        assert_eq!(root_actual, root_index);
+    }
+
+    fn proof_list_index_root(hashes: &[Hash]) -> Hash {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        let mut index = ProofListIndex::new("merkle_root", &mut fork);
+        index.extend(hashes.iter().cloned());
+        index.merkle_root()
+    }
+
+    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+        bytes.iter().map(|chunk| crypto::hash(chunk)).collect()
+    }
+
+    #[test]
+    fn root_hash_single() {
+        assert_root_hash_correct(&hash_list(&[b"1"]));
+    }
+
+    #[test]
+    fn root_hash_even() {
+        assert_root_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4"]));
+    }
+
+    #[test]
+    fn root_hash_odd() {
+        assert_root_hash_correct(&hash_list(&[b"1", b"2", b"3", b"4", b"5"]));
+    }
+
+    #[test]
+    fn root_hash_empty() {
+        assert_root_hash_correct(&hash_list(&[]));
     }
 }
