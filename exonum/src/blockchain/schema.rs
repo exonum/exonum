@@ -116,12 +116,9 @@ where
     }
 
     /// Returns the number of transactions in the pool.
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn transactions_pool_len(&self) -> usize {
         let pool = self.transactions_pool_len_index();
-        // TODO: Change count to other method with O(1) complexity. (ECR-977)
-        let count = pool.get().unwrap_or(0);
-        count as usize
+        pool.get().unwrap_or(0) as usize
     }
 
     /// Returns a table that keeps the block height and transaction position inside the block for every
