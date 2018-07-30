@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::user_agent;
+use helpers::{user_agent, Round};
 use messages::{Connect, PeersRequest, Precommit, Prevote};
 use node;
 
@@ -31,9 +31,9 @@ fn test_disable_and_enable() {
     let mut sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_ONE, Round(1));
     try_add_one_height(&sandbox, &sandbox_state).unwrap();
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
 
     // Disable the node.
     let message = node::ExternalMessage::Enable(false);
@@ -49,7 +49,7 @@ fn test_disable_and_enable() {
     let time_saved = sandbox.time();
 
     // A fail is expected here as the node is disabled.
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     // TODO: use try_add_one_height (ECR-1817)
     let result = try_add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     assert!(result.is_err());
@@ -65,14 +65,14 @@ fn test_disable_and_enable() {
     sandbox.process_events();
 
     // Check if the node is still at the same height and round.
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
 
     // Reset the time.
     sandbox.set_time(time_saved);
 
     // The node should work fine now
     try_add_one_height(&sandbox, &sandbox_state).unwrap();
-    sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_THREE, Round(1));
 }
 
 /// Scenario:
@@ -91,7 +91,7 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     ));
 
     assert!(sandbox.is_leader());
-    sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
+    sandbox.assert_state(HEIGHT_ONE, Round(3));
 
     // ok, we are leader
     let propose = ProposeBuilder::new(&sandbox)
@@ -142,7 +142,7 @@ fn should_not_vote_after_node_restart() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_1),
@@ -152,7 +152,7 @@ fn should_not_vote_after_node_restart() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_2),
@@ -162,7 +162,7 @@ fn should_not_vote_after_node_restart() {
     let precommit = Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -215,7 +215,7 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_1),
@@ -225,7 +225,7 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_2),
@@ -235,7 +235,7 @@ fn should_save_precommit_to_consensus_cache() {
     let precommit = Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -259,7 +259,7 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox_restarted.recv(&Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox_restarted.time().into(),
@@ -269,14 +269,14 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox_restarted.recv(&Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox_restarted.time().into(),
         sandbox_restarted.s(VALIDATOR_2),
     ));
 
-    sandbox_restarted.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox_restarted.assert_state(HEIGHT_TWO, Round(1));
     sandbox_restarted.check_broadcast_status(HEIGHT_TWO, &block.hash());
 }
 
@@ -306,7 +306,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &first_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_1),
@@ -316,7 +316,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &first_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_2),
@@ -326,7 +326,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let first_precommit = Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &first_propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -335,15 +335,15 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.broadcast(&first_precommit);
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_ONE, Round(1));
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-    sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
+    sandbox.assert_state(HEIGHT_ONE, Round(2));
 
     // make sure we broadcasted same Prevote for second round
     let first_updated_prevote = Prevote::new(
         first_prevote.validator(),
         first_prevote.height(),
-        ROUND_TWO,
+        Round(2),
         first_prevote.propose_hash(),
         LOCK_ONE,
         sandbox.s(VALIDATOR_0),
@@ -362,7 +362,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_TWO,
+        Round(2),
         &second_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_1),
@@ -371,7 +371,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_TWO,
+        Round(2),
         &second_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_2),
@@ -382,7 +382,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_TWO,
+        Round(2),
         &second_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_3),
@@ -393,7 +393,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let second_precommit = Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
-        ROUND_TWO,
+        Round(2),
         &second_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
@@ -406,7 +406,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let sandbox_new = sandbox.restart_with_time(saved_time);
 
     sandbox_new.assert_lock(LOCK_TWO, Some(second_propose.hash()));
-    sandbox_new.assert_state(HEIGHT_ONE, ROUND_TWO);
+    sandbox_new.assert_state(HEIGHT_ONE, Round(2));
     sandbox_new.broadcast(&first_prevote);
 
     let first_precommit_new_time = Precommit::new(

@@ -838,8 +838,7 @@ mod tests {
     use encoding;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{
-        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
-        ROUND_TWO,
+        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE,
     };
     use storage::{Fork, Snapshot};
 
@@ -945,11 +944,11 @@ mod tests {
     fn test_sandbox_assert_status() {
         // TODO: Remove this? (ECR-1627)
         let s = timestamping_sandbox();
-        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.assert_state(HEIGHT_ONE, Round(1));
         s.add_time(Duration::from_millis(999));
-        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.assert_state(HEIGHT_ONE, Round(1));
         s.add_time(Duration::from_millis(1));
-        s.assert_state(HEIGHT_ONE, ROUND_TWO);
+        s.assert_state(HEIGHT_ONE, Round(2));
     }
 
     #[test]

@@ -29,7 +29,7 @@ fn test_queue_message_from_future_round() {
     let propose = Propose::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_TWO,
+        Round(2),
         &sandbox.last_hash(),
         &[],
         sandbox.s(VALIDATOR_3),
@@ -37,13 +37,13 @@ fn test_queue_message_from_future_round() {
 
     sandbox.recv(&propose);
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_ONE, Round(1));
     sandbox.add_time(Duration::from_millis(1));
-    sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
+    sandbox.assert_state(HEIGHT_ONE, Round(2));
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
-        ROUND_TWO,
+        Round(2),
         &propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_0),
@@ -65,7 +65,7 @@ fn test_queue_prevote_message_from_next_height() {
     sandbox.recv(&Prevote::new(
         VALIDATOR_3,
         HEIGHT_TWO,
-        ROUND_ONE,
+        Round(1),
         &empty_hash(),
         Round::zero(),
         sandbox.s(VALIDATOR_3),
@@ -94,7 +94,7 @@ fn test_queue_propose_message_from_next_height() {
     let tx = gen_timestamping_tx();
 
     // TODO: This commented code is saved because it may be used later. (ECR-1627)
-    //    let block_at_first_height = Block::new(HEIGHT_ZERO, ROUND_FOUR, future_propose_time,
+    //    let block_at_first_height = Block::new(HEIGHT_ZERO, Round(4), future_propose_time,
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
@@ -106,7 +106,7 @@ fn test_queue_propose_message_from_next_height() {
     let future_propose = Propose::new(
         VALIDATOR_0,
         HEIGHT_TWO,
-        ROUND_TWO,
+        Round(2),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
         sandbox.s(VALIDATOR_0),
@@ -156,7 +156,7 @@ fn test_ignore_message_from_prev_height() {
 
     add_one_height(&sandbox, &sandbox_state);
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_height(HEIGHT_ZERO)//without this line some Prevote will be sent

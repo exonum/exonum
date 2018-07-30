@@ -38,10 +38,6 @@ pub const HEIGHT_FOUR: Height = Height(4);
 pub const LOCK_ZERO: Round = Round(0);
 pub const LOCK_ONE: Round = Round(1);
 pub const LOCK_TWO: Round = Round(2);
-pub const ROUND_ONE: Round = Round(1);
-pub const ROUND_TWO: Round = Round(2);
-pub const ROUND_THREE: Round = Round(3);
-pub const ROUND_FOUR: Round = Round(4);
 pub const VALIDATOR_0: ValidatorId = ValidatorId(0);
 pub const VALIDATOR_1: ValidatorId = ValidatorId(1);
 pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
@@ -344,7 +340,7 @@ where
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
-    sandbox.assert_state(initial_height, ROUND_ONE);
+    sandbox.assert_state(initial_height, Round(1));
 
     let hashes = {
         let mut hashes = Vec::new();
@@ -430,7 +426,7 @@ where
             }
 
             let new_height = initial_height.next();
-            sandbox.assert_state(new_height, ROUND_ONE);
+            sandbox.assert_state(new_height, Round(1));
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
@@ -457,7 +453,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
-    sandbox.assert_state(initial_height, ROUND_ONE);
+    sandbox.assert_state(initial_height, Round(1));
 
     let hashes = {
         let mut hashes = Vec::new();
@@ -524,7 +520,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
             }
 
             let new_height = initial_height.next();
-            sandbox.assert_state(new_height, ROUND_ONE);
+            sandbox.assert_state(new_height, Round(1));
             sandbox.check_broadcast_status(new_height, &block.hash());
 
             {

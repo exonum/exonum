@@ -17,6 +17,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
+use helpers::Round;
 use messages::{
     BlockRequest, BlockResponse, Message, Precommit, Status, TransactionsRequest,
     TransactionsResponse,
@@ -51,7 +52,7 @@ fn handle_block_response_tx_in_pool() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -60,7 +61,7 @@ fn handle_block_response_tx_in_pool() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -69,7 +70,7 @@ fn handle_block_response_tx_in_pool() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -104,7 +105,7 @@ fn handle_block_response_tx_in_pool() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     sandbox.broadcast(&Status::new(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
@@ -141,7 +142,7 @@ fn handle_block_response_with_unknown_tx() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -150,7 +151,7 @@ fn handle_block_response_with_unknown_tx() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -159,7 +160,7 @@ fn handle_block_response_with_unknown_tx() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -211,7 +212,7 @@ fn handle_block_response_with_unknown_tx() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     sandbox.broadcast(&Status::new(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
@@ -247,7 +248,7 @@ fn handle_block_response_with_invalid_txs_order() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -256,7 +257,7 @@ fn handle_block_response_with_invalid_txs_order() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -265,7 +266,7 @@ fn handle_block_response_with_invalid_txs_order() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -300,7 +301,7 @@ fn handle_block_response_with_invalid_txs_order() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_ONE, Round(1));
 }
 
 /// HANDLE block response
@@ -333,7 +334,7 @@ fn handle_block_response_with_invalid_precommits() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block1.hash(),
         sandbox.time().into(),
@@ -342,7 +343,7 @@ fn handle_block_response_with_invalid_precommits() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block1.hash(),
         sandbox.time().into(),
@@ -352,7 +353,7 @@ fn handle_block_response_with_invalid_precommits() {
     let precommit_for_other_block = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block2.hash(),
         sandbox.time().into(),
@@ -387,7 +388,7 @@ fn handle_block_response_with_invalid_precommits() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_ONE, Round(1));
 }
 
 /// HANDLE block response
@@ -422,7 +423,7 @@ fn handle_block_response_with_known_transaction() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -431,7 +432,7 @@ fn handle_block_response_with_known_transaction() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -440,7 +441,7 @@ fn handle_block_response_with_known_transaction() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -492,7 +493,7 @@ fn handle_block_response_with_known_transaction() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     sandbox.broadcast(&Status::new(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
@@ -532,7 +533,7 @@ fn handle_block_response_with_all_known_transactions() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -541,7 +542,7 @@ fn handle_block_response_with_all_known_transactions() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -550,7 +551,7 @@ fn handle_block_response_with_all_known_transactions() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -584,7 +585,7 @@ fn handle_block_response_with_all_known_transactions() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     sandbox.broadcast(&Status::new(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
@@ -633,7 +634,7 @@ fn received_block_while_there_is_full_propose() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -642,7 +643,7 @@ fn received_block_while_there_is_full_propose() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -651,7 +652,7 @@ fn received_block_while_there_is_full_propose() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -756,7 +757,7 @@ fn received_block_while_there_is_pending_block() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -765,7 +766,7 @@ fn received_block_while_there_is_pending_block() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -774,7 +775,7 @@ fn received_block_while_there_is_pending_block() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -833,7 +834,7 @@ fn received_block_while_there_is_pending_block() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     sandbox.broadcast(&Status::new(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
@@ -891,7 +892,7 @@ fn transactions_request_to_multiple_nodes() {
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -900,7 +901,7 @@ fn transactions_request_to_multiple_nodes() {
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -909,7 +910,7 @@ fn transactions_request_to_multiple_nodes() {
     let precommit_3 = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
-        ROUND_ONE,
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
@@ -966,7 +967,7 @@ fn transactions_request_to_multiple_nodes() {
         sandbox.s(VALIDATOR_2),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(HEIGHT_TWO, Round(1));
     sandbox.broadcast(&Status::new(
         &sandbox.p(VALIDATOR_0),
         HEIGHT_TWO,
