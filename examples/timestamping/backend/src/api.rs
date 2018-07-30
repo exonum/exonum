@@ -21,28 +21,39 @@ use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
 use TIMESTAMPING_SERVICE;
 
+/// The structure describes the query parameters for `handle_timestamp`
+/// and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TimestampQuery {
+    /// The hash of the given timestamp.
     pub hash: Hash,
 }
 
 impl TimestampQuery {
+    /// Creates new `TimestampQuery` with given `hash`.
     pub fn new(hash: Hash) -> Self {
         TimestampQuery { hash }
     }
 }
 
+/// The structure describes the information to prove the correctness of
+/// timestamp entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimestampProof {
+    /// The `BlockProof` of the appropriate block.
     pub block_info: BlockProof,
+    /// The proof of the actual state of timestamping.
     pub state_proof: MapProof<Hash, Hash>,
+    /// The proof of the appropriate `TimestampEntry`'s.
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
 
+/// Public service API.
 #[derive(Debug, Clone, Copy)]
 pub struct PublicApi;
 
 impl PublicApi {
+    /// Endpoint for handling timestamping transaction.
     pub fn handle_post_transaction(
         state: &ServiceApiState,
         transaction: TxTimestamp,
@@ -52,6 +63,7 @@ impl PublicApi {
         Ok(hash)
     }
 
+    /// Endpoint for getting single timestamp.
     pub fn handle_timestamp(
         state: &ServiceApiState,
         query: TimestampQuery,
@@ -61,6 +73,7 @@ impl PublicApi {
         Ok(schema.timestamps().get(&query.hash))
     }
 
+    /// Endpoint for getting the proof of single timestamp.
     pub fn handle_timestamp_proof(
         state: &ServiceApiState,
         query: TimestampQuery,
@@ -82,6 +95,7 @@ impl PublicApi {
         })
     }
 
+    /// Wires this endpoints to public scope of given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()

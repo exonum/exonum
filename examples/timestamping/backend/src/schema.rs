@@ -42,13 +42,14 @@ encoding_struct! {
     }
 }
 
+/// Timestamping information schema.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,
 }
 
-/// Timestamping information schema.
 impl<T> Schema<T> {
+    /// Creates new timestamping schema with given snapshot.
     pub fn new(snapshot: T) -> Self {
         Schema { view: snapshot }
     }
@@ -58,20 +59,24 @@ impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
+    /// Returns the list of timestamps with their proofs.
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
 
+    /// Returns the hash of timestamping state.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.timestamps().merkle_root()]
     }
 }
 
 impl<'a> Schema<&'a mut Fork> {
+    /// Returns the mutable list of timestamps.
     pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &mut self.view)
     }
 
+    /// Add the timestamp entry to the schema.
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp();
         let content_hash = timestamp.content_hash();

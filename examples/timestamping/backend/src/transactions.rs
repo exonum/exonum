@@ -44,6 +44,7 @@ impl From<Error> for ExecutionError {
 }
 
 transactions! {
+    /// Transaction group.
     pub TimeTransactions {
         const SERVICE_ID = TIMESTAMPING_SERVICE;
 

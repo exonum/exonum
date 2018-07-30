@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_debug_implementations, unsafe_code, bare_trait_objects)]
+//! Timestamping demo. Example of using Exonum framework.
+
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate chrono;
 #[macro_use]
@@ -27,8 +29,11 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
+/// REST API.
 pub mod api;
+/// Timestamping information schema.
 pub mod schema;
+/// Timestamping transactions.
 pub mod transactions;
 
 use exonum::{
@@ -42,16 +47,11 @@ use schema::Schema;
 use transactions::TimeTransactions;
 
 const TIMESTAMPING_SERVICE: u16 = 130;
-pub const SERVICE_NAME: &str = "timestamping";
+const SERVICE_NAME: &str = "timestamping";
 
+/// Demo timestamping service.
 #[derive(Debug, Default)]
 pub struct Service;
-
-impl Service {
-    pub fn new() -> Self {
-        Service
-    }
-}
 
 impl blockchain::Service for Service {
     fn service_id(&self) -> u16 {
@@ -87,6 +87,6 @@ impl fabric::ServiceFactory for ServiceFactory {
     }
 
     fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service::new())
+        Box::new(Service)
     }
 }
