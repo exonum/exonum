@@ -31,11 +31,9 @@ use api::{
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
-use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
-    time::{Duration, SystemTime},
+    collections::HashSet, fmt, io, net::SocketAddr, sync::Arc, thread, time::{Duration, SystemTime},
 };
 
 use blockchain::{
@@ -53,6 +51,8 @@ use helpers::{
 };
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
+
+use helpers::fabric::shared::Services;
 
 mod basic;
 mod connect_list;
@@ -251,7 +251,7 @@ pub struct NodeConfig {
     pub mempool: MemoryPoolConfig,
     /// Additional config, usable for services.
     #[serde(default)]
-    pub services_configs: BTreeMap<String, Value>,
+    pub services_configs: Services,
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,

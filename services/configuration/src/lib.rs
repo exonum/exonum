@@ -75,23 +75,28 @@ extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate serde_json;
 
 pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
-pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
-
+use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
     encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
-    storage::Snapshot,
+    node::NodeConfig, storage::{Fork, Snapshot},
 };
+pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+use serde_json::to_value;
+pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 mod api;
+mod config;
 mod errors;
 mod schema;
 #[cfg(test)]
 mod tests;
 mod transactions;
+
+use config::ServiceConfig;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -100,7 +105,9 @@ pub const SERVICE_NAME: &str = "configuration";
 
 /// Configuration service.
 #[derive(Debug, Default)]
-pub struct Service {}
+pub struct Service {
+    config: ServiceConfig,
+}
 
 impl blockchain::Service for Service {
     fn service_name(&self) -> &'static str {
@@ -124,6 +131,10 @@ impl blockchain::Service for Service {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
     }
+
+    fn initialize(&self, _fork: &mut Fork) -> Value {
+        to_value(self.config.clone()).unwrap()
+    }
 }
 
 /// A configuration service creator for the `NodeBuilder`.
@@ -135,7 +146,14 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service {})
+    fn make_service(&mut self, context: &Context) -> Box<dyn blockchain::Service> {
+        let node_config: NodeConfig = context.get(context_key!("node_config")).unwrap();
+        let service_config: ServiceConfig = ServiceConfig {
+            majority_count: node_config.services_configs.configuration.majority_count,
+        };
+
+        Box::new(Service {
+            config: service_config,
+        })
     }
 }

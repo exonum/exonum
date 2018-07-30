@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! Transaction definitions for the configuration service.
+//!
+extern crate serde_json;
 
 use exonum::{
     blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
@@ -20,6 +22,7 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
+use config::ServiceConfig;
 use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
 
@@ -117,12 +120,23 @@ fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool {
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
     let votes_count = votes.iter().filter(|vote| vote.is_consent()).count();
-    let majority_count = match actual_config.majority_count {
+
+    let config: ServiceConfig = get_service_config(&actual_config);
+
+    let majority_count = match config.majority_count {
         Some(majority_count) => majority_count as usize,
         _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
     };
 
     votes_count >= majority_count
+}
+
+fn get_service_config(config: &StoredConfiguration) -> ServiceConfig {
+    if let Some(config) = config.services.get("configuration") {
+        serde_json::from_value(config.clone()).unwrap_or_default()
+    } else {
+        Default::default()
+    }
 }
 
 impl Propose {
@@ -177,7 +191,9 @@ impl Propose {
             return Err(ActivationInPast(current_height));
         }
 
-        if let Some(proposed_majority_count) = candidate.majority_count {
+        let config: ServiceConfig = get_service_config(candidate);
+
+        if let Some(proposed_majority_count) = config.majority_count {
             let proposed_majority_count = proposed_majority_count as usize;
             let validators_num = candidate.validator_keys.len();
             let min_votes_count = State::byzantine_majority_count(validators_num);

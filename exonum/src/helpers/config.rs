@@ -148,8 +148,8 @@ pub fn validate_majority_count(
     if let Some(majority_count) = majority_count {
         if majority_count > validators_count || majority_count < byzantine_majority_count {
             Err(format!(
-                "Invalid majority count: {}, it should be <= {} and >= {}",
-                majority_count, validators_count, byzantine_majority_count
+                "Invalid majority count: {}, it should be >= {} and <= {}",
+                majority_count, byzantine_majority_count, validators_count
             ))?
         }
     }

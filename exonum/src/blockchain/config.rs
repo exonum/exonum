@@ -27,9 +27,8 @@ use serde_json::{self, Error as JsonError};
 use std::collections::{BTreeMap, HashSet};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
-use helpers::{config::validate_majority_count, Height, Milliseconds};
+use helpers::{Height, Milliseconds};
 use messages::HEADER_LENGTH;
-use node::State;
 use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -69,10 +68,6 @@ pub struct StoredConfiguration {
     /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
     #[serde(default)]
     pub services: BTreeMap<String, serde_json::Value>,
-    /// Number of votes required to commit the new configuration.
-    /// This value should be greater than 2/3 and less or equal to the
-    /// validators count.
-    pub majority_count: Option<u16>,
 }
 
 /// Consensus algorithm parameters.
@@ -242,17 +237,6 @@ impl StoredConfiguration {
             )));
         }
 
-        // Check majority count
-        let validators_count = config.validator_keys.len() as u16;
-        let byzantine_majority_count =
-            State::byzantine_majority_count(validators_count as usize) as u16;
-        if let Err(e) = validate_majority_count(
-            config.majority_count,
-            validators_count,
-            byzantine_majority_count,
-        ) {
-            return Err(JsonError::custom(e));
-        }
         Ok(config)
     }
 }
@@ -374,29 +358,6 @@ mod tests {
     fn too_small_max_message_len() {
         let mut configuration = create_test_configuration();
         configuration.consensus.max_message_len = 128;
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    fn set_correct_majority_count() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.majority_count = Some(3);
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid majority count: 2, it should be <= 3 and >= 3")]
-    fn too_small_majority_count() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.majority_count = Some(2);
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid majority count: 4, it should be <= 3 and >= 3")]
-    fn too_big_majority_count() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.majority_count = Some(4);
         serialize_deserialize(&configuration);
     }
 
