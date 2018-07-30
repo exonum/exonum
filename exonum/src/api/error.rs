@@ -30,7 +30,7 @@ pub enum Error {
     #[fail(display = "Storage error: {}", _0)]
     Storage(#[cause] storage::Error),
 
-    /// Input/output error. This type includes errors related files that are not
+    /// Input/output error. This type includes errors related to files that are not
     /// a part of the Exonum storage.
     #[fail(display = "IO error: {}", _0)]
     Io(#[cause] io::Error),

@@ -415,9 +415,9 @@ impl fmt::Debug for SystemRuntime {
 /// CORS header specification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AllowOrigin {
-    /// Allow access from any host.
+    /// Allows access from any host.
     Any,
-    /// Allow access only from the specified hosts.
+    /// Allows access only from the specified hosts.
     Whitelist(Vec<String>),
 }
 
