@@ -396,7 +396,7 @@ impl SharedConnectList {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        return connect_list.is_peer_allowed(public_key);
+        connect_list.is_peer_allowed(public_key)
     }
 
     /// Get public key corresponding to validator with `address`.
@@ -409,7 +409,7 @@ impl SharedConnectList {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed_x25519(&self, public_key: &x25519::PublicKey) -> bool {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        return connect_list.is_peer_allowed_x25519(public_key);
+        connect_list.is_peer_allowed_x25519(public_key)
     }
 
     /// Return `peers` from underlying `ConnectList`

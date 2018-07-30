@@ -352,7 +352,6 @@ impl RequestHandler {
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
-                        println!("disconnect with {:#?}", peer);
                         outgoing_connections.disconnect_with_peer(peer, network_tx.clone())
                     }
                     // Immediately stop the event loop.

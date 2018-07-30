@@ -200,17 +200,17 @@ pub fn raw_message(id: u16, len: usize) -> RawMessage {
 }
 
 #[derive(Debug, Clone)]
-struct ConnectionParams {
-    connect: Connect,
+pub struct ConnectionParams {
+    pub connect: Connect,
+    pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,
     secret_key: SecretKey,
     handshake_params: HandshakeParams,
-    connect_info: ConnectInfo,
 }
 
 impl ConnectionParams {
-    fn from_address(address: SocketAddr) -> Self {
+    pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
         let connect = connect_message(address, &public_key, &secret_key);
         let handshake_params = HandshakeParams::new(
@@ -233,7 +233,7 @@ impl ConnectionParams {
         }
     }
 
-    fn spawn(&self, events: TestEvents, connect_list: SharedConnectList) -> TestHandler {
+    pub fn spawn(&self, events: TestEvents, connect_list: SharedConnectList) -> TestHandler {
         events.spawn(connect_list, &self.handshake_params, self.connect.clone())
     }
 }
