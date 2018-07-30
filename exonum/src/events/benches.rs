@@ -17,10 +17,9 @@ use test::Bencher;
 use std::{net::SocketAddr, thread};
 
 use events::{
-    network::NetworkConfiguration,
-    tests::{raw_message, ConnectionParams, TestEvents},
+    network::NetworkConfiguration, tests::{raw_message, ConnectionParams, TestEvents},
 };
-use node::{EventsPoolCapacity, ConnectList, state::SharedConnectList};
+use node::{state::SharedConnectList, ConnectList, EventsPoolCapacity};
 
 struct BenchConfig {
     times: usize,

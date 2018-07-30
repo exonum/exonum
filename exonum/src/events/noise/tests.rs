@@ -25,7 +25,7 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{gen_keypair_from_seed, x25519, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -145,7 +145,8 @@ const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-    let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+    let mut params =
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
     params.set_remote_key(public_key);
     params
 }
@@ -301,10 +302,7 @@ fn run_handshake_listener(
                         Some(message) => Either::A(
                             NoiseErrorHandshake::responder(&params, message).listen(stream),
                         ),
-                        None => Either::B(
-                            NoiseHandshake::responder(&params, SharedConnectList::default())
-                                .listen(stream),
-                        ),
+                        None => Either::B(NoiseHandshake::responder(&params).listen(stream)),
                     };
 
                     handshake
@@ -328,7 +326,7 @@ fn send_handshake(
 
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params, SharedConnectList::default()).send(sock),
+            None => NoiseHandshake::initiator(&params).send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
@@ -350,10 +348,7 @@ impl NoiseErrorHandshake {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::initiator(
-                params,
-                SharedConnectList::default(),
-            )),
+            inner: Some(NoiseHandshake::initiator(params)),
         }
     }
 
@@ -361,10 +356,7 @@ impl NoiseErrorHandshake {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::responder(
-                params,
-                SharedConnectList::default(),
-            )),
+            inner: Some(NoiseHandshake::responder(params)),
         }
     }
 
@@ -418,9 +410,7 @@ impl NoiseErrorHandshake {
 }
 
 impl Handshake for NoiseErrorHandshake {
-    type Result = x25519::PublicKey;
-
-    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -431,7 +421,7 @@ impl Handshake for NoiseErrorHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {

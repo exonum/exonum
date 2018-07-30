@@ -32,12 +32,18 @@ use node::state::SharedConnectList;
 pub struct HandshakeParams {
     pub public_key: x25519::PublicKey,
     pub secret_key: x25519::SecretKey,
-    pub max_message_len: u32,
     pub remote_key: Option<x25519::PublicKey>,
+    pub connect_list: SharedConnectList,
+    max_message_len: u32,
 }
 
 impl HandshakeParams {
-    pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
+    pub fn new(
+        public_key: PublicKey,
+        secret_key: SecretKey,
+        connect_list: SharedConnectList,
+        max_message_len: u32,
+    ) -> Self {
         let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
 
         HandshakeParams {
@@ -45,6 +51,7 @@ impl HandshakeParams {
             secret_key,
             max_message_len,
             remote_key: None,
+            connect_list,
         }
     }
 
@@ -61,21 +68,21 @@ pub struct NoiseHandshake {
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams, connect_list: SharedConnectList) -> Self {
+    pub fn initiator(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::initiator(params);
         NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
-            connect_list,
+            connect_list: params.connect_list.clone(),
         }
     }
 
-    pub fn responder(params: &HandshakeParams, connect_list: SharedConnectList) -> Self {
+    pub fn responder(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::responder(params);
         NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
-            connect_list,
+            connect_list: params.connect_list.clone(),
         }
     }
 
@@ -102,31 +109,37 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<(Framed<S, MessagesCodec>, x25519::PublicKey), io::Error> {
-        let noise = self.noise.into_transport_mode()?;
+    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
-            let rs = noise
+            let rs = self.noise
                 .session
                 .get_remote_static()
                 .expect("Remote static key is not present!");
             x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
         };
 
-        if !self.connect_list.is_peer_allowed_x25519(&remote_static_key) {
+        if !self.is_peer_allowed(&remote_static_key) {
             return Err(other_error("Peer is not in ConnectList"));
         }
 
+        let noise = self.noise.into_transport_mode()?;
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
-        Ok((framed, remote_static_key))
+        Ok(framed)
+    }
+
+    fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
+        self.connect_list
+            .peers()
+            .iter()
+            .map(|info| into_x25519_public_key(info.public_key))
+            .any(|key| remote_static_key == &key)
     }
 }
 
 impl Handshake for NoiseHandshake {
-    type Result = x25519::PublicKey;
-
-    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -137,7 +150,7 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {

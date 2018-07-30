@@ -684,10 +684,7 @@ impl ConnectList {
     pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
-        ConnectList {
-            peers,
-            x25519_keys: Vec::new(),
-        }
+        ConnectList { peers }
     }
 }
 

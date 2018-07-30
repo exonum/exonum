@@ -14,10 +14,9 @@
 
 //! Mapping between peers public keys and IP-addresses.
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr};
 
-use crypto::{x25519, PublicKey};
+use crypto::PublicKey;
 use node::{ConnectInfo, ConnectListConfig};
 
 /// `ConnectList` stores mapping between IP-addresses and public keys.
@@ -26,9 +25,6 @@ pub struct ConnectList {
     /// Peers to which we can connect.
     #[serde(default)]
     pub peers: BTreeMap<PublicKey, SocketAddr>,
-
-    #[serde(skip)]
-    pub(crate) x25519_keys: Vec<x25519::PublicKey>,
 }
 
 impl ConnectList {
@@ -40,22 +36,12 @@ impl ConnectList {
             .map(|peer| (peer.public_key, peer.address))
             .collect();
 
-        let x25519_keys = peers
-            .keys()
-            .map(|key| x25519::into_x25519_public_key(*key))
-            .collect();
-
-        ConnectList { peers, x25519_keys }
+        ConnectList { peers }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
         self.peers.contains_key(peer)
-    }
-
-    /// Returns `true` if a peer with the given public key can connect.
-    pub fn is_peer_allowed_x25519(&self, peer: &x25519::PublicKey) -> bool {
-        self.x25519_keys.contains(peer)
     }
 
     /// Check if we allow to connect to `address`.
@@ -66,8 +52,6 @@ impl ConnectList {
     /// Adds peer to the ConnectList.
     pub fn add(&mut self, peer: ConnectInfo) {
         self.peers.insert(peer.public_key, peer.address);
-        self.x25519_keys
-            .push(x25519::into_x25519_public_key(peer.public_key))
     }
 
     /// Get public key corresponding to validator with `address`.
@@ -86,7 +70,7 @@ mod test {
     use std::net::SocketAddr;
 
     use super::ConnectList;
-    use crypto::{gen_keypair, x25519::into_x25519_public_key, PublicKey, PUBLIC_KEY_LENGTH};
+    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use node::ConnectInfo;
 
     static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
@@ -191,23 +175,6 @@ mod test {
             address: address.clone(),
         });
         assert!(connect_list.is_address_allowed(&address));
-    }
-
-    #[test]
-    fn test_handshake_key() {
-        let (public_key, _) = gen_keypair();
-        let public_key_x25519 = into_x25519_public_key(public_key);
-        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
-
-        let mut connect_list = ConnectList::default();
-        assert!(!connect_list.is_peer_allowed_x25519(&public_key_x25519));
-
-        connect_list.add(ConnectInfo {
-            public_key,
-            address: address.clone(),
-        });
-
-        assert!(connect_list.is_peer_allowed_x25519(&public_key_x25519));
     }
 
 }

@@ -24,7 +24,7 @@ use std::{
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crypto::{x25519, CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
@@ -402,14 +402,7 @@ impl SharedConnectList {
     /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        let list = connect_list.clone();
-        list.find_key_by_address(address).map(|k| *k)
-    }
-
-    /// Returns `true` if a peer with the given public key can connect.
-    pub fn is_peer_allowed_x25519(&self, public_key: &x25519::PublicKey) -> bool {
-        let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        connect_list.is_peer_allowed_x25519(public_key)
+        connect_list.find_key_by_address(address).cloned()
     }
 
     /// Return `peers` from underlying `ConnectList`

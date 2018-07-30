@@ -29,20 +29,18 @@ use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time
 use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
 };
-use crypto::x25519;
 use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-use node::state::SharedConnectList;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(ConnectInfo, Connect),
+    PeerConnected(SocketAddr, Connect),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -52,14 +50,6 @@ pub enum NetworkRequest {
     SendMessage(SocketAddr, RawMessage),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
-}
-
-#[derive(Debug, Clone)]
-pub struct ConnectInfo {
-    /// Peer address.
-    pub address: SocketAddr,
-    /// Peer public key.
-    pub public_key: x25519::PublicKey,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -132,7 +122,6 @@ impl ConnectionsPool {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-        connect_list: SharedConnectList,
     ) -> Option<mpsc::Sender<RawMessage>> {
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
@@ -154,7 +143,6 @@ impl ConnectionsPool {
             .take(max_tries);
         let handle_cloned = handle.clone();
         let handshake_params = handshake_params.clone();
-        let connect_list = connect_list.clone();
 
         let action = move || TcpStream::connect(&peer, &handle_cloned);
         let connect_handle = Retry::spawn(handle.clone(), strategy, action)
@@ -168,12 +156,12 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                Self::build_handshake_initiator(sock, &peer, &handshake_params, connect_list)
+                Self::build_handshake_initiator(sock, &peer, &handshake_params)
             })
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
                 trace!("Established connection with peer={}", peer);
-                let (sink, stream) = stream.0.split();
+                let (sink, stream) = stream.split();
 
                 let writer = conn_rx
                     .map_err(|_| other_error("Can't send data into socket"))
@@ -222,13 +210,12 @@ impl ConnectionsPool {
         stream: TcpStream,
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
-        connect_list: SharedConnectList,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, x25519::PublicKey), Error = io::Error>
-    {
+    ) -> impl Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error> {
+        let connect_list = &handshake_params.connect_list.clone();
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
-            NoiseHandshake::initiator(&handshake_params, connect_list).send(stream)
+            NoiseHandshake::initiator(&handshake_params).send(stream)
         } else {
             Box::new(err(other_error(format!(
                 "Attempt to connect to the peer with address {:?} which \
@@ -244,7 +231,6 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-        connect_list: SharedConnectList,
     ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancellation token
@@ -258,17 +244,15 @@ impl NetworkPart {
             self.network_requests.1,
             cancel_sender,
             handshake_params,
-            connect_list.clone(),
         );
-        // TODO Don't use unwrap here! (ECR-1633)
 
+        // TODO Don't use unwrap here! (ECR-1633)
         let server = Listener::bind(
             network_config,
             self.listen_address,
             handle.clone(),
             &self.network_tx,
             handshake_params,
-            connect_list,
         ).unwrap();
 
         let cancel_handler = cancel_handler.or_else(|e| {
@@ -298,7 +282,6 @@ impl RequestHandler {
         receiver: mpsc::Receiver<NetworkRequest>,
         cancel_sender: unsync::oneshot::Sender<()>,
         handshake_params: &HandshakeParams,
-        connect_list: SharedConnectList,
     ) -> Self {
         let mut cancel_sender = Some(cancel_sender);
         let outgoing_connections = ConnectionsPool::new();
@@ -312,7 +295,6 @@ impl RequestHandler {
                             .get(peer)
                             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
                             .or_else(|| {
-                                let connect_list = connect_list.clone();
                                 outgoing_connections
                                     .clone()
                                     .connect_to_peer(
@@ -321,7 +303,6 @@ impl RequestHandler {
                                         network_tx.clone(),
                                         &handle,
                                         &handshake_params,
-                                        connect_list,
                                     )
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
@@ -385,7 +366,6 @@ impl Listener {
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
         handshake_params: &HandshakeParams,
-        connect_list: SharedConnectList,
     ) -> Result<Self, io::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
@@ -410,10 +390,10 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", address);
             let network_tx = network_tx.clone();
 
-            let handshake = NoiseHandshake::responder(&handshake_params, connect_list.clone());
+            let handshake = NoiseHandshake::responder(&handshake_params);
             let connection_handler = handshake
                 .listen(sock)
-                .and_then(move |(sock, public_key)| {
+                .and_then(move |sock| {
                     let (_, stream) = sock.split();
                     stream
                         .into_future()
@@ -422,15 +402,7 @@ impl Listener {
                         .and_then(move |(connect, stream)| {
                             trace!("Received handshake message={:?}", connect);
 
-                            Self::process_incoming_messages(
-                                stream,
-                                network_tx,
-                                connect,
-                                ConnectInfo {
-                                    address,
-                                    public_key,
-                                },
-                            )
+                            Self::process_incoming_messages(stream, network_tx, connect, address)
                         })
                         .map(|_| {
                             // Ensure that holder lives until the stream ends.
@@ -462,13 +434,12 @@ impl Listener {
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
         connect: Connect,
-        info: ConnectInfo,
+        address: SocketAddr,
     ) -> impl Future<Item = (), Error = io::Error>
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
-        let address = info.address;
-        let event = NetworkEvent::PeerConnected(info, connect);
+        let event = NetworkEvent::PeerConnected(address, connect);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx

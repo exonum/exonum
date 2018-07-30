@@ -17,7 +17,6 @@ use rand::{self, Rng};
 use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
-use events::network;
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
@@ -40,8 +39,8 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, info: &network::ConnectInfo, connect: Connect) {
-        info!("Received Connect message from peer: {:?}", info);
+    pub fn handle_connected(&mut self, address: &SocketAddr, connect: Connect) {
+        info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
         self.handle_connect(connect);
     }
