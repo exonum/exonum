@@ -552,6 +552,8 @@ impl NodeHandler {
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
 
+        self.maybe_add_propose_timeout();
+
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
         for (hash, round) in full_proposes {
@@ -689,6 +691,7 @@ impl NodeHandler {
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+        self.allow_expedited_propose = true;
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late

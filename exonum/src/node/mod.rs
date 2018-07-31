@@ -126,6 +126,8 @@ pub struct NodeHandler {
     node_role: NodeRole,
     /// Configuration file manager.
     config_manager: Option<ConfigManager>,
+    /// Can we speed up Propose with transaction pressure?
+    allow_expedited_propose: bool,
 }
 
 /// Service configuration.
@@ -448,6 +450,7 @@ impl NodeHandler {
             is_enabled,
             node_role,
             config_manager,
+            allow_expedited_propose: true,
         }
     }
 
@@ -619,10 +622,7 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let snapshot = self.blockchain.snapshot();
-        let timeout = if Schema::new(&snapshot).transactions_pool_len()
-            >= self.propose_timeout_threshold() as usize
-        {
+        let timeout = if self.need_faster_propose() {
             self.min_propose_timeout()
         } else {
             self.max_propose_timeout()
@@ -638,6 +638,20 @@ impl NodeHandler {
         );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.add_timeout(timeout, time);
+    }
+
+    fn maybe_add_propose_timeout(&mut self) {
+        if self.need_faster_propose() && self.allow_expedited_propose {
+            info!("EXPEDITED PROPOSE TIMEOUT");
+            self.add_propose_timeout();
+            self.allow_expedited_propose = false;
+        }
+    }
+
+    fn need_faster_propose(&self) -> bool {
+        let snapshot = self.blockchain.snapshot();
+        let pending_tx_count = Schema::new(&snapshot).transactions_pool_len();
+        pending_tx_count >= self.propose_timeout_threshold() as usize
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
