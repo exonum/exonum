@@ -18,6 +18,11 @@
 // spell-checker:ignore exts
 
 use toml;
+use crypto;
+
+use std::{
+    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
+};
 
 use super::{
     internal::{CollectedCommand, Command, Feedback}, keys,
@@ -29,13 +34,8 @@ use super::{
 };
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
-use crypto;
-use crypto::gen_keypair;
 use helpers::config::{validate_majority_count, ConfigFile};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig, State};
-use std::{
-    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
-};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -768,7 +768,7 @@ pub fn generate_testnet_config(
     majority_count: Option<u16>,
 ) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair()))
+        .map(|_| (crypto::gen_keypair(), crypto::gen_keypair()))
         .unzip();
     let genesis = GenesisConfig::new(validators.iter().zip(services.iter()).map(|x| {
         ValidatorKeys {

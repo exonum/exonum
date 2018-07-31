@@ -7,7 +7,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking Changes
 
+- `majority_count` parameter was removed from `StoredConfiguration` and
+   moved to `ConfigurationService` configuration. (#828)
+
 #### exonum
+
+- `majority_count` parameter was added to `generate-template` and 
+  `generate-testnet` commands. (#828)
 
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
