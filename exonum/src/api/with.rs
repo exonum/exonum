@@ -24,6 +24,7 @@ pub type Result<I> = ::std::result::Result<I, error::Error>;
 pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract a handler from various entities.
+///
 /// The basic idea of this structure is to extract type parameters from the given handler,
 /// thus, it becomes possible to distinguish different types of closures in compile time.
 /// This structure allows applying anonymous functions to endpoints.

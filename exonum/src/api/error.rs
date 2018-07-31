@@ -44,7 +44,7 @@ pub enum Error {
     #[fail(display = "Not found: {}", _0)]
     NotFound(String),
 
-    /// Internal error. This type can return any internal error to the user.
+    /// Internal server error. This type can return any internal server error to the user.
     #[fail(display = "Internal server error: {}", _0)]
     InternalError(Box<error::Error + Send + Sync>),
 
