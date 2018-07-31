@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// Tests in this module are designed to test basic functionality
+/// related to consensus protocol handling, such as ability of the node
+/// to add block after receiving correct consensus messages.
 use rand::{thread_rng, Rng};
 
 use std::collections::BTreeMap;
