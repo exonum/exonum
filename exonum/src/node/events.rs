@@ -85,6 +85,7 @@ impl NodeHandler {
                             self.blockchain.remove_peer_with_addr(address);
                         }
                     }
+                    self.api_state.update_node_state(self.state());
                 }
             }
             ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
