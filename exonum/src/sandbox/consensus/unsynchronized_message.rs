@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Tests in this module are designed to test ability of the node to handle
+//! message that arrive at the wrong time.
+
 use std::time::Duration;
 
 use crypto::CryptoHash;

@@ -14,6 +14,9 @@
 
 // spell-checker:ignore uncommented, uncomment
 
+//! Tests in this module are designed to test details of the consensus protocol
+//! handling such as correct round state transition.
+
 use bit_vec::BitVec;
 
 use std::time::Duration;

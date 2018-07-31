@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Tests in this module are designed to test details of round timeout handling.
+
 use std::time::Duration;
 
 use crypto::CryptoHash;

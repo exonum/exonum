@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Tests in this module are designed to test configuration change protocol.
+
 use blockchain::Schema;
 use crypto::CryptoHash;
 use messages::Message;
