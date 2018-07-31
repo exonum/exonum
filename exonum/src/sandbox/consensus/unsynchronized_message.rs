@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::Round;
+use helpers::{Height, Round};
 use messages::{Message, Prevote, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -28,7 +28,7 @@ fn test_queue_message_from_future_round() {
 
     let propose = Propose::new(
         VALIDATOR_3,
-        HEIGHT_ONE,
+        Height(1),
         Round(2),
         &sandbox.last_hash(),
         &[],
@@ -37,12 +37,12 @@ fn test_queue_message_from_future_round() {
 
     sandbox.recv(&propose);
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
-    sandbox.assert_state(HEIGHT_ONE, Round(1));
+    sandbox.assert_state(Height(1), Round(1));
     sandbox.add_time(Duration::from_millis(1));
-    sandbox.assert_state(HEIGHT_ONE, Round(2));
+    sandbox.assert_state(Height(1), Round(2));
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
-        HEIGHT_ONE,
+        Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ZERO,
@@ -64,7 +64,7 @@ fn test_queue_prevote_message_from_next_height() {
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_3,
-        HEIGHT_TWO,
+        Height(2),
         Round(1),
         &empty_hash(),
         Round::zero(),
@@ -94,7 +94,7 @@ fn test_queue_propose_message_from_next_height() {
     let tx = gen_timestamping_tx();
 
     // TODO: This commented code is saved because it may be used later. (ECR-1627)
-    //    let block_at_first_height = Block::new(HEIGHT_ZERO, Round(4), future_propose_time,
+    //    let block_at_first_height = Block::new(Height(0), Round(4), future_propose_time,
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
@@ -105,7 +105,7 @@ fn test_queue_propose_message_from_next_height() {
 
     let future_propose = Propose::new(
         VALIDATOR_0,
-        HEIGHT_TWO,
+        Height(2),
         Round(2),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
@@ -139,7 +139,7 @@ fn test_ignore_message_from_far_height() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_height(HEIGHT_TWO)//without this line some Prevote will be sent
+        .with_height(Height(2))//without this line some Prevote will be sent
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .build();
 
@@ -156,10 +156,10 @@ fn test_ignore_message_from_prev_height() {
 
     add_one_height(&sandbox, &sandbox_state);
 
-    sandbox.assert_state(HEIGHT_TWO, Round(1));
+    sandbox.assert_state(Height(2), Round(1));
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_height(HEIGHT_ZERO)//without this line some Prevote will be sent
+        .with_height(Height(0))//without this line some Prevote will be sent
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .build();
 

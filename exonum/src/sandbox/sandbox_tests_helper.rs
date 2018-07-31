@@ -30,11 +30,6 @@ use storage::Database;
 
 pub type TimestampingSandbox = Sandbox;
 
-pub const HEIGHT_ZERO: Height = Height(0);
-pub const HEIGHT_ONE: Height = Height(1);
-pub const HEIGHT_TWO: Height = Height(2);
-pub const HEIGHT_THREE: Height = Height(3);
-pub const HEIGHT_FOUR: Height = Height(4);
 pub const LOCK_ZERO: Round = Round(0);
 pub const LOCK_ONE: Round = Round(1);
 pub const LOCK_TWO: Round = Round(2);

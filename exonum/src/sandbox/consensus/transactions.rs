@@ -19,7 +19,7 @@ use bit_vec::BitVec;
 use std::time::Duration;
 
 use crypto::{gen_keypair, CryptoHash};
-use helpers::Round;
+use helpers::{Height, Round};
 use messages::{
     Message, Precommit, Prevote, PrevotesRequest, ProposeRequest, TransactionsRequest,
     TransactionsResponse,
@@ -277,7 +277,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         assert!(sandbox.is_leader());
-        sandbox.assert_state(HEIGHT_ONE, Round(3));
+        sandbox.assert_state(Height(1), Round(3));
     }
 
     // option: with transaction
@@ -297,7 +297,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
-        HEIGHT_ONE,
+        Height(1),
         Round(3),
         &propose.hash(),
         &block.hash(),
@@ -306,7 +306,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
     );
     let precommit_2 = Precommit::new(
         VALIDATOR_2,
-        HEIGHT_ONE,
+        Height(1),
         Round(3),
         &propose.hash(),
         &block.hash(),
@@ -324,7 +324,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.recv(&ProposeRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
-            HEIGHT_ONE,
+            Height(1),
             &propose.hash(),
             sandbox.s(VALIDATOR_3),
         ));
@@ -340,7 +340,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.recv(&PrevotesRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
-            HEIGHT_ONE,
+            Height(1),
             Round(3),
             &propose.hash(),
             validators,
@@ -355,7 +355,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
-        HEIGHT_ONE,
+        Height(1),
         Round(3),
         &propose.hash(),
         Round::zero(),
@@ -363,7 +363,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
     ));
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
-        HEIGHT_ONE,
+        Height(1),
         Round(3),
         &propose.hash(),
         Round::zero(),
@@ -372,7 +372,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
-        HEIGHT_ONE,
+        Height(1),
         Round(3),
         &propose.hash(),
         &block.hash(),
@@ -383,8 +383,8 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
     sandbox.recv(&precommit_1);
     sandbox.recv(&precommit_2);
 
-    sandbox.assert_state(HEIGHT_TWO, Round(1));
-    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
+    sandbox.assert_state(Height(2), Round(1));
+    sandbox.check_broadcast_status(Height(2), &block.hash());
 
     {
         // respond to RequestTransactions
@@ -411,7 +411,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.recv(&ProposeRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
-            HEIGHT_ONE,
+            Height(1),
             &propose.hash(),
             sandbox.s(VALIDATOR_3),
         ));
@@ -431,7 +431,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.recv(&PrevotesRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
-            HEIGHT_ONE,
+            Height(1),
             Round(3),
             &propose.hash(),
             validators,
@@ -534,7 +534,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_3,
-        HEIGHT_ONE,
+        Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),

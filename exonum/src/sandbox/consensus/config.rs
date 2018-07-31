@@ -16,6 +16,7 @@
 
 use blockchain::Schema;
 use crypto::CryptoHash;
+use helpers::Height;
 use messages::Message;
 use sandbox::{config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -85,7 +86,7 @@ fn test_schema_config_changes() {
     );
     // Try to get configuration from non exists height
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(HEIGHT_FOUR),
+        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(Height(4)),
         prev_cfg
     );
     // Commit a new configuration
@@ -113,7 +114,7 @@ fn test_schema_config_changes() {
 
     // Finally check configuration for some heights
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(HEIGHT_ZERO),
+        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(Height(0)),
         prev_cfg
     );
     assert_eq!(

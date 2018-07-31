@@ -18,7 +18,7 @@
 //! incorrect messages.
 
 use crypto::CryptoHash;
-use helpers::Round;
+use helpers::{Height, Round};
 use messages::{Prevote, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -28,7 +28,7 @@ fn test_ignore_message_with_incorrect_validator_id() {
 
     let propose = Propose::new(
         INCORRECT_VALIDATOR_ID,
-        HEIGHT_ZERO,
+        Height(0),
         Round(1),
         &sandbox.last_hash(),
         &[],
@@ -44,7 +44,7 @@ fn test_ignore_message_with_incorrect_signature() {
 
     let propose = Propose::new(
         VALIDATOR_0,
-        HEIGHT_ZERO,
+        Height(0),
         Round(1),
         &sandbox.last_hash(),
         &[],
@@ -94,7 +94,7 @@ fn handle_propose_with_incorrect_time() {
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
-        HEIGHT_ONE,
+        Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
@@ -139,7 +139,7 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
-        HEIGHT_ONE,
+        Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,

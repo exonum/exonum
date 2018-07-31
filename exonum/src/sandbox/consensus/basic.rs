@@ -47,9 +47,9 @@ fn test_check_leader() {
     );
 
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
-        sandbox.assert_state(HEIGHT_ONE, round);
+        sandbox.assert_state(Height(1), round);
         add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
-        sandbox.assert_state(HEIGHT_ONE, round.next());
+        sandbox.assert_state(Height(1), round.next());
     }
 }
 
@@ -60,7 +60,7 @@ fn test_reach_one_height() {
     let sandbox_state = SandboxState::new();
 
     add_one_height(&sandbox, &sandbox_state);
-    sandbox.assert_state(HEIGHT_TWO, Round(1));
+    sandbox.assert_state(Height(2), Round(1));
 }
 
 /// Validator2,3,4 starts in 5th round
@@ -80,26 +80,26 @@ fn test_reach_actual_round() {
 
     let future_propose = Propose::new(
         VALIDATOR_3,
-        HEIGHT_ONE,
+        Height(1),
         Round(4),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
         sandbox.s(VALIDATOR_3),
     );
 
-    sandbox.assert_state(HEIGHT_ONE, Round(1));
+    sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&future_propose);
-    sandbox.assert_state(HEIGHT_ONE, Round(1));
+    sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
-        HEIGHT_ONE,
+        Height(1),
         Round(4),
         &block_at_first_height.clone().hash(),
         Round::zero(),
         sandbox.s(VALIDATOR_2),
     ));
 
-    sandbox.assert_state(HEIGHT_ONE, Round(4));
+    sandbox.assert_state(Height(1), Round(4));
 }
 
 /// idea of the test is to reach one height two times and compare block hash
@@ -109,14 +109,14 @@ fn test_reach_one_height_repeatable() {
     let sandbox_state = SandboxState::new();
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-    sandbox.assert_state(HEIGHT_TWO, Round(1));
+    sandbox.assert_state(Height(2), Round(1));
     let hash_1 = sandbox.last_block().hash();
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-    sandbox.assert_state(HEIGHT_TWO, Round(1));
+    sandbox.assert_state(Height(2), Round(1));
     let hash_2 = sandbox.last_block().hash();
 
     assert_eq!(hash_2, hash_1);
