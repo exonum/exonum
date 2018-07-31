@@ -32,12 +32,9 @@ use messages::{
     PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
     TransactionsResponse, CONSENSUS,
 };
-use node::{
-    self,
-    state::{
-        BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-        TRANSACTIONS_REQUEST_TIMEOUT,
-    },
+use node::state::{
+    BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+    TRANSACTIONS_REQUEST_TIMEOUT,
 };
 
 // HANDLE CONSENSUS BASIC
