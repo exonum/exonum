@@ -17,6 +17,9 @@
 //! `KeySetIndex` implements a set that stores elements as keys with empty values.
 //! The given section contains information on the methods related to `KeySetIndex`
 //! and the iterator over the items of this set.
+//!
+//! `KeySetIndex` should not be used when the element size is bigger than the `Hash` size
+//! (`HASH_SIZE`). In such case it is more optimal to use `ValueSetIndex`.
 
 use std::{borrow::Borrow, marker::PhantomData};
 
