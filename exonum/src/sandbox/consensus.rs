@@ -180,55 +180,6 @@ fn test_reach_thirteen_height() {
 }
 
 #[test]
-fn test_disable_and_enable() {
-    let mut sandbox = timestamping_sandbox();
-    let sandbox_state = SandboxState::new();
-
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    try_add_one_height(&sandbox, &sandbox_state).unwrap();
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-
-    // Disable the node.
-    let message = node::ExternalMessage::Enable(false);
-    sandbox
-        .node_handler_mut()
-        .channel
-        .api_requests
-        .send(message)
-        .unwrap();
-    sandbox.process_events();
-
-    // Save the current time to "rewind" sandbox to it later.
-    let time_saved = sandbox.time();
-
-    // A fail is expected here as the node is disabled.
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    // TODO: use try_add_one_height (ECR-1817)
-    let result = try_add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-    assert!(result.is_err());
-
-    // Re-enable the node.
-    let message = node::ExternalMessage::Enable(true);
-    sandbox
-        .node_handler_mut()
-        .channel
-        .api_requests
-        .send(message)
-        .unwrap();
-    sandbox.process_events();
-
-    // Check if the node is still at the same height and round.
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-
-    // Reset the time.
-    sandbox.set_time(time_saved);
-
-    // The node should work fine now
-    try_add_one_height(&sandbox, &sandbox_state).unwrap();
-    sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
-}
-
-#[test]
 fn test_query_state_hash() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();

@@ -332,7 +332,7 @@ impl fmt::Debug for ApiNodeState {
             .field("outgoing_connections", &self.outgoing_connections)
             .field("reconnects_timeout", &self.reconnects_timeout)
             .field("peers_info", &self.peers_info)
-            .field("is_enabled", &self.is_network_enabled)
+            .field("is_network_enabled", &self.is_network_enabled)
             .field("node_role", &self.node_role)
             .field("majority_count", &self.majority_count)
             .field("validators", &self.validators)
