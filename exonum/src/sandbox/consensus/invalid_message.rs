@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore precommiters, uncommented, uncomment, commited
+// spell-checker:ignore precommiters, commited
 
 use crypto::CryptoHash;
 use messages::{Prevote, Propose};

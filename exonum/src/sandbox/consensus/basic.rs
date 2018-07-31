@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore precommiters, uncommented, uncomment, commited
-
 use rand::{thread_rng, Rng};
 
 use std::collections::BTreeMap;

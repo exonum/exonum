@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore precommiters, uncommented, uncomment, commited
-
 use blockchain::Schema;
 use crypto::CryptoHash;
 use messages::Message;
