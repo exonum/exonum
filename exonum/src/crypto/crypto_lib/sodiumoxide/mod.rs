@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This module implements cryptograpic backend based
+//! This module implements cryptographic backend based
 //! on [Sodium library](https://github.com/jedisct1/libsodium)
 //! through [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 //! The constants in this module are imported from Sodium.
@@ -26,6 +26,8 @@
 //! This backend also makes use of Ed25519 keys. Ed25519 is a signature system that ensures
 //! fast signing and key generation, as well as security and collision
 //! resilience.
+
+// spell-checker:ignore DIGESTBYTES, PUBLICKEYBYTES, SECRETKEYBYTES, SEEDBYTES, SIGNATUREBYTES
 
 extern crate exonum_sodiumoxide as sodiumoxide;
 
