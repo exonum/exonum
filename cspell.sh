@@ -20,6 +20,7 @@ set -e
 
 ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
 ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
+./node_modules/.bin/cspell exonum/{src,benches,tests}/**/**/*.rs
 ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
 ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
 ./node_modules/.bin/cspell testkit/server/{src,examples,tests}/**/*.rs
