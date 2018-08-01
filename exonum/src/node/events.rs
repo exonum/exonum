@@ -58,7 +58,7 @@ impl NodeHandler {
 
                 if self.config_manager.is_some() {
                     let connect_list_config =
-                        ConnectListConfig::from_connect_list(self.state.connect_list());
+                        ConnectListConfig::from_connect_list(&self.state.connect_list());
 
                     self.config_manager
                         .as_ref()

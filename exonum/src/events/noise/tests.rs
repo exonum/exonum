@@ -25,7 +25,7 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{gen_keypair_from_seed, x25519, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -33,6 +33,7 @@ use events::{
         HandshakeRawMessage, HandshakeResult, NoiseHandshake,
     },
 };
+use node::state::SharedConnectList;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -144,7 +145,8 @@ const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-    let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+    let mut params =
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
     params.set_remote_key(public_key);
     params
 }
@@ -408,9 +410,7 @@ impl NoiseErrorHandshake {
 }
 
 impl Handshake for NoiseErrorHandshake {
-    type Result = x25519::PublicKey;
-
-    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -421,7 +421,7 @@ impl Handshake for NoiseErrorHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {

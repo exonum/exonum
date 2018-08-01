@@ -12,7 +12,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
 
-- `NodePublicConfig` `addr` field has been renamed to `address` (#809).
+- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
+
+- Config parameter `external_address` is now a required value. (#826)
+
+### New features
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. (#826)
 
 ### New Features
 
@@ -29,6 +36,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   to efficiently compute Merkle root hash from a list of hashes without
   an intermediate `ProofListIndex`. Verification of block root hashes
   has been optimized as well. (#802)
+
+- `NoiseHandshake::finalize` now returns error if remote peer's public key is not
+  in `ConnectList`. (#811)
 
 ## 0.9.0 - 2018-07-19
 

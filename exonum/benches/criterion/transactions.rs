@@ -167,7 +167,7 @@ impl TransactionsBenchmarkRunner {
         let handler = TransactionsHandler {
             inner: Some(NodeHandler::new(
                 blockchain,
-                node_config.external_address.unwrap(),
+                node_config.external_address,
                 channel.node_sender(),
                 system_state,
                 config,
@@ -231,7 +231,7 @@ impl TransactionsBenchmarkRunner {
 
         NodeConfig {
             listen_address: peer_address,
-            external_address: Some(peer_address),
+            external_address: peer_address,
             service_public_key,
             service_secret_key,
             consensus_public_key,

@@ -1,3 +1,5 @@
+// spell-checker:ignore rustc
+
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 static USER_AGENT_FILE_NAME: &str = "user_agent";

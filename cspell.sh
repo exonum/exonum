@@ -18,14 +18,5 @@
 
 set -e
 
-./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
-./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
-./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
-./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
-./node_modules/.bin/cspell testkit/server/{src,examples,tests}/**/*.rs
-./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
-./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
-./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
-./node_modules/.bin/cspell examples/cryptocurrency-advanced/{src,examples,tests}/**/*.rs
-./node_modules/.bin/cspell examples/timestamping/{src,examples,tests}/**/*.rs
+find . -not -path "*/target/*" -name "*.rs" | xargs ./node_modules/.bin/cspell
 find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell

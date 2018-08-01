@@ -32,7 +32,7 @@ toml = "=0.4.6"
 clap = "2.31.2"
 term = "=0.5.1"
 colored = "1.6.0"
-env_logger = "=0.5.10"
+env_logger = "=0.5.11"
 atty = "=0.2.11"
 bytes = "=0.4.9"
 futures = "=0.1.23"
@@ -42,7 +42,7 @@ tokio-retry = "=0.1.1"
 tokio-timer = "=0.1.2"
 failure = "=0.1.1"
 os_info = "1.0.1"
-chrono = { version = "=0.4.4", features = ["serde"] }
+chrono = { version = "=0.4.5", features = ["serde"] }
 uuid = { version = "=0.6.5", features = ["serde"] }
 snow = "=0.2.1"
 rust_decimal = "=0.9.1"
