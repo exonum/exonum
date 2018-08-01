@@ -26,7 +26,7 @@ use helpers::{Height, Round};
 use messages::{Message, Precommit, Prevote, Propose, RawMessage, CONSENSUS};
 use sandbox::{
     sandbox::timestamping_sandbox, sandbox_tests_helper::*,
-    timestamping::{TimestampingTxGenerator, TIMESTAMPING_SERVICE},
+    timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader

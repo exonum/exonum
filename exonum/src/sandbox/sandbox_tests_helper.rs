@@ -18,7 +18,7 @@ use bit_vec::BitVec;
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
 use super::{
-    sandbox::Sandbox, timestamping::{TimestampTx, TimestampingTxGenerator},
+    sandbox::Sandbox, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
 };
 use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
@@ -48,7 +48,6 @@ pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
 pub const VALIDATOR_3: ValidatorId = ValidatorId(3);
 pub const INCORRECT_VALIDATOR_ID: ValidatorId = ValidatorId(64_999);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
-pub const DATA_SIZE: usize = 64;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.

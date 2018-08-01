@@ -27,7 +27,7 @@ use messages::{
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*,
-    timestamping::TimestampingTxGenerator,
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
 };
 
 /// idea of the test is to verify request transaction scenario: other node requests
@@ -482,8 +482,8 @@ fn handle_tx_verify_signature() {
 
     // generate incorrect tx
     let (public_key, _) = gen_keypair();
-    let (_, secret_key) = gen_keypair();
-    let tx = TimestampingTxGenerator::with_keypair(DATA_SIZE, (public_key, secret_key))
+    let (_, wrong_secret_key) = gen_keypair();
+    let tx = TimestampingTxGenerator::with_keypair(DATA_SIZE, (public_key, wrong_secret_key))
         .next()
         .unwrap();
     sandbox.recv(&tx);
