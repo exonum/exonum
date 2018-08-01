@@ -238,7 +238,6 @@ impl Sandbox {
 
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
-        // TODO Think about addresses. (ECR-1627)
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
