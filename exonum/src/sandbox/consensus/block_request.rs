@@ -88,17 +88,17 @@ fn handle_block_response_tx_in_pool() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
     sandbox.recv(&tx);
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
@@ -107,10 +107,10 @@ fn handle_block_response_tx_in_pool() {
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -178,16 +178,16 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
@@ -198,26 +198,26 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         vec![tx.raw().clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -284,17 +284,17 @@ fn handle_block_response_with_invalid_txs_order() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     // Invalid transactions order.
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx2.hash(), tx1.hash()],
@@ -371,17 +371,17 @@ fn handle_block_response_with_invalid_precommits() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
     sandbox.recv(&tx);
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block1.clone(),
         vec![precommit_1, precommit_2, precommit_for_other_block],
         &[tx.hash()],
@@ -459,16 +459,16 @@ fn handle_block_response_with_known_transaction() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx1.hash(), tx2.hash()],
@@ -479,26 +479,26 @@ fn handle_block_response_with_known_transaction() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             &[tx2.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         vec![tx2.raw().clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -569,16 +569,16 @@ fn handle_block_response_with_all_known_transactions() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx1.hash(), tx2.hash()],
@@ -587,10 +587,10 @@ fn handle_block_response_with_all_known_transactions() {
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -664,16 +664,16 @@ fn received_block_while_there_is_full_propose() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
@@ -687,26 +687,26 @@ fn received_block_while_there_is_full_propose() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         vec![tx.raw().clone()],
         sandbox.s(ValidatorId(3)),
     ));
@@ -714,10 +714,10 @@ fn received_block_while_there_is_full_propose() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -787,16 +787,16 @@ fn received_block_while_there_is_pending_block() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![
             precommit_1.clone(),
@@ -809,7 +809,7 @@ fn received_block_while_there_is_pending_block() {
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
@@ -820,26 +820,26 @@ fn received_block_while_there_is_pending_block() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         vec![tx.raw().clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -922,16 +922,16 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &BlockRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             Height(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
         &sandbox.p(ValidatorId(3)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
@@ -942,10 +942,10 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
@@ -953,25 +953,25 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.send(
         sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
         &sandbox.p(ValidatorId(2)),
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         vec![tx.raw().clone()],
         sandbox.s(ValidatorId(2)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(SANDBOXED_VALIDATOR_ID),
+        &sandbox.p(SANDBOX_VALIDATOR_ID),
         Height(2),
         &block.hash(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }

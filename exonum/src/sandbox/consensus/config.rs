@@ -39,10 +39,10 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         TxConfig::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         )
     };
 
@@ -70,10 +70,10 @@ fn test_schema_config_changes() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         let tx = TxConfig::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         );
         (tx, consensus_cfg)
     };

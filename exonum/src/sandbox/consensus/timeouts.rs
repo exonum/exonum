@@ -181,12 +181,12 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
@@ -210,13 +210,13 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
     sandbox.broadcast(&Precommit::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -225,12 +225,12 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     //    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         Round(1),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.add_time(Duration::from_millis(0));
 }

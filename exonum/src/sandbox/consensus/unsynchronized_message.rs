@@ -41,12 +41,12 @@ fn test_queue_message_from_future_round() {
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(Height(1), Round(2));
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -98,18 +98,18 @@ fn test_queue_propose_message_from_next_height() {
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_proposer_id(SANDBOXED_VALIDATOR_ID)
+        .with_proposer_id(SANDBOX_VALIDATOR_ID)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let future_propose = Propose::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(2),
         Round(2),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     );
 
     sandbox.recv(&future_propose);

@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use super::{
     sandbox::timestamping_sandbox,
-    sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED, SANDBOXED_VALIDATOR_ID},
+    sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED, SANDBOX_VALIDATOR_ID},
 };
 use blockchain::Block;
 use crypto::{CryptoHash, Hash};
@@ -39,22 +39,22 @@ fn test_send_propose_and_prevote() {
 
     // ok, we are leader
     let propose = Propose::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(3),
         &sandbox.last_hash(),
         &[tx.hash()],
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     );
 
     sandbox.broadcast(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(3),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -73,12 +73,12 @@ fn test_send_prevote() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
@@ -106,12 +106,12 @@ fn test_get_lock_and_send_precommit() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.recv(&Prevote::new(
         ValidatorId(1),
@@ -131,13 +131,13 @@ fn test_get_lock_and_send_precommit() {
         sandbox.s(ValidatorId(2)),
     ));
     sandbox.broadcast(&Precommit::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 }
@@ -166,12 +166,12 @@ fn test_commit() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.recv(&Prevote::new(
         ValidatorId(1),
@@ -190,13 +190,13 @@ fn test_commit() {
         sandbox.s(ValidatorId(2)),
     ));
     sandbox.broadcast(&Precommit::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.recv(&Precommit::new(
         ValidatorId(2),
@@ -235,11 +235,11 @@ fn received_unexpected_propose() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height::zero(),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }

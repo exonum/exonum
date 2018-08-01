@@ -46,12 +46,12 @@ fn positive_get_propose_send_prevote() {
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     info!("time: {:?}", sandbox.time());
@@ -89,11 +89,11 @@ fn request_propose_when_get_prevote() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &ProposeRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             Height(1),
             &empty_hash(),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
     sandbox.add_time(Duration::from_millis(0));
@@ -116,11 +116,11 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &ProposeRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             Height(1),
             &empty_hash(),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
@@ -130,13 +130,13 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &PrevotesRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             Height(1),
             Round(1),
             &empty_hash(),
             validators,
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
     sandbox.add_time(Duration::from_millis(0));
@@ -168,12 +168,12 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
@@ -197,13 +197,13 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
     sandbox.broadcast(&Precommit::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -213,23 +213,23 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(2),
             &propose.hash(),
             Round(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
 
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(3),
             &propose.hash(),
             Round(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
     }
     sandbox.add_time(Duration::from_millis(0));
@@ -278,23 +278,23 @@ fn lock_to_past_round_broadcast_prevote() {
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
     sandbox.broadcast(&Precommit::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     // ! here broadcast of
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         Round(1),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.add_time(Duration::from_millis(0));
 
@@ -303,23 +303,23 @@ fn lock_to_past_round_broadcast_prevote() {
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(3),
             &propose.hash(),
             Round(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
 
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(4),
             &propose.hash(),
             Round(1),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
     }
     sandbox.add_time(Duration::from_millis(0));
@@ -346,12 +346,12 @@ fn handle_precommit_remove_request_prevotes() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
@@ -377,13 +377,13 @@ fn handle_precommit_remove_request_prevotes() {
         sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
         sandbox.broadcast(&Precommit::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             &block.hash(),
             sandbox.time().into(),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
         sandbox.assert_lock(Round(1), Some(propose.hash()));
         sandbox.add_time(Duration::from_millis(0));
@@ -478,22 +478,22 @@ fn lock_to_propose_and_send_prevote() {
 
     // !! here broadcast, of prevote from lock() function, occurs
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.broadcast(&Precommit::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.assert_lock(Round(2), Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -553,21 +553,21 @@ fn lock_remove_request_prevotes() {
             sandbox.s(ValidatorId(1)),
         ));
         sandbox.broadcast(&Prevote::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             NOT_LOCKED,
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
         sandbox.broadcast(&Precommit::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             &block.hash(),
             sandbox.time().into(),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
     }
     sandbox.add_time(Duration::from_millis(PREVOTES_REQUEST_TIMEOUT));
@@ -831,13 +831,13 @@ fn lock_not_send_prevotes_after_commit() {
         ));
 
         sandbox.broadcast(&Precommit::new(
-            SANDBOXED_VALIDATOR_ID,
+            SANDBOX_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             &block.hash(),
             sandbox.time().into(),
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ));
         sandbox.check_broadcast_status(Height(2), &block.hash());
     }
@@ -1122,12 +1122,12 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.recv(&tx);
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
     sandbox.check_broadcast_status(Height(2), &block.hash());
 
@@ -1238,12 +1238,12 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.recv(&tx);
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.add_time(Duration::from_millis(0));
@@ -1262,12 +1262,12 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
@@ -1288,12 +1288,12 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         .build();
     sandbox.recv(&future_propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(1),
         Round(2),
         &future_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
@@ -1345,7 +1345,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(block_1_delay)
-        .with_proposer_id(SANDBOXED_VALIDATOR_ID)
+        .with_proposer_id(SANDBOX_VALIDATOR_ID)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -1429,12 +1429,12 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
 
     sandbox.recv(&height_one_propose);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(2),
         Round(1),
         &height_one_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
@@ -1599,10 +1599,10 @@ fn handle_tx_handle_full_propose() {
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &TransactionsRequest::new(
-            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(SANDBOX_VALIDATOR_ID),
             &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(SANDBOXED_VALIDATOR_ID),
+            sandbox.s(SANDBOX_VALIDATOR_ID),
         ),
     );
 
@@ -1641,12 +1641,12 @@ fn broadcast_prevote_with_tx_positive() {
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.broadcast(&Prevote::new(
-        SANDBOXED_VALIDATOR_ID,
+        SANDBOX_VALIDATOR_ID,
         Height(2),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOXED_VALIDATOR_ID),
+        sandbox.s(SANDBOX_VALIDATOR_ID),
     ));
 }
 
