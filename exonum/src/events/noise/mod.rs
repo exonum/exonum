@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore uint
+
 #[cfg(feature = "sodiumoxide-crypto")]
 #[doc(inline)]
 pub use self::wrappers::sodium_wrapper::{
