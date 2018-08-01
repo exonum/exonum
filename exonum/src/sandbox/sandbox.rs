@@ -18,7 +18,7 @@
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    cell::{Ref, RefCell, RefMut},
+    self, cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -737,7 +737,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         max_message_len: 1024 * 1024,
         min_propose_timeout: PROPOSE_TIMEOUT,
         max_propose_timeout: PROPOSE_TIMEOUT,
-        propose_timeout_threshold: 0,
+        propose_timeout_threshold: std::u32::MAX,
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
