@@ -217,9 +217,8 @@ fn test_store_txs_positions() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    let data_size = 20;
     let generator = TimestampingTxGenerator::with_keypair(
-        data_size,
+        DATA_SIZE,
         gen_keypair_from_seed(&Seed::new([11; SEED_LENGTH])),
     );
 

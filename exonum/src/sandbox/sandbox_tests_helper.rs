@@ -48,6 +48,7 @@ pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
 pub const VALIDATOR_3: ValidatorId = ValidatorId(3);
 pub const INCORRECT_VALIDATOR_ID: ValidatorId = ValidatorId(64_999);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
+pub const DATA_SIZE: usize = 64;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.
@@ -292,7 +293,7 @@ pub fn try_add_round_with_transactions(
 }
 
 pub fn gen_timestamping_tx() -> TimestampTx {
-    let mut tx_gen = TimestampingTxGenerator::new(64);
+    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
     tx_gen.next().unwrap()
 }
 
