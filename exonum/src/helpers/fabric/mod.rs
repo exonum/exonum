@@ -36,7 +36,7 @@ mod details;
 mod info;
 mod internal;
 mod maintenance;
-pub mod shared;
+mod shared;
 #[macro_use]
 mod context_key;
 

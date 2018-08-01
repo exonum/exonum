@@ -21,10 +21,7 @@ use toml::Value;
 use blockchain::{GenesisConfig, ValidatorKeys};
 use exonum::node::{ConnectListConfig, NodeConfig};
 use exonum::{
-    helpers::fabric::{
-        keys, shared::AbstractConfig, Argument, CommandExtension, Context,
-        DEFAULT_EXONUM_LISTEN_PORT,
-    },
+    helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
     node::State,
 };
 
@@ -180,7 +177,7 @@ pub fn generate_testnet_config(
         }
     }));
 
-    let mut service_config = AbstractConfig::default();
+    let mut service_config: BTreeMap<String, Value> = BTreeMap::new();
 
     service_config.insert(
         "configuration_service".to_owned(),

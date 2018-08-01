@@ -436,6 +436,7 @@ mod tests {
     use exonum_testkit::{TestKit, TestKitBuilder};
 
     use super::{Hash, VotingDecisionRef};
+    use config::ConfigurationServiceConfig;
     use errors::Error as ServiceError;
     use tests::{new_tx_config_vote, new_tx_config_vote_against};
     use Service as ConfigurationService;
@@ -444,7 +445,9 @@ mod tests {
     fn test_vote_without_propose() {
         let testkit: TestKit = TestKitBuilder::validator()
             .with_validators(4)
-            .with_service(ConfigurationService {})
+            .with_service(ConfigurationService {
+                config: ConfigurationServiceConfig::default(),
+            })
             .create();
 
         let hash = Hash::default();
