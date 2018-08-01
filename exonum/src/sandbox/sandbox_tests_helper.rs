@@ -30,9 +30,7 @@ use storage::Database;
 
 pub type TimestampingSandbox = Sandbox;
 
-pub const LOCK_ZERO: Round = Round(0);
-pub const LOCK_ONE: Round = Round(1);
-pub const LOCK_TWO: Round = Round(2);
+pub const NOT_LOCKED: Round = Round(0);
 pub const SANDBOXED_VALIDATOR_ID: ValidatorId = ValidatorId(0);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
@@ -367,7 +365,7 @@ where
                     initial_height,
                     round,
                     &propose.hash(),
-                    LOCK_ZERO,
+                    NOT_LOCKED,
                     sandbox.s(val_idx),
                 ));
             }
@@ -482,7 +480,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
                     initial_height,
                     round,
                     &propose.hash(),
-                    LOCK_ZERO,
+                    NOT_LOCKED,
                     sandbox.s(val_idx),
                 ));
             }
@@ -598,7 +596,7 @@ fn try_check_and_broadcast_propose_and_prevote(
         sandbox.current_height(),
         sandbox.current_round(),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     Ok(Some(propose.clone()))
@@ -659,7 +657,7 @@ pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propos
         propose.height(),
         propose.round(),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     )
 }

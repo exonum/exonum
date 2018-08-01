@@ -93,13 +93,13 @@ fn handle_propose_with_incorrect_time() {
 
     sandbox.recv(&propose);
 
-    sandbox.assert_lock(LOCK_ZERO, None);
+    sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.broadcast(&Prevote::new(
         SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
@@ -138,13 +138,13 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
 
     sandbox.recv(&propose);
 
-    sandbox.assert_lock(LOCK_ZERO, None);
+    sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.broadcast(&Prevote::new(
         SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }

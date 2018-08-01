@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use super::{
     sandbox::timestamping_sandbox,
-    sandbox_tests_helper::{gen_timestamping_tx, SANDBOXED_VALIDATOR_ID},
+    sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED, SANDBOXED_VALIDATOR_ID},
 };
 use blockchain::Block;
 use crypto::{CryptoHash, Hash};
@@ -53,7 +53,7 @@ fn test_send_propose_and_prevote() {
         Height(1),
         Round(3),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
@@ -77,7 +77,7 @@ fn test_send_prevote() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
@@ -110,7 +110,7 @@ fn test_get_lock_and_send_precommit() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.recv(&Prevote::new(
@@ -118,16 +118,16 @@ fn test_get_lock_and_send_precommit() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.assert_lock(Round::zero(), None);
+    sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.recv(&Prevote::new(
         ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
     sandbox.broadcast(&Precommit::new(
@@ -170,7 +170,7 @@ fn test_commit() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.recv(&Prevote::new(
@@ -178,7 +178,7 @@ fn test_commit() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
     sandbox.recv(&Prevote::new(
@@ -186,7 +186,7 @@ fn test_commit() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
     sandbox.broadcast(&Precommit::new(
@@ -239,7 +239,7 @@ fn received_unexpected_propose() {
         Height::zero(),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }

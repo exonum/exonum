@@ -185,7 +185,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
@@ -194,20 +194,20 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
+    sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
         ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
+    sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
     sandbox.broadcast(&Precommit::new(
         SANDBOXED_VALIDATOR_ID,
@@ -218,7 +218,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         sandbox.time().into(),
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
 
     // trigger round_timeout
@@ -229,7 +229,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Height(1),
         Round(2),
         &propose.hash(),
-        LOCK_ONE,
+        Round(1),
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.add_time(Duration::from_millis(0));
@@ -251,7 +251,7 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
         Height(1),
         Round(2),
         &empty_hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
 

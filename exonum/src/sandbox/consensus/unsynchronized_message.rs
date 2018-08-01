@@ -45,7 +45,7 @@ fn test_queue_message_from_future_round() {
         Height(1),
         Round(2),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
@@ -67,7 +67,7 @@ fn test_queue_prevote_message_from_next_height() {
         Height(2),
         Round(1),
         &empty_hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(3)),
     ));
 

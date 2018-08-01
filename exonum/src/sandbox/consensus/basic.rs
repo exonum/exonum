@@ -95,7 +95,7 @@ fn test_reach_actual_round() {
         Height(1),
         Round(4),
         &block_at_first_height.clone().hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
 

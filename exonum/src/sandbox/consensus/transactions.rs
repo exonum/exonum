@@ -358,7 +358,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         Height(1),
         Round(3),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
     sandbox.recv(&Prevote::new(
@@ -366,7 +366,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         Height(1),
         Round(3),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
 
@@ -537,7 +537,7 @@ fn request_txs_when_get_propose_or_prevote() {
         Height(1),
         Round(1),
         &propose.hash(),
-        Round::zero(),
+        NOT_LOCKED,
         sandbox.s(ValidatorId(3)),
     ));
 

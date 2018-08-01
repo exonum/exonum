@@ -108,7 +108,7 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     let sandbox_restarted = sandbox.restart();
 
     sandbox_restarted.broadcast(&prevote);
-    sandbox_restarted.assert_lock(LOCK_ZERO, None);
+    sandbox_restarted.assert_lock(NOT_LOCKED, None);
     sandbox_restarted.assert_state(current_height, current_round);
 
     // Now we should be sure that node recovered its state but didn't send any messages.
@@ -144,20 +144,20 @@ fn should_not_vote_after_node_restart() {
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.assert_lock(LOCK_ZERO, None); // Do not lock if <2/3 prevotes
+    sandbox.assert_lock(NOT_LOCKED, None); // Do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
         ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.hash()));
 
     let precommit = Precommit::new(
         SANDBOXED_VALIDATOR_ID,
@@ -169,7 +169,7 @@ fn should_not_vote_after_node_restart() {
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
     sandbox.broadcast(&precommit);
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.hash()));
     let current_height = sandbox.current_height();
     let current_round = sandbox.current_round();
 
@@ -177,7 +177,7 @@ fn should_not_vote_after_node_restart() {
     let sandbox_restarted = sandbox.restart();
 
     // Assert that consensus messages were recovered and we're in locked state now.
-    sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox_restarted.assert_lock(Round(1), Some(propose.hash()));
     sandbox_restarted.assert_state(current_height, current_round);
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
@@ -217,20 +217,20 @@ fn should_save_precommit_to_consensus_cache() {
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
+    sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
         ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox.assert_lock(Round(1), Some(propose.hash()));
 
     let precommit = Precommit::new(
         SANDBOXED_VALIDATOR_ID,
@@ -251,7 +251,7 @@ fn should_save_precommit_to_consensus_cache() {
     let sandbox_restarted = sandbox.restart();
 
     // assert that consensus messages were recovered and we're in locked state now
-    sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox_restarted.assert_lock(Round(1), Some(propose.hash()));
     sandbox_restarted.assert_state(current_height, current_round);
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
@@ -308,20 +308,20 @@ fn test_recover_consensus_messages_in_other_round() {
         Height(1),
         Round(1),
         &first_propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
+    sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
         ValidatorId(2),
         Height(1),
         Round(1),
         &first_propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.assert_lock(LOCK_ONE, Some(first_propose.hash()));
+    sandbox.assert_lock(Round(1), Some(first_propose.hash()));
 
     let first_precommit = Precommit::new(
         SANDBOXED_VALIDATOR_ID,
@@ -345,7 +345,7 @@ fn test_recover_consensus_messages_in_other_round() {
         first_prevote.height(),
         Round(2),
         first_prevote.propose_hash(),
-        LOCK_ONE,
+        Round(1),
         sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
     sandbox.broadcast(&first_updated_prevote);
@@ -364,7 +364,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Height(1),
         Round(2),
         &second_propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
 
@@ -373,22 +373,22 @@ fn test_recover_consensus_messages_in_other_round() {
         Height(1),
         Round(2),
         &second_propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
 
-    sandbox.assert_lock(LOCK_ONE, Some(first_propose.hash()));
+    sandbox.assert_lock(Round(1), Some(first_propose.hash()));
 
     sandbox.recv(&Prevote::new(
         ValidatorId(3),
         Height(1),
         Round(2),
         &second_propose.hash(),
-        LOCK_ZERO,
+        NOT_LOCKED,
         sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_lock(LOCK_TWO, Some(second_propose.hash()));
+    sandbox.assert_lock(Round(2), Some(second_propose.hash()));
 
     let second_precommit = Precommit::new(
         SANDBOXED_VALIDATOR_ID,
@@ -405,7 +405,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let saved_time = sandbox.time();
     let sandbox_new = sandbox.restart_with_time(saved_time);
 
-    sandbox_new.assert_lock(LOCK_TWO, Some(second_propose.hash()));
+    sandbox_new.assert_lock(Round(2), Some(second_propose.hash()));
     sandbox_new.assert_state(Height(1), Round(2));
     sandbox_new.broadcast(&first_prevote);
 
