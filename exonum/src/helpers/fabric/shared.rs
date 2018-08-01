@@ -36,38 +36,6 @@ pub struct NodePublicConfig {
     pub services_public_configs: AbstractConfig,
 }
 
-/// Services configuration
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct Services {
-    /// Configuration for ConfigurationService
-    pub configuration: ConfigurationService,
-}
-
-impl Default for Services {
-    fn default() -> Self {
-        Self {
-            configuration: ConfigurationService::default(),
-        }
-    }
-}
-
-/// Configuration for ConfigurationService
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigurationService {
-    /// Number of votes required to commit the new configuration.
-    /// This value should be greater than 2/3 and less or equal to the
-    /// validators count.
-    pub majority_count: Option<u16>,
-}
-
-impl Default for ConfigurationService {
-    fn default() -> Self {
-        Self {
-            majority_count: None,
-        }
-    }
-}
-
 /// `SharedConfig` contain all public information that should be shared in the handshake process.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedConfig {
@@ -96,7 +64,7 @@ pub struct CommonConfigTemplate {
     pub consensus_config: ConsensusConfig,
     /// Services configuration.
     #[serde(default)]
-    pub services_config: Services,
+    pub services_config: AbstractConfig,
     /// General configuration.
     pub general_config: AbstractConfig,
 }

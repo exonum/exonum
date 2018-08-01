@@ -121,7 +121,7 @@ pub mod keys {
 
     use toml;
 
-    use super::shared::{CommonConfigTemplate, NodePublicConfig, Services};
+    use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
     use super::ContextKey;
     use node::NodeConfig;
 
@@ -139,7 +139,7 @@ pub mod keys {
 
     /// Services configuration.
     /// Set by `generate-testnet` command.
-    pub const SERVICES_CONFIG: ContextKey<Services> = context_key!("services_config");
+    pub const SERVICES_CONFIG: ContextKey<AbstractConfig> = context_key!("services_config");
 
     /// Common configuration.
     /// Set by `generate-config` and `finalize` commands.

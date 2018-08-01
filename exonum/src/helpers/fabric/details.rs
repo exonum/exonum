@@ -17,8 +17,8 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts
 
-use toml;
 use crypto;
+use toml;
 
 use std::{
     collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
@@ -27,15 +27,14 @@ use std::{
 use super::{
     internal::{CollectedCommand, Command, Feedback}, keys,
     shared::{
-        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, Services,
-        SharedConfig,
+        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
-use helpers::config::{validate_majority_count, ConfigFile};
-use node::{ConnectListConfig, NodeApiConfig, NodeConfig, State};
+use helpers::{config::ConfigFile, generate_testnet_config};
+use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
@@ -286,14 +285,6 @@ impl Command for GenerateCommonConfig {
                 "validators-count",
                 false,
             ),
-            Argument::new_named(
-                "MAJORITY_COUNT",
-                false,
-                "Number of votes required to commit new configuration",
-                None,
-                "majority-count",
-                false,
-            ),
         ]
     }
 
@@ -319,24 +310,15 @@ impl Command for GenerateCommonConfig {
             .arg::<u16>("VALIDATORS_COUNT")
             .expect("VALIDATORS_COUNT not found");
 
-        let majority_count = context.arg::<u16>("MAJORITY_COUNT").ok();
-
-        context.set(keys::SERVICES_CONFIG, Services::default());
+        context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
-        let mut services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
+        let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
         let mut general_config = AbstractConfig::default();
         general_config.insert(
             String::from("validators_count"),
             (validators_count as u32).into(),
         );
-
-        let byzantine_majority_count =
-            State::byzantine_majority_count(validators_count as usize) as u16;
-
-        validate_majority_count(majority_count, validators_count, byzantine_majority_count)
-            .unwrap();
-        services_config.configuration.majority_count = majority_count;
 
         let template = CommonConfigTemplate {
             services_config,
@@ -628,7 +610,6 @@ impl Command for Finalize {
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 
-        let services_config = common.clone().services_config;
         let genesis = Self::genesis_from_template(common.clone(), &list);
 
         let config = {
@@ -649,7 +630,7 @@ impl Command for Finalize {
                     ..Default::default()
                 },
                 mempool: Default::default(),
-                services_configs: services_config,
+                services_configs: Default::default(),
                 database: Default::default(),
                 connect_list: ConnectListConfig::from_node_config(&list),
             }
@@ -697,14 +678,6 @@ impl Command for GenerateTestnet {
                 false,
             ),
             Argument::new_positional("COUNT", true, "Count of validators in testnet."),
-            Argument::new_named(
-                "MAJORITY_COUNT",
-                false,
-                "Number of votes required to commit new configuration",
-                None,
-                "majority-count",
-                false,
-            ),
         ]
     }
 
@@ -732,20 +705,13 @@ impl Command for GenerateTestnet {
             panic!("Can't generate testnet with zero nodes count.");
         }
 
-        let majority_count = context.arg::<u16>("MAJORITY_COUNT").ok();
-
-        let byzantine_majority_count =
-            State::byzantine_majority_count(validators_count as usize) as u16;
-        validate_majority_count(majority_count, validators_count, byzantine_majority_count)
-            .unwrap();
-
         let dir = Path::new(&dir);
         let dir = dir.join("validators");
         if !dir.exists() {
             fs::create_dir_all(&dir).unwrap();
         }
 
-        let configs = generate_testnet_config(validators_count, start_port, majority_count);
+        let configs = generate_testnet_config(validators_count, start_port);
         context.set(keys::CONFIGS, configs);
         let new_context = exts(context);
         let configs = new_context
@@ -759,51 +725,4 @@ impl Command for GenerateTestnet {
 
         Feedback::None
     }
-}
-
-/// Generates testnet configuration.
-pub fn generate_testnet_config(
-    count: u16,
-    start_port: u16,
-    majority_count: Option<u16>,
-) -> Vec<NodeConfig> {
-    let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
-        .map(|_| (crypto::gen_keypair(), crypto::gen_keypair()))
-        .unzip();
-    let genesis = GenesisConfig::new(validators.iter().zip(services.iter()).map(|x| {
-        ValidatorKeys {
-            consensus_key: (x.0).0,
-            service_key: (x.1).0,
-        }
-    }));
-    let mut services_config = Services::default();
-    services_config.configuration.majority_count = majority_count;
-    let peers = (0..validators.len())
-        .map(|x| {
-            format!("127.0.0.1:{}", start_port + x as u16)
-                .parse()
-                .unwrap()
-        })
-        .collect::<Vec<_>>();
-
-    validators
-        .into_iter()
-        .zip(services.into_iter())
-        .enumerate()
-        .map(|(idx, (validator, service))| NodeConfig {
-            listen_address: peers[idx],
-            external_address: Some(peers[idx]),
-            network: Default::default(),
-            consensus_public_key: validator.0,
-            consensus_secret_key: validator.1,
-            service_public_key: service.0,
-            service_secret_key: service.1,
-            genesis: genesis.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
-            api: Default::default(),
-            mempool: Default::default(),
-            services_configs: services_config.clone(),
-            database: Default::default(),
-        })
-        .collect::<Vec<_>>()
 }

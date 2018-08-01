@@ -76,19 +76,22 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 extern crate serde_json;
+extern crate toml;
 
 pub use errors::ErrorCode;
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
-    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
-    node::NodeConfig, storage::{Fork, Snapshot},
+    encoding::Error as EncodingError,
+    helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
+    messages::RawTransaction, storage::{Fork, Snapshot},
 };
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 use serde_json::to_value;
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 mod api;
+mod cmd;
 mod config;
 mod errors;
 mod schema;
@@ -96,17 +99,18 @@ mod schema;
 mod tests;
 mod transactions;
 
-use config::ServiceConfig;
+use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
+use config::ConfigurationServiceConfig;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
 /// Configuration service name.
 pub const SERVICE_NAME: &str = "configuration";
 
-/// Configuration service.
+/// ConfigurationService config.
 #[derive(Debug, Default)]
 pub struct Service {
-    config: ServiceConfig,
+    config: ConfigurationServiceConfig,
 }
 
 impl blockchain::Service for Service {
@@ -146,11 +150,22 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
+    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
+        use exonum::helpers::fabric;
+        Some(match command {
+            v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
+            v if v == fabric::Finalize.name() => Box::new(Finalize),
+            v if v == fabric::GenerateTestnet.name() => Box::new(GenerateTestnet),
+            _ => return None,
+        })
+    }
+
     fn make_service(&mut self, context: &Context) -> Box<dyn blockchain::Service> {
-        let node_config: NodeConfig = context.get(context_key!("node_config")).unwrap();
-        let service_config: ServiceConfig = ServiceConfig {
-            majority_count: node_config.services_configs.configuration.majority_count,
-        };
+        let service_config: ConfigurationServiceConfig =
+            context.get(keys::NODE_CONFIG).unwrap().services_configs["configuration_service"]
+                .clone()
+                .try_into()
+                .unwrap();
 
         Box::new(Service {
             config: service_config,

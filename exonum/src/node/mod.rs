@@ -52,7 +52,7 @@ use helpers::{
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
-use helpers::fabric::shared::Services;
+use helpers::fabric::shared::AbstractConfig;
 
 mod basic;
 mod connect_list;
@@ -251,7 +251,7 @@ pub struct NodeConfig {
     pub mempool: MemoryPoolConfig,
     /// Additional config, usable for services.
     #[serde(default)]
-    pub services_configs: Services,
+    pub services_configs: AbstractConfig,
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,
