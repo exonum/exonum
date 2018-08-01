@@ -54,6 +54,7 @@ use helpers::{
     ValidatorId,
 };
 use messages::{Connect, Message, RawMessage};
+use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -364,17 +365,10 @@ impl ConnectListConfig {
     }
 
     /// Creates `ConnectListConfig` from `ConnectList`.
-    pub fn from_connect_list(connect_list: &ConnectList) -> Self {
-        let peers = connect_list
-            .peers
-            .iter()
-            .map(|(pk, a)| ConnectInfo {
-                address: *a,
-                public_key: *pk,
-            })
-            .collect();
-
-        ConnectListConfig { peers }
+    pub fn from_connect_list(connect_list: &SharedConnectList) -> Self {
+        ConnectListConfig {
+            peers: connect_list.peers(),
+        }
     }
 
     /// `ConnectListConfig` peers addresses.
@@ -569,19 +563,9 @@ impl NodeHandler {
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        let public_key = self.state.connect_list().find_key_by_address(&address);
-
-        if let Some(public_key) = public_key {
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
-            self.channel.network_requests.send(request).log_error();
-        } else {
-            warn!(
-                "Attempt to connect to the peer with address {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        trace!("Send to address: {}", address);
+        let request = NetworkRequest::SendMessage(*address, message.clone());
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
@@ -600,16 +584,7 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-
-        if self.state.connect_list().is_address_allowed(&address) {
-            self.send_to_addr(address, connect.raw());
-        } else {
-            warn!(
-                "Attempt to connect to the peer {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        self.send_to_addr(address, connect.raw());
     }
 
     /// Add timeout request.
@@ -1001,6 +976,7 @@ impl Node {
         let handshake_params = HandshakeParams::new(
             *self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
+            self.state().connect_list().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
