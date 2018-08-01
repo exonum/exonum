@@ -28,9 +28,9 @@
           filter_map,
           // Next lints produce too much noise/false positives.
           stutter, similar_names,
-          // Variant name ends with the enum's name. Similar behavior to similar_names.
+          // Variant name ends with the enum name. Similar behavior to similar_names.
           pub_enum_variant_names,
-          // Next lints allowed due to false possitive.
+          // Next lints allowed due to false positive.
           doc_markdown,
           // Can be enabled when rust-lang-nursery/rust-clippy#2894 is fixed.
           use_self,
