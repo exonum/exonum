@@ -275,7 +275,6 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
-    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
@@ -283,7 +282,6 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn try_broadcast_to_addrs<'a, T: Message, I>(
         &self,
         msg: &T,
