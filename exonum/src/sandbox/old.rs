@@ -16,13 +16,11 @@ use std::time::Duration;
 
 use super::{
     sandbox::timestamping_sandbox,
-    sandbox_tests_helper::{
-        gen_timestamping_tx, VALIDATOR_0, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3,
-    },
+    sandbox_tests_helper::{gen_timestamping_tx, SANDBOXED_VALIDATOR_ID},
 };
 use blockchain::Block;
 use crypto::{CryptoHash, Hash};
-use helpers::{Height, Round};
+use helpers::{Height, Round, ValidatorId};
 use messages::{Precommit, Prevote, Propose};
 
 #[test]
@@ -41,22 +39,22 @@ fn test_send_propose_and_prevote() {
 
     // ok, we are leader
     let propose = Propose::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(3),
         &sandbox.last_hash(),
         &[tx.hash()],
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
 
     sandbox.broadcast(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(3),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
 
@@ -65,22 +63,22 @@ fn test_send_prevote() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
 
@@ -89,16 +87,16 @@ fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
 
     let block = Block::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         0,
         &sandbox.last_hash(),
@@ -108,38 +106,38 @@ fn test_get_lock_and_send_precommit() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(Round::zero(), None);
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.broadcast(&Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 }
@@ -149,16 +147,16 @@ fn test_commit() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
 
     let block = Block::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         0,
         &sandbox.last_hash(),
@@ -168,55 +166,55 @@ fn test_commit() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.broadcast(&Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.recv(&Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &propose.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.recv(&Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &propose.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
     sandbox.assert_state(Height(1), Round(1));
 }
@@ -227,21 +225,21 @@ fn received_unexpected_propose() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height::zero(),
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height::zero(),
         Round(1),
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }

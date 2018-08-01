@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::{Height, Round};
+use helpers::{Height, Round, ValidatorId};
 use messages::{Message, Prevote, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -27,12 +27,12 @@ fn test_queue_message_from_future_round() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(2),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&propose);
@@ -41,12 +41,12 @@ fn test_queue_message_from_future_round() {
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(Height(1), Round(2));
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
 
@@ -63,12 +63,12 @@ fn test_queue_prevote_message_from_next_height() {
     let sandbox_state = SandboxState::new();
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(2),
         Round(1),
         &empty_hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     add_one_height(&sandbox, &sandbox_state);
@@ -98,18 +98,18 @@ fn test_queue_propose_message_from_next_height() {
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_proposer_id(VALIDATOR_0)
+        .with_proposer_id(SANDBOXED_VALIDATOR_ID)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let future_propose = Propose::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(2),
         Round(2),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
 
     sandbox.recv(&future_propose);

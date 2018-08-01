@@ -34,7 +34,7 @@ fn test_ignore_message_with_incorrect_validator_id() {
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
 
     sandbox.recv(&propose);
@@ -45,12 +45,12 @@ fn test_ignore_message_with_incorrect_signature() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(0),
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
 
     sandbox.recv(&propose);
@@ -75,7 +75,7 @@ fn ignore_propose_from_non_leader() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_validator(VALIDATOR_3)    //without this line Prevote would have been broadcast
+        .with_validator(ValidatorId(3))    //without this line Prevote would have been broadcast
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .build();
 
@@ -95,12 +95,12 @@ fn handle_propose_with_incorrect_time() {
 
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
 
@@ -140,11 +140,11 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
 
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }

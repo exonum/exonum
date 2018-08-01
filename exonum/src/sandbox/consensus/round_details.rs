@@ -22,7 +22,7 @@ use bit_vec::BitVec;
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::{Height, Round};
+use helpers::{Height, Round, ValidatorId};
 use messages::{Message, Precommit, Prevote, PrevotesRequest, ProposeRequest, TransactionsRequest};
 use node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
@@ -46,12 +46,12 @@ fn positive_get_propose_send_prevote() {
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     info!("time: {:?}", sandbox.time());
@@ -78,22 +78,22 @@ fn request_propose_when_get_prevote() {
     let sandbox = timestamping_sandbox();
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &empty_hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &ProposeRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
+            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(ValidatorId(2)),
             Height(1),
             &empty_hash(),
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ),
     );
     sandbox.add_time(Duration::from_millis(0));
@@ -105,38 +105,38 @@ fn request_prevotes_when_get_prevote_message() {
     let sandbox = timestamping_sandbox();
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &empty_hash(),
         LOCK_ONE,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &ProposeRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
+            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(ValidatorId(2)),
             Height(1),
             &empty_hash(),
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ),
     );
 
     let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
-    validators.set(VALIDATOR_2.into(), true);
+    validators.set(ValidatorId(2).into(), true);
 
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &PrevotesRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
+            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(ValidatorId(2)),
             Height(1),
             Round(1),
             &empty_hash(),
             validators,
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ),
     );
     sandbox.add_time(Duration::from_millis(0));
@@ -168,42 +168,42 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
 
     sandbox.broadcast(&Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -213,23 +213,23 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(2),
             &propose.hash(),
             LOCK_ONE,
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
 
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(3),
             &propose.hash(),
             LOCK_ONE,
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
     }
     sandbox.add_time(Duration::from_millis(0));
@@ -258,43 +258,43 @@ fn lock_to_past_round_broadcast_prevote() {
     sandbox.assert_state(Height(1), Round(2));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
 
     sandbox.broadcast(&Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
     // ! here broadcast of
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ONE,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.add_time(Duration::from_millis(0));
 
@@ -303,23 +303,23 @@ fn lock_to_past_round_broadcast_prevote() {
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(3),
             &propose.hash(),
             LOCK_ONE,
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
 
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
         sandbox.broadcast(&Prevote::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(4),
             &propose.hash(),
             LOCK_ONE,
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
     }
     sandbox.add_time(Duration::from_millis(0));
@@ -346,57 +346,57 @@ fn handle_precommit_remove_request_prevotes() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
     {
         // in this block lock is obtained; without this lock requestPrevotes would have been sent
         sandbox.recv(&Prevote::new(
-            VALIDATOR_2,
+            ValidatorId(2),
             Height(1),
             Round(1),
             &propose.hash(),
             LOCK_ZERO,
-            sandbox.s(VALIDATOR_2),
+            sandbox.s(ValidatorId(2)),
         ));
         sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
 
         sandbox.broadcast(&Precommit::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             &block.hash(),
             sandbox.time().into(),
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
         sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
         sandbox.add_time(Duration::from_millis(0));
     }
 
     sandbox.recv(&Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.add_time(Duration::from_millis(PREVOTES_REQUEST_TIMEOUT));
 }
@@ -447,53 +447,53 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None);
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
     sandbox.assert_lock(LOCK_TWO, Some(propose.hash())); //only if round > locked round
 
     // !! here broadcast, of prevote from lock() function, occurs
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.broadcast(&Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(2),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.assert_lock(LOCK_TWO, Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -526,48 +526,48 @@ fn lock_remove_request_prevotes() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ONE,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.recv(&Prevote::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ONE,
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     {
         // without this block RequestPrevotes would have been broadcast
         sandbox.recv(&Prevote::new(
-            VALIDATOR_1,
+            ValidatorId(1),
             Height(1),
             Round(1),
             &propose.hash(),
             LOCK_ONE,
-            sandbox.s(VALIDATOR_1),
+            sandbox.s(ValidatorId(1)),
         ));
         sandbox.broadcast(&Prevote::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             LOCK_ZERO,
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
         sandbox.broadcast(&Precommit::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             &block.hash(),
             sandbox.time().into(),
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
     }
     sandbox.add_time(Duration::from_millis(PREVOTES_REQUEST_TIMEOUT));
@@ -593,41 +593,41 @@ fn handle_precommit_different_block_hash() {
     let block = BlockBuilder::new(&sandbox).build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.recv(&propose);
@@ -658,41 +658,41 @@ fn handle_precommit_positive_scenario_commit() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -701,11 +701,11 @@ fn handle_precommit_positive_scenario_commit() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.recv(&propose);
@@ -758,33 +758,33 @@ fn lock_not_send_prevotes_after_commit() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
 
     {
         sandbox.recv(&precommit_1);
         sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
         sandbox.send(
-            sandbox.a(VALIDATOR_1),
+            sandbox.a(ValidatorId(1)),
             &make_request_propose_from_precommit(&sandbox, &precommit_1),
         );
         sandbox.send(
-            sandbox.a(VALIDATOR_1),
+            sandbox.a(ValidatorId(1)),
             &make_request_prevote_from_precommit(&sandbox, &precommit_1),
         );
     }
@@ -797,11 +797,11 @@ fn lock_not_send_prevotes_after_commit() {
         // because this condition is checked at node/mod.rs->actual_round()
         sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
         sandbox.send(
-            sandbox.a(VALIDATOR_2),
+            sandbox.a(ValidatorId(2)),
             &make_request_propose_from_precommit(&sandbox, &precommit_2),
         );
         sandbox.send(
-            sandbox.a(VALIDATOR_2),
+            sandbox.a(ValidatorId(2)),
             &make_request_prevote_from_precommit(&sandbox, &precommit_2),
         );
     }
@@ -812,32 +812,32 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
         sandbox.recv(&Prevote::new(
-            VALIDATOR_2,
+            ValidatorId(2),
             Height(1),
             Round(1),
             &propose.hash(),
             LOCK_ZERO,
-            sandbox.s(VALIDATOR_2),
+            sandbox.s(ValidatorId(2)),
         ));
         sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
         sandbox.recv(&Prevote::new(
-            VALIDATOR_3,
+            ValidatorId(3),
             Height(1),
             Round(1),
             &propose.hash(),
             LOCK_ZERO,
-            sandbox.s(VALIDATOR_3),
+            sandbox.s(ValidatorId(3)),
         ));
 
         sandbox.broadcast(&Precommit::new(
-            VALIDATOR_0,
+            SANDBOXED_VALIDATOR_ID,
             Height(1),
             Round(1),
             &propose.hash(),
             &block.hash(),
             sandbox.time().into(),
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ));
         sandbox.check_broadcast_status(Height(2), &block.hash());
     }
@@ -851,8 +851,8 @@ fn lock_not_send_prevotes_after_commit() {
         // if block with precommit_2 is uncommented, then during lock commit will occur and
         // lock will disappear and prevotes for disappeared lock (these prevotes are the
         // primary goal of the test) will not be sent
-        //  !!!      sandbox.broadcast(&Prevote::new(VALIDATOR_0, Height(0), Round(2),
-        // &propose.hash(), LOCK_ONE, sandbox.s(VALIDATOR_0)));
+        //  !!!      sandbox.broadcast(&Prevote::new(SANDBOXED_VALIDATOR_ID, Height(0), Round(2),
+        // &propose.hash(), LOCK_ONE, sandbox.s(SANDBOXED_VALIDATOR_ID)));
     }
 }
 
@@ -878,41 +878,41 @@ fn do_not_commit_if_propose_is_unknown() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -921,11 +921,11 @@ fn do_not_commit_if_propose_is_unknown() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     // !! if this propose would be received, commit would occur and last assert will
@@ -960,41 +960,41 @@ fn do_not_commit_if_tx_is_unknown() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1003,11 +1003,11 @@ fn do_not_commit_if_tx_is_unknown() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1053,41 +1053,41 @@ fn commit_using_unknown_propose_with_precommits() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1096,11 +1096,11 @@ fn commit_using_unknown_propose_with_precommits() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1108,11 +1108,11 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.recv(&precommit_3);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &make_request_propose_from_precommit(&sandbox, &precommit_3),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_3),
     );
 
@@ -1122,12 +1122,12 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.recv(&tx);
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     sandbox.check_broadcast_status(Height(2), &block.hash());
 
@@ -1167,41 +1167,41 @@ fn handle_full_propose_wrong_state_hash() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1210,11 +1210,11 @@ fn handle_full_propose_wrong_state_hash() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1222,11 +1222,11 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.recv(&precommit_3);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &make_request_propose_from_precommit(&sandbox, &precommit_3),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_3),
     );
 
@@ -1238,12 +1238,12 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.recv(&tx);
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.add_time(Duration::from_millis(0));
@@ -1262,53 +1262,53 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
     add_round_with_transactions(&sandbox, &sandbox_state, &[]);
 
     let future_propose = ProposeBuilder::new(&sandbox)
-        .with_validator(VALIDATOR_3)
+        .with_validator(ValidatorId(3))
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_round(Round(2))
         .build();
     sandbox.recv(&future_propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(2),
         &future_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
 
     // !! lock is obtained, but broadcast(Precommit is absent
-    //    sandbox.broadcast(&Precommit::new(VALIDATOR_0, Height(0), Round(1), &propose.hash(),
-    //          &block.hash(), sandbox.s(VALIDATOR_0)));
+    //    sandbox.broadcast(&Precommit::new(SANDBOXED_VALIDATOR_ID, Height(0), Round(1), &propose.hash(),
+    //          &block.hash(), sandbox.s(SANDBOXED_VALIDATOR_ID)));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
 }
@@ -1345,14 +1345,14 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(block_1_delay)
-        .with_proposer_id(VALIDATOR_0)
+        .with_proposer_id(SANDBOXED_VALIDATOR_ID)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     // this propose will be used during second commit
     let height_one_propose = ProposeBuilder::new(&sandbox)
-        .with_validator(VALIDATOR_3)
+        .with_validator(ValidatorId(3))
         .with_height(Height(2))
         .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
@@ -1360,7 +1360,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
 
     // this block will be created during second commit while manually creating precommits
     let second_block = BlockBuilder::new(&sandbox)
-        .with_proposer_id(VALIDATOR_3)
+        .with_proposer_id(ValidatorId(3))
         .with_height(Height(2))
         .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
@@ -1368,31 +1368,31 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(2),
         Round(1),
         &height_one_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(2),
         Round(1),
         &height_one_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(2),
         Round(1),
         &height_one_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1); //early precommit from future height
@@ -1406,11 +1406,11 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     //    sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1419,22 +1419,22 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
     sandbox.recv(&height_one_propose);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(2),
         Round(1),
         &height_one_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
@@ -1493,41 +1493,41 @@ fn commit_as_leader_send_propose_round_timeout() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         current_height,
         current_round,
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         current_height,
         current_round,
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         current_height,
         current_round,
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_1),
+        sandbox.a(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1536,11 +1536,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1597,12 +1597,12 @@ fn handle_tx_handle_full_propose() {
     sandbox.recv(&propose);
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
+            &sandbox.p(SANDBOXED_VALIDATOR_ID),
+            &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(SANDBOXED_VALIDATOR_ID),
         ),
     );
 
@@ -1641,12 +1641,12 @@ fn broadcast_prevote_with_tx_positive() {
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(2),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
 }
 

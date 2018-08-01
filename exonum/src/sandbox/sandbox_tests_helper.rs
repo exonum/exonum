@@ -33,10 +33,7 @@ pub type TimestampingSandbox = Sandbox;
 pub const LOCK_ZERO: Round = Round(0);
 pub const LOCK_ONE: Round = Round(1);
 pub const LOCK_TWO: Round = Round(2);
-pub const VALIDATOR_0: ValidatorId = ValidatorId(0);
-pub const VALIDATOR_1: ValidatorId = ValidatorId(1);
-pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
-pub const VALIDATOR_3: ValidatorId = ValidatorId(3);
+pub const SANDBOXED_VALIDATOR_ID: ValidatorId = ValidatorId(0);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
@@ -392,13 +389,13 @@ where
             }
 
             sandbox.broadcast(&Precommit::new(
-                VALIDATOR_0,
+                SANDBOXED_VALIDATOR_ID,
                 initial_height,
                 round,
                 &propose.hash(),
                 &block.hash(),
                 sandbox.time().into(),
-                sandbox.s(VALIDATOR_0),
+                sandbox.s(SANDBOXED_VALIDATOR_ID),
             ));
             sandbox.assert_lock(round, Some(propose.hash()));
 
@@ -466,12 +463,15 @@ pub fn add_one_height_with_transactions_from_other_validator(
         //        add_round_with_transactions(&sandbox, &[tx.hash()]);
         add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
         let round = sandbox.current_round();
-        if VALIDATOR_1 == sandbox.leader(round) {
+        if ValidatorId(1) == sandbox.leader(round) {
             sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
             // ok, we are leader
             trace!("ok, validator 1 leader, round: {:?}", round);
-            let propose =
-                get_propose_with_transactions_for_validator(sandbox, hashes.as_ref(), VALIDATOR_1);
+            let propose = get_propose_with_transactions_for_validator(
+                sandbox,
+                hashes.as_ref(),
+                ValidatorId(1),
+            );
             trace!("propose.hash: {:?}", propose.hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             sandbox.recv(&propose);
@@ -528,7 +528,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 }
 
 fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Propose {
-    get_propose_with_transactions_for_validator(sandbox, transactions, VALIDATOR_0)
+    get_propose_with_transactions_for_validator(sandbox, transactions, SANDBOXED_VALIDATOR_ID)
 }
 
 fn get_propose_with_transactions_for_validator(
@@ -594,12 +594,12 @@ fn try_check_and_broadcast_propose_and_prevote(
     sandbox.try_broadcast(&propose)?;
 
     sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         sandbox.current_height(),
         sandbox.current_round(),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     ));
     Ok(Some(propose.clone()))
 }
@@ -627,11 +627,11 @@ pub fn make_request_propose_from_precommit(
     precommit: &Precommit,
 ) -> ProposeRequest {
     ProposeRequest::new(
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(SANDBOXED_VALIDATOR_ID),
         &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.propose_hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     )
 }
 
@@ -641,13 +641,13 @@ pub fn make_request_prevote_from_precommit(
 ) -> PrevotesRequest {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
     PrevotesRequest::new(
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(SANDBOXED_VALIDATOR_ID),
         &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.round(),
         precommit.propose_hash(),
         validators,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     )
 }
 
@@ -655,11 +655,11 @@ pub fn make_request_prevote_from_precommit(
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
 pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Prevote {
     Prevote::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         propose.height(),
         propose.round(),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     )
 }

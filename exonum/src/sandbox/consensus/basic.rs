@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
-use helpers::{Height, Round};
+use helpers::{Height, Round, ValidatorId};
 use messages::{Message, Precommit, Prevote, Propose, RawMessage, CONSENSUS};
 use sandbox::{
     sandbox::timestamping_sandbox, sandbox_tests_helper::*,
@@ -74,29 +74,29 @@ fn test_reach_actual_round() {
     let tx = gen_timestamping_tx();
 
     let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_proposer_id(VALIDATOR_3)
+        .with_proposer_id(ValidatorId(3))
         .with_tx_hash(&tx.hash())
         .build();
 
     let future_propose = Propose::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(4),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&future_propose);
     sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(4),
         &block_at_first_height.clone().hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
 
     sandbox.assert_state(Height(1), Round(4));

@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::{user_agent, Height, Round};
+use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{Connect, PeersRequest, Precommit, Prevote};
 use node;
 
@@ -140,33 +140,33 @@ fn should_not_vote_after_node_restart() {
     sandbox.broadcast(&prevote);
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); // Do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
 
     let precommit = Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
@@ -213,33 +213,33 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox.broadcast(&prevote);
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
 
     let precommit = Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
 
     sandbox.broadcast(&precommit);
@@ -257,23 +257,23 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox_restarted.broadcast(&precommit);
 
     sandbox_restarted.recv(&Precommit::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox_restarted.time().into(),
-        sandbox_restarted.s(VALIDATOR_1),
+        sandbox_restarted.s(ValidatorId(1)),
     ));
 
     sandbox_restarted.recv(&Precommit::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox_restarted.time().into(),
-        sandbox_restarted.s(VALIDATOR_2),
+        sandbox_restarted.s(ValidatorId(2)),
     ));
 
     sandbox_restarted.assert_state(Height(2), Round(1));
@@ -304,33 +304,33 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.broadcast(&first_prevote);
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(1),
         &first_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(1),
         &first_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
     sandbox.assert_lock(LOCK_ONE, Some(first_propose.hash()));
 
     let first_precommit = Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(1),
         &first_propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
 
     sandbox.broadcast(&first_precommit);
@@ -346,7 +346,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(2),
         first_prevote.propose_hash(),
         LOCK_ONE,
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
     sandbox.broadcast(&first_updated_prevote);
 
@@ -360,44 +360,44 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.recv(&second_propose);
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_1,
+        ValidatorId(1),
         Height(1),
         Round(2),
         &second_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     ));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
+        ValidatorId(2),
         Height(1),
         Round(2),
         &second_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
 
     sandbox.assert_lock(LOCK_ONE, Some(first_propose.hash()));
 
     sandbox.recv(&Prevote::new(
-        VALIDATOR_3,
+        ValidatorId(3),
         Height(1),
         Round(2),
         &second_propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.assert_lock(LOCK_TWO, Some(second_propose.hash()));
 
     let second_precommit = Precommit::new(
-        VALIDATOR_0,
+        SANDBOXED_VALIDATOR_ID,
         Height(1),
         Round(2),
         &second_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(SANDBOXED_VALIDATOR_ID),
     );
     sandbox.broadcast(&second_precommit);
 
@@ -416,7 +416,7 @@ fn test_recover_consensus_messages_in_other_round() {
         first_precommit.propose_hash(),
         first_precommit.block_hash(),
         sandbox_new.time().into(),
-        sandbox_new.s(VALIDATOR_0),
+        sandbox_new.s(SANDBOXED_VALIDATOR_ID),
     );
     sandbox_new.broadcast(&first_precommit_new_time);
     sandbox_new.broadcast(&first_updated_prevote);
@@ -434,7 +434,7 @@ fn should_restore_peers_after_restart() {
     // create sandbox with nodes not aware about each other
     let sandbox = sandbox_with_services_uninitialized(vec![]);
 
-    let (v0, v1) = (VALIDATOR_0, VALIDATOR_1);
+    let (v0, v1) = (SANDBOXED_VALIDATOR_ID, ValidatorId(1));
     let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
