@@ -438,7 +438,7 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes);
+            let (_, patch) = blockchain.create_patch(SANDBOXED_VALIDATOR_ID, height, &hashes);
             fork.merge(patch);
             fork
         };
