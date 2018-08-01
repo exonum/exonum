@@ -61,27 +61,35 @@ impl From<Error> for ExecutionError {
 }
 
 transactions! {
+    /// Transaction group.
     pub WalletTransactions {
         const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
 
         /// Transfer `amount` of the currency from one wallet to another.
         struct Transfer {
+            /// `PublicKey` of sender's wallet.
             from:    &PublicKey,
+            /// `PublicKey` of receiver's wallet.
             to:      &PublicKey,
+            /// Amount of the currency to transfer.
             amount:  u64,
             seed:    u64,
         }
 
         /// Issue `amount` of the currency to the `wallet`.
         struct Issue {
+            /// `PublicKey` of the wallet.
             pub_key:  &PublicKey,
+            /// Issued amount of the currency.
             amount:  u64,
             seed:    u64,
         }
 
         /// Create wallet with the given `name`.
         struct CreateWallet {
+            /// `PublicKey` of the new wallet.
             pub_key: &PublicKey,
+            /// Name of the new wallet.
             name:    &str,
         }
     }
