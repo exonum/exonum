@@ -29,7 +29,7 @@ encoding_struct! {
 }
 
 encoding_struct! {
-    /// Timestamp entry
+    /// Timestamp entry.
     struct TimestampEntry {
         /// Timestamp data.
         timestamp: Timestamp,
@@ -42,14 +42,14 @@ encoding_struct! {
     }
 }
 
-/// Timestamping information schema.
+/// Timestamping database schema.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,
 }
 
 impl<T> Schema<T> {
-    /// Creates new timestamping schema with given snapshot.
+    /// Creates new timestamping schema with given view.
     pub fn new(snapshot: T) -> Self {
         Schema { view: snapshot }
     }
@@ -59,7 +59,7 @@ impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
-    /// Returns the list of timestamps with their proofs.
+    /// Returns the `ProofMapIndex` of timestamps with their proofs.
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
@@ -71,12 +71,12 @@ where
 }
 
 impl<'a> Schema<&'a mut Fork> {
-    /// Returns the mutable list of timestamps.
+    /// Returns the mutable `ProofMapIndex` of timestamps.
     pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &mut self.view)
     }
 
-    /// Add the timestamp entry to the schema.
+    /// Adds the timestamp entry to the database.
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp();
         let content_hash = timestamp.content_hash();

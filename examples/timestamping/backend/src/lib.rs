@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Timestamping demo. Example of using Exonum framework.
+//! Timestamping demo. This example shows how to use Exonum framework to create fast
+//! and secure service to prove the existence of specific file at some moment
+//! of time using blockchain as a secured database.
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
@@ -31,7 +33,7 @@ extern crate serde_json;
 
 /// REST API.
 pub mod api;
-/// Timestamping information schema.
+/// Timestamping database schema.
 pub mod schema;
 /// Timestamping transactions.
 pub mod transactions;

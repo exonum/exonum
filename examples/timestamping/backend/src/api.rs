@@ -21,11 +21,10 @@ use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
 use TIMESTAMPING_SERVICE;
 
-/// The structure describes the query parameters for `handle_timestamp`
-/// and `handle_timestamp_proof` endpoints.
+/// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TimestampQuery {
-    /// The hash of the given timestamp.
+    /// Hash of the requested timestamp.
     pub hash: Hash,
 }
 
@@ -36,15 +35,14 @@ impl TimestampQuery {
     }
 }
 
-/// The structure describes the information to prove the correctness of
-/// timestamp entry.
+/// Describes the information to prove the correctness of the timestamp entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimestampProof {
-    /// The `BlockProof` of the appropriate block.
+    /// `BlockProof` of the last block.
     pub block_info: BlockProof,
-    /// The proof of the actual state of timestamping.
+    /// `MapProof` of the actual state of timestamping service.
     pub state_proof: MapProof<Hash, Hash>,
-    /// The proof of the appropriate `TimestampEntry`'s.
+    /// `MapProof` of the actual state of timestamping database.
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
 
@@ -63,7 +61,7 @@ impl PublicApi {
         Ok(hash)
     }
 
-    /// Endpoint for getting single timestamp.
+    /// Endpoint for getting a single timestamp.
     pub fn handle_timestamp(
         state: &ServiceApiState,
         query: TimestampQuery,
@@ -73,7 +71,7 @@ impl PublicApi {
         Ok(schema.timestamps().get(&query.hash))
     }
 
-    /// Endpoint for getting the proof of single timestamp.
+    /// Endpoint for getting the proof of a single timestamp.
     pub fn handle_timestamp_proof(
         state: &ServiceApiState,
         query: TimestampQuery,
@@ -95,7 +93,7 @@ impl PublicApi {
         })
     }
 
-    /// Wires this endpoints to public scope of given `ServiceApiBuilder`.
+    /// Wires these endpoints to public API scope of given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
