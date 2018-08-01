@@ -770,7 +770,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         mempool: Default::default(),
     };
 
-    // TODO: Use factory or other solution like set_handler or run. (ECR-1627)
     let system_state = SandboxSystemStateProvider {
         listen_address: addresses[0],
         shared_time: SharedTime::new(Mutex::new(
