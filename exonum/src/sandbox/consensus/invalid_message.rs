@@ -18,7 +18,7 @@
 //! incorrect messages.
 
 use crypto::CryptoHash;
-use helpers::{Height, Round};
+use helpers::{Height, Round, ValidatorId};
 use messages::{Prevote, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -26,8 +26,10 @@ use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 fn test_ignore_message_with_incorrect_validator_id() {
     let sandbox = timestamping_sandbox();
 
+    let incorrect_validator_id = ValidatorId(64_999);
+
     let propose = Propose::new(
-        INCORRECT_VALIDATOR_ID,
+        incorrect_validator_id,
         Height(0),
         Round(1),
         &sandbox.last_hash(),

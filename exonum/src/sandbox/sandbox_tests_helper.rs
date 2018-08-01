@@ -37,7 +37,6 @@ pub const VALIDATOR_0: ValidatorId = ValidatorId(0);
 pub const VALIDATOR_1: ValidatorId = ValidatorId(1);
 pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
 pub const VALIDATOR_3: ValidatorId = ValidatorId(3);
-pub const INCORRECT_VALIDATOR_ID: ValidatorId = ValidatorId(64_999);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
