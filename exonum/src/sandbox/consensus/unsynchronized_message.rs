@@ -90,13 +90,8 @@ fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    // get some tx
     let tx = gen_timestamping_tx();
 
-    // TODO: This commented code is saved because it may be used later. (ECR-1627)
-    //    let block_at_first_height = Block::new(HEIGHT_ZERO, ROUND_FOUR, future_propose_time,
-    //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
-    //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
