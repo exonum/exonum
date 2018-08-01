@@ -64,7 +64,7 @@ where
         ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
 
-    /// Returns the hash of timestamping state.
+    /// Returns the state hash of timestamping service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.timestamps().merkle_root()]
     }
