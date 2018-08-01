@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! REST API.
+
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof},
     crypto::{CryptoHash, Hash}, node::TransactionSend, storage::MapProof,
@@ -35,7 +37,7 @@ impl TimestampQuery {
     }
 }
 
-/// Describes the information to prove the correctness of the timestamp entry.
+/// Describes the information required to prove the correctness of the timestamp entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimestampProof {
     /// `BlockProof` of the last block.
@@ -51,7 +53,7 @@ pub struct TimestampProof {
 pub struct PublicApi;
 
 impl PublicApi {
-    /// Endpoint for handling timestamping transaction.
+    /// Endpoint for handling timestamping transactions.
     pub fn handle_post_transaction(
         state: &ServiceApiState,
         transaction: TxTimestamp,
@@ -93,7 +95,7 @@ impl PublicApi {
         })
     }
 
-    /// Wires these endpoints to public API scope of given `ServiceApiBuilder`.
+    /// Wires the above endpoints to public API scope of the given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Timestamping database schema.
+
 use chrono::{DateTime, Utc};
 use exonum::{
     crypto::Hash, storage::{Fork, ProofMapIndex, Snapshot},
