@@ -122,7 +122,7 @@ jobs:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
     script:
-    - cargo test --all
+    - cargo test --all --tests
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
@@ -136,6 +136,28 @@ jobs:
     rust: nightly-2018-05-26
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Documentation tests.
+  - env: FEATURE=doc-tests
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - gcc
+        - g++
+        - libssl-dev
+        - libcurl4-openssl-dev
+        - libelf-dev
+        - libdw-dev
+        - binutils-dev
+        - libiberty-dev
+        - libsnappy-dev
+        - librocksdb
+    script:
+    - cargo test --all --doc
 
 notifications:
   slack:
