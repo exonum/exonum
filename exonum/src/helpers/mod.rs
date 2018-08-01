@@ -80,7 +80,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         .enumerate()
         .map(|(idx, (validator, service))| NodeConfig {
             listen_address: peers[idx],
-            external_address: Some(peers[idx]),
+            external_address: peers[idx],
             network: Default::default(),
             consensus_public_key: validator.0,
             consensus_secret_key: validator.1,
