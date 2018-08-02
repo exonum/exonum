@@ -106,7 +106,6 @@ rtype
 runtimes
 rustfmt
 rustup
-sandboxed
 scalarmult
 seedable
 serde

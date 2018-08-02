@@ -31,7 +31,6 @@ use storage::Database;
 pub type TimestampingSandbox = Sandbox;
 
 pub const NOT_LOCKED: Round = Round(0);
-pub const SANDBOX_VALIDATOR_ID: ValidatorId = ValidatorId(0);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
@@ -387,13 +386,13 @@ where
             }
 
             sandbox.broadcast(&Precommit::new(
-                SANDBOX_VALIDATOR_ID,
+                ValidatorId(0),
                 initial_height,
                 round,
                 &propose.hash(),
                 &block.hash(),
                 sandbox.time().into(),
-                sandbox.s(SANDBOX_VALIDATOR_ID),
+                sandbox.s(ValidatorId(0)),
             ));
             sandbox.assert_lock(round, Some(propose.hash()));
 
@@ -526,7 +525,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 }
 
 fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Propose {
-    get_propose_with_transactions_for_validator(sandbox, transactions, SANDBOX_VALIDATOR_ID)
+    get_propose_with_transactions_for_validator(sandbox, transactions, ValidatorId(0))
 }
 
 fn get_propose_with_transactions_for_validator(
@@ -592,12 +591,12 @@ fn try_check_and_broadcast_propose_and_prevote(
     sandbox.try_broadcast(&propose)?;
 
     sandbox.broadcast(&Prevote::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         sandbox.current_height(),
         sandbox.current_round(),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     ));
     Ok(Some(propose.clone()))
 }
@@ -625,11 +624,11 @@ pub fn make_request_propose_from_precommit(
     precommit: &Precommit,
 ) -> ProposeRequest {
     ProposeRequest::new(
-        &sandbox.p(SANDBOX_VALIDATOR_ID),
+        &sandbox.p(ValidatorId(0)),
         &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.propose_hash(),
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     )
 }
 
@@ -639,13 +638,13 @@ pub fn make_request_prevote_from_precommit(
 ) -> PrevotesRequest {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
     PrevotesRequest::new(
-        &sandbox.p(SANDBOX_VALIDATOR_ID),
+        &sandbox.p(ValidatorId(0)),
         &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.round(),
         precommit.propose_hash(),
         validators,
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     )
 }
 
@@ -653,11 +652,11 @@ pub fn make_request_prevote_from_precommit(
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
 pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Prevote {
     Prevote::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         propose.height(),
         propose.round(),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     )
 }

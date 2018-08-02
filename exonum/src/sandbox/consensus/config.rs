@@ -16,7 +16,7 @@
 
 use blockchain::Schema;
 use crypto::CryptoHash;
-use helpers::Height;
+use helpers::{Height, ValidatorId};
 use messages::Message;
 use sandbox::{config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -39,10 +39,10 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         TxConfig::new(
-            &sandbox.p(SANDBOX_VALIDATOR_ID),
+            &sandbox.p(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
-            sandbox.s(SANDBOX_VALIDATOR_ID),
+            sandbox.s(ValidatorId(0)),
         )
     };
 
@@ -70,10 +70,10 @@ fn test_schema_config_changes() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         let tx = TxConfig::new(
-            &sandbox.p(SANDBOX_VALIDATOR_ID),
+            &sandbox.p(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
-            sandbox.s(SANDBOX_VALIDATOR_ID),
+            sandbox.s(ValidatorId(0)),
         );
         (tx, consensus_cfg)
     };

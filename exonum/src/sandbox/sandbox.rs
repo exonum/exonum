@@ -25,8 +25,7 @@ use std::{
 };
 
 use super::{
-    config_updater::ConfigUpdateService,
-    sandbox_tests_helper::{PROPOSE_TIMEOUT, SANDBOX_VALIDATOR_ID},
+    config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
     timestamping::TimestampingService,
 };
 use blockchain::{
@@ -147,11 +146,11 @@ impl Sandbox {
         end_index: usize,
     ) {
         let connect = Connect::new(
-            &self.p(SANDBOX_VALIDATOR_ID),
-            self.a(SANDBOX_VALIDATOR_ID),
+            &self.p(ValidatorId(0)),
+            self.a(ValidatorId(0)),
             connect_message_time.into(),
             &user_agent::get(),
-            self.s(SANDBOX_VALIDATOR_ID),
+            self.s(ValidatorId(0)),
         );
 
         for validator in start_index..end_index {
@@ -438,7 +437,7 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(SANDBOX_VALIDATOR_ID, height, &hashes);
+            let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes);
             fork.merge(patch);
             fork
         };
@@ -543,7 +542,7 @@ impl Sandbox {
                 c.addr(),
                 time.into(),
                 c.user_agent(),
-                self.s(SANDBOX_VALIDATOR_ID),
+                self.s(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);
@@ -567,7 +566,7 @@ impl Sandbox {
         let internal_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
 
-        let address = self.a(SANDBOX_VALIDATOR_ID);
+        let address = self.a(ValidatorId(0));
         let inner = self.inner.borrow();
 
         let blockchain = inner
@@ -930,11 +929,11 @@ mod tests {
         s.send(
             s.a(ValidatorId(2)),
             &Connect::new(
-                &s.p(SANDBOX_VALIDATOR_ID),
-                s.a(SANDBOX_VALIDATOR_ID),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(SANDBOX_VALIDATOR_ID),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -957,11 +956,11 @@ mod tests {
         s.send(
             s.a(ValidatorId(1)),
             &Connect::new(
-                &s.p(SANDBOX_VALIDATOR_ID),
-                s.a(SANDBOX_VALIDATOR_ID),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(SANDBOX_VALIDATOR_ID),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -988,11 +987,11 @@ mod tests {
         s.send(
             s.a(ValidatorId(1)),
             &Connect::new(
-                &s.p(SANDBOX_VALIDATOR_ID),
-                s.a(SANDBOX_VALIDATOR_ID),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(SANDBOX_VALIDATOR_ID),
+                s.s(ValidatorId(0)),
             ),
         );
     }

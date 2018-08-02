@@ -160,13 +160,13 @@ fn should_not_vote_after_node_restart() {
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 
     let precommit = Precommit::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(Round(1), Some(propose.hash()));
@@ -233,13 +233,13 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 
     let precommit = Precommit::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(1),
         Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     );
 
     sandbox.broadcast(&precommit);
@@ -324,13 +324,13 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.assert_lock(Round(1), Some(first_propose.hash()));
 
     let first_precommit = Precommit::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(1),
         Round(1),
         &first_propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     );
 
     sandbox.broadcast(&first_precommit);
@@ -346,7 +346,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(2),
         first_prevote.propose_hash(),
         Round(1),
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     );
     sandbox.broadcast(&first_updated_prevote);
 
@@ -391,13 +391,13 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.assert_lock(Round(2), Some(second_propose.hash()));
 
     let second_precommit = Precommit::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(1),
         Round(2),
         &second_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     );
     sandbox.broadcast(&second_precommit);
 
@@ -416,7 +416,7 @@ fn test_recover_consensus_messages_in_other_round() {
         first_precommit.propose_hash(),
         first_precommit.block_hash(),
         sandbox_new.time().into(),
-        sandbox_new.s(SANDBOX_VALIDATOR_ID),
+        sandbox_new.s(ValidatorId(0)),
     );
     sandbox_new.broadcast(&first_precommit_new_time);
     sandbox_new.broadcast(&first_updated_prevote);
@@ -434,7 +434,7 @@ fn should_restore_peers_after_restart() {
     // create sandbox with nodes not aware about each other
     let sandbox = sandbox_with_services_uninitialized(vec![]);
 
-    let (v0, v1) = (SANDBOX_VALIDATOR_ID, ValidatorId(1));
+    let (v0, v1) = (ValidatorId(0), ValidatorId(1));
     let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 

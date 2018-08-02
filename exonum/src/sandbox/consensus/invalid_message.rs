@@ -45,7 +45,7 @@ fn test_ignore_message_with_incorrect_signature() {
     let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(0),
         Round(1),
         &sandbox.last_hash(),
@@ -95,12 +95,12 @@ fn handle_propose_with_incorrect_time() {
 
     sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.broadcast(&Prevote::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -140,11 +140,11 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
 
     sandbox.assert_lock(NOT_LOCKED, None);
     sandbox.broadcast(&Prevote::new(
-        SANDBOX_VALIDATOR_ID,
+        ValidatorId(0),
         Height(1),
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(SANDBOX_VALIDATOR_ID),
+        sandbox.s(ValidatorId(0)),
     ));
 }
