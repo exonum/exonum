@@ -24,7 +24,6 @@ use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{Height, Round};
 use messages::{Message, Precommit, Prevote, Propose, RawMessage, Status, CONSENSUS};
-
 use sandbox::{
     sandbox::timestamping_sandbox, sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, TIMESTAMPING_SERVICE},
@@ -32,7 +31,6 @@ use sandbox::{
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader
-
 #[test]
 fn test_check_leader() {
     let sandbox = timestamping_sandbox();
