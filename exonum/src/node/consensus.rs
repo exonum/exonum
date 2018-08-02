@@ -270,7 +270,7 @@ impl NodeHandler {
         }
 
         // Commit propose
-        for (round, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
+        for (round, block_hash) in self.state.take_unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
             let our_block_hash = self.execute(&hash);
 
