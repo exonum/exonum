@@ -21,7 +21,7 @@ extern crate serde_derive;
 extern crate toml;
 
 use exonum::{
-    api::backends::actix::AllowOrigin, crypto::PublicKey, encoding::serialize::FromHex,
+    api::backends::actix::AllowOrigin, crypto::PublicKey,
     helpers::{
         config::{ConfigFile, ConfigManager}, fabric::NodeBuilder,
     },
@@ -30,8 +30,8 @@ use exonum::{
 use toml::Value;
 
 use std::{
-    ffi::OsString, fs, fs::{File, OpenOptions}, io::{Read, Write},
-    net::{SocketAddr, ToSocketAddrs}, panic, path::Path, str::FromStr,
+    ffi::OsString, fs, fs::{File, OpenOptions}, io::{Read, Write}, net::SocketAddr, panic,
+    path::Path, str::FromStr,
 };
 
 const CONFIG_TMP_FOLDER: &str = "/tmp/";
@@ -359,54 +359,4 @@ fn test_update_config() {
 
     // Cleanup.
     fs::remove_dir_all(Path::new(&full_test_dir)).unwrap();
-}
-
-#[test]
-fn test_domain_name_peer() {
-    const TEST_CONFIG_FILE: &str = "config_domain.toml";
-    let testdata_path = full_testdata_name(TEST_CONFIG_FILE);
-    let config: ConnectListConfig =
-        ConfigFile::load(testdata_path).expect("Can't load node config file");
-
-    let resolve_address = |a: &str| {
-        a.to_socket_addrs()
-            .expect(&format!("unable to resolve name from hostname: {}", a))
-            .next()
-            .expect(&format!("no one ip belongs to the hostname: {}", a))
-    };
-
-    let connect_info = match resolve_address("localhost:6333") {
-        SocketAddr::V4(..) => ConnectInfo {
-            address: "127.0.0.1:6333".parse().unwrap(),
-            public_key: PublicKey::from_hex(
-                "648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3",
-            ).unwrap(),
-        },
-        SocketAddr::V6(..) => ConnectInfo {
-            address: "[::1]:6333".parse().unwrap(),
-            public_key: PublicKey::from_hex(
-                "648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3",
-            ).unwrap(),
-        },
-    };
-
-    let connect_list = ConnectListConfig {
-        peers: vec![
-            ConnectInfo {
-                address: "127.0.0.1:6333".parse().unwrap(),
-                public_key: PublicKey::from_hex(
-                    "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72",
-                ).unwrap(),
-            },
-            connect_info,
-            ConnectInfo {
-                address: "94.130.16.228:6333".parse().unwrap(),
-                public_key: PublicKey::from_hex(
-                    "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e",
-                ).unwrap(),
-            },
-        ],
-    };
-
-    assert_eq!(config.peers, connect_list.peers);
 }

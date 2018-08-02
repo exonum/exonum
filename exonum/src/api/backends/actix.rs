@@ -13,9 +13,6 @@
 // limitations under the License.
 
 //! Actix-web API backend.
-//!
-//! [Actix-web](https://github.com/actix/actix-web) is an asynchronous backend
-//! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
 pub use actix_web::middleware::cors::Cors;
 
@@ -60,7 +57,7 @@ type SystemAddr = Addr<Syn, System>;
 pub struct RequestHandler {
     /// Endpoint name.
     pub name: String,
-    /// Endpoint HTTP method.
+    /// Endpoint http method.
     pub method: actix_web::http::Method,
     /// Inner handler.
     pub inner: Arc<RawHandler>,
@@ -266,14 +263,14 @@ pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeC
 pub struct ApiRuntimeConfig {
     /// The socket address to bind.
     pub listen_address: SocketAddr,
-    /// API access level.
+    /// Api access level.
     pub access: ApiAccess,
     /// Optional App configuration.
     pub app_config: Option<AppConfig>,
 }
 
 impl ApiRuntimeConfig {
-    /// Creates API runtime configuration for the given address and access level.
+    /// Creates api runtime configuration for the given address and access level.
     pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
         Self {
             listen_address,
@@ -318,7 +315,7 @@ impl SystemRuntimeConfig {
 
 impl SystemRuntime {
     fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
-        // Creates a system thread.
+        // Creates system thread.
         let (system_address_tx, system_address_rx) = mpsc::channel();
         let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
         let api_runtimes = config.api_runtimes.clone();
@@ -415,9 +412,9 @@ impl fmt::Debug for SystemRuntime {
 /// CORS header specification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AllowOrigin {
-    /// Allows access from any host.
+    /// Allow access from any host.
     Any,
-    /// Allows access only from the specified hosts.
+    /// Allow access only from the following hosts.
     Whitelist(Vec<String>),
 }
 

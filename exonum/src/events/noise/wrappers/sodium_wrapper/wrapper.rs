@@ -157,8 +157,8 @@ impl NoiseWrapper {
     }
 
     // Each message consists of the payload and 16 bytes(`TAG_LENGTH`)
-    // of AEAD authentication data. Therefore to calculate an actual message
-    // length we need to subtract `TAG_LENGTH` multiplied by messages count
+    // of AEAD authentification data. Therefore to calculate an actual message
+    // length we need to substract `TAG_LENGTH` multiplied by messages count
     // from `data.len()`.
     fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
         raw_message_len - TAG_LENGTH * (raw_message_len / MAX_MESSAGE_LENGTH)

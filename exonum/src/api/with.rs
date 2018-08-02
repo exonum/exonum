@@ -23,13 +23,11 @@ pub type Result<I> = ::std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
 pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
-/// API endpoint handler extractor which can extract a handler from various entities.
-///
+/// API endpoint handler extractor which can extract handler from various entities.
 /// The basic idea of this structure is to extract type parameters from the given handler,
 /// thus, it becomes possible to distinguish different types of closures in compile time.
-/// This structure allows applying anonymous functions to endpoints.
 ///
-/// For example, for a handler with signature:
+/// For example for handler with signature:
 ///
 /// `Fn(state: &ServiceApiState, query: MyQuery) -> Result<MyResponse, api::Error>`
 ///
@@ -47,15 +45,15 @@ pub struct With<Q, I, R, F> {
     _result_type: PhantomData<R>,
 }
 
-/// Immutable endpoint marker, which enables creating an immutable kind of `NamedWith`.
+/// Immutable endpoint marker. With it possible to create immutable kind of `NamedWith`.
 #[derive(Debug)]
 pub struct Immutable;
 
-/// Mutable endpoint marker, which enables creating a mutable kind of `NamedWith`.
+/// Mutable endpoint marker. With it possible to create mutable kind of `NamedWith`.
 #[derive(Debug)]
 pub struct Mutable;
 
-/// API Endpoint extractor that also contains the endpoint name and its kind.
+/// API Endpoint extractor that also contains endpoint name and its kind.
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F, K> {
     /// Endpoint name.
@@ -80,7 +78,7 @@ impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
     }
 }
 
-// Implementations for `Result` and `query` parameters.
+// Implementations for Result and query params.
 
 impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
 where
@@ -96,7 +94,7 @@ where
     }
 }
 
-// Implementations for `FutureResult` and `query` parameters.
+// Implementations for FutureResult and query params.
 
 impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where

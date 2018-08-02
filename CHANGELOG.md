@@ -5,40 +5,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Breaking Changes
+## 0.9.1 - 2018-08-02
+
+### Bug Fixes
 
 #### exonum
 
-- `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
-  and `external_addr` to `external_address`. (#809)
+- `failure` version has been updated to `0.1.2` in order to fix the build issue
+  with `failure_derive`. (#845)
 
-- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
-
-- Config parameter `external_address` is now a required value. (#826)
-
-### New features
-
-- Added possibility to use domain names instead of IP addresses as a peer's
-  addresses. (#826)
-
-### New Features
-
-#### exonum
-
-- Added `/v1/blocks/subscribe` endpoint for following block commit events
-  through WebSockets (#792).
-
-### Internal Improvements
-
-- Transactions (signature) verification benchmark has been added. (#808)
-
-- A new function `storage::proof_list_index::root_hash()` has been added
-  to efficiently compute Merkle root hash from a list of hashes without
-  an intermediate `ProofListIndex`. Verification of block root hashes
-  has been optimized as well. (#802)
-
-- `NoiseHandshake::finalize` now returns error if remote peer's public key is not
-  in `ConnectList`. (#811)
+- Bug with "unknown propose" execution has been fixed. (#841)
 
 ## 0.9.0 - 2018-07-19
 
@@ -156,8 +132,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   has been introduced. (#722)
 
 - `storage::Entry` has been extended with `take` and `swap` methods. (#781)
-
-- Added remote public key validation when handling incoming `Connect` message. (#786)
 
 ### Bug Fixes
 

@@ -48,7 +48,6 @@ gitter
 hashable
 healthcheck
 idempotence
-interlayer
 keepalive
 keypair
 keypairs
@@ -102,7 +101,6 @@ roadmap
 rocksdb
 roughtime
 roundtrip
-rtype
 runtimes
 rustfmt
 rustup
@@ -148,6 +146,5 @@ uuids
 validator
 validator's
 validators
-websockets
 whitelisted
 writeln

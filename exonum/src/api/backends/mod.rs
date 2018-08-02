@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! API backends.
-//!
-//! Exonum API is abstract, its custom interlayer allows adding third-party
-//! backends, which are modules that implement API according to certain principles.
-//! Currently, only the Actix-web backend is available.
+//! API backends
 
 pub mod actix;
