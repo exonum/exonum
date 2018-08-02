@@ -105,7 +105,10 @@ pub struct ExplorerApi;
 
 impl ExplorerApi {
     /// Returns the explored range and the corresponding headers. The range specifies the smallest
-    /// and largest heights traversed to collect at most count blocks.
+    /// and largest heights traversed to collect the number of blocks specified in
+    /// the [`BlocksQuery`] struct.
+    ///
+    /// [`BlocksQuery`]: struct.BlocksQuery.html
     pub fn blocks(state: &ServiceApiState, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
         let explorer = BlockchainExplorer::new(state.blockchain());
         if query.count > MAX_BLOCKS_PER_REQUEST {
@@ -140,7 +143,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Returns the content for a block of a specific height.
+    /// Returns the content for a block at a specific height.
     pub fn block(
         state: &ServiceApiState,
         query: BlockQuery,
