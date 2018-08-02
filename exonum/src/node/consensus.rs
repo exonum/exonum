@@ -533,7 +533,8 @@ impl NodeHandler {
         }
     }
 
-    /// Checks if the transaction is new and adds it to the pool.
+    /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
+    /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
     fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
