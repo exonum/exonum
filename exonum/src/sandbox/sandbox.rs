@@ -14,7 +14,7 @@
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-
+use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -38,7 +38,7 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use messages::{Any, Connect, Message, PeersRequest, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -264,6 +264,26 @@ impl Sandbox {
                 "Expected to send the message {:?} to {} but nothing happened",
                 any_expected_msg, addr
             );
+        }
+    }
+
+    pub fn send_peers_request(&self) {
+        self.process_events();
+        let send = self.inner.borrow_mut().sent.pop_front();
+
+        if let Some((addr, msg)) = send {
+            let peers_request =
+                PeersRequest::from_raw(msg).expect("Incorrect message. PeersRequest was expected");
+
+            let id = self.addresses.iter().position(|&a| a == addr);
+            if let Some(id) = id {
+                assert_eq!(&self.p(ValidatorId(id as u16)), peers_request.to());
+            } else {
+                panic!("Sending PeersRequest to unknown peer {:?}", addr);
+            }
+            trace!("Sending {:?}", peers_request);
+        } else {
+            panic!("Expected to send the PeersRequest message but nothing happened");
         }
     }
 
@@ -820,6 +840,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
+    env_logger::try_init().unwrap();
     sandbox_with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),

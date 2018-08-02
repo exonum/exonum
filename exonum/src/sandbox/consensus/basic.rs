@@ -23,7 +23,8 @@ use std::collections::BTreeMap;
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{Height, Round};
-use messages::{Message, Precommit, Prevote, Propose, RawMessage, CONSENSUS};
+use messages::{Message, Precommit, Prevote, Propose, RawMessage, Status, CONSENSUS};
+
 use sandbox::{
     sandbox::timestamping_sandbox, sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, TIMESTAMPING_SERVICE},
@@ -31,6 +32,7 @@ use sandbox::{
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader
+
 #[test]
 fn test_check_leader() {
     let sandbox = timestamping_sandbox();
@@ -40,17 +42,30 @@ fn test_check_leader() {
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
 
-    // TODO: Would be nice to check also for RequestPeers message which will appear
-    // after 10 time units (at 11th round). (ECR-1627)
     let n_rounds_without_request_peers = Round(
         (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.round_timeout) as u32,
     );
 
+    let mut was_leader = false;
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
         sandbox.assert_state(HEIGHT_ONE, round);
         add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
         sandbox.assert_state(HEIGHT_ONE, round.next());
+        was_leader = was_leader || sandbox.is_leader();
     }
+    assert!(was_leader);
+
+    add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
+
+    // status_timeout is equal to peers timeout in sandbox' ConsensusConfig
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(VALIDATOR_0),
+        HEIGHT_ONE,
+        &sandbox.last_block().hash(),
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    sandbox.send_peers_request();
 }
 
 /// idea of the test is to reach one height

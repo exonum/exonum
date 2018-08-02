@@ -195,16 +195,15 @@ impl NodeHandler {
     pub fn handle_peer_exchange_timeout(&mut self) {
         if !self.state.peers().is_empty() {
             let to = self.state.peers().len();
-            let gen_peer_id = || -> usize {
+            let peer_id = {
                 let mut rng = rand::thread_rng();
                 rng.gen_range(0, to)
             };
-
             let peer = self.state
                 .peers()
                 .iter()
                 .map(|x| x.1.clone())
-                .nth(gen_peer_id())
+                .nth(peer_id)
                 .unwrap();
             let peer = peer.clone();
             let msg = PeersRequest::new(
