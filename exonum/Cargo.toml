@@ -40,7 +40,7 @@ tokio-core = "=0.1.17"
 tokio-io = "=0.1.6"
 tokio-retry = "=0.1.1"
 tokio-timer = "=0.1.2"
-failure = "=0.1.1"
+failure = "0.1.2"
 os_info = "1.0.1"
 chrono = { version = "=0.4.5", features = ["serde"] }
 uuid = { version = "=0.6.5", features = ["serde"] }
