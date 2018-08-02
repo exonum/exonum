@@ -5,6 +5,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.9.1 - 2018-08-02
+
+### Bug Fixes
+
+#### exonum
+
+- `failure` version has been updated to `0.1.2` in order to fix the build issue
+  with `failure_derive`. (#845)
+
+- Bug with "unknown propose" execution has been fixed. (#841)
+
 ## 0.9.0 - 2018-07-19
 
 ### Breaking Changes

@@ -743,6 +743,7 @@ impl State {
         // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
+        self.unknown_proposes_with_precommits.clear();
         self.prevotes.clear();
         self.precommits.clear();
         self.validators_rounds.clear();
@@ -1052,7 +1053,10 @@ impl State {
     }
 
     /// Removes propose from the list of unknown proposes and returns its round and hash.
-    pub fn unknown_propose_with_precommits(&mut self, propose_hash: &Hash) -> Vec<(Round, Hash)> {
+    pub fn take_unknown_propose_with_precommits(
+        &mut self,
+        propose_hash: &Hash,
+    ) -> Vec<(Round, Hash)> {
         self.unknown_proposes_with_precommits
             .remove(propose_hash)
             .unwrap_or_default()
