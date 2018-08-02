@@ -43,7 +43,8 @@ fn test_check_leader() {
     // TODO: Would be nice to check also for RequestPeers message which will appear
     // after 10 time units (at 11th round). (ECR-1627)
     let n_rounds_without_request_peers = Round(
-        (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.round_timeout) as u32,
+        (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.first_round_timeout)
+            as u32,
     );
 
     for round in Round::first().iter_to(n_rounds_without_request_peers) {

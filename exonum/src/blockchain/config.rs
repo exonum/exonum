@@ -89,16 +89,19 @@ pub struct StoredConfiguration {
 /// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
-    /// Interval between rounds. This interval defines the time that passes
+    /// Interval between first two rounds. This interval defines the time that passes
     /// between the moment a new block is committed to the blockchain and the
-    /// time when a new round starts, regardless of whether a new block has
+    /// time when second round starts, regardless of whether a new block has
     /// been committed during this period or not.
+    /// Each consecutive round will be longer then previous by round_timeout_increase.
     ///
     /// Note that rounds in Exonum
     /// do not have a defined end time. Nodes in a new round can
     /// continue to vote for proposals and process messages related to previous
     /// rounds.
-    pub round_timeout: Milliseconds,
+    pub first_round_timeout: Milliseconds,
+    /// Amount of time that is added to round timeout as round number increase.
+    pub round_timeout_increase: Milliseconds,
     /// Period of sending a Status message. This parameter defines the frequency
     /// with which a node broadcasts its status message to the network.
     pub status_timeout: Milliseconds,
@@ -138,11 +141,11 @@ impl ConsensusConfig {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 
-        if self.round_timeout <= 2 * self.max_propose_timeout {
+        if self.first_round_timeout <= 2 * self.max_propose_timeout {
             warn!(
-                "It is recommended that round_timeout ({}) be at least twice as large \
+                "It is recommended that first_round_timeout ({}) be at least twice as large \
                  as max_propose_timeout ({})",
-                self.round_timeout, self.max_propose_timeout
+                self.first_round_timeout, self.max_propose_timeout
             );
         }
 
@@ -167,7 +170,8 @@ impl ConsensusConfig {
 impl Default for ConsensusConfig {
     fn default() -> Self {
         Self {
-            round_timeout: 3000,
+            first_round_timeout: 3000,
+            round_timeout_increase: 300,
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
@@ -219,10 +223,10 @@ impl StoredConfiguration {
             )));
         }
 
-        if config.consensus.round_timeout <= config.consensus.max_propose_timeout {
+        if config.consensus.first_round_timeout <= config.consensus.max_propose_timeout {
             return Err(JsonError::custom(format!(
-                "round_timeout({}) must be strictly larger than max_propose_timeout({})",
-                config.consensus.round_timeout, config.consensus.max_propose_timeout
+                "first_round_timeout({}) must be strictly larger than max_propose_timeout({})",
+                config.consensus.first_round_timeout, config.consensus.max_propose_timeout
             )));
         }
 
@@ -297,7 +301,8 @@ mod tests {
             service_key = "acdb0e29743f0ccb8686d0a104cb96e05abefec1538765e7595869f7dc8c49aa"
 
             [consensus]
-            round_timeout = 3000
+            first_round_timeout = 3000
+            round_timeout_increase = 300
             status_timeout = 5000
             peers_timeout = 10000
             txs_block_limit = 1000
@@ -344,7 +349,7 @@ mod tests {
     )]
     fn invalid_round_timeout() {
         let mut configuration = create_test_configuration();
-        configuration.consensus.round_timeout = 50;
+        configuration.consensus.first_round_timeout = 50;
         configuration.consensus.max_propose_timeout = 50;
         serialize_deserialize(&configuration);
     }

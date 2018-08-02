@@ -483,7 +483,7 @@ impl Sandbox {
     }
 
     pub fn round_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.round_timeout
+        self.cfg().consensus.first_round_timeout
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
@@ -730,7 +730,8 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
     );
 
     let consensus = ConsensusConfig {
-        round_timeout: 1000,
+        first_round_timeout: 1000,
+        round_timeout_increase: 100,
         status_timeout: 600_000,
         peers_timeout: 600_000,
         txs_block_limit: 1000,

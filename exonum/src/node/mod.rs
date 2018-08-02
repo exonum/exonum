@@ -456,9 +456,14 @@ impl NodeHandler {
         &self.api_state
     }
 
-    /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().round_timeout
+    /// Returns value of the `first_round_timeout` field from the current `ConsensusConfig`.
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().first_round_timeout
+    }
+
+    /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        self.state().consensus_config().round_timeout_increase
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
@@ -676,7 +681,9 @@ impl NodeHandler {
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
         let previous_round: u64 = round.previous().into();
-        let ms = previous_round * self.round_timeout();
+        let ms = previous_round * self.first_round_timeout()
+            + (previous_round * previous_round.saturating_sub(1)) / 2
+                * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
