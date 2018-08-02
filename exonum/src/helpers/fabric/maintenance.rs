@@ -114,10 +114,9 @@ impl Command for Maintenance {
             .arg::<String>(MAINTENANCE_ACTION_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", MAINTENANCE_ACTION_PATH));
 
-        if action == "clear-cache" {
-            Self::clear_cache(&context);
-        } else {
-            println!("Unsupported maintenance action: {}", action);
+        match action.as_ref() {
+            "clear-cache" => Self::clear_cache(&context),
+            _ => println!("Unsupported maintenance action: {}", action),
         }
 
         Feedback::None

@@ -39,9 +39,8 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, address: &SocketAddr, connect: Connect) {
-        info!("Received Connect message from peer: {:?}", address);
-        // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
+    pub fn handle_connected(&mut self, addr: SocketAddr, connect: Connect) {
+        info!("Received Connect message from peer: {}", addr);
         self.handle_connect(connect);
     }
 
@@ -72,7 +71,6 @@ impl NodeHandler {
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO Add spam protection. (ECR-170)
-        // TODO: drop connection if checks have failed. (ECR-1837)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
             trace!("Received Connect with same address as our external_address.");

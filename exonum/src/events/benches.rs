@@ -17,9 +17,9 @@ use test::Bencher;
 use std::{net::SocketAddr, thread};
 
 use events::{
-    network::NetworkConfiguration, tests::{raw_message, ConnectionParams, TestEvents},
+    network::NetworkConfiguration, tests::{connect_message, raw_message, TestEvents},
 };
-use node::{state::SharedConnectList, ConnectList, EventsPoolCapacity};
+use node::EventsPoolCapacity;
 
 struct BenchConfig {
     times: usize,
@@ -46,26 +46,16 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
         let first = addrs[0];
         let second = addrs[1];
 
-        let mut connect_list = ConnectList::default();
+        let c1 = connect_message(first);
+        let c2 = connect_message(second);
 
-        let mut params1 = ConnectionParams::from_address(first);
-        connect_list.add(params1.connect_info);
+        let mut t1 = test_events(cfg, first).spawn();
+        let mut t2 = test_events(cfg, second).spawn();
 
-        let mut params2 = ConnectionParams::from_address(second);
-        connect_list.add(params2.connect_info);
-
-        let connect_list = SharedConnectList::from_connect_list(connect_list);
-
-        let e1 = test_events(cfg, first);
-        let e2 = test_events(cfg, second);
-
-        let mut t1 = params1.spawn(e1, connect_list.clone());
-        let mut t2 = params2.spawn(e2, connect_list);
-
-        t1.connect_with(second, params1.connect.clone());
-        t2.connect_with(first, params2.connect.clone());
-        assert_eq!(t1.wait_for_connect(), params2.connect.clone());
-        assert_eq!(t2.wait_for_connect(), params1.connect.clone());
+        t1.connect_with(second);
+        t2.connect_with(first);
+        assert_eq!(t1.wait_for_connect(), c2);
+        assert_eq!(t2.wait_for_connect(), c1);
 
         let t1 = thread::spawn(move || {
             for _ in 0..times {

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore chacha, privkey, authtext, ciphertext
-
 use byteorder::{ByteOrder, LittleEndian};
 use rand::{thread_rng, Rng};
 use snow::{
@@ -218,7 +216,7 @@ impl Cipher for SodiumChaChaPoly {
         assert_ne!(
             self.key,
             Self::default().key,
-            "Can't decrypt with default key in SodiumChaChaPoly"
+            "Can't dectypt with default key in SodiumChaChaPoly"
         );
 
         let nonce = Self::get_ietf_nonce(nonce);

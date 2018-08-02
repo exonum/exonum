@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Public part of the Exonum REST API.
-//!
-//! Public API includes requests for information which is available to outside
-//! users, e.g., for requesting proofs.
+//! Public part of the Exonum rest api.
 
 pub use self::{explorer::ExplorerApi, system::SystemApi};
 

@@ -14,20 +14,12 @@
 
 //! Exonum blockchain explorer API.
 
-use actix::Arbiter;
-use actix_web::{http, ws};
-use futures::IntoFuture;
 use serde_json;
 
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
 
-use api::{
-    backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websocket::{Server, Session}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
-    ServiceApiState,
-};
-use blockchain::{Block, SharedNodeState};
+use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
+use blockchain::Block;
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
@@ -105,10 +97,7 @@ pub struct ExplorerApi;
 
 impl ExplorerApi {
     /// Returns the explored range and the corresponding headers. The range specifies the smallest
-    /// and largest heights traversed to collect the number of blocks specified in
-    /// the [`BlocksQuery`] struct.
-    ///
-    /// [`BlocksQuery`]: struct.BlocksQuery.html
+    /// and largest heights traversed to collect at most count blocks.
     pub fn blocks(state: &ServiceApiState, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
         let explorer = BlockchainExplorer::new(state.blockchain());
         if query.count > MAX_BLOCKS_PER_REQUEST {
@@ -143,7 +132,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Returns the content for a block at a specific height.
+    /// Returns the content for a block of a specific height.
     pub fn block(
         state: &ServiceApiState,
         query: BlockQuery,
@@ -167,45 +156,8 @@ impl ExplorerApi {
             })
     }
 
-    /// Subscribes to block commits events.
-    pub fn handle_subscribe(
-        name: &'static str,
-        backend: &mut actix::ApiBuilder,
-        shared_node_state: SharedNodeState,
-    ) {
-        let server = Arc::new(Mutex::new(None));
-
-        let index = move |req: HttpRequest| -> FutureResponse {
-            let server = server.clone();
-            let mut address = server.lock().expect("Expected mutex lock");
-            if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::default()));
-
-                shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
-            }
-
-            Box::new(
-                ws::start(req.clone(), Session::new(address.to_owned().unwrap())).into_future(),
-            )
-        };
-
-        backend.raw_handler(RequestHandler {
-            name: name.to_owned(),
-            method: http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        });
-    }
-
     /// Adds explorer API endpoints to the corresponding scope.
-    pub fn wire(
-        api_scope: &mut ServiceApiScope,
-        shared_node_state: SharedNodeState,
-    ) -> &mut ServiceApiScope {
-        Self::handle_subscribe(
-            "v1/blocks/subscribe",
-            api_scope.web_backend(),
-            shared_node_state,
-        );
+    pub fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)

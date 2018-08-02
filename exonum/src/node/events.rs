@@ -39,7 +39,7 @@ impl NodeHandler {
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
         match event {
-            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
+            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
@@ -58,7 +58,7 @@ impl NodeHandler {
 
                 if self.config_manager.is_some() {
                     let connect_list_config =
-                        ConnectListConfig::from_connect_list(&self.state.connect_list());
+                        ConnectListConfig::from_connect_list(self.state.connect_list());
 
                     self.config_manager
                         .as_ref()
