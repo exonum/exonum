@@ -15,8 +15,8 @@
 use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
-use super::{super::StorageValue, key::ProofListKey, pair_hash};
-use crypto::{hash, Hash};
+use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
+use crypto::Hash;
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]
@@ -52,16 +52,16 @@ impl<V: StorageValue> ListProof<V> {
             return Err(ListProofError::UnexpectedBranch);
         }
         let hash = match *self {
-            ListProof::Full(ref left, ref right) => pair_hash(
+            ListProof::Full(ref left, ref right) => hash_pair(
                 &left.collect(key.left(), vec)?,
                 &right.collect(key.right(), vec)?,
             ),
             ListProof::Left(ref left, Some(ref right)) => {
-                pair_hash(&left.collect(key.left(), vec)?, right)
+                hash_pair(&left.collect(key.left(), vec)?, right)
             }
-            ListProof::Left(ref left, None) => hash(left.collect(key.left(), vec)?.as_ref()),
+            ListProof::Left(ref left, None) => hash_one(&left.collect(key.left(), vec)?),
             ListProof::Right(ref left, ref right) => {
-                pair_hash(left, &right.collect(key.right(), vec)?)
+                hash_pair(left, &right.collect(key.right(), vec)?)
             }
             ListProof::Leaf(ref value) => {
                 if key.height() > 1 {

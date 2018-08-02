@@ -22,20 +22,28 @@ use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
 use events::{
-    codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+    codec::MessagesCodec, error::other_error,
+    noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
+use node::state::SharedConnectList;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
     pub public_key: x25519::PublicKey,
     pub secret_key: x25519::SecretKey,
-    pub max_message_len: u32,
     pub remote_key: Option<x25519::PublicKey>,
+    pub connect_list: SharedConnectList,
+    max_message_len: u32,
 }
 
 impl HandshakeParams {
-    pub fn new(public_key: PublicKey, secret_key: SecretKey, max_message_len: u32) -> Self {
+    pub fn new(
+        public_key: PublicKey,
+        secret_key: SecretKey,
+        connect_list: SharedConnectList,
+        max_message_len: u32,
+    ) -> Self {
         let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
 
         HandshakeParams {
@@ -43,6 +51,7 @@ impl HandshakeParams {
             secret_key,
             max_message_len,
             remote_key: None,
+            connect_list,
         }
     }
 
@@ -55,6 +64,7 @@ impl HandshakeParams {
 pub struct NoiseHandshake {
     noise: NoiseWrapper,
     max_message_len: u32,
+    connect_list: SharedConnectList,
 }
 
 impl NoiseHandshake {
@@ -63,6 +73,7 @@ impl NoiseHandshake {
         NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
+            connect_list: params.connect_list.clone(),
         }
     }
 
@@ -71,6 +82,7 @@ impl NoiseHandshake {
         NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
+            connect_list: params.connect_list.clone(),
         }
     }
 
@@ -98,9 +110,31 @@ impl NoiseHandshake {
         self,
         stream: S,
     ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+        let remote_static_key = {
+            // Panic because with selected handshake pattern we must have
+            // `remote_static_key` on final step of handshake.
+            let rs = self.noise
+                .session
+                .get_remote_static()
+                .expect("Remote static key is not present!");
+            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+        };
+
+        if !self.is_peer_allowed(&remote_static_key) {
+            return Err(other_error("Peer is not in ConnectList"));
+        }
+
         let noise = self.noise.into_transport_mode()?;
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
         Ok(framed)
+    }
+
+    fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
+        self.connect_list
+            .peers()
+            .iter()
+            .map(|info| into_x25519_public_key(info.public_key))
+            .any(|key| remote_static_key == &key)
     }
 }
 
