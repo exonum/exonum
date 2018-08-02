@@ -17,7 +17,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::Round;
+use helpers::{Height, Round};
 use messages::{Message, Precommit, Prevote};
 use node::state::PROPOSE_REQUEST_TIMEOUT;
 
@@ -261,4 +261,34 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     // observe requestPropose request
     sandbox.add_time(Duration::from_millis(0));
+}
+
+/// Check that each consecutive round is longer than previous by the fixed amount
+#[test]
+fn test_round_timeout_increase() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    sandbox.add_time(Duration::from_millis(sandbox.first_round_timeout() - 1));
+    sandbox.assert_state(Height(1), Round(1));
+    sandbox.add_time(Duration::from_millis(1));
+    sandbox.assert_state(Height(1), Round(2));
+
+    sandbox.add_time(Duration::from_millis(
+        sandbox.first_round_timeout() + sandbox.round_timeout_increase() - 1,
+    ));
+    sandbox.assert_state(Height(1), Round(2));
+    sandbox.add_time(Duration::from_millis(1));
+    sandbox.assert_state(Height(1), Round(3));
+
+    //to make shure that there are no unchecked messages from validator 0 we skip round 3
+    add_round_with_transactions(&sandbox, &sandbox_state, &[]);
+    sandbox.assert_state(Height(1), Round(4));
+
+    sandbox.add_time(Duration::from_millis(
+        sandbox.first_round_timeout() + 3 * sandbox.round_timeout_increase() - 1,
+    ));
+    sandbox.assert_state(Height(1), Round(4));
+    sandbox.add_time(Duration::from_millis(1));
+    sandbox.assert_state(Height(1), Round(5));
 }
