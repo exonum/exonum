@@ -18,6 +18,11 @@ use node::ApiSender;
 use storage::Snapshot;
 
 /// Provides the current blockchain state to API handlers.
+///
+/// This structure is a part of the node that is available to the API. For example,
+/// it can return the private key of the node, which allows the service to send
+/// certain transactions to the blockchain. This case is used in the Exonum
+/// [Configuration Updater service](https://exonum.com/doc/advanced/configuration-updater/).
 #[derive(Debug, Clone)]
 pub struct ServiceApiState {
     blockchain: Blockchain,
