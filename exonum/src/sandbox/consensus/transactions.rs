@@ -274,8 +274,8 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // round happens to make us a leader
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
         assert!(sandbox.is_leader());
         sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
     }
@@ -518,7 +518,7 @@ fn request_txs_when_get_propose_or_prevote() {
         .build();
 
     sandbox.recv(&propose);
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
@@ -541,7 +541,7 @@ fn request_txs_when_get_propose_or_prevote() {
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
 
     sandbox.send(
         sandbox.a(VALIDATOR_3),

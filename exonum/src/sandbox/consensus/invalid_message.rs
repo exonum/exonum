@@ -85,7 +85,7 @@ fn handle_propose_with_incorrect_time() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.round_timeout() + PROPOSE_TIMEOUT + 1)
+        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT + 1)
         .build();
 
     sandbox.recv(&propose);

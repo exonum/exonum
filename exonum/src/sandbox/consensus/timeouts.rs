@@ -110,7 +110,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     sandbox.add_time(Duration::from_millis(0));
 
     sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() - 2 * PROPOSE_REQUEST_TIMEOUT,
+        sandbox.current_round_timeout() - 2 * PROPOSE_REQUEST_TIMEOUT,
     ));
     // This assert would fail if check for same height is absent in
     // node/consensus.rs->handle_round_timeout()
@@ -123,13 +123,13 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
 fn handle_round_timeout_increment_round_add_new_round_timeout() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
 
     // next round timeout is added
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
@@ -145,9 +145,9 @@ fn test_send_propose_and_prevote_when_we_are_leader() {
     let sandbox = timestamping_sandbox();
 
     // round happens
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() + PROPOSE_TIMEOUT,
+        sandbox.current_round_timeout() + PROPOSE_TIMEOUT,
     ));
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
@@ -222,7 +222,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     sandbox.add_time(Duration::from_millis(0));
 
     // trigger round_timeout
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     //    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
@@ -256,7 +256,7 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     ));
 
     // trigger round_timeout
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     // trigger request_propose_timeout
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     // observe requestPropose request

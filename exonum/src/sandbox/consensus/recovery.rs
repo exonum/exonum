@@ -85,9 +85,9 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     let sandbox = timestamping_sandbox();
 
     // round happens
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() + PROPOSE_TIMEOUT,
+        sandbox.current_round_timeout() + PROPOSE_TIMEOUT,
     ));
 
     assert!(sandbox.is_leader());
@@ -336,7 +336,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.broadcast(&first_precommit);
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
 
     // make sure we broadcasted same Prevote for second round

@@ -482,8 +482,17 @@ impl Sandbox {
         num_validators * 2 / 3 + 1
     }
 
-    pub fn round_timeout(&self) -> Milliseconds {
+    pub fn first_round_timeout(&self) -> Milliseconds {
         self.cfg().consensus.first_round_timeout
+    }
+
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        self.cfg().consensus.round_timeout_increase
+    }
+
+    pub fn current_round_timeout(&self) -> Milliseconds {
+        let previous_round: u64 = self.current_round().previous().into();
+        self.first_round_timeout() + previous_round * self.round_timeout_increase()
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
@@ -819,7 +828,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
     };
 
     // General assumption; necessary for correct work of consensus algorithm
-    assert!(PROPOSE_TIMEOUT < sandbox.round_timeout());
+    assert!(PROPOSE_TIMEOUT < sandbox.first_round_timeout());
     sandbox.process_events();
     sandbox
 }
