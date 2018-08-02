@@ -641,8 +641,8 @@ impl NodeHandler {
     }
 
     fn maybe_add_propose_timeout(&mut self) {
-        if self.need_faster_propose() && self.allow_expedited_propose {
-            info!("EXPEDITED PROPOSE TIMEOUT");
+        if self.allow_expedited_propose && self.need_faster_propose() {
+            info!("Add expedited propose timeout");
             self.add_propose_timeout();
             self.allow_expedited_propose = false;
         }
