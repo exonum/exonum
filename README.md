@@ -40,6 +40,9 @@ This is the main Exonum repository that includes
 
 See individual projects readme for the details.
 
+If you are using Exonum in your project and want to be listed on our website &
+GitHub list — write us a line to <exonum@bitfury.com>.
+
 ## Other languages support
 
 * [Java](https://github.com/exonum/exonum-java-binding)
