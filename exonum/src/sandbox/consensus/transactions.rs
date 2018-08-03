@@ -32,7 +32,6 @@ use sandbox::{
 
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
-// TODO: Add scenario with manually created and signed tx. (ECR-1627)
 #[test]
 fn response_to_request_txs() {
     let sandbox = timestamping_sandbox();
