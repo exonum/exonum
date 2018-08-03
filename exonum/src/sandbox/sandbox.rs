@@ -707,6 +707,8 @@ impl ConnectList {
 pub struct SandboxBuilder {
     initialize: bool,
     services: Vec<Box<dyn Service>>,
+    validators_count: u8,
+    logger: bool,
     consensus_config: ConsensusConfig,
 }
 
@@ -715,6 +717,8 @@ impl SandboxBuilder {
         SandboxBuilder {
             initialize: true,
             services: Vec::new(),
+            validators_count: 4,
+            logger: false,
             consensus_config: ConsensusConfig {
                 round_timeout: 1000,
                 status_timeout: 600_000,
@@ -743,13 +747,30 @@ impl SandboxBuilder {
         self
     }
 
+    pub fn with_validators(mut self, n: u8) -> Self {
+        self.validators_count = n;
+        self
+    }
+
+    pub fn with_logger(mut self) -> Self {
+        self.logger = true;
+        self
+    }
+
     pub fn build(self) -> Sandbox {
-        let mut sandbox = sandbox_with_services_uninitialized(self.services, self.consensus_config);
+        if self.logger {
+            let _ = env_logger::try_init();
+        }
+
+        let mut sandbox = sandbox_with_services_uninitialized(
+            self.services,
+            self.consensus_config,
+            self.validators_count,
+        );
 
         if self.initialize {
             let time = sandbox.time();
-            let validators_count = sandbox.validators_map.len();
-            sandbox.initialize(time, 1, validators_count);
+            sandbox.initialize(time, 1, self.validators_count as usize);
         }
 
         sandbox
@@ -765,21 +786,19 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 fn sandbox_with_services_uninitialized(
     services: Vec<Box<dyn Service>>,
     consensus: ConsensusConfig,
+    validators_count: u8,
 ) -> Sandbox {
-    let validators = vec![
-        gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([16; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([19; SEED_LENGTH])),
-    ];
-    let service_keys = vec![
-        gen_keypair_from_seed(&Seed::new([20; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([21; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([22; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([23; SEED_LENGTH])),
-    ];
+    let validators = (0..validators_count)
+        .map(|i| gen_keypair_from_seed(&Seed::new([i + 12; SEED_LENGTH])))
+        .collect::<Vec<_>>();
 
-    let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
+    let service_keys = (0..validators_count)
+        .map(|i| gen_keypair_from_seed(&Seed::new([i + 20; SEED_LENGTH])))
+        .collect::<Vec<_>>();
+
+    let addresses: Vec<SocketAddr> = (1..=validators_count)
+        .map(gen_primitive_socket_addr)
+        .collect::<Vec<_>>();
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
@@ -875,7 +894,6 @@ fn sandbox_with_services_uninitialized(
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    let _ = env_logger::try_init();
     timestamping_sandbox_builder().build()
 }
 

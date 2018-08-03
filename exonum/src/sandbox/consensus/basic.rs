@@ -25,7 +25,7 @@ use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENG
 use helpers::{Height, Round, ValidatorId};
 use messages::{Message, Precommit, Prevote, Propose, RawMessage, Status, CONSENSUS};
 use sandbox::{
-    sandbox::timestamping_sandbox, sandbox_tests_helper::*,
+    sandbox::{self, timestamping_sandbox}, sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
 };
 
@@ -70,6 +70,19 @@ fn test_check_leader() {
 #[test]
 fn test_reach_one_height() {
     let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height(&sandbox, &sandbox_state);
+    sandbox.assert_state(Height(2), Round(1));
+}
+
+/// idea of the test is to reach one height in the network with single validator
+#[test]
+fn test_one_validator() {
+    let sandbox = sandbox::timestamping_sandbox_builder()
+        .with_logger()
+        .with_validators(1)
+        .build();
     let sandbox_state = SandboxState::new();
 
     add_one_height(&sandbox, &sandbox_state);
