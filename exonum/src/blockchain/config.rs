@@ -100,7 +100,7 @@ pub struct ConsensusConfig {
     /// continue to vote for proposals and process messages related to previous
     /// rounds.
     pub first_round_timeout: Milliseconds,
-    /// Amount of time that is added to round timeout as round number increase.
+    /// Amount of time that is added to the round timeout each round
     pub round_timeout_increase: Milliseconds,
     /// Period of sending a Status message. This parameter defines the frequency
     /// with which a node broadcasts its status message to the network.

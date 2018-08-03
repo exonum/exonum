@@ -281,7 +281,7 @@ fn test_round_timeout_increase() {
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(Height(1), Round(3));
 
-    //to make shure that there are no unchecked messages from validator 0 we skip round 3
+    //to make sure that there are no unchecked messages from validator 0 we skip round 3
     add_round_with_transactions(&sandbox, &sandbox_state, &[]);
     sandbox.assert_state(Height(1), Round(4));
 

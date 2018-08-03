@@ -680,6 +680,11 @@ impl NodeHandler {
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
+        // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt
+        // Where:
+        // H - height start time
+        // t0 - Round(1) timeout length, dt - timeout increase value
+        // r - round number, r = 1,2,...
         let previous_round: u64 = round.previous().into();
         let ms = previous_round * self.first_round_timeout()
             + (previous_round * previous_round.saturating_sub(1)) / 2
