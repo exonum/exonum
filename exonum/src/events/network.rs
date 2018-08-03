@@ -33,6 +33,7 @@ use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
+use crypto::x25519;
 use messages::{Any, Connect, Message, RawMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
@@ -159,7 +160,7 @@ impl ConnectionsPool {
                 Self::build_handshake_initiator(sock, &peer, &handshake_params)
             })
             // Connect socket with the outgoing channel
-            .and_then(move |stream| {
+            .and_then(move |(stream, _)| {
                 trace!("Established connection with peer={}", peer);
                 let (sink, stream) = stream.split();
 
@@ -210,7 +211,7 @@ impl ConnectionsPool {
         stream: TcpStream,
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error> {
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, x25519::PublicKey), Error = io::Error> {
         let connect_list = &handshake_params.connect_list.clone();
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
@@ -394,7 +395,7 @@ impl Listener {
             let connection_handler = handshake
                 .listen(sock)
                 .and_then(move |sock| {
-                    let (_, stream) = sock.split();
+                    let (_, stream) = sock.0.split();
                     stream
                         .into_future()
                         .map_err(|e| e.0)

@@ -25,7 +25,7 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, x25519, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -410,7 +410,9 @@ impl NoiseErrorHandshake {
 }
 
 impl Handshake for NoiseErrorHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    type Result = x25519::PublicKey;
+
+    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -421,7 +423,7 @@ impl Handshake for NoiseErrorHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {

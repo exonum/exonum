@@ -44,11 +44,13 @@ pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
-type HandshakeResult<S> = Box<dyn Future<Item = (Framed<S, MessagesCodec>), Error = io::Error>>;
+type HandshakeResult<S, R> = Box<dyn Future<Item = (Framed<S, MessagesCodec>, R), Error = io::Error>>;
 
 pub trait Handshake {
-    fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
-    fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
+    type Result;
+
+    fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S, Self::Result>;
+    fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S, Self::Result>;
 }
 
 pub struct HandshakeRawMessage(pub Vec<u8>);

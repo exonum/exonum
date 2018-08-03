@@ -109,7 +109,7 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+    ) -> Result<(Framed<S, MessagesCodec>, x25519::PublicKey), io::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -126,7 +126,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_mode()?;
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
-        Ok(framed)
+        Ok((framed, remote_static_key))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
@@ -139,7 +139,9 @@ impl NoiseHandshake {
 }
 
 impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    type Result = x25519::PublicKey;
+
+    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
@@ -150,7 +152,7 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
