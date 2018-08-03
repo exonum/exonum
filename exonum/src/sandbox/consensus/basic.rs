@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
-use helpers::{Height, Round};
+use helpers::{Height, Round, ValidatorId};
 use messages::{Message, Precommit, Prevote, Propose, RawMessage, CONSENSUS};
 use sandbox::{
     sandbox::timestamping_sandbox, sandbox_tests_helper::*,
@@ -55,9 +55,9 @@ fn test_check_leader() {
     };
 
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
-        sandbox.assert_state(HEIGHT_ONE, round);
+        sandbox.assert_state(Height(1), round);
         add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
-        sandbox.assert_state(HEIGHT_ONE, round.next());
+        sandbox.assert_state(Height(1), round.next());
     }
 }
 
@@ -68,7 +68,7 @@ fn test_reach_one_height() {
     let sandbox_state = SandboxState::new();
 
     add_one_height(&sandbox, &sandbox_state);
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
 }
 
 /// Validator2,3,4 starts in 5th round
@@ -82,32 +82,32 @@ fn test_reach_actual_round() {
     let tx = gen_timestamping_tx();
 
     let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_proposer_id(VALIDATOR_3)
+        .with_proposer_id(ValidatorId(3))
         .with_tx_hash(&tx.hash())
         .build();
 
     let future_propose = Propose::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_FOUR,
+        ValidatorId(3),
+        Height(1),
+        Round(4),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&future_propose);
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&Prevote::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_FOUR,
+        ValidatorId(2),
+        Height(1),
+        Round(4),
         &block_at_first_height.clone().hash(),
-        Round::zero(),
-        sandbox.s(VALIDATOR_2),
+        NOT_LOCKED,
+        sandbox.s(ValidatorId(2)),
     ));
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_FOUR);
+    sandbox.assert_state(Height(1), Round(4));
 }
 
 /// idea of the test is to reach one height two times and compare block hash
@@ -117,14 +117,14 @@ fn test_reach_one_height_repeatable() {
     let sandbox_state = SandboxState::new();
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     let hash_1 = sandbox.last_block().hash();
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     let hash_2 = sandbox.last_block().hash();
 
     assert_eq!(hash_2, hash_1);
@@ -142,7 +142,7 @@ fn test_reach_thirteen_height() {
 
     for height in 2..target_height + 1 {
         add_one_height(&sandbox, &sandbox_state);
-        sandbox.assert_state(Height(height), ROUND_ONE);
+        sandbox.assert_state(Height(height), Round(1));
     }
 }
 
@@ -194,7 +194,7 @@ fn test_retrieve_block_and_precommits() {
     for _ in 2..target_height.0 + 1 {
         add_one_height(&sandbox, &sandbox_state)
     }
-    sandbox.assert_state(target_height, ROUND_ONE);
+    sandbox.assert_state(target_height, Round(1));
 
     let bl_proof_option = sandbox.block_and_precommits(target_height.previous());
     // use serde_json;
@@ -245,7 +245,7 @@ fn test_store_txs_positions() {
 
     let hashes =
         add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
-    sandbox.assert_state(committed_height.next(), ROUND_ONE);
+    sandbox.assert_state(committed_height.next(), Round(1));
 
     let snapshot = sandbox.blockchain_ref().snapshot();
     let schema = Schema::new(&snapshot);
