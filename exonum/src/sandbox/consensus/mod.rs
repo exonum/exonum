@@ -32,7 +32,7 @@ mod unsynchronized_message;
 // LOCK
 
 // - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
-// - if haven’t incompatible prevotes
+// - if haven't incompatible prevotes
 //     - if has +2/3 precommits
 //         TODO: This idea is unreachable because there are no any places in the code
 //         where RequestPrecommit is added. (ECR-1627)
@@ -104,7 +104,7 @@ mod unsynchronized_message;
 
 // HANDLE REQUEST TIMEOUT:
 
-// TODO: Investigate how check this and come back when '// FIXME: check height?' is fixed. (ECR-1627)
+// TODO: Investigate how check this and come back when '// FIXME: check height?' is fixed. (ECR-1627) (ECR-171)
 // - check height?
 // - Propose/Tx/Prevotes/Precommits/Commit  //looks like that all these are covered
 //      send(RequestPropose):       test_queue_prevote_message_from_next_height
