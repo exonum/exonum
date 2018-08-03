@@ -960,7 +960,6 @@ mod tests {
 
     #[test]
     fn test_sandbox_assert_status() {
-        // TODO: Remove this? (ECR-1627)
         let s = timestamping_sandbox();
         s.assert_state(HEIGHT_ONE, ROUND_ONE);
         s.add_time(Duration::from_millis(999));
