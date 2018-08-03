@@ -281,7 +281,6 @@ impl Sandbox {
             } else {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
             }
-            trace!("Sending {:?}", peers_request);
         } else {
             panic!("Expected to send the PeersRequest message but nothing happened");
         }
