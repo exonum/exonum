@@ -34,9 +34,6 @@ mod unsynchronized_message;
 // - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
 // - if haven't incompatible prevotes
 //     - if has +2/3 precommits
-//         TODO: This idea is unreachable because there are no any places in the code
-//         where RequestPrecommit is added. (ECR-1627)
-//         - remove precommit request
 //         - COMMIT //covered in test_reach_one_height
 //         - We are fucked up   //covered in handle_full_propose_we_are_fucked_up()
 //         - not send prevotes after commit     //covered in lock_not_send_prevotes_after_commit()
@@ -55,9 +52,6 @@ mod unsynchronized_message;
 // - Request prevotes           //covered in commit_using_unknown_propose_with_precommits()
 //     - if msg.round > locked round    //covered in handle_precommit_remove_request_prevotes()
 // - If has +2/3 precommit      //covered in handle_precommit_positive_scenario_commit()
-//     TODO: This idea is unreachable because there are no any places in the code where
-//     RequestPrecommit is added. (ECR-1627)
-//     - remove precommit request
 //     - COMMIT
 //         - if propose is known    //covered in do_not_commit_if_propose_is_unknown()
 //         - has all txs           //covered in do_not_commit_if_tx_is_unknown()

@@ -725,8 +725,6 @@ fn handle_precommit_positive_scenario_commit() {
 /// - Send precommit during the lock   // covered in `lock_to_propose_when_get_2_3_prevote_positive`
 /// - if there aren't incompatible prevotes
 ///     - if there're +2/3 precommits
-///         - remove precommit request // TODO: This idea is unreachable because there are no
-///           other places in the code where `PrecommitRequest` is added. (ECR-1627)
 ///         - COMMIT // covered in `test_reach_one_height`
 ///         -> do not send prevotes after the commit
 ///
