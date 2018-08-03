@@ -691,6 +691,7 @@ impl ConnectList {
 pub struct SandboxBuilder {
     initialize: bool,
     services: Vec<Box<dyn Service>>,
+    consensus_config: ConsensusConfig,
 }
 
 impl SandboxBuilder {
@@ -698,6 +699,16 @@ impl SandboxBuilder {
         SandboxBuilder {
             initialize: true,
             services: Vec::new(),
+            consensus_config: ConsensusConfig {
+                round_timeout: 1000,
+                status_timeout: 600_000,
+                peers_timeout: 600_000,
+                txs_block_limit: 1000,
+                max_message_len: 1024 * 1024,
+                min_propose_timeout: PROPOSE_TIMEOUT,
+                max_propose_timeout: PROPOSE_TIMEOUT,
+                propose_timeout_threshold: std::u32::MAX,
+            },
         }
     }
 
@@ -711,8 +722,13 @@ impl SandboxBuilder {
         self
     }
 
+    pub fn with_consensus<F: FnOnce(&mut ConsensusConfig)>(mut self, update: F) -> Self {
+        update(&mut self.consensus_config);
+        self
+    }
+
     pub fn build(self) -> Sandbox {
-        let mut sandbox = sandbox_with_services_uninitialized(self.services);
+        let mut sandbox = sandbox_with_services_uninitialized(self.services, self.consensus_config);
 
         if self.initialize {
             let time = sandbox.time();
@@ -730,7 +746,10 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 /// Constructs an uninitialized instance of a `Sandbox`.
-fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
+fn sandbox_with_services_uninitialized(
+    services: Vec<Box<dyn Service>>,
+    consensus: ConsensusConfig,
+) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
         gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
@@ -756,16 +775,6 @@ fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandb
         ApiSender::new(api_channel.0.clone()),
     );
 
-    let consensus = ConsensusConfig {
-        round_timeout: 1000,
-        status_timeout: 600_000,
-        peers_timeout: 600_000,
-        txs_block_limit: 1000,
-        max_message_len: 1024 * 1024,
-        min_propose_timeout: PROPOSE_TIMEOUT,
-        max_propose_timeout: PROPOSE_TIMEOUT,
-        propose_timeout_threshold: std::u32::MAX,
-    };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
         validators
