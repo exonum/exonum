@@ -839,7 +839,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    env_logger::try_init().unwrap();
+    let _ = env_logger::try_init();
     sandbox_with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),
