@@ -106,5 +106,3 @@ mod unsynchronized_message;
 // - if we have another known node:
 //     - send new request message//for RequestTransaction is covered in handle_tx_handle_full_propose()
 //     - add timeout             //for RequestTransaction is covered in handle_tx_handle_full_propose()
-
-// TODO: Add scenario for single node network. (ECR-1627)
