@@ -688,22 +688,49 @@ impl ConnectList {
     }
 }
 
+pub struct SandboxBuilder {
+    initialize: bool,
+    services: Vec<Box<dyn Service>>,
+}
+
+impl SandboxBuilder {
+    pub fn new() -> Self {
+        SandboxBuilder {
+            initialize: true,
+            services: Vec::new(),
+        }
+    }
+
+    pub fn do_not_initialize_connections(mut self) -> Self {
+        self.initialize = false;
+        self
+    }
+
+    pub fn with_services(mut self, services: Vec<Box<dyn Service>>) -> Self {
+        self.services = services;
+        self
+    }
+
+    pub fn build(self) -> Sandbox {
+        let mut sandbox = sandbox_with_services_uninitialized(self.services);
+
+        if self.initialize {
+            let time = sandbox.time();
+            let validators_count = sandbox.validators_map.len();
+            sandbox.initialize(time, 1, validators_count);
+        }
+
+        sandbox
+    }
+}
+
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
-/// Constructs an instance of a `Sandbox` and initializes connections.
-pub fn sandbox_with_services(services: Vec<Box<dyn Service>>) -> Sandbox {
-    let mut sandbox = sandbox_with_services_uninitialized(services);
-    let time = sandbox.time();
-    let validators_count = sandbox.validators_map.len();
-    sandbox.initialize(time, 1, validators_count);
-    sandbox
-}
-
 /// Constructs an uninitialized instance of a `Sandbox`.
-pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
+fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
         gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
@@ -823,11 +850,15 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
     sandbox
 }
 
-pub fn timestamping_sandbox() -> Sandbox {
-    sandbox_with_services(vec![
+pub fn timestamping_sandbox_builder() -> SandboxBuilder {
+    SandboxBuilder::new().with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),
     ])
+}
+
+pub fn timestamping_sandbox() -> Sandbox {
+    timestamping_sandbox_builder().build()
 }
 
 #[cfg(test)]
@@ -1071,10 +1102,12 @@ mod tests {
 
     #[test]
     fn test_sandbox_service_after_commit() {
-        let sandbox = sandbox_with_services(vec![
-            Box::new(AfterCommitService),
-            Box::new(TimestampingService::new()),
-        ]);
+        let sandbox = SandboxBuilder::new()
+            .with_services(vec![
+                Box::new(AfterCommitService),
+                Box::new(TimestampingService::new()),
+            ])
+            .build();
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));

@@ -23,7 +23,8 @@ use messages::{Connect, PeersRequest, Precommit, Prevote};
 use node;
 
 use sandbox::{
-    sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox}, sandbox_tests_helper::*,
+    sandbox::{timestamping_sandbox, SandboxBuilder},
+    sandbox_tests_helper::*,
 };
 
 #[test]
@@ -432,7 +433,9 @@ fn test_recover_consensus_messages_in_other_round() {
 #[test]
 fn should_restore_peers_after_restart() {
     // create sandbox with nodes not aware about each other
-    let sandbox = sandbox_with_services_uninitialized(vec![]);
+    let sandbox = SandboxBuilder::new()
+        .do_not_initialize_connections()
+        .build();
 
     let (v0, v1) = (ValidatorId(0), ValidatorId(1));
     let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
