@@ -42,6 +42,7 @@ const OUTGOING_CHANNEL_SIZE: usize = 10;
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
     PeerConnected(SocketAddr, Connect),
+    PeerConnected2(SocketAddr),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -394,16 +395,16 @@ impl Listener {
             let handshake = NoiseHandshake::responder(&handshake_params);
             let connection_handler = handshake
                 .listen(sock)
-                .and_then(move |sock| {
-                    let (_, stream) = sock.0.split();
+                .and_then(move |(sock, _public_key)| {
+                    let (_, stream) = sock.split();
                     stream
                         .into_future()
                         .map_err(|e| e.0)
-                        .and_then(|(raw, stream)| (Self::parse_connect_msg(raw), Ok(stream)))
+//                        .and_then(|(raw, stream)| (Self::parse_connect_msg(raw), Ok(stream)))
+                        //TODO: remove and_then, now we can process events immediately
                         .and_then(move |(connect, stream)| {
                             trace!("Received handshake message={:?}", connect);
-
-                            Self::process_incoming_messages(stream, network_tx, connect, address)
+                            Self::process_incoming_messages(stream, network_tx, address)
                         })
                         .map(|_| {
                             // Ensure that holder lives until the stream ends.
@@ -434,13 +435,13 @@ impl Listener {
     fn process_incoming_messages<S>(
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
-        connect: Connect,
+//        connect: Connect,
         address: SocketAddr,
     ) -> impl Future<Item = (), Error = io::Error>
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
-        let event = NetworkEvent::PeerConnected(address, connect);
+        let event = NetworkEvent::PeerConnected2(address);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx
