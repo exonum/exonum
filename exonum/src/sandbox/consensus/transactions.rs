@@ -261,7 +261,7 @@ fn response_size_larger_than_max_message_len() {
 }
 
 /// idea of the test is to
-///  - become e leader
+///  - become a leader
 ///  - receive tx
 ///  - broadcast propose & prevote
 ///  - receive 2 prevotes
