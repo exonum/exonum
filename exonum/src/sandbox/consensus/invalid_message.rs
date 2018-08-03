@@ -109,7 +109,6 @@ fn ignore_propose_with_commited_transaction() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    //    add_one_height(&sandbox);
     add_one_height(&sandbox, &sandbox_state);
 
     let propose = ProposeBuilder::new(&sandbox)
