@@ -18,16 +18,18 @@ use bit_vec::BitVec;
 
 use std::time::Duration;
 
-use crypto::{gen_keypair, CryptoHash};
-use helpers::{Height, Round, ValidatorId};
+use crypto::{gen_keypair, CryptoHash, Hash};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     Message, Precommit, Prevote, PrevotesRequest, ProposeRequest, TransactionsRequest,
     TransactionsResponse,
 };
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
-    config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*,
-    timestamping::{TimestampingTxGenerator, DATA_SIZE},
+    config_updater::TxConfig,
+    sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
+    sandbox_tests_helper::*,
+    timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
 };
 
 /// idea of the test is to verify request transaction scenario: other node requests
@@ -554,4 +556,77 @@ fn request_txs_when_get_propose_or_prevote() {
     );
 
     sandbox.add_time(Duration::from_millis(0));
+}
+
+const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
+const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
+const PROPOSE_THRESHOLD: u32 = 3;
+
+fn timestamping_sandbox_with_threshold() -> Sandbox {
+    let sandbox = timestamping_sandbox_builder()
+        .with_consensus(|config| {
+            config.max_propose_timeout = MAX_PROPOSE_TIMEOUT;
+            config.min_propose_timeout = MIN_PROPOSE_TIMEOUT;
+            config.propose_timeout_threshold = PROPOSE_THRESHOLD;
+        })
+        .build();
+
+    // Wait for us to become the leader.
+    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox
+}
+
+fn tx_hashes(txes: &[TimestampTx]) -> Vec<Hash> {
+    let mut hashes = txes.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+    hashes.sort();
+    hashes
+}
+
+#[test]
+fn regular_propose_when_no_transaction_pressure() {
+    let sandbox = timestamping_sandbox_with_threshold();
+
+    // Generate and receive some transactions (fewer than the threshold).
+    let txes = TimestampingTxGenerator::new(64)
+        .take(PROPOSE_THRESHOLD as usize - 1)
+        .collect::<Vec<_>>();
+
+    for tx in &txes {
+        sandbox.recv(tx);
+    }
+
+    // Proposal is expected to arrive after maximum timeout as we're still not over the threshold.
+    sandbox.add_time(Duration::from_millis(MAX_PROPOSE_TIMEOUT));
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&tx_hashes(&txes))
+        .build();
+
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
+}
+
+#[test]
+fn expedited_propose_on_transaction_pressure() {
+    let sandbox = timestamping_sandbox_with_threshold();
+
+    // Generate and receive some transactions (at the threshold).
+    let txes = TimestampingTxGenerator::new(64)
+        .take(PROPOSE_THRESHOLD as usize)
+        .collect::<Vec<_>>();
+
+    for tx in &txes {
+        sandbox.recv(tx);
+    }
+
+    // Proposal should be expedited and is expected to arrive after minimum timeout.
+    sandbox.add_time(Duration::from_millis(MIN_PROPOSE_TIMEOUT));
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&tx_hashes(&txes))
+        .build();
+
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 }
