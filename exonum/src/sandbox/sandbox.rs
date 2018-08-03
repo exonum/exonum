@@ -18,14 +18,14 @@
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    cell::{Ref, RefCell, RefMut},
+    self, cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::{
-    config_updater::ConfigUpdateService, sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
+    config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
     timestamping::TimestampingService,
 };
 use blockchain::{
@@ -146,11 +146,11 @@ impl Sandbox {
         end_index: usize,
     ) {
         let connect = Connect::new(
-            &self.p(VALIDATOR_0),
-            self.a(VALIDATOR_0),
+            &self.p(ValidatorId(0)),
+            self.a(ValidatorId(0)),
             connect_message_time.into(),
             &user_agent::get(),
-            self.s(VALIDATOR_0),
+            self.s(ValidatorId(0)),
         );
 
         for validator in start_index..end_index {
@@ -542,7 +542,7 @@ impl Sandbox {
                 c.addr(),
                 time.into(),
                 c.user_agent(),
-                self.s(VALIDATOR_0),
+                self.s(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);
@@ -566,7 +566,7 @@ impl Sandbox {
         let internal_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
 
-        let address = self.a(VALIDATOR_0);
+        let address = self.a(ValidatorId(0));
         let inner = self.inner.borrow();
 
         let blockchain = inner
@@ -737,7 +737,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         max_message_len: 1024 * 1024,
         min_propose_timeout: PROPOSE_TIMEOUT,
         max_propose_timeout: PROPOSE_TIMEOUT,
-        propose_timeout_threshold: 0,
+        propose_timeout_threshold: std::u32::MAX,
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
@@ -837,10 +837,7 @@ mod tests {
     use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use encoding;
     use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{
-        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
-        ROUND_TWO,
-    };
+    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::{Fork, Snapshot};
 
     const SERVICE_ID: u16 = 1;
@@ -924,19 +921,19 @@ mod tests {
 
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.send(
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             &Connect::new(
-                &s.p(VALIDATOR_0),
-                s.a(VALIDATOR_0),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(VALIDATOR_0),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -945,11 +942,11 @@ mod tests {
     fn test_sandbox_assert_status() {
         // TODO: Remove this? (ECR-1627)
         let s = timestamping_sandbox();
-        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.assert_state(Height(1), Round(1));
         s.add_time(Duration::from_millis(999));
-        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.assert_state(Height(1), Round(1));
         s.add_time(Duration::from_millis(1));
-        s.assert_state(HEIGHT_ONE, ROUND_TWO);
+        s.assert_state(Height(1), Round(2));
     }
 
     #[test]
@@ -957,13 +954,13 @@ mod tests {
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
         s.send(
-            s.a(VALIDATOR_1),
+            s.a(ValidatorId(1)),
             &Connect::new(
-                &s.p(VALIDATOR_0),
-                s.a(VALIDATOR_0),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(VALIDATOR_0),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -982,19 +979,19 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.send(
-            s.a(VALIDATOR_1),
+            s.a(ValidatorId(1)),
             &Connect::new(
-                &s.p(VALIDATOR_0),
-                s.a(VALIDATOR_0),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(VALIDATOR_0),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -1013,7 +1010,7 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1034,14 +1031,14 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_3),
+            s.a(ValidatorId(3)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1063,7 +1060,7 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
