@@ -58,7 +58,7 @@ fn test_check_leader() {
     // status_timeout is equal to peers timeout in sandbox' ConsensusConfig
     sandbox.broadcast(&Status::new(
         &sandbox.p(ValidatorId(0)),
-        Height(0),
+        Height(1),
         &sandbox.last_block().hash(),
         sandbox.s(ValidatorId(0)),
     ));
