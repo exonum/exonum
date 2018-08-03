@@ -16,10 +16,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Config parameter `external_address` is now a required value. (#826)
 
+- Config parameter `round_timeout` is removed.
+  `first_round_timeout` and `round_timeout_increase` should be used instead. (#848)
+
 ### New features
 
 - Added possibility to use domain names instead of IP addresses as a peer's
   addresses. (#826)
+
+- Now each consecutive round is longer than previous
+  by `round_timeout_increase`. (#848)
 
 ### New Features
 
