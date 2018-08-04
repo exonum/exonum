@@ -55,7 +55,7 @@ fn test_check_leader() {
 
     add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
 
-    // status_timeout is equal to peers timeout in sandbox' ConsensusConfig
+    // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
     sandbox.broadcast(&Status::new(
         &sandbox.p(ValidatorId(0)),
         Height(1),
