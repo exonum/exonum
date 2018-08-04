@@ -21,6 +21,7 @@ use messages::{Message, RawTransaction};
 use storage::{Fork, Snapshot};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
+pub const DATA_SIZE: usize = 64;
 
 transactions! {
     TimestampingTransactions {
