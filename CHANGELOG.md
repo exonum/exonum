@@ -16,8 +16,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Config parameter `external_address` is now a required value. (#826)
 
-- Config parameter `round_timeout` is removed.
-  `first_round_timeout` and `round_timeout_increase` should be used instead. (#848)
+- Config parameter `round_timeout` has been removed.
+  `first_round_timeout` and `round_timeout_increase` should be used instead.
+  Now timeout for round r is
+  `first_round_timeout + (r-1)*round_timeout_increase`. (#848)
 
 ### New features
 
