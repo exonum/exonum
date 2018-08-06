@@ -41,7 +41,8 @@ use std::{
 use serde::de::{self, Deserialize, Deserializer};
 
 use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
+    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
+    ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
@@ -463,7 +464,8 @@ impl NodeHandler {
 
     /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
     pub fn round_timeout_increase(&self) -> Milliseconds {
-        self.state().consensus_config().round_timeout_increase
+        (self.state().consensus_config().first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.

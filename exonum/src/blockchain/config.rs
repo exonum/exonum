@@ -93,15 +93,14 @@ pub struct ConsensusConfig {
     /// between the moment a new block is committed to the blockchain and the
     /// time when second round starts, regardless of whether a new block has
     /// been committed during this period or not.
-    /// Each consecutive round will be longer then previous by round_timeout_increase.
+    /// Each consecutive round will be longer then previous by constant factor determined
+    /// by ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT constant.
     ///
     /// Note that rounds in Exonum
     /// do not have a defined end time. Nodes in a new round can
     /// continue to vote for proposals and process messages related to previous
     /// rounds.
     pub first_round_timeout: Milliseconds,
-    /// Amount of time that is added to the round timeout each round
-    pub round_timeout_increase: Milliseconds,
     /// Period of sending a Status message. This parameter defines the frequency
     /// with which a node broadcasts its status message to the network.
     pub status_timeout: Milliseconds,
@@ -131,6 +130,9 @@ pub struct ConsensusConfig {
 impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
+
+    /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
+    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; //default value 10%
 
     /// Produces warnings if configuration contains non-optimal values.
     ///
@@ -171,7 +173,6 @@ impl Default for ConsensusConfig {
     fn default() -> Self {
         Self {
             first_round_timeout: 3000,
-            round_timeout_increase: 300,
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
@@ -302,7 +303,6 @@ mod tests {
 
             [consensus]
             first_round_timeout = 3000
-            round_timeout_increase = 300
             status_timeout = 5000
             peers_timeout = 10000
             txs_block_limit = 1000

@@ -487,7 +487,8 @@ impl Sandbox {
     }
 
     pub fn round_timeout_increase(&self) -> Milliseconds {
-        self.cfg().consensus.round_timeout_increase
+        (self.cfg().consensus.first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     pub fn current_round_timeout(&self) -> Milliseconds {
@@ -740,7 +741,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
 
     let consensus = ConsensusConfig {
         first_round_timeout: 1000,
-        round_timeout_increase: 100,
         status_timeout: 600_000,
         peers_timeout: 600_000,
         txs_block_limit: 1000,
