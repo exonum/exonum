@@ -586,8 +586,8 @@ impl NodeHandler {
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
-        let connect = self.state.our_connect_message().clone();
-        self.send_to_addr(address, connect.raw());
+        let request = NetworkRequest::ConnectToPeer(*address);
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Add timeout request.

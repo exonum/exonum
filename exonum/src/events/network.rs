@@ -50,6 +50,7 @@ pub enum NetworkEvent {
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
     SendMessage(SocketAddr, RawMessage),
+    ConnectToPeer(SocketAddr),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
@@ -292,7 +293,7 @@ impl RequestHandler {
             .map_err(|_| other_error("no network requests"))
             .for_each(move |request| {
                 match request {
-                    NetworkRequest::SendMessage(peer, msg) => {
+                    NetworkRequest::ConnectToPeer(peer) => {
                         let conn_tx = outgoing_connections
                             .get(peer)
                             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
@@ -307,16 +308,25 @@ impl RequestHandler {
                                         &handshake_params,
                                     )
                                     .map(|conn_tx|
-                                        // if we create new connect, we should send connect message
-                                        if &msg == connect_message.raw() {
-                                            conn_fut(Ok(conn_tx).into_future())
-                                        } else {
-                                            conn_fut(conn_tx.send(connect_message.raw().clone())
-                                                .map_err(|_| {
-                                                    other_error("can't send message to a connection")
-                                                }))
-                                        })
+                                        conn_fut(Ok(conn_tx).into_future()))
                             });
+                        if let Some(conn_tx) = conn_tx {
+                            to_box(conn_tx)
+                        } else {
+                            let event = NetworkEvent::UnableConnectToPeer(peer);
+                            let fut = network_tx
+                                .clone()
+                                .send(event)
+                                .map_err(|_| other_error("can't send network event"))
+                                .into_future();
+                            to_box(fut)
+                        }
+                    }
+                    NetworkRequest::SendMessage(peer, msg) => {
+                        let conn_tx = outgoing_connections
+                            .get(peer)
+                            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()));
+
                         if let Some(conn_tx) = conn_tx {
                             let fut = conn_tx.and_then(|conn_tx| {
                                 conn_tx
@@ -396,16 +406,10 @@ impl Listener {
             let connection_handler = handshake
                 .listen(sock)
                 .and_then(move |(sock, _public_key)| {
+                    trace!("Remote connection established with socket={:?}", sock);
                     let (_, stream) = sock.split();
-                    stream
-                        .into_future()
-                        .map_err(|e| e.0)
-//                        .and_then(|(raw, stream)| (Self::parse_connect_msg(raw), Ok(stream)))
-                        //TODO: remove and_then, now we can process events immediately
-                        .and_then(move |(connect, stream)| {
-                            trace!("Received handshake message={:?}", connect);
-                            Self::process_incoming_messages(stream, network_tx, address)
-                        })
+
+                    Self::process_incoming_messages(stream, network_tx, address)
                         .map(|_| {
                             // Ensure that holder lives until the stream ends.
                             let _holder = holder;
@@ -420,22 +424,9 @@ impl Listener {
         Ok(Listener(to_box(server)))
     }
 
-    fn parse_connect_msg(raw: Option<RawMessage>) -> Result<Connect, io::Error> {
-        let raw = raw.ok_or_else(|| other_error("Incoming socket closed"))?;
-        let message = Any::from_raw(raw).map_err(into_other)?;
-        match message {
-            Any::Connect(connect) => Ok(connect),
-            other => Err(other_error(&format!(
-                "First message from a remote peer is not Connect, got={:?}",
-                other
-            ))),
-        }
-    }
-
     fn process_incoming_messages<S>(
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
-//        connect: Connect,
         address: SocketAddr,
     ) -> impl Future<Item = (), Error = io::Error>
     where

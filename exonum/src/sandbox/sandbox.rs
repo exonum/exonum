@@ -45,6 +45,7 @@ use node::{
     NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
 };
 use storage::{MapProof, MemoryDB};
+use messages::MessageBuffer;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -96,6 +97,9 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::ConnectToPeer(peer) => {
+                        self.sent.push_back((peer, RawMessage::new(MessageBuffer::from_vec(Vec::new()))))
+                    },
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
