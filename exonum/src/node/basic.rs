@@ -18,7 +18,7 @@ use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
+use messages::{Any, Message, PeersRequest, RawMessage, Status};
 use node::ConnectInfo;
 
 impl NodeHandler {

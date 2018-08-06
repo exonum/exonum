@@ -27,7 +27,7 @@ use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
+    BlockResponse, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
 };
 use node::{connect_list::ConnectList, ConnectInfo};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
@@ -47,7 +47,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: Connect,
+    our_connect_message: ConnectInfo,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,

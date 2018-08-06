@@ -54,7 +54,7 @@ use helpers::{
     config::ConfigManager, fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round,
     ValidatorId,
 };
-use messages::{Connect, Message, RawMessage};
+use messages::{Message, RawMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions, StorageValue};
 

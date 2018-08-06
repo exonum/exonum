@@ -67,29 +67,29 @@ pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
 messages! {
     const SERVICE_ID = CONSENSUS;
 
-    /// Connect to a node.
-    ///
-    /// ### Validation
-    /// The message is ignored if its time is earlier than in the previous
-    /// `Connect` message received from the same peer.
-    ///
-    /// ### Processing
-    /// Connect to the peer.
-    ///
-    /// ### Generation
-    /// A node sends `Connect` message to all known addresses during
-    /// initialization. Additionally, the node responds by its own `Connect`
-    /// message after receiving `node::Event::Connected`.
-    struct Connect {
-        /// The sender's public key.
-        pub_key: &PublicKey,
-        /// The node's address.
-        addr: SocketAddr,
-        /// Time when the message was created.
-        time: DateTime<Utc>,
-        /// String containing information about this node including Exonum, Rust and OS versions.
-        user_agent: &str,
-    }
+//    /// Connect to a node.
+//    ///
+//    /// ### Validation
+//    /// The message is ignored if its time is earlier than in the previous
+//    /// `Connect` message received from the same peer.
+//    ///
+//    /// ### Processing
+//    /// Connect to the peer.
+//    ///
+//    /// ### Generation
+//    /// A node sends `Connect` message to all known addresses during
+//    /// initialization. Additionally, the node responds by its own `Connect`
+//    /// message after receiving `node::Event::Connected`.
+//    struct Connect {
+//        /// The sender's public key.
+//        pub_key: &PublicKey,
+//        /// The node's address.
+//        addr: SocketAddr,
+//        /// Time when the message was created.
+//        time: DateTime<Utc>,
+//        /// String containing information about this node including Exonum, Rust and OS versions.
+//        user_agent: &str,
+//    }
 
 
     /// Current node status.
