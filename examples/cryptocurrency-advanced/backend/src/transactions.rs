@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Cryptocurrency transactions.
+
 // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
@@ -21,7 +23,7 @@ use exonum::{
     messages::Message, storage::Fork,
 };
 
-use schema::CurrencySchema;
+use schema::Schema;
 use CRYPTOCURRENCY_SERVICE_ID;
 
 /// Error codes emitted by wallet transactions during execution.
@@ -73,6 +75,9 @@ transactions! {
             to:      &PublicKey,
             /// Amount of the currency to transfer.
             amount:  u64,
+            /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+            ///
+            /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
             seed:    u64,
         }
 
@@ -82,6 +87,9 @@ transactions! {
             pub_key:  &PublicKey,
             /// Issued amount of the currency.
             amount:  u64,
+            /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+            ///
+            /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
             seed:    u64,
         }
 
@@ -101,7 +109,7 @@ impl Transaction for Transfer {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CurrencySchema::new(fork);
+        let mut schema = Schema::new(fork);
 
         let from = self.from();
         let to = self.to();
@@ -129,7 +137,7 @@ impl Transaction for Issue {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CurrencySchema::new(fork);
+        let mut schema = Schema::new(fork);
         let pub_key = self.pub_key();
         let hash = self.hash();
 
@@ -149,7 +157,7 @@ impl Transaction for CreateWallet {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = CurrencySchema::new(fork);
+        let mut schema = Schema::new(fork);
         let pub_key = self.pub_key();
         let hash = self.hash();
 

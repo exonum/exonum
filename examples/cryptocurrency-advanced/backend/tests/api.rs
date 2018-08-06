@@ -33,7 +33,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 // Import data types used in tests from the crate where the service is defined.
 use cryptocurrency::{
     api::{WalletInfo, WalletQuery}, transactions::{CreateWallet, Transfer}, wallet::Wallet,
-    CurrencyService,
+    Service,
 };
 
 // Imports shared test constants.
@@ -292,7 +292,7 @@ impl CryptocurrencyApi {
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
     let testkit = TestKitBuilder::validator()
-        .with_service(CurrencyService)
+        .with_service(Service)
         .create();
     let api = CryptocurrencyApi {
         inner: testkit.api(),

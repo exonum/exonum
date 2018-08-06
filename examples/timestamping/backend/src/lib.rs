@@ -48,7 +48,7 @@ use transactions::TimeTransactions;
 const TIMESTAMPING_SERVICE: u16 = 130;
 const SERVICE_NAME: &str = "timestamping";
 
-/// Demo timestamping service.
+/// Exonum `Service` implementation.
 #[derive(Debug, Default)]
 pub struct Service;
 

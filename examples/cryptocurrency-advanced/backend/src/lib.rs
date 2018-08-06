@@ -24,7 +24,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub use schema::CurrencySchema;
+pub use schema::Schema;
 
 pub mod api;
 pub mod schema;
@@ -32,7 +32,7 @@ pub mod transactions;
 pub mod wallet;
 
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet}, crypto::Hash,
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
     encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
     storage::Snapshot,
 };
@@ -42,25 +42,25 @@ use transactions::WalletTransactions;
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
 /// Name of the service.
-pub const SERVICE_NAME: &str = "cryptocurrency";
+const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
 const INITIAL_BALANCE: u64 = 100;
 
 /// Exonum `Service` implementation.
 #[derive(Default, Debug)]
-pub struct CurrencyService;
+pub struct Service;
 
-impl Service for CurrencyService {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
+impl blockchain::Service for Service {
     fn service_id(&self) -> u16 {
         CRYPTOCURRENCY_SERVICE_ID
     }
 
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = CurrencySchema::new(view);
+        let schema = Schema::new(view);
         schema.state_hash()
     }
 
@@ -69,10 +69,11 @@ impl Service for CurrencyService {
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::CryptocurrencyApi::wire(builder);
+        api::PublicApi::wire(builder);
     }
 }
 
+/// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
 pub struct ServiceFactory;
 
@@ -82,6 +83,6 @@ impl fabric::ServiceFactory for ServiceFactory {
     }
 
     fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
-        Box::new(CurrencyService)
+        Box::new(Service)
     }
 }
