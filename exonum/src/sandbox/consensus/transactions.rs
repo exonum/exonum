@@ -21,7 +21,7 @@ use std::time::Duration;
 use crypto::{gen_keypair, CryptoHash};
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    Message, Precommit, Prevote, PrevotesRequest, ProposeRequest, TransactionsRequest,
+    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
     TransactionsResponse,
 };
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
@@ -67,6 +67,100 @@ fn empty_tx_request() {
         &[],
         sandbox.s(ValidatorId(1)),
     ));
+}
+
+// if tx was received after execute but before commit it produce conflict patch.
+// testcase:
+// 1. add tx
+// 2. create and execute propose
+// 3. add other tx
+// 4. commit propose.
+#[test]
+fn tx_pool_size_overflow() {
+    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
+    let tx1 = tx_gen.next().unwrap();
+    let tx2 = tx_gen.next().unwrap();
+    let sandbox = timestamping_sandbox();
+
+    sandbox.recv(&tx1);
+
+    let propose = Propose::new(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        &sandbox.last_hash(),
+        &[tx1.hash()],
+        sandbox.s(ValidatorId(2)),
+    );
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_proposer_id(ValidatorId(2))
+        .with_height(Height(1))
+        .with_tx_hash(&tx1.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone()]))
+        .with_prev_hash(&sandbox.last_hash())
+        .build();
+
+    sandbox.recv(&propose);
+    sandbox.broadcast(&Prevote::new(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        NOT_LOCKED,
+        sandbox.s(ValidatorId(0)),
+    ));
+    sandbox.recv(&Prevote::new(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        NOT_LOCKED,
+        sandbox.s(ValidatorId(1)),
+    ));
+    sandbox.assert_lock(NOT_LOCKED, None);
+    sandbox.recv(&Prevote::new(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        NOT_LOCKED,
+        sandbox.s(ValidatorId(2)),
+    ));
+    sandbox.broadcast(&Precommit::new(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(ValidatorId(0)),
+    ));
+    sandbox.assert_lock(Round(1), Some(propose.hash()));
+    sandbox.recv(&tx2);
+    sandbox.assert_pool_len(2);
+
+    sandbox.recv(&Precommit::new(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(ValidatorId(1)),
+    ));
+    sandbox.recv(&Precommit::new(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(ValidatorId(2)),
+    ));
+
+    //first tx should be committed and removed from pool
+    sandbox.assert_pool_len(1);
 }
 
 #[test]

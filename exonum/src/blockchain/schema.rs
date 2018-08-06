@@ -116,9 +116,9 @@ where
     }
 
     /// Returns the number of transactions in the pool.
-    pub fn transactions_pool_len(&self) -> usize {
+    pub fn transactions_pool_len(&self) -> u64 {
         let pool = self.transactions_pool_len_index();
-        pool.get().unwrap_or(0) as usize
+        pool.get().unwrap_or(0)
     }
 
     /// Returns a table that keeps the block height and transaction position inside the block for every

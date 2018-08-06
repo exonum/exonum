@@ -716,9 +716,9 @@ impl NodeHandler {
             info!("LEADER: pool = {}", pool_len);
 
             let round = self.state.round();
-            let max_count = ::std::cmp::min(self.txs_block_limit() as usize, pool_len);
+            let max_count = ::std::cmp::min(self.txs_block_limit() as u64, pool_len);
 
-            let txs: Vec<Hash> = pool.iter().take(max_count).collect();
+            let txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
             let propose = Propose::new(
                 validator_id,
                 self.state.height(),

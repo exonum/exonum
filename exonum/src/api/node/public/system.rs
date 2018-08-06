@@ -22,7 +22,7 @@ use helpers::user_agent;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct MemPoolInfo {
     /// Total number of uncommitted transactions.
-    pub size: usize,
+    pub size: u64,
 }
 
 /// Information about the amount of peers connected to the node.
