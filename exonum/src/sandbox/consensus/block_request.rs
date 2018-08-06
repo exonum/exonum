@@ -17,6 +17,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
+use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Message, Precommit, Status, TransactionsRequest,
     TransactionsResponse,
@@ -49,67 +50,67 @@ fn handle_block_response_tx_in_pool() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
     sandbox.recv(&tx);
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -139,84 +140,84 @@ fn handle_block_response_with_unknown_tx() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         vec![tx.raw().clone()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -245,62 +246,62 @@ fn handle_block_response_with_invalid_txs_order() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     // Invalid transactions order.
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx2.hash(), tx1.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(Height(1), Round(1));
 }
 
 /// HANDLE block response
@@ -331,63 +332,63 @@ fn handle_block_response_with_invalid_precommits() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block1.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block1.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     // Precommit with invalid block hash.
     let precommit_for_other_block = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block2.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block1.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
     sandbox.recv(&tx);
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block1.clone(),
         vec![precommit_1, precommit_2, precommit_for_other_block],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.assert_state(Height(1), Round(1));
 }
 
 /// HANDLE block response
@@ -420,84 +421,84 @@ fn handle_block_response_with_known_transaction() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx1.hash(), tx2.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
             &[tx2.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         vec![tx2.raw().clone()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -530,66 +531,66 @@ fn handle_block_response_with_all_known_transactions() {
         .build();
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx1.hash(), tx2.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -611,8 +612,8 @@ fn received_block_while_there_is_full_propose() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_height(HEIGHT_ONE)
-        .with_validator(VALIDATOR_2)
+        .with_height(Height(1))
+        .with_validator(ValidatorId(2))
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hashes(&[tx.hash()])
         .build();
@@ -624,59 +625,59 @@ fn received_block_while_there_is_full_propose() {
         .build();
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.recv(&propose);
@@ -684,39 +685,39 @@ fn received_block_while_there_is_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         vec![tx.raw().clone()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -747,55 +748,55 @@ fn received_block_while_there_is_pending_block() {
         .build();
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![
             precommit_1.clone(),
@@ -803,42 +804,42 @@ fn received_block_while_there_is_pending_block() {
             precommit_3.clone(),
         ],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         vec![tx.raw().clone()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
 
@@ -875,102 +876,102 @@ fn transactions_request_to_multiple_nodes() {
         .build();
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_2),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(2)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
 
     sandbox.recv(&Status::new(
-        &sandbox.p(VALIDATOR_3),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(3)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     let precommit_1 = Precommit::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(1),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_1),
+        sandbox.s(ValidatorId(1)),
     );
     let precommit_2 = Precommit::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(2),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     );
     let precommit_3 = Precommit::new(
-        VALIDATOR_3,
-        HEIGHT_ONE,
-        ROUND_ONE,
+        ValidatorId(3),
+        Height(1),
+        Round(1),
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     );
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &BlockRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
-            HEIGHT_ONE,
-            sandbox.s(VALIDATOR_0),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(2)),
+            Height(1),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&BlockResponse::new(
-        &sandbox.p(VALIDATOR_3),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(3)),
+        &sandbox.p(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(VALIDATOR_3),
+        sandbox.s(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_2),
+        sandbox.a(ValidatorId(2)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_2),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(VALIDATOR_3),
+        sandbox.a(ValidatorId(3)),
         &TransactionsRequest::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_3),
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(VALIDATOR_0),
+            sandbox.s(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
-        &sandbox.p(VALIDATOR_2),
-        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(ValidatorId(2)),
+        &sandbox.p(ValidatorId(0)),
         vec![tx.raw().clone()],
-        sandbox.s(VALIDATOR_2),
+        sandbox.s(ValidatorId(2)),
     ));
 
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&Status::new(
-        &sandbox.p(VALIDATOR_0),
-        HEIGHT_TWO,
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
         &block.hash(),
-        sandbox.s(VALIDATOR_0),
+        sandbox.s(ValidatorId(0)),
     ));
 }
