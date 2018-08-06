@@ -2,7 +2,6 @@
 max_message_len = 1048576
 peers_timeout = 10000
 first_round_timeout = 3000
-round_timeout_increase = 300
 status_timeout = 5000
 txs_block_limit = 1000
 min_propose_timeout = 10

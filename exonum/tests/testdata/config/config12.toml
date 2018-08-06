@@ -19,7 +19,6 @@ service_key = "7413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
 max_message_len = 1048576
 peers_timeout = 10000
 first_round_timeout = 3000
-round_timeout_increase = 300
 status_timeout = 5000
 txs_block_limit = 1000
 min_propose_timeout = 10
