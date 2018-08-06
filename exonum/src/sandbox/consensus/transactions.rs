@@ -575,8 +575,8 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
     sandbox
 }
 
-fn tx_hashes(txes: &[TimestampTx]) -> Vec<Hash> {
-    let mut hashes = txes.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+fn tx_hashes(transactions: &[TimestampTx]) -> Vec<Hash> {
+    let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
     hashes.sort();
     hashes
 }
@@ -586,11 +586,11 @@ fn regular_propose_when_no_transaction_pressure() {
     let sandbox = timestamping_sandbox_with_threshold();
 
     // Generate and receive some transactions (fewer than the threshold).
-    let txes = TimestampingTxGenerator::new(64)
+    let transactions = TimestampingTxGenerator::new(64)
         .take(PROPOSE_THRESHOLD as usize - 1)
         .collect::<Vec<_>>();
 
-    for tx in &txes {
+    for tx in &transactions {
         sandbox.recv(tx);
     }
 
@@ -598,7 +598,7 @@ fn regular_propose_when_no_transaction_pressure() {
     sandbox.add_time(Duration::from_millis(MAX_PROPOSE_TIMEOUT));
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&tx_hashes(&txes))
+        .with_tx_hashes(&tx_hashes(&transactions))
         .build();
 
     sandbox.broadcast(&propose);
@@ -610,11 +610,11 @@ fn expedited_propose_on_transaction_pressure() {
     let sandbox = timestamping_sandbox_with_threshold();
 
     // Generate and receive some transactions (at the threshold).
-    let txes = TimestampingTxGenerator::new(64)
+    let transactions = TimestampingTxGenerator::new(64)
         .take(PROPOSE_THRESHOLD as usize)
         .collect::<Vec<_>>();
 
-    for tx in &txes {
+    for tx in &transactions {
         sandbox.recv(tx);
     }
 
@@ -622,7 +622,7 @@ fn expedited_propose_on_transaction_pressure() {
     sandbox.add_time(Duration::from_millis(MIN_PROPOSE_TIMEOUT));
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&tx_hashes(&txes))
+        .with_tx_hashes(&tx_hashes(&transactions))
         .build();
 
     sandbox.broadcast(&propose);
