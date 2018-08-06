@@ -20,7 +20,6 @@ use std::time::Duration;
 use crypto::CryptoHash;
 use helpers::user_agent;
 use messages::{Connect, PeersRequest, Precommit, Prevote};
-use node;
 
 use sandbox::{
     sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox}, sandbox_tests_helper::*,

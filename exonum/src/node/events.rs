@@ -75,8 +75,11 @@ impl NodeHandler {
                     self.api_state().set_network_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_network_enabled {
-                        for address in self.state.connect_list().clone().peers.values() {
-                            self.connect(address);
+                        for (pub_key, address) in self.state.connect_list().clone().peers {
+                            self.connect(&address);
+                            let connect = self.state.our_connect_message().clone();
+                            self.state.add_peer(pub_key, connect.clone());
+                            self.blockchain.save_peer(&pub_key, connect);
                         }
                         self.add_round_timeout();
                     } else {
