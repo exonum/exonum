@@ -28,8 +28,7 @@ use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
     sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
-    sandbox_tests_helper::*,
-    timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
+    sandbox_tests_helper::*, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
 };
 
 /// idea of the test is to verify request transaction scenario: other node requests

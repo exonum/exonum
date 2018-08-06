@@ -23,8 +23,7 @@ use messages::{Connect, PeersRequest, Precommit, Prevote};
 use node;
 
 use sandbox::{
-    sandbox::{timestamping_sandbox, SandboxBuilder},
-    sandbox_tests_helper::*,
+    sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
 };
 
 #[test]
