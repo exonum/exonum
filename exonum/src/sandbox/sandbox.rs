@@ -14,7 +14,7 @@
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-
+use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -38,7 +38,7 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use messages::{Any, Connect, Message, PeersRequest, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -238,7 +238,6 @@ impl Sandbox {
 
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
-        // TODO Think about addresses. (ECR-1627)
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
@@ -268,6 +267,25 @@ impl Sandbox {
         }
     }
 
+    pub fn send_peers_request(&self) {
+        self.process_events();
+        let send = self.inner.borrow_mut().sent.pop_front();
+
+        if let Some((addr, msg)) = send {
+            let peers_request =
+                PeersRequest::from_raw(msg).expect("Incorrect message. PeersRequest was expected");
+
+            let id = self.addresses.iter().position(|&a| a == addr);
+            if let Some(id) = id {
+                assert_eq!(&self.p(ValidatorId(id as u16)), peers_request.to());
+            } else {
+                panic!("Sending PeersRequest to unknown peer {:?}", addr);
+            }
+        } else {
+            panic!("Expected to send the PeersRequest message but nothing happened");
+        }
+    }
+
     pub fn broadcast<T: Message>(&self, msg: &T) {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
@@ -276,7 +294,6 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
-    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
@@ -284,7 +301,6 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn try_broadcast_to_addrs<'a, T: Message, I>(
         &self,
         msg: &T,
@@ -771,7 +787,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         mempool: Default::default(),
     };
 
-    // TODO: Use factory or other solution like set_handler or run. (ECR-1627)
     let system_state = SandboxSystemStateProvider {
         listen_address: addresses[0],
         shared_time: SharedTime::new(Mutex::new(
@@ -824,6 +839,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
+    let _ = env_logger::try_init();
     sandbox_with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),
@@ -940,7 +956,6 @@ mod tests {
 
     #[test]
     fn test_sandbox_assert_status() {
-        // TODO: Remove this? (ECR-1627)
         let s = timestamping_sandbox();
         s.assert_state(Height(1), Round(1));
         s.add_time(Duration::from_millis(999));
