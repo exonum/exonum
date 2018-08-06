@@ -35,15 +35,16 @@ use toml::Value;
 
 use std::{
     collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
-    time::{Duration, SystemTime},
+    time::{Duration, SystemTime}, borrow::Cow,
 };
 
 use serde::de::{self, Deserialize, Deserializer};
+use serde_json;
 
 use blockchain::{
     Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
 };
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, hash};
 use events::{
     error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
     InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
@@ -55,9 +56,7 @@ use helpers::{
 };
 use messages::{Connect, Message, RawMessage};
 use node::state::SharedConnectList;
-use storage::{Database, DbOptions};
-use storage::StorageValue;
-use std::borrow::Cow;
+use storage::{Database, DbOptions, StorageValue};
 
 mod basic;
 mod connect_list;
@@ -783,18 +782,18 @@ pub struct ConnectInfo {
 
 impl StorageValue for ConnectInfo {
     fn into_bytes(self) -> Vec<u8> {
-        Vec::new()
+        serde_json::to_vec(&self).unwrap()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        //TODO: implement
-        unimplemented!()
+        serde_json::from_slice(value.as_ref()).unwrap()
     }
 }
 
 impl CryptoHash for ConnectInfo {
     fn hash(&self) -> Hash {
-        unimplemented!()
+        let vec_bytes = serde_json::to_vec(&self).unwrap();
+        hash(&vec_bytes)
     }
 }
 
