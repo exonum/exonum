@@ -82,7 +82,7 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
+    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
         Box::new(Service)
     }
 }
