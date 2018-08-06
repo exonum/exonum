@@ -39,8 +39,6 @@ use storage::proof_list_index::root_hash;
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
 
-/// `Connect` message id.
-pub const CONNECT_MESSAGE_ID: u16 = Connect::MESSAGE_ID;
 /// `Status` message id.
 pub const STATUS_MESSAGE_ID: u16 = Status::MESSAGE_ID;
 

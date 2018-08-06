@@ -701,9 +701,9 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
+    pub fn from_peers(peers: &HashMap<PublicKey, ConnectInfo>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =
-            peers.iter().map(|(p, c)| (*p, c.addr())).collect();
+            peers.iter().map(|(p, c)| (*p, c.address)).collect();
         ConnectList { peers }
     }
 }

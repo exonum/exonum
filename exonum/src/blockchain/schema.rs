@@ -20,6 +20,7 @@ use storage::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
     Snapshot,
 };
+use node::ConnectInfo;
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -182,7 +183,7 @@ where
 
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, ConnectInfo> {
         MapIndex::new(PEERS_CACHE, &self.view)
     }
 

@@ -35,14 +35,14 @@ use events::{
 use helpers::Milliseconds;
 use crypto::x25519;
 use messages::{Any, Connect, Message, RawMessage};
+use node::ConnectInfo;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(SocketAddr, Connect),
-    PeerConnected2(SocketAddr),
+    PeerConnected(ConnectInfo),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -441,7 +441,9 @@ impl Listener {
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
-        let event = NetworkEvent::PeerConnected2(address);
+        use crypto::PublicKey;
+        let info = ConnectInfo { address, public_key: PublicKey::zero() };
+        let event = NetworkEvent::PeerConnected(info);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx

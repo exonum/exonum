@@ -56,6 +56,8 @@ use helpers::{
 use messages::{Connect, Message, RawMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
+use storage::StorageValue;
+use std::borrow::Cow;
 
 mod basic;
 mod connect_list;
@@ -505,7 +507,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(Connect::addr);
+            let it = self.state.peers().values().map(|info| info.address);
             let it = it.chain(self.peer_discovery.iter().cloned());
             let it = it.filter(|&address| address != listen_address);
             it.collect()
@@ -551,7 +553,7 @@ impl NodeHandler {
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         let address = {
             if let Some(conn) = self.state.peers().get(&public_key) {
-                conn.addr()
+                conn.address
             } else {
                 warn!(
                     "Attempt to send message to peer with key {:?} without connection",
@@ -576,7 +578,7 @@ impl NodeHandler {
         let peers: Vec<SocketAddr> = self.state
             .peers()
             .values()
-            .map(|conn| conn.addr())
+            .map(|conn| conn.address)
             .collect();
 
         for address in peers {
@@ -777,6 +779,23 @@ pub struct ConnectInfo {
     pub address: SocketAddr,
     /// Peer public key.
     pub public_key: PublicKey,
+}
+
+impl StorageValue for ConnectInfo {
+    fn into_bytes(self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        //TODO: implement
+        unimplemented!()
+    }
+}
+
+impl CryptoHash for ConnectInfo {
+    fn hash(&self) -> Hash {
+        unimplemented!()
+    }
 }
 
 impl fmt::Display for ConnectInfo {
