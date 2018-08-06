@@ -23,10 +23,10 @@ use std::collections::BTreeMap;
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Precommit, Prevote, Propose, RawMessage, CONSENSUS};
+use messages::{Message, Precommit, Prevote, Propose, RawMessage, Status, CONSENSUS};
 use sandbox::{
     sandbox::timestamping_sandbox, sandbox_tests_helper::*,
-    timestamping::{TimestampingTxGenerator, TIMESTAMPING_SERVICE},
+    timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
@@ -40,8 +40,6 @@ fn test_check_leader() {
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
 
-    // TODO: Would be nice to check also for RequestPeers message which will appear
-    // after N time units (at Nth round). (ECR-1627)
     let n_rounds_without_request_peers = {
         let mut rounds = 0;
         let mut time_left = sandbox.cfg().consensus.peers_timeout;
@@ -54,11 +52,26 @@ fn test_check_leader() {
         Round(rounds as u32)
     };
 
+    let mut was_leader = false;
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
         sandbox.assert_state(Height(1), round);
         add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
         sandbox.assert_state(Height(1), round.next());
+        was_leader = was_leader || sandbox.is_leader();
     }
+    assert!(was_leader);
+
+    add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
+
+    // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(ValidatorId(0)),
+        Height(1),
+        &sandbox.last_block().hash(),
+        sandbox.s(ValidatorId(0)),
+    ));
+
+    sandbox.send_peers_request();
 }
 
 /// idea of the test is to reach one height
@@ -225,9 +238,8 @@ fn test_store_txs_positions() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    let data_size = 20;
     let generator = TimestampingTxGenerator::with_keypair(
-        data_size,
+        DATA_SIZE,
         gen_keypair_from_seed(&Seed::new([11; SEED_LENGTH])),
     );
 
