@@ -222,6 +222,7 @@ mod rocksdb_tests {
         super::changelog(rocksdb_database(path));
     }
 
+    #[ignore]
     #[test]
     fn test_multiple_patch() {
         let dir = TempDir::new("exonum_rocksdb_multiple_patch").unwrap();

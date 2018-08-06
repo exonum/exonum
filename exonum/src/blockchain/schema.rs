@@ -111,7 +111,8 @@ where
         KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
-    fn transactions_pool_len_index(&self) -> Entry<&T, u64> {
+    /// Returns an entry that represents count of uncommitted transactions.
+    pub(crate) fn transactions_pool_len_index(&self) -> Entry<&T, u64> {
         Entry::new(TRANSACTIONS_POOL_LEN, &self.view)
     }
 
@@ -393,7 +394,10 @@ impl<'a> Schema<&'a mut Fork> {
         KeySetIndex::new(TRANSACTIONS_POOL, self.view)
     }
 
-    fn transactions_pool_len_index_mut(&mut self) -> Entry<&mut Fork, u64> {
+    /// Mutable reference to the [`transactions_pool_len_index`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions_pool_len_index
+    pub(crate) fn transactions_pool_len_index_mut(&mut self) -> Entry<&mut Fork, u64> {
         Entry::new(TRANSACTIONS_POOL_LEN, self.view)
     }
 
@@ -526,8 +530,6 @@ impl<'a> Schema<&'a mut Fork> {
     /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
         self.transactions_pool_mut().remove(hash);
-        let x = self.transactions_pool_len_index().get().unwrap();
-        self.transactions_pool_len_index_mut().set(x - 1);
     }
 
     /// Removes transaction from the persistent pool.

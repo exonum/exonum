@@ -21,7 +21,7 @@ use std::time::Duration;
 use crypto::{gen_keypair, CryptoHash};
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
+    Message, Precommit, Status, Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
     TransactionsResponse,
 };
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
@@ -161,6 +161,12 @@ fn tx_pool_size_overflow() {
 
     //first tx should be committed and removed from pool
     sandbox.assert_pool_len(1);
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(ValidatorId(0)),
+        Height(2),
+        &block.hash(),
+        sandbox.s(ValidatorId(0)),
+    ));
 }
 
 #[test]
