@@ -18,7 +18,7 @@ use bit_vec::BitVec;
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
 use super::{
-    sandbox::Sandbox, timestamping::{TimestampTx, TimestampingTxGenerator},
+    sandbox::Sandbox, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
 };
 use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
@@ -276,7 +276,7 @@ pub fn try_add_round_with_transactions(
 }
 
 pub fn gen_timestamping_tx() -> TimestampTx {
-    let mut tx_gen = TimestampingTxGenerator::new(64);
+    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
     tx_gen.next().unwrap()
 }
 

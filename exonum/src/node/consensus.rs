@@ -533,7 +533,8 @@ impl NodeHandler {
         }
     }
 
-    /// Checks if the transaction is new and adds it to the pool.
+    /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
+    /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
     fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
@@ -551,6 +552,8 @@ impl NodeHandler {
         self.blockchain
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
+
+        self.maybe_add_propose_timeout();
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
@@ -689,6 +692,7 @@ impl NodeHandler {
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+        self.allow_expedited_propose = true;
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late

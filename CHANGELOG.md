@@ -50,6 +50,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `NoiseHandshake::finalize` now returns error if remote peer's public key is not
   in `ConnectList`. (#811)
 
+- Now nodes will switch to `min_propose_timeout` for block proposal timeout
+  faster if they receive more than `propose_timeout_threshold` transactions
+  during `max_propose_timeout`. (#844)
+
 ## 0.9.0 - 2018-07-19
 
 ### Breaking Changes

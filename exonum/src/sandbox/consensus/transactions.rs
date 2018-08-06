@@ -27,12 +27,11 @@ use messages::{
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*,
-    timestamping::{TimestampTx, TimestampingTxGenerator},
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
 };
 
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
-// TODO: Add scenario with manually created and signed tx. (ECR-1627)
 #[test]
 fn response_to_request_txs() {
     let sandbox = timestamping_sandbox();
@@ -74,7 +73,7 @@ fn empty_tx_request() {
 fn duplicate_tx_in_pool() {
     let sandbox = timestamping_sandbox();
 
-    let mut tx_gen = TimestampingTxGenerator::new(64);
+    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
     let tx1 = tx_gen.next().unwrap();
     let tx2 = tx_gen.next().unwrap();
 
@@ -114,8 +113,10 @@ fn incorrect_tx_in_request() {
 
     let (pub_key, _) = gen_keypair();
     let (_, sec_key) = gen_keypair();
-    let data = vec![0; 64];
-    let tx0 = TimestampTx::new(&pub_key, &data, &sec_key);
+
+    let tx0 = TimestampingTxGenerator::with_keypair(DATA_SIZE, (pub_key, sec_key))
+        .next()
+        .unwrap();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
@@ -177,9 +178,7 @@ fn response_size_larger_than_max_message_len() {
     let tx1 = gen_timestamping_tx();
     let tx2 = gen_timestamping_tx();
     let tx3 = gen_timestamping_tx();
-    let (pub_key, sec_key) = gen_keypair();
-    let data = vec![0; 65];
-    let tx4 = TimestampTx::new(&pub_key, &data, &sec_key);
+    let tx4 = TimestampingTxGenerator::new(DATA_SIZE + 1).next().unwrap();
 
     assert_eq!(
         tx1.raw().len() + tx2.raw().len() + 1,
@@ -261,7 +260,7 @@ fn response_size_larger_than_max_message_len() {
 }
 
 /// idea of the test is to
-///  - become e leader
+///  - become a leader
 ///  - receive tx
 ///  - broadcast propose & prevote
 ///  - receive 2 prevotes
@@ -481,11 +480,11 @@ fn handle_tx_verify_signature() {
     let sandbox = timestamping_sandbox();
 
     // generate incorrect tx
-    let (public_key1, _) = gen_keypair();
-    let (_, secret_key2) = gen_keypair();
-
-    let data = vec![0; 64]; // TODO: Find the way how to get rid of hard-coded value. (ECR-1627)
-    let tx = TimestampTx::new(&public_key1, &data, &secret_key2);
+    let (public_key, _) = gen_keypair();
+    let (_, wrong_secret_key) = gen_keypair();
+    let tx = TimestampingTxGenerator::with_keypair(DATA_SIZE, (public_key, wrong_secret_key))
+        .next()
+        .unwrap();
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
