@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Private part of the Exonum rest api.
+//! Private part of the Exonum REST API.
+//!
+//! Private API includes requests that are available only to the blockchain
+//! administrators, e.g. view the list of services on the current node.
 
 use std::{collections::HashMap, net::SocketAddr};
 

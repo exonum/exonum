@@ -262,7 +262,7 @@ impl NodeHandler {
         }
 
         // Commit propose
-        for (round, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
+        for (round, block_hash) in self.state.take_unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
             let our_block_hash = self.execute(&hash);
 
@@ -525,7 +525,8 @@ impl NodeHandler {
         }
     }
 
-    /// Checks if the transaction is new and adds it to the pool.
+    /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
+    /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
     fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
@@ -543,6 +544,10 @@ impl NodeHandler {
         self.blockchain
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
+
+        if self.state.is_leader() {
+            self.maybe_add_propose_timeout();
+        }
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
@@ -721,6 +726,8 @@ impl NodeHandler {
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
+
+            self.allow_expedited_propose = true;
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);

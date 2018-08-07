@@ -18,14 +18,14 @@ use api::{ServiceApiScope, ServiceApiState};
 use blockchain::{Schema, SharedNodeState};
 use helpers::user_agent;
 
-/// Information about the current state of the Node memory pool.
+/// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct MemPoolInfo {
     /// Total number of uncommitted transactions.
     pub size: usize,
 }
 
-/// Information about the amount of connected peers to the node.
+/// Information about the amount of peers connected to the node.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct PeersAmount {
     /// Amount of connected peers.
@@ -41,7 +41,7 @@ pub enum ConnectivityStatus {
     Connected(PeersAmount),
 }
 
-/// Information about the possibility to achieve the consensus between
+/// Information about whether it is possible to achieve the consensus between
 /// validators in the current state.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub enum ConsensusStatus {

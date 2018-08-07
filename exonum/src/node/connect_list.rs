@@ -14,8 +14,7 @@
 
 //! Mapping between peers public keys and IP-addresses.
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr};
 
 use crypto::PublicKey;
 use node::{ConnectInfo, ConnectListConfig};
@@ -177,4 +176,5 @@ mod test {
         });
         assert!(connect_list.is_address_allowed(&address));
     }
+
 }

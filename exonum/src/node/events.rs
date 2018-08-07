@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectInfo, ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 
 impl EventHandler for NodeHandler {
@@ -58,7 +58,7 @@ impl NodeHandler {
 
                 if self.config_manager.is_some() {
                     let connect_list_config =
-                        ConnectListConfig::from_connect_list(self.state.connect_list());
+                        ConnectListConfig::from_connect_list(&self.state.connect_list());
 
                     self.config_manager
                         .as_ref()
@@ -75,12 +75,16 @@ impl NodeHandler {
                     self.api_state().set_network_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_network_enabled {
-                        for (pub_key, address) in self.state.connect_list().clone().peers {
-                            info!("Connecting to {:?} {:?}", address, pub_key);
+                        for connect_info in self.state.connect_list().clone().peers() {
+                            let ConnectInfo {
+                                public_key,
+                                address,
+                            } = connect_info;
+                            info!("Connecting to {:?} {:?}", address, public_key);
                             self.connect(&address);
                             let connect = self.state.our_connect_message().clone();
-                            self.state.add_peer(pub_key, connect.clone());
-                            self.blockchain.save_peer(&pub_key, connect);
+                            self.state.add_peer(public_key, connect.clone());
+                            self.blockchain.save_peer(&public_key, connect);
                         }
                         self.add_round_timeout();
                     } else {
