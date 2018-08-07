@@ -115,7 +115,7 @@ impl SandboxInner {
                     InternalRequest::VerifyTx(tx) => {
                         if tx.verify() {
                             self.handler
-                                .handle_event(InternalEvent::TxVerified(tx).into());
+                                .handle_event(InternalEvent::TxVerified(tx.raw().clone()).into());
                         }
                     }
                 }

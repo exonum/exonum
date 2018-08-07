@@ -17,9 +17,10 @@
 use futures::{self, future, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 use tokio_threadpool::Builder as ThreadPoolBuilder;
+use tokio_executor::SpawnError;
 
 use std::{
-    io, rc::Rc, time::{Duration, SystemTime},
+    io, time::{Duration, SystemTime}, sync::Arc, rc::Rc,
 };
 
 use super::{
@@ -35,8 +36,8 @@ pub struct InternalPart {
 impl InternalPart {
     pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let thread_pool = Rc::new(ThreadPoolBuilder::new().build());
-
         let internal_tx = self.internal_tx.clone();
+
         let fut = self.internal_requests_rx
             .for_each(move |request| {
                 let event = match request {
@@ -78,19 +79,32 @@ impl InternalPart {
                     }
                     InternalRequest::VerifyTx(tx) => {
                         let internal_tx = internal_tx.clone();
+                        let tx = Arc::new(tx);
                         let thread_pool = Rc::clone(&thread_pool);
-                        let f = future::lazy(move || {
-                            thread_pool.spawn(future::lazy(move || {
-                                if tx.verify() {
-                                    internal_tx
-                                        .wait()
-                                        .send(InternalEvent::TxVerified(tx))
-                                        .expect("Cannot send TxVerified event.");
+
+                        let f = future::loop_fn(Err(SpawnError::at_capacity()), move |status| {
+                            let tx = Arc::clone(&tx);
+                            let internal_tx = internal_tx.clone();
+                            let thread_pool = Rc::clone(&thread_pool);
+
+                            match status {
+                                Ok(_) => Ok(future::Loop::Break(())),
+                                Err(ref e) if e.is_shutdown() => panic!("Signature Verification Thread Pool shutdown unexpectedly."),
+                                Err(_) => {
+                                    let status = thread_pool.sender().spawn(future::lazy(move || {
+                                        if tx.verify() {
+                                            internal_tx
+                                                .wait()
+                                                .send(InternalEvent::TxVerified(tx.raw().clone()))
+                                                .expect("Cannot send TxVerified event.");
+                                        }
+                                        Ok(())
+                                    }));
+                                    Ok(future::Loop::Continue(status))
                                 }
-                                Ok(())
-                            }));
-                            Ok(())
+                            }
                         });
+
                         to_box(f)
                     }
                 };
