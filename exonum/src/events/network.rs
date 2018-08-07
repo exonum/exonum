@@ -145,7 +145,7 @@ impl ConnectionsPool {
         let handshake_params = handshake_params.clone();
 
         let action = move || TcpStream::connect(&peer, &handle_cloned);
-        let connect_handle = Retry::spawn(handle.clone(), strategy, action)
+        let connect_handle = Retry::spawn(strategy, action)
             .map_err(into_other)
             // Configure socket
             .and_then(move |sock| {
