@@ -31,7 +31,7 @@ pub struct WalletQuery {
     pub pub_key: PublicKey,
 }
 
-/// Returned by the REST API.
+/// Response to a sent transaction returned by the REST API.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionResponse {
     /// Hash of the transaction.
@@ -50,7 +50,7 @@ pub struct WalletProof {
 /// Wallet history.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletHistory {
-    /// Proof to the transaction list.
+    /// Proof to the list of transaction hashes.
     pub proof: ListProof<Hash>,
     /// List of above transactions.
     pub transactions: Vec<WalletTransactions>,
@@ -63,7 +63,7 @@ pub struct WalletInfo {
     pub block_proof: BlockProof,
     /// `WalletProof` of the appropriate wallet.
     pub wallet_proof: WalletProof,
-    /// `WalletProof` of the appropriate wallet.
+    /// `WalletHistory` of the appropriate wallet.
     pub wallet_history: Option<WalletHistory>,
 }
 

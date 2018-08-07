@@ -51,7 +51,7 @@ pub struct Schema<T> {
 }
 
 impl<T> Schema<T> {
-    /// Creates new timestamping schema with given view.
+    /// Create a new schema from the database view.
     pub fn new(snapshot: T) -> Self {
         Schema { view: snapshot }
     }
@@ -61,12 +61,12 @@ impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
-    /// Returns the `ProofMapIndex` of timestamps with their proofs.
+    /// Returns the `ProofMapIndex` of timestamps.
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
 
-    /// Returns the state hash of timestamping service.
+    /// Returns the state hash of the timestamping service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.timestamps().merkle_root()]
     }

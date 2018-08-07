@@ -37,7 +37,7 @@ impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
-    /// Constructs schema from the database view.
+    /// Create a new schema from the database view.
     pub fn new(view: T) -> Self {
         Schema { view }
     }
@@ -57,7 +57,7 @@ where
         self.wallets().get(pub_key)
     }
 
-    /// Returns state hash of service database.
+    /// Returns the state hash of cryptocurrency service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.wallets().merkle_root()]
     }
