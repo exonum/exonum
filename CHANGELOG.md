@@ -20,8 +20,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Now timeout for round r is
   `first_round_timeout + (r-1)*round_timeout_increase`
    where `round_timeout_increase` is determined as a some percentage of
-  `first_round_timeout`. Value of this percentage is defined in constant inside
-  `ConsensusConfig` (#848)
+  `first_round_timeout`. Value of this percentage is defined
+  in `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
 
 ### New features
 
