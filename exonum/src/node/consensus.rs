@@ -692,7 +692,6 @@ impl NodeHandler {
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
-        self.allow_expedited_propose = true;
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late
@@ -733,6 +732,8 @@ impl NodeHandler {
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
+
+            self.allow_expedited_propose = true;
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
