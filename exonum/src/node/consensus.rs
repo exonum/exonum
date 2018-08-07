@@ -596,7 +596,6 @@ impl NodeHandler {
     }
 
     /// Handles raw transactions.
-    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
