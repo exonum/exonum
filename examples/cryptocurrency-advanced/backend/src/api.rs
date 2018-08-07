@@ -59,11 +59,11 @@ pub struct WalletHistory {
 /// Wallet information.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletInfo {
-    /// `BlockProof` of the last block.
+    /// Proof of the last block.
     pub block_proof: BlockProof,
-    /// `WalletProof` of the appropriate wallet.
+    /// Proof of the appropriate wallet.
     pub wallet_proof: WalletProof,
-    /// `WalletHistory` of the appropriate wallet.
+    /// History of the appropriate wallet.
     pub wallet_history: Option<WalletHistory>,
 }
 

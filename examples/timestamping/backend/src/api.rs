@@ -40,11 +40,11 @@ impl TimestampQuery {
 /// Describes the information required to prove the correctness of the timestamp entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimestampProof {
-    /// `BlockProof` of the last block.
+    /// Proof of the last block.
     pub block_info: BlockProof,
-    /// `MapProof` of the actual state of timestamping service.
+    /// Actual state hashes of the timestamping service with their proofs.
     pub state_proof: MapProof<Hash, Hash>,
-    /// `MapProof` of the actual state of timestamping database.
+    /// Actual state of the timestamping database with proofs.
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
 
