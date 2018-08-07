@@ -17,8 +17,6 @@ use rand::{self, Rng};
 use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
-use crypto::x25519;
-use events::network;
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
@@ -41,16 +39,10 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, info: &network::ConnectInfo, connect: Connect) {
-        info!("Received Connect message from peer: {:?}", info);
-
-        let remote_key = x25519::into_x25519_public_key(*connect.pub_key());
+    pub fn handle_connected(&mut self, address: &SocketAddr, connect: Connect) {
+        info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
-        if info.public_key == remote_key {
-            self.handle_connect(connect);
-        } else {
-            warn!("Received malicious connect message from {:?}", info)
-        }
+        self.handle_connect(connect);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
