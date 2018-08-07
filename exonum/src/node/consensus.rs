@@ -589,10 +589,10 @@ impl NodeHandler {
     }
 
     /// Handles an already verified transaction.
-    pub fn handle_verified_tx(&mut self, tx: &dyn Transaction) {
+    pub fn handle_verified_tx(&mut self, tx: RawTransaction) {
         // We don't care about result, because situation when transaction received twice
         // is normal for internal messages (transaction may be received from 2+ nodes).
-        let _ = self.handle_tx_inner(tx.raw().clone());
+        let _ = self.handle_tx_inner(tx);
     }
 
     /// Handles raw transactions.

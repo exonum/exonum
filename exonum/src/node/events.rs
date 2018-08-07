@@ -35,7 +35,7 @@ impl NodeHandler {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
-            InternalEvent::TxVerified(tx) => self.handle_verified_tx(tx.as_ref()),
+            InternalEvent::TxVerified(tx) => self.handle_verified_tx(tx),
         }
     }
 
