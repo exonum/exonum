@@ -76,6 +76,7 @@ impl NodeHandler {
                     info!("The node is {} now", s);
                     if self.is_network_enabled {
                         for (pub_key, address) in self.state.connect_list().clone().peers {
+                            info!("Connecting to {:?} {:?}", address, pub_key);
                             self.connect(&address);
                             let connect = self.state.our_connect_message().clone();
                             self.state.add_peer(pub_key, connect.clone());
@@ -84,6 +85,7 @@ impl NodeHandler {
                         self.add_round_timeout();
                     } else {
                         for address in self.state.connections().clone().keys() {
+                            info!("Disconnecting from {:?}", address);
                             self.state.remove_peer_with_addr(address);
                             self.blockchain.remove_peer_with_addr(address);
                         }
