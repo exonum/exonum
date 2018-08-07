@@ -23,7 +23,7 @@ encoding_struct! {
         pub_key:            &PublicKey,
         /// Name of the wallet.
         name:               &str,
-        /// Current balance at the wallet.
+        /// Current balance of the wallet.
         balance:            u64,
         /// Length of the transactions history.
         history_len:        u64,

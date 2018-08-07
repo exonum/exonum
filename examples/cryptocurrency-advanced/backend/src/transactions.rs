@@ -73,7 +73,7 @@ transactions! {
             from:    &PublicKey,
             /// `PublicKey` of receiver's wallet.
             to:      &PublicKey,
-            /// Amount of the currency to transfer.
+            /// Amount of currency to transfer.
             amount:  u64,
             /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
             ///
@@ -85,7 +85,7 @@ transactions! {
         struct Issue {
             /// `PublicKey` of the wallet.
             pub_key:  &PublicKey,
-            /// Issued amount of the currency.
+            /// Issued amount of currency.
             amount:  u64,
             /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
             ///

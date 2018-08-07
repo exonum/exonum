@@ -37,7 +37,7 @@ impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
-    /// Create a new schema from the database view.
+    /// Creates a new schema from the database view.
     pub fn new(view: T) -> Self {
         Schema { view }
     }

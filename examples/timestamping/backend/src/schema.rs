@@ -51,7 +51,7 @@ pub struct Schema<T> {
 }
 
 impl<T> Schema<T> {
-    /// Create a new schema from the database view.
+    /// Creates a new schema from the database view.
     pub fn new(snapshot: T) -> Self {
         Schema { view: snapshot }
     }

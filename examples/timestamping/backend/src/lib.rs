@@ -14,7 +14,7 @@
 
 //! Timestamping demo. This example shows how to use Exonum framework to create a fast
 //! and secure service to prove the existence of a specific file at some moment
-//! of time using blockchain as a secured database.
+//! of time using blockchain as a secure database.
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
