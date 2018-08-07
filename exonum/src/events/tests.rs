@@ -27,7 +27,7 @@ use events::{
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, MessageWriter, RawMessage};
+use messages::{Message, MessageWriter, RawMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
@@ -141,8 +141,8 @@ impl TestEvents {
         }
     }
 
-    pub fn spawn(self, handshake_params: &HandshakeParams, connect: Connect) -> TestHandler {
-        let (mut handler_part, network_part) = self.into_reactor(connect);
+    pub fn spawn(self, handshake_params: &HandshakeParams) -> TestHandler {
+        let (mut handler_part, network_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
@@ -153,14 +153,13 @@ impl TestEvents {
         handler_part
     }
 
-    fn into_reactor(self, connect: Connect) -> (TestHandler, NetworkPart) {
+    fn into_reactor(self) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
         let network_requests_tx = channel.network_requests.0.clone();
 
         let network_part = NetworkPart {
-            our_connect_message: connect,
             listen_address: self.listen_address,
             network_config,
             max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
@@ -173,21 +172,6 @@ impl TestEvents {
     }
 }
 
-pub fn connect_message(
-    addr: SocketAddr,
-    public_key: &PublicKey,
-    secret_key: &SecretKey,
-) -> Connect {
-    let time = time::UNIX_EPOCH;
-    Connect::new(
-        public_key,
-        addr,
-        time.into(),
-        &user_agent::get(),
-        secret_key,
-    )
-}
-
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
     let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, 0, id, len);
     RawMessage::new(writer.sign(&gen_keypair().1))
@@ -195,7 +179,6 @@ pub fn raw_message(id: u16, len: usize) -> RawMessage {
 
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub connect: Connect,
     pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,
@@ -206,7 +189,6 @@ pub struct ConnectionParams {
 impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
-        let connect = connect_message(address, &public_key, &secret_key);
         let handshake_params = HandshakeParams::new(
             public_key,
             secret_key.clone(),
@@ -219,7 +201,6 @@ impl ConnectionParams {
         };
 
         ConnectionParams {
-            connect,
             address,
             public_key,
             secret_key,
@@ -230,7 +211,7 @@ impl ConnectionParams {
 
     pub fn spawn(&mut self, events: TestEvents, connect_list: SharedConnectList) -> TestHandler {
         self.handshake_params.connect_list = connect_list.clone();
-        events.spawn(&self.handshake_params, self.connect.clone())
+        events.spawn(&self.handshake_params)
     }
 }
 

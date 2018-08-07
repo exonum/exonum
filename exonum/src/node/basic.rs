@@ -74,13 +74,13 @@ impl NodeHandler {
         // TODO Add spam protection. (ECR-170)
         // TODO: drop connection if checks have failed. (ECR-1837)
         let address = info.address;
-        if address == self.state.our_connect_message().addr() {
+        if address == self.state.our_connect_message().address {
             trace!("Received Connect with same address as our external_address.");
             return;
         }
 
         let public_key = info.public_key;
-        if public_key == *self.state.our_connect_message().pub_key() {
+        if public_key == self.state.our_connect_message().public_key {
             trace!("Received Connect with same pub_key as ours.");
             return;
         }
@@ -96,25 +96,20 @@ impl NodeHandler {
 
         // Check if we have another connect message from peer with the given public_key.
         let mut need_connect = true;
-//        if let Some(saved_message) = self.state.peers().get(&public_key) {
-//            if saved_message.time() > message.time() {
-//                error!("Received outdated Connect message from {}", address);
-//                return;
-//            } else if saved_message.time() < message.time() {
-//                need_connect = saved_message.addr() != message.addr();
-//            } else if saved_message.addr() == message.addr() {
-//                need_connect = false;
-//            } else {
-//                error!("Received weird Connect message from {}", address);
-//                return;
-//            }
-//        }
-//        self.state.add_peer(public_key, message.clone());
+        if let Some(saved_message) = self.state.peers().get(&public_key) {
+            if saved_message.address == info.address {
+                need_connect = false;
+            } else {
+                error!("Received weird Connect message from {}", address);
+                return;
+            }
+        }
+        self.state.add_peer(public_key, info);
         info!(
             "Received Connect message from {}, {}",
             address, need_connect,
         );
-//        self.blockchain.save_peer(&public_key, message);
+        self.blockchain.save_peer(&public_key, info);
         if need_connect {
             info!("Send Connect message to {}", address);
             self.connect(&address);

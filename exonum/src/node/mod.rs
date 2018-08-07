@@ -407,13 +407,15 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Connect::new(
-            &config.listener.consensus_public_key,
-            external_address,
-            system_state.current_time().into(),
-            &user_agent::get(),
-            &config.listener.consensus_secret_key,
-        );
+//        let connect = Connect::new(
+//            &config.listener.consensus_public_key,
+//            external_address,
+//            system_state.current_time().into(),
+//            &user_agent::get(),
+//            &config.listener.consensus_secret_key,
+//        );
+
+        let connect = ConnectInfo { address: external_address, public_key: config.listener.consensus_public_key.clone() };
 
         let connect_list = config.listener.connect_list;
         let state = State::new(
@@ -1021,11 +1023,9 @@ impl Node {
     }
 
     fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
-        let connect_message = self.state().our_connect_message().clone();
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
-            our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
             network_requests: self.channel.network_requests,
             network_tx,

@@ -34,7 +34,7 @@ use events::{
 };
 use helpers::Milliseconds;
 use crypto::x25519;
-use messages::{Any, Connect, Message, RawMessage};
+use messages::{Any, Message, RawMessage};
 use node::ConnectInfo;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
@@ -81,7 +81,6 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
-    pub our_connect_message: Connect,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
@@ -265,7 +264,6 @@ impl NetworkPart {
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
 
         let requests_handle = RequestHandler::new(
-            self.our_connect_message,
             network_config,
             self.network_tx.clone(),
             handle.clone(),
@@ -303,7 +301,6 @@ struct RequestHandler(
 
 impl RequestHandler {
     fn new(
-        connect_message: Connect,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,

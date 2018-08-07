@@ -432,7 +432,7 @@ impl State {
         tx_pool_capacity: usize,
         connect_list: ConnectList,
         stored: StoredConfiguration,
-        connect: Connect,
+        connect: ConnectInfo,
         peers: HashMap<PublicKey, ConnectInfo>,
         last_hash: Hash,
         last_height: Height,
@@ -1164,13 +1164,8 @@ impl State {
     }
 
     /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Connect {
+    pub fn our_connect_message(&self) -> &ConnectInfo {
         &self.our_connect_message
-    }
-
-    /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Connect) {
-        self.our_connect_message = msg;
     }
 
     /// Add peer to node's `ConnectList`.
