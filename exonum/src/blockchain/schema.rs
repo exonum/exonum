@@ -519,6 +519,8 @@ impl<'a> Schema<&'a mut Fork> {
     }
 
     /// Adds transaction into the persistent pool.
+    /// This method increment `transactions_pool_len_index`,
+    /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
         self.transactions_pool_mut().insert(tx.hash());

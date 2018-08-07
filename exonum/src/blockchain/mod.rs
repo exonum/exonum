@@ -483,8 +483,10 @@ impl Blockchain {
                 schema.consensus_messages_cache_mut().clear();
                 let txs_in_block = schema.last_block().tx_count();
                 let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
-                debug_assert!(txs_count >= txs_in_block as u64);
-                schema.transactions_pool_len_index_mut().set(txs_count - txs_in_block as u64);
+                debug_assert!(txs_count >= u64::from(txs_in_block));
+                schema
+                    .transactions_pool_len_index_mut()
+                    .set(txs_count - u64::from(txs_in_block));
             }
             fork.into_patch()
         };

@@ -21,8 +21,8 @@ use std::time::Duration;
 use crypto::{gen_keypair, CryptoHash};
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    Message, Precommit, Status, Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
-    TransactionsResponse,
+    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
+    TransactionsRequest, TransactionsResponse,
 };
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
