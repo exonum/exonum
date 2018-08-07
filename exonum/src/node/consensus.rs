@@ -553,7 +553,9 @@ impl NodeHandler {
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
 
-        self.maybe_add_propose_timeout();
+        if self.state.is_leader() {
+            self.maybe_add_propose_timeout();
+        }
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
