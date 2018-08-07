@@ -15,7 +15,7 @@
 // spell-checker:ignore chacha, privkey, authtext, ciphertext
 
 use byteorder::{ByteOrder, LittleEndian};
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, RngCore};
 use snow::{
     params::{CipherChoice, DHChoice, HashChoice}, types::{Cipher, Dh, Hash, Random},
     CryptoResolver, DefaultResolver,
@@ -85,8 +85,7 @@ impl Default for SodiumRandom {
 
 impl Random for SodiumRandom {
     fn fill_bytes(&mut self, out: &mut [u8]) {
-        let bytes: Vec<u8> = thread_rng().gen_iter::<u8>().take(out.len()).collect();
-        out.copy_from_slice(&bytes);
+        thread_rng().fill_bytes(out);
     }
 }
 

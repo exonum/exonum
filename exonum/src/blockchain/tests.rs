@@ -15,7 +15,7 @@
 #![allow(dead_code, unsafe_code)]
 
 use chrono::{DateTime, TimeZone, Utc};
-use rand::{thread_rng, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json;
 
 use blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction};
@@ -183,7 +183,7 @@ fn test_segments_has_spaces_between() {
 }
 
 fn gen_tempdir_name() -> String {
-    thread_rng().gen_ascii_chars().take(10).collect()
+    thread_rng().sample_iter(&Alphanumeric).take(10).collect()
 }
 
 fn handling_tx_panic(blockchain: &mut Blockchain) {
