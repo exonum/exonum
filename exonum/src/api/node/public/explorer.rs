@@ -185,7 +185,7 @@ impl ExplorerApi {
             }
 
             Box::new(
-                ws::start(req.clone(), Session::new(address.to_owned().unwrap())).into_future(),
+                ws::start(&req, Session::new(address.to_owned().unwrap())).into_future(),
             )
         };
 
