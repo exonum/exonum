@@ -25,8 +25,6 @@ pub mod metrics;
 use env_logger::Builder;
 use log::SetLoggerError;
 
-use std::env;
-
 use blockchain::{GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;
 use node::{ConnectListConfig, NodeConfig};
@@ -35,13 +33,9 @@ mod types;
 
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = Builder::from_default_env();
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.try_init()
+    Builder::from_default_env()
+        .default_format_timestamp_nanos(true)
+        .try_init()
 }
 
 /// Generates testnet configuration.
