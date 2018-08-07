@@ -32,7 +32,7 @@ mod unsynchronized_message;
 // LOCK
 
 // - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
-// - if haven't incompatible prevotes
+// - if there are no incompatible prevotes
 //     - if has +2/3 precommits
 //         - COMMIT //covered in test_reach_one_height
 //         - We are fucked up   //covered in handle_full_propose_we_are_fucked_up()
