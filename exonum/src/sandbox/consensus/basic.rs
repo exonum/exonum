@@ -76,7 +76,7 @@ fn test_reach_one_height() {
     sandbox.assert_state(Height(2), Round(1));
 }
 
-/// idea of the test is to reach one height in the network with single validator
+/// The idea of the test is to reach one height in the network with single validator.
 #[test]
 fn test_one_validator() {
     let sandbox = sandbox::timestamping_sandbox_builder()
