@@ -16,10 +16,10 @@ use futures::{
     future, future::{err, Either}, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture,
     Poll, Sink, Stream,
 };
+use tokio_codec::Framed;
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Handle,
 };
-use tokio_io::codec::Framed;
 use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
