@@ -31,6 +31,31 @@ use sandbox::{
     sandbox_tests_helper::*, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
 };
 
+const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
+const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
+const PROPOSE_THRESHOLD: u32 = 3;
+
+fn timestamping_sandbox_with_threshold() -> Sandbox {
+    let sandbox = timestamping_sandbox_builder()
+        .with_consensus(|config| {
+            config.max_propose_timeout = MAX_PROPOSE_TIMEOUT;
+            config.min_propose_timeout = MIN_PROPOSE_TIMEOUT;
+            config.propose_timeout_threshold = PROPOSE_THRESHOLD;
+        })
+        .build();
+
+    // Wait for us to become the leader.
+    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox
+}
+
+fn tx_hashes(transactions: &[TimestampTx]) -> Vec<Hash> {
+    let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+    hashes.sort();
+    hashes
+}
+
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
 #[test]
@@ -554,31 +579,6 @@ fn request_txs_when_get_propose_or_prevote() {
     );
 
     sandbox.add_time(Duration::from_millis(0));
-}
-
-const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
-const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
-const PROPOSE_THRESHOLD: u32 = 3;
-
-fn timestamping_sandbox_with_threshold() -> Sandbox {
-    let sandbox = timestamping_sandbox_builder()
-        .with_consensus(|config| {
-            config.max_propose_timeout = MAX_PROPOSE_TIMEOUT;
-            config.min_propose_timeout = MIN_PROPOSE_TIMEOUT;
-            config.propose_timeout_threshold = PROPOSE_THRESHOLD;
-        })
-        .build();
-
-    // Wait for us to become the leader.
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-    sandbox
-}
-
-fn tx_hashes(transactions: &[TimestampTx]) -> Vec<Hash> {
-    let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
-    hashes.sort();
-    hashes
 }
 
 #[test]
