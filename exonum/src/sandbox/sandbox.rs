@@ -93,12 +93,16 @@ impl SandboxInner {
     }
 
     fn process_network_requests(&mut self) {
+        println!("process_network_requests");
         let network_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
-                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::SendMessage(peer, msg) => {
+                        println!("add message to queue");
+                        self.sent.push_back((peer, msg))
+                    },
                     NetworkRequest::ConnectToPeer(peer) => {
-                        self.sent.push_back((peer, RawMessage::new(MessageBuffer::from_vec(Vec::new()))))
+                        println!("ConnectToPeer");
                     },
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
@@ -246,6 +250,8 @@ impl Sandbox {
         self.check_unexpected_message();
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
+
+        println!("recv event {:?}", event);
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -256,7 +262,11 @@ impl Sandbox {
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
         self.process_events();
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+
+        println!("any_expected_msg {:?}", any_expected_msg);
         let send = self.inner.borrow_mut().sent.pop_front();
+
+        println!("sended message {:?}", send);
         if let Some((real_addr, real_msg)) = send {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -271,6 +281,10 @@ impl Sandbox {
                 any_expected_msg, addr
             );
         }
+    }
+
+    pub fn connect(&self, addr: &SocketAddr) {
+        self.inner.borrow_mut().handler.connect(addr);
     }
 
     pub fn send_peers_request(&self) {
@@ -572,6 +586,10 @@ impl Sandbox {
 //        if let Some(connect) = connect {
 //            sandbox.broadcast(&connect);
 //        }
+
+        for address in &sandbox.addresses {
+            sandbox.connect(&address);
+        }
 
         sandbox
     }
@@ -928,6 +946,7 @@ mod tests {
 
     #[test]
     fn test_sandbox_recv_and_send() {
+        env_logger::init();
         let s = timestamping_sandbox();
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
@@ -942,24 +961,24 @@ mod tests {
         // Socket address doesn't matter in this case.
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
 
+        s.connect(&s.a(ValidatorId(2)));
+
         //TODO: fix and change to ConnectInfo
-//        s.recv(&Connect::new(
-//            &public,
-//            s.a(ValidatorId(2)),
-//            s.time().into(),
-//            &user_agent::get(),
-//            &secret,
-//        ));
-//        s.send(
-//            s.a(ValidatorId(2)),
-//            &Connect::new(
-//                &s.p(ValidatorId(0)),
-//                s.a(ValidatorId(0)),
-//                s.time().into(),
-//                &user_agent::get(),
-//                s.s(ValidatorId(0)),
-//            ),
-//        );
+        s.recv(&Status::new(
+            &public,
+            Height::zero(),
+            &Hash::zero(),
+            &secret,
+        ));
+        s.send(
+            s.a(ValidatorId(2)),
+            &Status::new(
+                &s.p(ValidatorId(0)),
+                Height::zero(),
+                &Hash::zero(),
+                s.s(ValidatorId(0)),
+            ),
+        );
     }
 
     #[test]

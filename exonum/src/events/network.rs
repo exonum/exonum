@@ -42,7 +42,7 @@ const OUTGOING_CHANNEL_SIZE: usize = 10;
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(ConnectInfo),
+    PeerConnected(SocketAddr),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -439,8 +439,7 @@ impl Listener {
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
         use crypto::PublicKey;
-        let info = ConnectInfo { address, public_key: PublicKey::zero() };
-        let event = NetworkEvent::PeerConnected(info);
+        let event = NetworkEvent::PeerConnected(address);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx
