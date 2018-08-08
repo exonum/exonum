@@ -12,17 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Wallet.
+//! Cryptocurrency wallet.
 
 use exonum::crypto::{Hash, PublicKey};
 
 encoding_struct! {
     /// Wallet information stored in the database.
     struct Wallet {
+        /// `PublicKey` of the wallet.
         pub_key:            &PublicKey,
+        /// Name of the wallet.
         name:               &str,
+        /// Current balance of the wallet.
         balance:            u64,
+        /// Length of the transactions history.
         history_len:        u64,
+        /// `Hash` of the transactions history.
         history_hash:       &Hash,
     }
 }

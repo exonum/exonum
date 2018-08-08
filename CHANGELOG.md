@@ -16,19 +16,34 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Config parameter `external_address` is now a required value. (#826)
 
-### New features
-
-- Added possibility to use domain names instead of IP addresses as a peer's
-  addresses. (#826)
+- Config parameter `round_timeout` has been renamed to `first_round_timeout`.
+  Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`
+  where `round_timeout_increase` is determined as a some percentage of
+  `first_round_timeout`. Value of this percentage is defined in
+  `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
 
 ### New Features
 
 #### exonum
 
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. (#826)
+
+- Now each consecutive round is longer than previous by some constant percentage
+  of `first_round_timeout`. (#848)
+
 - Added `/v1/blocks/subscribe` endpoint for following block commit events
   through WebSockets (#792).
 
+### Bug Fixes
+
+#### exonum
+
+- Bug with pool size overflow has been fixed. (#853)
+
 ### Internal Improvements
+
+#### exonum
 
 - Transactions (signature) verification benchmark has been added. (#808)
 
@@ -43,6 +58,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Now nodes will switch to `min_propose_timeout` for block proposal timeout
   faster if they receive more than `propose_timeout_threshold` transactions
   during `max_propose_timeout`. (#844)
+
+- Custom log formatting (along with `colored` and `term` dependencies) has been
+  removed in favor of `env_logger`. (#857).
+
+## 0.9.1 - 2018-08-02
+
+### Bug Fixes
+
+#### exonum
+
+- `failure` version has been updated to `0.1.2` in order to fix the build issue
+  with `failure_derive`. (#845)
+
+- Bug with "unknown propose" execution has been fixed. (#841)
 
 ## 0.9.0 - 2018-07-19
 

@@ -498,8 +498,18 @@ impl Sandbox {
         num_validators * 2 / 3 + 1
     }
 
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.round_timeout
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.cfg().consensus.first_round_timeout
+    }
+
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        (self.cfg().consensus.first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
+    }
+
+    pub fn current_round_timeout(&self) -> Milliseconds {
+        let previous_round: u64 = self.current_round().previous().into();
+        self.first_round_timeout() + previous_round * self.round_timeout_increase()
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
@@ -534,6 +544,12 @@ impl Sandbox {
         let actual_round = state.round();
         assert_eq!(actual_height, expected_height);
         assert_eq!(actual_round, expected_round);
+    }
+
+    pub fn assert_pool_len(&self, expected: u64) {
+        let view = self.blockchain_ref().snapshot();
+        let schema = Schema::new(view);
+        assert_eq!(expected, schema.transactions_pool_len());
     }
 
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
@@ -720,7 +736,7 @@ impl SandboxBuilder {
             validators_count: 4,
             logger: false,
             consensus_config: ConsensusConfig {
-                round_timeout: 1000,
+                first_round_timeout: 1000,
                 status_timeout: 600_000,
                 peers_timeout: 600_000,
                 txs_block_limit: 1000,
@@ -889,7 +905,7 @@ fn sandbox_with_services_uninitialized(
     };
 
     // General assumption; necessary for correct work of consensus algorithm
-    assert!(PROPOSE_TIMEOUT < sandbox.round_timeout());
+    assert!(PROPOSE_TIMEOUT < sandbox.first_round_timeout());
     sandbox.process_events();
     sandbox
 }

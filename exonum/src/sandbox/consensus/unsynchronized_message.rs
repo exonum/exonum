@@ -36,7 +36,7 @@ fn test_queue_message_from_future_round() {
     );
 
     sandbox.recv(&propose);
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.assert_state(Height(1), Round(1));
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(Height(1), Round(2));
@@ -72,7 +72,7 @@ fn test_queue_prevote_message_from_next_height() {
     ));
 
     add_one_height(&sandbox, &sandbox_state);
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.add_time(Duration::from_millis(0));
 }
 
@@ -122,7 +122,7 @@ fn test_queue_propose_message_from_next_height() {
         block_at_first_height.hash()
     );
 
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox.add_time(Duration::from_millis(0));
 }
 
