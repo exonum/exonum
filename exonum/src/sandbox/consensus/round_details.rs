@@ -85,7 +85,7 @@ fn request_propose_when_get_prevote() {
         NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &ProposeRequest::new(
@@ -112,7 +112,7 @@ fn request_prevotes_when_get_prevote_message() {
         Round(1),
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
         &ProposeRequest::new(
@@ -211,7 +211,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
     {
         // Send prevote even if current round > locked + 1
         // add round
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
         sandbox.broadcast(&Prevote::new(
             ValidatorId(0),
             Height(1),
@@ -222,7 +222,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         ));
 
         // add round
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
         sandbox.broadcast(&Prevote::new(
             ValidatorId(0),
             Height(1),
@@ -253,7 +253,7 @@ fn lock_to_past_round_broadcast_prevote() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() - PROPOSE_TIMEOUT,
+        sandbox.current_round_timeout() - PROPOSE_TIMEOUT,
     ));
     sandbox.assert_state(Height(1), Round(2));
 
@@ -301,7 +301,7 @@ fn lock_to_past_round_broadcast_prevote() {
     {
         // Send prevote even if current round > locked + 1
         // add round
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
         sandbox.broadcast(&Prevote::new(
             ValidatorId(0),
             Height(1),
@@ -312,7 +312,7 @@ fn lock_to_past_round_broadcast_prevote() {
         ));
 
         // add round
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
         sandbox.broadcast(&Prevote::new(
             ValidatorId(0),
             Height(1),
@@ -432,11 +432,11 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.round_timeout() + PROPOSE_TIMEOUT)
+        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT)
         .with_tx_hashes(&[tx.hash()])
         .build();
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.round_timeout() + PROPOSE_TIMEOUT)
+        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -444,7 +444,7 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.recv(&propose);
 
     // inc round
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
 
     sandbox.recv(&Prevote::new(
         ValidatorId(1),
@@ -512,7 +512,7 @@ fn lock_remove_request_prevotes() {
     let sandbox = timestamping_sandbox();
 
     // add round
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
@@ -843,7 +843,7 @@ fn lock_not_send_prevotes_after_commit() {
     }
 
     //    add rounds to become a leader to observe broadcast messages
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     {
         // this broadcast of Prevote will occur only if block with precommit_2 is commented
         // it is possible to comment block of code with precommit_2 and uncomment below
@@ -1335,8 +1335,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    let block_1_delay = 2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1;
-    let block_2_delay = 2 * sandbox.round_timeout() + 2 * PROPOSE_TIMEOUT + 1;
+    let block_1_delay = 2 * sandbox.current_round_timeout() + PROPOSE_TIMEOUT + 1;
+    let block_2_delay = 2 * sandbox.current_round_timeout() + 2 * PROPOSE_TIMEOUT + 1;
 
     // create some tx
     let tx = gen_timestamping_tx();
@@ -1571,7 +1571,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.broadcast(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() - PROPOSE_TIMEOUT,
+        sandbox.current_round_timeout() - PROPOSE_TIMEOUT,
     ));
     sandbox.assert_state(sandbox.current_height(), Round(2));
 }
@@ -1666,7 +1666,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     sandbox.assert_state(Height(2), Round(1));
 
     // add rounds & become leader
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     assert!(sandbox.is_leader());
 
     sandbox.recv(&tx);

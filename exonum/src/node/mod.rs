@@ -41,7 +41,8 @@ use std::{
 use serde::de::{self, Deserialize, Deserializer};
 
 use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
+    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
+    ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
@@ -461,9 +462,15 @@ impl NodeHandler {
         &self.api_state
     }
 
-    /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().round_timeout
+    /// Returns value of the `first_round_timeout` field from the current `ConsensusConfig`.
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().first_round_timeout
+    }
+
+    /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        (self.state().consensus_config().first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
@@ -691,8 +698,15 @@ impl NodeHandler {
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
+        // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt
+        // Where:
+        // H - height start time
+        // t0 - Round(1) timeout length, dt - timeout increase value
+        // r - round number, r = 1,2,...
         let previous_round: u64 = round.previous().into();
-        let ms = previous_round * self.round_timeout();
+        let ms = previous_round * self.first_round_timeout()
+            + (previous_round * previous_round.saturating_sub(1)) / 2
+                * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }

@@ -243,7 +243,7 @@ pub fn try_add_round_with_transactions(
     transactions: &[Hash],
 ) -> Result<Option<Propose>, String> {
     let mut res = None;
-    let round_timeout = sandbox.round_timeout(); //use local var to save long code call
+    let round_timeout = sandbox.current_round_timeout(); //use local var to save long code call
 
     trace!("-------------------------add_round_with_transactions started-------------------------");
     trace!("round before: {:?}", sandbox.current_round());

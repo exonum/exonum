@@ -46,7 +46,6 @@ extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
-extern crate colored;
 extern crate env_logger;
 extern crate exonum_rocksdb as rocksdb;
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -66,7 +65,6 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate snow;
-extern crate term;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;

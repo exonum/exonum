@@ -16,7 +16,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Config parameter `external_address` is now a required value. (#826)
 
-### New features
+- Config parameter `round_timeout` has been renamed to `first_round_timeout`.
+  Now timeout for round r is
+  `first_round_timeout + (r-1)*round_timeout_increase`
+   where `round_timeout_increase` is determined as a some percentage of
+  `first_round_timeout`. Value of this percentage is defined
+  in `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
+
+### New Features
+
+#### exonum
 
 - Added possibility to use domain names instead of IP addresses as a peer's
   addresses. (#826)
@@ -24,9 +33,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `v1/rebroadcast` endpoint that can be used to broadcast all transactions
   from the pool to the other nodes. (#859)
 
-### New Features
-
-#### exonum
+- Now each consecutive round is longer than previous by some constant percentage
+  of `first_round_timeout`. (#848)
 
 - Added `/v1/blocks/subscribe` endpoint for following block commit events
   through WebSockets (#792).

@@ -45,8 +45,8 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
         .build();
 
     // Wait for us to become the leader.
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox
 }
 
@@ -299,8 +299,8 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // round happens to make us a leader
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-        sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
         assert!(sandbox.is_leader());
         sandbox.assert_state(Height(1), Round(3));
     }
@@ -543,7 +543,7 @@ fn request_txs_when_get_propose_or_prevote() {
         .build();
 
     sandbox.recv(&propose);
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
 
     sandbox.send(
         sandbox.a(ValidatorId(2)),
@@ -566,7 +566,7 @@ fn request_txs_when_get_propose_or_prevote() {
         sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
 
     sandbox.send(
         sandbox.a(ValidatorId(3)),
