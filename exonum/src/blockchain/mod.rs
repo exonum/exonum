@@ -500,7 +500,7 @@ impl Blockchain {
     }
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
         let mut fork = self.fork();
 
         {
@@ -513,7 +513,7 @@ impl Blockchain {
     }
 
     /// Removes from the cache the `Connect` message from a peer.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+    pub(crate) fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
         let mut fork = self.fork();
 
         {
@@ -538,13 +538,13 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub fn save_message(&mut self, round: Round, raw: &RawMessage) {
+    pub(crate) fn save_message(&mut self, round: Round, raw: &RawMessage) {
         self.save_messages(round, iter::once(raw.clone()));
     }
 
     /// Saves a collection of RawMessage to the consensus messages cache with single access to the
     /// `Fork` instance.
-    pub fn save_messages<I>(&mut self, round: Round, iter: I)
+    pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
     where
         I: IntoIterator<Item = RawMessage>,
     {

@@ -74,6 +74,8 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
+    /// Rebroadcast transactions from the pool.
+    Rebroadcast,
 }
 
 /// Node timeout types.

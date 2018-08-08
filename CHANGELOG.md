@@ -21,6 +21,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added possibility to use domain names instead of IP addresses as a peer's
   addresses. (#826)
 
+- Added `v1/rebroadcast` endpoint that can be used to broadcast all transactions
+  from the pool to the other nodes. (#859)
+
 ### New Features
 
 #### exonum
