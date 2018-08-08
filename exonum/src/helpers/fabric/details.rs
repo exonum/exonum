@@ -615,7 +615,7 @@ impl Command for Finalize {
         let config = {
             NodeConfig {
                 listen_address: secret_config.listen_address,
-                external_address: Some(secret_config.external_address),
+                external_address: secret_config.external_address,
                 network: Default::default(),
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,

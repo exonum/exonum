@@ -16,7 +16,7 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
-//! Error module.
+//! The set of errors for the Exonum API module.
 
 use std::{error, io};
 
@@ -25,27 +25,31 @@ use storage;
 /// List of possible API errors.
 #[derive(Fail, Debug)]
 pub enum Error {
-    /// Storage error.
+    /// Storage error. This type includes errors related to the database, caused
+    /// by, for example, serialization issues.
     #[fail(display = "Storage error: {}", _0)]
     Storage(#[cause] storage::Error),
 
-    /// Input/output error.
+    /// Input/output error. This type includes errors related to files that are not
+    /// a part of the Exonum storage.
     #[fail(display = "IO error: {}", _0)]
     Io(#[cause] io::Error),
 
-    /// Bad request.
+    /// Bad request. This error occurs when the request contains invalid syntax.
     #[fail(display = "Bad request: {}", _0)]
     BadRequest(String),
 
-    /// Not found.
+    /// Not found. This error occurs when the server cannot locate the requested
+    /// resource.
     #[fail(display = "Not found: {}", _0)]
     NotFound(String),
 
-    /// Internal error.
+    /// Internal server error. This type can return any internal server error to the user.
     #[fail(display = "Internal server error: {}", _0)]
     InternalError(Box<error::Error + Send + Sync>),
 
-    /// Unauthorized error.
+    /// Unauthorized error. This error occurs when the request lacks valid
+    /// authentication credentials.
     #[fail(display = "Unauthorized")]
     Unauthorized,
 }

@@ -14,18 +14,18 @@
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-
+use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    cell::{Ref, RefCell, RefMut},
+    self, cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::{
-    config_updater::ConfigUpdateService, sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
+    config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
     timestamping::TimestampingService,
 };
 use blockchain::{
@@ -38,7 +38,7 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use messages::{Any, Connect, Message, PeersRequest, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -95,7 +95,7 @@ impl SandboxInner {
         let network_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
-                    NetworkRequest::SendMessage(peer, msg, _) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
@@ -146,11 +146,11 @@ impl Sandbox {
         end_index: usize,
     ) {
         let connect = Connect::new(
-            &self.p(VALIDATOR_0),
-            self.a(VALIDATOR_0),
+            &self.p(ValidatorId(0)),
+            self.a(ValidatorId(0)),
             connect_message_time.into(),
             &user_agent::get(),
-            self.s(VALIDATOR_0),
+            self.s(ValidatorId(0)),
         );
 
         for validator in start_index..end_index {
@@ -238,7 +238,6 @@ impl Sandbox {
 
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
-        // TODO Think about addresses. (ECR-1627)
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
@@ -268,6 +267,25 @@ impl Sandbox {
         }
     }
 
+    pub fn send_peers_request(&self) {
+        self.process_events();
+        let send = self.inner.borrow_mut().sent.pop_front();
+
+        if let Some((addr, msg)) = send {
+            let peers_request =
+                PeersRequest::from_raw(msg).expect("Incorrect message. PeersRequest was expected");
+
+            let id = self.addresses.iter().position(|&a| a == addr);
+            if let Some(id) = id {
+                assert_eq!(&self.p(ValidatorId(id as u16)), peers_request.to());
+            } else {
+                panic!("Sending PeersRequest to unknown peer {:?}", addr);
+            }
+        } else {
+            panic!("Expected to send the PeersRequest message but nothing happened");
+        }
+    }
+
     pub fn broadcast<T: Message>(&self, msg: &T) {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
@@ -276,7 +294,6 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
-    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
@@ -284,7 +301,6 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn try_broadcast_to_addrs<'a, T: Message, I>(
         &self,
         msg: &T,
@@ -482,8 +498,18 @@ impl Sandbox {
         num_validators * 2 / 3 + 1
     }
 
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.round_timeout
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.cfg().consensus.first_round_timeout
+    }
+
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        (self.cfg().consensus.first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
+    }
+
+    pub fn current_round_timeout(&self) -> Milliseconds {
+        let previous_round: u64 = self.current_round().previous().into();
+        self.first_round_timeout() + previous_round * self.round_timeout_increase()
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
@@ -542,7 +568,7 @@ impl Sandbox {
                 c.addr(),
                 time.into(),
                 c.user_agent(),
-                self.s(VALIDATOR_0),
+                self.s(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);
@@ -566,7 +592,7 @@ impl Sandbox {
         let internal_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
 
-        let address = self.a(VALIDATOR_0);
+        let address = self.a(ValidatorId(0));
         let inner = self.inner.borrow();
 
         let blockchain = inner
@@ -688,22 +714,68 @@ impl ConnectList {
     }
 }
 
+pub struct SandboxBuilder {
+    initialize: bool,
+    services: Vec<Box<dyn Service>>,
+    consensus_config: ConsensusConfig,
+}
+
+impl SandboxBuilder {
+    pub fn new() -> Self {
+        SandboxBuilder {
+            initialize: true,
+            services: Vec::new(),
+            consensus_config: ConsensusConfig {
+                first_round_timeout: 1000,
+                status_timeout: 600_000,
+                peers_timeout: 600_000,
+                txs_block_limit: 1000,
+                max_message_len: 1024 * 1024,
+                min_propose_timeout: PROPOSE_TIMEOUT,
+                max_propose_timeout: PROPOSE_TIMEOUT,
+                propose_timeout_threshold: std::u32::MAX,
+            },
+        }
+    }
+
+    pub fn do_not_initialize_connections(mut self) -> Self {
+        self.initialize = false;
+        self
+    }
+
+    pub fn with_services(mut self, services: Vec<Box<dyn Service>>) -> Self {
+        self.services = services;
+        self
+    }
+
+    pub fn with_consensus<F: FnOnce(&mut ConsensusConfig)>(mut self, update: F) -> Self {
+        update(&mut self.consensus_config);
+        self
+    }
+
+    pub fn build(self) -> Sandbox {
+        let mut sandbox = sandbox_with_services_uninitialized(self.services, self.consensus_config);
+
+        if self.initialize {
+            let time = sandbox.time();
+            let validators_count = sandbox.validators_map.len();
+            sandbox.initialize(time, 1, validators_count);
+        }
+
+        sandbox
+    }
+}
+
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
-/// Constructs an instance of a `Sandbox` and initializes connections.
-pub fn sandbox_with_services(services: Vec<Box<dyn Service>>) -> Sandbox {
-    let mut sandbox = sandbox_with_services_uninitialized(services);
-    let time = sandbox.time();
-    let validators_count = sandbox.validators_map.len();
-    sandbox.initialize(time, 1, validators_count);
-    sandbox
-}
-
 /// Constructs an uninitialized instance of a `Sandbox`.
-pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
+fn sandbox_with_services_uninitialized(
+    services: Vec<Box<dyn Service>>,
+    consensus: ConsensusConfig,
+) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
         gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
@@ -729,16 +801,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         ApiSender::new(api_channel.0.clone()),
     );
 
-    let consensus = ConsensusConfig {
-        round_timeout: 1000,
-        status_timeout: 600_000,
-        peers_timeout: 600_000,
-        txs_block_limit: 1000,
-        max_message_len: 1024 * 1024,
-        min_propose_timeout: PROPOSE_TIMEOUT,
-        max_propose_timeout: PROPOSE_TIMEOUT,
-        propose_timeout_threshold: 0,
-    };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
         validators
@@ -771,7 +833,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         mempool: Default::default(),
     };
 
-    // TODO: Use factory or other solution like set_handler or run. (ECR-1627)
     let system_state = SandboxSystemStateProvider {
         listen_address: addresses[0],
         shared_time: SharedTime::new(Mutex::new(
@@ -818,13 +879,18 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
     };
 
     // General assumption; necessary for correct work of consensus algorithm
-    assert!(PROPOSE_TIMEOUT < sandbox.round_timeout());
+    assert!(PROPOSE_TIMEOUT < sandbox.first_round_timeout());
     sandbox.process_events();
     sandbox
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    sandbox_with_services(vec![
+    let _ = env_logger::try_init();
+    timestamping_sandbox_builder().build()
+}
+
+pub fn timestamping_sandbox_builder() -> SandboxBuilder {
+    SandboxBuilder::new().with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),
     ])
@@ -837,10 +903,7 @@ mod tests {
     use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use encoding;
     use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{
-        add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
-        ROUND_TWO,
-    };
+    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::{Fork, Snapshot};
 
     const SERVICE_ID: u16 = 1;
@@ -924,32 +987,31 @@ mod tests {
 
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.send(
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             &Connect::new(
-                &s.p(VALIDATOR_0),
-                s.a(VALIDATOR_0),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(VALIDATOR_0),
+                s.s(ValidatorId(0)),
             ),
         );
     }
 
     #[test]
     fn test_sandbox_assert_status() {
-        // TODO: Remove this? (ECR-1627)
         let s = timestamping_sandbox();
-        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.assert_state(Height(1), Round(1));
         s.add_time(Duration::from_millis(999));
-        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.assert_state(Height(1), Round(1));
         s.add_time(Duration::from_millis(1));
-        s.assert_state(HEIGHT_ONE, ROUND_TWO);
+        s.assert_state(Height(1), Round(2));
     }
 
     #[test]
@@ -957,13 +1019,13 @@ mod tests {
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
         s.send(
-            s.a(VALIDATOR_1),
+            s.a(ValidatorId(1)),
             &Connect::new(
-                &s.p(VALIDATOR_0),
-                s.a(VALIDATOR_0),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(VALIDATOR_0),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -982,19 +1044,19 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.send(
-            s.a(VALIDATOR_1),
+            s.a(ValidatorId(1)),
             &Connect::new(
-                &s.p(VALIDATOR_0),
-                s.a(VALIDATOR_0),
+                &s.p(ValidatorId(0)),
+                s.a(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(VALIDATOR_0),
+                s.s(ValidatorId(0)),
             ),
         );
     }
@@ -1013,7 +1075,7 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1034,14 +1096,14 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_3),
+            s.a(ValidatorId(3)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1063,7 +1125,7 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&Connect::new(
             &public,
-            s.a(VALIDATOR_2),
+            s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1074,10 +1136,12 @@ mod tests {
 
     #[test]
     fn test_sandbox_service_after_commit() {
-        let sandbox = sandbox_with_services(vec![
-            Box::new(AfterCommitService),
-            Box::new(TimestampingService::new()),
-        ]);
+        let sandbox = SandboxBuilder::new()
+            .with_services(vec![
+                Box::new(AfterCommitService),
+                Box::new(TimestampingService::new()),
+            ])
+            .build();
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));

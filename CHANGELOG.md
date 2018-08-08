@@ -18,7 +18,31 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
 
-- `NodePublicConfig` `addr` field has been renamed to `address` (#809).
+- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
+
+- Config parameter `external_address` is now a required value. (#826)
+
+- Config parameter `round_timeout` has been renamed to `first_round_timeout`.
+  Now timeout for round r is
+  `first_round_timeout + (r-1)*round_timeout_increase`
+   where `round_timeout_increase` is determined as a some percentage of
+  `first_round_timeout`. Value of this percentage is defined
+  in `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
+
+### New features
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. (#826)
+
+- Now each consecutive round is longer than previous
+  by some constant percentage of `first_round_timeout`. (#848)
+
+### New Features
+
+#### exonum
+
+- Added `/v1/blocks/subscribe` endpoint for following block commit events
+  through WebSockets (#792).
 
 ### Internal Improvements
 
@@ -28,6 +52,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   to efficiently compute Merkle root hash from a list of hashes without
   an intermediate `ProofListIndex`. Verification of block root hashes
   has been optimized as well. (#802)
+
+- `NoiseHandshake::finalize` now returns error if remote peer's public key is not
+  in `ConnectList`. (#811)
+
+- Now nodes will switch to `min_propose_timeout` for block proposal timeout
+  faster if they receive more than `propose_timeout_threshold` transactions
+  during `max_propose_timeout`. (#844)
 
 ## 0.9.0 - 2018-07-19
 

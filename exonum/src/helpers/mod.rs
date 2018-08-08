@@ -22,6 +22,7 @@ pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
+<<<<<<< HEAD
 use chrono::{DateTime, Utc};
 use colored::*;
 use crypto::gen_keypair;
@@ -33,27 +34,21 @@ use node::{ConnectListConfig, NodeConfig};
 use std::{
     env, io::{self, Write}, time::SystemTime,
 };
+=======
+use env_logger::Builder;
+use log::SetLoggerError;
+>>>>>>> master
 
 mod types;
 
-/// Format for timestamps in logs.
-///
-/// It is similar to date/time format of RFC 2822, but with milliseconds:
-/// "Mon, 16 Jul 2018 13:37:18.594 +0100"
-const LOG_TIMESTAMP_FORMAT: &str = "%a, %e %b %Y %H:%M:%S%.3f %z";
-
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = Builder::new();
-    builder.format(format_log_record);
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.try_init()
+    Builder::from_default_env()
+        .default_format_timestamp_nanos(true)
+        .try_init()
 }
 
+<<<<<<< HEAD
 fn has_colors() -> bool {
     use atty;
     use std::io;
@@ -120,6 +115,10 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
 
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
+=======
+/// Generates testnet configuration.
+pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
+>>>>>>> master
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
@@ -129,7 +128,10 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             service_key: (x.1).0,
         }
     }));
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
     let peers = (0..validators.len())
         .map(|x| {
             format!("127.0.0.1:{}", start_port + x as u16)
@@ -144,7 +146,11 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         .enumerate()
         .map(|(idx, (validator, service))| NodeConfig {
             listen_address: peers[idx],
+<<<<<<< HEAD
             external_address: Some(peers[idx]),
+=======
+            external_address: peers[idx],
+>>>>>>> master
             network: Default::default(),
             consensus_public_key: validator.0,
             consensus_secret_key: validator.1,
@@ -159,6 +165,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         })
         .collect::<Vec<_>>()
 }
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod tests {
@@ -174,3 +181,5 @@ mod tests {
         );
     }
 }
+=======
+>>>>>>> master

@@ -46,7 +46,7 @@ fn node_config() -> NodeConfig {
         consensus_public_key,
         consensus_secret_key,
         genesis,
-        external_address: None,
+        external_address: peer_address,
         network: Default::default(),
         connect_list: Default::default(),
         api: api_cfg,

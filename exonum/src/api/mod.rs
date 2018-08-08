@@ -29,9 +29,12 @@ pub mod backends;
 pub mod error;
 pub mod node;
 mod state;
+pub(crate) mod websocket;
 mod with;
 
-/// Defines object that could be used as an API backend.
+/// Defines an object that could be used as an API backend.
+///
+/// This trait is used to implement an API backend for Exonum.
 pub trait ServiceApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
@@ -75,6 +78,9 @@ pub trait ServiceApiBackend: Sized {
 
 /// Service API builder for the concrete API scope or in other words
 /// access level (public or private).
+///
+/// Endpoints cannot be declared to the builder directly, first you need to
+/// indicate the scope the endpoint(s) will belong to.
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiScope {
     pub(crate) actix_backend: actix::ApiBuilder,
@@ -86,7 +92,8 @@ impl ServiceApiScope {
         Self::default()
     }
 
-    /// Adds the given endpoint handler to the API scope.
+    /// Adds the given endpoint handler to the API scope. These endpoints
+    /// are designed for reading operations.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
@@ -105,7 +112,8 @@ impl ServiceApiScope {
         self
     }
 
-    /// Adds the given mutable endpoint handler to the API scope.
+    /// Adds the given mutable endpoint handler to the API scope. These endpoints
+    /// are designed for modification operations.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
@@ -153,13 +161,13 @@ impl ServiceApiScope {
 ///
 /// // Declares structures for requests and responses.
 ///
-/// // For the web backend `MyQuery` will be deserialized from the `block_height={number}` string.
+/// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
 /// #[derive(Deserialize, Clone, Copy)]
 /// pub struct MyQuery {
 ///     pub block_height: u64
 /// }
 ///
-/// // For the web backend `BlockInfo` will be serialized into the JSON string.
+/// // For the web backend, `BlockInfo` will be serialized into a JSON string.
 /// #[derive(Serialize, Clone, Copy)]
 /// pub struct BlockInfo {
 ///     pub hash: Hash,
@@ -176,18 +184,18 @@ impl ServiceApiScope {
 ///         )
 ///     }
 ///
-///     // Mutable handler which removes peer with the given address from the cache.
+///     // Mutable handler which removes the peer with the given address from the cache.
 ///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
 ///         let mut blockchain = state.blockchain().clone();
 ///         Ok(blockchain.remove_peer_with_addr(&query))
 ///     }
 ///
-///     // Simple handler without any params.
+///     // Simple handler without any parameters.
 ///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
 ///
-///     // You may also creates an asynchronous handlers for the long requests.
+///     // You may also create asynchronous handlers for long requests.
 ///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
 ///      -> api::FutureResult<Option<Hash>> {
 ///         let blockchain = state.blockchain().clone();
@@ -231,7 +239,7 @@ impl ServiceApiBuilder {
     }
 }
 
-/// Exonum API access level.
+/// Exonum API access level, either private or public.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiAccess {
     /// Public API for end users.
@@ -250,6 +258,9 @@ impl fmt::Display for ApiAccess {
 }
 
 /// API backend extender.
+///
+/// This trait enables implementing additional API scopes, besides the built-in
+/// private and public scopes.
 pub trait ExtendApiBackend {
     /// Extends API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
@@ -257,7 +268,8 @@ pub trait ExtendApiBackend {
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
 }
 
-/// Exonum node API aggregator. Currently only HTTP v1 backend is available.
+/// Exonum node API aggregator. This structure enables several API backends to
+/// operate simultaneously. Currently, only HTTP v1 backend is available.
 #[derive(Debug, Clone)]
 pub struct ApiAggregator {
     blockchain: Blockchain,
@@ -274,7 +286,10 @@ impl ApiAggregator {
             "system".to_owned(),
             Self::system_api(&blockchain, node_state.clone()),
         );
-        inner.insert("explorer".to_owned(), Self::explorer_api());
+        inner.insert(
+            "explorer".to_owned(),
+            Self::explorer_api(node_state.clone()),
+        );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
             let mut builder = ServiceApiBuilder::new();
@@ -296,7 +311,7 @@ impl ApiAggregator {
         &self.blockchain
     }
 
-    /// Extends given API backend by the handlers with the given access level.
+    /// Extends the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         match access {
             ApiAccess::Public => backend.extend(
@@ -312,14 +327,14 @@ impl ApiAggregator {
         }
     }
 
-    /// Adds API factory with given prefix to the aggregator.
+    /// Adds API factory with the given prefix to the aggregator.
     pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
         self.inner.insert(prefix.into(), builder);
     }
 
-    fn explorer_api() -> ServiceApiBuilder {
+    fn explorer_api(shared_node_state: SharedNodeState) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        self::node::public::ExplorerApi::wire(builder.public_scope());
+        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_node_state);
         builder
     }
 

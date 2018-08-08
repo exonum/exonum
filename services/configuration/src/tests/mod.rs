@@ -212,9 +212,7 @@ fn test_apply_with_increased_majority() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(6)
         .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig {
-                majority_count: Some(6),
-            },
+            config: Default::default,
         })
         .create();
 

@@ -31,14 +31,17 @@ use api::{
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 use tokio_core::reactor::Core;
 use toml::Value;
 
+use serde::de::{self, Deserialize, Deserializer};
+
 use blockchain::{
-    Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction, ValidatorKeys,
+    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
+    ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
@@ -51,6 +54,7 @@ use helpers::{
     ValidatorId,
 };
 use messages::{Connect, Message, RawMessage};
+use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -122,6 +126,8 @@ pub struct NodeHandler {
     node_role: NodeRole,
     /// Configuration file manager.
     config_manager: Option<ConfigManager>,
+    /// Can we speed up Propose with transaction pressure?
+    allow_expedited_propose: bool,
 }
 
 /// Service configuration.
@@ -233,7 +239,8 @@ pub struct NodeConfig {
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
-    pub external_address: Option<SocketAddr>,
+    #[serde(deserialize_with = "deserialize_socket_address")]
+    pub external_address: SocketAddr,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Consensus public key.
@@ -360,17 +367,10 @@ impl ConnectListConfig {
     }
 
     /// Creates `ConnectListConfig` from `ConnectList`.
-    pub fn from_connect_list(connect_list: &ConnectList) -> Self {
-        let peers = connect_list
-            .peers
-            .iter()
-            .map(|(pk, a)| ConnectInfo {
-                address: *a,
-                public_key: *pk,
-            })
-            .collect();
-
-        ConnectListConfig { peers }
+    pub fn from_connect_list(connect_list: &SharedConnectList) -> Self {
+        ConnectListConfig {
+            peers: connect_list.peers(),
+        }
     }
 
     /// `ConnectListConfig` peers addresses.
@@ -450,6 +450,7 @@ impl NodeHandler {
             is_enabled,
             node_role,
             config_manager,
+            allow_expedited_propose: true,
         }
     }
 
@@ -458,9 +459,15 @@ impl NodeHandler {
         &self.api_state
     }
 
-    /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().round_timeout
+    /// Returns value of the `first_round_timeout` field from the current `ConsensusConfig`.
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().first_round_timeout
+    }
+
+    /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        (self.state().consensus_config().first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
@@ -565,19 +572,9 @@ impl NodeHandler {
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        let public_key = self.state.connect_list().find_key_by_address(&address);
-
-        if let Some(public_key) = public_key {
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(*address, message.clone(), *public_key);
-            self.channel.network_requests.send(request).log_error();
-        } else {
-            warn!(
-                "Attempt to connect to the peer with address {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        trace!("Send to address: {}", address);
+        let request = NetworkRequest::SendMessage(*address, message.clone());
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
@@ -596,16 +593,7 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-
-        if self.state.connect_list().is_address_allowed(&address) {
-            self.send_to_addr(address, connect.raw());
-        } else {
-            warn!(
-                "Attempt to connect to the peer {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        self.send_to_addr(address, connect.raw());
     }
 
     /// Add timeout request.
@@ -640,10 +628,7 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let snapshot = self.blockchain.snapshot();
-        let timeout = if Schema::new(&snapshot).transactions_pool_len()
-            >= self.propose_timeout_threshold() as usize
-        {
+        let timeout = if self.need_faster_propose() {
             self.min_propose_timeout()
         } else {
             self.max_propose_timeout()
@@ -659,6 +644,20 @@ impl NodeHandler {
         );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.add_timeout(timeout, time);
+    }
+
+    fn maybe_add_propose_timeout(&mut self) {
+        if self.allow_expedited_propose && self.need_faster_propose() {
+            info!("Add expedited propose timeout");
+            self.add_propose_timeout();
+            self.allow_expedited_propose = false;
+        }
+    }
+
+    fn need_faster_propose(&self) -> bool {
+        let snapshot = self.blockchain.snapshot();
+        let pending_tx_count = Schema::new(&snapshot).transactions_pool_len();
+        pending_tx_count >= self.propose_timeout_threshold() as usize
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
@@ -696,8 +695,15 @@ impl NodeHandler {
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
+        // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt
+        // Where:
+        // H - height start time
+        // t0 - Round(1) timeout length, dt - timeout increase value
+        // r - round number, r = 1,2,...
         let previous_round: u64 = round.previous().into();
-        let ms = previous_round * self.round_timeout();
+        let ms = previous_round * self.first_round_timeout()
+            + (previous_round * previous_round.saturating_sub(1)) / 2
+                * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
@@ -759,10 +765,28 @@ impl fmt::Debug for ApiSender {
     }
 }
 
+fn deserialize_socket_address<'de, D>(value: D) -> Result<SocketAddr, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let address_str: String = Deserialize::deserialize(value)?;
+    address_str
+        .to_socket_addrs()
+        .map_err(de::Error::custom)?
+        .next()
+        .ok_or_else(|| {
+            de::Error::custom(&format!(
+                "no one ip belongs to the hostname: {}",
+                address_str
+            ))
+        })
+}
+
 /// Data needed to add peer into `ConnectList`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct ConnectInfo {
     /// Peer address.
+    #[serde(deserialize_with = "deserialize_socket_address")]
     pub address: SocketAddr,
     /// Peer public key.
     pub public_key: PublicKey,
@@ -879,18 +903,12 @@ impl Node {
             peer_discovery: peers,
         };
 
-        let external_address = if let Some(v) = node_cfg.external_address {
-            v
-        } else {
-            warn!("Could not find 'external_address' in the config, using 'listen_address'");
-            node_cfg.listen_address
-        };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
-            external_address,
+            node_cfg.external_address,
             channel.node_sender(),
             system_state,
             config,
@@ -985,6 +1003,7 @@ impl Node {
         let handshake_params = HandshakeParams::new(
             *self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
+            self.state().connect_list().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
