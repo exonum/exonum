@@ -546,6 +546,12 @@ impl Sandbox {
         assert_eq!(actual_round, expected_round);
     }
 
+    pub fn assert_pool_len(&self, expected: u64) {
+        let view = self.blockchain_ref().snapshot();
+        let schema = Schema::new(view);
+        assert_eq!(expected, schema.transactions_pool_len());
+    }
+
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
         let state = self.node_state();
 

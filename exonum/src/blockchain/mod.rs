@@ -481,6 +481,12 @@ impl Blockchain {
                 // Consensus messages cache is useful only during one height, so it should be
                 // cleared when a new height is achieved.
                 schema.consensus_messages_cache_mut().clear();
+                let txs_in_block = schema.last_block().tx_count();
+                let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
+                debug_assert!(txs_count >= u64::from(txs_in_block));
+                schema
+                    .transactions_pool_len_index_mut()
+                    .set(txs_count - u64::from(txs_in_block));
             }
             fork.into_patch()
         };
@@ -492,6 +498,7 @@ impl Blockchain {
             self.api_sender.clone(),
             self.fork(),
         );
+
         // Invokes `after_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
             service.after_commit(&context);
