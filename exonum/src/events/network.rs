@@ -33,7 +33,7 @@ use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use crypto::x25519;
+use crypto::{x25519, PublicKey};
 use messages::{Any, Message, RawMessage};
 use node::ConnectInfo;
 
@@ -243,7 +243,7 @@ impl ConnectionsPool {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
             // TODO change `remote_public_key` to initiator public key
-            NoiseHandshake::initiator(&handshake_params).send(stream, ConnectInfo { address: *peer, public_key: remote_public_key })
+            NoiseHandshake::initiator(&handshake_params).send(stream, handshake_params.connect_info)
         } else {
             Box::new(err(other_error(format!(
                 "Attempt to connect to the peer with address {:?} which \

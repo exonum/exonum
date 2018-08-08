@@ -104,6 +104,8 @@ impl Encoder for MessagesCodec {
 mod test {
     use super::MessagesCodec;
 
+    use std::net::SocketAddr;
+
     use bytes::BytesMut;
     use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use events::noise::{HandshakeParams, NoiseWrapper};
@@ -149,8 +151,9 @@ mod test {
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+        let addr: SocketAddr = "127.0.0.1:8000".parse().unwrap();
         let mut params =
-            HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+            HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024, addr);
         params.set_remote_key(public_key);
 
         let mut initiator = NoiseWrapper::initiator(&params).session;

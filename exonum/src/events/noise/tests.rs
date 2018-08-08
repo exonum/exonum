@@ -146,8 +146,9 @@ const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+    let addr: SocketAddr = "127.0.0.1:8000".parse().unwrap();
     let mut params =
-        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024, addr);
     params.set_remote_key(public_key);
     params
 }

@@ -194,6 +194,7 @@ impl ConnectionParams {
             secret_key.clone(),
             SharedConnectList::default(),
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
+            address.clone(),
         );
         let connect_info = ConnectInfo {
             address,

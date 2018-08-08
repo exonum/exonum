@@ -783,10 +783,12 @@ pub struct ConnectInfo {
 }
 
 impl ConnectInfo {
+    /// TODO add docs
     pub fn try_serialize(self) -> serde_json::Result<Vec<u8>> {
         serde_json::to_vec(&self)
     }
 
+    /// TODO add docs
     pub fn try_deserialize(value: &[u8]) -> serde_json::Result<Self> {
         serde_json::from_slice(value.as_ref())
     }
@@ -1022,6 +1024,7 @@ impl Node {
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
             self.max_message_len,
+            self.handler.system_state.listen_address(),
         );
         self.run_handler(&handshake_params)?;
 

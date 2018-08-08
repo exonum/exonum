@@ -101,14 +101,14 @@ impl NodeHandler {
 
         // Check if we have another connect message from peer with the given public_key.
         let mut need_connect = true;
-        if let Some(saved_message) = self.state.peers().get(&public_key) {
-            if saved_message.address == info.address {
-                need_connect = false;
-            } else {
-                error!("Received weird Connect message from {}", address);
-                return;
-            }
-        }
+//        if let Some(saved_message) = self.state.peers().get(&public_key) {
+//            if saved_message.address == info.address {
+//                need_connect = true;
+//            } else {
+//                error!("Received weird Connect message from {}", address);
+//                return;
+//            }
+//        }
         self.state.add_peer(public_key, info);
         info!(
             "Received Connect message from {}, {}",

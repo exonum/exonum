@@ -27,6 +27,7 @@ use events::{
 };
 use node::state::SharedConnectList;
 use node::ConnectInfo;
+use std::net::SocketAddr;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
@@ -35,6 +36,7 @@ pub struct HandshakeParams {
     pub secret_key: x25519::SecretKey,
     pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
+    pub connect_info : ConnectInfo,
     max_message_len: u32,
 }
 
@@ -44,21 +46,25 @@ impl HandshakeParams {
         secret_key: SecretKey,
         connect_list: SharedConnectList,
         max_message_len: u32,
+        listen_address : SocketAddr,
     ) -> Self {
-        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+        let (public_key_x25519, secret_key_x25519) = into_x25519_keypair(public_key, secret_key).unwrap();
 
         HandshakeParams {
-            public_key,
-            secret_key,
+            public_key: public_key_x25519,
+            secret_key: secret_key_x25519,
             max_message_len,
             remote_key: None,
             connect_list,
+            connect_info: ConnectInfo { address: listen_address, public_key }
         }
     }
 
     pub fn set_remote_key(&mut self, remote_key: PublicKey) {
         self.remote_key = Some(into_x25519_public_key(remote_key));
     }
+
+
 }
 
 #[derive(Debug)]
@@ -93,9 +99,8 @@ impl NoiseHandshake {
     ) -> impl Future<Item = (S, Self, Option<ConnectInfo>), Error = io::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
             let message = self.noise.read_handshake_msg(&msg.0)?;
-            let info = ConnectInfo::try_deserialize(message.as_ref());
-            println!("info {:?}", info);
-            Ok((stream, self, info.ok()))
+            let remote_connect_info = ConnectInfo::try_deserialize(message.as_ref());
+            Ok((stream, self, remote_connect_info.ok()))
         })
     }
 
@@ -104,7 +109,6 @@ impl NoiseHandshake {
         stream: S,
         msg: &[u8],
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        println!("write_handshake_msg {:?}, len {}", msg, msg.len());
         done(self.noise.write_handshake_msg(msg))
             .map_err(|e| e.into())
             .and_then(|buf| HandshakeRawMessage(buf).write(stream))

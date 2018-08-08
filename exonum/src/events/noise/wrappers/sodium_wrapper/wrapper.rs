@@ -146,18 +146,13 @@ impl NoiseWrapper {
     fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; len];
         let len = self.session.read_message(input, &mut buf)?;
-        println!("self.session.read_message buf, len {}", len);
-
-        if len > 0 && len < 255 {
-            buf.truncate(len);
-        }
+        buf.truncate(len);
         Ok(buf)
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
-        println!("self.session.write_message len {}", len);
         buf.truncate(len);
         Ok(buf)
     }
@@ -167,7 +162,7 @@ impl NoiseWrapper {
     // length we need to subtract `TAG_LENGTH` multiplied by messages count
     // from `data.len()`.
     fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
-        raw_message_len - TAG_LENGTH * (raw_message_len / MAX_MESSAGE_LENGTH)
+        raw_message_len - TAG_LENGTH * ((raw_message_len as f32 / MAX_MESSAGE_LENGTH as f32).ceil() as usize)
     }
 
     // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
