@@ -359,6 +359,7 @@ where
                     sandbox.s(val_idx),
                 ));
             }
+            
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
@@ -514,7 +515,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     unreachable!("because at one of loops we should become a leader and return");
 }
 
-fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Propose {
+pub fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Propose {
     get_propose_with_transactions_for_validator(sandbox, transactions, ValidatorId(0))
 }
 

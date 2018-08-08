@@ -27,7 +27,7 @@ use messages::{Message, Precommit, Prevote, PrevotesRequest, ProposeRequest, Tra
 use node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
-use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use sandbox::{sandbox::{self, timestamping_sandbox,} , sandbox_tests_helper::*};
 
 
 /// check scenario:
@@ -1293,9 +1293,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    let block_1_delay = 2 * sandbox.current_round_timeout() + PROPOSE_TIMEOUT + 1;
-    let block_2_delay = 2 * sandbox.current_round_timeout() + 2 * PROPOSE_TIMEOUT + 1;
-
     // create some tx
     let tx = gen_timestamping_tx();
 
@@ -1630,4 +1627,48 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     sandbox.broadcast(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(0));
+}
+
+
+#[test]
+fn handle_precommit_remove_propose_request() {
+    let sandbox = sandbox::timestamping_sandbox_builder()
+        .build();
+
+    let tx = gen_timestamping_tx();
+    
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx.hash()])
+        
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_tx_hash(&tx.hash())
+        .build();
+    
+    let precommit = Precommit::new(
+        propose.validator(),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(ValidatorId(1)),
+    );
+    
+    sandbox.recv(&precommit);
+
+    // Propose request shouldn't be sent now.
+    sandbox.recv(&propose);
+    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+    
+    sandbox.send(
+        sandbox.a(propose.validator()),
+        &TransactionsRequest::new(
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(propose.validator()),
+            &[tx.hash()],
+            sandbox.s(ValidatorId(0)),
+        ),
+    );
 }

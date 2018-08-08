@@ -118,8 +118,9 @@ fn ignore_propose_with_commited_transaction() {
 
 // TODO: Ask Ivan how to test this scenario in terms of messages:
 // - remove propose request when getting propose and request txs from known nodes;
-//     - not only leader, but also prevotes;
-//     - not only leader, but also precommiters.
+
+// - not only leader, but also prevotes;
+// - not only leader, but also precommiters.
 // (ECR-1627)
 
 #[test]

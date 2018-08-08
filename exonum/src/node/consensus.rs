@@ -143,9 +143,9 @@ impl NodeHandler {
         let known_nodes = self.remove_request(&RequestData::Propose(hash));
 
         if has_unknown_txs {
-            trace!("REQUEST TRANSACTIONS");
+            trace!("REQUEST TRANSACTIONS {:#?}", from);
             self.request(RequestData::ProposeTransactions(hash), from);
-
+            trace!("AND OTHER");
             for node in known_nodes {
                 self.request(RequestData::ProposeTransactions(hash), node);
             }
@@ -750,7 +750,7 @@ impl NodeHandler {
 
     /// Handles request timeout by sending the corresponding request message to a peer.
     pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
-        trace!("HANDLE REQUEST TIMEOUT");
+        trace!("HANDLE REQUEST TIMEOUT {:#?}", data);
         // FIXME: Check height? (ECR-171)
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
