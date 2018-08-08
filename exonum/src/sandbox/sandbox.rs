@@ -153,29 +153,12 @@ impl Sandbox {
         start_index: usize,
         end_index: usize,
     ) {
-        //TODO: fix and change to ConnectInfo
-//        let connect = Connect::new(
-//            &self.p(ValidatorId(0)),
-//            self.a(ValidatorId(0)),
-//            connect_message_time.into(),
-//            &user_agent::get(),
-//            self.s(ValidatorId(0)),
-//        );
-
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
-//            self.recv(&Connect::new(
-//                &self.p(validator),
-//                self.a(validator),
-//                self.time().into(),
-//                &user_agent::get(),
-//                self.s(validator),
-//            ));
-//            self.send(self.a(validator), &connect);
+            self.connect(ConnectInfo { address: self.a(validator), public_key: self.p(validator) });
         }
 
         self.check_unexpected_message();
-//        self.connect = Some(connect);
     }
 
     fn check_unexpected_message(&self) {
@@ -240,18 +223,10 @@ impl Sandbox {
         })
     }
 
-    /// Returns connect message used during initialization.
-    //TODO: fix and change to ConnectInfo
-//    pub fn connect(&self) -> Option<&Connect> {
-//        self.connect.as_ref()
-//    }
-
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
-
-        println!("recv event {:?}", event);
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -263,10 +238,8 @@ impl Sandbox {
         self.process_events();
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
 
-        println!("any_expected_msg {:?}", any_expected_msg);
         let send = self.inner.borrow_mut().sent.pop_front();
 
-        println!("sended message {:?}", send);
         if let Some((real_addr, real_msg)) = send {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -283,8 +256,9 @@ impl Sandbox {
         }
     }
 
-    pub fn connect(&self, addr: &SocketAddr) {
-        self.inner.borrow_mut().handler.connect(addr);
+    pub fn connect(&self, info: ConnectInfo) {
+        info!("connecting to {:?}", info);
+        self.inner.borrow_mut().handler.state.add_peer(info.public_key, info);
     }
 
     pub fn send_peers_request(&self) {
@@ -572,23 +546,10 @@ impl Sandbox {
 
     /// Creates new sandbox with "restarted" node initialized by the given time.
     pub fn restart_with_time(self, time: SystemTime) -> Self {
-        //TODO: change to ConnectInfo
-//        let connect = self.connect().map(|c| {
-//            Connect::new(
-//                c.pub_key(),
-//                c.addr(),
-//                time.into(),
-//                c.user_agent(),
-//                self.s(ValidatorId(0)),
-//            )
-//        });
         let sandbox = self.restart_uninitialized_with_time(time);
-//        if let Some(connect) = connect {
-//            sandbox.broadcast(&connect);
-//        }
 
-        for address in &sandbox.addresses {
-            sandbox.connect(&address);
+        for id in 1..sandbox.n_validators() {
+            sandbox.connect(ConnectInfo{ address: sandbox.a(ValidatorId(id as u16)),  public_key:sandbox.p(ValidatorId(id as u16))});
         }
 
         sandbox
@@ -653,6 +614,11 @@ impl Sandbox {
             inner.handler.api_state.clone(),
             None,
         );
+
+        for peer in inner.handler.state.peers().values() {
+            handler.state.add_peer(peer.public_key, *peer);
+        }
+
         handler.initialize();
 
         let inner = SandboxInner {
@@ -672,6 +638,7 @@ impl Sandbox {
             addresses: self.addresses.clone(),
             connect: None,
         };
+
         sandbox.process_events();
         sandbox
     }
@@ -961,7 +928,7 @@ mod tests {
         // Socket address doesn't matter in this case.
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
 
-        s.connect(&s.a(ValidatorId(2)));
+//        s.connect(&s.a(ValidatorId(2)));
 
         //TODO: fix and change to ConnectInfo
         s.recv(&Status::new(

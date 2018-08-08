@@ -317,6 +317,7 @@ impl RequestHandler {
             .for_each(move |request| {
                 match request {
                     NetworkRequest::ConnectToPeer(peer) => {
+                        info!("NetworkRequest::ConnectToPeer(peer)");
                         let conn_tx = outgoing_connections.get_or_create(peer, network_tx.clone(),
                                                                          &handle, network_config, &handshake_params);
 

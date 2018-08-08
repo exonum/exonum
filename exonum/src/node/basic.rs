@@ -24,7 +24,6 @@ use node::ConnectInfo;
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, raw: RawMessage) {
-        println!("handle message {:?}", raw);
         match Any::from_raw(raw) {
             Ok(Any::Status(msg)) => self.handle_status(&msg),
             Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
@@ -73,42 +72,28 @@ impl NodeHandler {
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, info: ConnectInfo) {
         // TODO Add spam protection. (ECR-170)
-        // TODO: drop connection if checks have failed. (ECR-1837)
         let address = info.address;
         if address == self.state.our_connect_message().address {
-            trace!("Received Connect with same address as our external_address.");
+            trace!("Received connection with same address as our external_address.");
             return;
         }
 
-//        //TODO: remove unwrap
         let public_key = info.public_key;
-//        let info = ConnectInfo { address, public_key };
-//
-//
         if public_key == self.state.our_connect_message().public_key {
-            trace!("Received Connect with same pub_key as ours.");
+            trace!("Received connection with same pub_key as ours.");
             return;
         }
-
-//        if !self.state.connect_list().is_peer_allowed(&public_key) {
-//            error!(
-//                "Received connect message from {:?} peer which not in ConnectList.",
-//                public_key
-//            );
-//            return;
-//        }
-
 
         // Check if we have another connect message from peer with the given public_key.
         let mut need_connect = true;
-//        if let Some(saved_message) = self.state.peers().get(&public_key) {
-//            if saved_message.address == info.address {
-//                need_connect = true;
-//            } else {
-//                error!("Received weird Connect message from {}", address);
-//                return;
-//            }
-//        }
+        if let Some(saved_message) = self.state.peers().get(&public_key) {
+            if saved_message.address == info.address {
+                need_connect = false;
+            } else {
+                error!("Received weird connection from {}", address);
+                return;
+            }
+        }
         self.state.add_peer(public_key, info);
         info!(
             "Received Connect message from {}, {}",
@@ -116,7 +101,7 @@ impl NodeHandler {
         );
         self.blockchain.save_peer(&public_key, info);
         if need_connect {
-            info!("Send Connect message to {}", address);
+            info!("Connecting to {}", address);
             self.connect(&address);
         }
     }

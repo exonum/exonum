@@ -78,7 +78,6 @@ impl HandshakeRawMessage {
         sock: S,
     ) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
         let len = self.0.len();
-        println!("HandshakeRawMessage write len {}", len);
         debug_assert!(len < MAX_HANDSHAKE_MESSAGE_LENGTH);
 
         // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message

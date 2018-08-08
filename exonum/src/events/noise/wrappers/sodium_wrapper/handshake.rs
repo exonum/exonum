@@ -63,8 +63,6 @@ impl HandshakeParams {
     pub fn set_remote_key(&mut self, remote_key: PublicKey) {
         self.remote_key = Some(into_x25519_public_key(remote_key));
     }
-
-
 }
 
 #[derive(Debug)]
