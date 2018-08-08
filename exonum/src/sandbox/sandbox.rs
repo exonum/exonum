@@ -752,6 +752,7 @@ impl SandboxBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_logger(mut self) -> Self {
         self.logger = true;
         self
