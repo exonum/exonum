@@ -70,7 +70,7 @@ fn empty_tx_request() {
 }
 
 // if tx was received after execute but before commit it produce conflict patch.
-// testcase:
+// Test case:
 // 1. add tx
 // 2. create and execute propose
 // 3. add other tx
