@@ -42,7 +42,7 @@ const OUTGOING_CHANNEL_SIZE: usize = 10;
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(SocketAddr),
+    PeerConnected(ConnectInfo),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -237,12 +237,13 @@ impl ConnectionsPool {
         stream: TcpStream,
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, x25519::PublicKey), Error = io::Error> {
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Option<ConnectInfo>), Error = io::Error> {
         let connect_list = &handshake_params.connect_list.clone();
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
-            NoiseHandshake::initiator(&handshake_params).send(stream)
+            // TODO change `remote_public_key` to initiator public key
+            NoiseHandshake::initiator(&handshake_params).send(stream, ConnectInfo { address: *peer, public_key: remote_public_key })
         } else {
             Box::new(err(other_error(format!(
                 "Attempt to connect to the peer with address {:?} which \
@@ -411,11 +412,12 @@ impl Listener {
             let handshake = NoiseHandshake::responder(&handshake_params);
             let connection_handler = handshake
                 .listen(sock)
-                .and_then(move |(sock, _public_key)| {
+                .and_then(move |(sock, info)| {
                     trace!("Remote connection established with socket={:?}", sock);
+                    println!("listener info {:?}", info);
                     let (_, stream) = sock.split();
 
-                    Self::process_incoming_messages(stream, network_tx, address)
+                    Self::process_incoming_messages(stream, network_tx, address, info.unwrap())
                         .map(|_| {
                             // Ensure that holder lives until the stream ends.
                             let _holder = holder;
@@ -434,12 +436,13 @@ impl Listener {
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
         address: SocketAddr,
+        info: ConnectInfo,
     ) -> impl Future<Item = (), Error = io::Error>
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
         use crypto::PublicKey;
-        let event = NetworkEvent::PeerConnected(address);
+        let event = NetworkEvent::PeerConnected(info);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx

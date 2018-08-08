@@ -25,7 +25,7 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{gen_keypair_from_seed, Seed, x25519, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, PublicKey, x25519, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -34,6 +34,7 @@ use events::{
     },
 };
 use node::state::SharedConnectList;
+use node::ConnectInfo;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -324,10 +325,14 @@ fn send_handshake(
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
+    let connect_info = ConnectInfo { address: *addr, public_key: PublicKey::zero() };
+
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params).send(sock),
-            Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
+            None => NoiseHandshake::initiator(&params).send(sock, connect_info),
+            Some(message) => {
+                NoiseErrorHandshake::initiator(&params, message).send(sock, connect_info)
+            },
         })
         .map(|_| ())
         .map_err(into_other);
@@ -368,7 +373,7 @@ impl NoiseErrorHandshake {
 
         inner
             .read_handshake_msg(stream)
-            .map(move |(stream, inner)| {
+            .map(move |(stream, inner, _)| {
                 self.inner = Some(inner);
                 (stream, self)
             })
@@ -396,7 +401,7 @@ impl NoiseErrorHandshake {
 
             Either::B(
                 inner
-                    .write_handshake_msg(stream)
+                    .write_handshake_msg(stream, &[])
                     .map(move |(stream, inner)| {
                         self.inner = Some(inner);
                         self.current_step = self.current_step
@@ -410,7 +415,7 @@ impl NoiseErrorHandshake {
 }
 
 impl Handshake for NoiseErrorHandshake {
-    type Result = x25519::PublicKey;
+    type Result = Option<ConnectInfo>;
 
     fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
@@ -419,18 +424,18 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, None));
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S, info: ConnectInfo) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
         let framed = self.write_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, None));
         Box::new(framed)
     }
 }

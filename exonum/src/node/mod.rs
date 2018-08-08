@@ -782,19 +782,29 @@ pub struct ConnectInfo {
     pub public_key: PublicKey,
 }
 
+impl ConnectInfo {
+    pub fn try_serialize(self) -> serde_json::Result<Vec<u8>> {
+        serde_json::to_vec(&self)
+    }
+
+    pub fn try_deserialize(value: &[u8]) -> serde_json::Result<Self> {
+        serde_json::from_slice(value.as_ref())
+    }
+}
+
 impl StorageValue for ConnectInfo {
     fn into_bytes(self) -> Vec<u8> {
-        serde_json::to_vec(&self).unwrap()
+        self.try_serialize().unwrap()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        serde_json::from_slice(value.as_ref()).unwrap()
+        Self::try_deserialize(value.as_ref()).unwrap()
     }
 }
 
 impl CryptoHash for ConnectInfo {
     fn hash(&self) -> Hash {
-        let vec_bytes = serde_json::to_vec(&self).unwrap();
+        let vec_bytes = self.try_serialize().unwrap();
         hash(&vec_bytes)
     }
 }

@@ -26,6 +26,7 @@ use events::{
     noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
 use node::state::SharedConnectList;
+use node::ConnectInfo;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
@@ -89,18 +90,22 @@ impl NoiseHandshake {
     pub fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self, Option<ConnectInfo>), Error = io::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
-            self.noise.read_handshake_msg(&msg.0)?;
-            Ok((stream, self))
+            let message = self.noise.read_handshake_msg(&msg.0)?;
+            let info = ConnectInfo::try_deserialize(message.as_ref());
+            println!("info {:?}", info);
+            Ok((stream, self, info.ok()))
         })
     }
 
     pub fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
+        msg: &[u8],
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        done(self.noise.write_handshake_msg())
+        println!("write_handshake_msg {:?}, len {}", msg, msg.len());
+        done(self.noise.write_handshake_msg(msg))
             .map_err(|e| e.into())
             .and_then(|buf| HandshakeRawMessage(buf).write(stream))
             .map(move |(stream, _)| (stream, self))
@@ -109,7 +114,8 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<(Framed<S, MessagesCodec>, x25519::PublicKey), io::Error> {
+        info: Option<ConnectInfo>,
+    ) -> Result<(Framed<S, MessagesCodec>, Option<ConnectInfo>), io::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -126,7 +132,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_mode()?;
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
-        Ok((framed, remote_static_key))
+        Ok((framed, info))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
@@ -139,27 +145,27 @@ impl NoiseHandshake {
 }
 
 impl Handshake for NoiseHandshake {
-    type Result = x25519::PublicKey;
+    type Result = Option<ConnectInfo>;
 
     fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
         let framed = self.read_handshake_msg(stream)
-            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake, _)| handshake.write_handshake_msg(stream, &[]))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
+            .and_then(|(stream, handshake, info)| handshake.finalize(stream, info));
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S, info: ConnectInfo) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
-        let framed = self.write_handshake_msg(stream)
+        let framed = self.write_handshake_msg(stream, &[])
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
+            .and_then(move |(stream, handshake, _)| handshake.write_handshake_msg(stream, &info.try_serialize().unwrap()))
+            .and_then(|(stream, handshake)| handshake.finalize(stream, None));
         Box::new(framed)
     }
 }
