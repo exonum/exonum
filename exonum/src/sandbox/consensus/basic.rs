@@ -80,7 +80,6 @@ fn test_reach_one_height() {
 #[test]
 fn test_one_validator() {
     let sandbox = sandbox::timestamping_sandbox_builder()
-        .with_logger()
         .with_validators(1)
         .build();
     let sandbox_state = SandboxState::new();
