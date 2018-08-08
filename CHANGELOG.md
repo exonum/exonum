@@ -35,6 +35,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `/v1/blocks/subscribe` endpoint for following block commit events
   through WebSockets (#792).
 
+### Bug Fixes
+
+#### exonum
+
+- Bug with pool size overflow has been fixed. (#853)
+
 ### Internal Improvements
 
 #### exonum
