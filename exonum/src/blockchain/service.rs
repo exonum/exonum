@@ -318,7 +318,7 @@ pub struct ApiNodeState {
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
-    is_enabled: bool,
+    is_network_enabled: bool,
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
@@ -332,7 +332,7 @@ impl fmt::Debug for ApiNodeState {
             .field("outgoing_connections", &self.outgoing_connections)
             .field("reconnects_timeout", &self.reconnects_timeout)
             .field("peers_info", &self.peers_info)
-            .field("is_enabled", &self.is_enabled)
+            .field("is_network_enabled", &self.is_network_enabled)
             .field("node_role", &self.node_role)
             .field("majority_count", &self.majority_count)
             .field("validators", &self.validators)
@@ -343,7 +343,7 @@ impl fmt::Debug for ApiNodeState {
 impl ApiNodeState {
     fn new() -> Self {
         Self {
-            is_enabled: true,
+            is_network_enabled: true,
             ..Default::default()
         }
     }
@@ -457,16 +457,16 @@ impl SharedNodeState {
 
     /// Returns a boolean value which indicates whether the node is enabled
     /// or not.
-    pub fn is_enabled(&self) -> bool {
+    pub fn is_network_enabled(&self) -> bool {
         let state = self.state.read().expect("Expected read lock.");
-        state.is_enabled
+        state.is_network_enabled
     }
 
     /// Transfers information to the node that the consensus process on the node
     /// should halt.
-    pub fn set_enabled(&self, is_enabled: bool) {
+    pub fn set_network_enabled(&self, is_enabled: bool) {
         let mut state = self.state.write().expect("Expected write lock.");
-        state.is_enabled = is_enabled;
+        state.is_network_enabled = is_enabled;
     }
 
     pub(crate) fn set_node_role(&self, role: NodeRole) {

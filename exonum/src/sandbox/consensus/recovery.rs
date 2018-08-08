@@ -20,60 +20,10 @@ use std::time::Duration;
 use crypto::CryptoHash;
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{Connect, PeersRequest, Precommit, Prevote};
-use node;
 
 use sandbox::{
     sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
 };
-
-#[test]
-fn test_disable_and_enable() {
-    let mut sandbox = timestamping_sandbox();
-    let sandbox_state = SandboxState::new();
-
-    sandbox.assert_state(Height(1), Round(1));
-    try_add_one_height(&sandbox, &sandbox_state).unwrap();
-    sandbox.assert_state(Height(2), Round(1));
-
-    // Disable the node.
-    let message = node::ExternalMessage::Enable(false);
-    sandbox
-        .node_handler_mut()
-        .channel
-        .api_requests
-        .send(message)
-        .unwrap();
-    sandbox.process_events();
-
-    // Save the current time to "rewind" sandbox to it later.
-    let time_saved = sandbox.time();
-
-    // A fail is expected here as the node is disabled.
-    sandbox.assert_state(Height(2), Round(1));
-    // TODO: use try_add_one_height (ECR-1817)
-    let result = try_add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-    assert!(result.is_err());
-
-    // Re-enable the node.
-    let message = node::ExternalMessage::Enable(true);
-    sandbox
-        .node_handler_mut()
-        .channel
-        .api_requests
-        .send(message)
-        .unwrap();
-    sandbox.process_events();
-
-    // Check if the node is still at the same height and round.
-    sandbox.assert_state(Height(2), Round(1));
-
-    // Reset the time.
-    sandbox.set_time(time_saved);
-
-    // The node should work fine now
-    try_add_one_height(&sandbox, &sandbox_state).unwrap();
-    sandbox.assert_state(Height(3), Round(1));
-}
 
 /// Scenario:
 /// - Node sends `Propose` and `Prevote`.

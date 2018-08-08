@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectInfo, ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 
 impl EventHandler for NodeHandler {
@@ -68,15 +68,33 @@ impl NodeHandler {
             }
             ExternalMessage::Enable(value) => {
                 let s = if value { "enabled" } else { "disabled" };
-                if self.is_enabled == value {
+                if self.is_network_enabled == value {
                     info!("Node is already {}", s);
                 } else {
-                    self.is_enabled = value;
-                    self.api_state().set_enabled(value);
+                    self.is_network_enabled = value;
+                    self.api_state().set_network_enabled(value);
                     info!("The node is {} now", s);
-                    if self.is_enabled {
+                    if self.is_network_enabled {
+                        for connect_info in self.state.connect_list().clone().peers() {
+                            let ConnectInfo {
+                                public_key,
+                                address,
+                            } = connect_info;
+                            info!("Connecting to {:?} {:?}", address, public_key);
+                            self.connect(&address);
+                            let connect = self.state.our_connect_message().clone();
+                            self.state.add_peer(public_key, connect.clone());
+                            self.blockchain.save_peer(&public_key, connect);
+                        }
                         self.add_round_timeout();
+                    } else {
+                        for address in self.state.connections().clone().keys() {
+                            info!("Disconnecting from {:?}", address);
+                            self.state.remove_peer_with_addr(address);
+                            self.blockchain.remove_peer_with_addr(address);
+                        }
                     }
+                    self.api_state.update_node_state(self.state());
                 }
             }
             ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
@@ -84,13 +102,6 @@ impl NodeHandler {
     }
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
-        if !self.is_enabled {
-            info!(
-                "Ignoring a timeout {:?} because the node is disabled",
-                timeout
-            );
-            return;
-        }
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
