@@ -789,14 +789,14 @@ fn sandbox_with_services_uninitialized(
     validators_count: u8,
 ) -> Sandbox {
     let validators = (0..validators_count)
-        .map(|i| gen_keypair_from_seed(&Seed::new([i + 12; SEED_LENGTH])))
+        .map(|i| gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])))
         .collect::<Vec<_>>();
 
     let service_keys = (0..validators_count)
-        .map(|i| gen_keypair_from_seed(&Seed::new([i + 20; SEED_LENGTH])))
+        .map(|i| gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])))
         .collect::<Vec<_>>();
 
-    let addresses: Vec<SocketAddr> = (1..=validators_count)
+    let addresses = (1..=validators_count)
         .map(gen_primitive_socket_addr)
         .collect::<Vec<_>>();
 
