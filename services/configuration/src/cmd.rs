@@ -96,7 +96,7 @@ impl CommandExtension for Finalize {
         node_config.services_configs.insert(
             "configuration_service".to_owned(),
             Value::try_from(ConfigurationServiceConfig {
-                majority_count: majority_count,
+                majority_count,
             }).expect("Could not serialize configuration service config"),
         );
         context.set(keys::NODE_CONFIG, node_config);
@@ -182,7 +182,7 @@ pub fn generate_testnet_config(
     service_config.insert(
         "configuration_service".to_owned(),
         Value::try_from(ConfigurationServiceConfig {
-            majority_count: majority_count,
+            majority_count,
         }).expect("Could not serialize configuration service config"),
     );
 
