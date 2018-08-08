@@ -520,7 +520,7 @@ impl Blockchain {
     }
 
     /// Removes from the cache the `Connect` message from a peer.
-    pub(crate) fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
         let mut fork = self.fork();
 
         {
