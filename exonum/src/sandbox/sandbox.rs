@@ -37,7 +37,7 @@ use events::{
     network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Message, PeersRequest, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
 use node::{
@@ -45,7 +45,6 @@ use node::{
     NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
 };
 use storage::{MapProof, MemoryDB};
-use messages::MessageBuffer;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -101,7 +100,7 @@ impl SandboxInner {
                         println!("add message to queue");
                         self.sent.push_back((peer, msg))
                     },
-                    NetworkRequest::ConnectToPeer(peer) => {
+                    NetworkRequest::ConnectToPeer(_peer) => {
                         println!("ConnectToPeer");
                     },
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
@@ -142,14 +141,12 @@ pub struct Sandbox {
     pub services_map: HashMap<PublicKey, SecretKey>,
     inner: RefCell<SandboxInner>,
     addresses: Vec<SocketAddr>,
-    /// Connect message used during initialization.
-    connect: Option<ConnectInfo>,
 }
 
 impl Sandbox {
     pub fn initialize(
         &mut self,
-        connect_message_time: SystemTime,
+        _connect_message_time: SystemTime,
         start_index: usize,
         end_index: usize,
     ) {
@@ -636,7 +633,6 @@ impl Sandbox {
             validators_map: self.validators_map.clone(),
             services_map: self.services_map.clone(),
             addresses: self.addresses.clone(),
-            connect: None,
         };
 
         sandbox.process_events();
@@ -821,7 +817,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
         addresses,
-        connect: None,
     };
 
     // General assumption; necessary for correct work of consensus algorithm
@@ -963,16 +958,15 @@ mod tests {
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
         //TODO: fix and change to ConnectInfo
-//        s.send(
-//            s.a(ValidatorId(1)),
-//            &Connect::new(
-//                &s.p(ValidatorId(0)),
-//                s.a(ValidatorId(0)),
-//                s.time().into(),
-//                &user_agent::get(),
-//                s.s(ValidatorId(0)),
-//            ),
-//        );
+        s.send(
+            s.a(ValidatorId(1)),
+            &Status::new(
+                &s.p(ValidatorId(0)),
+                Height::zero(),
+                &Hash::zero(),
+                s.s(ValidatorId(0)),
+            ),
+        );
     }
 
     #[test]
@@ -1027,6 +1021,23 @@ mod tests {
 //            &user_agent::get(),
 //            &secret,
 //        ));
+        s.send(
+            s.a(ValidatorId(0)),
+            &Status::new(
+                &s.p(ValidatorId(0)),
+                Height::zero(),
+                &Hash::zero(),
+                s.s(ValidatorId(0)),
+            ),
+        );
+        s.recv(
+            &Status::new(
+                &public,
+                Height::zero(),
+                &Hash::zero(),
+                &secret,
+            ),
+        );
     }
 
     #[test]
@@ -1079,6 +1090,14 @@ mod tests {
 //            &user_agent::get(),
 //            &secret,
 //        ));
+        s.recv(
+            &Status::new(
+                &public,
+                Height::zero(),
+                &Hash::zero(),
+                &secret,
+            ),
+        );
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
     }

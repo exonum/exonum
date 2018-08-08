@@ -33,8 +33,7 @@ use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use crypto::{x25519, PublicKey};
-use messages::{Any, Message, RawMessage};
+use messages::RawMessage;
 use node::ConnectInfo;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
@@ -442,7 +441,6 @@ impl Listener {
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
-        use crypto::PublicKey;
         let event = NetworkEvent::PeerConnected(info);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 

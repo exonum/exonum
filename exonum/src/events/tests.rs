@@ -17,7 +17,7 @@ use tokio_core::reactor::Core;
 use tokio_timer::{TimeoutStream, Timer};
 
 use std::{
-    net::SocketAddr, thread, time::{self, Duration},
+    net::SocketAddr, thread, time:: Duration,
 };
 
 use blockchain::ConsensusConfig;
@@ -26,8 +26,7 @@ use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
 };
-use helpers::user_agent;
-use messages::{Message, MessageWriter, RawMessage};
+use messages::{MessageWriter, RawMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]

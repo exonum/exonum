@@ -28,8 +28,6 @@
 
 use chrono::{DateTime, Utc};
 
-use std::net::SocketAddr;
-
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};

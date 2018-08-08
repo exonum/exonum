@@ -51,10 +51,10 @@ use events::{
     NetworkRequest, SyncSender, TimeoutRequest,
 };
 use helpers::{
-    config::ConfigManager, fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round,
+    config::ConfigManager, fabric::NodePublicConfig, Height, Milliseconds, Round,
     ValidatorId,
 };
-use messages::{Message, RawMessage};
+use messages::RawMessage;
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions, StorageValue};
 

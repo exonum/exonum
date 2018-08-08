@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::{user_agent, Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId};
 use messages::{PeersRequest, Precommit, Prevote};
 use node;
 

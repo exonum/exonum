@@ -20,12 +20,12 @@ use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use std::{net::SocketAddr, str::FromStr};
+use std::str::FromStr;
 
 use super::{CheckedOffset, Field, Offset};
 use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, CryptoHash};
-use helpers::{user_agent, Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Message, Precommit, Prevote, Propose, RawMessage, Status,
 };
