@@ -22,22 +22,8 @@ pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
-<<<<<<< HEAD
-use chrono::{DateTime, Utc};
-use colored::*;
-use crypto::gen_keypair;
-use env_logger::{Builder, Formatter};
-use log::{Level, Record, SetLoggerError};
-
-use blockchain::{GenesisConfig, ValidatorKeys};
-use node::{ConnectListConfig, NodeConfig};
-use std::{
-    env, io::{self, Write}, time::SystemTime,
-};
-=======
 use env_logger::Builder;
 use log::SetLoggerError;
->>>>>>> master
 
 mod types;
 
@@ -48,77 +34,8 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
         .try_init()
 }
 
-<<<<<<< HEAD
-fn has_colors() -> bool {
-    use atty;
-    use std::io;
-    use term::terminfo::TerminfoTerminal;
-    use term::Terminal;
-
-    let out = io::stderr();
-    match TerminfoTerminal::new(out) {
-        Some(ref term) if atty::is(atty::Stream::Stderr) => term.supports_color(),
-        _ => false,
-    }
-}
-
-fn format_time(time: SystemTime) -> String {
-    DateTime::<Utc>::from(time)
-        .format(LOG_TIMESTAMP_FORMAT)
-        .to_string()
-}
-
-fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
-    let time = format_time(SystemTime::now());
-
-    let verbose_src_path = match env::var("RUST_VERBOSE_PATH") {
-        Ok(val) => val.parse::<bool>().unwrap_or(false),
-        Err(_) => false,
-    };
-
-    let module = record.module_path().unwrap_or("unknown_module");
-    let source_path = if verbose_src_path {
-        let file = record.file().unwrap_or("unknown_file");
-        let line = record.line().unwrap_or(0);
-        format!("{}:{}:{}", module, file, line)
-    } else {
-        module.to_string()
-    };
-
-    if has_colors() {
-        let level = match record.level() {
-            Level::Error => "ERROR".red(),
-            Level::Warn => "WARN".yellow(),
-            Level::Info => "INFO".green(),
-            Level::Debug => "DEBUG".cyan(),
-            Level::Trace => "TRACE".white(),
-        };
-        writeln!(
-            buf,
-            "{} {} {} {}",
-            time.dimmed(),
-            level,
-            source_path.dimmed(),
-            record.args()
-        )
-    } else {
-        let level = match record.level() {
-            Level::Error => "ERROR",
-            Level::Warn => "WARN",
-            Level::Info => "INFO",
-            Level::Debug => "DEBUG",
-            Level::Trace => "TRACE",
-        };
-        writeln!(buf, "{} {} {} {}", time, level, &source_path, record.args())
-    }
-}
-
-/// Generates testnet configuration.
-pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
-=======
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
->>>>>>> master
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
@@ -128,10 +45,6 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
             service_key: (x.1).0,
         }
     }));
-<<<<<<< HEAD
-
-=======
->>>>>>> master
     let peers = (0..validators.len())
         .map(|x| {
             format!("127.0.0.1:{}", start_port + x as u16)
@@ -146,11 +59,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         .enumerate()
         .map(|(idx, (validator, service))| NodeConfig {
             listen_address: peers[idx],
-<<<<<<< HEAD
-            external_address: Some(peers[idx]),
-=======
             external_address: peers[idx],
->>>>>>> master
             network: Default::default(),
             consensus_public_key: validator.0,
             consensus_secret_key: validator.1,
@@ -165,21 +74,3 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         })
         .collect::<Vec<_>>()
 }
-<<<<<<< HEAD
-
-#[cfg(test)]
-mod tests {
-    use std::time;
-
-    use super::*;
-
-    #[test]
-    fn time_formatting() {
-        assert_eq!(
-            format_time(time::UNIX_EPOCH),
-            "Thu,  1 Jan 1970 00:00:00.000 +0000"
-        );
-    }
-}
-=======
->>>>>>> master
