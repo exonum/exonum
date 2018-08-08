@@ -117,7 +117,7 @@ impl NodeHandler {
             self.broadcast(&schema
                 .transactions()
                 .get(&tx_hash)
-                .expect("Rebroiadcast: invalid transaction hash"))
+                .expect("Rebroadcast: invalid transaction hash"))
         }
     }
 }
