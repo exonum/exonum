@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Cryptocurrency database schema.
+
 use exonum::{
     crypto::{Hash, PublicKey}, storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot},
 };
@@ -21,26 +23,26 @@ use INITIAL_BALANCE;
 
 /// Database schema for the cryptocurrency.
 #[derive(Debug)]
-pub struct CurrencySchema<T> {
+pub struct Schema<T> {
     view: T,
 }
 
-impl<T> AsMut<T> for CurrencySchema<T> {
+impl<T> AsMut<T> for Schema<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.view
     }
 }
 
-impl<T> CurrencySchema<T>
+impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
-    /// Constructs schema from the database view.
+    /// Creates a new schema from the database view.
     pub fn new(view: T) -> Self {
-        CurrencySchema { view }
+        Schema { view }
     }
 
-    /// Returns `MerklePatriciaTable` with wallets.
+    /// Returns `ProofMapIndex` with wallets.
     pub fn wallets(&self) -> ProofMapIndex<&T, PublicKey, Wallet> {
         ProofMapIndex::new("cryptocurrency.wallets", &self.view)
     }
@@ -55,15 +57,15 @@ where
         self.wallets().get(pub_key)
     }
 
-    /// Returns state hash of service database.
+    /// Returns the state hash of cryptocurrency service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.wallets().merkle_root()]
     }
 }
 
 /// Implementation of mutable methods.
-impl<'a> CurrencySchema<&'a mut Fork> {
-    /// Returns mutable `MerklePatriciaTable` with wallets.
+impl<'a> Schema<&'a mut Fork> {
+    /// Returns mutable `ProofMapIndex` with wallets.
     pub fn wallets_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Wallet> {
         ProofMapIndex::new("cryptocurrency.wallets", &mut self.view)
     }
