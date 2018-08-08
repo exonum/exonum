@@ -212,7 +212,7 @@ fn test_apply_with_increased_majority() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(6)
         .with_service(ConfigurationService {
-            config: Default::default,
+            config: ConfigurationServiceConfig::default(),
         })
         .create();
 
@@ -222,6 +222,12 @@ fn test_apply_with_increased_majority() {
         let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("dummy", "First cfg");
         cfg.set_actual_from(cfg_change_height);
+        cfg.set_service_config(
+            "configuration",
+            ConfigurationServiceConfig {
+                majority_count: Some(6),
+            },
+        );
         cfg.stored_configuration().clone()
     };
     testkit.apply_configuration(ValidatorId(0), new_cfg);
