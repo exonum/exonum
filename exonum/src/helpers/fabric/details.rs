@@ -317,7 +317,7 @@ impl Command for GenerateCommonConfig {
         let mut general_config = AbstractConfig::default();
         general_config.insert(
             String::from("validators_count"),
-            (validators_count as u32).into(),
+            u32::from(validators_count).into(),
         );
 
         let template = CommonConfigTemplate {
