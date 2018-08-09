@@ -53,6 +53,7 @@ fn node_config() -> NodeConfig {
         mempool: Default::default(),
         services_configs: Default::default(),
         database: Default::default(),
+        thread_pool_size: Default::default(),
     }
 }
 

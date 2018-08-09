@@ -630,6 +630,7 @@ impl Command for Finalize {
                 services_configs: Default::default(),
                 database: Default::default(),
                 connect_list: ConnectListConfig::from_node_config(&list),
+                thread_pool_size: Default::default(),
             }
         };
 
