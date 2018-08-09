@@ -38,7 +38,6 @@ pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 pub struct BlockBuilder<'a> {
     proposer_id: Option<ValidatorId>,
     height: Option<Height>,
-    duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
@@ -52,7 +51,6 @@ impl<'a> BlockBuilder<'a> {
         BlockBuilder {
             proposer_id: None,
             height: None,
-            duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
@@ -69,14 +67,6 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn with_height(mut self, height: Height) -> Self {
         self.height = Some(height);
-        self
-    }
-
-    pub fn with_duration_since_sandbox_time(
-        mut self,
-        duration_since_sandbox_time: Milliseconds,
-    ) -> Self {
-        self.duration_since_sandbox_time = Some(duration_since_sandbox_time);
         self
     }
 
@@ -124,7 +114,6 @@ pub struct ProposeBuilder<'a> {
     validator_id: Option<ValidatorId>,
     height: Option<Height>,
     round: Option<Round>,
-    duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<&'a Hash>,
     tx_hashes: Option<&'a [Hash]>,
 
@@ -137,7 +126,6 @@ impl<'a> ProposeBuilder<'a> {
             validator_id: None,
             height: None,
             round: None,
-            duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
             sandbox,
@@ -156,14 +144,6 @@ impl<'a> ProposeBuilder<'a> {
 
     pub fn with_round(mut self, round: Round) -> Self {
         self.round = Some(round);
-        self
-    }
-
-    pub fn with_duration_since_sandbox_time(
-        mut self,
-        duration_since_sandbox_time: Milliseconds,
-    ) -> Self {
-        self.duration_since_sandbox_time = Some(duration_since_sandbox_time);
         self
     }
 

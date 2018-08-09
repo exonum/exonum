@@ -63,7 +63,6 @@ fn ignore_propose_with_incorrect_prev_hash() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_prev_hash(&empty_hash())
         .build();
 
@@ -76,8 +75,7 @@ fn ignore_propose_from_non_leader() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_validator(ValidatorId(3))    //without this line Prevote would have been broadcast
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+                .build();
 
     sandbox.recv(&propose);
 }
@@ -87,9 +85,7 @@ fn ignore_propose_from_non_leader() {
 fn handle_propose_with_incorrect_time() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT + 1)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
 
@@ -112,8 +108,7 @@ fn ignore_propose_with_commited_transaction() {
     add_one_height(&sandbox, &sandbox_state);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        // without this line Prevote would have been broadcast
+                // without this line Prevote would have been broadcast
         .with_tx_hashes(sandbox_state.committed_transaction_hashes.borrow().as_ref())
         .build();
 
@@ -131,9 +126,7 @@ fn ignore_propose_with_commited_transaction() {
 fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT - 1)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
 

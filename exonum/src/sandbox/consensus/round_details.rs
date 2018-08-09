@@ -29,6 +29,7 @@ use node::state::{
 };
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
+
 /// check scenario:
 /// HANDLE FULL PROPOSE
 /// - send prevote when lock=0 for known propose
@@ -36,9 +37,7 @@ use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 fn positive_get_propose_send_prevote() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
     sandbox.recv(&propose);
 
     // check scenario:
@@ -158,13 +157,9 @@ fn request_prevotes_when_get_prevote_message() {
 fn lock_to_propose_when_get_2_3_prevote_positive() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
@@ -336,13 +331,9 @@ fn lock_to_past_round_broadcast_prevote() {
 fn handle_precommit_remove_request_prevotes() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
@@ -421,9 +412,7 @@ fn handle_precommit_remove_request_prevotes() {
 fn lock_to_propose_and_send_prevote() {
     let sandbox = timestamping_sandbox();
 
-    let empty_propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let empty_propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&empty_propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose.clone()));
@@ -432,11 +421,9 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT)
         .with_tx_hashes(&[tx.hash()])
         .build();
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -514,13 +501,9 @@ fn lock_remove_request_prevotes() {
     // add round
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
@@ -584,8 +567,7 @@ fn handle_precommit_different_block_hash() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block will be received
@@ -648,11 +630,9 @@ fn handle_precommit_positive_scenario_commit() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -746,14 +726,10 @@ fn handle_precommit_positive_scenario_commit() {
 fn lock_not_send_prevotes_after_commit() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     // precommits with this block will be received
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     let precommit_1 = Precommit::new(
         ValidatorId(1),
@@ -865,15 +841,11 @@ fn do_not_commit_if_propose_is_unknown() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hash(&tx.hash())
-        .build();
+    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
     let precommit_1 = Precommit::new(
         ValidatorId(1),
@@ -947,15 +919,11 @@ fn do_not_commit_if_tx_is_unknown() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hash(&tx.hash())
-        .build();
+    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
     let precommit_1 = Precommit::new(
         ValidatorId(1),
@@ -1039,13 +1007,11 @@ fn commit_using_unknown_propose_with_precommits() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -1153,13 +1119,11 @@ fn handle_full_propose_wrong_state_hash() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&empty_hash())
         .build();
@@ -1230,8 +1194,7 @@ fn handle_full_propose_wrong_state_hash() {
 
     sandbox.assert_state(Height(1), Round(1));
     //    let tmp_propose = ProposeBuilder::new(&sandbox)
-    //        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-    //        .build();
+    //            //        .build();
     // !! if this tx would be received, commit would occur and last assert will require height one
     sandbox.recv(&tx);
     sandbox.recv(&propose);
@@ -1254,9 +1217,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
@@ -1281,7 +1242,6 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 
     let future_propose = ProposeBuilder::new(&sandbox)
         .with_validator(ValidatorId(3))
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_round(Round(2))
         .build();
     sandbox.recv(&future_propose);
@@ -1342,7 +1302,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(block_1_delay)
         .with_proposer_id(ValidatorId(0))
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
@@ -1352,7 +1311,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let height_one_propose = ProposeBuilder::new(&sandbox)
         .with_validator(ValidatorId(3))
         .with_height(Height(2))
-        .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
         .build();
 
@@ -1360,7 +1318,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let second_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(3))
         .with_height(Height(2))
-        .with_duration_since_sandbox_time(block_2_delay)
         .with_prev_hash(&first_block.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -1478,13 +1435,11 @@ fn commit_as_leader_send_propose_round_timeout() {
 
     // this propose will be a valid one when 0 node will become a leader after last commit
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block would be received if transaction will be received
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
@@ -1561,8 +1516,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.check_broadcast_status(new_height, &block.hash());
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        //        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                //        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
@@ -1588,8 +1542,7 @@ fn handle_tx_handle_full_propose() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -1629,8 +1582,7 @@ fn broadcast_prevote_with_tx_positive() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this received tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this received tx
         .build();
     sandbox.recv(&propose);
 
