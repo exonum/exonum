@@ -724,7 +724,6 @@ pub struct SandboxBuilder {
     initialize: bool,
     services: Vec<Box<dyn Service>>,
     validators_count: u8,
-    logger: bool,
     consensus_config: ConsensusConfig,
 }
 
@@ -734,7 +733,6 @@ impl SandboxBuilder {
             initialize: true,
             services: Vec::new(),
             validators_count: 4,
-            logger: false,
             consensus_config: ConsensusConfig {
                 first_round_timeout: 1000,
                 status_timeout: 600_000,
@@ -768,16 +766,10 @@ impl SandboxBuilder {
         self
     }
 
-    #[allow(dead_code)]
-    pub fn with_logger(mut self) -> Self {
-        self.logger = true;
-        self
-    }
-
     pub fn build(self) -> Sandbox {
-        if self.logger {
-            let _ = env_logger::try_init();
-        }
+        let _ = env_logger::Builder::from_default_env()
+            .target(env_logger::Target::Stdout)
+            .try_init();
 
         let mut sandbox = sandbox_with_services_uninitialized(
             self.services,
