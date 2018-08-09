@@ -199,6 +199,7 @@ impl TransactionsBenchmarkRunner {
         let internal_part = InternalPart {
             internal_tx: self.channel.internal_events.0,
             internal_requests_rx: self.channel.internal_requests.1,
+            thread_pool_size: None,
         };
         // Emulates transactions from the network.
         let socket_addr = handler_part.handler.inner().system_state.listen_address();
@@ -255,6 +256,7 @@ impl TransactionsBenchmarkRunner {
             mempool: Default::default(),
             services_configs: Default::default(),
             database: Default::default(),
+            thread_pool_size: Default::default(),
         }
     }
 }

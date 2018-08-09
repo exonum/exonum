@@ -31,11 +31,16 @@ use super::{
 pub struct InternalPart {
     pub internal_tx: mpsc::Sender<InternalEvent>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
+    pub thread_pool_size: Option<u8>,
 }
 
 impl InternalPart {
     pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = io::Error>> {
-        let thread_pool = Rc::new(ThreadPoolBuilder::new().build());
+        let thread_pool = if let Some(size) = self.thread_pool_size {
+            Rc::new(ThreadPoolBuilder::new().pool_size(size.into()).build())
+        } else {
+            Rc::new(ThreadPoolBuilder::new().build())
+        };
         let internal_tx = self.internal_tx.clone();
 
         let fut = self.internal_requests_rx

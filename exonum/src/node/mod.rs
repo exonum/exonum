@@ -266,6 +266,8 @@ pub struct NodeConfig {
     pub database: DbOptions,
     /// Node's ConnectList.
     pub connect_list: ConnectListConfig,
+    /// Transaction Verification Thread Pool size.
+    pub thread_pool_size: Option<u8>,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -844,6 +846,7 @@ pub struct Node {
     handler: NodeHandler,
     channel: NodeChannel,
     max_message_len: u32,
+    thread_pool_size: Option<u8>,
 }
 
 impl NodeChannel {
@@ -924,6 +927,7 @@ impl Node {
             channel,
             network_config,
             max_message_len: node_cfg.genesis.consensus.max_message_len,
+            thread_pool_size: node_cfg.thread_pool_size,
         }
     }
 
@@ -1042,6 +1046,7 @@ impl Node {
         let timeouts_part = InternalPart {
             internal_tx,
             internal_requests_rx,
+            thread_pool_size: self.thread_pool_size,
         };
         (handler_part, network_part, timeouts_part)
     }
