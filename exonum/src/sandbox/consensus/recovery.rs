@@ -19,8 +19,8 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{PeersRequest, Precommit, Prevote};
-use node;
+use messages::{PeersRequest, PeersResponse, Precommit, Prevote};
+use node::{self, ConnectInfo};
 
 use sandbox::{
     sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
@@ -432,6 +432,9 @@ fn test_recover_consensus_messages_in_other_round() {
 /// - Node 0 should be aware of Node 1 and send received `Connect` in response to `PeersRequest`
 #[test]
 fn should_restore_peers_after_restart() {
+    use env_logger;
+    env_logger::init();
+
     // create sandbox with nodes not aware about each other
     let sandbox = SandboxBuilder::new()
         .do_not_initialize_connections()
@@ -446,6 +449,7 @@ fn should_restore_peers_after_restart() {
 //    let connect_from_0 = Connect::new(&p0, a0, time.into(), &user_agent::get(), &s0);
 //    let connect_from_1 = Connect::new(&p1, a1, time.into(), &user_agent::get(), &s1);
     let peers_request = PeersRequest::new(&p1, &p0, &s1);
+    let peers_response = PeersResponse::new(&p1, &p0, vec![a0, a1], &s1);
 
     // check that peers are absent
     sandbox.recv(&peers_request);
@@ -453,6 +457,8 @@ fn should_restore_peers_after_restart() {
     // receive a `Connect` message and the respond on it
 //    sandbox.recv(&connect_from_1);
 //    sandbox.send(a1, &connect_from_0);
+
+    sandbox.connect(ConnectInfo { address: a0, public_key: p0 });
 
     // restart the node
     let sandbox_restarted = sandbox.restart_uninitialized();
@@ -462,5 +468,5 @@ fn should_restore_peers_after_restart() {
 
     // check that the peer is restored
     sandbox_restarted.recv(&peers_request);
-//    sandbox_restarted.send(a1, &connect_from_1);
+    sandbox_restarted.send(a0, &peers_response);
 }

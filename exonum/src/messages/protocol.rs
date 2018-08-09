@@ -28,11 +28,16 @@
 
 use chrono::{DateTime, Utc};
 
+use std::net::SocketAddr;
+
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
 use storage::proof_list_index::root_hash;
+use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
+use serde_json::{self, Value};
+use std::error::Error;
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
@@ -62,33 +67,10 @@ pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
 
+pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeersResponse::MESSAGE_ID;
+
 messages! {
     const SERVICE_ID = CONSENSUS;
-
-//    /// Connect to a node.
-//    ///
-//    /// ### Validation
-//    /// The message is ignored if its time is earlier than in the previous
-//    /// `Connect` message received from the same peer.
-//    ///
-//    /// ### Processing
-//    /// Connect to the peer.
-//    ///
-//    /// ### Generation
-//    /// A node sends `Connect` message to all known addresses during
-//    /// initialization. Additionally, the node responds by its own `Connect`
-//    /// message after receiving `node::Event::Connected`.
-//    struct Connect {
-//        /// The sender's public key.
-//        pub_key: &PublicKey,
-//        /// The node's address.
-//        addr: SocketAddr,
-//        /// Time when the message was created.
-//        time: DateTime<Utc>,
-//        /// String containing information about this node including Exonum, Rust and OS versions.
-//        user_agent: &str,
-//    }
-
 
     /// Current node status.
     ///
@@ -356,6 +338,27 @@ messages! {
         to: &PublicKey,
         /// The height to which the message is related.
         height: Height,
+    }
+
+     /// Request connected peers from a node.
+    ///
+    /// ### Validation
+    /// Request is considered valid if the sender of the message on the network
+    /// level corresponds to the `from` field.
+    ///
+    /// ### Processing
+    /// Peer `Connect` messages are sent to the recipient.
+    ///
+    /// ### Generation
+    /// `PeersRequest` message is sent regularly with the timeout controlled by
+    /// `blockchain::ConsensusConfig::peers_timeout`.
+    struct PeersResponse {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+
+        peers: Vec<SocketAddr>,
     }
 }
 

@@ -71,6 +71,8 @@ pub enum Any {
     Transaction(RawTransaction),
     /// A batch of the transactions.
     TransactionsBatch(TransactionsResponse),
+
+    PeersResponse(PeersResponse)
 }
 
 /// Consensus message.
@@ -250,6 +252,9 @@ impl Any {
                 }
                 BLOCK_REQUEST_MESSAGE_ID => {
                     Any::Request(RequestMessage::Block(BlockRequest::from_raw(raw)?))
+                }
+                PEERS_RESPONSE_MESSAGE_ID => {
+                    Any::PeersResponse(PeersResponse::from_raw(raw)?)
                 }
 
                 message_type => {

@@ -20,7 +20,7 @@ use events::InternalRequest;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, RawTransaction, TransactionsRequest, TransactionsResponse,
+    Propose, ProposeRequest, RawTransaction, TransactionsRequest, TransactionsResponse, PeersRequest,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;

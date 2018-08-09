@@ -47,7 +47,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: ConnectInfo,
+    our_connect_info: ConnectInfo,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -432,7 +432,7 @@ impl State {
         tx_pool_capacity: usize,
         connect_list: ConnectList,
         stored: StoredConfiguration,
-        connect: ConnectInfo,
+        connect_info: ConnectInfo,
         peers: HashMap<PublicKey, ConnectInfo>,
         last_hash: Hash,
         last_height: Height,
@@ -468,7 +468,7 @@ impl State {
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
 
-            our_connect_message: connect,
+            our_connect_info: connect_info,
 
             requests: HashMap::new(),
 
@@ -1163,9 +1163,9 @@ impl State {
         state.map(|s| s.known_nodes).unwrap_or_default()
     }
 
-    /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &ConnectInfo {
-        &self.our_connect_message
+    /// Returns the `ConnectInfo` of the current node.
+    pub fn our_connect_info(&self) -> &ConnectInfo {
+        &self.our_connect_info
     }
 
     /// Add peer to node's `ConnectList`.

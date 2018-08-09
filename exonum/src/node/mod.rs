@@ -410,15 +410,8 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-//        let connect = Connect::new(
-//            &config.listener.consensus_public_key,
-//            external_address,
-//            system_state.current_time().into(),
-//            &user_agent::get(),
-//            &config.listener.consensus_secret_key,
-//        );
 
-        let connect = ConnectInfo { address: external_address, public_key: config.listener.consensus_public_key.clone() };
+        let connect_info = ConnectInfo { address: external_address, public_key: config.listener.consensus_public_key.clone() };
 
         let connect_list = config.listener.connect_list;
         let state = State::new(
@@ -430,7 +423,7 @@ impl NodeHandler {
             config.mempool.tx_pool_capacity,
             connect_list,
             stored,
-            connect,
+            connect_info,
             blockchain.get_saved_peers(),
             last_hash,
             last_height,
@@ -801,12 +794,12 @@ pub struct ConnectInfo {
 }
 
 impl ConnectInfo {
-    /// TODO add docs
+    /// Tries to serialize the given `ConnectInfo` into a UTF-8 encoded JSON.
     pub fn try_serialize(self) -> serde_json::Result<Vec<u8>> {
         serde_json::to_vec(&self)
     }
 
-    /// TODO add docs
+    /// Tries to deserialize the given `value` into `ConnectInfo`.
     pub fn try_deserialize(value: &[u8]) -> serde_json::Result<Self> {
         serde_json::from_slice(value.as_ref())
     }

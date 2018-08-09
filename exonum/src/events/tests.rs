@@ -251,8 +251,6 @@ fn test_network_handshake() {
 
 #[test]
 fn test_network_big_message() {
-    use env_logger;
-    env_logger::init();
     let first = "127.0.0.1:17200".parse().unwrap();
     let second = "127.0.0.1:17201".parse().unwrap();
 

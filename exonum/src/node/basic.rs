@@ -18,7 +18,7 @@ use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use messages::{Any, Message, PeersRequest, RawMessage, Status};
+use messages::{Any, Message, PeersRequest, PeersResponse, RawMessage, Status};
 use node::ConnectInfo;
 
 impl NodeHandler {
@@ -31,6 +31,7 @@ impl NodeHandler {
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
+            Ok(Any::PeersResponse(msg)) => self.handle_peers_response(&msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
             }
@@ -40,8 +41,7 @@ impl NodeHandler {
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
     pub fn handle_connected(&mut self, info: ConnectInfo) {
-        info!("Received Connect message from peer: {:?}", info);
-        // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
+        info!("Received ConnectInfo  from peer: {:?}", info);
         self.handle_connect(info);
     }
 
@@ -73,14 +73,14 @@ impl NodeHandler {
     pub fn handle_connect(&mut self, info: ConnectInfo) {
         // TODO Add spam protection. (ECR-170)
         let address = info.address;
-        if address == self.state.our_connect_message().address {
-            trace!("Received connection with same address as our external_address.");
+        if address == self.state.our_connect_info().address {
+            trace!("Received ConnectInfo with same address as our external_address.");
             return;
         }
 
         let public_key = info.public_key;
-        if public_key == self.state.our_connect_message().public_key {
-            trace!("Received connection with same pub_key as ours.");
+        if public_key == self.state.our_connect_info().public_key {
+            trace!("Received ConnectInfo with same pub_key as ours.");
             return;
         }
 
@@ -90,13 +90,13 @@ impl NodeHandler {
             if saved_message.address == info.address {
                 need_connect = false;
             } else {
-                error!("Received weird connection from {}", address);
+                error!("Received weird ConnectInfo from {}", address);
                 return;
             }
         }
         self.state.add_peer(public_key, info);
         info!(
-            "Received Connect message from {}, {}",
+            "Received ConnectInfo  from {}, {}",
             address, need_connect,
         );
         self.blockchain.save_peer(&public_key, info);
@@ -149,18 +149,31 @@ impl NodeHandler {
         }
     }
 
-    /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
+    /// Handles the `PeersRequest` message. Node connects to other peers as result.
     pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
-        let peers: Vec<ConnectInfo> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
+        let peers: Vec<SocketAddr> = self.state.peers().values().map(|info|info.address).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,
             msg.from()
         );
 
+        let peers_request = PeersResponse::new(&self.state().consensus_public_key(),
+            &msg.to(), peers, &self.state().consensus_secret_key());
+
+        self.send_to_peer(*msg.from(), peers_request.raw())
+    }
+
+    pub fn handle_peers_response(&mut self, msg: &PeersResponse) {
+        let peers = msg.peers();
+
+        trace!(
+            "HANDLE PEERS RESPONSE: Connecting to peers {:?}",
+            peers,
+        );
+
         for peer in peers {
-//            self.send_to_peer(*msg.from(), peer.raw());
-            self.connect(&peer.address)
+            self.connect(&peer)
         }
     }
 

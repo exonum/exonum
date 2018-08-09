@@ -272,6 +272,13 @@ impl ExonumJson for SocketAddr {
     }
 }
 
+impl ExonumJsonDeserialize for SocketAddr {
+    fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>> where
+        Self: Sized {
+        serde_json::from_value(value.clone()).map_err(|e| e.into())
+    }
+}
+
 impl<'a> ExonumJson for &'a [Hash] {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,

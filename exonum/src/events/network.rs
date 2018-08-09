@@ -241,7 +241,6 @@ impl ConnectionsPool {
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
-            // TODO change `remote_public_key` to initiator public key
             NoiseHandshake::initiator(&handshake_params).send(stream, handshake_params.connect_info)
         } else {
             Box::new(err(other_error(format!(
@@ -316,14 +315,13 @@ impl RequestHandler {
             .for_each(move |request| {
                 match request {
                     NetworkRequest::ConnectToPeer(peer) => {
-                        info!("NetworkRequest::ConnectToPeer(peer)");
                         let conn_tx = outgoing_connections.get_or_create(peer, network_tx.clone(),
                                                                          &handle, network_config, &handshake_params);
 
                         if let Some(conn_tx) = conn_tx {
                             to_box(conn_tx)
                         } else {
-                            to_box(Self::send_unable_connect(peer, network_tx.clone()))
+                            to_box(Self::send_unable_connect_event(peer, network_tx.clone()))
                         }
                     }
                     NetworkRequest::SendMessage(peer, msg) => {
@@ -338,7 +336,7 @@ impl RequestHandler {
                             });
                             to_box(fut)
                         } else {
-                            to_box(Self::send_unable_connect(peer, network_tx.clone()))
+                            to_box(Self::send_unable_connect_event(peer, network_tx.clone()))
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
@@ -356,14 +354,13 @@ impl RequestHandler {
         RequestHandler(to_box(requests_handler))
     }
 
-    fn send_unable_connect(peer: SocketAddr, network_tx: mpsc::Sender<NetworkEvent>) -> impl Future<Item=mpsc::Sender<NetworkEvent>, Error=io::Error> {
+    fn send_unable_connect_event(peer: SocketAddr, network_tx: mpsc::Sender<NetworkEvent>) -> impl Future<Item=mpsc::Sender<NetworkEvent>, Error=io::Error> {
         let event = NetworkEvent::UnableConnectToPeer(peer);
-        let fut = network_tx
+        network_tx
             .clone()
             .send(event)
             .map_err(|_| other_error("can't send network event"))
-            .into_future();
-        fut
+            .into_future()
     }
 }
 
@@ -414,7 +411,6 @@ impl Listener {
                 .listen(sock)
                 .and_then(move |(sock, info)| {
                     trace!("Remote connection established with socket={:?}", sock);
-                    println!("listener info {:?}", info);
                     let (_, stream) = sock.split();
 
                     Self::process_incoming_messages(stream, network_tx, address, info.unwrap())
