@@ -72,6 +72,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Several dependencies have been updated. (#861, #865, #871)
 - Several dependencies have been updated. (#861)
+
 - Transactions are now verified in a thread pool. Thread pool size is set to
   optimal value by default (CPU count) or can be configured manually. (#673)
 
