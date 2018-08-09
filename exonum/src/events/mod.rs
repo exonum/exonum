@@ -31,8 +31,8 @@ use std::{cmp::Ordering, time::SystemTime};
 
 use blockchain::Transaction;
 use helpers::{Height, Round};
-use node::{ExternalMessage, NodeTimeout};
 use messages::RawTransaction;
+use node::{ExternalMessage, NodeTimeout};
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
