@@ -29,6 +29,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added possibility to use domain names instead of IP addresses as a peer's
   addresses. (#826)
 
+- Added `v1/rebroadcast` endpoint that can be used to broadcast all transactions
+  from the pool to the other nodes. (#859)
+
 - Now each consecutive round is longer than previous by some constant percentage
   of `first_round_timeout`. (#848)
 
@@ -61,6 +64,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Custom log formatting (along with `colored` and `term` dependencies) has been
   removed in favor of `env_logger`. (#857).
+
+- Several dependencies have been updated. (#861)
 
 ## 0.9.1 - 2018-08-02
 

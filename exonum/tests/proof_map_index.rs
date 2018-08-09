@@ -30,7 +30,7 @@ use exonum::storage::{
     proof_map_index::{ProofMapKey, ProofPath}, Database, MapProof, MemoryDB, ProofMapIndex,
     Snapshot, StorageValue,
 };
-use proptest::{num::u8::BinarySearch as U8BinarySearch, prelude::*, test_runner::Config};
+use proptest::{prelude::*, test_runner::Config};
 
 use std::{
     collections::{BTreeMap, BTreeSet}, fmt::Debug, ops::Range,
@@ -119,7 +119,7 @@ fn check_map_multiproof<T, K, V>(
 // Creates data a random-filled `ProofMapIndex<_, [u8; 32], u64>`.
 fn index_data<S>(key_bytes: S, elements_len: Range<usize>) -> BoxedStrategy<BTreeMap<[u8; 32], u64>>
 where
-    S: 'static + Strategy<Value = U8BinarySearch>,
+    S: 'static + Strategy<Value = u8>,
 {
     prop::collection::btree_map(
         prop::array::uniform32(key_bytes),

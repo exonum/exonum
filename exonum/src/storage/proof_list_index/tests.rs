@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{thread_rng, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
 
 use self::ListProof::*;
 use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
@@ -43,7 +43,7 @@ fn random_values(len: usize) -> Vec<Vec<u8>> {
 }
 
 fn gen_tempdir_name() -> String {
-    thread_rng().gen_ascii_chars().take(10).collect()
+    thread_rng().sample_iter(&Alphanumeric).take(10).collect()
 }
 
 fn list_methods(db: Box<dyn Database>) {

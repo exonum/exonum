@@ -15,7 +15,7 @@
 use futures::{
     future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
-use snow::{types::Dh, NoiseBuilder};
+use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Core,
 };
@@ -52,12 +52,12 @@ fn test_convert_ed_to_curve_dh() {
     let mut keypair_i: SodiumDh25519 = Default::default();
     keypair_i.set(secret_key_i.as_ref());
     let mut output_i = [0_u8; PUBLIC_KEY_LENGTH];
-    keypair_i.dh(public_key_r.as_ref(), &mut output_i);
+    keypair_i.dh(public_key_r.as_ref(), &mut output_i).unwrap();
 
     let mut keypair_r: SodiumDh25519 = Default::default();
     keypair_r.set(secret_key_r.as_ref());
     let mut output_r = [0_u8; PUBLIC_KEY_LENGTH];
-    keypair_r.dh(public_key_i.as_ref(), &mut output_r);
+    keypair_r.dh(public_key_i.as_ref(), &mut output_r).unwrap();
 
     assert_eq!(output_i, output_r);
 }
@@ -79,13 +79,13 @@ fn test_converted_keys_handshake() {
     let (_, secret_key_i) = into_x25519_keypair(public_key_i, secret_key_i).unwrap();
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
-    let mut h_i = NoiseBuilder::new(PATTERN.parse().unwrap())
+    let mut h_i = Builder::new(PATTERN.parse().unwrap())
         .local_private_key(secret_key_i.as_ref())
         .remote_public_key(public_key_r.as_ref())
         .build_initiator()
         .expect("Unable to create initiator");
 
-    let mut h_r = NoiseBuilder::new(PATTERN.parse().unwrap())
+    let mut h_r = Builder::new(PATTERN.parse().unwrap())
         .local_private_key(secret_key_r.as_ref())
         .build_responder()
         .expect("Unable to create responder");
@@ -197,7 +197,7 @@ fn test_noise_handshake_errors_ee_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
+    assert!(listener_err.unwrap_err().description().contains("Dh"));
 }
 
 #[test]
@@ -241,7 +241,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
     ));
     let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    assert!(sender_err.unwrap_err().description().contains("Decrypt"));
+    assert!(sender_err.unwrap_err().description().contains("Dh"));
 }
 
 #[test]
