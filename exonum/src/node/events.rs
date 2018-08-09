@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use blockchain::Schema;
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 
 impl EventHandler for NodeHandler {
@@ -80,6 +81,7 @@ impl NodeHandler {
                 }
             }
             ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
+            ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
         }
     }
 
@@ -104,5 +106,18 @@ impl NodeHandler {
     /// Schedule execution for later time
     pub(crate) fn execute_later(&mut self, event: InternalRequest) {
         self.channel.internal_requests.send(event).log_error();
+    }
+
+    /// Broadcasts all transactions from the pool to other validators.
+    pub(crate) fn handle_rebroadcast(&mut self) {
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(snapshot);
+        let pool = schema.transactions_pool();
+        for tx_hash in pool.iter() {
+            self.broadcast(&schema
+                .transactions()
+                .get(&tx_hash)
+                .expect("Rebroadcast: invalid transaction hash"))
+        }
     }
 }

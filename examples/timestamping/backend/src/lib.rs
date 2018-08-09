@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_debug_implementations, unsafe_code, bare_trait_objects)]
+//! Timestamping demo. This example shows how to use Exonum framework to create a fast
+//! and secure service to prove the existence of a specific file at some moment
+//! of time using blockchain as a secure database.
+
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate chrono;
 #[macro_use]
@@ -42,16 +46,11 @@ use schema::Schema;
 use transactions::TimeTransactions;
 
 const TIMESTAMPING_SERVICE: u16 = 130;
-pub const SERVICE_NAME: &str = "timestamping";
+const SERVICE_NAME: &str = "timestamping";
 
+/// Exonum `Service` implementation.
 #[derive(Debug, Default)]
 pub struct Service;
-
-impl Service {
-    pub fn new() -> Self {
-        Service
-    }
-}
 
 impl blockchain::Service for Service {
     fn service_id(&self) -> u16 {
@@ -87,6 +86,6 @@ impl fabric::ServiceFactory for ServiceFactory {
     }
 
     fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service::new())
+        Box::new(Service)
     }
 }

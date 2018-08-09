@@ -200,6 +200,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use super::super::{DbOptions, RocksDB};
     use std::path::Path;
+    use storage::{Database, ListIndex, Snapshot};
     use tempdir::TempDir;
 
     fn rocksdb_database(path: &Path) -> RocksDB {
@@ -219,5 +220,42 @@ mod rocksdb_tests {
         let dir = TempDir::new("exonum_rocksdb2").unwrap();
         let path = dir.path();
         super::changelog(rocksdb_database(path));
+    }
+
+    #[ignore]
+    #[test]
+    fn test_multiple_patch() {
+        let dir = TempDir::new("exonum_rocksdb_multiple_patch").unwrap();
+        let path = dir.path();
+        let db = rocksdb_database(path);
+        fn list_index<View: AsRef<dyn Snapshot>>(view: View) -> ListIndex<View, u64> {
+            ListIndex::new("list_index", view)
+        }
+        // create first patch
+        let patch1 = {
+            let mut fork = db.fork();
+            {
+                let mut index = list_index(&mut fork);
+                index.push(1);
+                index.push(3);
+                index.push(4);
+            }
+            fork.into_patch()
+        };
+        // create second patch
+        let patch2 = {
+            let mut fork = db.fork();
+            {
+                let mut index = list_index(&mut fork);
+                index.push(2);
+            }
+            fork.into_patch()
+        };
+        db.merge(patch1).unwrap();
+        db.merge(patch2).unwrap();
+        let snapshot = db.snapshot();
+        let index = list_index(snapshot);
+        let iter = index.iter();
+        assert_eq!(index.len() as usize, iter.count());
     }
 }

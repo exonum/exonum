@@ -553,7 +553,9 @@ impl NodeHandler {
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
 
-        self.maybe_add_propose_timeout();
+        if self.state.is_leader() {
+            self.maybe_add_propose_timeout();
+        }
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
@@ -692,7 +694,6 @@ impl NodeHandler {
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
-        self.allow_expedited_propose = true;
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late
@@ -716,9 +717,9 @@ impl NodeHandler {
             info!("LEADER: pool = {}", pool_len);
 
             let round = self.state.round();
-            let max_count = ::std::cmp::min(self.txs_block_limit() as usize, pool_len);
+            let max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), pool_len);
 
-            let txs: Vec<Hash> = pool.iter().take(max_count).collect();
+            let txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
             let propose = Propose::new(
                 validator_id,
                 self.state.height(),
@@ -733,6 +734,8 @@ impl NodeHandler {
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
+
+            self.allow_expedited_propose = true;
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);

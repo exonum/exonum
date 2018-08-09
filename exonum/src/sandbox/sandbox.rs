@@ -489,8 +489,18 @@ impl Sandbox {
         num_validators * 2 / 3 + 1
     }
 
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.round_timeout
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.cfg().consensus.first_round_timeout
+    }
+
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        (self.cfg().consensus.first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
+    }
+
+    pub fn current_round_timeout(&self) -> Milliseconds {
+        let previous_round: u64 = self.current_round().previous().into();
+        self.first_round_timeout() + previous_round * self.round_timeout_increase()
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
@@ -525,6 +535,12 @@ impl Sandbox {
         let actual_round = state.round();
         assert_eq!(actual_height, expected_height);
         assert_eq!(actual_round, expected_round);
+    }
+
+    pub fn assert_pool_len(&self, expected: u64) {
+        let view = self.blockchain_ref().snapshot();
+        let schema = Schema::new(view);
+        assert_eq!(expected, schema.transactions_pool_len());
     }
 
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
@@ -692,22 +708,68 @@ impl ConnectList {
     }
 }
 
+pub struct SandboxBuilder {
+    initialize: bool,
+    services: Vec<Box<dyn Service>>,
+    consensus_config: ConsensusConfig,
+}
+
+impl SandboxBuilder {
+    pub fn new() -> Self {
+        SandboxBuilder {
+            initialize: true,
+            services: Vec::new(),
+            consensus_config: ConsensusConfig {
+                first_round_timeout: 1000,
+                status_timeout: 600_000,
+                peers_timeout: 600_000,
+                txs_block_limit: 1000,
+                max_message_len: 1024 * 1024,
+                min_propose_timeout: PROPOSE_TIMEOUT,
+                max_propose_timeout: PROPOSE_TIMEOUT,
+                propose_timeout_threshold: std::u32::MAX,
+            },
+        }
+    }
+
+    pub fn do_not_initialize_connections(mut self) -> Self {
+        self.initialize = false;
+        self
+    }
+
+    pub fn with_services(mut self, services: Vec<Box<dyn Service>>) -> Self {
+        self.services = services;
+        self
+    }
+
+    pub fn with_consensus<F: FnOnce(&mut ConsensusConfig)>(mut self, update: F) -> Self {
+        update(&mut self.consensus_config);
+        self
+    }
+
+    pub fn build(self) -> Sandbox {
+        let mut sandbox = sandbox_with_services_uninitialized(self.services, self.consensus_config);
+
+        if self.initialize {
+            let time = sandbox.time();
+            let validators_count = sandbox.validators_map.len();
+            sandbox.initialize(time, 1, validators_count);
+        }
+
+        sandbox
+    }
+}
+
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
-/// Constructs an instance of a `Sandbox` and initializes connections.
-pub fn sandbox_with_services(services: Vec<Box<dyn Service>>) -> Sandbox {
-    let mut sandbox = sandbox_with_services_uninitialized(services);
-    let time = sandbox.time();
-    let validators_count = sandbox.validators_map.len();
-    sandbox.initialize(time, 1, validators_count);
-    sandbox
-}
-
 /// Constructs an uninitialized instance of a `Sandbox`.
-pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> Sandbox {
+fn sandbox_with_services_uninitialized(
+    services: Vec<Box<dyn Service>>,
+    consensus: ConsensusConfig,
+) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
         gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
@@ -733,16 +795,6 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
         ApiSender::new(api_channel.0.clone()),
     );
 
-    let consensus = ConsensusConfig {
-        round_timeout: 1000,
-        status_timeout: 600_000,
-        peers_timeout: 600_000,
-        txs_block_limit: 1000,
-        max_message_len: 1024 * 1024,
-        min_propose_timeout: PROPOSE_TIMEOUT,
-        max_propose_timeout: PROPOSE_TIMEOUT,
-        propose_timeout_threshold: std::u32::MAX,
-    };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
         validators
@@ -820,14 +872,18 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<dyn Service>>) -> S
     };
 
     // General assumption; necessary for correct work of consensus algorithm
-    assert!(PROPOSE_TIMEOUT < sandbox.round_timeout());
+    assert!(PROPOSE_TIMEOUT < sandbox.first_round_timeout());
     sandbox.process_events();
     sandbox
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
     let _ = env_logger::try_init();
-    sandbox_with_services(vec![
+    timestamping_sandbox_builder().build()
+}
+
+pub fn timestamping_sandbox_builder() -> SandboxBuilder {
+    SandboxBuilder::new().with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),
     ])
@@ -1104,10 +1160,12 @@ mod tests {
 
     #[test]
     fn test_sandbox_service_after_commit() {
-        let sandbox = sandbox_with_services(vec![
-            Box::new(AfterCommitService),
-            Box::new(TimestampingService::new()),
-        ]);
+        let sandbox = SandboxBuilder::new()
+            .with_services(vec![
+                Box::new(AfterCommitService),
+                Box::new(TimestampingService::new()),
+            ])
+            .build();
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));

@@ -23,7 +23,7 @@ use messages::{PeersRequest, Precommit, Prevote};
 use node;
 
 use sandbox::{
-    sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox}, sandbox_tests_helper::*,
+    sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
 };
 
 #[test]
@@ -85,9 +85,9 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     let sandbox = timestamping_sandbox();
 
     // round happens
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() + PROPOSE_TIMEOUT,
+        sandbox.current_round_timeout() + PROPOSE_TIMEOUT,
     ));
 
     assert!(sandbox.is_leader());
@@ -337,7 +337,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.broadcast(&first_precommit);
 
     sandbox.assert_state(Height(1), Round(1));
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     sandbox.assert_state(Height(1), Round(2));
 
     // make sure we broadcasted same Prevote for second round
@@ -433,7 +433,9 @@ fn test_recover_consensus_messages_in_other_round() {
 #[test]
 fn should_restore_peers_after_restart() {
     // create sandbox with nodes not aware about each other
-    let sandbox = sandbox_with_services_uninitialized(vec![]);
+    let sandbox = SandboxBuilder::new()
+        .do_not_initialize_connections()
+        .build();
 
     let (v0, v1) = (ValidatorId(0), ValidatorId(1));
     let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
