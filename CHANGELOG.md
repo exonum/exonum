@@ -43,6 +43,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - Bug with pool size overflow has been fixed. (#853)
+- Transactions (signature) verification benchmark has been fixed. (#673)
+- Node no longer panics when transaction pool has a lot of transactions and
+  consensus is at round 0. (#673)
 
 ### Internal Improvements
 
@@ -61,16 +64,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Now nodes will switch to `min_propose_timeout` for block proposal timeout
   faster if they receive more than `propose_timeout_threshold` transactions
   during `max_propose_timeout`. (#844)
-### Internal Improvements
-
-#### exonum
-
-- Transactions are now verified in a thread pool. (#673)
 
 - Custom log formatting (along with `colored` and `term` dependencies) has been
   removed in favor of `env_logger`. (#857).
 
 - Several dependencies have been updated. (#861, #865, #871)
+- Several dependencies have been updated. (#861)
+- Transactions are now verified in a thread pool. Thread pool size is set to
+  optimal value by default (CPU count) or can be configured manually (#673)
 
 ## 0.9.1 - 2018-08-02
 
