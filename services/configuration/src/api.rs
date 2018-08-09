@@ -14,11 +14,8 @@
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{Schema as CoreSchema, StoredConfiguration},
-    crypto::{CryptoHash, Hash},
-    helpers::Height,
-    node::TransactionSend,
-    storage::StorageValue,
+    blockchain::{Schema as CoreSchema, StoredConfiguration}, crypto::{CryptoHash, Hash},
+    helpers::Height, node::TransactionSend, storage::StorageValue,
 };
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};

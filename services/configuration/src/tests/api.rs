@@ -15,8 +15,7 @@
 // spell-checker:ignore postpropose, postvote
 
 use exonum::{
-    blockchain::{Schema, StoredConfiguration},
-    crypto::{CryptoHash, Hash},
+    blockchain::{Schema, StoredConfiguration}, crypto::{CryptoHash, Hash},
     helpers::{Height, ValidatorId},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
@@ -275,8 +274,7 @@ fn test_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
-    let response = api
-        .votes_for_propose(new_cfg.hash())
+    let response = api.votes_for_propose(new_cfg.hash())
         .expect("Votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("Vote for config is absent");
@@ -320,8 +318,7 @@ fn test_dissenting_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_dissenting_votes);
-    let response = api
-        .votes_for_propose(new_cfg.hash())
+    let response = api.votes_for_propose(new_cfg.hash())
         .expect("Dissenting votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("VoteAgainst for config is absent");
