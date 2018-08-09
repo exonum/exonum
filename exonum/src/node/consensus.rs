@@ -535,7 +535,7 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
-    fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
+    pub fn handle_verified_tx(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -588,13 +588,6 @@ impl NodeHandler {
         self.execute_later(InternalRequest::VerifyTx(tx));
     }
 
-    /// Handles an already verified transaction.
-    pub fn handle_verified_tx(&mut self, tx: RawTransaction) {
-        // We don't care about result, because situation when transaction received twice
-        // is normal for internal messages (transaction may be received from 2+ nodes).
-        let _ = self.handle_tx_inner(tx);
-    }
-
     /// Handles raw transactions.
     pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
@@ -629,7 +622,7 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Box<dyn Transaction>) {
         trace!("Handle incoming transaction");
-        match self.handle_tx_inner(msg.raw().clone()) {
+        match self.handle_verified_tx(msg.raw().clone()) {
             Ok(_) => self.broadcast(msg.raw()),
             Err(e) => error!("{}", e),
         }
