@@ -16,11 +16,11 @@
 
 use futures::{self, future, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_executor::SpawnError;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
-    io, time::{Duration, SystemTime}, sync::Arc, rc::Rc,
+    io, rc::Rc, sync::Arc, time::{Duration, SystemTime},
 };
 
 use super::{
@@ -89,17 +89,22 @@ impl InternalPart {
 
                             match status {
                                 Ok(_) => Ok(future::Loop::Break(())),
-                                Err(ref e) if e.is_shutdown() => panic!("Signature Verification Thread Pool shutdown unexpectedly."),
+                                Err(ref e) if e.is_shutdown() => panic!(
+                                    "Signature Verification Thread Pool shutdown unexpectedly."
+                                ),
                                 Err(_) => {
-                                    let status = thread_pool.sender().spawn(future::lazy(move || {
-                                        if tx.verify() {
-                                            internal_tx
-                                                .wait()
-                                                .send(InternalEvent::TxVerified(tx.raw().clone()))
-                                                .expect("Cannot send TxVerified event.");
-                                        }
-                                        Ok(())
-                                    }));
+                                    let status =
+                                        thread_pool.sender().spawn(future::lazy(move || {
+                                            if tx.verify() {
+                                                internal_tx
+                                                    .wait()
+                                                    .send(InternalEvent::TxVerified(
+                                                        tx.raw().clone(),
+                                                    ))
+                                                    .expect("Cannot send TxVerified event.");
+                                            }
+                                            Ok(())
+                                        }));
                                     Ok(future::Loop::Continue(status))
                                 }
                             }
