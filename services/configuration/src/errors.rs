@@ -17,8 +17,10 @@
 #![allow(bare_trait_objects)]
 
 use exonum::{
-    blockchain::{ExecutionError, StoredConfiguration}, crypto::Hash,
-    encoding::serialize::json::reexport::Error as JsonError, helpers::Height,
+    blockchain::{ExecutionError, StoredConfiguration},
+    crypto::Hash,
+    encoding::serialize::json::reexport::Error as JsonError,
+    helpers::Height,
 };
 
 use transactions::Propose;

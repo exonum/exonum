@@ -14,7 +14,8 @@
 
 use exonum::{
     blockchain::{Schema, StoredConfiguration, Transaction},
-    crypto::{hash, CryptoHash, Hash, HASH_SIZE}, helpers::{Height, ValidatorId},
+    crypto::{hash, CryptoHash, Hash, HASH_SIZE},
+    helpers::{Height, ValidatorId},
     storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
@@ -83,7 +84,8 @@ impl ConfigurationTestKit for TestKit {
         self.create_block_with_transactions(txvec![tx_propose]);
         // Push votes
         let cfg_proposal_hash = cfg_proposal.hash();
-        let tx_votes = self.network()
+        let tx_votes = self
+            .network()
             .validators()
             .iter()
             .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
@@ -440,9 +442,11 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_blocks_until(Height(10));
     let illegal_vote = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
-    assert!(!testkit
-        .votes_for_propose(new_cfg.hash())
-        .contains(&Some(VotingDecision::Yea(illegal_vote))));
+    assert!(
+        !testkit
+            .votes_for_propose(new_cfg.hash())
+            .contains(&Some(VotingDecision::Yea(illegal_vote)))
+    );
 }
 
 #[test]
@@ -551,9 +555,11 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
         let illegal_node = TestNode::new_auditor();
         let illegal_validator_vote = new_tx_config_vote(&illegal_node, discarded_votes_cfg.hash());
         testkit.create_block_with_transactions(txvec![illegal_validator_vote.clone()]);
-        assert!(!testkit
-            .votes_for_propose(discarded_votes_cfg.hash())
-            .contains(&Some(VotingDecision::Yea(illegal_validator_vote))))
+        assert!(
+            !testkit
+                .votes_for_propose(discarded_votes_cfg.hash())
+                .contains(&Some(VotingDecision::Yea(illegal_validator_vote)))
+        )
     }
     {
         let votes = (0..3)

@@ -81,10 +81,13 @@ extern crate toml;
 pub use errors::ErrorCode;
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    api::ServiceApiBuilder,
+    blockchain::{self, Transaction, TransactionSet},
+    crypto::Hash,
     encoding::Error as EncodingError,
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
-    messages::RawTransaction, storage::{Fork, Snapshot},
+    messages::RawTransaction,
+    storage::{Fork, Snapshot},
 };
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 use serde_json::to_value;
