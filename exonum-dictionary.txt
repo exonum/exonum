@@ -131,6 +131,7 @@ testdata
 testkit
 testnet
 testnetctl
+threadpool
 timestamping
 timestamps
 tlsdate
