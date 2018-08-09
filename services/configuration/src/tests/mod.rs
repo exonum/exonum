@@ -279,9 +279,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig {
-                majority_count: Some(5),
-            },
+            config: ConfigurationServiceConfig::default(),
         })
         .create();
 
@@ -290,6 +288,12 @@ fn test_discard_proposes_with_too_big_majority_count() {
         let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("dummy", "First cfg");
         cfg.set_actual_from(cfg_change_height);
+        cfg.set_service_config(
+            "configuration",
+            ConfigurationServiceConfig {
+                majority_count: Some(5),
+            },
+        );
         cfg.stored_configuration().clone()
     };
 
@@ -303,9 +307,7 @@ fn test_discard_proposes_with_too_small_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig {
-                majority_count: Some(2),
-            },
+            config: ConfigurationServiceConfig::default(),
         })
         .create();
 
@@ -314,6 +316,12 @@ fn test_discard_proposes_with_too_small_majority_count() {
         let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("dummy", "First cfg");
         cfg.set_actual_from(cfg_change_height);
+        cfg.set_service_config(
+            "configuration",
+            ConfigurationServiceConfig {
+                majority_count: Some(2),
+            },
+        );
         cfg.stored_configuration().clone()
     };
 

@@ -78,13 +78,12 @@ extern crate pretty_assertions;
 extern crate serde_json;
 extern crate toml;
 
-pub use errors::ErrorCode;
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
     encoding::Error as EncodingError,
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
-    messages::RawTransaction, storage::{Fork, Snapshot},
+    messages::RawTransaction, node::State, storage::{Fork, Snapshot},
 };
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 use serde_json::to_value;
@@ -166,6 +165,23 @@ impl fabric::ServiceFactory for ServiceFactory {
                 .clone()
                 .try_into()
                 .unwrap();
+
+        if let Some(majority_count) = service_config.majority_count {
+            let validators_count = context
+                .get(keys::NODE_CONFIG)
+                .unwrap()
+                .genesis
+                .validator_keys
+                .len() as u16;
+            let byzantine_majority_count =
+                State::byzantine_majority_count(validators_count as usize) as u16;
+            if majority_count > validators_count || majority_count < byzantine_majority_count {
+                panic!(
+                    "Invalid majority count: {}, it should be >= {} and <= {}",
+                    majority_count, byzantine_majority_count, validators_count
+                );
+            }
+        }
 
         Box::new(Service {
             config: service_config,
