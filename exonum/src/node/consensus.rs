@@ -553,7 +553,7 @@ impl NodeHandler {
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
 
-        if self.state.is_leader() {
+        if self.state.round() != Round::zero() && self.state.is_leader() {
             self.maybe_add_propose_timeout();
         }
 
