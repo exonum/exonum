@@ -12,7 +12,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `majority_count` parameter has been added to `generate-template` and 
+- `majority_count` parameter has been added to `generate-template` and
   `generate-testnet` commands. (#828)
 
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
