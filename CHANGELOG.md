@@ -62,6 +62,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Custom log formatting (along with `colored` and `term` dependencies) has been
   removed in favor of `env_logger`. (#857).
 
+- Several dependencies have been updated. (#861)
+
+  ```
+  proptest = "=0.8.4"
+  rand = "=0.5.4"
+  snow = "=0.3.1"
+  tokio-codec = "=0.1.0"
+  tokio-io = "=0.1.7"
+  tokio-retry = "=0.2.0"
+  ```
+
 ## 0.9.1 - 2018-08-02
 
 ### Bug Fixes
