@@ -412,7 +412,7 @@ impl NodeHandler {
 
         let connect_info = ConnectInfo {
             address: external_address,
-            public_key: config.listener.consensus_public_key.clone(),
+            public_key: config.listener.consensus_public_key,
         };
 
         let connect_list = config.listener.connect_list;
@@ -801,7 +801,7 @@ impl ConnectInfo {
 
     /// Tries to deserialize the given `value` into `ConnectInfo`.
     pub fn try_deserialize(value: &[u8]) -> serde_json::Result<Self> {
-        serde_json::from_slice(value.as_ref())
+        serde_json::from_slice(value)
     }
 }
 

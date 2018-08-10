@@ -439,10 +439,8 @@ fn should_restore_peers_after_restart() {
         .build();
 
     let (v0, v1) = (ValidatorId(0), ValidatorId(1));
-    let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
+    let (p0, s0) = (sandbox.p(v0), sandbox.s(v0).clone());
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
-
-    let time = sandbox.time();
 
     let peers_request = PeersRequest::new(&p1, &p0, &s1);
     let peers_response = PeersResponse::new(&p0, &p1, vec![a1], &s0);

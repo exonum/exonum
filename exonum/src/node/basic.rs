@@ -206,10 +206,10 @@ impl NodeHandler {
             let peer = self.state
                 .peers()
                 .iter()
-                .map(|x| x.1.clone())
+                .map(|x| *x.1)
                 .nth(gen_peer_id())
                 .unwrap();
-            let peer = peer.clone();
+
             let msg = PeersRequest::new(
                 self.state.consensus_public_key(),
                 &peer.public_key,

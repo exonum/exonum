@@ -119,12 +119,12 @@ impl ConnectionsPool {
     fn get_or_create(
         &self,
         peer: SocketAddr,
-        network_tx: mpsc::Sender<NetworkEvent>,
+        network_tx: &mpsc::Sender<NetworkEvent>,
         handle: &Handle,
         network_config: NetworkConfiguration,
         handshake_params: &HandshakeParams,
     ) -> Option<Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>> {
-        let conn_tx = self.get(peer)
+        self.get(peer)
             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
             .or_else(|| {
                 self.clone()
@@ -138,9 +138,7 @@ impl ConnectionsPool {
                     .map(|conn_tx| {
                         conn_fut(Ok(conn_tx).into_future())
                     })
-            });
-
-        conn_tx
+            })
     }
 
     fn connect_to_peer(
@@ -320,7 +318,7 @@ impl RequestHandler {
                     NetworkRequest::ConnectToPeer(peer) => {
                         let conn_tx = outgoing_connections.get_or_create(
                             peer,
-                            network_tx.clone(),
+                            &network_tx,
                             &handle,
                             network_config,
                             &handshake_params,
@@ -329,13 +327,13 @@ impl RequestHandler {
                         if let Some(conn_tx) = conn_tx {
                             to_box(conn_tx)
                         } else {
-                            to_box(Self::send_unable_connect_event(peer, network_tx.clone()))
+                            to_box(Self::send_unable_connect_event(peer, &network_tx))
                         }
                     }
                     NetworkRequest::SendMessage(peer, msg) => {
                         let conn_tx = outgoing_connections.get_or_create(
                             peer,
-                            network_tx.clone(),
+                            &network_tx,
                             &handle,
                             network_config,
                             &handshake_params,
@@ -349,7 +347,7 @@ impl RequestHandler {
                             });
                             to_box(fut)
                         } else {
-                            to_box(Self::send_unable_connect_event(peer, network_tx.clone()))
+                            to_box(Self::send_unable_connect_event(peer, &network_tx))
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
@@ -369,7 +367,7 @@ impl RequestHandler {
 
     fn send_unable_connect_event(
         peer: SocketAddr,
-        network_tx: mpsc::Sender<NetworkEvent>,
+        network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = io::Error> {
         let event = NetworkEvent::UnableConnectToPeer(peer);
         network_tx

@@ -32,7 +32,7 @@ use blockchain::{
     Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
     SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
 };
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use events::{
     network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
     NetworkEvent, NetworkRequest, TimeoutRequest,
@@ -92,7 +92,6 @@ impl SandboxInner {
     }
 
     fn process_network_requests(&mut self) {
-        println!("process_network_requests");
         let network_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
@@ -601,8 +600,6 @@ impl Sandbox {
         };
 
         let connect_list = ConnectList::from_peers(inner.handler.state.peers());
-
-        println!("connect list after restart {:?}", connect_list);
 
         let config = Configuration {
             listener: ListenerConfig {
