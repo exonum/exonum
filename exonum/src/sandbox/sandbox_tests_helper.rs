@@ -341,11 +341,22 @@ where
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
-    let mut propose: Option<Propose>;
 
     let n_validators = sandbox.n_validators();
+    let new_height = initial_height.next();
+
+    if n_validators == 1 {
+        try_add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref())?;
+        let block = sandbox.last_block();
+        assert_eq!(block.tx_hash(), &compute_txs_merkle_root(&hashes));
+        assert_eq!(block.tx_count(), hashes.len() as u32);
+        assert_eq!(block.height(), initial_height);
+        sandbox.assert_state(new_height, Round(1));
+
+        return Ok(hashes);
+    }
     for _ in 0..n_validators {
-        propose = try_add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref())?;
+        let propose = try_add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref())?;
         let round = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
@@ -413,7 +424,6 @@ where
                 }
             }
 
-            let new_height = initial_height.next();
             sandbox.assert_state(new_height, Round(1));
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;

@@ -467,10 +467,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::{Fork, ListIndex};
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
     fn list_index_methods(list_index: &mut ListIndex<&mut Fork, i32>) {

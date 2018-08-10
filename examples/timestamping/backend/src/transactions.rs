@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Timestamping transactions.
+
 // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
@@ -44,6 +46,7 @@ impl From<Error> for ExecutionError {
 }
 
 transactions! {
+    /// Transaction group.
     pub TimeTransactions {
         const SERVICE_ID = TIMESTAMPING_SERVICE;
 

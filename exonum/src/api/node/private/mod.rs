@@ -124,7 +124,8 @@ impl SystemApi {
             .handle_network_info("v1/network", api_scope)
             .handle_is_consensus_enabled("v1/consensus_enabled", api_scope)
             .handle_set_consensus_enabled("v1/consensus_enabled", api_scope)
-            .handle_shutdown("v1/shutdown", api_scope);
+            .handle_shutdown("v1/shutdown", api_scope)
+            .handle_rebroadcast("v1/rebroadcast", api_scope);
         api_scope
     }
 
@@ -215,6 +216,16 @@ impl SystemApi {
             state
                 .sender()
                 .send_external_message(ExternalMessage::Shutdown)
+                .map_err(ApiError::from)
+        });
+        self
+    }
+
+    fn handle_rebroadcast(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        api_scope.endpoint_mut(name, move |state: &ServiceApiState, _query: ()| {
+            state
+                .sender()
+                .send_external_message(ExternalMessage::Rebroadcast)
                 .map_err(ApiError::from)
         });
         self

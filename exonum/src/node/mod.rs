@@ -74,6 +74,8 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
+    /// Rebroadcast transactions from the pool.
+    Rebroadcast,
 }
 
 /// Node timeout types.
@@ -657,7 +659,7 @@ impl NodeHandler {
     fn need_faster_propose(&self) -> bool {
         let snapshot = self.blockchain.snapshot();
         let pending_tx_count = Schema::new(&snapshot).transactions_pool_len();
-        pending_tx_count >= self.propose_timeout_threshold() as usize
+        pending_tx_count >= u64::from(self.propose_timeout_threshold())
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
