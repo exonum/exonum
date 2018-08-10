@@ -13,6 +13,7 @@
   },
   "jest": {
     "verbose": true,
+    "testEnvironment": "node",
     "moduleDirectories": [
       "node_modules"
     ]
@@ -21,7 +22,7 @@
     "axios": "^0.18.0",
     "big-integer": "^1.6.27",
     "bootstrap": "^4.0.0",
-    "exonum-client": "^0.11.0",
+    "exonum-client": "^0.12.3",
     "jquery": "^3.3.1",
     "noty": "^3.2.0-beta",
     "numeral": "^2.0.6",
@@ -31,24 +32,25 @@
     "vuex": "^3.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.0.0-beta.49",
-    "@babel/preset-env": "^7.0.0-beta.49",
     "axios-mock-adapter": "^1.15.0",
-    "babel-core": "^7.0.0-bridge.0",
-    "babel-jest": "^23.0.1",
-    "babel-loader": "^7.1.4",
+    "babel-core": "^6.26.3",
+    "babel-eslint": "^8.2.6",
+    "babel-jest": "^23.4.2",
+    "babel-loader": "^7.1.5",
     "babel-polyfill": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
     "body-parser": "^1.18.2",
     "css-loader": "^0.28.11",
     "eslint": "^4.19.1",
     "eslint-plugin-vue": "^4.4.0",
     "express": "^4.16.3",
     "jest": "^23.1.0",
+    "regenerator-runtime": "^0.12.1",
     "request": "^2.85.0",
     "vue-loader": "^15.2.4",
     "vue-template-compiler": "^2.5.16",
-    "webpack": "^4.11.0",
-    "webpack-cli": "^3.0.2",
+    "webpack": "^4.16.3",
+    "webpack-cli": "^3.1.0",
     "yargs-parser": "^9.0.2"
   }
 }
