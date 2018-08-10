@@ -71,7 +71,7 @@ pub enum Any {
     Transaction(RawTransaction),
     /// A batch of the transactions.
     TransactionsBatch(TransactionsResponse),
-
+    /// Response containing know peers.
     PeersResponse(PeersResponse)
 }
 

@@ -35,7 +35,7 @@ use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
 use storage::proof_list_index::root_hash;
-use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
+use encoding::serialize::json::ExonumJson;
 use serde_json::{self, Value};
 use std::error::Error;
 
@@ -66,7 +66,7 @@ pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
-
+/// `PeersResponse` message id.
 pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeersResponse::MESSAGE_ID;
 
 messages! {
@@ -340,24 +340,23 @@ messages! {
         height: Height,
     }
 
-     /// Request connected peers from a node.
+    /// Send current node's connected peers to the sender.
     ///
     /// ### Validation
     /// Request is considered valid if the sender of the message on the network
     /// level corresponds to the `from` field.
     ///
     /// ### Processing
-    /// Peer `Connect` messages are sent to the recipient.
+    /// Peer connects to the received peers.
     ///
     /// ### Generation
-    /// `PeersRequest` message is sent regularly with the timeout controlled by
-    /// `blockchain::ConsensusConfig::peers_timeout`.
+    /// `PeersResponse` is sent as response to incoming `PeersRequest`.
     struct PeersResponse {
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
-
+        /// List of known peers.
         peers: Vec<SocketAddr>,
     }
 }

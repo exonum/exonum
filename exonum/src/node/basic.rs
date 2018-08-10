@@ -124,8 +124,6 @@ impl NodeHandler {
             return;
         }
 
-        println!("handle status {:?}", msg);
-
         // Handle message from future height
         if msg.height() > height {
             let peer = msg.from();
@@ -149,21 +147,22 @@ impl NodeHandler {
         }
     }
 
-    /// Handles the `PeersRequest` message. Node connects to other peers as result.
+    /// Handles the `PeersRequest` message. Node sends known peers to message sender.
     pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
         let peers: Vec<SocketAddr> = self.state.peers().values().map(|info|info.address).collect();
-        trace!(
+        info!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,
             msg.from()
         );
 
         let peers_request = PeersResponse::new(&self.state().consensus_public_key(),
-            &msg.to(), peers, &self.state().consensus_secret_key());
+            &msg.from(), peers, &self.state().consensus_secret_key());
 
         self.send_to_peer(*msg.from(), peers_request.raw())
     }
 
+    /// Handles the `PeersResponse` message. Node connects to other peers as result.
     pub fn handle_peers_response(&mut self, msg: &PeersResponse) {
         let peers = msg.peers();
 
@@ -171,6 +170,14 @@ impl NodeHandler {
             "HANDLE PEERS RESPONSE: Connecting to peers {:?}",
             peers,
         );
+
+        if !self.state.connect_list().is_peer_allowed(msg.from()) {
+            error!(
+                "Received PeersResponse from peer = {:?} which not in ConnectList.",
+                msg.from()
+            );
+            return;
+        }
 
         for peer in peers {
             self.connect(&peer)

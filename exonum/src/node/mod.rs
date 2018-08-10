@@ -584,8 +584,6 @@ impl NodeHandler {
             .map(|conn| conn.address)
             .collect();
 
-        trace!("peers: {:?}", peers);
-
         for address in peers {
             self.send_to_addr(&address, message);
         }
