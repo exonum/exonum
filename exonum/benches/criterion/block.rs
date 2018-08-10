@@ -214,16 +214,15 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
         let snapshot = blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 
-        assert!(txs.iter().all(|hash| {
-            schema.transactions_pool().contains(&hash) &&
-                !schema.transactions_locations().contains(&hash)
-        }));
+        assert!(
+            txs.iter()
+                .all(|hash| schema.transactions_pool().contains(&hash)
+                    && !schema.transactions_locations().contains(&hash))
+        );
     }
 
     let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
-    let keys: Vec<_> = (0..KEY_COUNT)
-        .map(|_| gen_keypair())
-        .collect();
+    let keys: Vec<_> = (0..KEY_COUNT).map(|_| gen_keypair()).collect();
 
     for i in 0..HEIGHT {
         let txs = prepare_txs(&mut blockchain, i, TRANSACTIONS_IN_BLOCK, &keys);
