@@ -119,6 +119,10 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
 }
 
 fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
+    const TRANSACTIONS_IN_BLOCK: u64 = 100;
+    const KEY_COUNT: usize = TRANSACTIONS_IN_BLOCK as usize * 10;
+    const INITIAL_BALANCE: u64 = 100;
+
     struct Cryptocurrency;
 
     impl Service for Cryptocurrency {
@@ -154,12 +158,14 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
             self.verify_signature(self.from())
         }
 
-        fn execute(&self, view: &mut Fork) -> ExecutionResult {
-            let mut index = ProofMapIndex::new("balances_txs", view);
-            let from_balance = index.get(self.from()).unwrap_or(0_u64);
-            let to_balance = index.get(self.to()).unwrap_or(0_u64);
+        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+            let mut index = ProofMapIndex::new("balances_txs", fork);
+
+            let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
             index.put(self.from(), from_balance - 1);
             index.put(self.to(), to_balance + 1);
+
             Ok(())
         }
     }
@@ -176,9 +182,9 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
             let mut schema = Schema::new(&mut fork);
             for i in (height * count)..((height + 1) * count) {
                 let tx = Tx::new(
-                    &keys[i as usize % 10_000].0,
-                    &keys[(i as usize + 3_456) % 10_000].0,
-                    &keys[i as usize % 10_000].1,
+                    &keys[i as usize % KEY_COUNT].0,
+                    &keys[(i as usize + KEY_COUNT / 7 * 3) % KEY_COUNT].0,
+                    &keys[i as usize % KEY_COUNT].1,
                 );
                 let tx_hash = Transaction::hash(&tx);
                 txs.push(tx_hash);
@@ -192,21 +198,21 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
     let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
     let mut keys = Vec::new();
 
-    for _ in 0..10_000 {
+    for _ in 0..KEY_COUNT {
         keys.push(gen_keypair());
     }
     for i in 0..100 {
-        let txs = prepare_txs(&mut blockchain, i, 1000, &keys);
+        let txs = prepare_txs(&mut blockchain, i, TRANSACTIONS_IN_BLOCK, &keys);
         let patch = execute_block(&blockchain, i, &txs);
         blockchain.merge(patch).unwrap();
     }
 
-    let txs = prepare_txs(&mut blockchain, 100, 1000, &keys);
+    let txs = prepare_txs(&mut blockchain, 100, TRANSACTIONS_IN_BLOCK, &keys);
     c.bench(
         "cryptocurrency",
         Benchmark::new("cryptocurrency", move |b| {
             b.iter(|| execute_block(&blockchain, 100, &txs))
-        }).sample_size(8),
+        }).sample_size(50),
     );
 }
 
@@ -231,9 +237,9 @@ fn bench_execute_block_cryptocurrency_rocksdb(c: &mut Criterion) {
 pub fn bench_block(c: &mut Criterion) {
     // Because execute_block is not really "micro benchmark"
     // executing it as regular benches, with 100 samples,
-    // lead to relatively big testing time (10 min on my mac).
-    // That's why, number of samples wa decreased in each test.
+    // lead to relatively big testing time.
+    // That's why, number of samples was decreased in each test.
 
-    bench_execute_block_timestamping_rocksdb(&mut *c);
-    bench_execute_block_cryptocurrency_rocksdb(&mut *c);
+    bench_execute_block_timestamping_rocksdb(c);
+    bench_execute_block_cryptocurrency_rocksdb(c);
 }
