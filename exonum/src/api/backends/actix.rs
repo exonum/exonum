@@ -106,7 +106,7 @@ impl ServiceApiBackend for ApiBuilder {
     }
 }
 
-// FIXME: workaround for a regression in actix-web 0.7.3 (ECR-2149)
+// TODO: remove this workaround for a regression in actix-web 0.7.3 (ECR-2149)
 fn sanitize(mut handler: RequestHandler) -> RequestHandler {
     if !handler.name.starts_with('/') {
         handler.name.insert(0, '/');
