@@ -162,7 +162,8 @@ impl NoiseWrapper {
     // length we need to subtract `TAG_LENGTH` multiplied by messages count
     // from `data.len()`.
     fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
-        raw_message_len - TAG_LENGTH * ((raw_message_len as f32 / MAX_MESSAGE_LENGTH as f32).ceil() as usize)
+        raw_message_len
+            - TAG_LENGTH * ((raw_message_len as f32 / MAX_MESSAGE_LENGTH as f32).ceil() as usize)
     }
 
     // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to

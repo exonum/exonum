@@ -25,7 +25,7 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{gen_keypair_from_seed, Seed, PublicKey, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, PublicKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -33,8 +33,7 @@ use events::{
         HandshakeRawMessage, HandshakeResult, NoiseHandshake,
     },
 };
-use node::state::SharedConnectList;
-use node::ConnectInfo;
+use node::{state::SharedConnectList, ConnectInfo};
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -147,8 +146,13 @@ const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 pub fn default_test_params() -> HandshakeParams {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
     let address: SocketAddr = "127.0.0.1:8000".parse().unwrap();
-    let mut params =
-        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024, address);
+    let mut params = HandshakeParams::new(
+        public_key,
+        secret_key,
+        SharedConnectList::default(),
+        1024,
+        address,
+    );
     params.set_remote_key(public_key);
     params
 }
@@ -326,14 +330,17 @@ fn send_handshake(
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let connect_info = ConnectInfo { address: *addr, public_key: PublicKey::zero() };
+    let connect_info = ConnectInfo {
+        address: *addr,
+        public_key: PublicKey::zero(),
+    };
 
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params).send(sock, connect_info),
             Some(message) => {
                 NoiseErrorHandshake::initiator(&params, message).send(sock, connect_info)
-            },
+            }
         })
         .map(|_| ())
         .map_err(into_other);

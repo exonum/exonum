@@ -57,9 +57,8 @@ use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
-use node::ApiSender;
+use node::{ApiSender, ConnectInfo};
 use storage::{self, Database, Error, Fork, Patch, Snapshot};
-use node::ConnectInfo;
 
 mod block;
 mod genesis;

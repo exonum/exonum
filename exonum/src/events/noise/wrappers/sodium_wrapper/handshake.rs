@@ -36,7 +36,7 @@ pub struct HandshakeParams {
     pub secret_key: x25519::SecretKey,
     pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
-    pub connect_info : ConnectInfo,
+    pub connect_info: ConnectInfo,
     max_message_len: u32,
 }
 
@@ -46,9 +46,10 @@ impl HandshakeParams {
         secret_key: SecretKey,
         connect_list: SharedConnectList,
         max_message_len: u32,
-        listen_address : SocketAddr,
+        address: SocketAddr,
     ) -> Self {
-        let (public_key_x25519, secret_key_x25519) = into_x25519_keypair(public_key, secret_key).unwrap();
+        let (public_key_x25519, secret_key_x25519) =
+            into_x25519_keypair(public_key, secret_key).unwrap();
 
         HandshakeParams {
             public_key: public_key_x25519,
@@ -56,7 +57,10 @@ impl HandshakeParams {
             max_message_len,
             remote_key: None,
             connect_list,
-            connect_info: ConnectInfo { address: listen_address, public_key }
+            connect_info: ConnectInfo {
+                address,
+                public_key,
+            },
         }
     }
 
@@ -166,7 +170,9 @@ impl Handshake for NoiseHandshake {
     {
         let framed = self.write_handshake_msg(stream, &[])
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(move |(stream, handshake, _)| handshake.write_handshake_msg(stream, &info.try_serialize().unwrap()))
+            .and_then(move |(stream, handshake, _)| {
+                handshake.write_handshake_msg(stream, &info.try_serialize().unwrap())
+            })
             .and_then(|(stream, handshake)| handshake.finalize(stream, None));
         Box::new(framed)
     }

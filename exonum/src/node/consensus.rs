@@ -19,8 +19,9 @@ use crypto::{CryptoHash, Hash, PublicKey};
 use events::InternalRequest;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, RawTransaction, TransactionsRequest, TransactionsResponse, PeersRequest,
+    BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
+    TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;

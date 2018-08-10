@@ -16,9 +16,7 @@ use futures::{stream::Wait, sync::mpsc, Future, Sink, Stream};
 use tokio_core::reactor::Core;
 use tokio_timer::{TimeoutStream, Timer};
 
-use std::{
-    net::SocketAddr, thread, time:: Duration,
-};
+use std::{net::SocketAddr, thread, time::Duration};
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, PublicKey, SecretKey};
@@ -83,7 +81,7 @@ impl TestHandler {
     }
 
     pub fn wait_for_connect(&mut self) -> bool {
-        match self.wait_for_event()  {
+        match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_address)) => true,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
             Err(e) => panic!("An error during wait for connect occurred, {:?}", e),

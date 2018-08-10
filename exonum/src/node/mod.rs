@@ -34,8 +34,8 @@ use tokio_core::reactor::Core;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
-    time::{Duration, SystemTime}, borrow::Cow,
+    borrow::Cow, collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs},
+    sync::Arc, thread, time::{Duration, SystemTime},
 };
 
 use serde::de::{self, Deserialize, Deserializer};
@@ -45,15 +45,14 @@ use blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
     ValidatorKeys,
 };
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, hash};
+use crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
     error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
     InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
     NetworkRequest, SyncSender, TimeoutRequest,
 };
 use helpers::{
-    config::ConfigManager, fabric::NodePublicConfig, Height, Milliseconds, Round,
-    ValidatorId,
+    config::ConfigManager, fabric::NodePublicConfig, Height, Milliseconds, Round, ValidatorId,
 };
 use messages::RawMessage;
 use node::state::SharedConnectList;
@@ -411,7 +410,10 @@ impl NodeHandler {
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
 
-        let connect_info = ConnectInfo { address: external_address, public_key: config.listener.consensus_public_key.clone() };
+        let connect_info = ConnectInfo {
+            address: external_address,
+            public_key: config.listener.consensus_public_key.clone(),
+        };
 
         let connect_list = config.listener.connect_list;
         let state = State::new(

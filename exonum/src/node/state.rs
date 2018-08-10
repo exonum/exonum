@@ -26,9 +26,7 @@ use std::{
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{
-    BlockResponse, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
-};
+use messages::{BlockResponse, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
 use node::{connect_list::ConnectList, ConnectInfo};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 

@@ -35,9 +35,6 @@ use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
 use storage::proof_list_index::root_hash;
-use encoding::serialize::json::ExonumJson;
-use serde_json::{self, Value};
-use std::error::Error;
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;

@@ -96,10 +96,8 @@ impl SandboxInner {
         let network_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
-                    NetworkRequest::SendMessage(peer, msg) => {
-                        self.sent.push_back((peer, msg))
-                    },
-                    NetworkRequest::ConnectToPeer(_peer) => {},
+                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::ConnectToPeer(_peer) => {}
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
@@ -149,7 +147,10 @@ impl Sandbox {
     ) {
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
-            self.connect(ConnectInfo { address: self.a(validator), public_key: self.p(validator) });
+            self.connect(ConnectInfo {
+                address: self.a(validator),
+                public_key: self.p(validator),
+            });
         }
 
         self.check_unexpected_message();
@@ -252,7 +253,11 @@ impl Sandbox {
 
     pub fn connect(&self, info: ConnectInfo) {
         info!("connecting to {:?}", info);
-        self.inner.borrow_mut().handler.state.add_peer(info.public_key, info);
+        self.inner
+            .borrow_mut()
+            .handler
+            .state
+            .add_peer(info.public_key, info);
     }
 
     pub fn send_peers_request(&self) {
@@ -559,7 +564,10 @@ impl Sandbox {
         let sandbox = self.restart_uninitialized_with_time(time);
 
         for id in 1..sandbox.n_validators() {
-            sandbox.connect(ConnectInfo{ address: sandbox.a(ValidatorId(id as u16)),  public_key:sandbox.p(ValidatorId(id as u16))});
+            sandbox.connect(ConnectInfo {
+                address: sandbox.a(ValidatorId(id as u16)),
+                public_key: sandbox.p(ValidatorId(id as u16)),
+            });
         }
 
         sandbox
@@ -688,7 +696,14 @@ impl Sandbox {
     }
 
     fn peers(&self) -> Vec<SocketAddr> {
-        self.inner.borrow_mut().handler.state.peers().values().map(|info| info.address).collect()
+        self.inner
+            .borrow_mut()
+            .handler
+            .state
+            .peers()
+            .values()
+            .map(|info| info.address)
+            .collect()
     }
 }
 
@@ -973,16 +988,10 @@ mod tests {
         let (receiver_pk, receiver_sk) = (&s.p(ValidatorId(0)), &s.s(ValidatorId(0)));
 
         let peers_request = PeersRequest::new(sender_pk, receiver_pk, sender_sk);
-        let peers_response = PeersResponse::new(receiver_pk,
-                                                &sender_pk,
-                                                s.peers(), receiver_sk);
+        let peers_response = PeersResponse::new(receiver_pk, &sender_pk, s.peers(), receiver_sk);
 
         s.recv(&peers_request);
-
-        s.send(
-            s.a(ValidatorId(1)),
-                &peers_response,
-        );
+        s.send(s.a(ValidatorId(1)), &peers_response);
     }
 
     #[test]
@@ -1020,16 +1029,10 @@ mod tests {
         let (receiver_pk, receiver_sk) = (&s.p(ValidatorId(0)), &s.s(ValidatorId(0)));
 
         let peers_request = PeersRequest::new(sender_pk, receiver_pk, sender_sk);
-        let peers_response = PeersResponse::new(receiver_pk,
-                                                &sender_pk,
-                                                vec![], receiver_sk);
+        let peers_response = PeersResponse::new(receiver_pk, &sender_pk, vec![], receiver_sk);
 
         s.recv(&peers_request);
-
-        s.send(
-            s.a(ValidatorId(1)),
-            &peers_response,
-        );
+        s.send(s.a(ValidatorId(1)), &peers_response);
     }
 
     #[test]
@@ -1037,7 +1040,11 @@ mod tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
 
-        let peers_request = PeersRequest::new(&s.p(ValidatorId(1)), &s.p(ValidatorId(0)), &s.s(ValidatorId(1)));
+        let peers_request = PeersRequest::new(
+            &s.p(ValidatorId(1)),
+            &s.p(ValidatorId(0)),
+            &s.s(ValidatorId(1)),
+        );
 
         s.recv(&peers_request);
     }
@@ -1047,8 +1054,16 @@ mod tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
 
-        let peers_request_1 = PeersRequest::new(&s.p(ValidatorId(1)), &s.p(ValidatorId(0)), &s.s(ValidatorId(1)));
-        let peers_request_2 = PeersRequest::new(&s.p(ValidatorId(2)), &s.p(ValidatorId(1)), &s.s(ValidatorId(2)));
+        let peers_request_1 = PeersRequest::new(
+            &s.p(ValidatorId(1)),
+            &s.p(ValidatorId(0)),
+            &s.s(ValidatorId(1)),
+        );
+        let peers_request_2 = PeersRequest::new(
+            &s.p(ValidatorId(2)),
+            &s.p(ValidatorId(1)),
+            &s.s(ValidatorId(2)),
+        );
 
         s.recv(&peers_request_1);
         s.recv(&peers_request_2);
@@ -1060,7 +1075,11 @@ mod tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
 
-        let peers_request_1 = PeersRequest::new(&s.p(ValidatorId(1)), &s.p(ValidatorId(0)), &s.s(ValidatorId(1)));
+        let peers_request_1 = PeersRequest::new(
+            &s.p(ValidatorId(1)),
+            &s.p(ValidatorId(0)),
+            &s.s(ValidatorId(1)),
+        );
 
         s.recv(&peers_request_1);
         s.add_time(Duration::from_millis(1000));

@@ -95,10 +95,7 @@ impl NodeHandler {
             }
         }
         self.state.add_peer(public_key, info);
-        info!(
-            "Received ConnectInfo  from {}, {}",
-            address, need_connect,
-        );
+        info!("Received ConnectInfo  from {}, {}", address, need_connect,);
         self.blockchain.save_peer(&public_key, info);
         if need_connect {
             info!("Connecting to {}", address);
@@ -149,15 +146,23 @@ impl NodeHandler {
 
     /// Handles the `PeersRequest` message. Node sends known peers to message sender.
     pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
-        let peers: Vec<SocketAddr> = self.state.peers().values().map(|info|info.address).collect();
+        let peers: Vec<SocketAddr> = self.state
+            .peers()
+            .values()
+            .map(|info| info.address)
+            .collect();
         info!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,
             msg.from()
         );
 
-        let peers_request = PeersResponse::new(&self.state().consensus_public_key(),
-            &msg.from(), peers, &self.state().consensus_secret_key());
+        let peers_request = PeersResponse::new(
+            &self.state().consensus_public_key(),
+            &msg.from(),
+            peers,
+            &self.state().consensus_secret_key(),
+        );
 
         self.send_to_peer(*msg.from(), peers_request.raw())
     }
@@ -166,10 +171,7 @@ impl NodeHandler {
     pub fn handle_peers_response(&mut self, msg: &PeersResponse) {
         let peers = msg.peers();
 
-        trace!(
-            "HANDLE PEERS RESPONSE: Connecting to peers {:?}",
-            peers,
-        );
+        trace!("HANDLE PEERS RESPONSE: Connecting to peers {:?}", peers,);
 
         if !self.state.connect_list().is_peer_allowed(msg.from()) {
             error!(

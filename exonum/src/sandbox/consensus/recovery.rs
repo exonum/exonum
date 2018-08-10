@@ -22,10 +22,10 @@ use helpers::{Height, Round, ValidatorId};
 use messages::{PeersRequest, PeersResponse, Precommit, Prevote};
 use node::{self, ConnectInfo};
 
+use blockchain::ValidatorKeys;
 use sandbox::{
     sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
 };
-use blockchain::ValidatorKeys;
 
 #[test]
 fn test_disable_and_enable() {
@@ -453,8 +453,17 @@ fn should_restore_peers_after_restart() {
     // restart the node
     let sandbox_restarted = sandbox.restart_uninitialized();
 
-    sandbox_restarted.add_peer_to_connect_list(a1, ValidatorKeys { consensus_key: p1, service_key: p1 });
-    sandbox_restarted.connect(ConnectInfo { address: a1, public_key: p1 });
+    sandbox_restarted.add_peer_to_connect_list(
+        a1,
+        ValidatorKeys {
+            consensus_key: p1,
+            service_key: p1,
+        },
+    );
+    sandbox_restarted.connect(ConnectInfo {
+        address: a1,
+        public_key: p1,
+    });
 
     // check that the peer is restored
     sandbox_restarted.recv(&peers_request);

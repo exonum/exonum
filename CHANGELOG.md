@@ -17,9 +17,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Config parameter `external_address` is now a required value. (#826)
 
 - `Connect`-messages have been removed from the protocol. Now handshake between
-  peers is handled by noise protocol.
+  peers are handled by noise protocol.
+
+- New message type `PeersResponse` has been added. Peers sends it as the
+  response to `PeersRequest`.
 
 ### New features
+
 - Config parameter `round_timeout` has been renamed to `first_round_timeout`.
   Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`
   where `round_timeout_increase` is determined as a some percentage of
