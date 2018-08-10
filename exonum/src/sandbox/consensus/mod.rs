@@ -32,11 +32,8 @@ mod unsynchronized_message;
 // LOCK
 
 // - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
-// - if haven’t incompatible prevotes
+// - if there are no incompatible prevotes
 //     - if has +2/3 precommits
-//         TODO: This idea is unreachable because there are no any places in the code
-//         where RequestPrecommit is added. (ECR-1627)
-//         - remove precommit request
 //         - COMMIT //covered in test_reach_one_height
 //         - We are fucked up   //covered in handle_full_propose_we_are_fucked_up()
 //         - not send prevotes after commit     //covered in lock_not_send_prevotes_after_commit()
@@ -55,9 +52,6 @@ mod unsynchronized_message;
 // - Request prevotes           //covered in commit_using_unknown_propose_with_precommits()
 //     - if msg.round > locked round    //covered in handle_precommit_remove_request_prevotes()
 // - If has +2/3 precommit      //covered in handle_precommit_positive_scenario_commit()
-//     TODO: This idea is unreachable because there are no any places in the code where
-//     RequestPrecommit is added. (ECR-1627)
-//     - remove precommit request
 //     - COMMIT
 //         - if propose is known    //covered in do_not_commit_if_propose_is_unknown()
 //         - has all txs           //covered in do_not_commit_if_tx_is_unknown()
@@ -104,7 +98,7 @@ mod unsynchronized_message;
 
 // HANDLE REQUEST TIMEOUT:
 
-// TODO: Investigate how check this and come back when '// FIXME: check height?' is fixed. (ECR-1627)
+// TODO: Investigate how check this and come back when '// FIXME: check height?' is fixed. (ECR-1627) (ECR-171)
 // - check height?
 // - Propose/Tx/Prevotes/Precommits/Commit  //looks like that all these are covered
 //      send(RequestPropose):       test_queue_prevote_message_from_next_height
@@ -112,5 +106,3 @@ mod unsynchronized_message;
 // - if we have another known node:
 //     - send new request message//for RequestTransaction is covered in handle_tx_handle_full_propose()
 //     - add timeout             //for RequestTransaction is covered in handle_tx_handle_full_propose()
-
-// TODO: Add scenario for single node network. (ECR-1627)
