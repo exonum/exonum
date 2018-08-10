@@ -17,6 +17,7 @@
 #![allow(bare_trait_objects)]
 
 use failure;
+use snow::SnowError;
 
 use std::io;
 
@@ -42,6 +43,12 @@ impl From<NoiseError> for io::Error {
 
 impl From<failure::Error> for NoiseError {
     fn from(e: failure::Error) -> Self {
+        NoiseError::Other(format!("{:?}", e))
+    }
+}
+
+impl From<SnowError> for NoiseError {
+    fn from(e: SnowError) -> Self {
         NoiseError::Other(format!("{:?}", e))
     }
 }

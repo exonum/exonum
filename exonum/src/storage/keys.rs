@@ -348,13 +348,13 @@ mod tests {
         (fuzz $type:ident, $size:expr => $test_name:ident) => {
             #[test]
             fn $test_name() {
-                use rand::{thread_rng, Rng};
+                use rand::{distributions::Standard, thread_rng, Rng};
                 let mut rng = thread_rng();
 
                 // Fuzzed roundtrip
                 let mut buffer = [0_u8; $size];
                 let handpicked_vals = vec![$type::min_value(), $type::max_value()];
-                for x in rng.gen_iter::<$type>()
+                for x in rng.sample_iter(&Standard)
                     .take(FUZZ_SAMPLES)
                     .chain(handpicked_vals)
                 {
@@ -364,7 +364,7 @@ mod tests {
 
                 // Fuzzed ordering
                 let (mut x_buffer, mut y_buffer) = ([0_u8; $size], [0_u8; $size]);
-                let mut vals: Vec<$type> = rng.gen_iter().take(FUZZ_SAMPLES).collect();
+                let mut vals: Vec<$type> = rng.sample_iter(&Standard).take(FUZZ_SAMPLES).collect();
                 vals.sort();
                 for w in vals.windows(2) {
                     let (x, y) = (w[0], w[1]);

@@ -16,10 +16,10 @@ use futures::{
     future, future::{err, Either}, stream::SplitStream, sync::mpsc, unsync, Future, IntoFuture,
     Poll, Sink, Stream,
 };
+use tokio_codec::Framed;
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Handle,
 };
-use tokio_io::codec::Framed;
 use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
@@ -171,7 +171,7 @@ impl ConnectionsPool {
         let handshake_params = handshake_params.clone();
 
         let action = move || TcpStream::connect(&peer, &handle_cloned);
-        let connect_handle = Retry::spawn(handle.clone(), strategy, action)
+        let connect_handle = Retry::spawn(strategy, action)
             .map_err(into_other)
             // Configure socket
             .and_then(move |sock| {

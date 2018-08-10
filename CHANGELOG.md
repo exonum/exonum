@@ -73,6 +73,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Custom log formatting (along with `colored` and `term` dependencies) has been
   removed in favor of `env_logger`. (#857).
 
+- Several dependencies have been updated. (#861)
+
 ## 0.9.1 - 2018-08-02
 
 ### Bug Fixes

@@ -633,13 +633,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::SparseListIndex;
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use storage::db::Database;
 
     const IDX_NAME: &'static str = "idx_name";
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
     fn list_index_methods(db: Box<dyn Database>) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{RngCore, SeedableRng, XorShiftRng};
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
@@ -64,7 +64,7 @@ impl TimestampingTxGenerator {
         data_size: usize,
         keypair: (PublicKey, SecretKey),
     ) -> TimestampingTxGenerator {
-        let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
+        let rand = XorShiftRng::from_seed([9; 16]);
 
         TimestampingTxGenerator {
             rand,
