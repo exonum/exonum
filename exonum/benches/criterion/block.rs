@@ -120,8 +120,12 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
 
 fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
     const TRANSACTIONS_IN_BLOCK: u64 = 100;
+    // Number of generated accounts.
     const KEY_COUNT: usize = TRANSACTIONS_IN_BLOCK as usize * 10;
+    // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
+    // The final blockchain height.
+    const HEIGHT: u64 = 100;
 
     struct Cryptocurrency;
 
@@ -177,41 +181,64 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
         keys: &[(PublicKey, SecretKey)],
     ) -> Vec<Hash> {
         let mut fork = blockchain.fork();
-        let mut txs = Vec::new();
-        {
+        let txs: Vec<_> = {
             let mut schema = Schema::new(&mut fork);
-            for i in (height * count)..((height + 1) * count) {
-                let tx = Tx::new(
-                    &keys[i as usize % KEY_COUNT].0,
-                    &keys[(i as usize + KEY_COUNT / 7 * 3) % KEY_COUNT].0,
-                    &keys[i as usize % KEY_COUNT].1,
-                );
-                let tx_hash = Transaction::hash(&tx);
-                txs.push(tx_hash);
-                schema.add_transaction_into_pool(tx.raw().clone());
-            }
-        }
+
+            (0..count)
+                .map(|x| x + height * count)
+                .map(|i| {
+                    // gcd(7, KEY_COUNT) == 1. This ensures that the recipient for each
+                    // height is different, even if the sender is the same, which is
+                    // required for proper emulation of transaction processing - we shouldn't
+                    // process the same transaction multiple times, as this never occurs
+                    // in the "real" blockchain.
+                    let shift = KEY_COUNT / 7 * (height as usize + 1);
+                    let tx = Tx::new(
+                        &keys[i as usize % KEY_COUNT].0,
+                        &keys[(i as usize + shift) % KEY_COUNT].0,
+                        &keys[i as usize % KEY_COUNT].1,
+                    );
+
+                    schema.add_transaction_into_pool(tx.raw().clone());
+                    Transaction::hash(&tx)
+                })
+                .collect()
+        };
         blockchain.merge(fork.into_patch()).unwrap();
         txs
     }
 
-    let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
-    let mut keys = Vec::new();
+    // Ensure proper transaction processing. These assertions are performed before
+    // the benchmark and do not influence its timings.
+    fn assert_transactions_in_pool(blockchain: &Blockchain, txs: &[Hash]) {
+        let snapshot = blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
 
-    for _ in 0..KEY_COUNT {
-        keys.push(gen_keypair());
+        assert!(txs.iter().all(|hash| {
+            schema.transactions_pool().contains(&hash) &&
+                !schema.transactions_locations().contains(&hash)
+        }));
     }
-    for i in 0..100 {
+
+    let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
+    let keys: Vec<_> = (0..KEY_COUNT)
+        .map(|_| gen_keypair())
+        .collect();
+
+    for i in 0..HEIGHT {
         let txs = prepare_txs(&mut blockchain, i, TRANSACTIONS_IN_BLOCK, &keys);
+        assert_transactions_in_pool(&blockchain, &txs);
+
         let patch = execute_block(&blockchain, i, &txs);
         blockchain.merge(patch).unwrap();
     }
 
-    let txs = prepare_txs(&mut blockchain, 100, TRANSACTIONS_IN_BLOCK, &keys);
+    let txs = prepare_txs(&mut blockchain, HEIGHT, TRANSACTIONS_IN_BLOCK, &keys);
+    assert_transactions_in_pool(&blockchain, &txs);
     c.bench(
         "cryptocurrency",
         Benchmark::new("cryptocurrency", move |b| {
-            b.iter(|| execute_block(&blockchain, 100, &txs))
+            b.iter(|| execute_block(&blockchain, HEIGHT, &txs))
         }).sample_size(50),
     );
 }
