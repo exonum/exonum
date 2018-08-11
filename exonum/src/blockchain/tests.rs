@@ -186,6 +186,42 @@ fn gen_tempdir_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(10).collect()
 }
 
+fn clear_transaction_pool(blockchain: &mut Blockchain) {
+    let (_, sec_key) = gen_keypair();
+    let mut txs: Vec<_> = (1..5).map(|i| Tx::new(i, &sec_key)).collect();
+
+    let mut fork = blockchain.fork();
+    let mut schema = Schema::new(&mut fork);
+    for tx in &txs {
+        schema.add_transaction_into_pool(tx.raw().clone());
+    }
+    assert!(
+        txs.iter()
+            .all(|tx| schema.transactions_pool().contains(&tx.hash()))
+    );
+    assert_eq!(schema.transactions_pool_len(), txs.len() as u64);
+
+    schema.clear_transaction_pool();
+    assert!(
+        txs.iter()
+            .map(|tx| tx.hash())
+            .all(|hash| !schema.transactions_pool().contains(&hash)
+                && !schema.transactions().contains(&hash))
+    );
+    assert_eq!(schema.transactions_pool_len(), 0);
+
+    // Check that adding transactions in the pool works normally after clearing the pool.
+    txs.truncate(2);
+    for tx in &txs {
+        schema.add_transaction_into_pool(tx.raw().clone());
+    }
+    assert!(
+        txs.iter()
+            .all(|tx| schema.transactions_pool().contains(&tx.hash()))
+    );
+    assert_eq!(schema.transactions_pool_len(), txs.len() as u64);
+}
+
 fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (_, sec_key) = gen_keypair();
 
@@ -489,6 +525,12 @@ mod memorydb_tests {
     }
 
     #[test]
+    fn clear_transaction_pool() {
+        let mut blockchain = create_blockchain();
+        super::clear_transaction_pool(&mut blockchain);
+    }
+
+    #[test]
     fn test_handling_tx_panic() {
         let mut blockchain = create_blockchain();
         super::handling_tx_panic(&mut blockchain);
@@ -568,6 +610,13 @@ mod rocksdb_tests {
 
     fn create_temp_dir() -> TempDir {
         TempDir::new(super::gen_tempdir_name().as_str()).unwrap()
+    }
+
+    #[test]
+    fn clear_transaction_pool() {
+        let dir = create_temp_dir();
+        let mut blockchain = create_blockchain(dir.path());
+        super::clear_transaction_pool(&mut blockchain);
     }
 
     #[test]

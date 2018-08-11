@@ -549,4 +549,20 @@ impl<'a> Schema<&'a mut Fork> {
             Err(())
         }
     }
+
+    /// Removes all transactions from the node's pool.
+    #[doc(hidden)]
+    pub fn clear_transaction_pool(&mut self) {
+        let tx_hashes: Vec<_> = {
+            let pool = self.transactions_pool();
+            let hashes = pool.iter().collect();
+            hashes
+        };
+
+        for hash in &tx_hashes {
+            self.transactions_pool_mut().remove(hash);
+            self.transactions_mut().remove(hash);
+        }
+        self.transactions_pool_len_index_mut().set(0);
+    }
 }
