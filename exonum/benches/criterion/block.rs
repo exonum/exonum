@@ -12,23 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{Benchmark, Criterion};
+use criterion::{ParameterizedBenchmark, Criterion};
 use exonum::{
     blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction},
-    crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey},
-    encoding::Error as EncodingError, helpers::{Height, ValidatorId},
-    messages::{Message, RawTransaction}, node::ApiSender,
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction}, node::ApiSender,
     storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, Snapshot},
 };
 use futures::sync::mpsc;
+use rand::{seq::sample_slice_ref, Rng, SeedableRng, XorShiftRng};
 use tempdir::TempDir;
 
 const TIMESTAMPING_SERVICE_ID: u16 = 1;
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 
-const TRANSACTIONS_IN_BLOCK: usize = 100;
-// The final blockchain height.
-const HEIGHT: usize = 100;
+const TOTAL_TRANSACTIONS: usize = 10_000;
+const TXS_IN_BLOCK: &[usize] = &[10, 25, 50, 100, 200];
+
+// Shorthand type for boxed transactions. Using `Box<Transaction>` within an `impl Iterator`
+// requires specifying the lifetime explicitly, so we do this one time here.
+type BoxedTx = Box<dyn Transaction + 'static>;
+
+fn gen_keypair_from_rng<R: Rng>(rng: &mut R) -> (PublicKey, SecretKey) {
+    use exonum::crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+
+    let mut bytes = [0_u8; SEED_LENGTH];
+    rng.fill(&mut bytes);
+    gen_keypair_from_seed(&Seed::new(bytes))
+}
+
+fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
+    let options = DbOptions::default();
+    RocksDB::open(tempdir.path(), &options).unwrap()
+}
 
 fn create_blockchain(db: impl Database, services: Vec<Box<Service>>) -> Blockchain {
     use std::sync::Arc;
@@ -50,7 +66,7 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> Patch {
         .1
 }
 
-fn execute_timestamping(db: impl Database, c: &mut Criterion) {
+fn timestamping() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
     struct Timestamping;
 
     impl Service for Timestamping {
@@ -66,7 +82,7 @@ fn execute_timestamping(db: impl Database, c: &mut Criterion) {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
             Ok(Box::new(Tx::from_raw(raw)?))
         }
     }
@@ -91,42 +107,18 @@ fn execute_timestamping(db: impl Database, c: &mut Criterion) {
         }
     }
 
-    fn prepare_txs(blockchain: &mut Blockchain, height: u64, count: u64) -> Vec<Hash> {
-        let mut fork = blockchain.fork();
-        let mut txs = Vec::new();
-        {
-            let mut schema = Schema::new(&mut fork);
-            let (pub_key, sec_key) = gen_keypair();
-            for i in (height * count)..((height + 1) * count) {
-                let tx = Tx::new(&pub_key, &i.hash(), &sec_key);
-                let tx_hash = Transaction::hash(&tx);
-                txs.push(tx_hash);
-                schema.add_transaction_into_pool(tx.raw().clone());
-            }
-        }
-        blockchain.merge(fork.into_patch()).unwrap();
-        txs
-    }
-    let mut blockchain = create_blockchain(db, vec![Box::new(Timestamping)]);
-    for i in 0..100 {
-        let txs = prepare_txs(&mut blockchain, i, 1000);
-        let patch = execute_block(&blockchain, i, &txs);
-        blockchain.merge(patch).unwrap();
-    }
+    let mut rng = XorShiftRng::from_seed([2_u8; 16]);
 
-    let txs = prepare_txs(&mut blockchain, 100, 1000);
-
-    c.bench(
-        "timestamping",
-        Benchmark::new("timestamping", move |b| {
-            b.iter(|| execute_block(&blockchain, 100, &txs))
-        }).sample_size(16),
-    );
+    let generator = (0..).map(move |i| {
+        let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+        Tx::new(&pub_key, &i.hash(), &sec_key).into()
+    });
+    (Box::new(Timestamping), generator)
 }
 
-fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = impl Transaction>) {
+fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
     // Number of generated accounts.
-    const KEY_COUNT: usize = TRANSACTIONS_IN_BLOCK * 10;
+    const KEY_COUNT: usize = TOTAL_TRANSACTIONS / 10;
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
@@ -145,7 +137,7 @@ fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = impl Transaction>
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
             Ok(Box::new(Tx::from_raw(raw)?))
         }
     }
@@ -156,6 +148,7 @@ fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = impl Transaction>
             struct Tx {
                 from: &PublicKey,
                 to: &PublicKey,
+                seed: u32,
             }
         }
     }
@@ -177,120 +170,117 @@ fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = impl Transaction>
         }
     }
 
-    let keys: Vec<_> = (0..KEY_COUNT).map(|_| gen_keypair()).collect();
+    let mut rng = XorShiftRng::from_seed([1; 16]);
+    let keys: Vec<_> = (0..KEY_COUNT)
+        .map(|_| gen_keypair_from_rng(&mut rng))
+        .collect();
 
-    let tx_generator = (0..).map(move |i| {
-        let height = i / TRANSACTIONS_IN_BLOCK;
-        // Different shift for each height ensures that the recipient for each
-        // height is different, even if the sender is the same, which is
-        // required for proper emulation of transaction processing - we shouldn't
-        // process the same transaction multiple times, as this never occurs
-        // in the "real" blockchain.
-        let shift = height + 1;
-
-        Tx::new(
-            &keys[i as usize % KEY_COUNT].0,
-            &keys[(i as usize + shift) % KEY_COUNT].0,
-            &keys[i as usize % KEY_COUNT].1,
-        )
+    let tx_generator = (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
+        [(ref from, ref from_sk), (ref to, ..)] => Tx::new(from, to, i, from_sk).into(),
+        _ => unreachable!(),
     });
 
     (Box::new(Cryptocurrency), tx_generator)
 }
 
-fn init_blockchain(
-    db: impl Database,
-    service: Box<dyn Service>,
-    generator: impl Iterator<Item = impl Transaction>,
-) -> (Blockchain, Vec<Hash>) {
-    fn prepare_txs(blockchain: &mut Blockchain, transactions: &[impl Transaction]) -> Vec<Hash> {
-        let mut fork = blockchain.fork();
+/// Writes transactions to the pool and returns their hashes.
+fn prepare_txs(blockchain: &mut Blockchain, transactions: &[BoxedTx]) -> Vec<Hash> {
+    let mut fork = blockchain.fork();
 
-        let tx_hashes = {
-            let mut schema = Schema::new(&mut fork);
+    let tx_hashes = {
+        let mut schema = Schema::new(&mut fork);
 
-            transactions
-                .iter()
-                .map(|tx| {
-                    schema.add_transaction_into_pool(tx.raw().clone());
-                    tx.hash()
-                })
-                .collect()
-        };
+        transactions
+            .iter()
+            .map(|tx| {
+                schema.add_transaction_into_pool(tx.raw().clone());
+                tx.hash()
+            })
+            .collect()
+    };
 
-        blockchain.merge(fork.into_patch()).unwrap();
+    blockchain.merge(fork.into_patch()).unwrap();
+    tx_hashes
+}
+
+/// Verifies that transactions with the specified hashes are present in the pool.
+///
+/// We do this to ensure proper transaction processing. The assertions are performed before
+/// the benchmark and do not influence its timings.
+fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+
+    assert!(
         tx_hashes
-    }
+            .iter()
+            .all(|hash| schema.transactions_pool().contains(&hash)
+                && !schema.transactions_locations().contains(&hash))
+    );
+    assert_eq!(tx_hashes.len() as u64, schema.transactions_pool_len());
+}
 
-    // Ensure proper transaction processing. These assertions are performed before
-    // the benchmark and do not influence its timings.
-    fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
-        let snapshot = blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-
-        assert!(
-            tx_hashes
-                .iter()
-                .all(|hash| schema.transactions_pool().contains(&hash)
-                    && !schema.transactions_locations().contains(&hash))
-        );
-    }
-
-    let mut blockchain = create_blockchain(db, vec![service]);
+fn prepare_blockchain(
+    blockchain: &mut Blockchain,
+    generator: impl Iterator<Item = BoxedTx>,
+    blockchain_height: usize,
+    txs_in_block: usize,
+) {
     let transactions: Vec<_> = generator
-        .take(TRANSACTIONS_IN_BLOCK * (HEIGHT + 1))
+        .take(txs_in_block * blockchain_height)
         .collect();
 
-    for i in 0..HEIGHT {
-        let start = TRANSACTIONS_IN_BLOCK * i;
-        let end = TRANSACTIONS_IN_BLOCK * (i + 1);
-        let tx_hashes = prepare_txs(&mut blockchain, &transactions[start..end]);
-        assert_transactions_in_pool(&blockchain, &tx_hashes);
+    for i in 0..blockchain_height {
+        let start = txs_in_block * i;
+        let end = txs_in_block * (i + 1);
+        let tx_hashes = prepare_txs(blockchain, &transactions[start..end]);
+        assert_transactions_in_pool(blockchain, &tx_hashes);
 
-        let patch = execute_block(&blockchain, i as u64, &tx_hashes);
+        let patch = execute_block(blockchain, i as u64, &tx_hashes);
         blockchain.merge(patch).unwrap();
     }
-
-    let start = TRANSACTIONS_IN_BLOCK * HEIGHT;
-    let tx_hashes = prepare_txs(&mut blockchain, &transactions[start..]);
-    assert_transactions_in_pool(&blockchain, &tx_hashes);
-
-    (blockchain, tx_hashes)
 }
 
-fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
-    let options = DbOptions::default();
-    RocksDB::open(tempdir.path(), &options).unwrap()
-}
-
-fn bench_execute_block_timestamping_rocksdb(c: &mut Criterion) {
+fn execute_block_rocksdb<F, I>(criterion: &mut Criterion, init: F, bench_name: &'static str)
+where
+    F: FnOnce() -> (Box<dyn Service>, I),
+    I: Iterator<Item = BoxedTx> + 'static,
+{
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);
-    execute_timestamping(db, c)
-}
+    let (service, mut tx_generator) = init();
+    let mut blockchain = create_blockchain(db, vec![service]);
 
-fn execute_block_cryptocurrency_rocksdb(criterion: &mut Criterion) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    let (service, tx_generator) = cryptocurrency();
-    let (blockchain, tx_hashes) = init_blockchain(db, service, tx_generator);
-
-    criterion.bench(
-        "cryptocurrency",
-        Benchmark::new("cryptocurrency", move |bencher| {
-            bencher.iter(|| {
-                execute_block(&blockchain, HEIGHT as u64, &tx_hashes);
-            });
-        }).sample_size(50),
+    // We don't particularly care how transactions are distributed in the blockchain
+    // in the preparation phase.
+    prepare_blockchain(
+        &mut blockchain,
+        tx_generator.by_ref(),
+        TOTAL_TRANSACTIONS / TXS_IN_BLOCK[2],
+        TXS_IN_BLOCK[2],
     );
-}
 
-pub fn bench_block(c: &mut Criterion) {
+    let txs: Vec<_> = tx_generator.take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1]).collect();
+
     // Because execute_block is not really "micro benchmark"
     // executing it as regular benches, with 100 samples,
     // lead to relatively big testing time.
     // That's why the number of samples was decreased in each test.
+    criterion.bench(
+        bench_name,
+        ParameterizedBenchmark::new(bench_name, move |bencher, &&txs_in_block| {
+            let tx_hashes = prepare_txs(&mut blockchain, &txs[0..txs_in_block]);
+            assert_transactions_in_pool(&blockchain, &tx_hashes);
 
-    bench_execute_block_timestamping_rocksdb(c);
-    execute_block_cryptocurrency_rocksdb(c);
+            let height: u64 = blockchain.last_block().height().next().into();
+            bencher.iter(|| {
+                execute_block(&blockchain, height, &tx_hashes);
+            });
+        }, TXS_IN_BLOCK).sample_size(50),
+    );
+}
+
+pub fn bench_block(criterion: &mut Criterion) {
+    execute_block_rocksdb(criterion, timestamping, "block_timestamping");
+    execute_block_rocksdb(criterion, cryptocurrency, "block_cryptocurrency");
 }
