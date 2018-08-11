@@ -12,25 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{ParameterizedBenchmark, Criterion};
+//! Benchmarking performance of creating patches for blocks (`Blockchain::create_patch` method).
+//!
+//! What the benchmark measures:
+//!
+//! - Work with the storage (reading and writing from indexes).
+//! - Cryptographic operations (`ProofMapIndex` in the `cryptocurrency` bench).
+//!
+//! What the benchmark doesn't measure:
+//!
+//! - Signature verification (transactions are written directly to the node's pool, bypassing
+//!   signature checks and other verification).
+
+use criterion::{Criterion, ParameterizedBenchmark};
 use exonum::{
-    blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction},
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction}, node::ApiSender,
-    storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, Snapshot},
+    blockchain::{Blockchain, Schema, Service, Transaction}, crypto::{Hash, PublicKey, SecretKey},
+    helpers::{Height, ValidatorId}, node::ApiSender,
+    storage::{Database, DbOptions, Patch, RocksDB},
 };
 use futures::sync::mpsc;
-use rand::{seq::sample_slice_ref, Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng, XorShiftRng};
 use tempdir::TempDir;
 
-const TIMESTAMPING_SERVICE_ID: u16 = 1;
-const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
+/// Number of transactions added to the blockchain before the bench begins.
+const PREPARE_TRANSACTIONS: usize = 10_000;
+/// Tested values for the number of transactions in an added block.
+///
+/// `PREPARE_TRANSACTIONS` should be divisible by all values.
+const TXS_IN_BLOCK: &[usize] = &[10, 25, 50, 100];
 
-const TOTAL_TRANSACTIONS: usize = 10_000;
-const TXS_IN_BLOCK: &[usize] = &[10, 25, 50, 100, 200];
-
-// Shorthand type for boxed transactions. Using `Box<Transaction>` within an `impl Iterator`
-// requires specifying the lifetime explicitly, so we do this one time here.
+/// Shorthand type for boxed transactions. Using `Box<Transaction>` within an `impl Iterator`
+/// requires specifying the lifetime explicitly, so we do this one time here.
 type BoxedTx = Box<dyn Transaction + 'static>;
 
 fn gen_keypair_from_rng<R: Rng>(rng: &mut R) -> (PublicKey, SecretKey) {
@@ -66,8 +78,18 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> Patch {
         .1
 }
 
-fn timestamping() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
-    struct Timestamping;
+mod timestamping {
+    use super::{gen_keypair_from_rng, BoxedTx};
+    use exonum::{
+        blockchain::{ExecutionResult, Service, Transaction}, crypto::{CryptoHash, Hash, PublicKey},
+        encoding::Error as EncodingError, messages::{Message, RawTransaction},
+        storage::{Fork, Snapshot},
+    };
+    use rand::Rng;
+
+    const TIMESTAMPING_SERVICE_ID: u16 = 1;
+
+    pub struct Timestamping;
 
     impl Service for Timestamping {
         fn service_id(&self) -> u16 {
@@ -83,13 +105,15 @@ fn timestamping() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
-            Ok(Box::new(Tx::from_raw(raw)?))
+            use exonum::blockchain::TransactionSet;
+            Ok(TimestampingTransactions::tx_from_raw(raw)?.into())
         }
     }
 
     transactions! {
         TimestampingTransactions {
             const SERVICE_ID = TIMESTAMPING_SERVICE_ID;
+
             struct Tx {
                 from: &PublicKey,
                 data: &Hash,
@@ -107,22 +131,31 @@ fn timestamping() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
         }
     }
 
-    let mut rng = XorShiftRng::from_seed([2_u8; 16]);
-
-    let generator = (0..).map(move |i| {
-        let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-        Tx::new(&pub_key, &i.hash(), &sec_key).into()
-    });
-    (Box::new(Timestamping), generator)
+    pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+        (0_u32..).map(move |i| {
+            let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+            Tx::new(&pub_key, &i.hash(), &sec_key).into()
+        })
+    }
 }
 
-fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
+mod cryptocurrency {
+    use super::{gen_keypair_from_rng, BoxedTx};
+    use exonum::{
+        blockchain::{ExecutionResult, Service, Transaction}, crypto::{Hash, PublicKey},
+        encoding::Error as EncodingError, messages::{Message, RawTransaction},
+        storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
+    };
+    use rand::{seq::sample_slice_ref, Rng};
+
+    const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
+
     // Number of generated accounts.
-    const KEY_COUNT: usize = TOTAL_TRANSACTIONS / 10;
+    const KEY_COUNT: usize = super::PREPARE_TRANSACTIONS / 10;
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    struct Cryptocurrency;
+    pub struct Cryptocurrency;
 
     impl Service for Cryptocurrency {
         fn service_id(&self) -> u16 {
@@ -138,14 +171,24 @@ fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
-            Ok(Box::new(Tx::from_raw(raw)?))
+            use exonum::blockchain::TransactionSet;
+            Ok(CryptocurrencyTransactions::tx_from_raw(raw)?.into())
         }
     }
 
     transactions! {
         CryptocurrencyTransactions {
             const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
+
+            /// Transfers one unit of currency from `from` to `to`.
             struct Tx {
+                from: &PublicKey,
+                to: &PublicKey,
+                seed: u32,
+            }
+
+            /// Same as `Tx`, but without cryptographic proofs in `execute`.
+            struct SimpleTx {
                 from: &PublicKey,
                 to: &PublicKey,
                 seed: u32,
@@ -159,7 +202,7 @@ fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            let mut index = ProofMapIndex::new("balances_txs", fork);
+            let mut index = ProofMapIndex::new("provable_balances", fork);
 
             let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
@@ -170,17 +213,44 @@ fn cryptocurrency() -> (Box<dyn Service>, impl Iterator<Item = BoxedTx>) {
         }
     }
 
-    let mut rng = XorShiftRng::from_seed([1; 16]);
-    let keys: Vec<_> = (0..KEY_COUNT)
-        .map(|_| gen_keypair_from_rng(&mut rng))
-        .collect();
+    impl Transaction for SimpleTx {
+        fn verify(&self) -> bool {
+            self.verify_signature(self.from())
+        }
 
-    let tx_generator = (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-        [(ref from, ref from_sk), (ref to, ..)] => Tx::new(from, to, i, from_sk).into(),
-        _ => unreachable!(),
-    });
+        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+            let mut index = MapIndex::new("balances", fork);
 
-    (Box::new(Cryptocurrency), tx_generator)
+            let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            index.put(self.from(), from_balance - 1);
+            index.put(self.to(), to_balance + 1);
+
+            Ok(())
+        }
+    }
+
+    pub fn provable_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+        let keys: Vec<_> = (0..KEY_COUNT)
+            .map(|_| gen_keypair_from_rng(&mut rng))
+            .collect();
+
+        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
+            [(ref from, ref from_sk), (ref to, ..)] => Tx::new(from, to, i, from_sk).into(),
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn unprovable_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+        let keys: Vec<_> = (0..KEY_COUNT)
+            .map(|_| gen_keypair_from_rng(&mut rng))
+            .collect();
+
+        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
+            [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::new(from, to, i, from_sk).into(),
+            _ => unreachable!(),
+        })
+    }
 }
 
 /// Writes transactions to the pool and returns their hashes.
@@ -189,6 +259,10 @@ fn prepare_txs(blockchain: &mut Blockchain, transactions: &[BoxedTx]) -> Vec<Has
 
     let tx_hashes = {
         let mut schema = Schema::new(&mut fork);
+
+        // Remove all currently present transactions from the pool,
+        // so that they won't clutter it eventually.
+        schema.clear_transaction_pool();
 
         transactions
             .iter()
@@ -226,9 +300,7 @@ fn prepare_blockchain(
     blockchain_height: usize,
     txs_in_block: usize,
 ) {
-    let transactions: Vec<_> = generator
-        .take(txs_in_block * blockchain_height)
-        .collect();
+    let transactions: Vec<_> = generator.take(txs_in_block * blockchain_height).collect();
 
     for i in 0..blockchain_height {
         let start = txs_in_block * i;
@@ -241,14 +313,14 @@ fn prepare_blockchain(
     }
 }
 
-fn execute_block_rocksdb<F, I>(criterion: &mut Criterion, init: F, bench_name: &'static str)
-where
-    F: FnOnce() -> (Box<dyn Service>, I),
-    I: Iterator<Item = BoxedTx> + 'static,
-{
+fn execute_block_rocksdb(
+    criterion: &mut Criterion,
+    bench_name: &'static str,
+    service: Box<dyn Service>,
+    mut tx_generator: impl Iterator<Item = BoxedTx>,
+) {
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);
-    let (service, mut tx_generator) = init();
     let mut blockchain = create_blockchain(db, vec![service]);
 
     // We don't particularly care how transactions are distributed in the blockchain
@@ -256,11 +328,14 @@ where
     prepare_blockchain(
         &mut blockchain,
         tx_generator.by_ref(),
-        TOTAL_TRANSACTIONS / TXS_IN_BLOCK[2],
+        PREPARE_TRANSACTIONS / TXS_IN_BLOCK[2],
         TXS_IN_BLOCK[2],
     );
 
-    let txs: Vec<_> = tx_generator.take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1]).collect();
+    // Pre-cache transactions for the created block.
+    let txs: Vec<_> = tx_generator
+        .take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1])
+        .collect();
 
     // Because execute_block is not really "micro benchmark"
     // executing it as regular benches, with 100 samples,
@@ -268,19 +343,41 @@ where
     // That's why the number of samples was decreased in each test.
     criterion.bench(
         bench_name,
-        ParameterizedBenchmark::new(bench_name, move |bencher, &&txs_in_block| {
-            let tx_hashes = prepare_txs(&mut blockchain, &txs[0..txs_in_block]);
-            assert_transactions_in_pool(&blockchain, &tx_hashes);
+        ParameterizedBenchmark::new(
+            bench_name,
+            move |bencher, &&txs_in_block| {
+                let tx_hashes = prepare_txs(&mut blockchain, &txs[..txs_in_block]);
+                assert_transactions_in_pool(&blockchain, &tx_hashes);
 
-            let height: u64 = blockchain.last_block().height().next().into();
-            bencher.iter(|| {
-                execute_block(&blockchain, height, &tx_hashes);
-            });
-        }, TXS_IN_BLOCK).sample_size(50),
+                let height: u64 = blockchain.last_block().height().next().into();
+                bencher.iter(|| {
+                    execute_block(&blockchain, height, &tx_hashes);
+                });
+            },
+            TXS_IN_BLOCK,
+        ).sample_size(50),
     );
 }
 
 pub fn bench_block(criterion: &mut Criterion) {
-    execute_block_rocksdb(criterion, timestamping, "block_timestamping");
-    execute_block_rocksdb(criterion, cryptocurrency, "block_cryptocurrency");
+    execute_block_rocksdb(
+        criterion,
+        "block_timestamping",
+        timestamping::Timestamping.into(),
+        timestamping::transactions(XorShiftRng::from_seed([2; 16])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block_cryptocurrency",
+        cryptocurrency::Cryptocurrency.into(),
+        cryptocurrency::provable_transactions(XorShiftRng::from_seed([3; 16])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block_cryptocurrency_no_proofs",
+        cryptocurrency::Cryptocurrency.into(),
+        cryptocurrency::unprovable_transactions(XorShiftRng::from_seed([4; 16])),
+    );
 }
