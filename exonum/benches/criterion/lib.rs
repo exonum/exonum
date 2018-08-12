@@ -17,6 +17,7 @@ extern crate criterion;
 #[macro_use]
 extern crate exonum;
 extern crate futures;
+extern crate log;
 extern crate num;
 extern crate rand;
 extern crate tempdir;

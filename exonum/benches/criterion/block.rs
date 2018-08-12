@@ -23,6 +23,19 @@
 //!
 //! - Signature verification (transactions are written directly to the node's pool, bypassing
 //!   signature checks and other verification).
+//!
+//! # Constituent benchmarks
+//!
+//! - `block_timestamping`: Valid no-op transactions. Measures the efficiency of operations
+//!   on core indexes (e.g., recording transaction location and result).
+//! - `block_timestamping_panic`: Panicking no-op transactions. Measures the efficiency of
+//!   `panic` handling.
+//! - `block_cryptocurrency`: Transferring cryptocurrency among random accounts. Accounts are
+//!   stored in a `ProofMapIndex`.
+//! - `block_cryptocurrency_no_proofs`: Transferring cryptocurrency among random accounts.
+//!   Accounts are stored in a `MapIndex`.
+//! - `block_cryptocurrency_rollback`: Transferring cryptocurrency among random accounts.
+//!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
 use criterion::{Criterion, ParameterizedBenchmark};
 use exonum::{
@@ -118,6 +131,11 @@ mod timestamping {
                 from: &PublicKey,
                 data: &Hash,
             }
+
+            struct PanickingTx {
+                from: &PublicKey,
+                data: &Hash,
+            }
         }
     }
 
@@ -131,10 +149,27 @@ mod timestamping {
         }
     }
 
+    impl Transaction for PanickingTx {
+        fn verify(&self) -> bool {
+            self.verify_signature(self.from())
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            panic!("panic text");
+        }
+    }
+
     pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             Tx::new(&pub_key, &i.hash(), &sec_key).into()
+        })
+    }
+
+    pub fn panicking_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+        (0_u32..).map(move |i| {
+            let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
+            PanickingTx::new(&pub_key, &i.hash(), &sec_key).into()
         })
     }
 }
@@ -142,9 +177,9 @@ mod timestamping {
 mod cryptocurrency {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
-        blockchain::{ExecutionResult, Service, Transaction}, crypto::{Hash, PublicKey},
-        encoding::Error as EncodingError, messages::{Message, RawTransaction},
-        storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
+        blockchain::{ExecutionError, ExecutionResult, Service, Transaction},
+        crypto::{Hash, PublicKey}, encoding::Error as EncodingError,
+        messages::{Message, RawTransaction}, storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
     };
     use rand::{seq::sample_slice_ref, Rng};
 
@@ -193,6 +228,13 @@ mod cryptocurrency {
                 to: &PublicKey,
                 seed: u32,
             }
+
+            /// Same as `SimpleTx`, but signals an error 50% of the time.
+            struct RollbackTx {
+                from: &PublicKey,
+                to: &PublicKey,
+                seed: u32,
+            }
         }
     }
 
@@ -230,6 +272,29 @@ mod cryptocurrency {
         }
     }
 
+    impl Transaction for RollbackTx {
+        fn verify(&self) -> bool {
+            self.verify_signature(self.from())
+        }
+
+        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+            let mut index = MapIndex::new("balances", fork);
+
+            let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            index.put(self.from(), from_balance - 1);
+            index.put(self.to(), to_balance + 1);
+
+            // We deliberately perform the check *after* reads/writes in order
+            // to check efficiency of rolling the changes back.
+            if self.seed() % 2 == 0 {
+                Ok(())
+            } else {
+                Err(ExecutionError::new(1))
+            }
+        }
+    }
+
     pub fn provable_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
@@ -248,6 +313,17 @@ mod cryptocurrency {
 
         (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
             [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::new(from, to, i, from_sk).into(),
+            _ => unreachable!(),
+        })
+    }
+
+    pub fn rollback_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+        let keys: Vec<_> = (0..KEY_COUNT)
+            .map(|_| gen_keypair_from_rng(&mut rng))
+            .collect();
+
+        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
+            [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::new(from, to, i, from_sk).into(),
             _ => unreachable!(),
         })
     }
@@ -360,12 +436,28 @@ fn execute_block_rocksdb(
 }
 
 pub fn bench_block(criterion: &mut Criterion) {
+    use log::{self, LevelFilter};
+    use std::panic;
+
+    log::set_max_level(LevelFilter::Off);
+
     execute_block_rocksdb(
         criterion,
         "block_timestamping",
         timestamping::Timestamping.into(),
         timestamping::transactions(XorShiftRng::from_seed([2; 16])),
     );
+
+    // We expect lots of panics here, so we switch their reporting off.
+    let panic_hook = panic::take_hook();
+    panic::set_hook(Box::new(|_| ()));
+    execute_block_rocksdb(
+        criterion,
+        "block_timestamping_panic",
+        timestamping::Timestamping.into(),
+        timestamping::panicking_transactions(XorShiftRng::from_seed([2; 16])),
+    );
+    panic::set_hook(panic_hook);
 
     execute_block_rocksdb(
         criterion,
@@ -379,5 +471,12 @@ pub fn bench_block(criterion: &mut Criterion) {
         "block_cryptocurrency_no_proofs",
         cryptocurrency::Cryptocurrency.into(),
         cryptocurrency::unprovable_transactions(XorShiftRng::from_seed([4; 16])),
+    );
+
+    execute_block_rocksdb(
+        criterion,
+        "block_cryptocurrency_rollback",
+        cryptocurrency::Cryptocurrency.into(),
+        cryptocurrency::rollback_transactions(XorShiftRng::from_seed([4; 16])),
     );
 }
