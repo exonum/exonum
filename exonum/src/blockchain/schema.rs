@@ -552,6 +552,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     /// Removes all transactions from the node's pool.
     #[doc(hidden)]
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn clear_transaction_pool(&mut self) {
         let tx_hashes: Vec<_> = {
             let pool = self.transactions_pool();
