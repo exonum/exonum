@@ -80,7 +80,10 @@ impl NodeHandler {
 
         let public_key = info.public_key;
         if public_key == self.state.our_connect_info().public_key {
-            trace!("Received ConnectInfo with same public key {:?} as ours.", public_key);
+            trace!(
+                "Received ConnectInfo with same public key {:?} as ours.",
+                public_key
+            );
             return;
         }
 
