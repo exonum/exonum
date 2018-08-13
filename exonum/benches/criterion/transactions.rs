@@ -12,35 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const TRANSACTIONS_COUNT: usize = 100_000;
-const SAMPLE_SIZE: usize = 3;
+const TRANSACTIONS_COUNT: usize = 1_000;
+const SAMPLE_SIZE: usize = 20;
 
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use futures::{stream, Future, Sink};
-use num::pow::pow;
-use tempdir::TempDir;
+use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
 use tokio_core::reactor::Core;
 
-use std::{io, sync::Arc, thread};
+use std::{
+    sync::{Arc, RwLock}, thread::{self, JoinHandle},
+};
 
+use exonum::events::InternalRequest;
+use exonum::node::EventsPoolCapacity;
+use exonum::node::ExternalMessage;
 use exonum::{
-    blockchain::{
-        Blockchain, ExecutionResult, GenesisConfig, Service, SharedNodeState, Transaction,
-        TransactionSet, ValidatorKeys,
-    },
-    crypto::{self, Hash, PublicKey}, encoding,
-    events::{
-        error::other_error, Event, EventHandler, HandlerPart, InternalEvent, InternalPart,
-        NetworkEvent,
-    },
-    messages::{Message, RawTransaction},
-    node::{
-        ApiSender, Configuration, ConnectList, DefaultSystemState, ListenerConfig, NodeApiConfig,
-        NodeChannel, NodeConfig, NodeHandler, ServiceConfig,
-    },
-    storage::{Database, DbOptions, Fork, RocksDB, Snapshot},
+    blockchain::{ExecutionResult, Transaction}, crypto::{self, PublicKey},
+    events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
+    messages::Message, node::NodeChannel, storage::Fork,
 };
 
 pub const SERVICE_ID: u16 = 1;
@@ -61,210 +52,170 @@ impl Transaction for Blank {
         self.verify_signature(self.author())
     }
 
-    fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, _: &mut Fork) -> ExecutionResult {
         Ok(())
     }
 }
 
-struct DummyService;
+fn gen_transactions(count: usize, padding_len: usize) -> Vec<Box<Blank>> {
+    let padding = vec![0; padding_len];
 
-impl Service for DummyService {
-    fn service_name(&self) -> &str {
-        "dummy"
-    }
-
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
-
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let tx = Transactions::tx_from_raw(raw)?;
-        Ok(tx.into())
-    }
-}
-
-fn gen_transactions(count: usize, len: usize) -> Vec<Box<dyn Transaction>> {
-    let padding = vec![0; len];
     (0..count)
         .map(|_| {
             let (p, s) = crypto::gen_keypair();
-            Box::new(Blank::new(&p, &padding, &s)) as Box<dyn Transaction>
+            Box::new(Blank::new(&p, &padding, &s))
         })
         .collect()
 }
 
 struct TransactionsHandler {
-    inner: Option<NodeHandler>,
     txs_count: usize,
+    expected_count: usize,
+    finish_signal: Option<oneshot::Sender<()>>,
 }
 
 impl TransactionsHandler {
-    fn inner(&self) -> &NodeHandler {
-        self.inner.as_ref().unwrap()
+    fn new(expected_count: usize) -> (Self, oneshot::Receiver<()>) {
+        let channel = oneshot::channel();
+
+        let handler = TransactionsHandler {
+            txs_count: 0,
+            expected_count,
+            finish_signal: Some(channel.0),
+        };
+        (handler, channel.1)
+    }
+
+    fn is_finished(&self) -> bool {
+        self.finish_signal.is_none()
     }
 }
 
 impl EventHandler for TransactionsHandler {
     fn handle_event(&mut self, event: Event) {
-        let is_transaction = if let Event::Internal(InternalEvent::TxVerified(_)) = event {
-            true
-        } else {
-            false
-        };
+        match event {
+            Event::Internal(InternalEvent::TxVerified(_)) => {
+                assert!(!self.is_finished(), "unexpected `TxVerified`");
 
-        self.inner.as_mut().unwrap().handle_event(event);
-        if is_transaction {
-            self.txs_count -= 1;
-            if self.txs_count == 0 {
-                self.inner.take();
+                self.txs_count += 1;
+
+                if self.txs_count == self.expected_count {
+                    self.finish_signal
+                        .take()
+                        .unwrap()
+                        .send(())
+                        .expect("cannot send finish signal");
+                }
             }
+            _ => unreachable!(),
         }
     }
 }
 
-struct TransactionsBenchmarkRunner {
-    handler: TransactionsHandler,
-    channel: NodeChannel,
-    transactions: Vec<RawTransaction>,
+#[derive(Clone)]
+struct TransactionsHandlerRef {
+    // We need to reset the handler from the main thread and then access it from the
+    // handler thread, hence the use of `Arc<RwLock<_>>`.
+    inner: Arc<RwLock<TransactionsHandler>>,
 }
 
-impl TransactionsBenchmarkRunner {
-    fn new(db: Arc<dyn Database>, transactions: impl IntoIterator<Item = RawTransaction>) -> Self {
-        let node_config = Self::node_config();
-        let channel = NodeChannel::new(&node_config.mempool.events_pool_capacity);
-        let mut blockchain = Blockchain::new(
-            db,
-            vec![Box::new(DummyService) as Box<dyn Service>],
-            node_config.service_public_key,
-            node_config.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        );
-        blockchain.initialize(node_config.genesis.clone()).unwrap();
-
-        let peers = node_config.connect_list.addresses();
-
-        let config = Configuration {
-            listener: ListenerConfig {
-                consensus_public_key: node_config.consensus_public_key,
-                consensus_secret_key: node_config.consensus_secret_key,
-                connect_list: ConnectList::from_config(node_config.connect_list),
-                address: node_config.listen_address,
-            },
-            service: ServiceConfig {
-                service_public_key: node_config.service_public_key,
-                service_secret_key: node_config.service_secret_key,
-            },
-            mempool: node_config.mempool,
-            network: node_config.network,
-            peer_discovery: peers,
-        };
-
-        let transactions = transactions.into_iter().collect::<Vec<_>>();
-        let api_state = SharedNodeState::new(node_config.api.state_update_timeout as u64);
-        let system_state = Box::new(DefaultSystemState(node_config.listen_address));
-        let handler = TransactionsHandler {
-            inner: Some(NodeHandler::new(
-                blockchain,
-                node_config.external_address,
-                channel.node_sender(),
-                system_state,
-                config,
-                api_state,
-                None,
-            )),
-            txs_count: transactions.len(),
-        };
-
-        Self {
-            handler,
-            channel,
-            transactions,
+impl TransactionsHandlerRef {
+    fn new() -> Self {
+        let (handler, _) = TransactionsHandler::new(0);
+        TransactionsHandlerRef {
+            inner: Arc::new(RwLock::new(handler)),
         }
     }
 
-    fn run(self) -> io::Result<()> {
-        // Creates node handler part.
-        let tx_sender = self.channel.network_events.0.clone();
+    fn reset(&self, expected_count: usize) -> oneshot::Receiver<()> {
+        let (handler, finish_signal) = TransactionsHandler::new(expected_count);
+        *self.inner.write().unwrap() = handler;
+        finish_signal
+    }
+}
+
+impl EventHandler for TransactionsHandlerRef {
+    fn handle_event(&mut self, event: Event) {
+        self.inner.write().unwrap().handle_event(event);
+    }
+}
+
+struct TransactionVerifier {
+    tx_sender: Option<Sender<InternalRequest>>,
+    tx_handler: TransactionsHandlerRef,
+    network_thread: JoinHandle<()>,
+    handler_thread: JoinHandle<()>,
+    api_sender: Option<Sender<ExternalMessage>>,
+    network_sender: Option<Sender<NetworkEvent>>,
+}
+
+impl TransactionVerifier {
+    fn new() -> Self {
+        let channel = NodeChannel::new(&EventsPoolCapacity::default());
+        let handler = TransactionsHandlerRef::new();
+
         let handler_part = HandlerPart {
-            handler: self.handler,
-            internal_rx: self.channel.internal_events.1,
-            network_rx: self.channel.network_events.1,
-            api_rx: self.channel.api_requests.1,
+            handler: handler.clone(),
+            internal_rx: channel.internal_events.1,
+            network_rx: channel.network_events.1,
+            api_rx: channel.api_requests.1,
         };
+
+        let handler_thread = thread::spawn(move || {
+            let mut core = Core::new().unwrap();
+            core.run(handler_part.run()).unwrap();
+        });
+
         let internal_part = InternalPart {
-            internal_tx: self.channel.internal_events.0,
-            internal_requests_rx: self.channel.internal_requests.1,
+            internal_tx: channel.internal_events.0,
+            internal_requests_rx: channel.internal_requests.1,
             thread_pool_size: None,
         };
-        // Emulates transactions from the network.
-        let socket_addr = handler_part.handler.inner().system_state.listen_address();
-        let transactions = self.transactions
-            .into_iter()
-            .map(|raw| NetworkEvent::MessageReceived(socket_addr, raw))
-            .collect::<Vec<_>>();
+
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new()?;
+            let mut core = Core::new().unwrap();
             let handle = core.handle();
-            core.handle().spawn(
-                tx_sender
-                    .send_all(stream::iter_ok(transactions))
-                    .map(drop)
-                    .map_err(drop),
-            );
-            core.run(internal_part.run(handle))
-                .map_err(|_| other_error("An error in the `Network` thread occurred"))
+            core.run(internal_part.run(handle)).unwrap();
         });
-        // Drops unused channels.
-        drop(self.channel.api_requests.0);
-        // Runs handler part.
-        let mut core = Core::new()?;
-        core.run(handler_part.run())
-            .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
-        // Drops internal part.
-        drop(self.channel.internal_requests.0);
-        network_thread.join().unwrap()?;
-        Ok(())
-    }
 
-    fn node_config() -> NodeConfig {
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
-
-        let validator_keys = ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
-        };
-        let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
-        let peer_address = "0.0.0.0:2000".parse().unwrap();
-
-        NodeConfig {
-            listen_address: peer_address,
-            external_address: peer_address,
-            service_public_key,
-            service_secret_key,
-            consensus_public_key,
-            consensus_secret_key,
-            genesis,
-            network: Default::default(),
-            connect_list: Default::default(),
-            api: NodeApiConfig::default(),
-            mempool: Default::default(),
-            services_configs: Default::default(),
-            database: Default::default(),
-            thread_pool_size: Default::default(),
+        TransactionVerifier {
+            handler_thread,
+            network_thread,
+            tx_sender: Some(channel.internal_requests.0.clone()),
+            tx_handler: handler,
+            api_sender: Some(channel.api_requests.0),
+            network_sender: Some(channel.network_events.0),
         }
     }
-}
 
-fn create_rocksdb(tempdir: &TempDir) -> Arc<dyn Database> {
-    let options = DbOptions::default();
-    let db = RocksDB::open(tempdir.path(), &options).unwrap();
-    Arc::new(db)
+    fn send_all<'a>(
+        &self,
+        transactions: &'a [Box<Blank>],
+    ) -> impl Future<Item = (), Error = ()> + 'a {
+        let tx_sender = self.tx_sender.as_ref().unwrap().clone();
+        let finish_signal = self.tx_handler.reset(transactions.len());
+
+        tx_sender
+            .send_all(stream::iter_ok(
+                transactions
+                    .iter()
+                    .cloned()
+                    .map(|tx| InternalRequest::VerifyTx(tx as Box<dyn Transaction>)),
+            ))
+            .map(drop)
+            .map_err(drop)
+            .and_then(|()| finish_signal.map_err(drop))
+    }
+
+    /// Stops the transaction verifier.
+    fn join(mut self) {
+        self.tx_sender = None;
+        self.network_thread.join().unwrap();
+
+        self.api_sender = None;
+        self.network_sender = None;
+        self.handler_thread.join().unwrap();
+    }
 }
 
 fn bench_verify_transactions_simple(b: &mut Bencher, &size: &usize) {
@@ -278,27 +229,20 @@ fn bench_verify_transactions_simple(b: &mut Bencher, &size: &usize) {
 
 fn bench_verify_transactions_event_loop(b: &mut Bencher, &size: &usize) {
     let transactions = gen_transactions(TRANSACTIONS_COUNT, size);
-    b.iter_with_large_setup(
-        || {
-            let dir = TempDir::new("exonum").unwrap();
-            let runner = TransactionsBenchmarkRunner::new(
-                create_rocksdb(&dir),
-                transactions
-                    .iter()
-                    .map(|transaction| transaction.raw().clone()),
-            );
-            (runner, dir)
-        },
-        |(runner, _dir)| {
-            runner.run().unwrap();
-        },
-    )
+
+    let verifier = TransactionVerifier::new();
+    let mut core = Core::new().unwrap();
+
+    b.iter(|| {
+        core.run(verifier.send_all(&transactions)).unwrap();
+    });
+    verifier.join();
 }
 
 pub fn bench_verify_transactions(c: &mut Criterion) {
     crypto::init();
 
-    let parameters = (7..12).map(|i| pow(2, i)).collect::<Vec<_>>();
+    let parameters = (7..12).map(|i| 1 << i).collect::<Vec<_>>();
     c.bench(
         "transactions/simple",
         ParameterizedBenchmark::new("size", bench_verify_transactions_simple, parameters.clone())
