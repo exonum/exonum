@@ -161,9 +161,12 @@ impl NoiseWrapper {
     // of AEAD authentication data. Therefore to calculate an actual message
     // length we need to subtract `TAG_LENGTH` multiplied by messages count
     // from `data.len()`.
+    //
+    // f32 precision is enough to calculate message length.
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_precision_loss))]
     fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
         raw_message_len
-            - TAG_LENGTH * ((raw_message_len as f64 / MAX_MESSAGE_LENGTH as f64).ceil() as usize)
+            - TAG_LENGTH * ((raw_message_len as f32 / MAX_MESSAGE_LENGTH as f32).ceil() as usize)
     }
 
     // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
