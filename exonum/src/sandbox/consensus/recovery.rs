@@ -175,7 +175,6 @@ fn should_not_vote_after_node_restart() {
     let current_round = sandbox.current_round();
 
     // Simulate node restart.
-    println!("RESTARTING SANDBOX!");
     let sandbox_restarted = sandbox.restart();
 
     // Assert that consensus messages were recovered and we're in locked state now.

@@ -125,7 +125,6 @@ impl ConnectionsPool {
         handshake_params: &HandshakeParams,
     ) -> Option<Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>> {
         self.get(peer)
-            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
             .or_else(|| {
                 self.clone()
                     .connect_to_peer(
@@ -135,8 +134,8 @@ impl ConnectionsPool {
                         &handle,
                         &handshake_params,
                     )
-                    .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
             })
+            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
     }
 
     fn connect_to_peer(

@@ -28,7 +28,6 @@ impl NodeHandler {
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
-            println!("Message sended to self");
             return;
         }
 

@@ -102,16 +102,16 @@ impl Encoder for MessagesCodec {
 
 #[cfg(test)]
 mod test {
-    use super::MessagesCodec;
+    use tokio_io::codec::{Decoder, Encoder};
 
     use std::net::SocketAddr;
 
+    use super::MessagesCodec;
     use bytes::BytesMut;
     use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use events::noise::{HandshakeParams, NoiseWrapper};
     use messages::{MessageBuffer, RawMessage};
     use node::state::SharedConnectList;
-    use tokio_io::codec::{Decoder, Encoder};
 
     #[test]
     fn decode_message_valid_header_size() {
