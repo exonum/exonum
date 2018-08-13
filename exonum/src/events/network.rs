@@ -135,9 +135,7 @@ impl ConnectionsPool {
                         &handle,
                         &handshake_params,
                     )
-                    .map(|conn_tx| {
-                        conn_fut(Ok(conn_tx).into_future())
-                    })
+                    .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
             })
     }
 
