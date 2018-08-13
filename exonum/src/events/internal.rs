@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{self, future, sync::mpsc, Future, Sink, Stream};
+use futures::{
+    self, future::{self, Either}, sync::mpsc, Future, Sink, Stream,
+};
 use tokio_core::reactor::{Handle, Timeout};
-use tokio_executor::SpawnError;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
-    io, rc::Rc, sync::Arc, time::{Duration, SystemTime},
+    io, time::{Duration, SystemTime},
 };
 
 use super::{
@@ -35,15 +36,15 @@ pub struct InternalPart {
 impl InternalPart {
     pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let thread_pool = if let Some(size) = self.thread_pool_size {
-            Rc::new(ThreadPoolBuilder::new().pool_size(size.into()).build())
+            ThreadPoolBuilder::new().pool_size(size.into()).build()
         } else {
-            Rc::new(ThreadPoolBuilder::new().build())
+            ThreadPoolBuilder::new().build()
         };
         let internal_tx = self.internal_tx.clone();
 
         let fut = self.internal_requests_rx
             .for_each(move |request| {
-                let event = match request {
+                match request {
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
                         let duration = time.duration_since(SystemTime::now())
                             .unwrap_or_else(|_| Duration::from_millis(0));
@@ -58,8 +59,10 @@ impl InternalPart {
                                     .map_err(into_other)
                             })
                             .map_err(|_| panic!("Can't timeout"));
-                        to_box(fut)
+
+                        handle.spawn(fut);
                     }
+
                     InternalRequest::JumpToRound(height, round) => {
                         let internal_tx = internal_tx.clone();
                         let f = futures::lazy(move || {
@@ -68,8 +71,10 @@ impl InternalPart {
                                 .map(drop)
                                 .map_err(into_other)
                         }).map_err(|_| panic!("Can't execute jump to round"));
-                        to_box(f)
+
+                        handle.spawn(f);
                     }
+
                     InternalRequest::Shutdown => {
                         let internal_tx = internal_tx.clone();
                         let f = futures::lazy(move || {
@@ -78,46 +83,32 @@ impl InternalPart {
                                 .map(drop)
                                 .map_err(into_other)
                         }).map_err(|_| panic!("Can't execute shutdown"));
-                        to_box(f)
+
+                        handle.spawn(f);
                     }
+
                     InternalRequest::VerifyTx(tx) => {
                         let internal_tx = internal_tx.clone();
-                        let tx = Arc::new(tx);
-                        let thread_pool = Rc::clone(&thread_pool);
 
-                        let f = future::loop_fn(Err(SpawnError::at_capacity()), move |status| {
-                            let tx = Arc::clone(&tx);
-                            let internal_tx = internal_tx.clone();
-                            let thread_pool = Rc::clone(&thread_pool);
-
-                            match status {
-                                Ok(_) => Ok(future::Loop::Break(())),
-                                Err(ref e) if e.is_shutdown() => panic!(
-                                    "Signature Verification Thread Pool shutdown unexpectedly."
-                                ),
-                                Err(_) => {
-                                    let status =
-                                        thread_pool.sender().spawn(future::lazy(move || {
-                                            if tx.verify() {
-                                                internal_tx
-                                                    .wait()
-                                                    .send(InternalEvent::TxVerified(
-                                                        tx.raw().clone(),
-                                                    ))
-                                                    .expect("Cannot send TxVerified event.");
-                                            }
-                                            Ok(())
-                                        }));
-                                    Ok(future::Loop::Continue(status))
+                        thread_pool
+                            .sender()
+                            .spawn(future::lazy(move || {
+                                if tx.verify() {
+                                    let evt = InternalEvent::TxVerified(tx.raw().clone());
+                                    Either::A(
+                                        internal_tx
+                                            .send(evt)
+                                            .map(drop)
+                                            .map_err(|e| panic!("{:?}", e)),
+                                    )
+                                } else {
+                                    Either::B(future::empty())
                                 }
-                            }
-                        });
-
-                        to_box(f)
+                            }))
+                            .unwrap();
                     }
-                };
+                }
 
-                handle.spawn(event);
                 Ok(())
             })
             .map_err(|_| other_error("Can't handle timeout request"));
