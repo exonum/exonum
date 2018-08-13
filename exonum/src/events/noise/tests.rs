@@ -25,7 +25,9 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
+use bytes::BytesMut;
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use events::noise::NoiseWrapper;
 use events::{
     error::into_other,
     noise::{
@@ -34,6 +36,7 @@ use events::{
     },
 };
 use node::state::SharedConnectList;
+use snow::Session;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -105,6 +108,73 @@ fn test_converted_keys_handshake() {
 
     h_r.into_transport_mode()
         .expect("Unable to transition session into transport mode");
+}
+
+#[test]
+fn test_encrypt_decrypt_handshake() {
+    use super::HEADER_LENGTH;
+    const MSG_SIZE: usize = 256;
+
+    let (mut h_i, mut h_r) = create_noise_sessions();
+
+    let mut buffer_msg = BytesMut::with_capacity(MSG_SIZE);
+
+
+    let len = h_i.encrypt_msg(&[0_u8; 64], &mut buffer_msg).unwrap();
+
+    let len = 80;
+    println!("buffer_msg {:?}, len {}", buffer_msg.to_vec(), len);
+
+
+//    let message = vec![0; 64];
+//
+//    let res = h_r.decrypt_msg(48, &mut BytesMut::from(&message[..]));
+//
+//    assert!(res.is_err());
+
+    let mut to_decrypt = vec![];
+    to_decrypt.extend_from_slice(&buffer_msg);
+    to_decrypt.extend_from_slice(&vec![0; 16]);
+
+    println!("to_decrypt {:?}", to_decrypt);
+
+    // 0. Test with wrong input len
+    // 1. Test with big messages
+    // 2. Test with wrong messages
+
+    let res = h_r.decrypt_msg(len, &mut BytesMut::from(&to_decrypt[..]));
+
+    println!("res {:?}", res);
+
+    assert!(res.is_ok())
+}
+
+fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
+    const MSG_SIZE: usize = 256;
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+    println!("public key {:?}, secret key {:?}", public_key, secret_key);
+
+    let mut params =
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+    params.set_remote_key(public_key);
+
+    let mut initiator = NoiseWrapper::initiator(&params);
+    let mut responder = NoiseWrapper::responder(&params);
+
+    let mut buffer_msg = [0_u8; MSG_SIZE * 2];
+
+    let buffer_out = initiator.write_handshake_msg().unwrap();
+    responder.read_handshake_msg(&buffer_out)
+        .unwrap();
+
+    let buffer_out = responder.write_handshake_msg().unwrap();
+    initiator.read_handshake_msg(&buffer_out)
+        .unwrap();
+    let buffer_out = initiator.write_handshake_msg().unwrap();
+    responder.read_handshake_msg(&buffer_out)
+        .unwrap();
+
+    (initiator.into_transport_mode().expect(""), responder.into_transport_mode().expect(""))
 }
 
 #[derive(Debug, Copy, Clone)]
