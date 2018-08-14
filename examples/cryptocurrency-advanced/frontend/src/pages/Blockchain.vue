@@ -66,12 +66,22 @@
 
       loadMore() {
         this.loadBlocks(this.blocks[this.blocks.length - 1].height - 1)
+      },
+
+      handleBlock(event) {
+        console.log(event.data)
       }
     },
     mounted() {
       this.$nextTick(function() {
         this.loadBlocks()
+
+        this.ws = new WebSocket('ws://127.0.0.1:8200/api/explorer/v1/blocks/subscribe')
+        this.ws.onmessage = this.handleBlock
       })
+    },
+    destroyed() {
+      this.ws.close()
     }
   }
 </script>
