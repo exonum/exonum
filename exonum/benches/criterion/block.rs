@@ -47,6 +47,8 @@ use futures::sync::mpsc;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use tempdir::TempDir;
 
+use std::iter;
+
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
 /// Tested values for the number of transactions in an added block.
@@ -72,23 +74,33 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 }
 
 fn create_blockchain(db: impl Database, services: Vec<Box<Service>>) -> Blockchain {
+    use exonum::{
+        blockchain::{GenesisConfig, ValidatorKeys}, crypto,
+    };
     use std::sync::Arc;
 
     let dummy_channel = mpsc::channel(1);
-    let dummy_keypair = (PublicKey::zero(), SecretKey::zero());
-    Blockchain::new(
+    let service_keypair = (PublicKey::zero(), SecretKey::zero());
+    let mut blockchain = Blockchain::new(
         Arc::new(db) as Arc<dyn Database>,
         services,
-        dummy_keypair.0,
-        dummy_keypair.1,
+        service_keypair.0,
+        service_keypair.1,
         ApiSender::new(dummy_channel.0),
-    )
+    );
+
+    let consensus_keypair = crypto::gen_keypair();
+    let config = GenesisConfig::new(iter::once(ValidatorKeys {
+        consensus_key: consensus_keypair.0,
+        service_key: service_keypair.0,
+    }));
+    blockchain.initialize(config).unwrap();
+
+    blockchain
 }
 
-fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> Patch {
-    blockchain
-        .create_patch(ValidatorId::zero(), Height(height), txs)
-        .1
+fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, Patch) {
+    blockchain.create_patch(ValidatorId::zero(), Height(height), txs)
 }
 
 mod timestamping {
@@ -336,10 +348,8 @@ fn prepare_txs(blockchain: &mut Blockchain, transactions: &[BoxedTx]) -> Vec<Has
     let tx_hashes = {
         let mut schema = Schema::new(&mut fork);
 
-        // Remove all currently present transactions from the pool,
-        // so that they won't clutter it eventually.
-        schema.clear_transaction_pool();
-
+        // In the case of the block within `Bencher::iter()`, some transactions
+        // may already be present in the pool. We don't particularly care about this.
         transactions
             .iter()
             .map(|tx| {
@@ -384,8 +394,12 @@ fn prepare_blockchain(
         let tx_hashes = prepare_txs(blockchain, &transactions[start..end]);
         assert_transactions_in_pool(blockchain, &tx_hashes);
 
-        let patch = execute_block(blockchain, i as u64, &tx_hashes);
-        blockchain.merge(patch).unwrap();
+        let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
+        // We make use of the fact that `Blockchain::commit()` doesn't check
+        // precommits in any way (they are checked beforehand by the consensus algorithm).
+        blockchain
+            .commit(&patch, block_hash, iter::empty())
+            .unwrap();
     }
 }
 
@@ -413,6 +427,9 @@ fn execute_block_rocksdb(
         .take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1])
         .collect();
 
+    let tx_hashes = prepare_txs(&mut blockchain, &txs);
+    assert_transactions_in_pool(&blockchain, &tx_hashes);
+
     // Because execute_block is not really "micro benchmark"
     // executing it as regular benches, with 100 samples,
     // lead to relatively big testing time.
@@ -422,12 +439,9 @@ fn execute_block_rocksdb(
         ParameterizedBenchmark::new(
             "transactions",
             move |bencher, &&txs_in_block| {
-                let tx_hashes = prepare_txs(&mut blockchain, &txs[..txs_in_block]);
-                assert_transactions_in_pool(&blockchain, &tx_hashes);
-
                 let height: u64 = blockchain.last_block().height().next().into();
                 bencher.iter(|| {
-                    execute_block(&blockchain, height, &tx_hashes);
+                    execute_block(&blockchain, height, &tx_hashes[..txs_in_block]);
                 });
             },
             TXS_IN_BLOCK,
