@@ -35,7 +35,7 @@ use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacit
 pub struct TestHandler {
     handle: Option<thread::JoinHandle<()>>,
     listen_address: SocketAddr,
-    network_events_rx: Option<mpsc::Receiver<NetworkEvent>>,
+    network_events_rx: mpsc::Receiver<NetworkEvent>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
 }
 
@@ -48,22 +48,19 @@ impl TestHandler {
         TestHandler {
             handle: None,
             listen_address,
-            network_events_rx: Some(network_events_rx),
+            network_events_rx,
             network_requests_tx,
         }
     }
 
     pub fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
-        let rx = self.network_events_rx.take().expect("event stream gone");
+        let rx = self.network_events_rx.by_ref();
         let future = rx.into_future()
             .deadline(Instant::now() + Duration::from_secs(30))
-            // Unfortunately, we can't get our stream back if timeout happens. This may change,
-            // keep an eye on https://github.com/tokio-rs/tokio/issues/545
             .map_err(drop);
 
         let mut core = Core::new().unwrap();
-        let (event, stream) = core.run(future)?;
-        self.network_events_rx = Some(stream);
+        let (event, _) = core.run(future)?;
         event.ok_or(())
     }
 
