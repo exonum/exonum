@@ -116,10 +116,6 @@ fn ignore_propose_with_commited_transaction() {
     //    broadcast here is absent
 }
 
-// - not only leader, but also prevotes;
-// - not only leader, but also precommiters.
-// (ECR-1627)
-
 #[test]
 fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
     let sandbox = timestamping_sandbox();

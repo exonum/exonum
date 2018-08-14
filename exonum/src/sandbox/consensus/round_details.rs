@@ -17,6 +17,8 @@
 //! Tests in this module are designed to test details of the consensus protocol
 //! handling such as correct round state transition.
 
+use std::collections::HashSet;
+
 use bit_vec::BitVec;
 
 use std::time::Duration;
@@ -1649,7 +1651,7 @@ fn handle_precommit_remove_propose_request() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.s(propose.validator()),
     );
 
     sandbox.recv(&precommit);
@@ -1666,5 +1668,155 @@ fn handle_precommit_remove_propose_request() {
             &[tx.hash()],
             sandbox.s(ValidatorId(0)),
         ),
+    );
+
+    // There is no known prevoters.
+    let prevoters = BitVec::from_elem(sandbox.n_validators(), false);
+
+    sandbox.send(
+        sandbox.a(propose.validator()),
+        &PrevotesRequest::new(
+            &sandbox.p(ValidatorId(0)),
+            &sandbox.p(propose.validator()),
+            Height(1),
+            Round(1),
+            &propose.hash(),
+            prevoters,
+            sandbox.s(ValidatorId(0)),
+        ),
+    );
+}
+
+#[test]
+fn handle_precommit_remove_propose_request_ask_prevoters() {
+    let sandbox = sandbox::timestamping_sandbox_builder().build();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx.hash()])
+        .build();
+
+    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
+
+    let precommit = Precommit::new(
+        propose.validator(),
+        Height(1),
+        Round(1),
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(propose.validator()),
+    );
+
+    sandbox.recv(&precommit);
+
+    let mut prevoters = BitVec::from_elem(sandbox.n_validators(), false);
+    for i in 1..sandbox.n_validators() as u16 {
+        sandbox.recv(&Prevote::new(
+            ValidatorId(i),
+            Height(1),
+            Round(1),
+            &propose.hash(),
+            Round(0),
+            sandbox.s(ValidatorId(i)),
+        ));
+        prevoters.set(i as usize, true);
+    }
+
+    // Propose request shouldn't be sent now.
+    sandbox.recv(&propose);
+
+    let mut validators = (1..sandbox.n_validators() as u16)
+        .map(|x| sandbox.p(ValidatorId(x)))
+        .collect::<HashSet<_>>();
+
+    for i in 1..sandbox.n_validators() {
+        sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+        sandbox.process_events();
+
+        let (_, msg) = sandbox.pop_sent().unwrap();
+        let msg = TransactionsRequest::from_raw(msg)
+            .expect("Incorrect message. TransactionsRequest was expected.");
+
+        assert!(
+            validators.remove(msg.to()),
+            "Unexpected validator's PublicKey"
+        );
+
+        if i == 1 {
+            sandbox.send(
+                sandbox.a(propose.validator()),
+                &PrevotesRequest::new(
+                    &sandbox.p(ValidatorId(0)),
+                    &sandbox.p(propose.validator()),
+                    Height(1),
+                    Round(1),
+                    &propose.hash(),
+                    prevoters.clone(),
+                    sandbox.s(ValidatorId(0)),
+                ),
+            );
+        }
+    }
+
+    assert!(
+        validators.is_empty(),
+        "Should send TransactionsRequest to all validators"
+    );
+}
+
+#[test]
+fn handle_precommit_remove_propose_request_ask_precommiters() {
+    let sandbox = sandbox::timestamping_sandbox_builder().build();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx.hash()])
+        .build();
+
+    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
+
+    for i in 1..sandbox.n_validators() as u16 {
+        sandbox.recv(&Precommit::new(
+            ValidatorId(i),
+            Height(1),
+            Round(1),
+            &propose.hash(),
+            &block.hash(),
+            sandbox.time().into(),
+            sandbox.s(ValidatorId(i)),
+        ))
+    }
+
+    // Propose request shouldn't be sent now.
+    sandbox.recv(&propose);
+
+    let mut validators = (1..sandbox.n_validators() as u16)
+        .map(|x| sandbox.p(ValidatorId(x)))
+        .collect::<HashSet<_>>();
+
+    for _ in 1..sandbox.n_validators() {
+        sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+        sandbox.process_events();
+
+        let (_, msg) = sandbox.pop_sent().unwrap();
+        let msg = TransactionsRequest::from_raw(msg)
+            .expect("Incorrect message. TransactionsRequest was expected.");
+
+        assert!(
+            validators.remove(msg.to()),
+            "Unexpected validator's PublicKey"
+        );
+
+        let (_, msg) = sandbox.pop_sent().unwrap();
+        PrevotesRequest::from_raw(msg)
+            .expect("Incorrect message. PrevotesRequest was expected.");
+    }
+
+    assert!(
+        validators.is_empty(),
+        "Should send TransactionsRequest to all validators"
     );
 }
