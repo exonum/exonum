@@ -37,7 +37,7 @@
 //! - `block_cryptocurrency_rollback`: Transferring cryptocurrency among random accounts.
 //!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
-use criterion::{Criterion, ParameterizedBenchmark};
+use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{Blockchain, Schema, Service, Transaction}, crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId}, node::ApiSender,
@@ -420,7 +420,7 @@ fn execute_block_rocksdb(
     criterion.bench(
         bench_name,
         ParameterizedBenchmark::new(
-            bench_name,
+            "transactions",
             move |bencher, &&txs_in_block| {
                 let tx_hashes = prepare_txs(&mut blockchain, &txs[..txs_in_block]);
                 assert_transactions_in_pool(&blockchain, &tx_hashes);
@@ -431,7 +431,8 @@ fn execute_block_rocksdb(
                 });
             },
             TXS_IN_BLOCK,
-        ).sample_size(50),
+        ).sample_size(50)
+            .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
     );
 }
 
@@ -443,7 +444,7 @@ pub fn bench_block(criterion: &mut Criterion) {
 
     execute_block_rocksdb(
         criterion,
-        "block_timestamping",
+        "block/timestamping",
         timestamping::Timestamping.into(),
         timestamping::transactions(XorShiftRng::from_seed([2; 16])),
     );
@@ -453,7 +454,7 @@ pub fn bench_block(criterion: &mut Criterion) {
     panic::set_hook(Box::new(|_| ()));
     execute_block_rocksdb(
         criterion,
-        "block_timestamping_panic",
+        "block/timestamping_panic",
         timestamping::Timestamping.into(),
         timestamping::panicking_transactions(XorShiftRng::from_seed([2; 16])),
     );
@@ -461,21 +462,21 @@ pub fn bench_block(criterion: &mut Criterion) {
 
     execute_block_rocksdb(
         criterion,
-        "block_cryptocurrency",
+        "block/cryptocurrency",
         cryptocurrency::Cryptocurrency.into(),
         cryptocurrency::provable_transactions(XorShiftRng::from_seed([3; 16])),
     );
 
     execute_block_rocksdb(
         criterion,
-        "block_cryptocurrency_no_proofs",
+        "block/cryptocurrency_no_proofs",
         cryptocurrency::Cryptocurrency.into(),
         cryptocurrency::unprovable_transactions(XorShiftRng::from_seed([4; 16])),
     );
 
     execute_block_rocksdb(
         criterion,
-        "block_cryptocurrency_rollback",
+        "block/cryptocurrency_rollback",
         cryptocurrency::Cryptocurrency.into(),
         cryptocurrency::rollback_transactions(XorShiftRng::from_seed([4; 16])),
     );
