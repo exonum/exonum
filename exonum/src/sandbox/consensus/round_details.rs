@@ -1811,8 +1811,7 @@ fn handle_precommit_remove_propose_request_ask_precommiters() {
         );
 
         let (_, msg) = sandbox.pop_sent().unwrap();
-        PrevotesRequest::from_raw(msg)
-            .expect("Incorrect message. PrevotesRequest was expected.");
+        PrevotesRequest::from_raw(msg).expect("Incorrect message. PrevotesRequest was expected.");
     }
 
     assert!(
