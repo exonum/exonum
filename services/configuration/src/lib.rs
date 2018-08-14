@@ -78,6 +78,7 @@ extern crate pretty_assertions;
 extern crate serde_json;
 extern crate toml;
 
+pub use errors::ErrorCode;
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
