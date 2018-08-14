@@ -19,9 +19,11 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::node::{
-        private::NodeInfo, public::system::{ConnectivityStatus, ConsensusStatus, HealthCheckInfo},
+        private::NodeInfo,
+        public::system::{ConnectivityStatus, ConsensusStatus, HealthCheckInfo},
     },
-    helpers::user_agent, messages::PROTOCOL_MAJOR_VERSION,
+    helpers::user_agent,
+    messages::PROTOCOL_MAJOR_VERSION,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -75,4 +77,17 @@ fn shutdown() {
             .unwrap(),
         ()
     );
+}
+
+#[test]
+fn rebroadcast() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    assert_eq!(
+        api.private(ApiKind::System)
+            .post::<()>("v1/rebroadcast")
+            .unwrap(),
+        ()
+    )
 }

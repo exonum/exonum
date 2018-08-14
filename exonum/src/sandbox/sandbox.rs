@@ -18,9 +18,13 @@ use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    self, cell::{Ref, RefCell, RefMut},
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
-    net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
+    self,
+    cell::{Ref, RefCell, RefMut},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    iter::FromIterator,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::{AddAssign, Deref},
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -109,7 +113,8 @@ impl SandboxInner {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
                     InternalRequest::Timeout(t) => self.timers.push(t),
-                    InternalRequest::JumpToRound(height, round) => self.handler
+                    InternalRequest::JumpToRound(height, round) => self
+                        .handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
                 }
@@ -241,6 +246,13 @@ impl Sandbox {
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
+    }
+
+    pub fn rebroadcast(&self) {
+        self.check_unexpected_message();
+        self.inner
+            .borrow_mut()
+            .handle_event(ExternalMessage::Rebroadcast);
     }
 
     pub fn process_events(&self) {
