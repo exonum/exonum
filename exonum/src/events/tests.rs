@@ -35,7 +35,6 @@ use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacit
 pub struct TestHandler {
     handle: Option<thread::JoinHandle<()>>,
     listen_address: SocketAddr,
-    network_events_core: Core,
     network_events_rx: Option<mpsc::Receiver<NetworkEvent>>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
 }
@@ -49,7 +48,6 @@ impl TestHandler {
         TestHandler {
             handle: None,
             listen_address,
-            network_events_core: Core::new().unwrap(),
             network_events_rx: Some(network_events_rx),
             network_requests_tx,
         }
@@ -63,7 +61,8 @@ impl TestHandler {
             // keep an eye on https://github.com/tokio-rs/tokio/issues/545
             .map_err(drop);
 
-        let (event, stream) = self.network_events_core.run(future)?;
+        let mut core = Core::new().unwrap();
+        let (event, stream) = core.run(future)?;
         self.network_events_rx = Some(stream);
         event.ok_or(())
     }
