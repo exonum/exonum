@@ -28,8 +28,7 @@ use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
     sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
-    sandbox_tests_helper::*,
-    timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
+    sandbox_tests_helper::*, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
@@ -243,14 +242,14 @@ fn rebroadcast_transactions() {
 
     transactions.sort_by(|a, b| a.hash().cmp(&b.hash()));
 
-    for tx in transactions {
-        sandbox.recv(&tx);
+    for tx in &transactions {
+        sandbox.recv(tx);
     }
 
     sandbox.rebroadcast();
 
-    for tx in transactions {
-        sandbox.broadcast(&tx)
+    for tx in &transactions {
+        sandbox.broadcast(tx)
     }
 }
 
