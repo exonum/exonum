@@ -246,7 +246,7 @@ fn rebroadcast_transactions() {
         sandbox.recv(tx);
     }
 
-    sandbox.rebroadcast();
+    sandbox.recv_rebroadcast();
 
     for tx in &transactions {
         sandbox.broadcast(tx)
