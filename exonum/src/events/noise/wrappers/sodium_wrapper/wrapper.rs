@@ -144,14 +144,14 @@ impl NoiseWrapper {
         Ok(None)
     }
 
-    pub fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
+    fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; len];
         let len = self.session.read_message(input, &mut buf)?;
         buf.truncate(len);
         Ok(buf)
     }
 
-    pub fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
+    fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
         buf.truncate(len);
