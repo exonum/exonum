@@ -107,8 +107,7 @@ mod timestamping {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction}, crypto::{CryptoHash, Hash, PublicKey},
-        encoding::Error as EncodingError, messages::{Message, RawTransaction},
-        storage::{Fork, Snapshot},
+        encoding::Error as EncodingError, messages::RawTransaction, storage::{Fork, Snapshot},
     };
     use rand::Rng;
 
@@ -153,7 +152,9 @@ mod timestamping {
 
     impl Transaction for Tx {
         fn verify(&self) -> bool {
-            self.verify_signature(self.from())
+            // We don't verify transactions within the benchmark, so in this
+            // and following transaction types the verification code is trivial.
+            true
         }
 
         fn execute(&self, _: &mut Fork) -> ExecutionResult {
@@ -163,7 +164,7 @@ mod timestamping {
 
     impl Transaction for PanickingTx {
         fn verify(&self) -> bool {
-            self.verify_signature(self.from())
+            true
         }
 
         fn execute(&self, _: &mut Fork) -> ExecutionResult {
@@ -190,8 +191,8 @@ mod cryptocurrency {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction},
-        crypto::{Hash, PublicKey}, encoding::Error as EncodingError,
-        messages::{Message, RawTransaction}, storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
+        crypto::{Hash, PublicKey}, encoding::Error as EncodingError, messages::RawTransaction,
+        storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
     };
     use rand::{seq::sample_slice_ref, Rng};
 
@@ -252,7 +253,7 @@ mod cryptocurrency {
 
     impl Transaction for Tx {
         fn verify(&self) -> bool {
-            self.verify_signature(self.from())
+            true
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
@@ -269,7 +270,7 @@ mod cryptocurrency {
 
     impl Transaction for SimpleTx {
         fn verify(&self) -> bool {
-            self.verify_signature(self.from())
+            true
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
@@ -286,7 +287,7 @@ mod cryptocurrency {
 
     impl Transaction for RollbackTx {
         fn verify(&self) -> bool {
-            self.verify_signature(self.from())
+            true
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
