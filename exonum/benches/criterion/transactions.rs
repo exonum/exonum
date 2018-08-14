@@ -33,6 +33,7 @@ use exonum::{
     events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
     messages::Message, node::NodeChannel, storage::Fork,
 };
+use tokio_threadpool::ThreadPool;
 
 pub const SERVICE_ID: u16 = 1;
 
@@ -169,13 +170,17 @@ impl TransactionVerifier {
         let internal_part = InternalPart {
             internal_tx: channel.internal_events.0,
             internal_requests_rx: channel.internal_requests.1,
-            thread_pool_size: None,
         };
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new().unwrap();
             let handle = core.handle();
-            core.run(internal_part.run(handle)).unwrap();
+
+            let thread_pool = ThreadPool::new();
+            let verify_handle = thread_pool.sender().clone();
+            //let verify_handle = core.handle();
+
+            core.run(internal_part.run(handle, verify_handle)).unwrap();
         });
 
         TransactionVerifier {
