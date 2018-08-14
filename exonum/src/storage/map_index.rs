@@ -469,7 +469,7 @@ where
 mod tests {
     use super::super::{Database, MemoryDB};
     use super::*;
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
 
@@ -575,7 +575,7 @@ mod tests {
     }
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
     mod memorydb_tests {

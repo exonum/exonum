@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Timestamping database schema.
+
 use chrono::{DateTime, Utc};
 use exonum::{
     crypto::Hash, storage::{Fork, ProofMapIndex, Snapshot},
@@ -29,7 +31,7 @@ encoding_struct! {
 }
 
 encoding_struct! {
-    /// Timestamp entry
+    /// Timestamp entry.
     struct TimestampEntry {
         /// Timestamp data.
         timestamp: Timestamp,
@@ -42,13 +44,14 @@ encoding_struct! {
     }
 }
 
+/// Timestamping database schema.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,
 }
 
-/// Timestamping information schema.
 impl<T> Schema<T> {
+    /// Creates a new schema from the database view.
     pub fn new(snapshot: T) -> Self {
         Schema { view: snapshot }
     }
@@ -58,20 +61,24 @@ impl<T> Schema<T>
 where
     T: AsRef<dyn Snapshot>,
 {
+    /// Returns the `ProofMapIndex` of timestamps.
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
 
+    /// Returns the state hash of the timestamping service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.timestamps().merkle_root()]
     }
 }
 
 impl<'a> Schema<&'a mut Fork> {
+    /// Returns the mutable `ProofMapIndex` of timestamps.
     pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
         ProofMapIndex::new("timestamping.timestamps", &mut self.view)
     }
 
+    /// Adds the timestamp entry to the database.
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp();
         let content_hash = timestamp.content_hash();

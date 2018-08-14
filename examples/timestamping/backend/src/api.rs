@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! REST API.
+
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof},
     crypto::{CryptoHash, Hash}, node::TransactionSend, storage::MapProof,
@@ -21,28 +23,37 @@ use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
 use TIMESTAMPING_SERVICE;
 
+/// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct TimestampQuery {
+    /// Hash of the requested timestamp.
     pub hash: Hash,
 }
 
 impl TimestampQuery {
+    /// Creates new `TimestampQuery` with given `hash`.
     pub fn new(hash: Hash) -> Self {
         TimestampQuery { hash }
     }
 }
 
+/// Describes the information required to prove the correctness of the timestamp entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimestampProof {
+    /// Proof of the last block.
     pub block_info: BlockProof,
+    /// Actual state hashes of the timestamping service with their proofs.
     pub state_proof: MapProof<Hash, Hash>,
+    /// Actual state of the timestamping database with proofs.
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
 
+/// Public service API.
 #[derive(Debug, Clone, Copy)]
 pub struct PublicApi;
 
 impl PublicApi {
+    /// Endpoint for handling timestamping transactions.
     pub fn handle_post_transaction(
         state: &ServiceApiState,
         transaction: TxTimestamp,
@@ -52,6 +63,7 @@ impl PublicApi {
         Ok(hash)
     }
 
+    /// Endpoint for getting a single timestamp.
     pub fn handle_timestamp(
         state: &ServiceApiState,
         query: TimestampQuery,
@@ -61,6 +73,7 @@ impl PublicApi {
         Ok(schema.timestamps().get(&query.hash))
     }
 
+    /// Endpoint for getting the proof of a single timestamp.
     pub fn handle_timestamp_proof(
         state: &ServiceApiState,
         query: TimestampQuery,
@@ -82,6 +95,7 @@ impl PublicApi {
         })
     }
 
+    /// Wires the above endpoints to public API scope of the given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()

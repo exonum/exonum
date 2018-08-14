@@ -546,6 +546,12 @@ impl Sandbox {
         assert_eq!(actual_round, expected_round);
     }
 
+    pub fn assert_pool_len(&self, expected: u64) {
+        let view = self.blockchain_ref().snapshot();
+        let schema = Schema::new(view);
+        assert_eq!(expected, schema.transactions_pool_len());
+    }
+
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
         let state = self.node_state();
 
@@ -717,6 +723,7 @@ impl ConnectList {
 pub struct SandboxBuilder {
     initialize: bool,
     services: Vec<Box<dyn Service>>,
+    validators_count: u8,
     consensus_config: ConsensusConfig,
 }
 
@@ -725,6 +732,7 @@ impl SandboxBuilder {
         SandboxBuilder {
             initialize: true,
             services: Vec::new(),
+            validators_count: 4,
             consensus_config: ConsensusConfig {
                 first_round_timeout: 1000,
                 status_timeout: 600_000,
@@ -753,13 +761,25 @@ impl SandboxBuilder {
         self
     }
 
+    pub fn with_validators(mut self, n: u8) -> Self {
+        self.validators_count = n;
+        self
+    }
+
     pub fn build(self) -> Sandbox {
-        let mut sandbox = sandbox_with_services_uninitialized(self.services, self.consensus_config);
+        let _ = env_logger::Builder::from_default_env()
+            .target(env_logger::Target::Stdout)
+            .try_init();
+
+        let mut sandbox = sandbox_with_services_uninitialized(
+            self.services,
+            self.consensus_config,
+            self.validators_count,
+        );
 
         if self.initialize {
             let time = sandbox.time();
-            let validators_count = sandbox.validators_map.len();
-            sandbox.initialize(time, 1, validators_count);
+            sandbox.initialize(time, 1, self.validators_count as usize);
         }
 
         sandbox
@@ -775,21 +795,19 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 fn sandbox_with_services_uninitialized(
     services: Vec<Box<dyn Service>>,
     consensus: ConsensusConfig,
+    validators_count: u8,
 ) -> Sandbox {
-    let validators = vec![
-        gen_keypair_from_seed(&Seed::new([12; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([13; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([16; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([19; SEED_LENGTH])),
-    ];
-    let service_keys = vec![
-        gen_keypair_from_seed(&Seed::new([20; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([21; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([22; SEED_LENGTH])),
-        gen_keypair_from_seed(&Seed::new([23; SEED_LENGTH])),
-    ];
+    let validators = (0..validators_count)
+        .map(|i| gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])))
+        .collect::<Vec<_>>();
 
-    let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
+    let service_keys = (0..validators_count)
+        .map(|i| gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])))
+        .collect::<Vec<_>>();
+
+    let addresses = (1..=validators_count)
+        .map(gen_primitive_socket_addr)
+        .collect::<Vec<_>>();
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
@@ -885,7 +903,6 @@ fn sandbox_with_services_uninitialized(
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    let _ = env_logger::try_init();
     timestamping_sandbox_builder().build()
 }
 

@@ -176,7 +176,7 @@ fn test_fuzz_transfers() {
         let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&mut api, key)).sum();
         assert_eq!(total_balance, (USERS as u64) * testkit.height().0);
 
-        let tx_count = rng.next_u32() & 15;
+        let tx_count = rng.gen::<u32>() & 15;
         let height = testkit.height().0;
         let txs = (0..tx_count)
             .map(|_| {
@@ -186,7 +186,7 @@ fn test_fuzz_transfers() {
                 let receiver = pubkeys[rng.gen_range(0, USERS)];
                 let amount = rng.gen_range(1, 2 * height);
 
-                TxTransfer::new(sender, receiver, amount, rng.next_u64(), sender_key)
+                TxTransfer::new(sender, receiver, amount, rng.gen::<u64>(), sender_key)
             })
             .map(Box::<Transaction>::from);
         testkit.create_block_with_transactions(txs);
