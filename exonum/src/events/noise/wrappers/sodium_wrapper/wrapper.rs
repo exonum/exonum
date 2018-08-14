@@ -94,6 +94,7 @@ impl NoiseWrapper {
     /// 2. Then each packet is decrypted by selected noise algorithm.
     /// 3. Append all decrypted packets to `decoded_message`.
     pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
+        debug_assert!(len + HEADER_LENGTH <= buf.len());
         let data = buf.split_to(len + HEADER_LENGTH).to_vec();
         let data = &data[HEADER_LENGTH..];
 
@@ -143,13 +144,14 @@ impl NoiseWrapper {
         Ok(None)
     }
 
-    pub(crate) fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
+    pub fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; len];
-        self.session.read_message(input, &mut buf)?;
+        let len = self.session.read_message(input, &mut buf)?;
+        buf.truncate(len);
         Ok(buf)
     }
 
-    pub(crate) fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
+    pub fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
         let len = self.session.write_message(msg, &mut buf)?;
         buf.truncate(len);
@@ -160,8 +162,12 @@ impl NoiseWrapper {
     // of AEAD authentication data. Therefore to calculate an actual message
     // length we need to subtract `TAG_LENGTH` multiplied by messages count
     // from `data.len()`.
+    //
+    // f32 precision is enough to calculate message length.
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_precision_loss))]
     fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
-        raw_message_len - TAG_LENGTH * (raw_message_len / MAX_MESSAGE_LENGTH)
+        raw_message_len
+            - TAG_LENGTH * ((raw_message_len as f32 / MAX_MESSAGE_LENGTH as f32).ceil() as usize)
     }
 
     // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to

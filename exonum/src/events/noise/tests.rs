@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use byteorder::{ByteOrder, LittleEndian};
 use futures::{
     future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
@@ -27,20 +28,21 @@ use std::{
 
 use bytes::BytesMut;
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
-use events::noise::NoiseWrapper;
 use events::{
     error::into_other,
     noise::{
         wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
-        HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+        HandshakeRawMessage, HandshakeResult, NoiseHandshake, NoiseWrapper, HEADER_LENGTH,
+        MAX_MESSAGE_LENGTH,
     },
+    tests::raw_message,
 };
+use messages::RawMessage;
 use node::state::SharedConnectList;
-use snow::Session;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
-fn test_convert_ed_to_curve_dh() {
+fn test_noise_convert_ed_to_curve_dh() {
     use crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     // Generate Ed25519 keys for initiator and responder.
@@ -67,7 +69,7 @@ fn test_convert_ed_to_curve_dh() {
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
-fn test_converted_keys_handshake() {
+fn test_noise_converted_keys_handshake() {
     use crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
@@ -111,48 +113,57 @@ fn test_converted_keys_handshake() {
 }
 
 #[test]
-fn test_encrypt_decrypt_handshake() {
-    use super::HEADER_LENGTH;
-    const MSG_SIZE: usize = 256;
+fn test_noise_encrypt_decrypt_short_message() {
+    test_encrypt_decrypt(64);
+}
+
+#[test]
+fn test_noise_encrypt_decrypt_long_message() {
+    test_encrypt_decrypt(MAX_MESSAGE_LENGTH + 1);
+}
+
+#[test]
+fn test_noise_encrypt_decrypt_bogus_message() {
+    let msg_size = 64;
 
     let (mut h_i, mut h_r) = create_noise_sessions();
+    let mut buffer_msg = BytesMut::with_capacity(msg_size);
 
-    let mut buffer_msg = BytesMut::with_capacity(MSG_SIZE);
+    let _res = h_i.encrypt_msg(&vec![0_u8; msg_size], &mut buffer_msg);
 
-
-    let len = h_i.encrypt_msg(&[0_u8; 64], &mut buffer_msg).unwrap();
-
-    let len = 80;
-    println!("buffer_msg {:?}, len {}", buffer_msg.to_vec(), len);
-
-
-//    let message = vec![0; 64];
-//
-//    let res = h_r.decrypt_msg(48, &mut BytesMut::from(&message[..]));
-//
-//    assert!(res.is_err());
-
+    let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
     let mut to_decrypt = vec![];
     to_decrypt.extend_from_slice(&buffer_msg);
-    to_decrypt.extend_from_slice(&vec![0; 16]);
 
-    println!("to_decrypt {:?}", to_decrypt);
+    // Wrong length.
+    let res = h_r.decrypt_msg(len - 1, &mut BytesMut::from(&to_decrypt[..]));
+    assert!(res.unwrap_err().description().contains("Decrypt"));
 
-    // 0. Test with wrong input len
-    // 1. Test with big messages
-    // 2. Test with wrong messages
+    // Wrong message.
+    let res = h_r.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; to_decrypt.len()]));
+    assert!(res.unwrap_err().description().contains("Decrypt"));
+}
+
+fn test_encrypt_decrypt(msg_size: usize) {
+    let (mut h_i, mut h_r) = create_noise_sessions();
+    let mut buffer_msg = BytesMut::with_capacity(msg_size);
+    let message = raw_message(1, msg_size);
+
+    let res = h_i.encrypt_msg(message.as_ref(), &mut buffer_msg);
+    assert!(res.is_ok());
+
+    let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
+    let mut to_decrypt = vec![];
+    to_decrypt.extend_from_slice(&buffer_msg);
 
     let res = h_r.decrypt_msg(len, &mut BytesMut::from(&to_decrypt[..]));
-
-    println!("res {:?}", res);
-
-    assert!(res.is_ok())
+    assert!(res.is_ok());
+    let decrypted_message = RawMessage::from_vec(res.unwrap().to_vec());
+    assert_eq!(message, decrypted_message);
 }
 
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
-    const MSG_SIZE: usize = 256;
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-    println!("public key {:?}, secret key {:?}", public_key, secret_key);
 
     let mut params =
         HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
@@ -161,20 +172,22 @@ fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
     let mut initiator = NoiseWrapper::initiator(&params);
     let mut responder = NoiseWrapper::responder(&params);
 
-    let mut buffer_msg = [0_u8; MSG_SIZE * 2];
-
     let buffer_out = initiator.write_handshake_msg().unwrap();
-    responder.read_handshake_msg(&buffer_out)
-        .unwrap();
+    responder.read_handshake_msg(&buffer_out).unwrap();
 
     let buffer_out = responder.write_handshake_msg().unwrap();
-    initiator.read_handshake_msg(&buffer_out)
-        .unwrap();
+    initiator.read_handshake_msg(&buffer_out).unwrap();
     let buffer_out = initiator.write_handshake_msg().unwrap();
-    responder.read_handshake_msg(&buffer_out)
-        .unwrap();
+    responder.read_handshake_msg(&buffer_out).unwrap();
 
-    (initiator.into_transport_mode().expect(""), responder.into_transport_mode().expect(""))
+    (
+        initiator
+            .into_transport_mode()
+            .expect("transit to transport mode"),
+        responder
+            .into_transport_mode()
+            .expect("transit to transport mode"),
+    )
 }
 
 #[derive(Debug, Copy, Clone)]
