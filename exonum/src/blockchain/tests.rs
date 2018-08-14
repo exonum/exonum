@@ -74,7 +74,7 @@ impl Transaction for Tx {
 }
 
 #[test]
-fn test_encode_decode() {
+fn encode_decode() {
     encoding_struct! {
         struct Parent {
             child: Child,
@@ -93,7 +93,7 @@ fn test_encode_decode() {
 }
 
 #[test]
-fn test_u64() {
+fn u64_json_serialization() {
     encoding_struct! {
         struct Test {
             some_test: u64,
@@ -106,7 +106,7 @@ fn test_u64() {
 }
 
 #[test]
-fn test_date_time() {
+fn date_time_json_serialization() {
     encoding_struct! {
         struct Test {
             some_test: DateTime<Utc>,
@@ -130,7 +130,7 @@ encoding_struct! {
 }
 
 #[test]
-fn test_correct_encoding_struct() {
+fn correct_encoding_struct() {
     let dat: Vec<u8> = vec![
         8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2,
     ];
@@ -146,7 +146,7 @@ fn test_correct_encoding_struct() {
 
 #[test]
 #[should_panic(expected = "OverlappingSegment")]
-fn test_overlap_segments() {
+fn overlap_segments() {
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
@@ -155,7 +155,7 @@ fn test_overlap_segments() {
 
 #[test]
 #[should_panic(expected = "SpaceBetweenSegments")]
-fn test_segments_has_spaces_between() {
+fn segments_has_spaces_between() {
     let test = vec![
         16u8,
         0,
@@ -531,27 +531,27 @@ mod memorydb_tests {
     }
 
     #[test]
-    fn test_handling_tx_panic() {
+    fn handling_tx_panic() {
         let mut blockchain = create_blockchain();
         super::handling_tx_panic(&mut blockchain);
     }
 
     #[test]
     #[should_panic]
-    fn test_handling_tx_panic_storage_error() {
+    fn handling_tx_panic_storage_error() {
         let mut blockchain = create_blockchain();
         super::handling_tx_panic_storage_error(&mut blockchain);
     }
 
     #[test]
-    fn test_service_execute() {
+    fn service_execute() {
         let blockchain = create_blockchain_with_service(Box::new(ServiceGood));
         let mut db = create_database();
         super::assert_service_execute(&blockchain, &mut db);
     }
 
     #[test]
-    fn test_service_execute_panic() {
+    fn service_execute_panic() {
         let blockchain = create_blockchain_with_service(Box::new(ServicePanic));
         let mut db = create_database();
         super::assert_service_execute_panic(&blockchain, &mut db);
@@ -559,7 +559,7 @@ mod memorydb_tests {
 
     #[test]
     #[should_panic]
-    fn test_service_execute_panic_storage_error() {
+    fn service_execute_panic_storage_error() {
         let blockchain = create_blockchain_with_service(Box::new(ServicePanicStorageError));
         let mut db = create_database();
         super::assert_service_execute(&blockchain, &mut db);
@@ -620,7 +620,7 @@ mod rocksdb_tests {
     }
 
     #[test]
-    fn test_handling_tx_panic() {
+    fn handling_tx_panic() {
         let dir = create_temp_dir();
         let mut blockchain = create_blockchain(dir.path());
         super::handling_tx_panic(&mut blockchain);
@@ -628,14 +628,14 @@ mod rocksdb_tests {
 
     #[test]
     #[should_panic]
-    fn test_handling_tx_panic_storage_error() {
+    fn handling_tx_panic_storage_error() {
         let dir = create_temp_dir();
         let mut blockchain = create_blockchain(dir.path());
         super::handling_tx_panic_storage_error(&mut blockchain);
     }
 
     #[test]
-    fn test_service_execute() {
+    fn service_execute() {
         let dir = create_temp_dir();
         let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServiceGood));
         let dir = create_temp_dir();
@@ -644,7 +644,7 @@ mod rocksdb_tests {
     }
 
     #[test]
-    fn test_service_execute_panic() {
+    fn service_execute_panic() {
         let dir = create_temp_dir();
         let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanic));
         let dir = create_temp_dir();
@@ -654,7 +654,7 @@ mod rocksdb_tests {
 
     #[test]
     #[should_panic]
-    fn test_service_execute_panic_storage_error() {
+    fn service_execute_panic_storage_error() {
         let dir = create_temp_dir();
         let blockchain =
             create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
