@@ -56,6 +56,18 @@ fn tx_hashes(transactions: &[TimestampTx]) -> Vec<Hash> {
     hashes
 }
 
+/// sends transactions into pool and return this transactions
+/// and returns this transactions in processing order
+fn send_txs_into_pool(sandbox: &Sandbox, mut transactions: Vec<TimestampTx>) -> Vec<TimestampTx> {
+    for tx in &transactions {
+        sandbox.recv(tx);
+    }
+
+    transactions.sort_by(|tx1, tx2| tx1.hash().cmp(&tx2.hash()));
+
+    transactions
+}
+
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
 #[test]
@@ -236,15 +248,10 @@ fn duplicate_tx_in_pool() {
 fn rebroadcast_transactions() {
     let sandbox = timestamping_sandbox();
 
-    let mut transactions = TimestampingTxGenerator::new(DATA_SIZE)
-        .take(5)
-        .collect::<Vec<_>>();
-
-    transactions.sort_by(|a, b| a.hash().cmp(&b.hash()));
-
-    for tx in &transactions {
-        sandbox.recv(tx);
-    }
+    let transactions = send_txs_into_pool(
+        &sandbox,
+        TimestampingTxGenerator::new(DATA_SIZE).take(5).collect()
+    );
 
     sandbox.recv_rebroadcast();
 
