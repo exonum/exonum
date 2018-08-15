@@ -47,7 +47,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use hex::{encode_hex, FromHex, FromHexError, ToHex};
+use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 // use helpers::Round;
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
