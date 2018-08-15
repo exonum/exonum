@@ -56,8 +56,7 @@ fn tx_hashes(transactions: &[TimestampTx]) -> Vec<Hash> {
     hashes
 }
 
-/// sends transactions into pool and return this transactions
-/// and returns this transactions in processing order
+/// sends transactions into pool and returns this transactions in processing order
 fn send_txs_into_pool(sandbox: &Sandbox, mut transactions: Vec<TimestampTx>) -> Vec<TimestampTx> {
     for tx in &transactions {
         sandbox.recv(tx);
