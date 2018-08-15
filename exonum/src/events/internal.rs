@@ -106,3 +106,83 @@ impl InternalPart {
             .map(drop)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use tokio_core::reactor::Core;
+
+    use std::thread;
+
+    use super::*;
+    use blockchain::ExecutionResult;
+    use crypto::{gen_keypair, PublicKey, Signature};
+    use messages::Message;
+    use storage::Fork;
+
+    transactions! {
+        Transactions {
+            const SERVICE_ID = 255;
+
+            struct Tx {
+                sender: &PublicKey,
+                data: &str,
+            }
+        }
+    }
+
+    impl Transaction for Tx {
+        fn verify(&self) -> bool {
+            self.verify_signature(self.sender())
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    fn verify_transaction<T: Transaction>(tx: T) -> Option<InternalEvent> {
+        let (internal_tx, internal_rx) = mpsc::channel(16);
+        let (internal_requests_tx, internal_requests_rx) = mpsc::channel(16);
+
+        let internal_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
+        };
+
+        let thread = thread::spawn(|| {
+            let mut core = Core::new().unwrap();
+            let handle = core.handle();
+            let verifier = core.handle();
+
+            let task = internal_part
+                .run(handle, verifier)
+                .map_err(drop)
+                .and_then(|()| internal_rx.into_future().map_err(drop))
+                .map(|(event, _)| event);
+            core.run(task).unwrap()
+        });
+
+        let request = InternalRequest::VerifyTx(tx.into());
+        internal_requests_tx.wait().send(request).unwrap();
+        thread.join().unwrap()
+    }
+
+    #[test]
+    fn verify_tx() {
+        let (pk, sk) = gen_keypair();
+        let tx = Tx::new(&pk, "foo", &sk);
+
+        let expected_event = InternalEvent::TxVerified(tx.raw().clone());
+        let event = verify_transaction(tx);
+        assert_eq!(event, Some(expected_event));
+    }
+
+    #[test]
+    fn verify_incorrect_tx() {
+        let (pk, _) = gen_keypair();
+        let tx = Tx::new_with_signature(&pk, "foo", &Signature::zero());
+
+        let event = verify_transaction(tx);
+        assert_eq!(event, None);
+    }
+}
