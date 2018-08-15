@@ -24,7 +24,7 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration, error::Error};
 
 use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
@@ -293,7 +293,7 @@ impl RequestHandler {
                     NetworkRequest::SendMessage(peer, msg) => {
                         let conn_tx = outgoing_connections
                             .get(peer)
-                            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
+                            .map(|conn_tx| to_future(Ok(conn_tx)))
                             .or_else(|| {
                                 outgoing_connections
                                     .clone()
@@ -307,9 +307,9 @@ impl RequestHandler {
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
                                         if &msg == connect_message.raw() {
-                                            conn_fut(Ok(conn_tx).into_future())
+                                            to_future(Ok(conn_tx))
                                         } else {
-                                            conn_fut(conn_tx.send(connect_message.raw().clone())
+                                            to_future(conn_tx.send(connect_message.raw().clone())
                                                 .map_err(|_| {
                                                     other_error("can't send message to a connection")
                                                 }))
@@ -459,9 +459,11 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
+
+fn to_future<F, I, E>(fut: F) -> Box<dyn Future<Item = I, Error = E>>
 where
-    F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
+    F: IntoFuture<Item = I, Error = E> + 'static,
+    E: Error,
 {
-    Box::new(fut)
+    Box::new(fut.into_future())
 }
