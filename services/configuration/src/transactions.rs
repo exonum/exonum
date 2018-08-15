@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Transaction definitions for the configuration service.
-//!
+
 extern crate serde_json;
 
 use exonum::{
@@ -21,7 +21,6 @@ use exonum::{
     crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
     storage::{Fork, Snapshot},
 };
-
 use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};

@@ -17,13 +17,13 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts
 
-use crypto;
 use toml;
 
 use std::{
     collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
 };
 
+use crypto;
 use super::{
     internal::{CollectedCommand, Command, Feedback}, keys,
     shared::{

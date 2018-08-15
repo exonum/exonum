@@ -79,6 +79,11 @@ extern crate serde_json;
 extern crate toml;
 
 pub use errors::ErrorCode;
+pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
+
+use serde_json::to_value;
+
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
@@ -86,9 +91,8 @@ use exonum::{
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction, node::State, storage::{Fork, Snapshot},
 };
-pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
-use serde_json::to_value;
-pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
+use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
+use config::ConfigurationServiceConfig;
 
 mod api;
 mod cmd;
@@ -98,9 +102,6 @@ mod schema;
 #[cfg(test)]
 mod tests;
 mod transactions;
-
-use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
-use config::ConfigurationServiceConfig;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
