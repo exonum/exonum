@@ -46,9 +46,9 @@ use blockchain::{
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
-    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
-    NetworkRequest, SyncSender, TimeoutRequest,
+    error::{into_other, other_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
+    SyncSender, TimeoutRequest,
 };
 use helpers::{
     config::ConfigManager, fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round,
@@ -947,8 +947,7 @@ impl Node {
             let thread_pool = ThreadPool::new();
             let executor = thread_pool.sender().clone();
 
-            core.handle()
-                .spawn(timeouts_part.run(handle, executor).map_err(log_error));
+            core.handle().spawn(timeouts_part.run(handle, executor));
             let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))

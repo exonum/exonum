@@ -17,13 +17,9 @@ use futures::{
 };
 use tokio_core::reactor::{Handle, Timeout};
 
-use std::{
-    io, time::{Duration, SystemTime},
-};
+use std::time::{Duration, SystemTime};
 
-use super::{
-    error::{into_other, other_error}, InternalEvent, InternalRequest, TimeoutRequest,
-};
+use super::{InternalEvent, InternalRequest, TimeoutRequest};
 use blockchain::Transaction;
 
 #[derive(Debug)]
@@ -33,77 +29,78 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
+    // If the receiver for internal events is gone, we panic, as we cannot
+    // continue our work (e.g., timely responding to timeouts).
+    fn send_event(
+        event: impl Future<Item = InternalEvent, Error = ()>,
+        sender: mpsc::Sender<InternalEvent>,
+    ) -> impl Future<Item = (), Error = ()> {
+        event.and_then(|evt| {
+            sender
+                .send(evt)
+                .map(drop)
+                .map_err(|_| panic!("cannot send internal event"))
+        })
+    }
+
     fn verify_transaction(
         tx: Box<dyn Transaction>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(move || {
             if tx.verify() {
-                let send_event = internal_tx
-                    .send(InternalEvent::TxVerified(tx.raw().clone()))
-                    .map(drop)
-                    .map_err(|e| {
-                        panic!(
-                            "error sending verified transaction \
-                             to internal events pipe: {:?}",
-                            e
-                        );
-                    });
-                Either::A(send_event)
+                let event = future::ok(InternalEvent::TxVerified(tx.raw().clone()));
+                Either::A(Self::send_event(event, internal_tx))
             } else {
                 Either::B(future::ok(()))
             }
         })
     }
 
-    pub fn run<E>(
-        self,
-        handle: Handle,
-        verify_executor: E,
-    ) -> impl Future<Item = (), Error = io::Error>
+    pub fn run<E>(self, handle: Handle, verify_executor: E) -> impl Future<Item = (), Error = ()>
     where
         E: Executor<Box<dyn Future<Item = (), Error = ()> + Send>>,
     {
-        let internal_tx = self.internal_tx.clone();
+        let internal_tx = self.internal_tx;
 
         self.internal_requests_rx
-            .map_err(|()| other_error("error fetching internal requests"))
-            .filter_map(move |request| match request {
-                InternalRequest::VerifyTx(tx) => {
-                    let fut = Self::verify_transaction(tx, internal_tx.clone());
-                    // TODO: can errors be piped here?
-                    verify_executor
-                        .execute(Box::new(fut))
-                        .expect("cannot schedule transaction verification");
-                    None
-                }
-                req => Some(req),
+            .map(move |request| {
+                let event = match request {
+                    InternalRequest::VerifyTx(tx) => {
+                        let fut = Self::verify_transaction(tx, internal_tx.clone());
+                        verify_executor
+                            .execute(Box::new(fut))
+                            .expect("cannot schedule transaction verification");
+                        return;
+                    }
+
+                    InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
+                        let duration = time.duration_since(SystemTime::now())
+                            .unwrap_or_else(|_| Duration::from_millis(0));
+
+                        let fut = Timeout::new(duration, &handle)
+                            .expect("Unable to create timeout")
+                            .map(|()| InternalEvent::Timeout(timeout))
+                            .map_err(|e| panic!("Cannot execute timeout: {:?}", e));
+
+                        Either::A(fut)
+                    }
+
+                    InternalRequest::JumpToRound(height, round) => {
+                        let event = InternalEvent::JumpToRound(height, round);
+                        Either::B(future::ok(event))
+                    }
+
+                    InternalRequest::Shutdown => {
+                        let event = InternalEvent::Shutdown;
+                        Either::B(future::ok(event))
+                    }
+                };
+
+                let send_event = Self::send_event(event, internal_tx.clone());
+                handle.spawn(send_event);
             })
-            .and_then(move |request| match request {
-                InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
-                    let duration = time.duration_since(SystemTime::now())
-                        .unwrap_or_else(|_| Duration::from_millis(0));
-                    let fut = Timeout::new(duration, &handle)
-                        .expect("Unable to create timeout")
-                        .map(move |_| InternalEvent::Timeout(timeout));
-
-                    Either::A(fut)
-                }
-
-                InternalRequest::JumpToRound(height, round) => {
-                    let evt = InternalEvent::JumpToRound(height, round);
-                    Either::B(future::ok(evt))
-                }
-
-                InternalRequest::Shutdown => {
-                    let evt = InternalEvent::Shutdown;
-                    Either::B(future::ok(evt))
-                }
-
-                InternalRequest::VerifyTx(..) => unreachable!(),
-            })
-            .forward(self.internal_tx.sink_map_err(into_other))
-            .map(drop)
+            .for_each(Ok)
     }
 }
 

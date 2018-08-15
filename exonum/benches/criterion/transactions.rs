@@ -33,7 +33,7 @@ use exonum::{
     events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
     messages::Message, node::NodeChannel, storage::Fork,
 };
-use tokio_threadpool::ThreadPool;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 pub const SERVICE_ID: u16 = 1;
 
@@ -176,9 +176,8 @@ impl TransactionVerifier {
             let mut core = Core::new().unwrap();
             let handle = core.handle();
 
-            let thread_pool = ThreadPool::new();
+            let thread_pool = ThreadPoolBuilder::new().build();
             let verify_handle = thread_pool.sender().clone();
-            //let verify_handle = core.handle();
 
             core.run(internal_part.run(handle, verify_handle)).unwrap();
         });
@@ -248,6 +247,7 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
     crypto::init();
 
     let parameters = (7..12).map(|i| 1 << i).collect::<Vec<_>>();
+
     c.bench(
         "transactions/simple",
         ParameterizedBenchmark::new("size", bench_verify_transactions_simple, parameters.clone())
