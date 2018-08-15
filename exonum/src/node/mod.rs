@@ -24,11 +24,11 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use tokio_core::reactor::Core;
-use toml::Value;
-use serde::de::{self, Deserialize, Deserializer};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
+use serde::de::{self, Deserialize, Deserializer};
+use tokio_core::reactor::Core;
+use toml::Value;
 
 use std::{
     collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,

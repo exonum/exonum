@@ -14,6 +14,7 @@
 
 use std::str;
 
+use config::ConfigurationServiceConfig;
 use exonum::{
     blockchain::{Schema, StoredConfiguration, Transaction},
     crypto::{hash, CryptoHash, Hash, HASH_SIZE}, helpers::{Height, ValidatorId},
@@ -24,7 +25,6 @@ use {
     Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
     VotingDecision,
 };
-use config::ConfigurationServiceConfig;
 
 mod api;
 

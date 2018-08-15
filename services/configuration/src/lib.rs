@@ -84,6 +84,8 @@ pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use serde_json::to_value;
 
+use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
+use config::ConfigurationServiceConfig;
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
@@ -91,8 +93,6 @@ use exonum::{
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction, node::State, storage::{Fork, Snapshot},
 };
-use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
-use config::ConfigurationServiceConfig;
 
 mod api;
 mod cmd;

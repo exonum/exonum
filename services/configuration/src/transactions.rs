@@ -16,13 +16,13 @@
 
 extern crate serde_json;
 
+use config::ConfigurationServiceConfig;
+use errors::Error as ServiceError;
 use exonum::{
     blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
     crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
     storage::{Fork, Snapshot},
 };
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
 
 transactions! {
@@ -192,8 +192,7 @@ impl Propose {
 
         let config: ConfigurationServiceConfig = get_service_config(candidate);
 
-        if let Some(proposed_majority_count) = config.majority_count {
-            let proposed_majority_count = proposed_majority_count as usize;
+        if let Some(proposed_majority_count) = config.majority_count.map(|count| count as usize) {
             let validators_num = candidate.validator_keys.len();
             let min_votes_count = State::byzantine_majority_count(validators_num);
 
