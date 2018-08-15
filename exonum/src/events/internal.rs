@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use futures::{
-    future::{self, Either}, sync::mpsc, Future, Sink, Stream,
+    future::{self, Either, Executor}, sync::mpsc, Future, Sink, Stream,
 };
 use tokio_core::reactor::{Handle, Timeout};
 
@@ -24,7 +24,7 @@ use std::{
 use super::{
     error::{into_other, other_error}, InternalEvent, InternalRequest, TimeoutRequest,
 };
-use futures::future::Executor;
+use blockchain::Transaction;
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -33,6 +33,29 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
+    fn verify_transaction(
+        tx: Box<dyn Transaction>,
+        internal_tx: mpsc::Sender<InternalEvent>,
+    ) -> impl Future<Item = (), Error = ()> {
+        future::lazy(move || {
+            if tx.verify() {
+                let send_event = internal_tx
+                    .send(InternalEvent::TxVerified(tx.raw().clone()))
+                    .map(drop)
+                    .map_err(|e| {
+                        panic!(
+                            "error sending verified transaction \
+                             to internal events pipe: {:?}",
+                            e
+                        );
+                    });
+                Either::A(send_event)
+            } else {
+                Either::B(future::ok(()))
+            }
+        })
+    }
+
     pub fn run<E>(
         self,
         handle: Handle,
@@ -47,27 +70,8 @@ impl InternalPart {
             .map_err(|()| other_error("error fetching internal requests"))
             .filter_map(move |request| match request {
                 InternalRequest::VerifyTx(tx) => {
-                    let internal_tx = internal_tx.clone();
-
-                    let fut = future::lazy(move || {
-                        if tx.verify() {
-                            let fut = internal_tx
-                                .send(InternalEvent::TxVerified(tx.raw().clone()))
-                                .map(drop)
-                                .map_err(|e| {
-                                    panic!(
-                                        "error sending verified transaction \
-                                         to internal events pipe: {:?}",
-                                        e
-                                    )
-                                });
-                            Either::A(fut)
-                        } else {
-                            Either::B(future::ok(()))
-                        }
-                    });
-
-                    // FIXME: can errors be piped here?
+                    let fut = Self::verify_transaction(tx, internal_tx.clone());
+                    // TODO: can errors be piped here?
                     verify_executor
                         .execute(Box::new(fut))
                         .expect("cannot schedule transaction verification");
