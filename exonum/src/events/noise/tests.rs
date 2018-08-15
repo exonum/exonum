@@ -42,7 +42,7 @@ use node::state::SharedConnectList;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
-fn test_noise_convert_ed_to_curve_dh() {
+fn noise_convert_ed_to_curve_dh() {
     use crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     // Generate Ed25519 keys for initiator and responder.
@@ -69,7 +69,7 @@ fn test_noise_convert_ed_to_curve_dh() {
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
-fn test_noise_converted_keys_handshake() {
+fn noise_converted_keys_handshake() {
     use crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
@@ -113,52 +113,52 @@ fn test_noise_converted_keys_handshake() {
 }
 
 #[test]
-fn test_noise_encrypt_decrypt_short_message() {
-    test_encrypt_decrypt(64);
+fn noise_encrypt_decrypt_short_message() {
+    check_encrypt_decrypt_message(64);
 }
 
 #[test]
-fn test_noise_encrypt_decrypt_long_message() {
-    test_encrypt_decrypt(MAX_MESSAGE_LENGTH + 1);
+fn noise_encrypt_decrypt_long_message() {
+    check_encrypt_decrypt_message(MAX_MESSAGE_LENGTH + 1);
 }
 
 #[test]
-fn test_noise_encrypt_decrypt_bogus_message() {
+fn noise_encrypt_decrypt_bogus_message() {
     let msg_size = 64;
 
-    let (mut h_i, mut h_r) = create_noise_sessions();
+    let (mut initiator, mut responder) = create_noise_sessions();
     let mut buffer_msg = BytesMut::with_capacity(msg_size);
 
-    let _res = h_i.encrypt_msg(&vec![0_u8; msg_size], &mut buffer_msg);
+    initiator
+        .encrypt_msg(&vec![0_u8; msg_size], &mut buffer_msg)
+        .expect("Unable to encrypt message");
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
-    let mut to_decrypt = vec![];
-    to_decrypt.extend_from_slice(&buffer_msg);
 
     // Wrong length.
-    let res = h_r.decrypt_msg(len - 1, &mut BytesMut::from(&to_decrypt[..]));
+    let res = responder.decrypt_msg(len - 1, &mut buffer_msg);
     assert!(res.unwrap_err().description().contains("Decrypt"));
 
     // Wrong message.
-    let res = h_r.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; to_decrypt.len()]));
+    let res = responder.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; len + HEADER_LENGTH]));
     assert!(res.unwrap_err().description().contains("Decrypt"));
 }
 
-fn test_encrypt_decrypt(msg_size: usize) {
-    let (mut h_i, mut h_r) = create_noise_sessions();
+fn check_encrypt_decrypt_message(msg_size: usize) {
+    let (mut initiator, mut responder) = create_noise_sessions();
     let mut buffer_msg = BytesMut::with_capacity(msg_size);
     let message = raw_message(1, msg_size);
 
-    let res = h_i.encrypt_msg(message.as_ref(), &mut buffer_msg);
-    assert!(res.is_ok());
+    initiator
+        .encrypt_msg(message.as_ref(), &mut buffer_msg)
+        .expect("Unable to encrypt message");
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
-    let mut to_decrypt = vec![];
-    to_decrypt.extend_from_slice(&buffer_msg);
 
-    let res = h_r.decrypt_msg(len, &mut BytesMut::from(&to_decrypt[..]));
-    assert!(res.is_ok());
-    let decrypted_message = RawMessage::from_vec(res.unwrap().to_vec());
+    let res = responder
+        .decrypt_msg(len, &mut buffer_msg)
+        .expect("Unable to decrypt message");
+    let decrypted_message = RawMessage::from_vec(res.to_vec());
     assert_eq!(message, decrypted_message);
 }
 
@@ -235,7 +235,7 @@ pub fn default_test_params() -> HandshakeParams {
 }
 
 #[test]
-fn test_noise_handshake_errors_ee_empty() {
+fn noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
     let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
@@ -253,7 +253,7 @@ fn test_noise_handshake_errors_ee_empty() {
 }
 
 #[test]
-fn test_noise_handshake_errors_es_empty() {
+fn noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
     let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
@@ -271,7 +271,7 @@ fn test_noise_handshake_errors_es_empty() {
 }
 
 #[test]
-fn test_noise_handshake_errors_ee_standard() {
+fn noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
     let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
@@ -284,7 +284,7 @@ fn test_noise_handshake_errors_ee_standard() {
 }
 
 #[test]
-fn test_noise_handshake_errors_es_standard() {
+fn noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
     let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
@@ -297,7 +297,7 @@ fn test_noise_handshake_errors_es_standard() {
 }
 
 #[test]
-fn test_noise_handshake_errors_ee_empty_listen() {
+fn noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
     let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
@@ -315,7 +315,7 @@ fn test_noise_handshake_errors_ee_empty_listen() {
 }
 
 #[test]
-fn test_noise_handshake_errors_ee_standard_listen() {
+fn noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
     let params = default_test_params();
     let bogus_message = Some(BogusMessage::new(
@@ -328,7 +328,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
 }
 
 #[test]
-fn test_noise_handshake_wrong_remote_key() {
+fn noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = default_test_params();
     let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
