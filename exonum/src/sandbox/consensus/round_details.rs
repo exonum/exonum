@@ -1196,8 +1196,7 @@ fn handle_full_propose_wrong_state_hash() {
     );
 
     sandbox.assert_state(Height(1), Round(1));
-    //    let tmp_propose = ProposeBuilder::new(&sandbox)
-    //            //        .build();
+
     // !! if this tx would be received, commit would occur and last assert will require height one
     sandbox.recv(&tx);
     sandbox.recv(&propose);
@@ -1515,9 +1514,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.assert_state(new_height, Round(1));
     sandbox.check_broadcast_status(new_height, &block.hash());
 
-    let propose = ProposeBuilder::new(&sandbox)
-                //        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
     sandbox.broadcast(&propose);
