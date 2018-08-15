@@ -30,15 +30,15 @@ use api::{
 };
 use failure;
 use futures::{sync::mpsc, Future, Sink};
+use serde::de::{self, Deserialize, Deserializer};
 use tokio_core::reactor::Core;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
     collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
-
-use serde::de::{self, Deserialize, Deserializer};
 
 use blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
@@ -57,7 +57,6 @@ use helpers::{
 use messages::{Connect, Message, RawMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
-use tokio_threadpool::ThreadPool;
 
 mod basic;
 mod connect_list;
@@ -937,17 +936,23 @@ impl Node {
     pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
         self.handler.initialize();
 
-        let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let pool_size = self.thread_pool_size;
+        let (handler_part, network_part, internal_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
 
-            let thread_pool = ThreadPool::new();
+            let mut pool_builder = ThreadPoolBuilder::new();
+            if let Some(pool_size) = pool_size {
+                pool_builder.pool_size(pool_size as usize);
+            }
+            let thread_pool = pool_builder.build();
             let executor = thread_pool.sender().clone();
 
-            core.handle().spawn(timeouts_part.run(handle, executor));
+            core.handle().spawn(internal_part.run(handle, executor));
+
             let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
