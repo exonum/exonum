@@ -12,115 +12,175 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{self, future, sync::mpsc, Future, Sink, Stream};
-use tokio_core::reactor::{Handle, Timeout};
-use tokio_executor::SpawnError;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
-
-use std::{
-    io, rc::Rc, sync::Arc, time::{Duration, SystemTime},
+use futures::{
+    future::{self, Either, Executor}, sync::mpsc, Future, Sink, Stream,
 };
+use tokio_core::reactor::{Handle, Timeout};
+
+use std::{io, time::{Duration, SystemTime}};
 
 use super::{
-    error::{into_other, other_error}, to_box, InternalEvent, InternalRequest, TimeoutRequest,
+    error::{into_other, other_error}, InternalEvent, InternalRequest, TimeoutRequest,
 };
+use blockchain::Transaction;
 
 #[derive(Debug)]
 pub struct InternalPart {
     pub internal_tx: mpsc::Sender<InternalEvent>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
-    pub thread_pool_size: Option<u8>,
 }
 
 impl InternalPart {
-    pub fn run(self, handle: Handle) -> Box<dyn Future<Item = (), Error = io::Error>> {
-        let thread_pool = if let Some(size) = self.thread_pool_size {
-            Rc::new(ThreadPoolBuilder::new().pool_size(size.into()).build())
-        } else {
-            Rc::new(ThreadPoolBuilder::new().build())
-        };
+    fn verify_transaction(
+        tx: Box<dyn Transaction>,
+        internal_tx: mpsc::Sender<InternalEvent>,
+    ) -> impl Future<Item = (), Error = ()> {
+        future::lazy(move || {
+            if tx.verify() {
+                let send_event = internal_tx
+                    .send(InternalEvent::TxVerified(tx.raw().clone()))
+                    .map(drop)
+                    .map_err(|e| {
+                        panic!(
+                            "error sending verified transaction \
+                             to internal events pipe: {:?}",
+                            e
+                        );
+                    });
+                Either::A(send_event)
+            } else {
+                Either::B(future::ok(()))
+            }
+        })
+    }
+
+    pub fn run<E>(
+        self,
+        handle: Handle,
+        verify_executor: E,
+    ) -> impl Future<Item = (), Error = io::Error>
+    where
+        E: Executor<Box<dyn Future<Item = (), Error = ()> + Send>>,
+    {
         let internal_tx = self.internal_tx.clone();
 
-        let fut = self.internal_requests_rx
-            .for_each(move |request| {
-                let event = match request {
-                    InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
-                        let duration = time.duration_since(SystemTime::now())
-                            .unwrap_or_else(|_| Duration::from_millis(0));
-                        let internal_tx = internal_tx.clone();
-                        let fut = Timeout::new(duration, &handle)
-                            .expect("Unable to create timeout")
-                            .and_then(move |_| {
-                                internal_tx
-                                    .clone()
-                                    .send(InternalEvent::Timeout(timeout))
-                                    .map(drop)
-                                    .map_err(into_other)
-                            })
-                            .map_err(|_| panic!("Can't timeout"));
-                        to_box(fut)
-                    }
-                    InternalRequest::JumpToRound(height, round) => {
-                        let internal_tx = internal_tx.clone();
-                        let f = futures::lazy(move || {
-                            internal_tx
-                                .send(InternalEvent::JumpToRound(height, round))
-                                .map(drop)
-                                .map_err(into_other)
-                        }).map_err(|_| panic!("Can't execute jump to round"));
-                        to_box(f)
-                    }
-                    InternalRequest::Shutdown => {
-                        let internal_tx = internal_tx.clone();
-                        let f = futures::lazy(move || {
-                            internal_tx
-                                .send(InternalEvent::Shutdown)
-                                .map(drop)
-                                .map_err(into_other)
-                        }).map_err(|_| panic!("Can't execute shutdown"));
-                        to_box(f)
-                    }
-                    InternalRequest::VerifyTx(tx) => {
-                        let internal_tx = internal_tx.clone();
-                        let tx = Arc::new(tx);
-                        let thread_pool = Rc::clone(&thread_pool);
-
-                        let f = future::loop_fn(Err(SpawnError::at_capacity()), move |status| {
-                            let tx = Arc::clone(&tx);
-                            let internal_tx = internal_tx.clone();
-                            let thread_pool = Rc::clone(&thread_pool);
-
-                            match status {
-                                Ok(_) => Ok(future::Loop::Break(())),
-                                Err(ref e) if e.is_shutdown() => panic!(
-                                    "Signature Verification Thread Pool shutdown unexpectedly."
-                                ),
-                                Err(_) => {
-                                    let status =
-                                        thread_pool.sender().spawn(future::lazy(move || {
-                                            if tx.verify() {
-                                                internal_tx
-                                                    .wait()
-                                                    .send(InternalEvent::TxVerified(
-                                                        tx.raw().clone(),
-                                                    ))
-                                                    .expect("Cannot send TxVerified event.");
-                                            }
-                                            Ok(())
-                                        }));
-                                    Ok(future::Loop::Continue(status))
-                                }
-                            }
-                        });
-
-                        to_box(f)
-                    }
-                };
-
-                handle.spawn(event);
-                Ok(())
+        self.internal_requests_rx
+            .map_err(|()| other_error("error fetching internal requests"))
+            .filter_map(move |request| match request {
+                InternalRequest::VerifyTx(tx) => {
+                    let fut = Self::verify_transaction(tx, internal_tx.clone());
+                    // TODO: can errors be piped here?
+                    verify_executor
+                        .execute(Box::new(fut))
+                        .expect("cannot schedule transaction verification");
+                    None
+                }
+                req => Some(req),
             })
-            .map_err(|_| other_error("Can't handle timeout request"));
-        to_box(fut)
+            .and_then(move |request| match request {
+                InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
+                    let duration = time.duration_since(SystemTime::now())
+                        .unwrap_or_else(|_| Duration::from_millis(0));
+                    let fut = Timeout::new(duration, &handle)
+                        .expect("Unable to create timeout")
+                        .map(move |_| InternalEvent::Timeout(timeout));
+
+                    Either::A(fut)
+                }
+
+                InternalRequest::JumpToRound(height, round) => {
+                    let evt = InternalEvent::JumpToRound(height, round);
+                    Either::B(future::ok(evt))
+                }
+
+                InternalRequest::Shutdown => {
+                    let evt = InternalEvent::Shutdown;
+                    Either::B(future::ok(evt))
+                }
+
+                InternalRequest::VerifyTx(..) => unreachable!(),
+            })
+            .forward(self.internal_tx.sink_map_err(into_other))
+            .map(drop)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio_core::reactor::Core;
+
+    use std::thread;
+
+    use super::*;
+    use blockchain::ExecutionResult;
+    use crypto::{gen_keypair, PublicKey, Signature};
+    use messages::Message;
+    use storage::Fork;
+
+    transactions! {
+        Transactions {
+            const SERVICE_ID = 255;
+
+            struct Tx {
+                sender: &PublicKey,
+                data: &str,
+            }
+        }
+    }
+
+    impl Transaction for Tx {
+        fn verify(&self) -> bool {
+            self.verify_signature(self.sender())
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    fn verify_transaction<T: Transaction>(tx: T) -> Option<InternalEvent> {
+        let (internal_tx, internal_rx) = mpsc::channel(16);
+        let (internal_requests_tx, internal_requests_rx) = mpsc::channel(16);
+
+        let internal_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
+        };
+
+        let thread = thread::spawn(|| {
+            let mut core = Core::new().unwrap();
+            let handle = core.handle();
+            let verifier = core.handle();
+
+            let task = internal_part
+                .run(handle, verifier)
+                .map_err(drop)
+                .and_then(|()| internal_rx.into_future().map_err(drop))
+                .map(|(event, _)| event);
+            core.run(task).unwrap()
+        });
+
+        let request = InternalRequest::VerifyTx(tx.into());
+        internal_requests_tx.wait().send(request).unwrap();
+        thread.join().unwrap()
+    }
+
+    #[test]
+    fn verify_tx() {
+        let (pk, sk) = gen_keypair();
+        let tx = Tx::new(&pk, "foo", &sk);
+
+        let expected_event = InternalEvent::TxVerified(tx.raw().clone());
+        let event = verify_transaction(tx);
+        assert_eq!(event, Some(expected_event));
+    }
+
+    #[test]
+    fn verify_incorrect_tx() {
+        let (pk, _) = gen_keypair();
+        let tx = Tx::new_with_signature(&pk, "foo", &Signature::zero());
+
+        let event = verify_transaction(tx);
+        assert_eq!(event, None);
     }
 }

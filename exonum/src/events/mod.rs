@@ -43,7 +43,7 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InternalEvent {
     /// Round update event.
     JumpToRound(Height, Round),

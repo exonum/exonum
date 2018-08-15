@@ -57,6 +57,7 @@ use helpers::{
 use messages::{Connect, Message, RawMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
+use tokio_threadpool::ThreadPool;
 
 mod basic;
 mod connect_list;
@@ -942,8 +943,12 @@ impl Node {
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
+
+            let thread_pool = ThreadPool::new();
+            let executor = thread_pool.sender().clone();
+
             core.handle()
-                .spawn(timeouts_part.run(handle).map_err(log_error));
+                .spawn(timeouts_part.run(handle, executor).map_err(log_error));
             let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
@@ -1043,12 +1048,11 @@ impl Node {
             api_rx: self.channel.api_requests.1,
         };
 
-        let timeouts_part = InternalPart {
+        let internal_part = InternalPart {
             internal_tx,
             internal_requests_rx,
-            thread_pool_size: self.thread_pool_size,
         };
-        (handler_part, network_part, timeouts_part)
+        (handler_part, network_part, internal_part)
     }
 
     /// Returns `Blockchain` instance.
