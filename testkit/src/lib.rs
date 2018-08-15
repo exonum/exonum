@@ -138,6 +138,7 @@ extern crate actix_web;
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
 extern crate assert_matches;
+extern crate exonum_crypto as crypto;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate failure;
@@ -164,12 +165,13 @@ use tokio_core::reactor::Core;
 use std::sync::{Arc, RwLock};
 use std::{fmt, net::SocketAddr};
 
+use crypto::Hash;
 use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
     },
     blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
-    crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
+    explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId}, messages::RawMessage,
     node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
 };

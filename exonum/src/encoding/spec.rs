@@ -135,9 +135,9 @@ macro_rules! encoding_struct {
             }
         }
 
-        impl $crate::crypto::CryptoHash for $name {
-            fn hash(&self) -> $crate::crypto::Hash {
-                $crate::crypto::hash(self.raw.as_ref())
+        impl ::crypto::CryptoHash for $name {
+            fn hash(&self) -> ::crypto::Hash {
+                ::crypto::hash(self.raw.as_ref())
             }
         }
 

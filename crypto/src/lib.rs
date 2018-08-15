@@ -496,6 +496,12 @@ impl Default for Hash {
     }
 }
 
+impl CryptoHash for Hash {
+    fn hash(&self) -> Hash {
+        *self
+    }
+}
+
 impl CryptoHash for bool {
     fn hash(&self) -> Hash {
         hash(&[*self as u8])
@@ -612,19 +618,17 @@ impl CryptoHash for DateTime<Utc> {
     }
 }
 
+// TODO: think about move it anywhere
 impl CryptoHash for Duration {
     fn hash(&self) -> Hash {
-        let mut buffer = vec![0; Self::field_size() as usize];
-        let from: Offset = 0;
-        let to: Offset = Self::field_size();
-        self.write(&mut buffer, from, to);
-        buffer.hash()
-    }
-}
+        let secs = self.num_seconds();
+        let nanos_as_duration = *self - Self::seconds(secs);
+        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
 
-impl CryptoHash for Round {
-    fn hash(&self) -> Hash {
-        self.0.hash()
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_i64(&mut buffer[0..8], secs);
+        LittleEndian::write_i32(&mut buffer[8..12], nanos);
+        buffer.hash()
     }
 }
 

@@ -16,6 +16,7 @@
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -31,8 +32,9 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
+use crypto::Hash;
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet},
     encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
     storage::Snapshot,
 };

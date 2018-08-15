@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crypto::{self, CryptoHash};
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
-    crypto::{self, CryptoHash}, helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Propose},
+    helpers::{Height, Round, ValidatorId}, messages::{Precommit, Propose},
 };
 use serde::{Deserialize, Serialize};
 use serde_json;

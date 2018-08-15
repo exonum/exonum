@@ -18,8 +18,9 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
+use crypto::{CryptoHash, PublicKey};
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
+    blockchain::{ExecutionError, ExecutionResult, Transaction},
     messages::Message, storage::Fork,
 };
 

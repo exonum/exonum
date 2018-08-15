@@ -37,7 +37,8 @@ const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
 /// framework) that can be obtained through `Schema` `transaction_statuses` method.
-pub type TransactionResult = Result<(), TransactionError>;
+#[derive(Debug)]
+pub struct TransactionResult(pub Result<(), TransactionError>);
 
 /// Transaction processing functionality for `Message`, which allows applying authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
@@ -318,7 +319,7 @@ impl From<ExecutionError> for TransactionError {
 impl StorageValue for TransactionResult {
     fn into_bytes(self) -> Vec<u8> {
         let mut res = u16::into_bytes(status_as_u16(&self));
-        if let Some(description) = self.err().and_then(|e| e.description) {
+        if let Some(description) = self.0.err().and_then(|e| e.description) {
             res.extend(bool::into_bytes(true));
             res.extend(String::into_bytes(description));
         } else {
@@ -335,17 +336,17 @@ impl StorageValue for TransactionResult {
             None
         };
 
-        match main_part {
+        TransactionResult(match main_part {
             value @ 0...MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::panic(description)),
             value => panic!("Invalid TransactionResult value: {}", value),
-        }
+        })
     }
 }
 
 fn status_as_u16(status: &TransactionResult) -> u16 {
-    match *status {
+    match (*status).0 {
         Ok(()) => TRANSACTION_STATUS_OK,
         Err(ref e) => match e.error_type {
             TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,

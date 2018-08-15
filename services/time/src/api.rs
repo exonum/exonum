@@ -16,7 +16,8 @@
 
 use chrono::{DateTime, Utc};
 
-use exonum::{api, blockchain::Schema, crypto::PublicKey};
+use crypto::PublicKey;
+use exonum::{api, blockchain::Schema};
 
 use TimeSchema;
 

@@ -83,7 +83,7 @@ macro_rules! __ex_message {
             -> ::std::result::Result<$name, $crate::encoding::Error> {
                 let min_message_size = $name::__ex_header_size() as usize
                             + $crate::messages::HEADER_LENGTH as usize
-                            + $crate::crypto::SIGNATURE_LENGTH as usize;
+                            + ::crypto::SIGNATURE_LENGTH as usize;
                 if raw.len() < min_message_size {
                     return Err($crate::encoding::Error::UnexpectedlyShortPayload {
                         actual_size: raw.len() as $crate::encoding::Offset,
@@ -111,7 +111,7 @@ macro_rules! __ex_message {
                 // Check body
                 let body_len = <Self>::check_fields(&raw)?;
                 if body_len.unchecked_offset() as usize +
-                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                    ::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
                     return Err("Incorrect raw message length.".into())
                 }
 
@@ -121,6 +121,13 @@ macro_rules! __ex_message {
 
             fn raw(&self) -> &$crate::messages::RawMessage {
                 &self.raw
+            }
+        }
+
+        impl ::crypto::CryptoHash for $name {
+            fn hash(&self) -> ::crypto::Hash {
+                use $crate::messages::Message;
+                ::crypto::hash(self.raw().as_ref())
             }
         }
 
@@ -178,7 +185,7 @@ macro_rules! __ex_message {
             /// Creates message and signs it.
             #[allow(unused_mut)]
             pub fn new($($field_name: $field_type,)*
-                       secret_key: &$crate::crypto::SecretKey) -> $name {
+                       secret_key: &::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
                 let mut writer = MessageWriter::new(
                     $crate::messages::PROTOCOL_MAJOR_VERSION,
@@ -197,7 +204,7 @@ macro_rules! __ex_message {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(dead_code, unused_mut)]
             pub fn new_with_signature($($field_name: $field_type,)*
-                                      signature: &$crate::crypto::Signature) -> $name {
+                                      signature: &::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
                 let mut writer = MessageWriter::new(
                     $crate::messages::PROTOCOL_MAJOR_VERSION,

@@ -25,6 +25,7 @@
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -36,9 +37,8 @@ extern crate serde_json;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::{
-        crypto::PublicKey, storage::{Fork, MapIndex, Snapshot},
-    };
+    use crypto::PublicKey;
+    use exonum::storage::{Fork, MapIndex, Snapshot};
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
@@ -113,7 +113,7 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
-    use exonum::crypto::PublicKey;
+    use crypto::PublicKey;
 
     use service::SERVICE_ID;
 
@@ -278,9 +278,10 @@ pub mod contracts {
 
 /// REST API.
 pub mod api {
+    use crypto::{Hash, PublicKey};
     use exonum::{
         api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::Transaction,
-        crypto::{Hash, PublicKey}, node::TransactionSend,
+        node::TransactionSend,
     };
 
     use schema::{CurrencySchema, Wallet};
@@ -351,8 +352,9 @@ pub mod api {
 
 /// Service declaration.
 pub mod service {
+    use crypto::Hash;
     use exonum::{
-        api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet}, crypto::Hash,
+        api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet},
         encoding, messages::RawTransaction, storage::Snapshot,
     };
 

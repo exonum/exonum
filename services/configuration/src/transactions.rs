@@ -14,10 +14,10 @@
 
 //! Transaction definitions for the configuration service.
 
+use crypto::{CryptoHash, Hash, PublicKey};
 use exonum::{
     blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
-    crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
-    storage::{Fork, Snapshot},
+    messages::Message, node::State, storage::{Fork, Snapshot},
 };
 
 use errors::Error as ServiceError;

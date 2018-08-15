@@ -14,8 +14,9 @@
 
 //! Storage schema for the configuration service.
 
+use crypto::{self, CryptoHash, Hash, PublicKey, Signature};
 use exonum::{
-    crypto::{self, CryptoHash, Hash, PublicKey, Signature}, messages::{RawMessage, ServiceMessage},
+    messages::{RawMessage, ServiceMessage},
     storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 

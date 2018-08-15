@@ -13,6 +13,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.9.0", path = "../../../exonum" }
+exonum-crypto = { version = "0.9.0", path = "../../../crypto" }
 exonum-configuration = { version = "0.9.0", path = "../../../services/configuration" }
 exonum-time = { version = "0.9.0", path = "../../../services/time" }
 serde = "1.0.10"

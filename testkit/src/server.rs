@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crypto;
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::{SharedNodeState, Transaction}, crypto,
+    blockchain::{SharedNodeState, Transaction},
     explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
 };
 

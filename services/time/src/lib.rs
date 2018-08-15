@@ -21,6 +21,7 @@
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
+extern crate exonum_crypto as crypto;
 extern crate chrono;
 #[macro_use]
 extern crate exonum;
@@ -40,9 +41,10 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
+use crypto::Hash;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{Service, ServiceContext, Transaction, TransactionSet},
-    crypto::Hash, encoding::{self, serialize::json::reexport::Value},
+    encoding::{self, serialize::json::reexport::Value},
     helpers::fabric::{Context, ServiceFactory}, messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
