@@ -249,7 +249,7 @@ fn rebroadcast_transactions() {
 
     let transactions = send_txs_into_pool(
         &sandbox,
-        TimestampingTxGenerator::new(DATA_SIZE).take(5).collect()
+        TimestampingTxGenerator::new(DATA_SIZE).take(5).collect(),
     );
 
     sandbox.recv_rebroadcast();
