@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore precommiters, commited
 
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.

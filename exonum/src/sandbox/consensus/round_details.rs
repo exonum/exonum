@@ -1767,7 +1767,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 }
 
 #[test]
-fn handle_precommit_remove_propose_request_ask_precommiters() {
+fn handle_precommit_remove_propose_request_ask_precommitters() {
     let sandbox = sandbox::timestamping_sandbox_builder().build();
 
     let tx = gen_timestamping_tx();
