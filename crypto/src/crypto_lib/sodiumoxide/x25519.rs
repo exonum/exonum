@@ -26,8 +26,6 @@ use sodiumoxide::crypto::sign::ed25519::{
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
-use crypto;
-
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
 /// Length of the secret Curve25519 key.

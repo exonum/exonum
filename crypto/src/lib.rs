@@ -20,6 +20,13 @@
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
+extern crate byteorder;
+extern crate chrono;
+extern crate hex;
+extern crate rust_decimal;
+extern crate serde;
+extern crate uuid;
+
 #[doc(inline)]
 pub use self::crypto_impl::{
     HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
@@ -40,10 +47,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use encoding::{
-    serialize::{encode_hex, FromHex, FromHexError, ToHex}, Field, Offset,
-};
-use helpers::Round;
+use hex::{encode_hex, FromHex, FromHexError, ToHex};
+// use helpers::Round;
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
 use self::crypto_lib::sodiumoxide as crypto_impl;
@@ -642,7 +647,7 @@ mod tests {
     use serde::de::DeserializeOwned;
     use serde_json;
 
-    use encoding::serialize::FromHex;
+    use hex::FromHex;
 
     #[test]
     fn to_from_hex_hash() {
@@ -781,8 +786,8 @@ mod tests {
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)
-    where
-        T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
+        where
+            T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
     {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();

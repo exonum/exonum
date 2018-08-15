@@ -46,6 +46,7 @@ extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
+extern crate crypto;
 extern crate env_logger;
 extern crate exonum_rocksdb as rocksdb;
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -90,7 +91,6 @@ pub mod encoding;
 pub mod messages;
 #[macro_use]
 pub mod helpers;
-pub mod crypto;
 pub mod node;
 pub mod storage;
 #[macro_use]
