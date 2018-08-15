@@ -17,9 +17,7 @@ use futures::{
 };
 use tokio_core::reactor::{Handle, Timeout};
 
-use std::{
-    io, time::{Duration, SystemTime},
-};
+use std::{io, time::{Duration, SystemTime}};
 
 use super::{
     error::{into_other, other_error}, InternalEvent, InternalRequest, TimeoutRequest,

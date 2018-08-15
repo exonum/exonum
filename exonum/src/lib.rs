@@ -65,14 +65,13 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate snow;
+extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_executor;
 extern crate tokio_io;
 extern crate tokio_retry;
 extern crate tokio_threadpool;
-#[cfg(any(test, feature = "long_benchmarks"))]
-extern crate tokio_timer;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;

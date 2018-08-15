@@ -16,14 +16,16 @@
 extern crate exonum;
 extern crate futures;
 extern crate serde_json;
-extern crate tokio_timer;
+extern crate tokio;
+extern crate tokio_core;
 
-use futures::{sync::oneshot, Future};
+use futures::{sync::oneshot, Future, IntoFuture};
 use serde_json::Value;
-use tokio_timer::Timer;
+use tokio::util::FutureExt;
+use tokio_core::reactor::Core;
 
 use std::{
-    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
+    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::{Duration, Instant},
 };
 
 use exonum::{
@@ -111,11 +113,13 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
 fn test_node_run() {
     let (nodes, commit_rxs) = run_nodes(4, 16_300);
 
-    let timer = Timer::default();
+    let mut core = Core::new().unwrap();
     let duration = Duration::from_secs(60);
     for rx in commit_rxs {
-        let rx = timer.timeout(rx.map_err(drop), duration);
-        rx.wait().unwrap();
+        let future = rx.into_future()
+            .deadline(Instant::now() + duration)
+            .map_err(drop);
+        core.run(future).expect("failed commit");
     }
 
     for handle in nodes {

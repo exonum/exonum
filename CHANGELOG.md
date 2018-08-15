@@ -70,6 +70,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Custom log formatting (along with `colored` and `term` dependencies) has been
   removed in favor of `env_logger`. (#857).
 
+- Several dependencies have been updated. (#861, #865, #871)
 - Several dependencies have been updated. (#861)
 
 - Transactions are now verified in a thread pool. Thread pool size is set to

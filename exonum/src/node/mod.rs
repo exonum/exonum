@@ -1048,11 +1048,11 @@ impl Node {
             api_rx: self.channel.api_requests.1,
         };
 
-        let timeouts_part = InternalPart {
+        let internal_part = InternalPart {
             internal_tx,
             internal_requests_rx,
         };
-        (handler_part, network_part, timeouts_part)
+        (handler_part, network_part, internal_part)
     }
 
     /// Returns `Blockchain` instance.
