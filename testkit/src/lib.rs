@@ -17,6 +17,7 @@
 //!
 //! # Example
 //! ```
+//! extern crate exonum_crypto as crypto;
 //! #[macro_use]
 //! extern crate exonum;
 //! #[macro_use]
@@ -25,9 +26,9 @@
 //!
 //! use serde_json::Value;
 //!
+//! use crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
-//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::encoding;
 //! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
@@ -138,9 +139,9 @@ extern crate actix_web;
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
 extern crate assert_matches;
-extern crate exonum_crypto as crypto;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
+extern crate exonum_crypto as crypto;
 extern crate failure;
 extern crate futures;
 #[macro_use]
@@ -171,9 +172,9 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
     },
     blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
-    explorer::{BlockWithTransactions, BlockchainExplorer},
-    helpers::{Height, ValidatorId}, messages::RawMessage,
-    node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
+    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::{Height, ValidatorId},
+    messages::RawMessage, node::{ApiSender, ExternalMessage, State as NodeState},
+    storage::{MemoryDB, Patch, Snapshot},
 };
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
@@ -239,6 +240,7 @@ mod server;
 /// # Example
 ///
 /// ```
+/// # extern crate exonum_crypto as crypto;
 /// # extern crate exonum;
 /// # extern crate exonum_testkit;
 /// # use exonum::blockchain::{Service, Transaction};
@@ -250,7 +252,7 @@ mod server;
 /// #    fn service_name(&self) -> &str {
 /// #        "documentation"
 /// #    }
-/// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+/// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<crypto::Hash> {
 /// #        Vec::new()
 /// #    }
 /// #    fn service_id(&self) -> u16 {
@@ -489,6 +491,7 @@ impl TestKit {
     /// in different order and/or in different blocks) that require an expensive setup:
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate exonum_testkit;
     /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
@@ -502,7 +505,7 @@ impl TestKit {
     /// #    fn service_name(&self) -> &str {
     /// #        "documentation"
     /// #    }
-    /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+    /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<crypto::Hash> {
     /// #        Vec::new()
     /// #    }
     /// #    fn service_id(&self) -> u16 {
@@ -519,7 +522,7 @@ impl TestKit {
     /// #         const SERVICE_ID = 1;
     /// #
     /// #         struct MyTransaction {
-    /// #             from: &exonum::crypto::PublicKey,
+    /// #             from: &crypto::PublicKey,
     /// #             msg: &str,
     /// #         }
     /// #     }
@@ -537,7 +540,7 @@ impl TestKit {
     ///     .with_service(MyService)
     ///     .create();
     /// expensive_setup(&mut testkit);
-    /// let (pubkey, key) = exonum::crypto::gen_keypair();
+    /// let (pubkey, key) = crypto::gen_keypair();
     /// let tx_a = MyTransaction::new(&pubkey, "foo", &key);
     /// let tx_b = MyTransaction::new(&pubkey, "bar", &key);
     ///
@@ -880,13 +883,14 @@ impl TestKit {
     /// # Example
     ///
     /// ```
+    /// extern crate exonum_crypto as crypto;
     /// extern crate exonum;
     /// extern crate exonum_testkit;
     /// extern crate serde;
     /// extern crate serde_json;
     ///
+    /// use crypto::CryptoHash;
     /// use exonum::blockchain::Schema;
-    /// use exonum::crypto::CryptoHash;
     /// use exonum::helpers::{Height, ValidatorId};
     /// use exonum_testkit::TestKitBuilder;
     ///

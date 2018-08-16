@@ -19,13 +19,14 @@
 //! the service schema to make assertions about the storage state.
 
 extern crate exonum;
+extern crate exonum_crypto as crypto;
 extern crate exonum_cryptocurrency as cryptocurrency;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate rand;
 
+use crypto::{PublicKey, SecretKey};
 use exonum::blockchain::Transaction;
-use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.

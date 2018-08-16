@@ -14,6 +14,7 @@
 
 #[macro_use]
 extern crate assert_matches;
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -28,11 +29,11 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+use crypto::{CryptoHash, PublicKey};
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::{Transaction, TransactionErrorType as ErrorType},
-    crypto::{self, CryptoHash, PublicKey}, encoding::serialize::{json::ExonumJson, FromHex},
-    helpers::Height, messages::Message,
+    encoding::serialize::{json::ExonumJson, FromHex}, helpers::Height, messages::Message,
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
@@ -661,15 +662,15 @@ fn test_explorer_transaction_statuses() {
     ]);
 
     fn check_statuses(statuses: &[TransactionResult]) {
-        assert!(statuses[0].is_ok());
+        assert!(statuses[0].0.is_ok());
         assert_matches!(
             statuses[1],
-            Err(ref err) if err.error_type() == ErrorType::Code(0)
+            TransactionResult(Err(ref err)) if err.error_type() == ErrorType::Code(0)
                 && err.description() == Some("Adding zero does nothing!")
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.error_type() == ErrorType::Panic
+            TransactionResult(Err(ref err)) if err.error_type() == ErrorType::Panic
                 && err.description() == Some("attempt to add with overflow")
         );
     }
@@ -678,7 +679,7 @@ fn test_explorer_transaction_statuses() {
     let statuses: Vec<_> = block
         .transactions
         .iter()
-        .map(|tx| tx.status().map_err(Clone::clone))
+        .map(|tx| TransactionResult(tx.status().map_err(Clone::clone)))
         .collect();
     check_statuses(&statuses);
 
@@ -690,7 +691,7 @@ fn test_explorer_transaction_statuses() {
                 .query(&TransactionQuery::new(*hash))
                 .get("v1/transactions")
                 .unwrap();
-            info.as_committed().unwrap().status().map_err(Clone::clone)
+            TransactionResult(info.as_committed().unwrap().status().map_err(Clone::clone))
         })
         .collect();
     check_statuses(&statuses);

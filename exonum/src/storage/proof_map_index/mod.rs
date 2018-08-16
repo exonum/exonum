@@ -123,8 +123,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -155,8 +157,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -217,8 +221,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -248,8 +254,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -271,8 +279,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -294,8 +304,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
@@ -337,8 +349,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -362,8 +376,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -387,8 +403,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -411,8 +429,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -437,8 +457,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -463,8 +485,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -563,8 +587,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -680,8 +706,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -740,8 +768,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";

@@ -354,8 +354,8 @@ pub mod api {
 pub mod service {
     use crypto::Hash;
     use exonum::{
-        api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet},
-        encoding, messages::RawTransaction, storage::Snapshot,
+        api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet}, encoding,
+        messages::RawTransaction, storage::Snapshot,
     };
 
     use api::CryptocurrencyApi;

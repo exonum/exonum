@@ -38,11 +38,12 @@ use messages::{MessageBuffer, RawMessage};
 /// Implementing `StorageValue` for the type:
 ///
 /// ```
+/// # extern crate exonum_crypto as crypto;
 /// # extern crate exonum;
 /// # extern crate byteorder;
 /// use std::borrow::Cow;
+/// use crypto::{CryptoHash, Hash};
 /// use exonum::storage::StorageValue;
-/// use exonum::crypto::{self, CryptoHash, Hash};
 /// use byteorder::{LittleEndian, ByteOrder};
 ///
 /// struct Data {

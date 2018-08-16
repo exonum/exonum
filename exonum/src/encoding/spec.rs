@@ -42,6 +42,7 @@
 /// prints out a value.
 ///
 /// ```
+/// # extern crate exonum_crypto as crypto;
 /// #[macro_use] extern crate exonum;
 ///
 /// encoding_struct! {

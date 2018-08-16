@@ -17,14 +17,14 @@ extern crate serde_json;
 
 #[macro_use]
 extern crate exonum_testkit;
-
 extern crate exonum;
+extern crate exonum_crypto as crypto;
 extern crate exonum_time;
 extern crate exonum_timestamping;
 
+use crypto::{gen_keypair, hash, CryptoHash, Hash};
 use exonum::{
-    api::node::public::explorer::TransactionQuery, blockchain::Transaction,
-    crypto::{gen_keypair, hash, CryptoHash, Hash}, helpers::Height,
+    api::node::public::explorer::TransactionQuery, blockchain::Transaction, helpers::Height,
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeService};

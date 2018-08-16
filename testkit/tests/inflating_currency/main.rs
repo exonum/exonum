@@ -16,6 +16,7 @@
 //! integration test, with the difference that the balance of each created wallet increases by 1
 //! on each block. Correspondingly, the initial wallet balance is set to 0.
 
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -26,9 +27,8 @@ extern crate rand;
 #[macro_use]
 extern crate serde_derive;
 
-use exonum::{
-    blockchain::Transaction, crypto::{self, CryptoHash, PublicKey, SecretKey}, helpers::Height,
-};
+use crypto::{CryptoHash, PublicKey, SecretKey};
+use exonum::{blockchain::Transaction, helpers::Height};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 

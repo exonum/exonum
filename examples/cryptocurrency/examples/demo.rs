@@ -13,6 +13,7 @@
 // limitations under the License.
 
 extern crate exonum;
+extern crate exonum_crypto as crypto;
 extern crate exonum_cryptocurrency as cryptocurrency;
 
 use exonum::blockchain::{GenesisConfig, ValidatorKeys};
@@ -22,8 +23,8 @@ use exonum::storage::MemoryDB;
 use cryptocurrency::service::CurrencyService;
 
 fn node_config() -> NodeConfig {
-    let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
-    let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
+    let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
+    let (service_public_key, service_secret_key) = crypto::gen_keypair();
 
     let validator_keys = ValidatorKeys {
         consensus_key: consensus_public_key,

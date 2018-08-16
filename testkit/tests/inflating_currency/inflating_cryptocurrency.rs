@@ -15,10 +15,11 @@
 extern crate serde;
 extern crate serde_json;
 
+use crypto::{Hash, PublicKey};
 use exonum::{
     api, blockchain::{ExecutionResult, Schema as CoreSchema, Service, Transaction, TransactionSet},
-    crypto::{Hash, PublicKey}, encoding, helpers::Height, messages::{Message, RawTransaction},
-    node::TransactionSend, storage::{Fork, MapIndex, Snapshot},
+    encoding, helpers::Height, messages::{Message, RawTransaction}, node::TransactionSend,
+    storage::{Fork, MapIndex, Snapshot},
 };
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //

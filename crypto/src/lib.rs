@@ -25,6 +25,7 @@ extern crate chrono;
 extern crate hex;
 extern crate rust_decimal;
 extern crate serde;
+extern crate serde_json;
 extern crate uuid;
 
 #[doc(inline)]
@@ -82,7 +83,7 @@ fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
 /// secret key.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair();
@@ -103,7 +104,8 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// Indicating the same seed value always results in the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, SEED_LENGTH, Seed};
+/// # extern crate exonum_crypto as crypto;
+/// use crypto::{SEED_LENGTH, Seed};
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
@@ -121,7 +123,7 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// The example below generates a unique keypair.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair();
@@ -141,7 +143,7 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// verifies that the data have been signed with the corresponding secret key.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair();
@@ -162,7 +164,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// The example below calculates the hash of the indicated data.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let data = [1, 2, 3];
@@ -192,7 +194,7 @@ pub trait CryptoHash {
 /// # Examples
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// crypto::init();
 /// ```
@@ -215,7 +217,8 @@ pub fn init() {
 /// and calculates the resulting hash of the system.
 ///
 /// ```rust
-/// use exonum::crypto::HashStream;
+/// # extern crate exonum_crypto as crypto;
+/// use crypto::HashStream;
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
 /// let mut hash_stream = HashStream::new();
@@ -258,7 +261,8 @@ impl HashStream {
 /// of random public and secret keys, signs the data and verifies the signature.
 ///
 /// ```rust
-/// use exonum::crypto::{SignStream, gen_keypair};
+/// # extern crate exonum_crypto as crypto;
+/// use crypto::{SignStream, gen_keypair};
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
 /// let (public_key, secret_key) = gen_keypair();
@@ -280,7 +284,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::SignStream;
+    /// # extern crate exonum_crypto as crypto;
+    /// use crypto::SignStream;
     ///
     /// let stream = SignStream::new();
     /// ```
@@ -293,7 +298,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::SignStream;
+    /// # extern crate exonum_crypto as crypto;
+    /// use crypto::SignStream;
     ///
     /// let mut stream = SignStream::new();
     ///
@@ -313,7 +319,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::{SignStream, gen_keypair};
+    /// # extern crate exonum_crypto as crypto;
+    /// use crypto::{SignStream, gen_keypair};
     ///
     /// let mut stream = SignStream::new();
     ///
@@ -335,7 +342,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::{SignStream, gen_keypair};
+    /// # extern crate exonum_crypto as crypto;
+    /// use crypto::{SignStream, gen_keypair};
     ///
     /// let mut stream = SignStream::new();
     /// let mut verify_stream = SignStream::new();
@@ -372,7 +380,7 @@ implement_public_crypto_wrapper! {
 /// secret keys.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let (public_key, _) = crypto::gen_keypair();
@@ -397,7 +405,7 @@ implement_private_crypto_wrapper! {
 /// secret keys.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let (_, secret_key) = crypto::gen_keypair();
@@ -417,7 +425,8 @@ implement_public_crypto_wrapper! {
 /// The example below generates the hash of the indicated data.
 ///
 /// ```
-/// use exonum::crypto::{self, Hash};
+/// # extern crate exonum_crypto as crypto;
+/// use crypto::Hash;
 ///
 /// let data = [1, 2, 3];
 /// let hash_from_data = crypto::hash(&data);
@@ -441,7 +450,7 @@ implement_public_crypto_wrapper! {
 /// that the data have been signed with that secret key.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair();
@@ -469,7 +478,8 @@ implement_private_crypto_wrapper! {
 /// generation of the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, SEED_LENGTH, Seed};
+/// # extern crate exonum_crypto as crypto;
+/// use crypto::{SEED_LENGTH, Seed};
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
@@ -790,8 +800,8 @@ mod tests {
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)
-        where
-            T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
+    where
+        T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
     {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();

@@ -22,8 +22,7 @@
 
 use crypto::{CryptoHash, PublicKey};
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction},
-    messages::Message, storage::Fork,
+    blockchain::{ExecutionError, ExecutionResult, Transaction}, messages::Message, storage::Fork,
 };
 use exonum_time::schema::TimeSchema;
 

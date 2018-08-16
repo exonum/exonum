@@ -14,6 +14,7 @@
 
 extern crate chrono;
 extern crate exonum;
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate exonum_time;
@@ -21,10 +22,10 @@ extern crate exonum_time;
 extern crate pretty_assertions;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use crypto::{gen_keypair, CryptoHash, PublicKey};
 use exonum::{
-    blockchain::{Schema, Transaction, TransactionErrorType},
-    crypto::{gen_keypair, CryptoHash, PublicKey}, helpers::{Height, ValidatorId},
-    storage::Snapshot,
+    blockchain::{Schema, Transaction, TransactionErrorType, TransactionResult},
+    helpers::{Height, ValidatorId}, storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
@@ -64,7 +65,7 @@ fn assert_transaction_result<S: AsRef<Snapshot>, T: Transaction>(
         .transaction_results()
         .get(&transaction.hash());
     match result {
-        Some(Err(e)) => {
+        Some(TransactionResult(Err(e))) => {
             assert_eq!(e.error_type(), TransactionErrorType::Code(expected_code));
             e.description().map(str::to_string)
         }
@@ -283,7 +284,7 @@ fn test_exonum_time_service_with_7_validators() {
             Schema::new(testkit.snapshot())
                 .transaction_results()
                 .get(&tx.hash()),
-            Some(Ok(()))
+            Some(TransactionResult(Ok(())))
         );
 
         validators_times[i] = Some(times[i]);
@@ -383,7 +384,7 @@ fn test_selected_time_less_than_time_in_storage() {
             Schema::new(testkit.snapshot())
                 .transaction_results()
                 .get(&tx.hash()),
-            Some(Ok(()))
+            Some(TransactionResult(Ok(())))
         );
     }
 
@@ -434,7 +435,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
         Schema::new(testkit.snapshot())
             .transaction_results()
             .get(&tx0.hash()),
-        Some(Ok(()))
+        Some(TransactionResult(Ok(())))
     );
 
     let snapshot = testkit.snapshot();

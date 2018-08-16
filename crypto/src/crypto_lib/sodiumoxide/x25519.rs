@@ -26,7 +26,10 @@ use super::sodiumoxide::crypto::sign::ed25519::{
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
-use super::super::super::{write_short_hex as crypto_write_short_hex, PublicKey as crypto_PublicKey, SecretKey as crypto_SecretKey};
+use super::super::super::{
+    write_short_hex as crypto_write_short_hex, PublicKey as crypto_PublicKey,
+    SecretKey as crypto_SecretKey,
+};
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
@@ -44,7 +47,7 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// converts it to pair of Curve25519 keys.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto as crypto;
 /// # crypto::init();
 ///
 /// let (pk, sk) = crypto::gen_keypair();

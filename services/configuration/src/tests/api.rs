@@ -14,9 +14,9 @@
 
 // spell-checker:ignore postpropose, postvote
 
+use crypto::{CryptoHash, Hash};
 use exonum::{
-    blockchain::{Schema, StoredConfiguration}, crypto::{CryptoHash, Hash},
-    helpers::{Height, ValidatorId},
+    blockchain::{Schema, StoredConfiguration}, helpers::{Height, ValidatorId},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 

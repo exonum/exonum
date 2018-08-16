@@ -262,7 +262,7 @@ impl<'a> Schema<&'a mut Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exonum::crypto::HASH_SIZE;
+    use crypto::HASH_SIZE;
     use exonum::storage::{Database, MemoryDB};
 
     lazy_static! {

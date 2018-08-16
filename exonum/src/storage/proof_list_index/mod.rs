@@ -309,8 +309,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// # extern crate exonum_crypto as crypto;
+    /// # extern crate exonum;
+    /// use crypto::Hash;
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
-    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";

@@ -386,10 +386,11 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// Use of the custom type parameter for deserialization:
 ///
 /// ```
+/// # extern crate exonum_crypto as crypto;
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
+/// # use crypto::{Hash, PublicKey, Signature};
 /// # use exonum::blockchain::{ExecutionResult, Transaction};
-/// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
 /// # use exonum::helpers::Height;
 /// # use exonum::storage::Fork;
@@ -562,10 +563,11 @@ impl<T> CommittedTransaction<T> {
 /// Use of the custom type parameter for deserialization:
 ///
 /// ```
+/// # extern crate exonum_crypto as crypto;
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
+/// # use crypto::{PublicKey, Signature};
 /// # use exonum::blockchain::{ExecutionResult, Transaction};
-/// # use exonum::crypto::{PublicKey, Signature};
 /// # use exonum::explorer::TransactionInfo;
 /// # use exonum::storage::Fork;
 /// transactions! {

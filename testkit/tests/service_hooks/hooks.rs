@@ -14,10 +14,10 @@
 
 //! A special service which generates transactions on `after_commit` events.
 
+use crypto::{Hash, Signature};
 use exonum::{
-    blockchain::{ExecutionResult, Service, ServiceContext, Transaction, TransactionSet},
-    crypto::{Hash, Signature}, encoding, helpers::Height, messages::RawTransaction,
-    storage::{Fork, Snapshot},
+    blockchain::{ExecutionResult, Service, ServiceContext, Transaction, TransactionSet}, encoding,
+    helpers::Height, messages::RawTransaction, storage::{Fork, Snapshot},
 };
 
 const SERVICE_ID: u16 = 512;

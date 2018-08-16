@@ -14,6 +14,7 @@
 
 // This is a regression test for exonum node.
 extern crate exonum;
+extern crate exonum_crypto as crypto;
 extern crate futures;
 extern crate serde_json;
 extern crate tokio_timer;
@@ -26,10 +27,11 @@ use std::{
     sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
 };
 
+use crypto::Hash;
 use exonum::{
-    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash,
-    encoding::Error as EncodingError, helpers, messages::RawTransaction,
-    node::{ApiSender, ExternalMessage, Node}, storage::{Database, Fork, MemoryDB, Snapshot},
+    blockchain::{Service, ServiceContext, Transaction}, encoding::Error as EncodingError, helpers,
+    messages::RawTransaction, node::{ApiSender, ExternalMessage, Node},
+    storage::{Database, Fork, MemoryDB, Snapshot},
 };
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);

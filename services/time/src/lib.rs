@@ -21,8 +21,8 @@
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
-extern crate exonum_crypto as crypto;
 extern crate chrono;
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -44,9 +44,8 @@ pub mod transactions;
 use crypto::Hash;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{Service, ServiceContext, Transaction, TransactionSet},
-    encoding::{self, serialize::json::reexport::Value},
-    helpers::fabric::{Context, ServiceFactory}, messages::RawTransaction,
-    storage::{Fork, Snapshot},
+    encoding::{self, serialize::json::reexport::Value}, helpers::fabric::{Context, ServiceFactory},
+    messages::RawTransaction, storage::{Fork, Snapshot},
 };
 use schema::TimeSchema;
 

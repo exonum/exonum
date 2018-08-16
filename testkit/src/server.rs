@@ -159,9 +159,9 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 mod tests {
     use serde_json;
 
+    use crypto::{CryptoHash, Hash, PublicKey};
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction};
-    use exonum::crypto::{CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;

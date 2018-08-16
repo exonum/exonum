@@ -72,6 +72,7 @@ where
 /// # Example
 ///
 /// ```
+/// # extern crate exonum_crypto as crypto;
 /// # #[macro_use] extern crate exonum;
 /// # use exonum::storage::{MemoryDB, Database, ProofMapIndex, HashedKey};
 /// encoding_struct!{

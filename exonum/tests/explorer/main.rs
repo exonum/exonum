@@ -14,6 +14,7 @@
 
 //! Tests for the blockchain explorer functionality.
 
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -21,10 +22,10 @@ extern crate serde_json;
 
 use serde_json::Value as JsonValue;
 
+use crypto::{CryptoHash, Hash};
 use exonum::{
-    blockchain::{Schema, Transaction, TransactionErrorType, TxLocation},
-    crypto::{self, CryptoHash, Hash}, explorer::*, helpers::Height,
-    messages::{Message, ServiceMessage},
+    blockchain::{Schema, Transaction, TransactionErrorType, TxLocation}, explorer::*,
+    helpers::Height, messages::{Message, ServiceMessage},
 };
 
 use blockchain::{create_block, create_blockchain, CreateWallet, Transfer};

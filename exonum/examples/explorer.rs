@@ -14,13 +14,14 @@
 
 //! Examples of usage of a blockchain explorer.
 
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate serde_json;
 
 use exonum::{
-    blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
+    blockchain::{Blockchain, Schema, Transaction, TransactionError}, explorer::*,
     helpers::{Height, ValidatorId},
 };
 

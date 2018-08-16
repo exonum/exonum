@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 use exonum::{
-    blockchain::{Schema, StoredConfiguration, Transaction},
-    crypto::{hash, CryptoHash, Hash, HASH_SIZE}, helpers::{Height, ValidatorId},
+    blockchain::{Schema, StoredConfiguration, Transaction}, helpers::{Height, ValidatorId},
     storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
