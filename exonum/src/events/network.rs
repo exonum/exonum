@@ -24,7 +24,9 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration, error::Error};
+use std::{
+    cell::RefCell, collections::HashMap, error::Error, io, net::SocketAddr, rc::Rc, time::Duration,
+};
 
 use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
@@ -458,7 +460,6 @@ impl Future for Listener {
         self.0.poll()
     }
 }
-
 
 fn to_future<F, I, E>(fut: F) -> Box<dyn Future<Item = I, Error = E>>
 where
