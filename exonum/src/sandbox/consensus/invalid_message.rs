@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
@@ -100,14 +99,14 @@ fn handle_propose_with_incorrect_time() {
 }
 
 #[test]
-fn ignore_propose_with_commited_transaction() {
+fn ignore_propose_with_committed_transaction() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
     add_one_height(&sandbox, &sandbox_state);
 
     let propose = ProposeBuilder::new(&sandbox)
-                // without this line Prevote would have been broadcast
+        // without this line Prevote would have been broadcast
         .with_tx_hashes(sandbox_state.committed_transaction_hashes.borrow().as_ref())
         .build();
 
