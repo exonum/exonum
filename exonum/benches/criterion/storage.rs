@@ -123,7 +123,7 @@ fn bench_merkle_patricia_table_insertion_fork_rocksdb(b: &mut Bencher) {
 }
 
 pub fn bench_storage(c: &mut Criterion) {
-    ::exonum::crypto::init();
+    ::crypto::init();
 
     c.bench_function("append merkle table", bench_merkle_table_append_rocksdb);
     c.bench_function(
