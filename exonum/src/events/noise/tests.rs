@@ -25,7 +25,7 @@ use std::{
     error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
 };
 
-use crypto::{gen_keypair_from_seed, PublicKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -330,16 +330,11 @@ fn send_handshake(
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let connect_info = ConnectInfo {
-        address: *addr,
-        public_key: PublicKey::zero(),
-    };
-
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params).send(sock, connect_info),
+            None => NoiseHandshake::initiator(&params).send(sock),
             Some(message) => {
-                NoiseErrorHandshake::initiator(&params, message).send(sock, connect_info)
+                NoiseErrorHandshake::initiator(&params, message).send(sock)
             }
         })
         .map(|_| ())
@@ -436,7 +431,7 @@ impl Handshake for NoiseErrorHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S, _info: ConnectInfo) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {

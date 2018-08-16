@@ -75,6 +75,7 @@ pub struct NoiseHandshake {
     noise: NoiseWrapper,
     max_message_len: u32,
     connect_list: SharedConnectList,
+    connect_info: ConnectInfo,
 }
 
 impl NoiseHandshake {
@@ -84,6 +85,7 @@ impl NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
+            connect_info: params.connect_info,
         }
     }
 
@@ -93,6 +95,7 @@ impl NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
+            connect_info: params.connect_info,
         }
     }
 
@@ -165,14 +168,15 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S, info: ConnectInfo) -> HandshakeResult<S, Self::Result>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
+        let connect_info = self.connect_info;
         let framed = self.write_handshake_msg(stream, &[])
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(move |(stream, handshake, _)| {
-                handshake.write_handshake_msg(stream, &info.try_serialize().unwrap())
+                handshake.write_handshake_msg(stream, &connect_info.try_serialize().unwrap())
             })
             .and_then(|(stream, handshake)| handshake.finalize(stream, None));
         Box::new(framed)

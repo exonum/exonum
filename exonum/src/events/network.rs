@@ -24,7 +24,7 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration, error::Error};
 
 use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
@@ -134,7 +134,7 @@ impl ConnectionsPool {
                     &handshake_params,
                 )
             })
-            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
+            .map(|conn_tx| to_future(Ok(conn_tx)))
     }
 
     fn connect_to_peer(
@@ -238,7 +238,7 @@ impl ConnectionsPool {
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
-            NoiseHandshake::initiator(&handshake_params).send(stream, handshake_params.connect_info)
+            NoiseHandshake::initiator(&handshake_params).send(stream)
         } else {
             Box::new(err(other_error(format!(
                 "Attempt to connect to the peer with address {:?} which \
@@ -468,9 +468,10 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
-where
-    F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
+fn to_future<F, I, E>(fut: F) -> Box<dyn Future<Item = I, Error = E>>
+    where
+        F: IntoFuture<Item = I, Error = E> + 'static,
+        E: Error,
 {
-    Box::new(fut)
+    Box::new(fut.into_future())
 }

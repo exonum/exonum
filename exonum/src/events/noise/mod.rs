@@ -34,7 +34,6 @@ use tokio_io::{
 use std::io;
 
 use events::codec::MessagesCodec;
-use node::ConnectInfo;
 
 pub mod error;
 pub mod wrappers;
@@ -59,7 +58,6 @@ pub trait Handshake {
     fn send<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-        info: ConnectInfo,
     ) -> HandshakeResult<S, Self::Result>;
 }
 
