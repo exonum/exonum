@@ -21,6 +21,7 @@ use exonum::{
     storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
+use SERVICE_NAME;
 use {
     Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
     VotingDecision,
@@ -221,7 +222,7 @@ fn test_apply_with_increased_majority() {
         cfg.set_service_config("dummy", "First cfg");
         cfg.set_actual_from(cfg_change_height);
         cfg.set_service_config(
-            "configuration",
+            SERVICE_NAME,
             ConfigurationServiceConfig {
                 majority_count: Some(6),
             },
@@ -287,7 +288,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
         cfg.set_service_config("dummy", "First cfg");
         cfg.set_actual_from(cfg_change_height);
         cfg.set_service_config(
-            "configuration",
+            SERVICE_NAME,
             ConfigurationServiceConfig {
                 majority_count: Some(5),
             },
@@ -315,7 +316,7 @@ fn test_discard_proposes_with_too_small_majority_count() {
         cfg.set_service_config("dummy", "First cfg");
         cfg.set_actual_from(cfg_change_height);
         cfg.set_service_config(
-            "configuration",
+            SERVICE_NAME,
             ConfigurationServiceConfig {
                 majority_count: Some(2),
             },

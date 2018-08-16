@@ -24,6 +24,7 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 use schema::{MaybeVote, ProposeData, Schema};
+use SERVICE_NAME;
 
 transactions! {
     /// Configuration Service transactions.
@@ -131,11 +132,11 @@ fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool {
 }
 
 fn get_service_config(config: &StoredConfiguration) -> ConfigurationServiceConfig {
-    if let Some(config) = config.services.get("configuration") {
-        serde_json::from_value(config.clone()).unwrap_or_default()
-    } else {
-        Default::default()
-    }
+    config
+        .services
+        .get(SERVICE_NAME)
+        .map(|config| serde_json::from_value(config.clone()).expect("Configuration is invalid"))
+        .unwrap_or_default()
 }
 
 impl Propose {
