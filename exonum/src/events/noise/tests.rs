@@ -21,9 +21,7 @@ use tokio_core::{
 };
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::{
-    error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
-};
+use std::{net::SocketAddr, thread, time::Duration};
 
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
@@ -263,7 +261,7 @@ fn wait_for_handshake_result(
     sender_message: Option<BogusMessage>,
     responder_message: Option<BogusMessage>,
 ) -> (IoResult<()>, IoResult<()>) {
-    let (err_tx, err_rx) = mpsc::channel::<io::Error>(0);
+    let (err_tx, err_rx) = mpsc::channel::<failure::Error>(0);
 
     let responder_message = responder_message.clone();
     let remote_params = params.clone();
@@ -363,7 +361,7 @@ impl NoiseErrorHandshake {
     fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         let inner = self.inner.take().unwrap();
 
         inner
@@ -377,7 +375,7 @@ impl NoiseErrorHandshake {
     fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 

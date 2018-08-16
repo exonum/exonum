@@ -14,11 +14,9 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use failure;
 use tokio_io::codec::{Decoder, Encoder};
 
-use std::io;
-
-use super::error::other_error;
 use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
 use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
@@ -41,9 +39,9 @@ impl MessagesCodec {
 
 impl Decoder for MessagesCodec {
     type Item = RawMessage;
-    type Error = io::Error;
+    type Error = failure::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, io::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Read header
         if buf.len() < HEADER_LENGTH {
             return Ok(None);
@@ -59,25 +57,27 @@ impl Decoder for MessagesCodec {
         let mut buf = self.session.decrypt_msg(len, buf)?;
 
         if buf[0] != 0 {
-            return Err(other_error("Message first byte must be set to 0"));
+            bail!("Message first byte must be set to 0");
         }
 
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
 
         if total_len as u32 > self.max_message_len {
-            return Err(other_error(format!(
+            bail!(
                 "Received message is too long: {}, maximum allowed length is {} bytes",
-                total_len, self.max_message_len,
-            )));
+                total_len,
+                self.max_message_len,
+            );
         }
 
         if total_len < HEADER_LENGTH {
-            return Err(other_error(format!(
+            bail!(
                 "Received malicious message with insufficient \
                  size in header: {}, expected header size {}",
-                total_len, HEADER_LENGTH
-            )));
+                total_len,
+                HEADER_LENGTH
+            );
         }
 
         // Read message
@@ -92,9 +92,9 @@ impl Decoder for MessagesCodec {
 
 impl Encoder for MessagesCodec {
     type Item = RawMessage;
-    type Error = io::Error;
+    type Error = failure::Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
         self.session.encrypt_msg(msg.as_ref(), buf)?;
         Ok(())
     }
