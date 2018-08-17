@@ -89,6 +89,7 @@ precommits
 prevote
 prevotes
 println
+proptest
 pubkey
 pubkeys
 readonly

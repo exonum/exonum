@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore oneof
+
 //! Property testing for proof map index as a rust collection.
 
 extern crate exonum;
