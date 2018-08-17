@@ -15,7 +15,7 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use actix::{Addr, Syn};
+use actix::Addr;
 use serde_json::Value;
 
 use std::{
@@ -322,7 +322,7 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    broadcast_server_address: Option<Addr<Syn, websocket::Server>>,
+    broadcast_server_address: Option<Addr<websocket::Server>>,
 }
 
 impl fmt::Debug for ApiNodeState {
@@ -536,7 +536,7 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    pub(crate) fn set_broadcast_server_address(&self, address: Addr<Syn, websocket::Server>) {
+    pub(crate) fn set_broadcast_server_address(&self, address: Addr<websocket::Server>) {
         let mut state = self.state.write().expect("Expected write lock");
         state.broadcast_server_address = Some(address);
     }

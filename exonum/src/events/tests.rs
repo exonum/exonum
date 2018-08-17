@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{stream::Wait, sync::mpsc, Future, Sink, Stream};
+use futures::{sync::mpsc, Future, Sink, Stream};
+use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
-use tokio_timer::{TimeoutStream, Timer};
 
-use std::{net::SocketAddr, thread, time::Duration};
+use std::{
+    net::SocketAddr, thread, time::{self, Duration, Instant},
+};
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, PublicKey, SecretKey};
@@ -31,7 +33,7 @@ use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacit
 pub struct TestHandler {
     handle: Option<thread::JoinHandle<()>>,
     listen_address: SocketAddr,
-    network_events_rx: Wait<TimeoutStream<mpsc::Receiver<NetworkEvent>>>,
+    network_events_rx: mpsc::Receiver<NetworkEvent>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
 }
 
@@ -41,19 +43,23 @@ impl TestHandler {
         network_requests_tx: mpsc::Sender<NetworkRequest>,
         network_events_rx: mpsc::Receiver<NetworkEvent>,
     ) -> TestHandler {
-        let timer = Timer::default();
-        let receiver = timer.timeout_stream(network_events_rx, Duration::from_secs(30));
         TestHandler {
             handle: None,
             listen_address,
+            network_events_rx,
             network_requests_tx,
-            network_events_rx: receiver.wait(),
         }
     }
 
     pub fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
-        let event = self.network_events_rx.next().unwrap()?;
-        Ok(event)
+        let rx = self.network_events_rx.by_ref();
+        let future = rx.into_future()
+            .deadline(Instant::now() + Duration::from_secs(30))
+            .map_err(drop);
+
+        let mut core = Core::new().unwrap();
+        let (event, _) = core.run(future)?;
+        event.ok_or(())
     }
 
     pub fn disconnect_with(&self, addr: SocketAddr) {
