@@ -165,9 +165,9 @@ impl NodeHandler {
         let peers: Vec<ConnectInfo> = self.state
             .peers()
             .values()
-//            .map(|info| info.address)
             .cloned()
             .collect();
+
         info!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,

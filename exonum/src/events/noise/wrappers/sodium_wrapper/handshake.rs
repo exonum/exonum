@@ -140,7 +140,6 @@ impl NoiseHandshake {
     ) -> impl Future<Item = (S, Self, Vec<u8>), Error = io::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
             let message = self.noise.read_handshake_msg(&msg.0)?;
-
             Ok((stream, self, message))
         })
     }
@@ -159,7 +158,7 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-        info: Vec<u8>,
+        peers_exchange: Vec<u8>,
     ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), io::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
@@ -177,7 +176,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_mode()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok((framed, info))
+        Ok((framed, peers_exchange))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
@@ -199,7 +198,7 @@ impl Handshake for NoiseHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake, _)| handshake.write_handshake_msg(stream, &[]))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake, info)| handshake.finalize(stream, info));
+            .and_then(|(stream, handshake, peers_exchange)| handshake.finalize(stream, peers_exchange));
         Box::new(framed)
     }
 

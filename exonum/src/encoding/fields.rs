@@ -469,7 +469,7 @@ impl<'a> Field<'a> for ConnectInfo {
         let public_key_offset = from + SocketAddr::field_size();
 
         let address = SocketAddr::read(buffer, from, public_key_offset);
-        // Unwrap here is safe, because `from_slice` only fails if length is smaller than
+        // Unwrap here is safe, because `from_slice` only fails if length is not equal to
         // PUBLIC_KEY_LENGTH.
         let public_key =
             PublicKey::from_slice(&buffer[public_key_offset as usize..to as usize]).unwrap();

@@ -454,12 +454,12 @@ impl Listener {
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
         address: SocketAddr,
-        info: PeersExchange,
+        peers_exchange: PeersExchange,
     ) -> impl Future<Item = (), Error = io::Error>
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
     {
-        let event = NetworkEvent::PeerConnected(info);
+        let event = NetworkEvent::PeerConnected(peers_exchange);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx

@@ -692,17 +692,6 @@ impl Sandbox {
         self.inner.borrow_mut().handler.state.update_config(config);
     }
 
-    //    fn peers(&self) -> Vec<SocketAddr> {
-    //        self.inner
-    //            .borrow_mut()
-    //            .handler
-    //            .state
-    //            .peers()
-    //            .values()
-    //            .map(|info| info.address)
-    //            .collect()
-    //    }
-
     fn peers(&self) -> Vec<ConnectInfo> {
         self.inner
             .borrow_mut()
