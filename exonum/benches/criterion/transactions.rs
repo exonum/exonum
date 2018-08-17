@@ -94,21 +94,18 @@ impl TransactionsHandler {
 
 impl EventHandler for TransactionsHandler {
     fn handle_event(&mut self, event: Event) {
-        match event {
-            Event::Internal(InternalEvent::TxVerified(_)) => {
-                assert!(!self.is_finished(), "unexpected `TxVerified`");
+        if let Event::Internal(InternalEvent::TxVerified(_)) = event {
+            assert!(!self.is_finished(), "unexpected `TxVerified`");
 
-                self.txs_count += 1;
+            self.txs_count += 1;
 
-                if self.txs_count == self.expected_count {
-                    self.finish_signal
-                        .take()
-                        .unwrap()
-                        .send(())
-                        .expect("cannot send finish signal");
-                }
+            if self.txs_count == self.expected_count {
+                self.finish_signal
+                    .take()
+                    .unwrap()
+                    .send(())
+                    .expect("cannot send finish signal");
             }
-            _ => unreachable!(),
         }
     }
 }

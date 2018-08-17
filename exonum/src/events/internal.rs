@@ -57,6 +57,9 @@ impl InternalPart {
         })
     }
 
+    /// Represents a task that processes Internal Requests and produces Internal Events.
+    /// `handle` is used to schedule additional tasks within this task.
+    /// `verify_executor` is where transaction verification task is executed.
     pub fn run<E>(self, handle: Handle, verify_executor: E) -> impl Future<Item = (), Error = ()>
     where
         E: Executor<Box<dyn Future<Item = (), Error = ()> + Send>>,

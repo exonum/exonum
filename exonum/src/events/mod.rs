@@ -56,6 +56,7 @@ pub enum InternalEvent {
 }
 
 #[derive(Debug)]
+/// Asynchronous requests for internal actions.
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
