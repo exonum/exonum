@@ -162,11 +162,7 @@ impl NodeHandler {
 
     /// Handles the `PeersRequest` message. Node sends known peers to message sender.
     pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
-        let peers: Vec<ConnectInfo> = self.state
-            .peers()
-            .values()
-            .cloned()
-            .collect();
+        let peers: Vec<ConnectInfo> = self.state.peers().values().cloned().collect();
 
         info!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",

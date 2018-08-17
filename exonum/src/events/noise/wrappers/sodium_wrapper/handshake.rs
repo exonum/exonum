@@ -198,7 +198,9 @@ impl Handshake for NoiseHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake, _)| handshake.write_handshake_msg(stream, &[]))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake, peers_exchange)| handshake.finalize(stream, peers_exchange));
+            .and_then(|(stream, handshake, peers_exchange)| {
+                handshake.finalize(stream, peers_exchange)
+            });
         Box::new(framed)
     }
 
