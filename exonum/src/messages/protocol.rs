@@ -68,6 +68,26 @@ pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeersExchange::MESSAGE_ID;
 messages! {
     const SERVICE_ID = CONSENSUS;
 
+    /// Send current node's connected peers to the sender.
+    ///
+    /// ### Validation
+    /// Request is considered valid if the sender of the message on the network
+    /// level corresponds to the `from` field.
+    ///
+    /// ### Processing
+    /// Peer connects to the received peers.
+    ///
+    /// ### Generation
+    /// `PeersExchange` is sent as response to incoming `PeersRequest`.
+    struct PeersExchange {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+        /// List of known peers.
+        peers: Vec<ConnectInfo>,
+    }
+
     /// Current node status.
     ///
     /// ### Validation
@@ -334,26 +354,6 @@ messages! {
         to: &PublicKey,
         /// The height to which the message is related.
         height: Height,
-    }
-
-    /// Send current node's connected peers to the sender.
-    ///
-    /// ### Validation
-    /// Request is considered valid if the sender of the message on the network
-    /// level corresponds to the `from` field.
-    ///
-    /// ### Processing
-    /// Peer connects to the received peers.
-    ///
-    /// ### Generation
-    /// `PeersResponse` is sent as response to incoming `PeersRequest`.
-    struct PeersResponse {
-        /// The sender's public key.
-        from: &PublicKey,
-        /// Public key of the recipient.
-        to: &PublicKey,
-        /// List of known peers.
-        peers: Vec<SocketAddr>,
     }
 }
 

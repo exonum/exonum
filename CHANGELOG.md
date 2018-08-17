@@ -17,7 +17,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Config parameter `external_address` is now a required value. (#826)
 
 - `Connect`-messages have been removed from the protocol. Now handshake between
-  peers are handled by noise protocol.
+  peers are handled by noise protocol. (#866)
 
 - New message type `PeersExchange` has been added. Peers sends it as the
   response to `PeersRequest`. (#866)
