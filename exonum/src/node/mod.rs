@@ -593,6 +593,11 @@ impl NodeHandler {
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
+        if address == &self.system_state.listen_address() {
+            warn!("Attempt to connect to self {:?}", address);
+            return;
+        }
+
         let request = NetworkRequest::ConnectToPeer(*address);
         self.channel.network_requests.send(request).log_error();
     }
@@ -1035,7 +1040,7 @@ impl Node {
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
             self.max_message_len,
-            self.handler.system_state.listen_address(),
+            self.state().our_connect_info().address,
         );
         self.run_handler(&handshake_params)?;
 

@@ -72,7 +72,7 @@ pub enum Any {
     /// A batch of the transactions.
     TransactionsBatch(TransactionsResponse),
     /// Response containing know peers.
-    PeersResponse(PeersResponse),
+    PeersExchange(PeersExchange),
 }
 
 /// Consensus message.
@@ -253,7 +253,7 @@ impl Any {
                 BLOCK_REQUEST_MESSAGE_ID => {
                     Any::Request(RequestMessage::Block(BlockRequest::from_raw(raw)?))
                 }
-                PEERS_RESPONSE_MESSAGE_ID => Any::PeersResponse(PeersResponse::from_raw(raw)?),
+                PEERS_RESPONSE_MESSAGE_ID => Any::PeersExchange(PeersExchange::from_raw(raw)?),
 
                 message_type => {
                     return Err(Error::IncorrectMessageType { message_type });

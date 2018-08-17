@@ -19,8 +19,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Connect`-messages have been removed from the protocol. Now handshake between
   peers are handled by noise protocol.
 
-- New message type `PeersResponse` has been added. Peers sends it as the
-  response to `PeersRequest`.
+- New message type `PeersExchange` has been added. Peers sends it as the
+  response to `PeersRequest`. (#866)
 
 ### New features
 

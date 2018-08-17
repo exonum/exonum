@@ -24,7 +24,9 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration, error::Error};
+use std::{
+    cell::RefCell, collections::HashMap, error::Error, io, net::SocketAddr, rc::Rc, time::Duration,
+};
 
 use super::{
     error::{into_other, log_error, other_error, result_ok}, to_box,
@@ -33,15 +35,14 @@ use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use messages::RawMessage;
-use node::ConnectInfo;
+use messages::{Any, PeersExchange, RawMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(ConnectInfo),
+    PeerConnected(PeersExchange),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -232,9 +233,8 @@ impl ConnectionsPool {
         stream: TcpStream,
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Option<ConnectInfo>), Error = io::Error>
-    {
-        let connect_list = &handshake_params.connect_list.clone();
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = io::Error> {
+        let connect_list = &handshake_params.connect_list();
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
@@ -370,7 +370,6 @@ impl RequestHandler {
             .clone()
             .send(event)
             .map_err(|_| other_error("can't send network event"))
-            .into_future()
     }
 }
 
@@ -419,11 +418,12 @@ impl Listener {
             let handshake = NoiseHandshake::responder(&handshake_params);
             let connection_handler = handshake
                 .listen(sock)
-                .and_then(move |(sock, info)| {
+                .and_then(|(stream, raw)| (Ok(stream), Self::parse_peers_exchange(raw)))
+                .and_then(move |(sock, exchange)| {
                     trace!("Remote connection established with socket={:?}", sock);
                     let (_, stream) = sock.split();
 
-                    Self::process_incoming_messages(stream, network_tx, address, info.unwrap()).map(
+                    Self::process_incoming_messages(stream, network_tx, address, exchange).map(
                         |_| {
                             // Ensure that holder lives until the stream ends.
                             let _holder = holder;
@@ -439,11 +439,22 @@ impl Listener {
         Ok(Listener(to_box(server)))
     }
 
+    fn parse_peers_exchange(raw: Vec<u8>) -> Result<PeersExchange, io::Error> {
+        let raw = RawMessage::from_vec(raw);
+        let raw = Any::from_raw(raw);
+        match raw {
+            Ok(Any::PeersExchange(connect)) => Ok(connect),
+            _ => Err(other_error(
+                "Missing PeersExchange message from the remote peer".to_string(),
+            )),
+        }
+    }
+
     fn process_incoming_messages<S>(
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
         address: SocketAddr,
-        info: ConnectInfo,
+        info: PeersExchange,
     ) -> impl Future<Item = (), Error = io::Error>
     where
         S: Stream<Item = RawMessage, Error = io::Error>,
@@ -469,9 +480,9 @@ impl Future for Listener {
 }
 
 fn to_future<F, I, E>(fut: F) -> Box<dyn Future<Item = I, Error = E>>
-    where
-        F: IntoFuture<Item = I, Error = E> + 'static,
-        E: Error,
+where
+    F: IntoFuture<Item = I, Error = E> + 'static,
+    E: Error,
 {
     Box::new(fut.into_future())
 }

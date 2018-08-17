@@ -40,7 +40,7 @@ impl NodeHandler {
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
         match event {
-            NetworkEvent::PeerConnected(info) => self.handle_connected(info),
+            NetworkEvent::PeerConnected(peers_exchange) => self.handle_connected(&peers_exchange),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),

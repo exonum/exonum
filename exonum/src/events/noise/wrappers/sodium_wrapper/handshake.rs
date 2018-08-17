@@ -16,7 +16,7 @@ use futures::future::{done, Future};
 use tokio_codec::{Decoder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::io;
+use std::{io, net::SocketAddr};
 
 use super::wrapper::NoiseWrapper;
 use crypto::{
@@ -26,18 +26,22 @@ use events::{
     codec::MessagesCodec, error::other_error,
     noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
-use node::state::SharedConnectList;
-use node::ConnectInfo;
-use std::net::SocketAddr;
+use futures::future;
+use messages::PeersExchange;
+use node::{state::SharedConnectList, ConnectInfo};
+use storage::StorageValue;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: x25519::PublicKey,
-    pub secret_key: x25519::SecretKey,
-    pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
-    pub connect_info: ConnectInfo,
+    connect_info: ConnectInfo,
+    public_key: PublicKey,
+    secret_key: SecretKey,
+    remote_key: Option<PublicKey>,
+    public_key_x25519: x25519::PublicKey,
+    secret_key_x25519: x25519::SecretKey,
+    remote_key_x25519: Option<x25519::PublicKey>,
     max_message_len: u32,
 }
 
@@ -50,23 +54,54 @@ impl HandshakeParams {
         address: SocketAddr,
     ) -> Self {
         let (public_key_x25519, secret_key_x25519) =
-            into_x25519_keypair(public_key, secret_key).unwrap();
+            into_x25519_keypair(public_key, secret_key.clone()).unwrap();
 
         HandshakeParams {
-            public_key: public_key_x25519,
-            secret_key: secret_key_x25519,
+            public_key_x25519,
+            secret_key_x25519,
             max_message_len,
             remote_key: None,
+            remote_key_x25519: None,
             connect_list,
             connect_info: ConnectInfo {
                 address,
                 public_key,
             },
+            public_key,
+            secret_key,
         }
     }
 
     pub fn set_remote_key(&mut self, remote_key: PublicKey) {
-        self.remote_key = Some(into_x25519_public_key(remote_key));
+        self.remote_key = Some(remote_key);
+        self.remote_key_x25519 = Some(into_x25519_public_key(remote_key));
+    }
+
+    pub fn peers_exchange(&self) -> Option<PeersExchange> {
+        self.remote_key.map(|key| {
+            PeersExchange::new(
+                &self.public_key,
+                &key,
+                vec![self.connect_info],
+                &self.secret_key,
+            )
+        })
+    }
+
+    pub fn public_key(&self) -> &x25519::PublicKey {
+        &self.public_key_x25519
+    }
+
+    pub fn secret_key(&self) -> &x25519::SecretKey {
+        &self.secret_key_x25519
+    }
+
+    pub fn remote_key(&self) -> &Option<x25519::PublicKey> {
+        &self.remote_key_x25519
+    }
+
+    pub fn connect_list(&self) -> SharedConnectList {
+        self.connect_list.clone()
     }
 }
 
@@ -75,7 +110,7 @@ pub struct NoiseHandshake {
     noise: NoiseWrapper,
     max_message_len: u32,
     connect_list: SharedConnectList,
-    connect_info: ConnectInfo,
+    peers_exchange: Option<PeersExchange>,
 }
 
 impl NoiseHandshake {
@@ -85,7 +120,7 @@ impl NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
-            connect_info: params.connect_info,
+            peers_exchange: params.peers_exchange(),
         }
     }
 
@@ -95,18 +130,18 @@ impl NoiseHandshake {
             noise,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
-            connect_info: params.connect_info,
+            peers_exchange: params.peers_exchange(),
         }
     }
 
     pub fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self, Option<ConnectInfo>), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self, Vec<u8>), Error = io::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
             let message = self.noise.read_handshake_msg(&msg.0)?;
-            let remote_connect_info = ConnectInfo::try_deserialize(message.as_ref());
-            Ok((stream, self, remote_connect_info.ok()))
+
+            Ok((stream, self, message))
         })
     }
 
@@ -124,8 +159,8 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-        info: Option<ConnectInfo>,
-    ) -> Result<(Framed<S, MessagesCodec>, Option<ConnectInfo>), io::Error> {
+        info: Vec<u8>,
+    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), io::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -155,7 +190,7 @@ impl NoiseHandshake {
 }
 
 impl Handshake for NoiseHandshake {
-    type Result = Option<ConnectInfo>;
+    type Result = Vec<u8>;
 
     fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
@@ -172,13 +207,19 @@ impl Handshake for NoiseHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
-        let connect_info = self.connect_info;
-        let framed = self.write_handshake_msg(stream, &[])
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(move |(stream, handshake, _)| {
-                handshake.write_handshake_msg(stream, &connect_info.try_serialize().unwrap())
-            })
-            .and_then(|(stream, handshake)| handshake.finalize(stream, None));
-        Box::new(framed)
+        match self.peers_exchange.clone() {
+            Some(peers_exchange) => {
+                let framed = self.write_handshake_msg(stream, &[])
+                    .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+                    .and_then(move |(stream, handshake, _)| {
+                        handshake.write_handshake_msg(stream, &peers_exchange.into_bytes())
+                    })
+                    .and_then(|(stream, handshake)| handshake.finalize(stream, Vec::new()));
+                Box::new(framed)
+            }
+            None => Box::new(future::err(other_error(
+                "Can't send handshake request without PeersExchange",
+            ))),
+        }
     }
 }

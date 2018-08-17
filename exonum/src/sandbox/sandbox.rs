@@ -38,7 +38,7 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Any, Message, PeersRequest, PeersResponse, RawMessage, RawTransaction, Status};
+use messages::{Any, Message, PeersExchange, PeersRequest, RawMessage, RawTransaction, Status};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -692,14 +692,25 @@ impl Sandbox {
         self.inner.borrow_mut().handler.state.update_config(config);
     }
 
-    fn peers(&self) -> Vec<SocketAddr> {
+    //    fn peers(&self) -> Vec<SocketAddr> {
+    //        self.inner
+    //            .borrow_mut()
+    //            .handler
+    //            .state
+    //            .peers()
+    //            .values()
+    //            .map(|info| info.address)
+    //            .collect()
+    //    }
+
+    fn peers(&self) -> Vec<ConnectInfo> {
         self.inner
             .borrow_mut()
             .handler
             .state
             .peers()
             .values()
-            .map(|info| info.address)
+            .cloned()
             .collect()
     }
 }
@@ -996,7 +1007,7 @@ mod tests {
         let (receiver_pk, receiver_sk) = (&s.p(ValidatorId(0)), &s.s(ValidatorId(0)));
 
         let peers_request = PeersRequest::new(sender_pk, receiver_pk, sender_sk);
-        let peers_response = PeersResponse::new(receiver_pk, &sender_pk, s.peers(), receiver_sk);
+        let peers_response = PeersExchange::new(receiver_pk, &sender_pk, s.peers(), receiver_sk);
 
         s.recv(&peers_request);
         s.send(s.a(ValidatorId(1)), &peers_response);
@@ -1037,7 +1048,7 @@ mod tests {
         let (receiver_pk, receiver_sk) = (&s.p(ValidatorId(0)), &s.s(ValidatorId(0)));
 
         let peers_request = PeersRequest::new(sender_pk, receiver_pk, sender_sk);
-        let peers_response = PeersResponse::new(receiver_pk, &sender_pk, vec![], receiver_sk);
+        let peers_response = PeersExchange::new(receiver_pk, &sender_pk, vec![], receiver_sk);
 
         s.recv(&peers_request);
         s.send(s.a(ValidatorId(1)), &peers_response);

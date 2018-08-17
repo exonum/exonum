@@ -33,7 +33,7 @@ use events::{
         HandshakeRawMessage, HandshakeResult, NoiseHandshake,
     },
 };
-use node::{state::SharedConnectList, ConnectInfo};
+use node::state::SharedConnectList;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -333,9 +333,7 @@ fn send_handshake(
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params).send(sock),
-            Some(message) => {
-                NoiseErrorHandshake::initiator(&params, message).send(sock)
-            }
+            Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
         .map_err(into_other);
@@ -418,7 +416,7 @@ impl NoiseErrorHandshake {
 }
 
 impl Handshake for NoiseErrorHandshake {
-    type Result = Option<ConnectInfo>;
+    type Result = Vec<u8>;
 
     fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
@@ -427,7 +425,7 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, None));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, Vec::new()));
         Box::new(framed)
     }
 
@@ -438,7 +436,7 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.write_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, None));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, Vec::new()));
         Box::new(framed)
     }
 }

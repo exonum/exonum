@@ -197,6 +197,30 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 }
 
+//impl<'a> SegmentField<'a> for ConnectInfo {
+//    fn item_size() -> Offset {
+//        1
+//    }
+//
+//    fn count(&self) -> Offset {
+//        unimplemented!()
+//    }
+//
+//    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
+//
+//
+//
+//    }
+//
+//    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+//        unimplemented!()
+//    }
+//
+//    fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset, latest_segment: CheckedOffset) -> Result {
+//        unimplemented!()
+//    }
+//}
+
 impl<'a, T> SegmentField<'a> for Vec<T>
 where
     T: Field<'a>,

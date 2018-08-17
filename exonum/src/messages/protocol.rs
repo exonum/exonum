@@ -28,12 +28,11 @@
 
 use chrono::{DateTime, Utc};
 
-use std::net::SocketAddr;
-
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
+use node::ConnectInfo;
 use storage::proof_list_index::root_hash;
 
 /// Consensus message type.
@@ -63,8 +62,8 @@ pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
-/// `PeersResponse` message id.
-pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeersResponse::MESSAGE_ID;
+/// `PeersExchange` message id.
+pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeersExchange::MESSAGE_ID;
 
 messages! {
     const SERVICE_ID = CONSENSUS;

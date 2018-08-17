@@ -18,7 +18,7 @@ use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use messages::{Any, Message, PeersRequest, PeersResponse, RawMessage, Status};
+use messages::{Any, Message, PeersExchange, PeersRequest, RawMessage, Status};
 use node::ConnectInfo;
 
 impl NodeHandler {
@@ -31,18 +31,18 @@ impl NodeHandler {
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
-            Ok(Any::PeersResponse(msg)) => self.handle_peers_response(&msg),
+            Ok(Any::PeersExchange(msg)) => self.handle_peers_exchange(&msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
             }
         }
     }
 
-    /// Handles the `Connected` event. Node's `Connect` message is sent as response
-    /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, info: ConnectInfo) {
-        info!("Received ConnectInfo  from peer: {:?}", info);
-        self.handle_connect(info);
+    /// Handles the incoming connection. Node connects to the sender
+    /// if received `PeersExchange` is correct.
+    pub fn handle_connected(&mut self, peers_exchange: &PeersExchange) {
+        info!("Received PeersExchange  from peer: {:?}", peers_exchange);
+        self.handle_peers_exchange(&peers_exchange);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
@@ -69,40 +69,53 @@ impl NodeHandler {
         self.blockchain.remove_peer_with_addr(&addr);
     }
 
-    /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, info: ConnectInfo) {
+    /// Handles the `ConnectInfo` and connects to a peer as result.
+    pub fn handle_peers_exchange(&mut self, peers_exchange: &PeersExchange) {
         // TODO Add spam protection. (ECR-170)
-        let address = info.address;
-        if address == self.state.our_connect_info().address {
-            trace!("Received ConnectInfo with same address as our external_address.");
-            return;
-        }
-
-        let public_key = info.public_key;
-        if public_key == self.state.our_connect_info().public_key {
-            trace!(
-                "Received ConnectInfo with same public key {:?} as ours.",
-                public_key
+        if !self.state
+            .connect_list()
+            .is_peer_allowed(peers_exchange.from())
+        {
+            error!(
+                "Received PeersExchange message from peer = {:?} which not in ConnectList.",
+                peers_exchange.from()
             );
             return;
         }
 
-        // Check if we have another connect message from peer with the given public_key.
-        let mut need_connect = true;
-        if let Some(saved_message) = self.state.peers().get(&public_key) {
-            if saved_message.address == info.address {
-                need_connect = false;
-            } else {
-                error!("Received weird ConnectInfo from {}", address);
+        for peer in peers_exchange.peers() {
+            let address = peer.address;
+            if address == self.state.our_connect_info().address {
+                trace!("Received ConnectInfo with same address as our external_address.");
                 return;
             }
-        }
-        self.state.add_peer(public_key, info);
-        info!("Received ConnectInfo  from {}, {}", address, need_connect,);
-        self.blockchain.save_peer(&public_key, info);
-        if need_connect {
-            info!("Connecting to {}", address);
-            self.connect(&address);
+
+            let public_key = peer.public_key;
+            if public_key == self.state.our_connect_info().public_key {
+                trace!(
+                    "Received ConnectInfo with same public key {:?} as ours.",
+                    public_key
+                );
+                return;
+            }
+
+            // Check if we have another connect message from peer with the given public_key.
+            let mut need_connect = true;
+            if let Some(saved_message) = self.state.peers().get(&public_key) {
+                if saved_message.address == peer.address {
+                    need_connect = false;
+                } else {
+                    error!("Received weird ConnectInfo from {}", address);
+                    return;
+                }
+            }
+            self.state.add_peer(public_key, peer);
+            info!("Received ConnectInfo  from {}, {}", address, need_connect,);
+            self.blockchain.save_peer(&public_key, peer);
+            if need_connect {
+                info!("Connecting to {}", address);
+                self.connect(&address);
+            }
         }
     }
 
@@ -149,10 +162,11 @@ impl NodeHandler {
 
     /// Handles the `PeersRequest` message. Node sends known peers to message sender.
     pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
-        let peers: Vec<SocketAddr> = self.state
+        let peers: Vec<ConnectInfo> = self.state
             .peers()
             .values()
-            .map(|info| info.address)
+//            .map(|info| info.address)
+            .cloned()
             .collect();
         info!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
@@ -160,7 +174,7 @@ impl NodeHandler {
             msg.from()
         );
 
-        let peers_request = PeersResponse::new(
+        let peers_request = PeersExchange::new(
             &self.state().consensus_public_key(),
             &msg.from(),
             peers,
@@ -168,25 +182,6 @@ impl NodeHandler {
         );
 
         self.send_to_peer(*msg.from(), peers_request.raw())
-    }
-
-    /// Handles the `PeersResponse` message. Node connects to other peers as result.
-    pub fn handle_peers_response(&mut self, msg: &PeersResponse) {
-        let peers = msg.peers();
-
-        trace!("HANDLE PEERS RESPONSE: Connecting to peers {:?}", peers,);
-
-        if !self.state.connect_list().is_peer_allowed(msg.from()) {
-            error!(
-                "Received PeersResponse from peer = {:?} which not in ConnectList.",
-                msg.from()
-            );
-            return;
-        }
-
-        for peer in peers {
-            self.connect(&peer)
-        }
     }
 
     /// Handles `NodeTimeout::Status`, broadcasts the `Status` message if it isn't outdated as
