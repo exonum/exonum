@@ -704,6 +704,9 @@ mod tests {
         // check that capacity gets overwritten by bigger index correctly
         assert_eq!(None, list_index.set(42, 1024));
         assert_eq!(43, list_index.capacity());
+
+        list_index.clear();
+        assert_eq!(0, list_index.len());
     }
 
     fn list_index_iter(db: Box<dyn Database>) {

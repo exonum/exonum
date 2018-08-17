@@ -510,6 +510,9 @@ mod tests {
 
         assert_eq!(3, list_index.len());
         assert_eq!(Some(777), list_index.last());
+
+        list_index.clear();
+        assert_eq!(0, list_index.len());
     }
 
     fn list_index_iter(list_index: &mut ListIndex<&mut Fork, u8>) {
