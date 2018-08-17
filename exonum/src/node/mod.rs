@@ -24,12 +24,10 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
-    ApiAccess, ApiAggregator,
-};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
+use serde::de::{self, Deserialize, Deserializer};
+use serde_json;
 use tokio_core::reactor::Core;
 use toml::Value;
 
@@ -38,9 +36,10 @@ use std::{
     sync::Arc, thread, time::{Duration, SystemTime},
 };
 
-use serde::de::{self, Deserialize, Deserializer};
-use serde_json;
-
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};
 use blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
     ValidatorKeys,
