@@ -44,7 +44,7 @@ os_info = "1.0.1"
 chrono = { version = "=0.4.5", features = ["serde"] }
 uuid = { version = "=0.6.5", features = ["serde"] }
 snow = "=0.3.1"
-rust_decimal = "=0.9.1"
+rust_decimal = "=0.10.0"
 
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
