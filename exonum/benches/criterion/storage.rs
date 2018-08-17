@@ -17,7 +17,7 @@ use exonum::storage::{
     proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, ProofListIndex,
     ProofMapIndex, RocksDB,
 };
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, RngCore, SeedableRng, XorShiftRng};
 use tempdir::TempDir;
 
 use std::collections::HashSet;
@@ -25,7 +25,7 @@ use std::collections::HashSet;
 const NAME: &str = "name";
 
 fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-    let mut rng = XorShiftRng::from_seed([1, 56, 168, 192]);
+    let mut rng = XorShiftRng::from_seed([100; 16]);
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
@@ -51,7 +51,7 @@ fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
 }
 
 fn merkle_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
-    let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
+    let mut rng = XorShiftRng::from_seed([200; 16]);
     let mut storage = db.fork();
     let mut table = ProofListIndex::new(NAME, &mut storage);
 

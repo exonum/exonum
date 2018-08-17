@@ -184,9 +184,7 @@ impl ExplorerApi {
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
 
-            Box::new(
-                ws::start(req.clone(), Session::new(address.to_owned().unwrap())).into_future(),
-            )
+            Box::new(ws::start(&req, Session::new(address.to_owned().unwrap())).into_future())
         };
 
         backend.raw_handler(RequestHandler {

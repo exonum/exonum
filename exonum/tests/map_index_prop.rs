@@ -22,6 +22,7 @@ extern crate proptest;
 
 use exonum::storage::{Database, Fork, MapIndex, MemoryDB};
 use proptest::{collection::vec, num, prelude::*, strategy};
+
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
