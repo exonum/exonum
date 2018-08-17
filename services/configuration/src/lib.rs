@@ -75,18 +75,28 @@ extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate serde_json;
+extern crate toml;
 
 pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
+use serde_json::to_value;
+
+use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
+use config::ConfigurationServiceConfig;
+use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
-    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
-    storage::Snapshot,
+    encoding::Error as EncodingError,
+    helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
+    messages::RawTransaction, node::State, storage::{Fork, Snapshot},
 };
 
 mod api;
+mod cmd;
+mod config;
 mod errors;
 mod schema;
 #[cfg(test)]
@@ -98,9 +108,11 @@ pub const SERVICE_ID: u16 = 1;
 /// Configuration service name.
 pub const SERVICE_NAME: &str = "configuration";
 
-/// Configuration service.
+/// ConfigurationService config.
 #[derive(Debug, Default)]
-pub struct Service {}
+pub struct Service {
+    config: ConfigurationServiceConfig,
+}
 
 impl blockchain::Service for Service {
     fn service_name(&self) -> &'static str {
@@ -124,6 +136,10 @@ impl blockchain::Service for Service {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
     }
+
+    fn initialize(&self, _fork: &mut Fork) -> Value {
+        to_value(self.config.clone()).unwrap()
+    }
 }
 
 /// A configuration service creator for the `NodeBuilder`.
@@ -135,7 +151,42 @@ impl fabric::ServiceFactory for ServiceFactory {
         SERVICE_NAME
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service {})
+    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
+        use exonum::helpers::fabric;
+        Some(match command {
+            v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
+            v if v == fabric::Finalize.name() => Box::new(Finalize),
+            v if v == fabric::GenerateTestnet.name() => Box::new(GenerateTestnet),
+            _ => return None,
+        })
+    }
+
+    fn make_service(&mut self, context: &Context) -> Box<dyn blockchain::Service> {
+        let service_config: ConfigurationServiceConfig =
+            context.get(keys::NODE_CONFIG).unwrap().services_configs["configuration_service"]
+                .clone()
+                .try_into()
+                .unwrap();
+
+        if let Some(majority_count) = service_config.majority_count {
+            let validators_count = context
+                .get(keys::NODE_CONFIG)
+                .unwrap()
+                .genesis
+                .validator_keys
+                .len() as u16;
+            let byzantine_majority_count =
+                State::byzantine_majority_count(validators_count as usize) as u16;
+            if majority_count > validators_count || majority_count < byzantine_majority_count {
+                panic!(
+                    "Invalid majority count: {}, it should be >= {} and <= {}",
+                    majority_count, byzantine_majority_count, validators_count
+                );
+            }
+        }
+
+        Box::new(Service {
+            config: service_config,
+        })
     }
 }
