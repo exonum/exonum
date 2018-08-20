@@ -368,6 +368,7 @@ impl RequestHandler {
         let event = NetworkEvent::UnableConnectToPeer(peer);
         Box::new(
             network_tx
+                .clone()
                 .send(event)
                 .map(drop)
                 .map_err(|_| other_error("can't send network event")),
