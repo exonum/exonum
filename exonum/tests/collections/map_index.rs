@@ -16,41 +16,23 @@
 
 //! Property testing for map index and proof map index as a rust collection.
 
-use exonum::storage::{Database, Fork, MapIndex, MemoryDB};
+use exonum::storage::{Database, Fork, MapIndex, MemoryDB, StorageValue};
+use modifier::Modifier;
 use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
+
+use MapAction;
 
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
-enum Action {
-    //Applied to key modulo 8
-    Put(u8, i32),
-    //Applied to key modulo 8
-    Remove(u8),
-    Clear,
-    MergeFork,
-}
-
-impl Action {
-    fn apply_map(&self, map: &mut MapIndex<&mut Fork, u8, i32>, ref_map: &mut HashMap<u8, i32>) {
-        match *self {
-            Action::Put(k, v) => {
-                let k = k % 8;
-                map.put(&k, v);
-                ref_map.insert(k, v);
-            }
-            Action::Remove(k) => {
-                let ref k = k % 8;
-                map.remove(k);
-                ref_map.remove(k);
-            }
-            Action::Clear => {
-                map.clear();
-                ref_map.clear();
-            }
-            _ => unreachable!(),
-        }
-    }
+macro_rules! generate_action {
+    () => {
+        prop_oneof![
+            (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
+            num::u8::ANY.prop_map(MapAction::Remove),
+            strategy::Just(MapAction::Clear),
+            strategy::Just(MapAction::MergeFork),
+        ]
+    };
 }
 
 fn compare_collections(
@@ -68,13 +50,7 @@ fn compare_collections(
 
 proptest!{
     #[test]
-    fn proptest_map_index_to_rust_map(ref actions in
-                     vec( prop_oneof![
-                         (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| Action::Put(i,v)),
-                         num::u8::ANY.prop_map(Action::Remove),
-                         strategy::Just(Action::Clear),
-                         strategy::Just(Action::MergeFork),
-                     ] , 1..10) ) {
+    fn proptest_map_index_to_rust_map(ref actions in vec( generate_action!() , 1..10) ) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
@@ -82,13 +58,14 @@ proptest!{
 
         for action in actions {
             match action {
-                Action::MergeFork => {
+                MapAction::MergeFork => {
                     db.merge(fork.into_patch()).unwrap();
                     fork = db.fork();
                 },
                 _ => {
                     let mut map_index = MapIndex::new("test", &mut fork);
-                    action.apply_map(&mut map_index, &mut ref_map);
+                    action.clone().modify(&mut map_index);
+                    action.clone().modify(&mut ref_map);
                     compare_collections(&map_index, &ref_map)?;
                 }
             }
@@ -98,5 +75,27 @@ proptest!{
         let mut fork = db.fork();
         let map_index = MapIndex::<_, u8, i32>::new("test", &mut fork);
         compare_collections(&map_index, &ref_map)?;
+    }
+}
+
+impl<'a, V> Modifier<MapIndex<&'a mut Fork, u8, V>> for MapAction<u8, V>
+where
+    V: StorageValue,
+{
+    fn modify(self, map: &mut MapIndex<&'a mut Fork, u8, V>) {
+        match self {
+            MapAction::Put(k, v) => {
+                let k = k % 8;
+                map.put(&k, v);
+            }
+            MapAction::Remove(k) => {
+                let ref k = k % 8;
+                map.remove(k);
+            }
+            MapAction::Clear => {
+                map.clear();
+            }
+            _ => unreachable!(),
+        }
     }
 }
