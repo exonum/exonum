@@ -215,7 +215,6 @@ fn duplicate_tx_in_pool() {
     let tx2 = tx_gen.next().unwrap();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hashes(&[tx1.hash()])
         .build();
 
@@ -272,7 +271,6 @@ fn incorrect_tx_in_request() {
         .unwrap();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hashes(&[tx0.hash()])
         .build();
 
@@ -614,8 +612,7 @@ fn not_request_txs_when_get_tx_and_propose() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -641,8 +638,7 @@ fn handle_tx_verify_signature() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -665,8 +661,7 @@ fn request_txs_when_get_propose_or_prevote() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
