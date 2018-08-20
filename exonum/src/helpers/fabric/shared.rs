@@ -39,7 +39,9 @@ pub struct NodePublicConfig {
 /// `SharedConfig` contain all public information that should be shared in the handshake process.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedConfig {
+    /// Template for common configuration
     pub common: CommonConfigTemplate,
+    /// Public node
     pub node: NodePublicConfig,
 }
 
