@@ -17,6 +17,7 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts
 
+use crypto;
 use toml;
 
 use std::{
@@ -32,7 +33,6 @@ use super::{
 };
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
-use crypto;
 use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
@@ -307,7 +307,7 @@ impl Command for GenerateCommonConfig {
             .expect("COMMON_CONFIG not found");
 
         let validators_count = context
-            .arg::<u8>("VALIDATORS_COUNT")
+            .arg::<u16>("VALIDATORS_COUNT")
             .expect("VALIDATORS_COUNT not found");
 
         context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
@@ -315,7 +315,10 @@ impl Command for GenerateCommonConfig {
         let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
         let mut general_config = AbstractConfig::default();
-        general_config.insert(String::from("validators_count"), validators_count.into());
+        general_config.insert(
+            String::from("validators_count"),
+            u32::from(validators_count).into(),
+        );
 
         let template = CommonConfigTemplate {
             services_config,
@@ -693,12 +696,12 @@ impl Command for GenerateTestnet {
         exts: &dyn Fn(Context) -> Context,
     ) -> Feedback {
         let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
-        let count: u8 = context.arg("COUNT").expect("count as int");
+        let validators_count: u16 = context.arg("COUNT").expect("count as int");
         let start_port = context
             .arg::<u16>("START_PORT")
             .unwrap_or(DEFAULT_EXONUM_LISTEN_PORT);
 
-        if count == 0 {
+        if validators_count == 0 {
             panic!("Can't generate testnet with zero nodes count.");
         }
 
@@ -708,7 +711,7 @@ impl Command for GenerateTestnet {
             fs::create_dir_all(&dir).unwrap();
         }
 
-        let configs = generate_testnet_config(count, start_port);
+        let configs = generate_testnet_config(validators_count, start_port);
         context.set(keys::CONFIGS, configs);
         let new_context = exts(context);
         let configs = new_context
