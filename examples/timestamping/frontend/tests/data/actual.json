@@ -31,9 +31,10 @@
       "max_propose_timeout":200,
       "propose_timeout_threshold":500
     },
-    "majority_count":null,
     "services":{
-      "configuration":null,
+      "configuration":{
+        "majority_count": null
+      },
       "exonum_time":null,
       "timestamping":null
     }
