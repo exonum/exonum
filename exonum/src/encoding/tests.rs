@@ -628,7 +628,10 @@ fn test_correct_encoding_struct() {
 fn test_connect_info() {
     let address = "127.0.0.1:8000".parse().unwrap();
     let public_key = PublicKey::zero();
-    let connect_info = ConnectInfo { address, public_key };
+    let connect_info = ConnectInfo {
+        address,
+        public_key,
+    };
 
     assert_write_check_read(connect_info, 51);
 }
