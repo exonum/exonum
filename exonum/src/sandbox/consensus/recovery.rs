@@ -95,9 +95,7 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     sandbox.assert_state(Height(1), Round(3));
 
     // ok, we are leader
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let prevote = make_prevote_from_propose(&sandbox, &propose);
     sandbox.broadcast(&propose);
@@ -126,15 +124,11 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
 fn should_not_vote_after_node_restart() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let prevote = make_prevote_from_propose(&sandbox, &propose);
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
 
@@ -199,15 +193,11 @@ fn should_not_vote_after_node_restart() {
 fn should_save_precommit_to_consensus_cache() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let prevote = make_prevote_from_propose(&sandbox, &propose);
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
 
@@ -292,13 +282,9 @@ fn should_save_precommit_to_consensus_cache() {
 fn test_recover_consensus_messages_in_other_round() {
     let sandbox = timestamping_sandbox();
 
-    let first_propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let first_propose = ProposeBuilder::new(&sandbox).build();
     let first_prevote = make_prevote_from_propose(&sandbox, &first_propose);
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&first_propose);
 
@@ -351,12 +337,8 @@ fn test_recover_consensus_messages_in_other_round() {
     );
     sandbox.broadcast(&first_updated_prevote);
 
-    let second_propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
-    let second_block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let second_propose = ProposeBuilder::new(&sandbox).build();
+    let second_block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&second_propose);
 
