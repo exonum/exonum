@@ -86,8 +86,10 @@ postvote
 precheck
 precommit
 precommits
+precommitters
 prevote
 prevotes
+prevoters
 println
 pubkey
 pubkeys

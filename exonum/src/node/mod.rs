@@ -24,10 +24,6 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
-    ApiAccess, ApiAggregator,
-};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use serde::de::{self, Deserialize, Deserializer};
@@ -40,6 +36,10 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};
 use blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
     ValidatorKeys,
