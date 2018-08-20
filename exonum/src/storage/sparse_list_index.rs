@@ -649,6 +649,7 @@ mod tests {
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.capacity());
         assert!(list_index.get(0).is_none());
+        assert_eq!(None, list_index.pop());
 
         let extended_by = vec![45, 3422, 234];
         list_index.extend(extended_by);
