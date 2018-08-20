@@ -102,11 +102,11 @@ fn map_methods(db: Box<dyn Database>) {
     assert_eq!(index.get(&[1; 32]), None);
 
     index.put(&[2; 32], 2u8);
-    index.put(&[2; 32], 3u8);
+    index.put(&[3; 32], 3u8);
     index.clear();
 
     assert!(!index.contains(&[2; 32]));
-    assert!(!index.contains(&[2; 32]));
+    assert!(!index.contains(&[3; 32]));
 }
 
 fn insert_trivial(db1: Box<dyn Database>, db2: Box<dyn Database>) {
