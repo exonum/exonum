@@ -136,7 +136,7 @@ impl NoiseWrapper {
 
         for (i, msg) in msg.chunks(CHUNK_LENGTH).enumerate() {
             let written = self.write(msg)?;
-            let start = HEADER_LENGTH + i * (CHUNK_LENGTH + TAG_LENGTH);
+            let start = HEADER_LENGTH + i * MAX_MESSAGE_LENGTH;
             let end = start + written.len();
 
             encrypted_message[start..end].copy_from_slice(&written);
