@@ -14,43 +14,35 @@
 
 // cspell:ignore oneof
 
-//! Property testing for proof map index as a rust collection.
+//! Property testing for map index and proof map index as a rust collection.
 
-extern crate exonum;
-#[macro_use]
-extern crate proptest;
-
-use exonum::storage::{Database, Fork, MemoryDB, ProofMapIndex};
+use exonum::storage::{Database, Fork, MapIndex, MemoryDB};
 use proptest::{collection::vec, num, prelude::*, strategy};
 
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 enum Action {
-    //Applied to key where key[0] is modulo 8
-    Put([u8; 32], i32),
-    //Applied to key where key[0] is modulo 8
-    Remove([u8; 32]),
+    //Applied to key modulo 8
+    Put(u8, i32),
+    //Applied to key modulo 8
+    Remove(u8),
     Clear,
     MergeFork,
 }
 
 impl Action {
-    fn apply_map(
-        &self,
-        map: &mut ProofMapIndex<&mut Fork, [u8; 32], i32>,
-        ref_map: &mut HashMap<[u8; 32], i32>,
-    ) {
+    fn apply_map(&self, map: &mut MapIndex<&mut Fork, u8, i32>, ref_map: &mut HashMap<u8, i32>) {
         match *self {
-            Action::Put(mut k, v) => {
-                k[0] = k[0] % 8;
+            Action::Put(k, v) => {
+                let k = k % 8;
                 map.put(&k, v);
                 ref_map.insert(k, v);
             }
-            Action::Remove(mut k) => {
-                k[0] = k[0] % 8;
-                map.remove(&k);
-                ref_map.remove(&k);
+            Action::Remove(k) => {
+                let ref k = k % 8;
+                map.remove(k);
+                ref_map.remove(k);
             }
             Action::Clear => {
                 map.clear();
@@ -63,24 +55,17 @@ impl Action {
 
 proptest!{
     #[test]
-    fn proptest_proof_map_index_to_rust_map(ref actions in
+    fn proptest_map_index_to_rust_map(ref actions in
                      vec( prop_oneof![
-                         (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)|{
-                             let mut key = [0u8;32];
-                             key[0] = i;
-                             Action::Put(key,v)
-                         }),
-                         num::u8::ANY.prop_map(|i| {
-                             let mut key = [0u8;32];
-                             key[0] = i;
-                             Action::Remove(key)}),
+                         (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| Action::Put(i,v)),
+                         num::u8::ANY.prop_map(Action::Remove),
                          strategy::Just(Action::Clear),
                          strategy::Just(Action::MergeFork),
                      ] , 1..10) ) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
-        let mut ref_map : HashMap<[u8; 32], i32> = HashMap::new();
+        let mut ref_map : HashMap<u8,i32> = HashMap::new();
 
         for action in actions {
             match action {
@@ -89,7 +74,7 @@ proptest!{
                     fork = db.fork();
                 },
                 _ => {
-                    let mut map = ProofMapIndex::<_, [u8; 32], i32>::new("test", &mut fork);
+                    let mut map = MapIndex::<_, u8, i32>::new("test", &mut fork);
                     action.apply_map(&mut map, &mut ref_map);
                 }
             }
@@ -97,7 +82,7 @@ proptest!{
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let map_index = ProofMapIndex::<_, [u8; 32], i32>::new("test", &snapshot);
+        let map_index = MapIndex::<_, u8, i32>::new("test", &snapshot);
 
         for k in ref_map.keys() {
             prop_assert!(map_index.contains(k));

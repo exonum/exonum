@@ -16,10 +16,6 @@
 
 //! Property testing for list index as a rust collection.
 
-extern crate exonum;
-#[macro_use]
-extern crate proptest;
-
 use exonum::storage::{Database, Fork, ListIndex, MemoryDB};
 use proptest::{collection::vec, num, prelude::*, strategy};
 
