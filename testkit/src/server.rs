@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto;
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::{SharedNodeState, Transaction},
+    blockchain::{SharedNodeState, Transaction}, crypto::Hash,
     explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
 };
 
@@ -25,7 +24,7 @@ use super::{TestKit, TestNetworkConfiguration};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CreateBlockQuery {
-    tx_hashes: Option<Vec<crypto::Hash>>,
+    tx_hashes: Option<Vec<Hash>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,7 +57,7 @@ impl TestkitServerApi {
 
     fn create_block(
         &self,
-        tx_hashes: Option<Vec<crypto::Hash>>,
+        tx_hashes: Option<Vec<Hash>>,
     ) -> api::Result<BlockWithTransactions<Box<dyn Transaction>>> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
@@ -159,9 +158,9 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 mod tests {
     use serde_json;
 
-    use crypto::{CryptoHash, Hash, PublicKey};
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction};
+    use exonum::crypto::{self, CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;

@@ -19,7 +19,6 @@
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 
 extern crate chrono;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 extern crate exonum_time;
@@ -36,9 +35,8 @@ pub mod api;
 pub mod schema;
 pub mod transactions;
 
-use crypto::Hash;
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet},
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
     encoding::Error as StreamStructError, helpers::fabric, messages::RawTransaction,
     storage::Snapshot,
 };

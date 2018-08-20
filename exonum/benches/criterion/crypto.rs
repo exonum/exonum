@@ -15,7 +15,7 @@
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use crypto::{gen_keypair, hash, sign, verify};
+use exonum::crypto::{gen_keypair, hash, sign, verify};
 use num::pow::pow;
 
 fn bench_sign(b: &mut Bencher, &count: &usize) {
@@ -37,7 +37,7 @@ fn bench_hash(b: &mut Bencher, &count: &usize) {
 }
 
 pub fn bench_crypto(c: &mut Criterion) {
-    ::crypto::init();
+    ::exonum::crypto::init();
 
     // Testing crypto functions with different data sizes.
     //

@@ -16,9 +16,8 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
-use crypto::Hash;
 use exonum::{
-    blockchain::{ExecutionError, StoredConfiguration},
+    blockchain::{ExecutionError, StoredConfiguration}, crypto::Hash,
     encoding::serialize::json::reexport::Error as JsonError, helpers::Height,
 };
 

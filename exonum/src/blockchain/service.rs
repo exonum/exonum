@@ -45,10 +45,9 @@ use storage::{Fork, Snapshot};
 /// The example below provides a bare-bones foundation for implementing a service.
 ///
 /// ```
-/// extern crate exonum_crypto as crypto;
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use crypto::Hash;
+/// # use exonum::crypto::Hash;
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 /// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};

@@ -47,11 +47,11 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// converts it to pair of Curve25519 keys.
 ///
 /// ```
-/// # extern crate exonum_crypto as crypto;
-/// # crypto::init();
+/// # extern crate exonum_crypto;
+/// # exonum_crypto::init();
 ///
-/// let (pk, sk) = crypto::gen_keypair();
-/// let (public_key, secret_key) = crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
+/// let (pk, sk) = exonum_crypto::gen_keypair();
+/// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 pub fn into_x25519_keypair(

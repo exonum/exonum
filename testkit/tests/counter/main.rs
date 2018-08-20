@@ -14,7 +14,6 @@
 
 #[macro_use]
 extern crate assert_matches;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -29,10 +28,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use crypto::{CryptoHash, PublicKey};
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
-    blockchain::{Transaction, TransactionErrorType as ErrorType},
+    blockchain::{Transaction, TransactionErrorType as ErrorType}, crypto::{self, CryptoHash, PublicKey},
     encoding::serialize::{json::ExonumJson, FromHex}, helpers::Height, messages::Message,
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};

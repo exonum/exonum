@@ -14,7 +14,6 @@
 
 extern crate chrono;
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate exonum_time;
@@ -22,10 +21,9 @@ extern crate exonum_time;
 extern crate pretty_assertions;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use crypto::{gen_keypair, CryptoHash, PublicKey};
 use exonum::{
     blockchain::{Schema, Transaction, TransactionErrorType, TransactionResult},
-    helpers::{Height, ValidatorId}, storage::Snapshot,
+    crypto::{gen_keypair, CryptoHash, PublicKey}, helpers::{Height, ValidatorId}, storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{

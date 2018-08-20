@@ -16,20 +16,19 @@
 extern crate criterion;
 #[macro_use]
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 extern crate futures;
 extern crate num;
 extern crate rand;
 extern crate tempdir;
 extern crate tokio_core;
 
-use bench_crypto::bench_crypto;
+use crypto::bench_crypto;
 use block::bench_block;
 use criterion::Criterion;
 use storage::bench_storage;
 use transactions::bench_verify_transactions;
 
-mod bench_crypto;
+mod crypto;
 mod block;
 mod storage;
 mod transactions;

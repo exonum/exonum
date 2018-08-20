@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 extern crate exonum_testkit;
@@ -22,8 +21,7 @@ extern crate serde_json;
 // HACK: Silent "dead_code" warning.
 pub use hooks::{AfterCommitService, TxAfterCommit};
 
-use crypto::{CryptoHash, Signature};
-use exonum::{helpers::Height, messages::Message};
+use exonum::{crypto::{CryptoHash, Signature}, helpers::Height, messages::Message};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;

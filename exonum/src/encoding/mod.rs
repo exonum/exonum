@@ -38,7 +38,6 @@
 //! you need to use macros like this:
 //!
 //! ```
-//! # extern crate exonum_crypto as crypto;
 //! # #[macro_use] extern crate exonum;
 //! # extern crate serde;
 //! # extern crate serde_json;

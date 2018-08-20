@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate serde_json;
 
-use crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet}, encoding,
+    blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet},
+    crypto::{gen_keypair, CryptoHash, Hash, PublicKey}, encoding,
     messages::{Message, RawTransaction}, storage::{Fork, Snapshot},
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};

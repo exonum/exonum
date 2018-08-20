@@ -19,14 +19,12 @@
 //! the service schema to make assertions about the storage state.
 
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 extern crate exonum_cryptocurrency as cryptocurrency;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate rand;
 
-use crypto::{PublicKey, SecretKey};
-use exonum::blockchain::Transaction;
+use exonum::{blockchain::Transaction, crypto::{PublicKey, SecretKey}};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
@@ -55,8 +53,8 @@ fn test_create_wallet() {
 #[test]
 fn test_transfer() {
     let mut testkit = init_testkit();
-    let (alice_pubkey, alice_key) = crypto::gen_keypair();
-    let (bob_pubkey, bob_key) = crypto::gen_keypair();
+    let (alice_pubkey, alice_key) = exonum::crypto::gen_keypair();
+    let (bob_pubkey, bob_key) = exonum::crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
@@ -79,8 +77,8 @@ fn test_transfer() {
 #[test]
 fn test_transfer_from_nonexisting_wallet() {
     let mut testkit = init_testkit();
-    let (alice_pubkey, alice_key) = crypto::gen_keypair();
-    let (bob_pubkey, bob_key) = crypto::gen_keypair();
+    let (alice_pubkey, alice_key) = exonum::crypto::gen_keypair();
+    let (bob_pubkey, bob_key) = exonum::crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
         TxTransfer::new(
@@ -101,8 +99,8 @@ fn test_transfer_from_nonexisting_wallet() {
 #[test]
 fn test_transfer_to_nonexisting_wallet() {
     let mut testkit = init_testkit();
-    let (alice_pubkey, alice_key) = crypto::gen_keypair();
-    let (bob_pubkey, bob_key) = crypto::gen_keypair();
+    let (alice_pubkey, alice_key) = exonum::crypto::gen_keypair();
+    let (bob_pubkey, bob_key) = exonum::crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
         TxTransfer::new(
@@ -126,8 +124,8 @@ fn test_transfer_to_nonexisting_wallet() {
 #[test]
 fn test_transfer_overcharge() {
     let mut testkit = init_testkit();
-    let (alice_pubkey, alice_key) = crypto::gen_keypair();
-    let (bob_pubkey, bob_key) = crypto::gen_keypair();
+    let (alice_pubkey, alice_key) = exonum::crypto::gen_keypair();
+    let (bob_pubkey, bob_key) = exonum::crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
@@ -152,8 +150,8 @@ fn test_transfer_overcharge() {
 #[test]
 fn test_transfers_in_single_block() {
     let mut testkit = init_testkit();
-    let (alice_pubkey, alice_key) = crypto::gen_keypair();
-    let (bob_pubkey, bob_key) = crypto::gen_keypair();
+    let (alice_pubkey, alice_key) = exonum::crypto::gen_keypair();
+    let (bob_pubkey, bob_key) = exonum::crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
@@ -210,8 +208,8 @@ fn test_fuzz_transfers() {
     let mut rng = rand::thread_rng();
 
     let mut testkit = init_testkit();
-    let alice_keys = crypto::gen_keypair();
-    let bob_keys = crypto::gen_keypair();
+    let alice_keys = exonum::crypto::gen_keypair();
+    let bob_keys = exonum::crypto::gen_keypair();
     let keys = &[alice_keys.clone(), bob_keys.clone()];
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_keys.0, ALICE_NAME, &alice_keys.1),
@@ -256,7 +254,7 @@ fn init_testkit() -> TestKit {
 
 /// Creates a wallet with the given name and a random key.
 fn create_wallet(testkit: &mut TestKit, name: &str) -> (TxCreateWallet, SecretKey) {
-    let (pubkey, key) = crypto::gen_keypair();
+    let (pubkey, key) = exonum::crypto::gen_keypair();
     let tx = TxCreateWallet::new(&pubkey, name, &key);
     testkit.create_block_with_transaction(tx.clone());
     (tx, key)

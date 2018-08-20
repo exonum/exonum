@@ -17,10 +17,9 @@
 #![allow(bare_trait_objects)]
 
 use chrono::{DateTime, Utc};
-use crypto::PublicKey;
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction}, messages::Message,
-    storage::{Fork, Snapshot},
+    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction}, crypto::PublicKey,
+    messages::Message, storage::{Fork, Snapshot},
 };
 
 use schema::TimeSchema;

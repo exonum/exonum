@@ -14,16 +14,14 @@
 
 // This is a regression test for exonum configuration.
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
 
-use crypto::PublicKey;
 use exonum::{
-    api::backends::actix::AllowOrigin, encoding::serialize::FromHex,
+    api::backends::actix::AllowOrigin, crypto::PublicKey, encoding::serialize::FromHex,
     helpers::{
         config::{ConfigFile, ConfigManager}, fabric::NodeBuilder,
     },

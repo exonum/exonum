@@ -14,9 +14,8 @@
 
 //! Storage schema for the configuration service.
 
-use crypto::{self, CryptoHash, Hash, PublicKey, Signature};
 use exonum::{
-    messages::{RawMessage, ServiceMessage},
+    crypto::{self, CryptoHash, Hash, PublicKey, Signature}, messages::{RawMessage, ServiceMessage},
     storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 
@@ -262,7 +261,7 @@ impl<'a> Schema<&'a mut Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto::HASH_SIZE;
+    use exonum::crypto::{self, HASH_SIZE};
     use exonum::storage::{Database, MemoryDB};
 
     lazy_static! {

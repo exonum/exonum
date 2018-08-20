@@ -14,7 +14,6 @@
 
 extern crate exonum;
 extern crate exonum_configuration;
-extern crate exonum_crypto;
 extern crate exonum_cryptocurrency_advanced;
 
 use exonum::helpers::{self, fabric::NodeBuilder};
@@ -22,7 +21,7 @@ use exonum_configuration as configuration;
 use exonum_cryptocurrency_advanced as cryptocurrency;
 
 fn main() {
-    exonum_crypto::init();
+    exonum::crypto::init();
     helpers::init_logger().unwrap();
 
     let node = NodeBuilder::new()

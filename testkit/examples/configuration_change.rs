@@ -13,14 +13,12 @@
 // limitations under the License.
 
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 
-use crypto::CryptoHash;
 use exonum::{
-    blockchain::Schema, helpers::{Height, ValidatorId},
+    blockchain::Schema, crypto::CryptoHash, helpers::{Height, ValidatorId},
 };
 use exonum_testkit::TestKitBuilder;
 

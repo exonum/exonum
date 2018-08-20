@@ -14,7 +14,6 @@
 
 // This is a regression test for exonum node.
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 extern crate futures;
 extern crate serde_json;
 extern crate tokio;
@@ -29,9 +28,8 @@ use std::{
     sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::{Duration, Instant},
 };
 
-use crypto::Hash;
 use exonum::{
-    blockchain::{Service, ServiceContext, Transaction}, encoding::Error as EncodingError, helpers,
+    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash, encoding::Error as EncodingError, helpers,
     messages::RawTransaction, node::{ApiSender, ExternalMessage, Node},
     storage::{Database, Fork, MemoryDB, Snapshot},
 };

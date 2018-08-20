@@ -21,13 +21,12 @@
 #[macro_use]
 extern crate assert_matches;
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use exonum::api::{self, node::public::explorer::TransactionQuery};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
@@ -227,7 +226,7 @@ impl CryptocurrencyApi {
     /// Note that the transaction is not immediately added to the blockchain, but rather is put
     /// to the pool of unconfirmed transactions.
     fn create_wallet(&self, name: &str) -> (TxCreateWallet, SecretKey) {
-        let (pubkey, key) = crypto::gen_keypair();
+        let (pubkey, key) = exonum::crypto::gen_keypair();
         // Create a pre-signed transaction
         let tx = TxCreateWallet::new(&pubkey, name, &key);
 

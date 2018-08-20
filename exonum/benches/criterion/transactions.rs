@@ -25,13 +25,13 @@ use tokio_core::reactor::Core;
 
 use std::{io, sync::Arc, thread};
 
-use crypto::{Hash, PublicKey};
 use exonum::{
     blockchain::{
         Blockchain, ExecutionResult, GenesisConfig, Service, SharedNodeState, Transaction,
         TransactionSet, ValidatorKeys,
     },
-    encoding, events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent},
+    crypto::{Hash, PublicKey}, encoding,
+    events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent},
     messages::{Message, RawTransaction},
     node::{
         ApiSender, Configuration, ConnectList, DefaultSystemState, ListenerConfig, NodeApiConfig,
@@ -282,7 +282,7 @@ fn bench_verify_transactions_event_loop(b: &mut Bencher, &size: &usize) {
 }
 
 pub fn bench_verify_transactions(c: &mut Criterion) {
-    ::crypto::init();
+    ::exonum::crypto::init();
 
     let parameters = (7..12).map(|i| pow(2, i)).collect::<Vec<_>>();
     c.bench(

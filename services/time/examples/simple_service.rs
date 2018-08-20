@@ -15,7 +15,6 @@
 //! Service, which uses the time oracle.
 
 extern crate chrono;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -25,9 +24,9 @@ extern crate serde;
 extern crate serde_json;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use crypto::{gen_keypair, Hash, PublicKey};
 use exonum::{
-    blockchain::{ExecutionResult, Service, Transaction, TransactionSet}, encoding, helpers::Height,
+    blockchain::{ExecutionResult, Service, Transaction, TransactionSet},
+    crypto::{gen_keypair, Hash, PublicKey}, encoding, helpers::Height,
     messages::{Message, RawTransaction}, storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;

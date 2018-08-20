@@ -14,11 +14,10 @@
 
 //! Cryptocurrency API.
 
-use crypto::{Hash, PublicKey};
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, Transaction, TransactionSet}, helpers::Height,
-    node::TransactionSend, storage::{ListProof, MapProof},
+    blockchain::{self, BlockProof, Transaction, TransactionSet}, crypto::{Hash, PublicKey},
+    helpers::Height, node::TransactionSend, storage::{ListProof, MapProof},
 };
 
 use transactions::WalletTransactions;

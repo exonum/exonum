@@ -13,10 +13,9 @@
 // limitations under the License.
 
 //! Sample counter service.
-use crypto::{Hash, PublicKey};
 use exonum::{
     api, blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionSet},
-    encoding, messages::{Message, RawTransaction}, node::TransactionSend,
+    crypto::{Hash, PublicKey}, encoding, messages::{Message, RawTransaction}, node::TransactionSend,
     storage::{Entry, Fork, Snapshot},
 };
 

@@ -14,7 +14,7 @@
 
 //! Cryptocurrency wallet.
 
-use crypto::{Hash, PublicKey};
+use exonum::crypto::{Hash, PublicKey};
 
 encoding_struct! {
     /// Wallet information stored in the database.

@@ -66,10 +66,9 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum_crypto as crypto;
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use crypto::PublicKey;
+    /// use exonum::crypto::PublicKey;
     /// use exonum::blockchain::Transaction;
     /// use exonum::messages::Message;
     /// # use exonum::blockchain::ExecutionResult;
@@ -113,10 +112,9 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum_crypto as crypto;
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use crypto::PublicKey;
+    /// use exonum::crypto::PublicKey;
     /// use exonum::blockchain::{Transaction, ExecutionResult};
     /// use exonum::storage::Fork;
     ///
@@ -214,9 +212,8 @@ pub enum TransactionErrorType {
 /// transaction is successful or not.
 ///
 /// ```
-/// # extern crate exonum_crypto as crypto;
 /// # extern crate exonum;
-/// # use crypto::Hash;
+/// # use exonum::crypto::Hash;
 /// # use exonum::storage::{MemoryDB, Database};
 /// use exonum::blockchain::Schema;
 ///
@@ -421,9 +418,8 @@ pub trait TransactionSet:
 /// transactions for a service with the indicated ID and adds two transactions.
 ///
 /// ```
-/// # extern crate exonum_crypto as crypto;
 /// #[macro_use] extern crate exonum;
-/// use crypto::PublicKey;
+/// use exonum::crypto::PublicKey;
 /// # use exonum::storage::Fork;
 /// # use exonum::blockchain::{Transaction, ExecutionResult};
 ///

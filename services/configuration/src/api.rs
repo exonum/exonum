@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{CryptoHash, Hash};
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{Schema as CoreSchema, StoredConfiguration}, helpers::Height,
-    node::TransactionSend, storage::StorageValue,
+    blockchain::{Schema as CoreSchema, StoredConfiguration}, crypto::{CryptoHash, Hash},
+    helpers::Height, node::TransactionSend, storage::StorageValue,
 };
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};

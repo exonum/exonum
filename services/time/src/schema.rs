@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use crypto::{Hash, PublicKey};
-use exonum::storage::{Entry, Fork, ProofMapIndex, Snapshot};
+use exonum::{
+    crypto::{Hash, PublicKey},
+    storage::{Entry, Fork, ProofMapIndex, Snapshot}
+};
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]

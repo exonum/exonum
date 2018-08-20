@@ -14,7 +14,6 @@
 
 //! Tests for the blockchain explorer functionality.
 
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -22,10 +21,9 @@ extern crate serde_json;
 
 use serde_json::Value as JsonValue;
 
-use crypto::{CryptoHash, Hash};
 use exonum::{
-    blockchain::{Schema, Transaction, TransactionErrorType, TxLocation}, explorer::*,
-    helpers::Height, messages::{Message, ServiceMessage},
+    blockchain::{Schema, Transaction, TransactionErrorType, TxLocation}, crypto::{CryptoHash, Hash},
+    explorer::*, helpers::Height, messages::{Message, ServiceMessage},
 };
 
 use blockchain::{create_block, create_blockchain, CreateWallet, Transfer};
@@ -36,8 +34,8 @@ mod blockchain;
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
 
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let (pk_alice, key_alice) = exonum::crypto::gen_keypair();
+    let (pk_bob, key_bob) = exonum::crypto::gen_keypair();
 
     let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
@@ -151,7 +149,7 @@ fn test_explorer_basics() {
 fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
 
-    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let (pk_alice, key_alice) = exonum::crypto::gen_keypair();
     let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     let tx_hash = tx_alice.hash();
 
@@ -176,7 +174,7 @@ fn test_explorer_pool_transaction() {
 
 fn tx_generator() -> Box<Iterator<Item = Box<Transaction>>> {
     Box::new((0..).map(|i| {
-        let (pk, key) = crypto::gen_keypair();
+        let (pk, key) = exonum::crypto::gen_keypair();
         let tx = CreateWallet::new(&pk, &format!("Alice #{}", i), &key);
         Box::new(tx) as Box<Transaction>
     }))
@@ -317,8 +315,8 @@ fn test_transaction_iterator() {
 
     // Test filtering and other nice stuff.
 
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let (pk_alice, key_alice) = exonum::crypto::gen_keypair();
+    let (pk_bob, key_bob) = exonum::crypto::gen_keypair();
     let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
@@ -419,7 +417,7 @@ fn test_transaction_info_roundtrip() {
 #[test]
 fn test_block_with_transactions_roundtrip() {
     let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let (pk_alice, key_alice) = exonum::crypto::gen_keypair();
     let tx = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     create_block(&mut blockchain, vec![tx.clone().into()]);
 
