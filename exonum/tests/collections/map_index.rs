@@ -70,9 +70,11 @@ macro_rules! generate_action {
     };
 }
 
-proptest!{
+proptest! {
     #[test]
-    fn proptest_map_index_to_rust_map(ref actions in vec( generate_action!() , 1..ACTIONS_MAX_LEN) ) {
+    fn proptest_map_index_to_rust_map(ref actions in
+                                      vec(generate_action!(),
+                                          1..ACTIONS_MAX_LEN)) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
@@ -95,7 +97,7 @@ proptest!{
         db.merge(fork.into_patch()).unwrap();
 
         let mut fork = db.fork();
-        let map_index = MapIndex::<_, u8, i32>::new("test", &mut fork);
+        let map_index = MapIndex::new("test", &mut fork);
         compare_collections(&map_index, &ref_map)?;
     }
 }

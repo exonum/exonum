@@ -78,10 +78,11 @@ macro_rules! generate_action {
     };
 }
 
-proptest!{
+proptest! {
     #[test]
     fn proptest_proof_map_index_to_rust_map(ref actions in
-                     vec( generate_action!(), 1..ACTIONS_MAX_LEN) ) {
+                                            vec(generate_action!(),
+                                                1..ACTIONS_MAX_LEN) ) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
@@ -97,14 +98,14 @@ proptest!{
                     let mut map_index = ProofMapIndex::new("test", &mut fork);
                     action.clone().modify(&mut map_index);
                     action.clone().modify(&mut ref_map);
-                    compare_collections(&map_index,&ref_map)?;
+                    compare_collections(&map_index, &ref_map)?;
                 }
             }
         }
         db.merge(fork.into_patch()).unwrap();
 
         let mut fork = db.fork();
-        let map_index = ProofMapIndex::<_, [u8; 32], i32>::new("test", &mut fork);
-        compare_collections(&map_index,&ref_map)?;
+        let map_index = ProofMapIndex::new("test", &mut fork);
+        compare_collections(&map_index, &ref_map)?;
     }
 }

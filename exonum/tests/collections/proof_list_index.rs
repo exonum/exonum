@@ -72,10 +72,11 @@ macro_rules! generate_action {
     };
 }
 
-proptest!{
+proptest! {
     #[test]
     fn proptest_proof_list_index_to_rust_vec(ref actions in
-                     vec( generate_action!(), 1..ACTIONS_MAX_LEN) ) {
+                                             vec(generate_action!(),
+                                                 1..ACTIONS_MAX_LEN)) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
