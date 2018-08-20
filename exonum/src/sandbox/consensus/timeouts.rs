@@ -36,13 +36,11 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -171,13 +169,9 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     // fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
