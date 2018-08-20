@@ -323,7 +323,7 @@ impl RequestHandler {
                         if let Some(conn_tx) = conn_tx {
                             to_box(conn_tx)
                         } else {
-                            to_box(Self::send_unable_connect_event(peer, &network_tx))
+                            Self::send_unable_connect_event(peer, &network_tx)
                         }
                     }
                     NetworkRequest::SendMessage(peer, msg) => {
@@ -343,7 +343,7 @@ impl RequestHandler {
                             });
                             to_box(fut)
                         } else {
-                            to_box(Self::send_unable_connect_event(peer, &network_tx))
+                            Self::send_unable_connect_event(peer, &network_tx)
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
@@ -364,12 +364,14 @@ impl RequestHandler {
     fn send_unable_connect_event(
         peer: SocketAddr,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = io::Error> {
+    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
         let event = NetworkEvent::UnableConnectToPeer(peer);
-        network_tx
-            .clone()
-            .send(event)
-            .map_err(|_| other_error("can't send network event"))
+        Box::new(
+            network_tx
+                .send(event)
+                .map(drop)
+                .map_err(|_| other_error("can't send network event")),
+        )
     }
 }
 
