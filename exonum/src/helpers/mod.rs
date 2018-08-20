@@ -21,12 +21,11 @@ pub mod fabric;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
-
+use crypto::gen_keypair;
 use env_logger::Builder;
 use log::SetLoggerError;
 
 use blockchain::{GenesisConfig, ValidatorKeys};
-use crypto::gen_keypair;
 use node::{ConnectListConfig, NodeConfig};
 
 mod types;
@@ -39,7 +38,7 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 }
 
 /// Generates testnet configuration.
-pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
+pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
