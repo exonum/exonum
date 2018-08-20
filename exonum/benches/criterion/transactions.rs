@@ -30,7 +30,7 @@ use exonum::{
         Blockchain, ExecutionResult, GenesisConfig, Service, SharedNodeState, Transaction,
         TransactionSet, ValidatorKeys,
     },
-    crypto::{Hash, PublicKey}, encoding,
+    crypto::{self, Hash, PublicKey}, encoding,
     events::{error::other_error, Event, EventHandler, HandlerPart, NetworkEvent},
     messages::{Message, RawTransaction},
     node::{
@@ -89,7 +89,7 @@ fn gen_transactions(count: usize, len: usize) -> Vec<Box<dyn Transaction>> {
     let padding = vec![0; len];
     (0..count)
         .map(|_| {
-            let (p, s) = ::crypto::gen_keypair();
+            let (p, s) = crypto::gen_keypair();
             Box::new(Blank::new(&p, &padding, &s)) as Box<dyn Transaction>
         })
         .collect()
@@ -219,8 +219,8 @@ impl TransactionsBenchmarkRunner {
     }
 
     fn node_config() -> NodeConfig {
-        let (consensus_public_key, consensus_secret_key) = ::crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = ::crypto::gen_keypair();
+        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
+        let (service_public_key, service_secret_key) = crypto::gen_keypair();
 
         let validator_keys = ValidatorKeys {
             consensus_key: consensus_public_key,
@@ -282,7 +282,7 @@ fn bench_verify_transactions_event_loop(b: &mut Bencher, &size: &usize) {
 }
 
 pub fn bench_verify_transactions(c: &mut Criterion) {
-    ::exonum::crypto::init();
+    crypto::init();
 
     let parameters = (7..12).map(|i| pow(2, i)).collect::<Vec<_>>();
     c.bench(

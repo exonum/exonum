@@ -14,7 +14,7 @@ autobenches = false
 
 [dependencies]
 byteorder = "1.2.3"
-chrono = { version = "=0.4.5", features = ["serde"] }
+chrono = "=0.4.5"
 hex = "=0.3.2"
 rust_decimal = "=0.10.0"
 serde = "1.0.10"

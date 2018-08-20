@@ -200,10 +200,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// to obtain information about the proof.
 ///
 /// ```
-/// # extern crate exonum;
-/// # extern crate exonum_crypto as crypto;
-/// # use crypto::hash;
 /// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
+/// # use exonum::crypto::hash;
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
 /// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));
@@ -232,12 +230,11 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///   which is asserted by the proof.
 ///
 /// ```
-/// # extern crate exonum_crypto as crypto;
 /// # extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
-/// # use crypto::{hash, CryptoHash};
 /// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
 /// # use exonum::storage::proof_map_index::ProofPath;
+/// # use exonum::crypto::{hash, CryptoHash};
 /// # fn main() {
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
@@ -535,10 +532,8 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum;
-    /// # extern crate exonum_crypto as crypto;
-    /// # use crypto::hash;
     /// # use exonum::storage::{Database, MemoryDB, ProofMapIndex};
+    /// # use exonum::crypto::hash;
     /// let mut fork = { let db = MemoryDB::new(); db.fork() };
     /// let mut map = ProofMapIndex::new("index", &mut fork);
     /// let (h1, h2) = (hash(&[1]), hash(&[2]));

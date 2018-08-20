@@ -26,10 +26,9 @@ use super::sodiumoxide::crypto::sign::ed25519::{
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
-use super::super::super::{
-    write_short_hex as crypto_write_short_hex, PublicKey as crypto_PublicKey,
-    SecretKey as crypto_SecretKey,
-};
+use write_short_hex;
+use PublicKey as crypto_PublicKey;
+use SecretKey as crypto_SecretKey;
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
@@ -138,7 +137,7 @@ macro_rules! implement_x25519_type {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            crypto_write_short_hex(f, &self.0[..])?;
+            write_short_hex(f, &self.0[..])?;
             write!(f, ")")
         }
     }

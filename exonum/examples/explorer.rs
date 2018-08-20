@@ -20,7 +20,7 @@ extern crate exonum;
 extern crate serde_json;
 
 use exonum::{
-    blockchain::{Blockchain, Schema, Transaction, TransactionError}, explorer::*,
+    blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
     helpers::{Height, ValidatorId},
 };
 
@@ -48,8 +48,8 @@ pub fn mempool_transaction() -> Box<Transaction> {
 /// Additionally, a single transaction is placed into the pool.
 pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = exonum::crypto::gen_keypair();
-    let (pk_bob, key_bob) = exonum::crypto::gen_keypair();
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let (pk_bob, key_bob) = crypto::gen_keypair();
     let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);

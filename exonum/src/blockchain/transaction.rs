@@ -68,8 +68,8 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use exonum::crypto::PublicKey;
     /// use exonum::blockchain::Transaction;
+    /// use exonum::crypto::PublicKey;
     /// use exonum::messages::Message;
     /// # use exonum::blockchain::ExecutionResult;
     /// # use exonum::storage::Fork;
@@ -114,8 +114,8 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use exonum::crypto::PublicKey;
     /// use exonum::blockchain::{Transaction, ExecutionResult};
+    /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
     /// transactions! {
@@ -212,7 +212,6 @@ pub enum TransactionErrorType {
 /// transaction is successful or not.
 ///
 /// ```
-/// # extern crate exonum;
 /// # use exonum::crypto::Hash;
 /// # use exonum::storage::{MemoryDB, Database};
 /// use exonum::blockchain::Schema;

@@ -169,7 +169,7 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig}, ApiAccess,
     },
     blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration, Transaction},
-    crypto::Hash, explorer::{BlockWithTransactions, BlockchainExplorer},
+    crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId}, messages::RawMessage,
     node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
 };
@@ -346,7 +346,7 @@ impl TestKitBuilder {
         if self.logger {
             exonum::helpers::init_logger().ok();
         }
-        exonum::crypto::init();
+        crypto::init();
         TestKit::assemble(
             self.services,
             TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1)),
@@ -587,7 +587,7 @@ impl TestKit {
         self.probe_all(vec![Box::new(transaction) as Box<dyn Transaction>])
     }
 
-    fn do_create_block(&mut self, tx_hashes: &[exonum::crypto::Hash]) -> BlockWithTransactions {
+    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
@@ -741,7 +741,7 @@ impl TestKit {
     /// - Panics in the case any of transaction hashes are not in the pool.
     pub fn create_block_with_tx_hashes(
         &mut self,
-        tx_hashes: &[exonum::crypto::Hash],
+        tx_hashes: &[crypto::Hash],
     ) -> BlockWithTransactions {
         self.poll_events();
 
@@ -811,7 +811,7 @@ impl TestKit {
     }
 
     /// Returns the hash of latest committed block.
-    pub fn last_block_hash(&self) -> exonum::crypto::Hash {
+    pub fn last_block_hash(&self) -> crypto::Hash {
         self.blockchain.last_hash()
     }
 

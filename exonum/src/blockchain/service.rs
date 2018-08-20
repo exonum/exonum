@@ -47,8 +47,8 @@ use storage::{Fork, Snapshot};
 /// ```
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::crypto::Hash;
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+/// # use exonum::crypto::Hash;
 /// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;

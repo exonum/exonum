@@ -144,7 +144,6 @@ impl ServiceApiScope {
 /// The example below shows a common practice of API implementation.
 ///
 /// ```rust
-/// extern crate exonum_crypto as crypto;
 /// #[macro_use] extern crate exonum;
 /// #[macro_use] extern crate serde_derive;
 /// extern crate futures;
@@ -153,9 +152,9 @@ impl ServiceApiScope {
 ///
 /// use std::net::SocketAddr;
 ///
-/// use crypto::Hash;
 /// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
 /// use exonum::blockchain::{Schema};
+/// use exonum::crypto::Hash;
 ///
 /// // Declares a type which describes an API specification and implementation.
 /// pub struct MyApi;
