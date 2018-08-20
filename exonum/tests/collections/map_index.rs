@@ -17,7 +17,7 @@
 //! Property testing for map index and proof map index as a rust collection.
 
 use exonum::storage::{Database, Fork, MapIndex, MemoryDB};
-use proptest::{collection::vec, num, prelude::*, strategy};
+use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
 
 use std::collections::HashMap;
 
@@ -53,6 +53,19 @@ impl Action {
     }
 }
 
+fn compare_collections(
+    map_index: &MapIndex<&mut Fork, u8, i32>,
+    ref_map: &HashMap<u8, i32>,
+) -> TestCaseResult {
+    for k in ref_map.keys() {
+        prop_assert!(map_index.contains(k));
+    }
+    for (k, v) in map_index.iter() {
+        prop_assert_eq!(Some(&v), ref_map.get(&k));
+    }
+    Ok(())
+}
+
 proptest!{
     #[test]
     fn proptest_map_index_to_rust_map(ref actions in
@@ -74,21 +87,16 @@ proptest!{
                     fork = db.fork();
                 },
                 _ => {
-                    let mut map = MapIndex::<_, u8, i32>::new("test", &mut fork);
-                    action.apply_map(&mut map, &mut ref_map);
+                    let mut map_index = MapIndex::new("test", &mut fork);
+                    action.apply_map(&mut map_index, &mut ref_map);
+                    compare_collections(&map_index, &ref_map)?;
                 }
             }
         }
         db.merge(fork.into_patch()).unwrap();
 
-        let snapshot = db.snapshot();
-        let map_index = MapIndex::<_, u8, i32>::new("test", &snapshot);
-
-        for k in ref_map.keys() {
-            prop_assert!(map_index.contains(k));
-        }
-        for (k,v) in map_index.iter() {
-            prop_assert_eq!(Some(&v), ref_map.get(&k));
-        }
+        let mut fork = db.fork();
+        let map_index = MapIndex::<_, u8, i32>::new("test", &mut fork);
+        compare_collections(&map_index, &ref_map)?;
     }
 }

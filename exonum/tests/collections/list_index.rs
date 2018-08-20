@@ -17,7 +17,7 @@
 //! Property testing for list index as a rust collection.
 
 use exonum::storage::{Database, Fork, ListIndex, MemoryDB};
-use proptest::{collection::vec, num, prelude::*, strategy};
+use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
 
 #[derive(Debug, Clone)]
 enum Action {
@@ -76,6 +76,18 @@ impl Action {
     }
 }
 
+fn compare_collections(
+    list_index: &ListIndex<&mut Fork, i32>,
+    ref_list: &Vec<i32>,
+) -> TestCaseResult {
+    prop_assert_eq!(list_index.len() as usize, ref_list.len());
+
+    for (&l, r) in ref_list.iter().zip(list_index.iter()) {
+        prop_assert_eq!(l, r);
+    }
+    Ok(())
+}
+
 proptest!{
     #[test]
     fn proptest_list_index_to_rust_vec(ref actions in
@@ -100,20 +112,16 @@ proptest!{
                     fork = db.fork();
                 },
                 _ => {
-                    let mut list = ListIndex::<_, i32>::new("test", &mut fork);
-                    action.apply(&mut list, &mut ref_list);
+                    let mut list_index = ListIndex::new("test", &mut fork);
+                    action.apply(&mut list_index, &mut ref_list);
+                    compare_collections(&list_index, &ref_list)?;
                 }
             }
         }
         db.merge(fork.into_patch()).unwrap();
 
-        let snapshot = db.snapshot();
-        let list_index = ListIndex::<_, i32>::new("test", &snapshot);
-
-        prop_assert_eq!(list_index.len() as usize, ref_list.len());
-
-        for (&l,r) in ref_list.iter().zip(list_index.iter()) {
-            prop_assert_eq!(l, r);
-        }
+        let mut fork = db.fork();
+        let list_index = ListIndex::<_, i32>::new("test", &mut fork);
+        compare_collections(&list_index, &ref_list)?;
     }
 }
