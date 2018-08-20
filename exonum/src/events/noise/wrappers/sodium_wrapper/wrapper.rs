@@ -18,6 +18,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use num::Integer;
 use snow::{Builder, Session};
 
 use std::{
@@ -99,20 +100,22 @@ impl NoiseWrapper {
         let data = &data[HEADER_LENGTH..];
 
         let len = decrypted_msg_len(data.len());
-        let mut decrypted_message = Vec::with_capacity(len);
+        let mut decrypted_message = vec![0; len];
 
-        for msg in data.chunks(MAX_MESSAGE_LENGTH) {
+        for (i, msg) in data.chunks(MAX_MESSAGE_LENGTH).enumerate() {
             let len_to_read = if msg.len() == MAX_MESSAGE_LENGTH {
                 msg.len() - TAG_LENGTH
             } else {
                 msg.len()
             };
 
-            let read_to = self.read(msg, len_to_read)?;
-            decrypted_message.extend_from_slice(&read_to);
+            let read = self.read(msg, len_to_read)?;
+            let start = i * (MAX_MESSAGE_LENGTH - TAG_LENGTH);
+            let end = start + read.len();
+
+            decrypted_message[start..end].copy_from_slice(&read);
         }
 
-        debug_assert_eq!(len, decrypted_message.len());
         Ok(BytesMut::from(decrypted_message))
     }
 
@@ -125,22 +128,21 @@ impl NoiseWrapper {
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> io::Result<()> {
+        const CHUNK_LENGTH: usize = MAX_MESSAGE_LENGTH - TAG_LENGTH;
         let len = encrypted_msg_len(msg.len());
-        let mut encrypted_message = Vec::with_capacity(len);
+        let mut encrypted_message = vec![0; len + HEADER_LENGTH];
 
-        for msg in msg.chunks(MAX_MESSAGE_LENGTH - TAG_LENGTH) {
+        LittleEndian::write_u32(&mut encrypted_message[..HEADER_LENGTH], len as u32);
+
+        for (i, msg) in msg.chunks(CHUNK_LENGTH).enumerate() {
             let written = self.write(msg)?;
-            encrypted_message.extend_from_slice(&written);
+            let start = HEADER_LENGTH + i * (CHUNK_LENGTH + TAG_LENGTH);
+            let end = start + written.len();
+
+            encrypted_message[start..end].copy_from_slice(&written);
         }
 
-        let mut msg_len_buf = vec![0_u8; HEADER_LENGTH];
-
-        LittleEndian::write_u32(&mut msg_len_buf, len as u32);
-        let encoded_message = &encrypted_message[0..len];
-        msg_len_buf.extend_from_slice(encoded_message);
-        buf.extend_from_slice(&msg_len_buf);
-
-        debug_assert_eq!(len, encoded_message.len());
+        buf.extend_from_slice(&encrypted_message);
         Ok(())
     }
 
@@ -168,18 +170,21 @@ impl NoiseWrapper {
 // length we need to subtract `TAG_LENGTH` multiplied by messages count
 // from `data.len()`.
 fn decrypted_msg_len(raw_message_len: usize) -> usize {
-    raw_message_len - TAG_LENGTH * tag_count(raw_message_len)
+    raw_message_len - TAG_LENGTH * (div_ceil(raw_message_len, MAX_MESSAGE_LENGTH))
 }
 
 // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
 // calculate actual message length.
 fn encrypted_msg_len(raw_message_len: usize) -> usize {
-    raw_message_len + TAG_LENGTH * tag_count(raw_message_len)
+    raw_message_len
+        + TAG_LENGTH * (raw_message_len.div_floor(&(MAX_MESSAGE_LENGTH - TAG_LENGTH)) + 1)
 }
 
-fn tag_count(message_len: usize) -> usize {
-    debug_assert!(message_len > 0);
-    1 + (message_len - 1) / MAX_MESSAGE_LENGTH
+fn div_ceil(lhs: usize, rhs: usize) -> usize {
+    match lhs.div_rem(&rhs) {
+        (d, r) if (r == 0) => d,
+        (d, _) => d + 1,
+    }
 }
 
 impl fmt::Debug for NoiseWrapper {

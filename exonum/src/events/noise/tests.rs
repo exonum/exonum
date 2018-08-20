@@ -27,7 +27,7 @@ use std::{
 };
 
 use bytes::BytesMut;
-use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -120,6 +120,11 @@ fn noise_encrypt_decrypt_short_message() {
 #[test]
 fn noise_encrypt_decrypt_long_message() {
     check_encrypt_decrypt_message(MAX_MESSAGE_LENGTH + 1);
+}
+
+#[test]
+fn noise_encrypt_decrypt_max_message_len() {
+    check_encrypt_decrypt_message(MAX_MESSAGE_LENGTH - SIGNATURE_LENGTH - HEADER_LENGTH - 10)
 }
 
 #[test]
