@@ -24,7 +24,7 @@ use std::str::FromStr;
 
 use super::{CheckedOffset, Field, Offset};
 use blockchain::{Block, BlockProof};
-use crypto::{gen_keypair, hash, CryptoHash};
+use crypto::{gen_keypair, hash, CryptoHash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Message, Precommit, Prevote, Propose, RawMessage, Status,
@@ -53,6 +53,7 @@ mod ignore_new {
 }
 
 use self::ignore_new::*;
+use node::ConnectInfo;
 
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
@@ -621,4 +622,13 @@ fn test_correct_encoding_struct() {
         }
     }
     drop(ThreeFields::new(0, 0, 0));
+}
+
+#[test]
+fn test_connect_info() {
+    let address = "127.0.0.1:8000".parse().unwrap();
+    let public_key = PublicKey::zero();
+    let connect_info = ConnectInfo { address, public_key };
+
+    assert_write_check_read(connect_info, 51);
 }
