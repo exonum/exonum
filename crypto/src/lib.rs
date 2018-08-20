@@ -13,10 +13,10 @@
 // limitations under the License.
 
 //! Cryptography related types, constants, traits and functions. The functions
-//! in this module are used for key generation, hashing, signing and signature
+//! in this library are used for key generation, hashing, signing and signature
 //! verification.
 //!
-//! The Crypto module makes it possible to potentially change the type of
+//! The Crypto library makes it possible to potentially change the type of
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 

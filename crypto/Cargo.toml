@@ -9,7 +9,7 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "cryptography", "library"]
 categories = ["cryptography", "hashing"]
-description = "An extensible framework for blockchain software projects."
+description = "Cryptography related types, constants, traits and functions. "
 autobenches = false
 
 [dependencies]
