@@ -74,12 +74,18 @@ impl NoiseWrapper {
             return Err(NoiseError::WrongMessageLength(input.len()));
         }
 
-        self.read(input, MAX_MESSAGE_LENGTH)
+        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
+        let len = self.read(input, &mut buf)?;
+        buf.truncate(len);
+        Ok(buf)
     }
 
     pub fn write_handshake_msg(&mut self) -> Result<Vec<u8>, NoiseError> {
         // Payload in handshake messages can be empty.
-        self.write(&[])
+        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
+        let len = self.write(&[], &mut buf)?;
+        buf.truncate(len);
+        Ok(buf)
     }
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
@@ -102,18 +108,13 @@ impl NoiseWrapper {
         let len = decrypted_msg_len(data.len());
         let mut decrypted_message = vec![0; len];
 
+        let mut read = vec![0_u8; MAX_MESSAGE_LENGTH];
         for (i, msg) in data.chunks(MAX_MESSAGE_LENGTH).enumerate() {
-            let len_to_read = if msg.len() == MAX_MESSAGE_LENGTH {
-                msg.len() - TAG_LENGTH
-            } else {
-                msg.len()
-            };
-
-            let read = self.read(msg, len_to_read)?;
+            let len = self.read(msg, &mut read)?;
             let start = i * (MAX_MESSAGE_LENGTH - TAG_LENGTH);
-            let end = start + read.len();
+            let end = start + len;
 
-            decrypted_message[start..end].copy_from_slice(&read);
+            decrypted_message[start..end].copy_from_slice(&read[..len]);
         }
 
         Ok(BytesMut::from(decrypted_message))
@@ -134,30 +135,27 @@ impl NoiseWrapper {
 
         LittleEndian::write_u32(&mut encrypted_message[..HEADER_LENGTH], len as u32);
 
+        let mut written = vec![0_u8; MAX_MESSAGE_LENGTH];
         for (i, msg) in msg.chunks(CHUNK_LENGTH).enumerate() {
-            let written = self.write(msg)?;
+            let len = self.write(msg, &mut written)?;
             let start = HEADER_LENGTH + i * MAX_MESSAGE_LENGTH;
-            let end = start + written.len();
+            let end = start + len;
 
-            encrypted_message[start..end].copy_from_slice(&written);
+            encrypted_message[start..end].copy_from_slice(&written[..len]);
         }
 
         buf.extend_from_slice(&encrypted_message);
         Ok(())
     }
 
-    fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0_u8; len];
-        let len = self.session.read_message(input, &mut buf)?;
-        buf.truncate(len);
-        Ok(buf)
+    fn read(&mut self, input: &[u8], buf: &mut [u8]) -> Result<usize, NoiseError> {
+        let len = self.session.read_message(input, buf)?;
+        Ok(len)
     }
 
-    fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
-        let len = self.session.write_message(msg, &mut buf)?;
-        buf.truncate(len);
-        Ok(buf)
+    fn write(&mut self, msg: &[u8], buf: &mut [u8]) -> Result<usize, NoiseError> {
+        let len = self.session.write_message(msg, buf)?;
+        Ok(len)
     }
 
     fn noise_builder<'a>() -> Builder<'a> {
