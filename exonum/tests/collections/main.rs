@@ -25,12 +25,15 @@ mod map_index;
 mod proof_list_index;
 mod proof_map_index;
 
+// Max size of the generated sequence of actions.
+const ACTIONS_MAX_LEN: usize = 100;
+
 #[derive(Debug, Clone)]
 enum ListAction<V> {
     Push(V),
     Pop,
     Extend(Vec<V>),
-    //Applied with argument modulo collection.len()
+    // Applied with argument modulo collection.len()
     Truncate(u64),
     // Applied to index modulo collection.len()
     Set(u64, V),

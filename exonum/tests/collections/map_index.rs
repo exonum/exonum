@@ -20,7 +20,7 @@ use exonum::storage::{Database, Fork, MapIndex, MemoryDB, StorageValue};
 use modifier::Modifier;
 use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
 
-use MapAction;
+use super::{MapAction, ACTIONS_MAX_LEN};
 
 use std::collections::HashMap;
 
@@ -50,7 +50,7 @@ fn compare_collections(
 
 proptest!{
     #[test]
-    fn proptest_map_index_to_rust_map(ref actions in vec( generate_action!() , 1..10) ) {
+    fn proptest_map_index_to_rust_map(ref actions in vec( generate_action!() , 1..ACTIONS_MAX_LEN) ) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();

@@ -20,7 +20,7 @@ use exonum::storage::{Database, Fork, ListIndex, MemoryDB, StorageValue};
 use modifier::Modifier;
 use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
 
-use ListAction;
+use super::{ListAction, ACTIONS_MAX_LEN};
 
 macro_rules! generate_action {
     () => {
@@ -50,7 +50,7 @@ fn compare_collections(
 
 proptest!{
     #[test]
-    fn proptest_list_index_to_rust_vec(ref actions in vec(generate_action!(), 1..10) ) {
+    fn proptest_list_index_to_rust_vec(ref actions in vec(generate_action!(), 1..ACTIONS_MAX_LEN) ) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();

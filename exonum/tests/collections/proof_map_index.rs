@@ -22,7 +22,7 @@ use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCase
 
 use std::collections::HashMap;
 
-use MapAction;
+use super::{MapAction, ACTIONS_MAX_LEN};
 
 macro_rules! generate_action {
     () => {
@@ -59,7 +59,7 @@ fn compare_collections(
 proptest!{
     #[test]
     fn proptest_proof_map_index_to_rust_map(ref actions in
-                     vec( generate_action!(), 1..10) ) {
+                     vec( generate_action!(), 1..ACTIONS_MAX_LEN) ) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
