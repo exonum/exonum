@@ -24,6 +24,41 @@ use std::collections::HashMap;
 
 use super::{MapAction, ACTIONS_MAX_LEN};
 
+impl<'a, V> Modifier<ProofMapIndex<&'a mut Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
+where
+    V: StorageValue,
+{
+    fn modify(self, map: &mut ProofMapIndex<&mut Fork, [u8; 32], V>) {
+        match self {
+            MapAction::Put(mut k, v) => {
+                k[0] = k[0] % 8;
+                map.put(&k, v);
+            }
+            MapAction::Remove(mut k) => {
+                k[0] = k[0] % 8;
+                map.remove(&k);
+            }
+            MapAction::Clear => {
+                map.clear();
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn compare_collections(
+    map_index: &ProofMapIndex<&mut Fork, [u8; 32], i32>,
+    ref_map: &HashMap<[u8; 32], i32>,
+) -> TestCaseResult {
+    for k in ref_map.keys() {
+        prop_assert!(map_index.contains(k));
+    }
+    for (k, v) in map_index.iter() {
+        prop_assert_eq!(Some(&v), ref_map.get(&k));
+    }
+    Ok(())
+}
+
 macro_rules! generate_action {
     () => {
         prop_oneof![
@@ -41,19 +76,6 @@ macro_rules! generate_action {
             strategy::Just(MapAction::MergeFork),
         ]
     };
-}
-
-fn compare_collections(
-    map_index: &ProofMapIndex<&mut Fork, [u8; 32], i32>,
-    ref_map: &HashMap<[u8; 32], i32>,
-) -> TestCaseResult {
-    for k in ref_map.keys() {
-        prop_assert!(map_index.contains(k));
-    }
-    for (k, v) in map_index.iter() {
-        prop_assert_eq!(Some(&v), ref_map.get(&k));
-    }
-    Ok(())
 }
 
 proptest!{
@@ -84,27 +106,5 @@ proptest!{
         let mut fork = db.fork();
         let map_index = ProofMapIndex::<_, [u8; 32], i32>::new("test", &mut fork);
         compare_collections(&map_index,&ref_map)?;
-    }
-}
-
-impl<'a, V> Modifier<ProofMapIndex<&'a mut Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
-where
-    V: StorageValue,
-{
-    fn modify(self, map: &mut ProofMapIndex<&mut Fork, [u8; 32], V>) {
-        match self {
-            MapAction::Put(mut k, v) => {
-                k[0] = k[0] % 8;
-                map.put(&k, v);
-            }
-            MapAction::Remove(mut k) => {
-                k[0] = k[0] % 8;
-                map.remove(&k);
-            }
-            MapAction::Clear => {
-                map.clear();
-            }
-            _ => unreachable!(),
-        }
     }
 }

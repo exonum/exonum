@@ -20,19 +20,30 @@ use exonum::storage::{Database, Fork, MapIndex, MemoryDB, StorageValue};
 use modifier::Modifier;
 use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
 
-use super::{MapAction, ACTIONS_MAX_LEN};
-
 use std::collections::HashMap;
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
-            num::u8::ANY.prop_map(MapAction::Remove),
-            strategy::Just(MapAction::Clear),
-            strategy::Just(MapAction::MergeFork),
-        ]
-    };
+use super::{MapAction, ACTIONS_MAX_LEN};
+
+impl<'a, V> Modifier<MapIndex<&'a mut Fork, u8, V>> for MapAction<u8, V>
+where
+    V: StorageValue,
+{
+    fn modify(self, map: &mut MapIndex<&'a mut Fork, u8, V>) {
+        match self {
+            MapAction::Put(k, v) => {
+                let k = k % 8;
+                map.put(&k, v);
+            }
+            MapAction::Remove(k) => {
+                let ref k = k % 8;
+                map.remove(k);
+            }
+            MapAction::Clear => {
+                map.clear();
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 fn compare_collections(
@@ -46,6 +57,17 @@ fn compare_collections(
         prop_assert_eq!(Some(&v), ref_map.get(&k));
     }
     Ok(())
+}
+
+macro_rules! generate_action {
+    () => {
+        prop_oneof![
+            (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
+            num::u8::ANY.prop_map(MapAction::Remove),
+            strategy::Just(MapAction::Clear),
+            strategy::Just(MapAction::MergeFork),
+        ]
+    };
 }
 
 proptest!{
@@ -75,27 +97,5 @@ proptest!{
         let mut fork = db.fork();
         let map_index = MapIndex::<_, u8, i32>::new("test", &mut fork);
         compare_collections(&map_index, &ref_map)?;
-    }
-}
-
-impl<'a, V> Modifier<MapIndex<&'a mut Fork, u8, V>> for MapAction<u8, V>
-where
-    V: StorageValue,
-{
-    fn modify(self, map: &mut MapIndex<&'a mut Fork, u8, V>) {
-        match self {
-            MapAction::Put(k, v) => {
-                let k = k % 8;
-                map.put(&k, v);
-            }
-            MapAction::Remove(k) => {
-                let ref k = k % 8;
-                map.remove(k);
-            }
-            MapAction::Clear => {
-                map.clear();
-            }
-            _ => unreachable!(),
-        }
     }
 }

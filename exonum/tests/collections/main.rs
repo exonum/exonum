@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Tests that compare exonum collections and corresponding rust types using proptest.
+
 extern crate exonum;
 #[macro_use]
 extern crate proptest;
@@ -33,9 +35,9 @@ enum ListAction<V> {
     Push(V),
     Pop,
     Extend(Vec<V>),
-    // Applied with argument modulo collection.len()
+    // Applied with argument modulo `collection.len()`.
     Truncate(u64),
-    // Applied to index modulo collection.len()
+    // Applied to index modulo `collection.len()`.
     Set(u64, V),
     Clear,
     MergeFork,

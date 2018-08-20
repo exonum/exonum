@@ -22,16 +22,30 @@ use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCase
 
 use super::{ListAction, ACTIONS_MAX_LEN};
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            num::i32::ANY.prop_map(ListAction::Push),
-            vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
-            (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
-            strategy::Just(ListAction::Clear),
-            strategy::Just(ListAction::MergeFork),
-        ]
-    };
+impl<'a, V> Modifier<ProofListIndex<&'a mut Fork, V>> for ListAction<V>
+where
+    V: StorageValue,
+{
+    fn modify(self, list: &mut ProofListIndex<&mut Fork, V>) {
+        match self {
+            ListAction::Push(val) => {
+                list.push(val);
+            }
+            ListAction::Extend(vec) => {
+                list.extend(vec);
+            }
+            ListAction::Set(idx, val) => {
+                let len = list.len();
+                if len > 0 {
+                    list.set(idx % len, val);
+                }
+            }
+            ListAction::Clear => {
+                list.clear();
+            }
+            _ => unreachable!(),
+        }
+    }
 }
 
 fn compare_collections(
@@ -44,6 +58,18 @@ fn compare_collections(
         prop_assert_eq!(l, r);
     }
     Ok(())
+}
+
+macro_rules! generate_action {
+    () => {
+        prop_oneof![
+            num::i32::ANY.prop_map(ListAction::Push),
+            vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
+            (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
+            strategy::Just(ListAction::Clear),
+            strategy::Just(ListAction::MergeFork),
+        ]
+    };
 }
 
 proptest!{
@@ -74,31 +100,5 @@ proptest!{
         let mut fork = db.fork();
         let list_index = ProofListIndex::<_, i32>::new("test", &mut fork);
         compare_collections(&list_index, &ref_list)?;
-    }
-}
-
-impl<'a, V> Modifier<ProofListIndex<&'a mut Fork, V>> for ListAction<V>
-where
-    V: StorageValue,
-{
-    fn modify(self, list: &mut ProofListIndex<&mut Fork, V>) {
-        match self {
-            ListAction::Push(val) => {
-                list.push(val);
-            }
-            ListAction::Extend(vec) => {
-                list.extend(vec);
-            }
-            ListAction::Set(idx, val) => {
-                let len = list.len();
-                if len > 0 {
-                    list.set(idx % len, val);
-                }
-            }
-            ListAction::Clear => {
-                list.clear();
-            }
-            _ => unreachable!(),
-        }
     }
 }

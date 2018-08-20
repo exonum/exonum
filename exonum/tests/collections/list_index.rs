@@ -22,62 +22,6 @@ use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCase
 
 use super::{ListAction, ACTIONS_MAX_LEN};
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            num::i32::ANY.prop_map(ListAction::Push),
-            strategy::Just(ListAction::Pop),
-            vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
-            num::u64::ANY.prop_map(ListAction::Truncate),
-            (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
-            strategy::Just(ListAction::Clear),
-            strategy::Just(ListAction::MergeFork),
-        ]
-    };
-}
-
-fn compare_collections(
-    list_index: &ListIndex<&mut Fork, i32>,
-    ref_list: &Vec<i32>,
-) -> TestCaseResult {
-    prop_assert_eq!(list_index.len() as usize, ref_list.len());
-
-    for (&l, r) in ref_list.iter().zip(list_index.iter()) {
-        prop_assert_eq!(l, r);
-    }
-    Ok(())
-}
-
-proptest!{
-    #[test]
-    fn proptest_list_index_to_rust_vec(ref actions in vec(generate_action!(), 1..ACTIONS_MAX_LEN) ) {
-        let db = MemoryDB::new();
-
-        let mut fork = db.fork();
-        let mut ref_list : Vec<i32> = Vec::new();
-
-        for action in actions {
-            match action {
-                ListAction::MergeFork => {
-                    db.merge(fork.into_patch()).unwrap();
-                    fork = db.fork();
-                },
-                _ => {
-                    let mut list_index = ListIndex::new("test", &mut fork);
-                    action.clone().modify(&mut list_index);
-                    action.clone().modify(&mut ref_list);
-                    compare_collections(&list_index, &ref_list)?;
-                }
-            }
-        }
-        db.merge(fork.into_patch()).unwrap();
-
-        let mut fork = db.fork();
-        let list_index = ListIndex::<_, i32>::new("test", &mut fork);
-        compare_collections(&list_index, &ref_list)?;
-    }
-}
-
 impl<'a, V> Modifier<ListIndex<&'a mut Fork, V>> for ListAction<V>
 where
     V: StorageValue,
@@ -110,5 +54,61 @@ where
             }
             _ => unreachable!(),
         }
+    }
+}
+
+fn compare_collections(
+    list_index: &ListIndex<&mut Fork, i32>,
+    ref_list: &Vec<i32>,
+) -> TestCaseResult {
+    prop_assert_eq!(list_index.len() as usize, ref_list.len());
+
+    for (&l, r) in ref_list.iter().zip(list_index.iter()) {
+        prop_assert_eq!(l, r);
+    }
+    Ok(())
+}
+
+macro_rules! generate_action {
+    () => {
+        prop_oneof![
+            num::i32::ANY.prop_map(ListAction::Push),
+            strategy::Just(ListAction::Pop),
+            vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
+            num::u64::ANY.prop_map(ListAction::Truncate),
+            (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
+            strategy::Just(ListAction::Clear),
+            strategy::Just(ListAction::MergeFork),
+        ]
+    };
+}
+
+proptest!{
+    #[test]
+    fn proptest_list_index_to_rust_vec(ref actions in vec(generate_action!(), 1..ACTIONS_MAX_LEN) ) {
+        let db = MemoryDB::new();
+
+        let mut fork = db.fork();
+        let mut ref_list : Vec<i32> = Vec::new();
+
+        for action in actions {
+            match action {
+                ListAction::MergeFork => {
+                    db.merge(fork.into_patch()).unwrap();
+                    fork = db.fork();
+                },
+                _ => {
+                    let mut list_index = ListIndex::new("test", &mut fork);
+                    action.clone().modify(&mut list_index);
+                    action.clone().modify(&mut ref_list);
+                    compare_collections(&list_index, &ref_list)?;
+                }
+            }
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+        let list_index = ListIndex::<_, i32>::new("test", &mut fork);
+        compare_collections(&list_index, &ref_list)?;
     }
 }
