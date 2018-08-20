@@ -119,7 +119,6 @@ module.exports = {
 
         // Sign transaction
         const signature = transaction.sign(keyPair.secretKey, data)
-        transaction.signature = signature
 
         // Send transaction into blockchain
         return transaction.send(TRANSACTION_URL, TRANSACTION_EXPLORER_URL, data, signature)
