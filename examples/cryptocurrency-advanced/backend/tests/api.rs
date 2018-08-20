@@ -25,8 +25,7 @@ extern crate exonum_testkit;
 extern crate serde_json;
 
 use exonum::{
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-    api::node::public::explorer::TransactionQuery,
+    api::node::public::explorer::TransactionQuery, crypto::{CryptoHash, Hash, PublicKey, SecretKey},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 

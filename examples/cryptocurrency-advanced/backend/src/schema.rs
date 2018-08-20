@@ -14,7 +14,9 @@
 
 //! Cryptocurrency database schema.
 
-use exonum::{crypto::{Hash, PublicKey}, storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot}};
+use exonum::{
+    crypto::{Hash, PublicKey}, storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot},
+};
 
 use wallet::Wallet;
 use INITIAL_BALANCE;

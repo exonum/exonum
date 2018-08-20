@@ -32,9 +32,9 @@ pub mod transactions;
 pub mod wallet;
 
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet},
-    crypto::Hash, encoding::Error as EncodingError, helpers::fabric::{self, Context},
-    messages::RawTransaction, storage::Snapshot,
+    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
+    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
+    storage::Snapshot,
 };
 
 use transactions::WalletTransactions;

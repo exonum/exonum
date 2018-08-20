@@ -36,7 +36,9 @@ extern crate serde_json;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::{crypto::PublicKey, storage::{Fork, MapIndex, Snapshot}};
+    use exonum::{
+        crypto::PublicKey, storage::{Fork, MapIndex, Snapshot},
+    };
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.

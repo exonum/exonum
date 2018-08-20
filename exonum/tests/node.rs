@@ -29,9 +29,9 @@ use std::{
 };
 
 use exonum::{
-    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash, encoding::Error as EncodingError, helpers,
-    messages::RawTransaction, node::{ApiSender, ExternalMessage, Node},
-    storage::{Database, Fork, MemoryDB, Snapshot},
+    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash,
+    encoding::Error as EncodingError, helpers, messages::RawTransaction,
+    node::{ApiSender, ExternalMessage, Node}, storage::{Database, Fork, MemoryDB, Snapshot},
 };
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);

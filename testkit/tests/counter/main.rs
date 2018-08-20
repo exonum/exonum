@@ -30,8 +30,9 @@ extern crate serde_json;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
-    blockchain::{Transaction, TransactionErrorType as ErrorType}, crypto::{self, CryptoHash, PublicKey},
-    encoding::serialize::{json::ExonumJson, FromHex}, helpers::Height, messages::Message,
+    blockchain::{Transaction, TransactionErrorType as ErrorType},
+    crypto::{self, CryptoHash, PublicKey}, encoding::serialize::{json::ExonumJson, FromHex},
+    helpers::Height, messages::Message,
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;

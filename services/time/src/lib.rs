@@ -43,7 +43,8 @@ pub mod transactions;
 use exonum::{
     api::ServiceApiBuilder, blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash, encoding::{self, serialize::json::reexport::Value},
-    helpers::fabric::{Context, ServiceFactory}, messages::RawTransaction, storage::{Fork, Snapshot},
+    helpers::fabric::{Context, ServiceFactory}, messages::RawTransaction,
+    storage::{Fork, Snapshot},
 };
 use schema::TimeSchema;
 

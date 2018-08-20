@@ -23,7 +23,8 @@ extern crate pretty_assertions;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{Schema, Transaction, TransactionErrorType, TransactionResult},
-    crypto::{gen_keypair, CryptoHash, PublicKey}, helpers::{Height, ValidatorId}, storage::Snapshot,
+    crypto::{gen_keypair, CryptoHash, PublicKey}, helpers::{Height, ValidatorId},
+    storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{

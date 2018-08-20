@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{Schema, StoredConfiguration, Transaction}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
-    helpers::{Height, ValidatorId}, storage::StorageValue,
+    blockchain::{Schema, StoredConfiguration, Transaction},
+    crypto::{hash, CryptoHash, Hash, HASH_SIZE}, helpers::{Height, ValidatorId},
+    storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 

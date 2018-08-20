@@ -24,7 +24,9 @@ extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
 extern crate rand;
 
-use exonum::{blockchain::Transaction, crypto::{PublicKey, SecretKey}};
+use exonum::{
+    blockchain::Transaction, crypto::{PublicKey, SecretKey},
+};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.

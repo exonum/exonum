@@ -22,14 +22,14 @@ extern crate rand;
 extern crate tempdir;
 extern crate tokio_core;
 
-use crypto::bench_crypto;
 use block::bench_block;
 use criterion::Criterion;
+use crypto::bench_crypto;
 use storage::bench_storage;
 use transactions::bench_verify_transactions;
 
-mod crypto;
 mod block;
+mod crypto;
 mod storage;
 mod transactions;
 

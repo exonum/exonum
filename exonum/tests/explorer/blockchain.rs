@@ -22,8 +22,7 @@ use exonum::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionSet,
     },
     crypto::{self, CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::RawTransaction, node::ApiSender,
-    storage::{Fork, MemoryDB, Snapshot},
+    messages::RawTransaction, node::ApiSender, storage::{Fork, MemoryDB, Snapshot},
 };
 
 transactions! {
