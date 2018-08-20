@@ -17,6 +17,7 @@ extern crate serde_json;
 
 #[macro_use]
 extern crate exonum_testkit;
+
 extern crate exonum;
 extern crate exonum_time;
 extern crate exonum_timestamping;

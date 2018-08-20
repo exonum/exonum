@@ -160,7 +160,7 @@ mod tests {
 
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction};
-    use exonum::crypto::{self, CryptoHash, Hash, PublicKey};
+    use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
@@ -185,7 +185,7 @@ mod tests {
 
     impl TxTimestamp {
         fn for_str(s: &str) -> Self {
-            let (pubkey, key) = crypto::gen_keypair();
+            let (pubkey, key) = gen_keypair();
             TxTimestamp::new(&pubkey, s, &key)
         }
     }

@@ -212,8 +212,8 @@ pub enum TransactionErrorType {
 /// transaction is successful or not.
 ///
 /// ```
-/// # use exonum::crypto::Hash;
 /// # use exonum::storage::{MemoryDB, Database};
+/// # use exonum::crypto::Hash;
 /// use exonum::blockchain::Schema;
 ///
 /// # let db = MemoryDB::new();
