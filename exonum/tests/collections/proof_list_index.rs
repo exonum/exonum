@@ -74,20 +74,19 @@ macro_rules! generate_action {
 
 proptest! {
     #[test]
-    fn proptest_proof_list_index_to_rust_vec(ref actions in
-                                             vec(generate_action!(),
-                                                 1..ACTIONS_MAX_LEN)) {
+    fn proptest_proof_list_index_to_rust_vec(ref actions in vec(generate_action(),
+                                                                1..ACTIONS_MAX_LEN)) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
-        let mut ref_list : Vec<i32> = Vec::new();
+        let mut ref_list: Vec<i32> = Vec::new();
 
         for action in actions {
             match action {
                 ListAction::MergeFork => {
                     db.merge(fork.into_patch()).unwrap();
                     fork = db.fork();
-                },
+                }
                 _ => {
                     let mut list_index = ProofListIndex::new("test", &mut fork);
                     action.clone().modify(&mut list_index);

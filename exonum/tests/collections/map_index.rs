@@ -72,20 +72,19 @@ macro_rules! generate_action {
 
 proptest! {
     #[test]
-    fn proptest_map_index_to_rust_map(ref actions in
-                                      vec(generate_action!(),
-                                          1..ACTIONS_MAX_LEN)) {
+    fn proptest_map_index_to_rust_map(ref actions in vec(generate_action!(),
+                                                         1..ACTIONS_MAX_LEN)) {
         let db = MemoryDB::new();
 
         let mut fork = db.fork();
-        let mut ref_map : HashMap<u8,i32> = HashMap::new();
+        let mut ref_map: HashMap<u8, i32> = HashMap::new();
 
         for action in actions {
             match action {
                 MapAction::MergeFork => {
                     db.merge(fork.into_patch()).unwrap();
                     fork = db.fork();
-                },
+                }
                 _ => {
                     let mut map_index = MapIndex::new("test", &mut fork);
                     action.clone().modify(&mut map_index);
