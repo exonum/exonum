@@ -10,6 +10,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `majority_count` parameter has been removed from `StoredConfiguration` and
    moved to `ConfigurationService` configuration. (#828)
 
+- Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#???)
+
 #### exonum
 
 - `majority_count` parameter has been added to `generate-template` and

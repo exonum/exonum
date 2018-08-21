@@ -159,8 +159,6 @@ pub struct ListenerConfig {
 pub struct NodeApiConfig {
     /// Timeout to update api state.
     pub state_update_timeout: usize,
-    /// Enable api endpoints for the `blockchain_explorer` on public api address.
-    pub enable_blockchain_explorer: bool,
     /// Listen address for public api endpoints.
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
@@ -181,7 +179,6 @@ impl Default for NodeApiConfig {
     fn default() -> Self {
         Self {
             state_update_timeout: 10_000,
-            enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
             public_allow_origin: None,
