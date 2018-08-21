@@ -76,3 +76,16 @@ fn shutdown() {
         ()
     );
 }
+
+#[test]
+fn rebroadcast() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+
+    assert_eq!(
+        api.private(ApiKind::System)
+            .post::<()>("v1/rebroadcast")
+            .unwrap(),
+        ()
+    )
+}

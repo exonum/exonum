@@ -249,6 +249,13 @@ impl Sandbox {
         self.inner.borrow_mut().handle_event(event);
     }
 
+    pub fn recv_rebroadcast(&self) {
+        self.check_unexpected_message();
+        self.inner
+            .borrow_mut()
+            .handle_event(ExternalMessage::Rebroadcast);
+    }
+
     pub fn process_events(&self) {
         self.inner.borrow_mut().process_events();
     }

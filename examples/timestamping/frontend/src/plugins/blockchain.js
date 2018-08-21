@@ -2,12 +2,9 @@ import * as Exonum from 'exonum-client'
 import axios from 'axios'
 
 const PER_PAGE = 10
-const ATTEMPTS = 10
-const ATTEMPT_TIMEOUT = 500
 const PROTOCOL_VERSION = 0
 const SERVICE_ID = 130
 const TX_ID = 0
-
 const TableKey = Exonum.newType({
   fields: [
     { name: 'service_id', type: Exonum.Uint16 },
@@ -43,7 +40,7 @@ module.exports = {
 
       createTimestamp: (keyPair, hash, metadata) => {
         // Describe transaction
-        const TxTimestamp = Exonum.newMessage({
+        const transaction = Exonum.newMessage({
           protocol_version: PROTOCOL_VERSION,
           service_id: SERVICE_ID,
           message_id: TX_ID,
@@ -63,10 +60,10 @@ module.exports = {
         }
 
         // Sign transaction
-        const signature = TxTimestamp.sign(keyPair.secretKey, data)
+        const signature = transaction.sign(keyPair.secretKey, data)
 
         // Send transaction into blockchain
-        return TxTimestamp.send('/api/services/timestamping/v1/timestamps', 'api/explorer/v1/transactions?hash=', data, signature)
+        return transaction.send('/api/services/timestamping/v1/timestamps', 'api/explorer/v1/transactions?hash=', data, signature)
       },
 
       getTimestamp: hash => {
