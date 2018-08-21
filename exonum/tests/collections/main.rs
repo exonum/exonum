@@ -45,9 +45,9 @@ enum ListAction<V> {
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {
-    // Applied to key modulo 8.
+    // Should be applied to a small subset of keys (like modulo 8 for int).
     Put(K, V),
-    // Applied to key modulo 8.
+    // Should be applied to a small subset of keys (like modulo 8 for int).
     Remove(K),
     Clear,
     MergeFork,
@@ -93,8 +93,8 @@ impl<V> Modifier<HashMap<u8, V>> for MapAction<u8, V> {
                 map.insert(k, v);
             }
             MapAction::Remove(k) => {
-                let ref k = k % 8;
-                map.remove(k);
+                let k = k % 8;
+                map.remove(&k);
             }
             MapAction::Clear => {
                 map.clear();
