@@ -52,11 +52,7 @@ fn compare_collections(
     list_index: &ProofListIndex<&mut Fork, i32>,
     ref_list: &Vec<i32>,
 ) -> TestCaseResult {
-    prop_assert_eq!(list_index.len() as usize, ref_list.len());
-
-    for (&l, r) in ref_list.iter().zip(list_index.iter()) {
-        prop_assert_eq!(l, r);
-    }
+    prop_assert!(ref_list.iter().map(|v| *v).eq(list_index));
     Ok(())
 }
 
