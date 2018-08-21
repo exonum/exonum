@@ -32,7 +32,7 @@ pub(crate) struct Message(pub String);
 #[derive(Message)]
 #[rtype(usize)]
 pub(crate) struct Subscribe {
-    pub address: Recipient<Syn, Message>,
+    pub address: Recipient<Message>,
 }
 
 #[derive(Message)]
@@ -46,7 +46,7 @@ pub(crate) struct Broadcast {
 }
 
 pub(crate) struct Server {
-    pub subscribers: HashMap<usize, Recipient<Syn, Message>>,
+    pub subscribers: HashMap<usize, Recipient<Message>>,
     rng: RefCell<ThreadRng>,
 }
 
@@ -94,11 +94,11 @@ impl Handler<Broadcast> for Server {
 
 pub(crate) struct Session {
     pub id: usize,
-    pub server_address: Addr<Syn, Server>,
+    pub server_address: Addr<Server>,
 }
 
 impl Session {
-    pub fn new(server_address: Addr<Syn, Server>) -> Self {
+    pub fn new(server_address: Addr<Server>) -> Self {
         Self {
             id: 0,
             server_address,
@@ -110,7 +110,7 @@ impl Actor for Session {
     type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let address: Addr<Syn, _> = ctx.address();
+        let address: Addr<_> = ctx.address();
         self.server_address
             .send(Subscribe {
                 address: address.clone().recipient(),

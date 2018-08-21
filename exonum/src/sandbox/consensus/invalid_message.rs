@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore precommiters, commited
-
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
@@ -63,7 +61,6 @@ fn ignore_propose_with_incorrect_prev_hash() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_prev_hash(&empty_hash())
         .build();
 
@@ -76,7 +73,6 @@ fn ignore_propose_from_non_leader() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_validator(ValidatorId(3))    //without this line Prevote would have been broadcast
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .build();
 
     sandbox.recv(&propose);
@@ -87,9 +83,7 @@ fn ignore_propose_from_non_leader() {
 fn handle_propose_with_incorrect_time() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.current_round_timeout() + PROPOSE_TIMEOUT + 1)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
 
@@ -105,14 +99,13 @@ fn handle_propose_with_incorrect_time() {
 }
 
 #[test]
-fn ignore_propose_with_commited_transaction() {
+fn ignore_propose_with_committed_transaction() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
     add_one_height(&sandbox, &sandbox_state);
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         // without this line Prevote would have been broadcast
         .with_tx_hashes(sandbox_state.committed_transaction_hashes.borrow().as_ref())
         .build();
@@ -121,19 +114,11 @@ fn ignore_propose_with_commited_transaction() {
     //    broadcast here is absent
 }
 
-// TODO: Ask Ivan how to test this scenario in terms of messages:
-// - remove propose request when getting propose and request txs from known nodes;
-//     - not only leader, but also prevotes;
-//     - not only leader, but also precommiters.
-// (ECR-1627)
-
 #[test]
 fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT - 1)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
 

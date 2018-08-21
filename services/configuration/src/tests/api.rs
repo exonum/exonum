@@ -28,6 +28,7 @@ use api::{
     ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
     VoteResponse, VotesInfo,
 };
+use SERVICE_NAME;
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;
@@ -59,19 +60,19 @@ trait ConfigurationApiTest {
 
 impl ConfigurationApiTest for TestKitApi {
     fn actual_config(&self) -> ConfigHashInfo {
-        self.public(ApiKind::Service("configuration"))
+        self.public(ApiKind::Service(SERVICE_NAME))
             .get("v1/configs/actual")
             .unwrap()
     }
 
     fn following_config(&self) -> Option<ConfigHashInfo> {
-        self.public(ApiKind::Service("configuration"))
+        self.public(ApiKind::Service(SERVICE_NAME))
             .get("v1/configs/following")
             .unwrap()
     }
 
     fn config_by_hash(&self, hash: Hash) -> ConfigInfo {
-        self.public(ApiKind::Service("configuration"))
+        self.public(ApiKind::Service(SERVICE_NAME))
             .query(&HashQuery { hash })
             .get("v1/configs")
             .unwrap()
@@ -82,7 +83,7 @@ impl ConfigurationApiTest for TestKitApi {
         previous_cfg_hash: Option<Hash>,
         actual_from: Option<Height>,
     ) -> Vec<ProposeHashInfo> {
-        self.public(ApiKind::Service("configuration"))
+        self.public(ApiKind::Service(SERVICE_NAME))
             .query(&FilterQuery {
                 previous_cfg_hash,
                 actual_from,
@@ -92,7 +93,7 @@ impl ConfigurationApiTest for TestKitApi {
     }
 
     fn votes_for_propose(&self, hash: Hash) -> VotesInfo {
-        self.public(ApiKind::Service("configuration"))
+        self.public(ApiKind::Service(SERVICE_NAME))
             .query(&HashQuery { hash })
             .get("v1/configs/votes")
             .unwrap()
@@ -103,7 +104,7 @@ impl ConfigurationApiTest for TestKitApi {
         previous_cfg_hash: Option<Hash>,
         actual_from: Option<Height>,
     ) -> Vec<ConfigHashInfo> {
-        self.public(ApiKind::Service("configuration"))
+        self.public(ApiKind::Service(SERVICE_NAME))
             .query(&FilterQuery {
                 previous_cfg_hash,
                 actual_from,
@@ -113,21 +114,21 @@ impl ConfigurationApiTest for TestKitApi {
     }
 
     fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse {
-        self.private(ApiKind::Service("configuration"))
+        self.private(ApiKind::Service(SERVICE_NAME))
             .query(cfg)
             .post("v1/configs/postpropose")
             .unwrap()
     }
 
     fn post_config_vote(&self, hash: Hash) -> VoteResponse {
-        self.private(ApiKind::Service("configuration"))
+        self.private(ApiKind::Service(SERVICE_NAME))
             .query(&HashQuery { hash })
             .post("v1/configs/postvote")
             .unwrap()
     }
 
     fn post_config_vote_against(&self, hash: Hash) -> VoteResponse {
-        self.private(ApiKind::Service("configuration"))
+        self.private(ApiKind::Service(SERVICE_NAME))
             .query(&HashQuery { hash })
             .post("v1/configs/postagainst")
             .unwrap()

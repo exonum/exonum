@@ -39,12 +39,9 @@ fn handle_block_response_tx_in_pool() {
 
     let tx = gen_timestamping_tx();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -129,12 +126,9 @@ fn handle_block_response_with_unknown_tx() {
 
     let tx = gen_timestamping_tx();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -235,12 +229,9 @@ fn handle_block_response_with_invalid_txs_order() {
     let tx1 = gen_timestamping_tx();
     let tx2 = gen_timestamping_tx();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
         .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
         .build();
@@ -317,19 +308,14 @@ fn handle_block_response_with_invalid_precommits() {
 
     let tx = gen_timestamping_tx();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block1 = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let block2 = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let block2 = BlockBuilder::new(&sandbox).build();
 
     let precommit_1 = Precommit::new(
         ValidatorId(1),
@@ -410,12 +396,9 @@ fn handle_block_response_with_known_transaction() {
 
     sandbox.recv(&tx1);
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
         .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
         .build();
@@ -520,12 +503,9 @@ fn handle_block_response_with_all_known_transactions() {
     sandbox.recv(&tx1);
     sandbox.recv(&tx2);
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
         .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
         .build();
@@ -614,12 +594,10 @@ fn received_block_while_there_is_full_propose() {
     let propose = ProposeBuilder::new(&sandbox)
         .with_height(Height(1))
         .with_validator(ValidatorId(2))
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hashes(&[tx.hash()])
         .build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -737,12 +715,9 @@ fn received_block_while_there_is_pending_block() {
 
     let tx = gen_timestamping_tx();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
@@ -865,12 +840,9 @@ fn transactions_request_to_multiple_nodes() {
 
     let tx = gen_timestamping_tx();
 
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
-        .build();
+    let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();

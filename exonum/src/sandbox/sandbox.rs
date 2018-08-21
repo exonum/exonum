@@ -170,7 +170,7 @@ impl Sandbox {
     }
 
     fn check_unexpected_message(&self) {
-        if let Some((addr, msg)) = self.inner.borrow_mut().sent.pop_front() {
+        if let Some((addr, msg)) = self.pop_sent() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -243,14 +243,25 @@ impl Sandbox {
         self.inner.borrow_mut().handle_event(event);
     }
 
+    pub fn recv_rebroadcast(&self) {
+        self.check_unexpected_message();
+        self.inner
+            .borrow_mut()
+            .handle_event(ExternalMessage::Rebroadcast);
+    }
+
     pub fn process_events(&self) {
         self.inner.borrow_mut().process_events();
+    }
+
+    pub fn pop_sent(&self) -> Option<(SocketAddr, RawMessage)> {
+        self.inner.borrow_mut().sent.pop_front()
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
         self.process_events();
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let send = self.inner.borrow_mut().sent.pop_front();
+        let send = self.pop_sent();
         if let Some((real_addr, real_msg)) = send {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -269,7 +280,7 @@ impl Sandbox {
 
     pub fn send_peers_request(&self) {
         self.process_events();
-        let send = self.inner.borrow_mut().sent.pop_front();
+        let send = self.pop_sent();
 
         if let Some((addr, msg)) = send {
             let peers_request =
@@ -316,7 +327,7 @@ impl Sandbox {
         let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
         for _ in 0..expected_set.len() {
-            let send = self.inner.borrow_mut().sent.pop_front();
+            let send = self.pop_sent();
             if let Some((real_addr, real_msg)) = send {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
