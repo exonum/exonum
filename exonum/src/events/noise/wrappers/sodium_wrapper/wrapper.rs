@@ -18,7 +18,6 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use num::Integer;
 use snow::{Builder, Session};
 
 use std::{
@@ -174,12 +173,12 @@ fn decrypted_msg_len(raw_message_len: usize) -> usize {
 // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
 // calculate actual message length.
 fn encrypted_msg_len(raw_message_len: usize) -> usize {
-    raw_message_len
-        + TAG_LENGTH * (raw_message_len.div_floor(&(MAX_MESSAGE_LENGTH - TAG_LENGTH)) + 1)
+    let tag_count = div_ceil(raw_message_len, MAX_MESSAGE_LENGTH - TAG_LENGTH);
+    raw_message_len + TAG_LENGTH * tag_count
 }
 
 fn div_ceil(lhs: usize, rhs: usize) -> usize {
-    match lhs.div_rem(&rhs) {
+    match (lhs / rhs, lhs % rhs) {
         (d, r) if (r == 0) => d,
         (d, _) => d + 1,
     }

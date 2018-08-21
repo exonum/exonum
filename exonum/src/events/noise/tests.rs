@@ -27,7 +27,7 @@ use std::{
 };
 
 use bytes::BytesMut;
-use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH};
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_other,
     noise::{
@@ -113,18 +113,27 @@ fn noise_converted_keys_handshake() {
 }
 
 #[test]
-fn noise_encrypt_decrypt_short_message() {
-    check_encrypt_decrypt_message(64);
-}
-
-#[test]
-fn noise_encrypt_decrypt_long_message() {
-    check_encrypt_decrypt_message(MAX_MESSAGE_LENGTH + 1);
-}
-
-#[test]
 fn noise_encrypt_decrypt_max_message_len() {
-    check_encrypt_decrypt_message(MAX_MESSAGE_LENGTH - SIGNATURE_LENGTH - HEADER_LENGTH - 10)
+    let small_sizes = 0..100;
+
+    // Message sizes that must be tested:
+    // 1. 65_445 (MAX_MESSAGE_LENGTH - SIGNATURE_LENGTH - HEADER_LENGTH - 22)
+    // because in this case `raw_message_len` is divisible by (MAX_MESSAGE_LENGTH - TAG_LENGTH)
+    // 2. 65_446 (previous size + 1)
+    // from this size message is being split.
+    // 3. 130_964 - next message size when `raw_message_len` is divisible by
+    // (MAX_MESSAGE_LENGTH - TAG_LENGTH)
+    // 4. 130_965 - Size when message is being split by 3 chunks.
+    // To be sure we also test ranges near zero and near MAX_MESSAGE_LENGTH.
+    let lower_bound = MAX_MESSAGE_LENGTH - 100;
+    let upper_bound = MAX_MESSAGE_LENGTH + 100;
+
+    let near_max_sizes = lower_bound..upper_bound;
+    let big_size = vec![130964, 130965];
+
+    for size in small_sizes.chain(near_max_sizes).chain(big_size) {
+        check_encrypt_decrypt_message(size);
+    }
 }
 
 #[test]
@@ -156,13 +165,13 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
 
     initiator
         .encrypt_msg(message.as_ref(), &mut buffer_msg)
-        .expect("Unable to encrypt message");
+        .expect(format!("Unable to encrypt message with size {}", msg_size).as_str());
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
 
     let res = responder
         .decrypt_msg(len, &mut buffer_msg)
-        .expect("Unable to decrypt message");
+        .expect(format!("Unable to decrypt message with size {}", msg_size).as_str());
     let decrypted_message = RawMessage::from_vec(res.to_vec());
     assert_eq!(message, decrypted_message);
 }

@@ -64,7 +64,6 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate num;
 extern crate snow;
 extern crate tokio;
 extern crate tokio_codec;
