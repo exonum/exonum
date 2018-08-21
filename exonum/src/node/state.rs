@@ -574,16 +574,18 @@ impl State {
         self.peers.insert(pubkey, msg).is_none()
     }
 
-    /// Removes a peer by the socket address.
+    /// Removes a peer by the socket address. Returns true if a validator peer has been removed.
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.config
-                .validator_keys
-                .iter()
-                .any(|x| x.consensus_key == pubkey);
+            return self.is_trusted_validator_peer(&pubkey);
         }
         false
+    }
+
+    fn is_trusted_validator_peer(&self, pubkey: &PublicKey) -> bool {
+        let is_validator = self.config.validator_keys.iter().any(|x| x.consensus_key == *pubkey);
+        is_validator && self.connect_list.is_peer_allowed(pubkey)
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
