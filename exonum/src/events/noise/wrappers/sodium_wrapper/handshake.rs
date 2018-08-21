@@ -16,7 +16,7 @@ use futures::future::{done, Future};
 use tokio_codec::{Decoder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::io;
+use std::{io, net::SocketAddr};
 
 use super::wrapper::NoiseWrapper;
 use crypto::{
@@ -64,24 +64,27 @@ impl HandshakeParams {
 #[derive(Debug)]
 pub struct NoiseHandshake {
     noise: NoiseWrapper,
+    peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams) -> Self {
+    pub fn initiator(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
         let noise = NoiseWrapper::initiator(params);
         NoiseHandshake {
             noise,
+            peer_address: peer_address.clone(),
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
         }
     }
 
-    pub fn responder(params: &HandshakeParams) -> Self {
+    pub fn responder(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
         let noise = NoiseWrapper::responder(params);
         NoiseHandshake {
             noise,
+            peer_address: peer_address.clone(),
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
         }
@@ -122,7 +125,10 @@ impl NoiseHandshake {
         };
 
         if !self.is_peer_allowed(&remote_static_key) {
-            return Err(other_error("Peer is not in ConnectList"));
+            return Err(other_error(format!(
+                "Peer {} is not in ConnectList",
+                self.peer_address,
+            )));
         }
 
         let noise = self.noise.into_transport_mode()?;

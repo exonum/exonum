@@ -215,7 +215,7 @@ impl ConnectionsPool {
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
-            NoiseHandshake::initiator(&handshake_params).send(stream)
+            NoiseHandshake::initiator(&handshake_params, peer).send(stream)
         } else {
             Box::new(err(other_error(format!(
                 "Attempt to connect to the peer with address {:?} which \
@@ -390,7 +390,7 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", address);
             let network_tx = network_tx.clone();
 
-            let handshake = NoiseHandshake::responder(&handshake_params);
+            let handshake = NoiseHandshake::responder(&handshake_params, &address);
             let connection_handler = handshake
                 .listen(sock)
                 .and_then(move |sock| {
