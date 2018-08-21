@@ -18,7 +18,7 @@
 
 use exonum::storage::{Database, Fork, MapIndex, MemoryDB, StorageValue};
 use modifier::Modifier;
-use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
+use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
 
 use std::collections::HashMap;
 
@@ -59,20 +59,18 @@ fn compare_collections(
     Ok(())
 }
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
-            num::u8::ANY.prop_map(MapAction::Remove),
-            strategy::Just(MapAction::Clear),
-            strategy::Just(MapAction::MergeFork),
-        ]
-    };
+fn generate_action() -> impl Strategy<Value = MapAction<u8, i32>> {
+    prop_oneof![
+        (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
+        num::u8::ANY.prop_map(MapAction::Remove),
+        strategy::Just(MapAction::Clear),
+        strategy::Just(MapAction::MergeFork),
+    ]
 }
 
 proptest! {
     #[test]
-    fn proptest_map_index_to_rust_map(ref actions in vec(generate_action!(),
+    fn proptest_map_index_to_rust_map(ref actions in vec(generate_action(),
                                                          1..ACTIONS_MAX_LEN)) {
         let db = MemoryDB::new();
 

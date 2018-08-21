@@ -18,7 +18,7 @@
 
 use exonum::storage::{Database, Fork, MemoryDB, ProofMapIndex, StorageValue};
 use modifier::Modifier;
-use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
+use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
 
 use std::collections::HashMap;
 
@@ -59,23 +59,21 @@ fn compare_collections(
     Ok(())
 }
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| {
-                let mut key = [0u8; 32];
-                key[0] = i;
-                MapAction::Put(key, v)
-            }),
-            num::u8::ANY.prop_map(|i| {
-                let mut key = [0u8; 32];
-                key[0] = i;
-                MapAction::Remove(key)
-            }),
-            strategy::Just(MapAction::Clear),
-            strategy::Just(MapAction::MergeFork),
-        ]
-    };
+fn generate_action() -> impl Strategy<Value = MapAction<[u8; 32], i32>> {
+    prop_oneof![
+        (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| {
+            let mut key = [0u8; 32];
+            key[0] = i;
+            MapAction::Put(key, v)
+        }),
+        num::u8::ANY.prop_map(|i| {
+            let mut key = [0u8; 32];
+            key[0] = i;
+            MapAction::Remove(key)
+        }),
+        strategy::Just(MapAction::Clear),
+        strategy::Just(MapAction::MergeFork),
+    ]
 }
 
 proptest! {

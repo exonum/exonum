@@ -18,7 +18,7 @@
 
 use exonum::storage::{Database, Fork, MemoryDB, ProofListIndex, StorageValue};
 use modifier::Modifier;
-use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
+use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
 
 use super::{ListAction, ACTIONS_MAX_LEN};
 
@@ -60,16 +60,14 @@ fn compare_collections(
     Ok(())
 }
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            num::i32::ANY.prop_map(ListAction::Push),
-            vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
-            (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
-            strategy::Just(ListAction::Clear),
-            strategy::Just(ListAction::MergeFork),
-        ]
-    };
+fn generate_action() -> impl Strategy<Value = ListAction<i32>> {
+    prop_oneof![
+        num::i32::ANY.prop_map(ListAction::Push),
+        vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
+        (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
+        strategy::Just(ListAction::Clear),
+        strategy::Just(ListAction::MergeFork),
+    ]
 }
 
 proptest! {

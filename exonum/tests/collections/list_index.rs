@@ -18,7 +18,7 @@
 
 use exonum::storage::{Database, Fork, ListIndex, MemoryDB, StorageValue};
 use modifier::Modifier;
-use proptest::{collection::vec, num, prelude::*, strategy, test_runner::TestCaseResult};
+use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
 
 use super::{ListAction, ACTIONS_MAX_LEN};
 
@@ -69,23 +69,21 @@ fn compare_collections(
     Ok(())
 }
 
-macro_rules! generate_action {
-    () => {
-        prop_oneof![
-            num::i32::ANY.prop_map(ListAction::Push),
-            strategy::Just(ListAction::Pop),
-            vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
-            num::u64::ANY.prop_map(ListAction::Truncate),
-            (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
-            strategy::Just(ListAction::Clear),
-            strategy::Just(ListAction::MergeFork),
-        ]
-    };
+fn generate_action() -> impl Strategy<Value = ListAction<i32>> {
+    prop_oneof![
+        num::i32::ANY.prop_map(ListAction::Push),
+        strategy::Just(ListAction::Pop),
+        vec(num::i32::ANY, 1..5).prop_map(ListAction::Extend),
+        num::u64::ANY.prop_map(ListAction::Truncate),
+        (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
+        strategy::Just(ListAction::Clear),
+        strategy::Just(ListAction::MergeFork),
+    ]
 }
 
 proptest! {
     #[test]
-    fn proptest_list_index_to_rust_vec(ref actions in vec(generate_action!(),
+    fn proptest_list_index_to_rust_vec(ref actions in vec(generate_action(),
                                                           1..ACTIONS_MAX_LEN)) {
         let db = MemoryDB::new();
 
