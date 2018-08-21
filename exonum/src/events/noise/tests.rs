@@ -15,6 +15,8 @@
 use futures::{
     future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
+use failure;
+
 use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Core,
@@ -25,7 +27,7 @@ use std::{net::SocketAddr, thread, time::Duration};
 
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
-    error::into_other,
+    error::into_failure,
     noise::{
         wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
         HandshakeRawMessage, HandshakeResult, NoiseHandshake,
@@ -162,7 +164,7 @@ fn test_noise_handshake_errors_ee_empty() {
     assert!(
         listener_err
             .unwrap_err()
-            .description()
+            .to_string()
             .contains("WrongMessageLength")
     );
 }
@@ -180,7 +182,7 @@ fn test_noise_handshake_errors_es_empty() {
     assert!(
         listener_err
             .unwrap_err()
-            .description()
+            .to_string()
             .contains("WrongMessageLength")
     );
 }
@@ -195,7 +197,7 @@ fn test_noise_handshake_errors_ee_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Dh"));
+    assert!(listener_err.unwrap_err().to_string().contains("Dh"));
 }
 
 #[test]
@@ -208,7 +210,7 @@ fn test_noise_handshake_errors_es_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
+    assert!(listener_err.unwrap_err().to_string().contains("Decrypt"));
 }
 
 #[test]
@@ -224,7 +226,7 @@ fn test_noise_handshake_errors_ee_empty_listen() {
     assert!(
         sender_err
             .unwrap_err()
-            .description()
+            .to_string()
             .contains("WrongMessageLength")
     );
 }
@@ -239,7 +241,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
     ));
     let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    assert!(sender_err.unwrap_err().description().contains("Dh"));
+    assert!(sender_err.unwrap_err().to_string().contains("Dh"));
 }
 
 #[test]
@@ -251,7 +253,7 @@ fn test_noise_handshake_wrong_remote_key() {
 
     let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
+    assert!(listener_err.unwrap_err().to_string().contains("Decrypt"));
 }
 
 // We need check result from both: sender and responder.
@@ -260,7 +262,7 @@ fn wait_for_handshake_result(
     params: &HandshakeParams,
     sender_message: Option<BogusMessage>,
     responder_message: Option<BogusMessage>,
-) -> (IoResult<()>, IoResult<()>) {
+) -> (Result<(), failure::Error>, Result<(), failure::Error>) {
     let (err_tx, err_rx) = mpsc::channel::<failure::Error>(0);
 
     let responder_message = responder_message.clone();
@@ -282,9 +284,9 @@ fn wait_for_handshake_result(
 fn run_handshake_listener(
     addr: &SocketAddr,
     params: &HandshakeParams,
-    err_sender: Sender<io::Error>,
+    err_sender: Sender<failure::Error>,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), io::Error> {
+) -> Result<(), failure::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
@@ -310,7 +312,7 @@ fn run_handshake_listener(
                 });
                 Ok(())
             })
-            .map_err(|e| into_other(e)),
+            .map_err(into_failure),
     )
 }
 
@@ -318,17 +320,18 @@ fn send_handshake(
     addr: &SocketAddr,
     params: &HandshakeParams,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), io::Error> {
+) -> Result<(), failure::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
     let stream = TcpStream::connect(&addr, &handle)
+        .map_err(into_failure)
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params).send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
-        .map_err(into_other);
+        .map_err(into_failure);
 
     core.run(stream)
 }
