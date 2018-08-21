@@ -50,8 +50,8 @@ use events::{
     NetworkRequest, SyncSender, TimeoutRequest,
 };
 use helpers::{
-    config::ConfigManager, fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round,
-    ValidatorId,
+    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
+    Milliseconds, Round, ValidatorId,
 };
 use messages::{Connect, Message, RawMessage};
 use node::state::SharedConnectList;
@@ -343,8 +343,9 @@ pub struct ConnectListConfig {
 
 impl ConnectListConfig {
     /// Creates `ConnectListConfig` from validators public configs.
-    pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
+    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
         let peers = list.iter()
+            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address,

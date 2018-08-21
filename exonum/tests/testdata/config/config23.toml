@@ -55,8 +55,4 @@ public_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
 
 [[connect_list.peers]]
 address = "127.0.0.1:6333"
-public_key = "648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3"
-
-[[connect_list.peers]]
-address = "127.0.0.1:6333"
 public_key = "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e"
