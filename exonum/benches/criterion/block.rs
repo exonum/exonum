@@ -154,7 +154,7 @@ mod timestamping {
         fn verify(&self) -> bool {
             // We don't verify transactions within the benchmark, so in this
             // and following transaction types the verification code is trivial.
-            true
+            unimplemented!("never used in benchmark")
         }
 
         fn execute(&self, _: &mut Fork) -> ExecutionResult {
@@ -164,7 +164,7 @@ mod timestamping {
 
     impl Transaction for PanickingTx {
         fn verify(&self) -> bool {
-            true
+            unimplemented!("never used in benchmark")
         }
 
         fn execute(&self, _: &mut Fork) -> ExecutionResult {
@@ -253,7 +253,7 @@ mod cryptocurrency {
 
     impl Transaction for Tx {
         fn verify(&self) -> bool {
-            true
+            unimplemented!("never used in benchmark")
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
@@ -270,7 +270,7 @@ mod cryptocurrency {
 
     impl Transaction for SimpleTx {
         fn verify(&self) -> bool {
-            true
+            unimplemented!("never used in benchmark")
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
@@ -287,7 +287,7 @@ mod cryptocurrency {
 
     impl Transaction for RollbackTx {
         fn verify(&self) -> bool {
-            true
+            unimplemented!("never used in benchmark")
         }
 
         fn execute(&self, fork: &mut Fork) -> ExecutionResult {
