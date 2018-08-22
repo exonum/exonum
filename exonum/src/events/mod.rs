@@ -29,7 +29,9 @@ use futures::{
 
 use std::{cmp::Ordering, time::SystemTime};
 
+use blockchain::Transaction;
 use helpers::{Height, Round};
+use messages::RawTransaction;
 use node::{ExternalMessage, NodeTimeout};
 
 #[cfg(all(test, feature = "long_benchmarks"))]
@@ -41,7 +43,7 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InternalEvent {
     /// Round update event.
     JumpToRound(Height, Round),
@@ -49,13 +51,18 @@ pub enum InternalEvent {
     Timeout(NodeTimeout),
     /// Shutdown the node.
     Shutdown,
+    /// Transaction has been successfully verified.
+    TxVerified(RawTransaction),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
+/// Asynchronous requests for internal actions.
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
     Shutdown,
+    /// Async request to verify a transaction in the thread pool.
+    VerifyTx(Box<dyn Transaction>),
 }
 
 #[derive(Debug, PartialEq, Eq)]

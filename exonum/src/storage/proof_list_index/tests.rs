@@ -59,12 +59,20 @@ fn list_methods(db: Box<dyn Database>) {
     index.push(vec![2]);
     assert_eq!(index.len(), 2);
 
-    index.push(vec![3]);
+    index.extend(vec![vec![3]]);
     assert_eq!(index.len(), 3);
 
     assert_eq!(index.get(0), Some(vec![1]));
     assert_eq!(index.get(1), Some(vec![2]));
     assert_eq!(index.get(2), Some(vec![3]));
+
+    assert_eq!(index.last(), Some(vec![3]));
+
+    index.set(1, vec![4]);
+    assert_eq!(index.get(1), Some(vec![4]));
+
+    index.clear();
+    assert_eq!(index.len(), 0);
 }
 
 fn height(db: Box<dyn Database>) {

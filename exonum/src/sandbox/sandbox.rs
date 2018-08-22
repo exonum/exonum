@@ -112,6 +112,12 @@ impl SandboxInner {
                     InternalRequest::JumpToRound(height, round) => self.handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
+                    InternalRequest::VerifyTx(tx) => {
+                        if tx.verify() {
+                            self.handler
+                                .handle_event(InternalEvent::TxVerified(tx.raw().clone()).into());
+                        }
+                    }
                 }
             }
             Ok(())
