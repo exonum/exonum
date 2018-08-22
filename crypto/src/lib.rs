@@ -628,7 +628,7 @@ impl CryptoHash for DateTime<Utc> {
     }
 }
 
-// TODO: think about move it anywhere
+// TODO: think about move it anywhere (ECR-2217)
 impl CryptoHash for Duration {
     fn hash(&self) -> Hash {
         let secs = self.num_seconds();
