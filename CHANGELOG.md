@@ -50,6 +50,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Bug with pool size overflow has been fixed. (#853)
 
+- Transactions (signature) verification benchmark has been fixed. (#673)
+
+- Node no longer panics when transaction pool has a lot of transactions and
+  consensus is at round 0. (#673)
+
 ### Internal Improvements
 
 #### exonum
@@ -72,6 +77,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   removed in favor of `env_logger`. (#857).
 
 - Several dependencies have been updated. (#861, #865, #871)
+
+- Transactions are now verified in a thread pool. Thread pool size is set to
+  optimal value by default (CPU count) or can be configured manually. (#673)
 
 ## 0.9.1 - 2018-08-02
 
