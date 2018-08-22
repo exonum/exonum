@@ -584,7 +584,10 @@ impl State {
     }
 
     fn is_trusted_validator_peer(&self, pubkey: &PublicKey) -> bool {
-        let is_validator = self.config.validator_keys.iter().any(|x| x.consensus_key == *pubkey);
+        let is_validator = self.config
+            .validator_keys
+            .iter()
+            .any(|x| x.consensus_key == *pubkey);
         is_validator && self.connect_list.is_peer_allowed(pubkey)
     }
 
