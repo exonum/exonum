@@ -73,6 +73,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Several dependencies have been updated. (#861, #865, #871)
 
+- The `finalize` command now does not include the node itself as its own
+  trusted peer in the generated configuration. (#892)
+
 ## 0.9.1 - 2018-08-02
 
 ### Bug Fixes
