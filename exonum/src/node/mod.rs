@@ -953,9 +953,9 @@ impl Node {
             core.handle().spawn(internal_part.run(handle, executor));
 
             let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler).map(drop).map_err(|e| {
-                format_err!("An error in the `Network` thread occurred: {}", e)
-            })
+            core.run(network_handler)
+                .map(drop)
+                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
         });
 
         let mut core = Core::new().map_err(into_failure)?;
