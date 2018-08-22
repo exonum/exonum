@@ -9,6 +9,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `api::Error::InternalError` now contain `failure::Error` instead of `Box<::std::error::Error>`. (#879)
+
 - `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
   and `external_addr` to `external_address`. (#809)
 
