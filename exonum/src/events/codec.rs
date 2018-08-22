@@ -57,7 +57,7 @@ impl Decoder for MessagesCodec {
         let mut buf = self.session.decrypt_msg(len, buf)?;
 
         if buf[0] != 0 {
-            bail!("Message first byte must be set to 0");
+            bail!("A first byte of the message must be set to 0");
         }
 
         // Check payload len
