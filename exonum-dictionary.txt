@@ -86,8 +86,10 @@ postvote
 precheck
 precommit
 precommits
+precommitters
 prevote
 prevotes
+prevoters
 println
 pubkey
 pubkeys
@@ -131,6 +133,7 @@ testdata
 testkit
 testnet
 testnetctl
+threadpool
 timestamping
 timestamps
 tlsdate

@@ -24,13 +24,11 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
-    ApiAccess, ApiAggregator,
-};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
+use serde::de::{self, Deserialize, Deserializer};
 use tokio_core::reactor::Core;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
@@ -38,15 +36,17 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use serde::de::{self, Deserialize, Deserializer};
-
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};
 use blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
     ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_failure, log_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    error::{into_failure, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
     InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
     SyncSender, TimeoutRequest,
 };
@@ -266,6 +266,8 @@ pub struct NodeConfig {
     pub database: DbOptions,
     /// Node's ConnectList.
     pub connect_list: ConnectListConfig,
+    /// Transaction Verification Thread Pool size.
+    pub thread_pool_size: Option<u8>,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -754,7 +756,7 @@ impl ApiSender {
 impl TransactionSend for ApiSender {
     fn send(&self, tx: Box<dyn Transaction>) -> Result<(), failure::Error> {
         if !tx.verify() {
-            bail!("Unable to verify transaction")
+            bail!("Unable to verify transaction");
         }
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
@@ -843,6 +845,7 @@ pub struct Node {
     handler: NodeHandler,
     channel: NodeChannel,
     max_message_len: u32,
+    thread_pool_size: Option<u8>,
 }
 
 impl NodeChannel {
@@ -923,6 +926,7 @@ impl Node {
             channel,
             network_config,
             max_message_len: node_cfg.genesis.consensus.max_message_len,
+            thread_pool_size: node_cfg.thread_pool_size,
         }
     }
 
@@ -931,18 +935,27 @@ impl Node {
     pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), failure::Error> {
         self.handler.initialize();
 
-        let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let pool_size = self.thread_pool_size;
+        let (handler_part, network_part, internal_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new().map_err(into_failure)?;
             let handle = core.handle();
-            core.handle()
-                .spawn(timeouts_part.run(handle).map_err(log_error));
+
+            let mut pool_builder = ThreadPoolBuilder::new();
+            if let Some(pool_size) = pool_size {
+                pool_builder.pool_size(pool_size as usize);
+            }
+            let thread_pool = pool_builder.build();
+            let executor = thread_pool.sender().clone();
+
+            core.handle().spawn(internal_part.run(handle, executor));
+
             let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler)
-                .map(drop)
-                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
+            core.run(network_handler).map(drop).map_err(|e| {
+                format_err!("An error in the `Network` thread occurred: {}", e)
+            })
         });
 
         let mut core = Core::new().map_err(into_failure)?;
@@ -1038,11 +1051,11 @@ impl Node {
             api_rx: self.channel.api_requests.1,
         };
 
-        let timeouts_part = InternalPart {
+        let internal_part = InternalPart {
             internal_tx,
             internal_requests_rx,
         };
-        (handler_part, network_part, timeouts_part)
+        (handler_part, network_part, internal_part)
     }
 
     /// Returns `Blockchain` instance.

@@ -12,33 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate criterion;
-#[macro_use]
-extern crate exonum;
-extern crate futures;
-extern crate num;
-extern crate rand;
-extern crate tempdir;
-extern crate tokio_core;
-extern crate tokio_threadpool;
+/// Config for Configuration service.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigurationServiceConfig {
+    /// Number of votes required to commit the new configuration.
+    /// This value should be greater than 2/3 and less or equal to the
+    /// validators count.
+    pub majority_count: Option<u16>,
+}
 
-use block::bench_block;
-use criterion::Criterion;
-use crypto::bench_crypto;
-use storage::bench_storage;
-use transactions::bench_verify_transactions;
-
-mod block;
-mod crypto;
-mod storage;
-mod transactions;
-
-criterion_group!(
-    benches,
-    bench_crypto,
-    bench_block,
-    bench_storage,
-    bench_verify_transactions
-);
-criterion_main!(benches);
+impl Default for ConfigurationServiceConfig {
+    fn default() -> Self {
+        Self {
+            majority_count: None,
+        }
+    }
+}
