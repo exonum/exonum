@@ -535,7 +535,7 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
-    fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
+    pub fn handle_verified_tx(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -553,7 +553,7 @@ impl NodeHandler {
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
 
-        if self.state.is_leader() {
+        if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
         }
 
@@ -575,7 +575,7 @@ impl NodeHandler {
 
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
-    pub fn handle_tx(&mut self, msg: RawTransaction) {
+    pub fn handle_tx(&mut self, msg: &RawTransaction) {
         let tx = match self.blockchain.tx_from_raw(msg.clone()) {
             Ok(tx) => tx,
             Err(e) => {
@@ -585,13 +585,7 @@ impl NodeHandler {
             }
         };
 
-        if !tx.verify() {
-            return;
-        }
-
-        // We don't care about result, because situation when transaction received twice
-        // is normal for internal messages (transaction may be received from 2+ nodes).
-        let _ = self.handle_tx_inner(msg);
+        self.execute_later(InternalRequest::VerifyTx(tx));
     }
 
     /// Handles raw transactions.
@@ -619,7 +613,7 @@ impl NodeHandler {
         }
 
         for tx in msg.transactions() {
-            self.handle_tx(tx);
+            self.handle_tx(&tx);
         }
     }
 
@@ -628,7 +622,7 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Box<dyn Transaction>) {
         trace!("Handle incoming transaction");
-        match self.handle_tx_inner(msg.raw().clone()) {
+        match self.handle_verified_tx(msg.raw().clone()) {
             Ok(_) => self.broadcast(msg.raw()),
             Err(e) => error!("{}", e),
         }

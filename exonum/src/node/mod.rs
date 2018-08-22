@@ -28,6 +28,7 @@ use failure;
 use futures::{sync::mpsc, Future, Sink};
 use serde::de::{self, Deserialize, Deserializer};
 use tokio_core::reactor::Core;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
@@ -45,9 +46,9 @@ use blockchain::{
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
-    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
-    NetworkRequest, SyncSender, TimeoutRequest,
+    error::{into_other, other_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
+    SyncSender, TimeoutRequest,
 };
 use helpers::{
     config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
@@ -265,6 +266,8 @@ pub struct NodeConfig {
     pub database: DbOptions,
     /// Node's ConnectList.
     pub connect_list: ConnectListConfig,
+    /// Transaction Verification Thread Pool size.
+    pub thread_pool_size: Option<u8>,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -844,6 +847,7 @@ pub struct Node {
     handler: NodeHandler,
     channel: NodeChannel,
     max_message_len: u32,
+    thread_pool_size: Option<u8>,
 }
 
 impl NodeChannel {
@@ -924,6 +928,7 @@ impl Node {
             channel,
             network_config,
             max_message_len: node_cfg.genesis.consensus.max_message_len,
+            thread_pool_size: node_cfg.thread_pool_size,
         }
     }
 
@@ -932,14 +937,23 @@ impl Node {
     pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
         self.handler.initialize();
 
-        let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let pool_size = self.thread_pool_size;
+        let (handler_part, network_part, internal_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
-            core.handle()
-                .spawn(timeouts_part.run(handle).map_err(log_error));
+
+            let mut pool_builder = ThreadPoolBuilder::new();
+            if let Some(pool_size) = pool_size {
+                pool_builder.pool_size(pool_size as usize);
+            }
+            let thread_pool = pool_builder.build();
+            let executor = thread_pool.sender().clone();
+
+            core.handle().spawn(internal_part.run(handle, executor));
+
             let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
@@ -1039,11 +1053,11 @@ impl Node {
             api_rx: self.channel.api_requests.1,
         };
 
-        let timeouts_part = InternalPart {
+        let internal_part = InternalPart {
             internal_tx,
             internal_requests_rx,
         };
-        (handler_part, network_part, timeouts_part)
+        (handler_part, network_part, internal_part)
     }
 
     /// Returns `Blockchain` instance.
