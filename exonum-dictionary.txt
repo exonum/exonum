@@ -91,6 +91,7 @@ prevote
 prevotes
 prevoters
 println
+proptest
 pubkey
 pubkeys
 readonly
