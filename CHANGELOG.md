@@ -14,7 +14,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `api::Error::InternalError` now contains `failure::Error` instead of `Box<::std::error::Error>`. (#879)
 
-- `TransactionSend::send` now returns `Result<(), failure::Error>` insetad of `io::Result`. (#879)
+- `TransactionSend::send` now returns `Result<(), failure::Error>` instead of `io::Result`. (#879)
 
 - `ApiSender` methods `send_external_message` and `peer_add` 
    now returns `Result<(), failure::Error>` instead of `io::Result`. (#879)
