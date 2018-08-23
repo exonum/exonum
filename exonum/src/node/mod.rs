@@ -32,7 +32,7 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 
@@ -46,7 +46,7 @@ use blockchain::{
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_other, other_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    error::{into_failure, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
     InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
     SyncSender, TimeoutRequest,
 };
@@ -727,7 +727,7 @@ impl fmt::Debug for NodeHandler {
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()>;
+    fn send(&self, tx: Box<dyn Transaction>) -> Result<(), failure::Error>;
 }
 
 impl ApiSender {
@@ -737,27 +737,26 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: ConnectInfo) -> io::Result<()> {
+    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), failure::Error> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
 
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), failure::Error> {
         self.0
             .clone()
             .send(message)
             .wait()
             .map(drop)
-            .map_err(into_other)
+            .map_err(into_failure)
     }
 }
 
 impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<dyn Transaction>) -> io::Result<()> {
+    fn send(&self, tx: Box<dyn Transaction>) -> Result<(), failure::Error> {
         if !tx.verify() {
-            let msg = "Unable to verify transaction";
-            return Err(io::Error::new(io::ErrorKind::Other, msg));
+            bail!("Unable to verify transaction");
         }
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
@@ -933,7 +932,7 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), failure::Error> {
         self.handler.initialize();
 
         let pool_size = self.thread_pool_size;
@@ -941,7 +940,7 @@ impl Node {
         let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new()?;
+            let mut core = Core::new().map_err(into_failure)?;
             let handle = core.handle();
 
             let mut pool_builder = ThreadPoolBuilder::new();
@@ -954,14 +953,14 @@ impl Node {
             core.handle().spawn(internal_part.run(handle, executor));
 
             let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occurred: {}", e))
-            })
+            core.run(network_handler)
+                .map(drop)
+                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
         });
 
-        let mut core = Core::new()?;
+        let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
-            .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
+            .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
         network_thread.join().unwrap()
     }
 

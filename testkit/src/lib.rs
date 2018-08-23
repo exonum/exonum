@@ -140,6 +140,7 @@ extern crate actix_web;
 extern crate assert_matches;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
+#[macro_use]
 extern crate failure;
 extern crate futures;
 #[macro_use]

@@ -12,6 +12,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `api::Error::InternalError` now contains `failure::Error` instead of
+  `Box<::std::error::Error>`. (#879)
+
+- `TransactionSend::send` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
+
+- `ApiSender` methods `send_external_message` and `peer_add`
+   now returns `Result<(), failure::Error>` instead of `io::Result`. (#879)
+
 - `majority_count` parameter has been added to `generate-template` and
   `generate-testnet` commands. (#828)
 
@@ -58,6 +67,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Internal Improvements
 
 #### exonum
+
+- `NodeHandler::run_handler` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
 
 - Transactions (signature) verification benchmark has been added. (#808)
 
