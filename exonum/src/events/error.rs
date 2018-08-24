@@ -15,31 +15,29 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
-use std::{error::Error as StdError, io};
+use failure::Error;
 
-pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, s.as_ref())
-}
+use std::{error::Error as StdError, fmt::Display};
 
-pub fn result_ok<T, E: StdError>(_: T) -> Result<(), E> {
+pub fn result_ok<T>(_: T) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn log_error<E: StdError>(err: E) {
-    error!("An error occurred: {}", err)
-}
-
-pub fn into_other<E: StdError>(err: E) -> io::Error {
-    other_error(&format!("An error occurred, {}", err.description()))
+pub fn log_error<E: Display>(error: E) {
+    error!("An error occurred: {}", error)
 }
 
 pub trait LogError {
     fn log_error(self);
 }
 
+pub fn into_failure<E: StdError + Sync + Send + 'static>(error: E) -> Error {
+    Error::from_boxed_compat(Box::new(error))
+}
+
 impl<T, E> LogError for Result<T, E>
 where
-    E: ::std::fmt::Display,
+    E: Display,
 {
     fn log_error(self) {
         if let Err(error) = self {

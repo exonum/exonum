@@ -8,7 +8,7 @@
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
-    "build": "npm run lint && npm run test && npm run compile",
+    "build": "npm run lint && npm run compile && npm run test",
     "start": "node server.js"
   },
   "jest": {
@@ -23,7 +23,7 @@
     "big-integer": "^1.6.28",
     "bootstrap": "^4.1.0",
     "crypto-js": "^3.1.9-1",
-    "exonum-client": "^0.12.3",
+    "exonum-client": "^0.12.4",
     "jquery": "^3.3.1",
     "moment": "^2.22.0",
     "noty": "^3.2.0-beta",
@@ -47,9 +47,9 @@
     "jest": "^23.1.0",
     "regenerator-runtime": "^0.12.1",
     "request": "^2.85.0",
-    "vue-loader": "^15.2.4",
+    "vue-loader": "^15.4.0",
     "vue-template-compiler": "^2.5.16",
-    "webpack": "^4.12.0",
+    "webpack": "^4.17.1",
     "webpack-cli": "^3.0.4",
     "yargs-parser": "^10.0.0"
   }

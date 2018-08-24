@@ -112,6 +112,12 @@ impl SandboxInner {
                     InternalRequest::JumpToRound(height, round) => self.handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
+                    InternalRequest::VerifyTx(tx) => {
+                        if tx.verify() {
+                            self.handler
+                                .handle_event(InternalEvent::TxVerified(tx.raw().clone()).into());
+                        }
+                    }
                 }
             }
             Ok(())
@@ -241,6 +247,13 @@ impl Sandbox {
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
+    }
+
+    pub fn recv_rebroadcast(&self) {
+        self.check_unexpected_message();
+        self.inner
+            .borrow_mut()
+            .handle_event(ExternalMessage::Rebroadcast);
     }
 
     pub fn process_events(&self) {

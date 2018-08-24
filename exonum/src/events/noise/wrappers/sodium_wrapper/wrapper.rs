@@ -18,11 +18,10 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use failure;
 use snow::{Builder, Session};
 
-use std::{
-    fmt::{self, Error, Formatter}, io,
-};
+use std::fmt::{self, Error, Formatter};
 
 use super::{handshake::HandshakeParams, resolver::SodiumResolver};
 use events::noise::{error::NoiseError, HEADER_LENGTH, MAX_MESSAGE_LENGTH, TAG_LENGTH};
@@ -99,7 +98,11 @@ impl NoiseWrapper {
     /// 1. Message splits to packets of length smaller or equal to 65_535 bytes.
     /// 2. Then each packet is decrypted by selected noise algorithm.
     /// 3. Append all decrypted packets to `decoded_message`.
-    pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
+    pub fn decrypt_msg(
+        &mut self,
+        len: usize,
+        buf: &mut BytesMut,
+    ) -> Result<BytesMut, failure::Error> {
         debug_assert!(len + HEADER_LENGTH <= buf.len());
         let data = buf.split_to(len + HEADER_LENGTH).to_vec();
         let data = &data[HEADER_LENGTH..];
@@ -127,7 +130,11 @@ impl NoiseWrapper {
     /// 3. Result message: first 4 bytes is message length(`len').
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
-    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> io::Result<()> {
+    pub fn encrypt_msg(
+        &mut self,
+        msg: &[u8],
+        buf: &mut BytesMut,
+    ) -> Result<Option<()>, failure::Error> {
         //TODO: don't use additional allocations [ECR-2213]
         const CHUNK_LENGTH: usize = MAX_MESSAGE_LENGTH - TAG_LENGTH;
         let len = encrypted_msg_len(msg.len());

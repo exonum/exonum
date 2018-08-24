@@ -17,10 +17,12 @@ extern crate criterion;
 #[macro_use]
 extern crate exonum;
 extern crate futures;
+extern crate log;
 extern crate num;
 extern crate rand;
 extern crate tempdir;
 extern crate tokio_core;
+extern crate tokio_threadpool;
 
 use block::bench_block;
 use criterion::Criterion;
