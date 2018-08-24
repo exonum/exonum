@@ -151,11 +151,11 @@ fn noise_encrypt_decrypt_bogus_message() {
 
     // Wrong length.
     let res = responder.decrypt_msg(len - 1, &mut buffer_msg);
-    assert!(res.unwrap_err().description().contains("Decrypt"));
+    assert!(res.unwrap_err().to_string().contains("decryption failed"));
 
     // Wrong message.
     let res = responder.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; len + HEADER_LENGTH]));
-    assert!(res.unwrap_err().description().contains("Decrypt"));
+    assert!(res.unwrap_err().to_string().contains("decryption failed"));
 }
 
 fn check_encrypt_decrypt_message(msg_size: usize) {

@@ -464,10 +464,9 @@ impl Future for Listener {
     }
 }
 
-fn to_future<F, I, E>(fut: F) -> Box<dyn Future<Item = I, Error = E>>
+fn to_future<F, I>(fut: F) -> Box<dyn Future<Item = I, Error = failure::Error>>
 where
-    F: IntoFuture<Item = I, Error = E> + 'static,
-    E: failure::Error,
+    F: IntoFuture<Item = I, Error = failure::Error> + 'static,
 {
     Box::new(fut.into_future())
 }

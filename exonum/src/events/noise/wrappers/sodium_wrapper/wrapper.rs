@@ -130,11 +130,7 @@ impl NoiseWrapper {
     /// 3. Result message: first 4 bytes is message length(`len').
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
-    pub fn encrypt_msg(
-        &mut self,
-        msg: &[u8],
-        buf: &mut BytesMut,
-    ) -> Result<Option<()>, failure::Error> {
+    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<(), failure::Error> {
         //TODO: don't use additional allocations [ECR-2213]
         const CHUNK_LENGTH: usize = MAX_MESSAGE_LENGTH - TAG_LENGTH;
         let len = encrypted_msg_len(msg.len());
