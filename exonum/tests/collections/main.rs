@@ -23,6 +23,40 @@ use modifier::Modifier;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+macro_rules! proptest_compare_collections {
+    ($name:ident, $collection:ident, $reference:ident) => {
+        proptest! {
+            #[test]
+            fn $name(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN)) {
+                let db = MemoryDB::new();
+
+                let mut fork = db.fork();
+                let mut reference = $reference::new();
+
+                for action in actions {
+                    match action {
+                        MergeFork => {
+                            db.merge(fork.into_patch()).unwrap();
+                            fork = db.fork();
+                        }
+                        _ => {
+                            let mut collection = $collection::new("test", &mut fork);
+                            action.clone().modify(&mut collection);
+                            action.clone().modify(&mut reference);
+                            compare_collections(&collection, &reference)?;
+                        }
+                    }
+                }
+                db.merge(fork.into_patch()).unwrap();
+
+                let mut fork = db.fork();
+                let collection = $collection::new("test", &mut fork);
+                compare_collections(&collection, &reference)?;
+            }
+        }
+    };
+}
+
 mod key_set_index;
 mod list_index;
 mod map_index;

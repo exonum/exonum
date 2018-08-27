@@ -21,6 +21,7 @@ use modifier::Modifier;
 use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
 
 use super::{ListAction, ACTIONS_MAX_LEN};
+use ListAction::MergeFork;
 
 impl<'a, V> Modifier<ProofListIndex<&'a mut Fork, V>> for ListAction<V>
 where
@@ -66,33 +67,4 @@ fn generate_action() -> impl Strategy<Value = ListAction<i32>> {
     ]
 }
 
-proptest! {
-    #[test]
-    fn proptest_proof_list_index_to_rust_vec(ref actions in vec(generate_action(),
-                                                                1..ACTIONS_MAX_LEN)) {
-        let db = MemoryDB::new();
-
-        let mut fork = db.fork();
-        let mut ref_list: Vec<i32> = Vec::new();
-
-        for action in actions {
-            match action {
-                ListAction::MergeFork => {
-                    db.merge(fork.into_patch()).unwrap();
-                    fork = db.fork();
-                }
-                _ => {
-                    let mut list_index = ProofListIndex::new("test", &mut fork);
-                    action.clone().modify(&mut list_index);
-                    action.clone().modify(&mut ref_list);
-                    compare_collections(&list_index, &ref_list)?;
-                }
-            }
-        }
-        db.merge(fork.into_patch()).unwrap();
-
-        let mut fork = db.fork();
-        let list_index = ProofListIndex::<_, i32>::new("test", &mut fork);
-        compare_collections(&list_index, &ref_list)?;
-    }
-}
+proptest_compare_collections!(proptest_compare_to_rust_vec, ProofListIndex, Vec);

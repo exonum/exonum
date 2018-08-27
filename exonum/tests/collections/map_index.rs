@@ -23,6 +23,7 @@ use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::
 use std::collections::HashMap;
 
 use super::{MapAction, ACTIONS_MAX_LEN};
+use MapAction::MergeFork;
 
 impl<'a, V> Modifier<MapIndex<&'a mut Fork, u8, V>> for MapAction<u8, V>
 where
@@ -68,33 +69,4 @@ fn generate_action() -> impl Strategy<Value = MapAction<u8, i32>> {
     ]
 }
 
-proptest! {
-    #[test]
-    fn proptest_map_index_to_rust_map(ref actions in vec(generate_action(),
-                                                         1..ACTIONS_MAX_LEN)) {
-        let db = MemoryDB::new();
-
-        let mut fork = db.fork();
-        let mut ref_map: HashMap<u8, i32> = HashMap::new();
-
-        for action in actions {
-            match action {
-                MapAction::MergeFork => {
-                    db.merge(fork.into_patch()).unwrap();
-                    fork = db.fork();
-                }
-                _ => {
-                    let mut map_index = MapIndex::new("test", &mut fork);
-                    action.clone().modify(&mut map_index);
-                    action.clone().modify(&mut ref_map);
-                    compare_collections(&map_index, &ref_map)?;
-                }
-            }
-        }
-        db.merge(fork.into_patch()).unwrap();
-
-        let mut fork = db.fork();
-        let map_index = MapIndex::new("test", &mut fork);
-        compare_collections(&map_index, &ref_map)?;
-    }
-}
+proptest_compare_collections!(proptest_compare_to_rust_map, MapIndex, HashMap);

@@ -23,6 +23,7 @@ use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::
 use std::collections::HashSet;
 
 use super::{SetAction, ACTIONS_MAX_LEN};
+use SetAction::MergeFork;
 
 impl<'a> Modifier<KeySetIndex<&'a mut Fork, u8>> for SetAction<u8> where {
     fn modify(self, set: &mut KeySetIndex<&'a mut Fork, u8>) {
@@ -65,33 +66,4 @@ fn generate_action() -> impl Strategy<Value = SetAction<u8>> {
     ]
 }
 
-proptest! {
-    #[test]
-    fn proptest_key_set_index_to_rust_set(ref actions in vec(generate_action(),
-                                                             1..ACTIONS_MAX_LEN)) {
-        let db = MemoryDB::new();
-
-        let mut fork = db.fork();
-        let mut ref_set: HashSet<u8> = HashSet::new();
-
-        for action in actions {
-            match action {
-                SetAction::MergeFork => {
-                    db.merge(fork.into_patch()).unwrap();
-                    fork = db.fork();
-                }
-                _ => {
-                    let mut set_index = KeySetIndex::new("test", &mut fork);
-                    action.clone().modify(&mut set_index);
-                    action.clone().modify(&mut ref_set);
-                    compare_collections(&set_index, &ref_set)?;
-                }
-            }
-        }
-        db.merge(fork.into_patch()).unwrap();
-
-        let mut fork = db.fork();
-        let set_index = KeySetIndex::new("test", &mut fork);
-        compare_collections(&set_index, &ref_set)?;
-    }
-}
+proptest_compare_collections!(proptest_compare_to_rust_set, KeySetIndex, HashSet);
