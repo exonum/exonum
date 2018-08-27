@@ -469,10 +469,10 @@ impl<'a> Field<'a> for ConnectInfo {
         let public_key_offset = from + SocketAddr::field_size();
 
         let address = SocketAddr::read(buffer, from, public_key_offset);
-        // Unwrap here is safe, because `from_slice` only fails if length is not equal to
-        // PUBLIC_KEY_LENGTH.
-        let public_key =
-            PublicKey::from_slice(&buffer[public_key_offset as usize..to as usize]).unwrap();
+
+        debug_assert_eq!(to - public_key_offset, PUBLIC_KEY_LENGTH as u32);
+        let public_key = PublicKey::from_slice(&buffer[public_key_offset as usize..to as usize])
+            .expect("Unable to create PublicKey");
 
         ConnectInfo {
             address,
@@ -497,10 +497,14 @@ impl<'a> Field<'a> for ConnectInfo {
 
         let public_key_offset =
             CheckedOffset::new(from.unchecked_offset() + SocketAddr::field_size());
-        debug_assert_eq!(
-            (to - public_key_offset)?.unchecked_offset(),
-            PUBLIC_KEY_LENGTH as u32
-        );
+        let public_key_length = (to - public_key_offset)?.unchecked_offset() as usize;
+
+        if public_key_length != PUBLIC_KEY_LENGTH {
+            return Err(Error::IncorrectPublicKeyLength {
+                expected_length: PUBLIC_KEY_LENGTH,
+                actual_length: public_key_length,
+            });
+        }
 
         SocketAddr::check(buffer, from, public_key_offset, latest_segment)
     }

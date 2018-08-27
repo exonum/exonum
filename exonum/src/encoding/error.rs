@@ -133,6 +133,13 @@ pub enum Error {
         /// Nanoseconds in gotten duration.
         nanos: i32,
     },
+    /// Incorrect PublicKey length.
+    IncorrectPublicKeyLength {
+        /// Expected length.
+        expected_length: usize,
+        /// Actual length.
+        actual_length: usize,
+    },
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields.
@@ -166,6 +173,7 @@ impl StdError for Error {
             Error::OffsetOverflow => "Offset pointers overflow",
             Error::DurationOverflow => "Overflow in Duration object",
             Error::IncorrectDuration { .. } => "Incorrect Duration object representation",
+            Error::IncorrectPublicKeyLength { .. } => "Incorrect PublicKey length",
             Error::Basic(ref x) => x.as_ref(),
             Error::Other(_) => "Other error",
         }
