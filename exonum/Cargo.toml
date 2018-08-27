@@ -55,7 +55,7 @@ exonum_sodiumoxide = { version = "0.0.20", optional = true }
 pretty_assertions = "=0.5.1"
 tempdir = "=0.3.7"
 lazy_static = "1.0.1"
-proptest = "=0.8.4"
+proptest = "=0.8.6"
 modifier = "0.1.0"
 criterion = "=0.2.4"
 num = "=0.2.0"
