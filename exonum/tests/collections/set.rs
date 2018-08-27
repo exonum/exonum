@@ -106,7 +106,7 @@ mod key_set_index {
 mod value_set_index {
     use super::*;
 
-    impl<'a> Modifier<ValueSetIndex<&'a mut Fork, u8>> for SetAction<u8> where {
+    impl<'a> Modifier<ValueSetIndex<&'a mut Fork, u8>> for SetAction<u8> {
         fn modify(self, set: &mut ValueSetIndex<&'a mut Fork, u8>) {
             match self {
                 SetAction::Put(k) => {
