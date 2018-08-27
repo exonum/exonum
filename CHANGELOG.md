@@ -64,6 +64,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Node no longer panics when transaction pool has a lot of transactions and
   consensus is at round 0. (#673)
 
+- Node now works correctly after consensus re-enable via API. (#902)
+
 ### Internal Improvements
 
 #### exonum
