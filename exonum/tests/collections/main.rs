@@ -21,11 +21,14 @@ extern crate modifier;
 
 use modifier::Modifier;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
+mod key_set_index;
 mod list_index;
 mod map_index;
 mod proof_list_index;
 mod proof_map_index;
+mod value_set_index;
 
 // Max size of the generated sequence of actions.
 const ACTIONS_MAX_LEN: usize = 100;
@@ -49,6 +52,16 @@ enum MapAction<K, V> {
     Put(K, V),
     // Should be applied to a small subset of keys (like modulo 8 for int).
     Remove(K),
+    Clear,
+    MergeFork,
+}
+
+#[derive(Debug, Clone)]
+enum SetAction<V> {
+    // Should be applied to a small subset of values (like modulo 8 for int).
+    Put(V),
+    // Should be applied to a small subset of values (like modulo 8 for int).
+    Remove(V),
     Clear,
     MergeFork,
 }
@@ -118,6 +131,23 @@ impl<V> Modifier<HashMap<[u8; 32], V>> for MapAction<[u8; 32], V> {
             MapAction::Clear => {
                 map.clear();
             }
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Modifier<HashSet<u8>> for SetAction<u8> {
+    fn modify(self, set: &mut HashSet<u8>) {
+        match self {
+            SetAction::Put(mut v) => {
+                v = v % 8;
+                set.insert(v);
+            }
+            SetAction::Remove(mut v) => {
+                v = v % 8;
+                set.remove(&v);
+            }
+            SetAction::Clear => set.clear(),
             _ => unreachable!(),
         }
     }
