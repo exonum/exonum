@@ -74,7 +74,7 @@ impl NoiseHandshake {
         let noise = NoiseWrapper::initiator(params);
         NoiseHandshake {
             noise,
-            peer_address: peer_address.clone(),
+            peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
         }
@@ -84,7 +84,7 @@ impl NoiseHandshake {
         let noise = NoiseWrapper::responder(params);
         NoiseHandshake {
             noise,
-            peer_address: peer_address.clone(),
+            peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
         }
