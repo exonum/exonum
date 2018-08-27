@@ -125,7 +125,7 @@ impl NoiseHandshake {
         };
 
         if !self.is_peer_allowed(&remote_static_key) {
-            bail!("Peer {} is not in ConnectList", self.peer_address)
+            bail!("peer is not in ConnectList")
         }
 
         let noise = self.noise.into_transport_mode()?;
@@ -147,10 +147,12 @@ impl Handshake for NoiseHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
+        let peer_address = self.peer_address;
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
+            .and_then(|(stream, handshake)| handshake.finalize(stream))
+            .map_err(move |e| e.context(format!("peer {} disconnected", peer_address)).into());
         Box::new(framed)
     }
 
@@ -158,10 +160,12 @@ impl Handshake for NoiseHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
+        let peer_address = self.peer_address;
         let framed = self.write_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
+            .and_then(|(stream, handshake)| handshake.finalize(stream))
+            .map_err(move |e| e.context(format!("peer {} disconnected", peer_address)).into());
         Box::new(framed)
     }
 }

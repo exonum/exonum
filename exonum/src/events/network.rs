@@ -413,7 +413,9 @@ impl Listener {
                                 let _holder = holder;
                             })
                     })
-                    .map_err(log_error);
+                    .map_err(|e| {
+                        error!("Connection terminated: {}: {}", e, e.find_root_cause());
+                    });
 
                 handle.spawn(to_box(connection_handler));
                 to_box(future::ok(()))
