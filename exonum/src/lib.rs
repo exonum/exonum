@@ -15,7 +15,7 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
-//#![feature(trace_macros)]
+#![feature(trace_macros)]
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]

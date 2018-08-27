@@ -47,7 +47,7 @@ pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 261;
 #[doc(hidden)]
 /// RawTransaction size with zero transactions payload.
 pub const RAW_TRANSACTION_EMPTY_SIZE: usize = 0;
-
+/*
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Protocol {
@@ -104,48 +104,7 @@ pub enum RequestMessage {
     #[serde(with = "BinaryFormSerialize")]
     Block(BlockRequest),
 }
-
-impl RequestMessage {
-    /// Returns public key of the message recipient.
-    pub fn to(&self) -> &PublicKey {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.to(),
-            RequestMessage::Transactions(ref msg) => msg.to(),
-            RequestMessage::Prevotes(ref msg) => msg.to(),
-            RequestMessage::Peers(ref msg) => msg.to(),
-            RequestMessage::Block(ref msg) => msg.to(),
-        }
-    }
-}
-
-impl ConsensusMessage {
-    /// Returns validator id of the message sender.
-    pub fn validator(&self) -> ValidatorId {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.validator(),
-            ConsensusMessage::Prevote(ref msg) => msg.validator(),
-            ConsensusMessage::Precommit(ref msg) => msg.validator(),
-        }
-    }
-
-    /// Returns height of the message.
-    pub fn height(&self) -> Height {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.height(),
-            ConsensusMessage::Prevote(ref msg) => msg.height(),
-            ConsensusMessage::Precommit(ref msg) => msg.height(),
-        }
-    }
-
-    /// Returns round of the message.
-    pub fn round(&self) -> Round {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.round(),
-            ConsensusMessage::Prevote(ref msg) => msg.round(),
-            ConsensusMessage::Precommit(ref msg) => msg.round(),
-        }
-    }
-}
+*/
 
 encoding_struct! {
     /// Connect to a node.
@@ -459,98 +418,230 @@ impl Precommit {
         signed.into_message().map_into::<Precommit>()
     }
 }
+
 /// Full message constraints list.
 #[doc(hidden)]
-pub trait ProtocolMessage:
-    Debug + Into<Protocol> + PartialEq<Protocol> + Clone + TryFromProtocol
+pub trait ProtocolMessage: Debug + Clone
 {
-}
-impl<T: Debug + Into<Protocol> + PartialEq<Protocol> + Clone + TryFromProtocol> ProtocolMessage
-    for T
-{
+    fn message_type() -> (u8, u8);
+    fn try_from_protocol(value: Protocol) -> Result<Self, &'static str>;
 }
 
-/// Specialised `TryFrom` analog.
-#[doc(hidden)]
-pub trait TryFromProtocol: Sized {
-    fn try_from_protocol(value: Protocol) -> Result<Self, failure::Error>;
-}
-
-impl TryFromProtocol for Protocol {
-    fn try_from_protocol(value: Protocol) -> Result<Self, failure::Error> {
-        Ok(value)
-    }
-}
-
+/// Implement Exonum message protocol.
+///
+/// Protocol should be described according to format:
+/// ```
+/// $ProtocolName {
+///     $($MessageClass {
+///         $(
+///         $MessageType
+///         )+
+///     }
+///     )+
+/// }
+/// ```
+/// This shema will be expanded into enums:
+/// `$ProtocolName` is an name of protocol which is described by this schema,
+///     enum with same name will be created. All message classes are encapsulate by this enum;
+/// `$MessageClass` is a module name which is designed to handle messages,
+///     enum with same name will be crated. All message within `MessageClass` should be unique;
+/// `$MessageType` is a concrete messages within some `$MessageClass`;
+///
+/// Each `$MessageType` should implement `PartialEq<Self>`, `Clone` and `Debug`.
+///
+/// Additionally some converting code will be generated:
+/// 1. `From<$MessageClass> for $ProtocolName`
+/// 2. `From<$MessageType> for $ProtocolName`
+/// 3. `ProtocolPart for $MessageType`
+/// 4. `PartialEq<Protocol> for $MessageType`
+/// 5. `PartialEq<Protocol> for $MessageClass`
+///
+/// ## Examples:
+/// If ones write:
+/// ```rust
+/// impl_protocol! {
+/// Protocol {
+///     Inner {
+///         Connect
+///     }
+///     Informative {
+///         Status,
+///         StatusRequest
+///     }
+/// }
+/// }
+/// ```
+/// this will introduce new protocol named `Protocol` with two classes of message:
+/// 1. `Inner`
+/// 2. `Informative`
+/// `Inner` will contain single message named `Connect`.
+/// Where `Informative` is designed to handle two messages `Status` and `StatusRequest`.
+/// The schema above will expand to:
+/// ```
+/// enum Inner {
+///     Connect(Connect)
+/// }
+/// enum Informative {
+///     Status(Status),
+///     Status(Request),
+/// }
+/// enum Protocol {
+///     Inner(Inner),
+///     Informative(Informative)
+/// }
+/// ```
+/// And converting code will be generated as well.
 macro_rules! impl_protocol {
-    ($val:ident => $v:ident = ($($ma:tt)*) => $($ma2:tt)*) => {
-    impl PartialEq<Protocol> for $val {
-        fn eq(&self, other: &Protocol) -> bool {
-            if let $($ma2)* = *other {
-                return $v == self;
+    ($proto_name:ident => $any_name:ident{
+        $($cls_num:expr => $cls:ident{
+            $( $typ:ident = $typ_num:expr),+ $(,)*
+        } $(,)*)+
+    }
+    ) => {
+
+        $(
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        pub enum $cls {
+        $(
+            $typ($typ)
+        ),+
+        }
+
+        impl Into<$proto_name> for $cls {
+            fn into(self) -> $proto_name {
+                $proto_name::$cls(self)
             }
-            false
         }
-    }
 
-    impl TryFromProtocol for $val {
-        fn try_from_protocol(value: Protocol) -> Result<Self, failure::Error> {
-            match value {
-                $($ma)* => Ok($v),
-                _ => bail!(concat!("Received message other than ", stringify!($val)) )
+       impl PartialEq<$proto_name> for $cls {
+            fn eq(&self, other: &$proto_name) -> bool {
+                if let $proto_name::$cls(ref cls) = *other {
+                    return cls == self
+                }
+                false
             }
         }
-    }
 
-    impl Into<Protocol> for $val {
-        fn into(self) -> Protocol {
-            let $v = self;
-            $($ma)*
+        $(
+
+        impl ProtocolPart for $typ {
+            //TODO: Return Protocol if error?
+            fn try_from_protocol(value: Protocol) -> Result<Self, &'static str> {
+                match value {
+                    $proto_name::$cls($cls::$typ(msg)) => Ok(msg),
+                    _ => Err(concat!("Processing message other than ", stringify!($typ)))
+                }
+            }
         }
-    }
 
+        impl Into<$proto_name> for $typ {
+            fn into(self) -> $proto_name {
+                $proto_name::$cls($cls::$typ(self))
+            }
+        }
+
+        impl PartialEq<$proto_name> for $typ {
+            fn eq(&self, other: &$proto_name) -> bool {
+                if let $proto_name::$cls($cls::$typ(ref msg)) = *other {
+                    return msg == self;
+                }
+                false
+            }
+        }
+
+
+        )+
+        )+
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        pub enum $proto_name {
+            $(
+                $cls($cls)
+            ),+
+        }
+
+        impl $proto_name {
+            pub fn tag(&self) -> (u8, u8) {
+                match &self {
+                    $($($proto_name::$cls($cls::$typ(_)) => ($cls_num, $typ_num),)+)+
+                }
+            }
+
+            pub fn serialize(&self) -> Vec<u8> {
+                unimplemented!()
+            }
+        }
     };
 }
 
-//TODO: Replace by better arm parsing
 
-impl_protocol!{Connect => c =
-(Protocol::Connect(c)) => Protocol::Connect(ref c)}
-impl_protocol!{Status => c =
-(Protocol::Status(c)) => Protocol::Status(ref c)}
-impl_protocol!{BlockResponse => c =
-(Protocol::Block(c)) => Protocol::Block(ref c)}
-impl_protocol!{RawTransaction => c =
-(Protocol::Transaction(c)) => Protocol::Transaction(ref c)}
-impl_protocol!{TransactionsResponse => c =
-(Protocol::TransactionsBatch(c)) => Protocol::TransactionsBatch(ref c)}
 
-impl_protocol!{ConsensusMessage => c =
-(Protocol::Consensus(c)) => Protocol::Consensus(ref c)}
-impl_protocol!{Propose => c =
-(Protocol::Consensus(ConsensusMessage::Propose(c))) =>
-Protocol::Consensus(ConsensusMessage::Propose(ref c))}
-impl_protocol!{Prevote => c =
-(Protocol::Consensus(ConsensusMessage::Prevote(c))) =>
-Protocol::Consensus(ConsensusMessage::Prevote(ref c))}
-impl_protocol!{Precommit => c =
-(Protocol::Consensus(ConsensusMessage::Precommit(c))) =>
-Protocol::Consensus(ConsensusMessage::Precommit(ref c))}
+impl_protocol!{
+    Protocol => Any {
+        0 => Service {
+            Transaction = 0,
+            Connect = 1,
+            Status = 2,
+        },
+        1 => Consensus {
+            Precommit = 0,
+            Propose = 1,
+            Prevote = 2,
+        },
+        3 => Responses {
+            TransactionsResponse = 0,
+            BlockResponse = 1
+        },
+        3 => Requests {
+            ProposeRequest = 0,
+            TransactionsRequest = 1,
+            PrevotesRequest = 2,
+            PeersRequest = 3,
+            BlockRequest = 4,
+        },
 
-impl_protocol!{RequestMessage => c =
-(Protocol::Request(c)) => Protocol::Request(ref c)}
-impl_protocol!{ProposeRequest => c =
-(Protocol::Request(RequestMessage::Propose(c))) =>
-Protocol::Request(RequestMessage::Propose(ref c))}
-impl_protocol!{TransactionsRequest => c =
-(Protocol::Request(RequestMessage::Transactions(c))) =>
-Protocol::Request(RequestMessage::Transactions(ref c))}
-impl_protocol!{PrevotesRequest => c =
-(Protocol::Request(RequestMessage::Prevotes(c))) =>
-Protocol::Request(RequestMessage::Prevotes(ref c))}
-impl_protocol!{PeersRequest => c =
-(Protocol::Request(RequestMessage::Peers(c))) =>
-Protocol::Request(RequestMessage::Peers(ref c))}
-impl_protocol!{BlockRequest => c =
-(Protocol::Request(RequestMessage::Block(c))) =>
-Protocol::Request(RequestMessage::Block(ref c))}
+    }
+}
+
+
+
+impl Requests {
+    /// Returns public key of the message recipient.
+    pub fn to(&self) -> &PublicKey {
+        match *self {
+            Requests::Propose(ref msg) => msg.to(),
+            Requests::Transactions(ref msg) => msg.to(),
+            Requests::Prevotes(ref msg) => msg.to(),
+            Requests::Peers(ref msg) => msg.to(),
+            Requests::Block(ref msg) => msg.to(),
+        }
+    }
+}
+
+impl Consensus {
+    /// Returns validator id of the message sender.
+    pub fn validator(&self) -> ValidatorId {
+        match *self {
+            Consensus::Propose(ref msg) => msg.validator(),
+            Consensus::Prevote(ref msg) => msg.validator(),
+            Consensus::Precommit(ref msg) => msg.validator(),
+        }
+    }
+
+    /// Returns height of the message.
+    pub fn height(&self) -> Height {
+        match *self {
+            Consensus::Propose(ref msg) => msg.height(),
+            Consensus::Prevote(ref msg) => msg.height(),
+            Consensus::Precommit(ref msg) => msg.height(),
+        }
+    }
+
+    /// Returns round of the message.
+    pub fn round(&self) -> Round {
+        match *self {
+            Consensus::Propose(ref msg) => msg.round(),
+            Consensus::Prevote(ref msg) => msg.round(),
+            Consensus::Precommit(ref msg) => msg.round(),
+        }
+    }
+}
