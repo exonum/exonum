@@ -62,9 +62,12 @@ impl NodeHandler {
     /// Removes peer from the state and from the cache. Node will try to connect to that address
     /// again if it was in the validators list.
     fn remove_peer_with_addr(&mut self, addr: SocketAddr) {
-        let need_reconnect = self.state.remove_peer_with_addr(&addr);
-        if need_reconnect {
-            self.connect(&addr);
+        if let Some(pubkey) = self.state.remove_peer_with_addr(&addr) {
+            let is_validator = self.state.peer_is_validator(&pubkey);
+            let in_connect_list = self.state.peer_in_connect_list(&pubkey);
+            if is_validator && in_connect_list {
+                self.connect(&addr);
+            }
         }
         self.blockchain.remove_peer_with_addr(&addr);
     }
