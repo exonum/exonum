@@ -93,6 +93,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Transactions are now verified in a thread pool. Thread pool size is set to
   optimal value by default (CPU count) or can be configured manually. (#673)
 
+- The `finalize` command now does not include the node itself as its own
+  trusted peer in the generated configuration. (#892)
+
 ## 0.9.1 - 2018-08-02
 
 ### Bug Fixes
