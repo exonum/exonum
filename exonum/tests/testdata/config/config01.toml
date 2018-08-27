@@ -43,6 +43,5 @@ tcp_connect_max_retries = 10
 [database]
 create_if_missing = true
 
-[[connect_list.peers]]
-address = "127.0.0.1:6333"
-public_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
+[connect_list]
+peers = []

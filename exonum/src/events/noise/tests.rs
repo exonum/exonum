@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::{
     future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
+
 use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Core,
 };
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::{
-    error::Error, io::{self, Result as IoResult}, net::SocketAddr, thread, time::Duration,
-};
+use std::{net::SocketAddr, thread, time::Duration};
 
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
-    error::into_other,
+    error::into_failure,
     noise::{
         wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
         HandshakeRawMessage, HandshakeResult, NoiseHandshake,
@@ -152,6 +152,7 @@ pub fn default_test_params() -> HandshakeParams {
 }
 
 #[test]
+#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
     let params = default_test_params();
@@ -161,15 +162,11 @@ fn test_noise_handshake_errors_ee_empty() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(
-        listener_err
-            .unwrap_err()
-            .description()
-            .contains("WrongMessageLength")
-    );
+    listener_err.unwrap()
 }
 
 #[test]
+#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
     let params = default_test_params();
@@ -179,15 +176,11 @@ fn test_noise_handshake_errors_es_empty() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(
-        listener_err
-            .unwrap_err()
-            .description()
-            .contains("WrongMessageLength")
-    );
+    listener_err.unwrap()
 }
 
 #[test]
+#[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
     let params = default_test_params();
@@ -197,10 +190,11 @@ fn test_noise_handshake_errors_ee_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Dh"));
+    listener_err.unwrap()
 }
 
 #[test]
+#[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
     let params = default_test_params();
@@ -210,10 +204,11 @@ fn test_noise_handshake_errors_es_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
+    listener_err.unwrap();
 }
 
 #[test]
+#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
     let params = default_test_params();
@@ -223,15 +218,11 @@ fn test_noise_handshake_errors_ee_empty_listen() {
     ));
     let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    assert!(
-        sender_err
-            .unwrap_err()
-            .description()
-            .contains("WrongMessageLength")
-    );
+    sender_err.unwrap();
 }
 
 #[test]
+#[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
     let params = default_test_params();
@@ -241,10 +232,11 @@ fn test_noise_handshake_errors_ee_standard_listen() {
     ));
     let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    assert!(sender_err.unwrap_err().description().contains("Dh"));
+    sender_err.unwrap();
 }
 
 #[test]
+#[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = default_test_params();
@@ -253,7 +245,7 @@ fn test_noise_handshake_wrong_remote_key() {
 
     let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);
 
-    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
+    listener_err.unwrap();
 }
 
 // We need check result from both: sender and responder.
@@ -262,8 +254,8 @@ fn wait_for_handshake_result(
     params: &HandshakeParams,
     sender_message: Option<BogusMessage>,
     responder_message: Option<BogusMessage>,
-) -> (IoResult<()>, IoResult<()>) {
-    let (err_tx, err_rx) = mpsc::channel::<io::Error>(0);
+) -> (Result<(), failure::Error>, Result<(), failure::Error>) {
+    let (err_tx, err_rx) = mpsc::channel::<failure::Error>(0);
 
     let responder_message = responder_message.clone();
     let remote_params = params.clone();
@@ -284,9 +276,9 @@ fn wait_for_handshake_result(
 fn run_handshake_listener(
     addr: &SocketAddr,
     params: &HandshakeParams,
-    err_sender: Sender<io::Error>,
+    err_sender: Sender<failure::Error>,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), io::Error> {
+) -> Result<(), failure::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
@@ -312,7 +304,7 @@ fn run_handshake_listener(
                 });
                 Ok(())
             })
-            .map_err(|e| into_other(e)),
+            .map_err(into_failure),
     )
 }
 
@@ -320,17 +312,17 @@ fn send_handshake(
     addr: &SocketAddr,
     params: &HandshakeParams,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), io::Error> {
+) -> Result<(), failure::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
     let stream = TcpStream::connect(&addr, &handle)
+        .map_err(into_failure)
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params, addr).send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, addr, message).send(sock),
         })
-        .map(|_| ())
-        .map_err(into_other);
+        .map(|_| ());
 
     core.run(stream)
 }
@@ -371,7 +363,7 @@ impl NoiseErrorHandshake {
     fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         let inner = self.inner.take().unwrap();
 
         inner
@@ -385,7 +377,7 @@ impl NoiseErrorHandshake {
     fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 

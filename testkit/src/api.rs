@@ -268,7 +268,10 @@ where
             StatusCode::Forbidden => Err(api::Error::Unauthorized),
             StatusCode::BadRequest => Err(api::Error::BadRequest(error(response))),
             StatusCode::NotFound => Err(api::Error::NotFound(error(response))),
-            s if s.is_server_error() => Err(api::Error::InternalError(error(response).into())),
+            s if s.is_server_error() => Err(api::Error::InternalError(format_err!(
+                "{}",
+                error(response)
+            ))),
             s => panic!("Received non-error response status: {}", s.as_u16()),
         }
     }
