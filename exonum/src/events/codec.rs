@@ -44,7 +44,7 @@ impl Decoder for MessagesCodec {
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Error> {
         // Read size
-        if buf.len() < size_of<u32>() {
+        if buf.len() < size_of::<u32>() {
             return Ok(None);
         }
 
