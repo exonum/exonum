@@ -152,7 +152,10 @@ impl Handshake for NoiseHandshake {
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.finalize(stream))
-            .map_err(move |e| e.context(format!("peer {} disconnected", peer_address)).into());
+            .map_err(move |e| {
+                e.context(format!("peer {} disconnected", peer_address))
+                    .into()
+            });
         Box::new(framed)
     }
 
@@ -165,7 +168,10 @@ impl Handshake for NoiseHandshake {
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.finalize(stream))
-            .map_err(move |e| e.context(format!("peer {} disconnected", peer_address)).into());
+            .map_err(move |e| {
+                e.context(format!("peer {} disconnected", peer_address))
+                    .into()
+            });
         Box::new(framed)
     }
 }
