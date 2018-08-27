@@ -176,7 +176,7 @@ macro_rules! __ex_message {
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Creates message and signs it.
-            #[allow(unused_mut)]
+            #[allow(dead_code, unused_mut)]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};

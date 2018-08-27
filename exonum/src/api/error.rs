@@ -18,7 +18,8 @@
 
 //! The set of errors for the Exonum API module.
 
-use std::{error, io};
+use failure;
+use std::io;
 
 use storage;
 
@@ -46,7 +47,7 @@ pub enum Error {
 
     /// Internal server error. This type can return any internal server error to the user.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<error::Error + Send + Sync>),
+    InternalError(failure::Error),
 
     /// Unauthorized error. This error occurs when the request lacks valid
     /// authentication credentials.
@@ -57,6 +58,12 @@ pub enum Error {
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Error::Io(e)
+    }
+}
+
+impl From<failure::Error> for Error {
+    fn from(e: failure::Error) -> Self {
+        Error::InternalError(e)
     }
 }
 

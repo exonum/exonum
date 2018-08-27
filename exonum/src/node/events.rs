@@ -35,6 +35,11 @@ impl NodeHandler {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
+            InternalEvent::TxVerified(tx) => {
+                // We don't care about result, because situation when transaction received twice
+                // is normal for internal messages (transaction may be received from 2+ nodes).
+                let _ = self.handle_verified_tx(tx);
+            }
         }
     }
 
@@ -76,7 +81,8 @@ impl NodeHandler {
                     self.api_state().set_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_enabled {
-                        self.add_round_timeout();
+                        self.add_timeouts();
+                        self.request_next_block();
                     }
                 }
             }

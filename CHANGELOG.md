@@ -12,6 +12,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `api::Error::InternalError` now contains `failure::Error` instead of
+  `Box<::std::error::Error>`. (#879)
+
+- `TransactionSend::send` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
+
+- `ApiSender` methods `send_external_message` and `peer_add`
+   now returns `Result<(), failure::Error>` instead of `io::Result`. (#879)
+
 - `majority_count` parameter has been added to `generate-template` and
   `generate-testnet` commands. (#828)
 
@@ -50,9 +59,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Bug with pool size overflow has been fixed. (#853)
 
+- Transactions (signature) verification benchmark has been fixed. (#673)
+
+- Node no longer panics when transaction pool has a lot of transactions and
+  consensus is at round 0. (#673)
+
+- Node now works correctly after consensus re-enable via API. (#902)
+
 ### Internal Improvements
 
 #### exonum
+
+- `NodeHandler::run_handler` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
 
 - Transactions (signature) verification benchmark has been added. (#808)
 
@@ -72,6 +91,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   removed in favor of `env_logger`. (#857).
 
 - Several dependencies have been updated. (#861, #865, #871)
+
+- Transactions are now verified in a thread pool. Thread pool size is set to
+  optimal value by default (CPU count) or can be configured manually. (#673)
+
+- The `finalize` command now does not include the node itself as its own
+  trusted peer in the generated configuration. (#892)
 
 ## 0.9.1 - 2018-08-02
 

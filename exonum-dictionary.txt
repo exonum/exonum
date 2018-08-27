@@ -91,6 +91,7 @@ prevote
 prevotes
 prevoters
 println
+proptest
 pubkey
 pubkeys
 readonly
@@ -133,6 +134,7 @@ testdata
 testkit
 testnet
 testnetctl
+threadpool
 timestamping
 timestamps
 tlsdate
