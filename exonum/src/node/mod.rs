@@ -536,10 +536,7 @@ impl NodeHandler {
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
-        self.add_round_timeout();
-        self.add_status_timeout();
-        self.add_peer_exchange_timeout();
-        self.add_update_api_state_timeout();
+        self.add_timeouts();
 
         // Recover cached consensus messages if any. We do this after main initialization and before
         // the start of event processing.
@@ -547,6 +544,14 @@ impl NodeHandler {
         for msg in messages.iter() {
             self.handle_message(msg);
         }
+    }
+
+    /// Runs the node's basic timers.
+    fn add_timeouts(&mut self) {
+        self.add_round_timeout();
+        self.add_status_timeout();
+        self.add_peer_exchange_timeout();
+        self.add_update_api_state_timeout();
     }
 
     /// Sends the given message to a peer by its id.
