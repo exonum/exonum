@@ -49,7 +49,6 @@ impl Decoder for MessagesCodec {
 
         let len = LittleEndian::read_u32(buf) as usize;
 
-        // To fix some weird `decode()` behavior https://github.com/carllerche/bytes/issues/104
         if buf.len() < len + NOISE_HEADER_LENGTH {
             return Ok(None);
         }
@@ -80,13 +79,32 @@ impl Decoder for MessagesCodec {
             );
         }
 
-        // Read message
-        if buf.len() >= total_len {
-            let data = buf.split_to(total_len).to_vec();
-            let raw = RawMessage::new(MessageBuffer::from_vec(data));
-            return Ok(Some(raw));
+        //TODO: Add test for this case
+        if total_len > buf.len() {
+            bail!(
+                "Received malicious message with wrong \
+                 total_length: {}, expected message length {}",
+                total_length,
+                buf.len()
+            );
         }
-        Ok(None)
+
+        let data = buf.split_to(total_len).to_vec();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data));
+        Ok(Some(raw))
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        match try!(self.decode(buf)) {
+            Some(frame) => Ok(Some(frame)),
+            None => {
+                if !buf.is_empty() {
+                    trace!("Bytes remaining in buffer after receiving EOF.")
+                }
+
+                Ok(None)
+            }
+        }
     }
 }
 
