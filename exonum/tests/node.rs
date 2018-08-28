@@ -25,7 +25,7 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::{Duration, Instant},
+    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
 };
 
 use exonum::{
@@ -116,9 +116,7 @@ fn test_node_run() {
     let mut core = Core::new().unwrap();
     let duration = Duration::from_secs(60);
     for rx in commit_rxs {
-        let future = rx.into_future()
-            .deadline(Instant::now() + duration)
-            .map_err(drop);
+        let future = rx.into_future().timeout(duration).map_err(drop);
         core.run(future).expect("failed commit");
     }
 

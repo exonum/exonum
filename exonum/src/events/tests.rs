@@ -17,7 +17,7 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    net::SocketAddr, thread, time::{self, Duration, Instant},
+    net::SocketAddr, thread, time::{self, Duration},
 };
 
 use blockchain::ConsensusConfig;
@@ -56,7 +56,7 @@ impl TestHandler {
     pub fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
         let rx = self.network_events_rx.by_ref();
         let future = rx.into_future()
-            .deadline(Instant::now() + Duration::from_secs(30))
+            .timeout(Duration::from_secs(30))
             .map_err(drop);
 
         let mut core = Core::new().unwrap();
