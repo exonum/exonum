@@ -574,8 +574,8 @@ impl State {
         self.peers.insert(pubkey, msg).is_none()
     }
 
-    /// Removes a peer by the socket address. Returns Some public key of the peer if it was indeed
-    /// connected or None if there was no connection with given socket address.
+    /// Removes a peer by the socket address. Returns `Some` public key of the peer if it was
+    /// indeed connected or `None` if there was no connection with given socket address.
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
         let pubkey = self.connections.remove(addr);
         if let Some(ref pubkey) = pubkey {
