@@ -592,8 +592,14 @@ impl NodeHandler {
     pub fn broadcast(&mut self, message: &RawMessage) {
         let peers: Vec<SocketAddr> = self.state
             .peers()
-            .values()
-            .map(|conn| conn.addr())
+            .iter()
+            .filter_map(|(pubkey, connection)| {
+                if self.state.connect_list().is_peer_allowed(pubkey) {
+                    Some(connection.addr())
+                } else {
+                    None
+                }
+            })
             .collect();
 
         for address in peers {
