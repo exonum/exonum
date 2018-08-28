@@ -17,7 +17,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 clap = "2.30.0"
-env_logger = "=0.5.12"
+env_logger = "=0.5.13"
 exonum = { version = "0.9.0", path = "../../exonum" }
 failure = "0.1.2"
 lazy_static = "1.0.0"
