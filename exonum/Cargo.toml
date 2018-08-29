@@ -40,7 +40,7 @@ tokio-core = "=0.1.17"
 tokio-executor = "=0.1.4"
 tokio-io = "=0.1.8"
 tokio-retry = "=0.2.0"
-tokio-threadpool = "=0.1.5"
+tokio-threadpool = "=0.1.6"
 failure = "0.1.2"
 os_info = "1.0.1"
 chrono = { version = "=0.4.6", features = ["serde"] }
