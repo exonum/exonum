@@ -215,7 +215,7 @@ impl ConnectionsPool {
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
             handshake_params.set_remote_key(remote_public_key);
-            NoiseHandshake::initiator(&handshake_params).send(stream)
+            NoiseHandshake::initiator(&handshake_params, peer).send(stream)
         } else {
             Box::new(err(format_err!(
                 "Attempt to connect to the peer with address {:?} which \
@@ -293,7 +293,7 @@ impl RequestHandler {
                     NetworkRequest::SendMessage(peer, msg) => {
                         let conn_tx = outgoing_connections
                             .get(peer)
-                            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
+                            .map(|conn_tx| to_future(Ok(conn_tx)))
                             .or_else(|| {
                                 outgoing_connections
                                     .clone()
@@ -307,9 +307,9 @@ impl RequestHandler {
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
                                         if &msg == connect_message.raw() {
-                                            conn_fut(Ok(conn_tx).into_future())
+                                            to_future(Ok(conn_tx))
                                         } else {
-                                            conn_fut(conn_tx.send(connect_message.raw().clone())
+                                            to_future(conn_tx.send(connect_message.raw().clone())
                                                 .map_err(|_| {
                                                     format_err!("can't send message to a connection")
                                                 }))
@@ -392,7 +392,7 @@ impl Listener {
                 trace!("Accepted incoming connection with peer={}", address);
                 let network_tx = network_tx.clone();
 
-                let handshake = NoiseHandshake::responder(&handshake_params);
+                let handshake = NoiseHandshake::responder(&handshake_params, &address);
                 let connection_handler = handshake
                     .listen(sock)
                     .and_then(move |sock| {
@@ -413,7 +413,9 @@ impl Listener {
                                 let _holder = holder;
                             })
                     })
-                    .map_err(log_error);
+                    .map_err(|e| {
+                        error!("Connection terminated: {}: {}", e, e.find_root_cause());
+                    });
 
                 handle.spawn(to_box(connection_handler));
                 to_box(future::ok(()))
@@ -464,9 +466,9 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error>>
+fn to_future<F, I>(fut: F) -> Box<dyn Future<Item = I, Error = failure::Error>>
 where
-    F: Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error> + 'static,
+    F: IntoFuture<Item = I, Error = failure::Error> + 'static,
 {
-    Box::new(fut)
+    Box::new(fut.into_future())
 }

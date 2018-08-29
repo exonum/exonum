@@ -81,7 +81,8 @@ impl NodeHandler {
                     self.api_state().set_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_enabled {
-                        self.add_round_timeout();
+                        self.add_timeouts();
+                        self.request_next_block();
                     }
                 }
             }
