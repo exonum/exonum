@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use byteorder::{ByteOrder, LittleEndian};
+use bytes::BytesMut;
 use failure;
 use futures::{
     future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
-
 use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Core,
@@ -30,14 +31,17 @@ use events::{
     error::into_failure,
     noise::{
         wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
-        HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+        HandshakeRawMessage, HandshakeResult, NoiseHandshake, NoiseWrapper, HEADER_LENGTH,
+        MAX_MESSAGE_LENGTH,
     },
+    tests::raw_message,
 };
+use messages::RawMessage;
 use node::state::SharedConnectList;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
-fn test_convert_ed_to_curve_dh() {
+fn noise_convert_ed_to_curve_dh() {
     use crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     // Generate Ed25519 keys for initiator and responder.
@@ -64,7 +68,7 @@ fn test_convert_ed_to_curve_dh() {
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
-fn test_converted_keys_handshake() {
+fn noise_converted_keys_handshake() {
     use crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
@@ -105,6 +109,98 @@ fn test_converted_keys_handshake() {
 
     h_r.into_transport_mode()
         .expect("Unable to transition session into transport mode");
+}
+
+#[test]
+fn noise_encrypt_decrypt_max_message_len() {
+    let small_sizes = 0..100;
+
+    // Message sizes that must be tested:
+    // 1. 65_445 (MAX_MESSAGE_LENGTH - SIGNATURE_LENGTH - HEADER_LENGTH - 22)
+    // because in this case `raw_message_len` is divisible by (MAX_MESSAGE_LENGTH - TAG_LENGTH)
+    // 2. 65_446 (previous size + 1)
+    // from this size message is being split.
+    // 3. 130_964 - next message size when `raw_message_len` is divisible by
+    // (MAX_MESSAGE_LENGTH - TAG_LENGTH)
+    // 4. 130_965 - Size when message is being split by 3 chunks.
+    // To be sure we also test ranges near zero and near MAX_MESSAGE_LENGTH.
+    let lower_bound = MAX_MESSAGE_LENGTH - 100;
+    let upper_bound = MAX_MESSAGE_LENGTH + 100;
+
+    let near_max_sizes = lower_bound..upper_bound;
+    let big_size = vec![130964, 130965];
+
+    for size in small_sizes.chain(near_max_sizes).chain(big_size) {
+        check_encrypt_decrypt_message(size);
+    }
+}
+
+#[test]
+fn noise_encrypt_decrypt_bogus_message() {
+    let msg_size = 64;
+
+    let (mut initiator, mut responder) = create_noise_sessions();
+    let mut buffer_msg = BytesMut::with_capacity(msg_size);
+
+    initiator
+        .encrypt_msg(&vec![0_u8; msg_size], &mut buffer_msg)
+        .expect("Unable to encrypt message");
+
+    let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
+
+    // Wrong length.
+    let res = responder.decrypt_msg(len - 1, &mut buffer_msg);
+    assert!(res.unwrap_err().to_string().contains("decryption failed"));
+
+    // Wrong message.
+    let res = responder.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; len + HEADER_LENGTH]));
+    assert!(res.unwrap_err().to_string().contains("decryption failed"));
+}
+
+fn check_encrypt_decrypt_message(msg_size: usize) {
+    let (mut initiator, mut responder) = create_noise_sessions();
+    let mut buffer_msg = BytesMut::with_capacity(msg_size);
+    let message = raw_message(1, msg_size);
+
+    initiator
+        .encrypt_msg(message.as_ref(), &mut buffer_msg)
+        .expect(format!("Unable to encrypt message with size {}", msg_size).as_str());
+
+    let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
+
+    let res = responder
+        .decrypt_msg(len, &mut buffer_msg)
+        .expect(format!("Unable to decrypt message with size {}", msg_size).as_str());
+    let decrypted_message = RawMessage::from_vec(res.to_vec());
+    assert_eq!(message, decrypted_message);
+}
+
+fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+
+    let mut params =
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+    params.set_remote_key(public_key);
+
+    let mut initiator = NoiseWrapper::initiator(&params);
+    let mut responder = NoiseWrapper::responder(&params);
+
+    let buffer_out = initiator.write_handshake_msg().unwrap();
+    responder.read_handshake_msg(&buffer_out).unwrap();
+
+    let buffer_out = responder.write_handshake_msg().unwrap();
+    initiator.read_handshake_msg(&buffer_out).unwrap();
+    let buffer_out = initiator.write_handshake_msg().unwrap();
+    responder.read_handshake_msg(&buffer_out).unwrap();
+
+    (
+        initiator
+            .into_transport_mode()
+            .expect("transit to transport mode"),
+        responder
+            .into_transport_mode()
+            .expect("transit to transport mode"),
+    )
 }
 
 #[derive(Debug, Copy, Clone)]

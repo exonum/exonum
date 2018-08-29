@@ -59,6 +59,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Bug with pool size overflow has been fixed. (#853)
 
+- Bug in `NoiseWrapper::decrypt_msg` caused by wrong calculation of
+  encrypted and decrypted message sizes has been fixed. (#873)
+
 - Transactions (signature) verification benchmark has been fixed. (#673)
 
 - Node no longer panics when transaction pool has a lot of transactions and

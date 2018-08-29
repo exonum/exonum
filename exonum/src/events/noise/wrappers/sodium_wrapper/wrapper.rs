@@ -72,12 +72,18 @@ impl NoiseWrapper {
             return Err(NoiseError::WrongMessageLength(input.len()));
         }
 
-        self.read(input, MAX_MESSAGE_LENGTH)
+        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
+        let len = self.read(input, &mut buf)?;
+        buf.truncate(len);
+        Ok(buf)
     }
 
     pub fn write_handshake_msg(&mut self) -> Result<Vec<u8>, NoiseError> {
         // Payload in handshake messages can be empty.
-        self.write(&[])
+        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
+        let len = self.write(&[], &mut buf)?;
+        buf.truncate(len);
+        Ok(buf)
     }
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
@@ -97,24 +103,22 @@ impl NoiseWrapper {
         len: usize,
         buf: &mut BytesMut,
     ) -> Result<BytesMut, failure::Error> {
+        debug_assert!(len + HEADER_LENGTH <= buf.len());
         let data = buf.split_to(len + HEADER_LENGTH).to_vec();
         let data = &data[HEADER_LENGTH..];
 
-        let len = self.decrypted_msg_len(data.len());
-        let mut decrypted_message = Vec::with_capacity(len);
+        let len = decrypted_msg_len(data.len());
+        let mut decrypted_message = vec![0; len];
 
-        for msg in data.chunks(MAX_MESSAGE_LENGTH) {
-            let len_to_read = if msg.len() == MAX_MESSAGE_LENGTH {
-                msg.len() - TAG_LENGTH
-            } else {
-                msg.len()
-            };
+        let mut read = vec![0_u8; MAX_MESSAGE_LENGTH];
+        for (i, msg) in data.chunks(MAX_MESSAGE_LENGTH).enumerate() {
+            let len = self.read(msg, &mut read)?;
+            let start = i * (MAX_MESSAGE_LENGTH - TAG_LENGTH);
+            let end = start + len;
 
-            let read_to = self.read(msg, len_to_read)?;
-            decrypted_message.extend_from_slice(&read_to);
+            decrypted_message[start..end].copy_from_slice(&read[..len]);
         }
 
-        debug_assert_eq!(len, decrypted_message.len());
         Ok(BytesMut::from(decrypted_message))
     }
 
@@ -126,59 +130,61 @@ impl NoiseWrapper {
     /// 3. Result message: first 4 bytes is message length(`len').
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
-    pub fn encrypt_msg(
-        &mut self,
-        msg: &[u8],
-        buf: &mut BytesMut,
-    ) -> Result<Option<()>, failure::Error> {
-        let len = self.encrypted_msg_len(msg.len());
-        let mut encrypted_message = Vec::with_capacity(len);
+    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<(), failure::Error> {
+        //TODO: don't use additional allocations [ECR-2213]
+        const CHUNK_LENGTH: usize = MAX_MESSAGE_LENGTH - TAG_LENGTH;
+        let len = encrypted_msg_len(msg.len());
+        let mut encrypted_message = vec![0; len + HEADER_LENGTH];
 
-        for msg in msg.chunks(MAX_MESSAGE_LENGTH - TAG_LENGTH) {
-            let written = self.write(msg)?;
-            encrypted_message.extend_from_slice(&written);
+        LittleEndian::write_u32(&mut encrypted_message[..HEADER_LENGTH], len as u32);
+
+        let mut written = vec![0_u8; MAX_MESSAGE_LENGTH];
+        for (i, msg) in msg.chunks(CHUNK_LENGTH).enumerate() {
+            let len = self.write(msg, &mut written)?;
+            let start = HEADER_LENGTH + i * MAX_MESSAGE_LENGTH;
+            let end = start + len;
+
+            encrypted_message[start..end].copy_from_slice(&written[..len]);
         }
 
-        let mut msg_len_buf = vec![0_u8; HEADER_LENGTH];
-
-        LittleEndian::write_u32(&mut msg_len_buf, len as u32);
-        let encoded_message = &encrypted_message[0..len];
-        msg_len_buf.extend_from_slice(encoded_message);
-        buf.extend_from_slice(&msg_len_buf);
-
-        debug_assert_eq!(len, encoded_message.len());
-        Ok(None)
+        buf.extend_from_slice(&encrypted_message);
+        Ok(())
     }
 
-    fn read(&mut self, input: &[u8], len: usize) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0_u8; len];
-        self.session.read_message(input, &mut buf)?;
-        Ok(buf)
+    fn read(&mut self, input: &[u8], buf: &mut [u8]) -> Result<usize, NoiseError> {
+        let len = self.session.read_message(input, buf)?;
+        Ok(len)
     }
 
-    fn write(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
-        let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
-        let len = self.session.write_message(msg, &mut buf)?;
-        buf.truncate(len);
-        Ok(buf)
-    }
-
-    // Each message consists of the payload and 16 bytes(`TAG_LENGTH`)
-    // of AEAD authentication data. Therefore to calculate an actual message
-    // length we need to subtract `TAG_LENGTH` multiplied by messages count
-    // from `data.len()`.
-    fn decrypted_msg_len(&self, raw_message_len: usize) -> usize {
-        raw_message_len - TAG_LENGTH * (raw_message_len / MAX_MESSAGE_LENGTH)
-    }
-
-    // In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
-    // calculate actual message length.
-    fn encrypted_msg_len(&self, raw_message_len: usize) -> usize {
-        raw_message_len + TAG_LENGTH * ((raw_message_len / MAX_MESSAGE_LENGTH) + 1)
+    fn write(&mut self, msg: &[u8], buf: &mut [u8]) -> Result<usize, NoiseError> {
+        let len = self.session.write_message(msg, buf)?;
+        Ok(len)
     }
 
     fn noise_builder<'a>() -> Builder<'a> {
         Builder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
+    }
+}
+
+// Each message consists of the payload and 16 bytes(`TAG_LENGTH`)
+// of AEAD authentication data. Therefore to calculate an actual message
+// length we need to subtract `TAG_LENGTH` multiplied by messages count
+// from `data.len()`.
+fn decrypted_msg_len(raw_message_len: usize) -> usize {
+    raw_message_len - TAG_LENGTH * div_ceil(raw_message_len, MAX_MESSAGE_LENGTH)
+}
+
+// In case of encryption we need to add `TAG_LENGTH` multiplied by messages count to
+// calculate actual message length.
+fn encrypted_msg_len(raw_message_len: usize) -> usize {
+    let tag_count = div_ceil(raw_message_len, MAX_MESSAGE_LENGTH - TAG_LENGTH);
+    raw_message_len + TAG_LENGTH * tag_count
+}
+
+fn div_ceil(lhs: usize, rhs: usize) -> usize {
+    match (lhs / rhs, lhs % rhs) {
+        (d, r) if (r == 0) => d,
+        (d, _) => d + 1,
     }
 }
 
