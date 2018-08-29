@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use byteorder::{ByteOrder, LittleEndian};
+use bytes::BytesMut;
 use failure;
 use futures::{
     future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
-
 use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream}, reactor::Core,
@@ -26,7 +26,6 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::{net::SocketAddr, thread, time::Duration};
 
-use bytes::BytesMut;
 use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
 use events::{
     error::into_failure,
