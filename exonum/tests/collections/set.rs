@@ -35,6 +35,15 @@ enum SetAction<V> {
     MergeFork,
 }
 
+fn generate_action() -> impl Strategy<Value = SetAction<u8>> {
+    prop_oneof![
+        (0..8u8).prop_map(SetAction::Put),
+        (0..8u8).prop_map(SetAction::Remove),
+        strategy::Just(SetAction::Clear),
+        strategy::Just(SetAction::MergeFork),
+    ]
+}
+
 impl<V> Modifier<HashSet<V>> for SetAction<V>
 where
     V: Eq + Hash,
@@ -86,15 +95,6 @@ mod key_set_index {
         Ok(())
     }
 
-    fn generate_action() -> impl Strategy<Value = SetAction<u8>> {
-        prop_oneof![
-            (0..8u8).prop_map(SetAction::Put),
-            (0..8u8).prop_map(SetAction::Remove),
-            strategy::Just(SetAction::Clear),
-            strategy::Just(SetAction::MergeFork),
-        ]
-    }
-
     proptest_compare_collections!(
         proptest_compare_to_rust_set,
         KeySetIndex,
@@ -134,15 +134,6 @@ mod value_set_index {
             prop_assert!(ref_set.contains(&k));
         }
         Ok(())
-    }
-
-    fn generate_action() -> impl Strategy<Value = SetAction<u8>> {
-        prop_oneof![
-            (0..8u8).prop_map(SetAction::Put),
-            (0..8u8).prop_map(SetAction::Remove),
-            strategy::Just(SetAction::Clear),
-            strategy::Just(SetAction::MergeFork),
-        ]
     }
 
     proptest_compare_collections!(
