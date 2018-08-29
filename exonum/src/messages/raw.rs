@@ -27,12 +27,6 @@ impl UncheckedBuffer {
     }
 }
 
-/// A raw message represented by the bytes buffer.
-#[derive(Debug, PartialEq)]
-pub struct MessageBuffer {
-    raw: Vec<u8>,
-}
-
 impl ::std::convert::AsRef<[u8]> for UncheckedBuffer {
     fn as_ref(&self) -> &[u8] {
         &self.message

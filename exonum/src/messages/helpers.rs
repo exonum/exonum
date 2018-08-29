@@ -12,6 +12,7 @@ pub trait BinaryForm: Sized {
     fn deserialize(buffer: &[u8]) -> Result<Self, Error>;
 }
 
+
 #[doc(hidden)]
 pub fn partial_enum_to_vec(tag: u8, vec: Vec<u8>) -> Vec<u8> {
     ::std::iter::once(tag).chain(vec).collect()

@@ -29,13 +29,13 @@ use super::{
 use crypto::PublicKey;
 use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
-use messages::{Connect, Message, Protocol, SignedMessage, UncheckedBuffer};
+use messages::{Connect, Message, Protocol, Service, SignedMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    MessageReceived(SocketAddr, UncheckedBuffer),
+    MessageReceived(SocketAddr, Vec<u8>),
     PeerConnected(SocketAddr, Message<Connect>),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
@@ -384,17 +384,16 @@ impl Listener {
                         let raw = raw.ok_or_else(|| {
                             format_err!("Connection closed before first message.")
                         })?;
-                        let signed = SignedMessage::verify_buffer(raw)?;
-                        let (payload, signed) = signed.into_message().into_parts();
-                        let payload = match payload {
-                            Protocol::Connect(c) => c,
+                        let signed = Protocol::deserialize(SignedMessage::verify_buffer(raw)?)?;
+                        let connect = match signed {
+                            Protocol::Service(Service::Connect(c)) => c,
                             _ => bail!(
                                 "Received first message different\
                                  from Connect msg = {:?}.",
-                                payload
+                                signed
                             ),
                         };
-                        Ok((Message::from_parts(payload, signed)?, stream))
+                        Ok((connect, stream))
                     })
                     .and_then(move |(connect, stream)| {
                         trace!("Received handshake message={:?}", connect);

@@ -31,14 +31,16 @@ use chrono::{DateTime, Utc};
 
 use std::fmt::Debug;
 use std::net::SocketAddr;
+use std::borrow::Cow;
 
 use failure;
 
-use super::{Message, RawTransaction, SignedMessage, UncheckedBuffer, BinaryFormSerialize};
-use blockchain;
-use crypto::{Hash, PublicKey};
+use super::{TransactionFromSet, Message, RawTransaction, BinaryForm,
+            SignedMessage, BinaryFormSerialize};
+use blockchain::{self, Transaction};
+use crypto::{Hash, PublicKey, SecretKey, CryptoHash};
 use helpers::{Height, Round, ValidatorId};
-use storage::{Database, MemoryDB, ProofListIndex};
+use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 
 #[doc(hidden)]
 /// TransactionsResponse size with zero transactions inside.
@@ -47,64 +49,6 @@ pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 261;
 #[doc(hidden)]
 /// RawTransaction size with zero transactions payload.
 pub const RAW_TRANSACTION_EMPTY_SIZE: usize = 0;
-/*
-/// Any possible message.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Protocol {
-    /// Transaction.
-    Transaction(RawTransaction),
-    /// Consensus message.
-    Consensus(ConsensusMessage),
-    /// `Connect` message.
-    #[serde(with = "BinaryFormSerialize")]
-    Connect(Connect),
-    /// `Status` message.
-    #[serde(with = "BinaryFormSerialize")]
-    Status(Status),
-    /// `Block` message.
-    #[serde(with = "BinaryFormSerialize")]
-    Block(BlockResponse),
-    /// Request for the some data.
-    Request(RequestMessage),
-    /// A batch of the transactions.
-    #[serde(with = "BinaryFormSerialize")]
-    TransactionsBatch(TransactionsResponse),
-}
-
-/// Consensus message.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ConsensusMessage {
-    /// `Precommit` message.
-    #[serde(with = "BinaryFormSerialize")]
-    Precommit(Precommit),
-    /// `Propose` message.
-    #[serde(with = "BinaryFormSerialize")]
-    Propose(Propose),
-    /// `Prevote` message.
-    #[serde(with = "BinaryFormSerialize")]
-    Prevote(Prevote),
-}
-
-/// A request for the some data.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum RequestMessage {
-    /// Propose request.
-    #[serde(with = "BinaryFormSerialize")]
-    Propose(ProposeRequest),
-    /// Transactions request.
-    #[serde(with = "BinaryFormSerialize")]
-    Transactions(TransactionsRequest),
-    /// Prevotes request.
-    #[serde(with = "BinaryFormSerialize")]
-    Prevotes(PrevotesRequest),
-    /// Peers request.
-    #[serde(with = "BinaryFormSerialize")]
-    Peers(PeersRequest),
-    /// Block request.
-    #[serde(with = "BinaryFormSerialize")]
-    Block(BlockRequest),
-}
-*/
 
 encoding_struct! {
     /// Connect to a node.
@@ -269,7 +213,7 @@ encoding_struct! {
         /// Block header.
         block: blockchain::Block,
         /// List of pre-commits.
-        precommits: Vec<UncheckedBuffer>,
+        precommits: Vec<Vec<u8>>,
         /// List of the transaction hashes.
         transactions: &[Hash],
     }
@@ -292,7 +236,7 @@ encoding_struct! {
         /// Public key of the recipient.
         to: &PublicKey,
         /// List of the transactions.
-        transactions: Vec<UncheckedBuffer>,
+        transactions: Vec<Vec<u8>>,
     }
 
 }
@@ -412,87 +356,54 @@ impl BlockResponse {
 impl Precommit {
     /// Verify precommit's signature and return it's safer wrapper
     pub(crate) fn verify_precommit(
-        buffer: UncheckedBuffer,
+        buffer: Vec<u8>,
     ) -> Result<Message<Precommit>, ::failure::Error> {
-        let signed = SignedMessage::verify_buffer(buffer)?;
-        signed.into_message().map_into::<Precommit>()
+        unimplemented!()
+//        let signed = SignedMessage::verify_buffer(buffer)?;
+//        signed.into_message().map_into::<Precommit>()
     }
 }
 
 /// Full message constraints list.
 #[doc(hidden)]
-pub trait ProtocolMessage: Debug + Clone
+pub trait ProtocolMessage: Debug + Clone + BinaryForm
 {
     fn message_type() -> (u8, u8);
-    fn try_from_protocol(value: Protocol) -> Result<Self, &'static str>;
+    ///Trying to convert `Protocol` to concrete message,
+    ///if ok returns message `Message<Self>` if fails, returns `Protocol` back.
+    fn try_from(p: Protocol) -> Result<Message<Self>, Protocol>;
+
+    fn into_protocol(this: Message<Self>) -> Protocol;
+
 }
 
 /// Implement Exonum message protocol.
 ///
 /// Protocol should be described according to format:
 /// ```
-/// $ProtocolName {
-///     $($MessageClass {
+/// $SignedMessage => $ProtocolName {
+///     $($cls_num => $MessageClass {
 ///         $(
-///         $MessageType
+///         $MessageType = $typ_num
 ///         )+
 ///     }
 ///     )+
 /// }
 /// ```
-/// This shema will be expanded into enums:
+/// where:
 /// `$ProtocolName` is an name of protocol which is described by this schema,
 ///     enum with same name will be created. All message classes are encapsulate by this enum;
 /// `$MessageClass` is a module name which is designed to handle messages,
 ///     enum with same name will be crated. All message within `MessageClass` should be unique;
 /// `$MessageType` is a concrete messages within some `$MessageClass`;
+/// `$SignedMessage` is a typename of `SignedMessage` from which $ProtocolName could be created;
+/// `$cls_num` and `$typ_num` is a constant which represent
+///     message class and message type respectively
 ///
-/// Each `$MessageType` should implement `PartialEq<Self>`, `Clone` and `Debug`.
+/// Each `$MessageType` should implement `Clone` and `Debug`.
 ///
-/// Additionally some converting code will be generated:
-/// 1. `From<$MessageClass> for $ProtocolName`
-/// 2. `From<$MessageType> for $ProtocolName`
-/// 3. `ProtocolPart for $MessageType`
-/// 4. `PartialEq<Protocol> for $MessageType`
-/// 5. `PartialEq<Protocol> for $MessageClass`
-///
-/// ## Examples:
-/// If ones write:
-/// ```rust
-/// impl_protocol! {
-/// Protocol {
-///     Inner {
-///         Connect
-///     }
-///     Informative {
-///         Status,
-///         StatusRequest
-///     }
-/// }
-/// }
-/// ```
-/// this will introduce new protocol named `Protocol` with two classes of message:
-/// 1. `Inner`
-/// 2. `Informative`
-/// `Inner` will contain single message named `Connect`.
-/// Where `Informative` is designed to handle two messages `Status` and `StatusRequest`.
-/// The schema above will expand to:
-/// ```
-/// enum Inner {
-///     Connect(Connect)
-/// }
-/// enum Informative {
-///     Status(Status),
-///     Status(Request),
-/// }
-/// enum Protocol {
-///     Inner(Inner),
-///     Informative(Informative)
-/// }
-/// ```
-/// And converting code will be generated as well.
 macro_rules! impl_protocol {
-    ($proto_name:ident => $any_name:ident{
+    ($signed_message:ident => $proto_name:ident{
         $($cls_num:expr => $cls:ident{
             $( $typ:ident = $typ_num:expr),+ $(,)*
         } $(,)*)+
@@ -500,58 +411,34 @@ macro_rules! impl_protocol {
     ) => {
 
         $(
-        #[derive(PartialEq, Eq, Debug, Clone)]
-        pub enum $cls {
-        $(
-            $typ($typ)
-        ),+
-        }
-
-        impl Into<$proto_name> for $cls {
-            fn into(self) -> $proto_name {
-                $proto_name::$cls(self)
+            #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+            pub enum $cls {
+            $(
+                $typ(Message<$typ>)
+            ),+
             }
-        }
 
-       impl PartialEq<$proto_name> for $cls {
-            fn eq(&self, other: &$proto_name) -> bool {
-                if let $proto_name::$cls(ref cls) = *other {
-                    return cls == self
+            $(
+
+            impl ProtocolMessage for $typ {
+                fn message_type() -> (u8, u8) {
+                    ($cls_num, $typ_num)
                 }
-                false
-            }
-        }
 
-        $(
+                fn try_from(p: $proto_name) -> Result<Message<Self>,Protocol> {
+                    match p {
+                        $proto_name::$cls($cls::$typ(s)) => Ok(s),
+                        p => Err(p)
+                    }
+                }
 
-        impl ProtocolPart for $typ {
-            //TODO: Return Protocol if error?
-            fn try_from_protocol(value: Protocol) -> Result<Self, &'static str> {
-                match value {
-                    $proto_name::$cls($cls::$typ(msg)) => Ok(msg),
-                    _ => Err(concat!("Processing message other than ", stringify!($typ)))
+                fn into_protocol(this: Message<Self>) -> Protocol {
+                    $proto_name::$cls($cls::$typ(this))
                 }
             }
-        }
-
-        impl Into<$proto_name> for $typ {
-            fn into(self) -> $proto_name {
-                $proto_name::$cls($cls::$typ(self))
-            }
-        }
-
-        impl PartialEq<$proto_name> for $typ {
-            fn eq(&self, other: &$proto_name) -> bool {
-                if let $proto_name::$cls($cls::$typ(ref msg)) = *other {
-                    return msg == self;
-                }
-                false
-            }
-        }
-
-
+            )+
         )+
-        )+
+
         #[derive(PartialEq, Eq, Debug, Clone)]
         pub enum $proto_name {
             $(
@@ -560,25 +447,47 @@ macro_rules! impl_protocol {
         }
 
         impl $proto_name {
-            pub fn tag(&self) -> (u8, u8) {
-                match &self {
-                    $($($proto_name::$cls($cls::$typ(_)) => ($cls_num, $typ_num),)+)+
+            pub fn deserialize(message: SignedMessage) -> Result<Protocol, failure::Error> {
+            use $crate::events::error::into_failure;
+                match message.message_class() {
+                    $($cls_num =>
+                        match message.message_type() {
+                            $($typ_num =>{
+                                let payload = $typ::deserialize(message.payload())
+                                                .map_err(into_failure)?;
+                                let message = Message::new(payload, message);
+                                Ok($proto_name::$cls($cls::$typ(message)))
+                            }),+
+                            _ => bail!("Not found message with this type {}", message.message_type())
+                        }
+                    ),+
+                    _ => bail!("Not found message with this class {}", message.message_class())
                 }
             }
 
-            pub fn serialize(&self) -> Vec<u8> {
-                unimplemented!()
+            pub fn signed_message(&self) -> &SignedMessage {
+                match *self {
+                    $(
+                        $proto_name::$cls(ref c) => {
+                            match *c {
+                                $(
+                                    $cls::$typ(ref t) => {
+                                        t.signed_message()
+                                    }
+                                ),+
+                            }
+                        }
+                    ),+
+                }
             }
         }
     };
 }
 
-
-
 impl_protocol!{
-    Protocol => Any {
+    SignedMessage => Protocol {
         0 => Service {
-            Transaction = 0,
+            RawTransaction = 0,
             Connect = 1,
             Status = 2,
         },
@@ -603,21 +512,95 @@ impl_protocol!{
 }
 
 
+impl Protocol {
+
+    /// Creates new protocol message.
+    ///
+    /// # Panics
+    ///
+    /// On serialization fail this method can panic.
+    pub fn new<T: ProtocolMessage>(message: T, author: PublicKey, secret_key: &SecretKey)
+                                -> Protocol {
+        let signed = SignedMessage::new(message, author, secret_key);
+        Self::deserialize(signed).expect("Couldn't deserialize newly created message.")
+    }
+
+    /// Creates new protocol message.
+    /// Return concrete `Message<T>`
+    ///
+    /// # Panics
+    ///
+    /// On serialization fail this method can panic.
+    pub fn concrete<T: ProtocolMessage>(message: T, author: PublicKey, secret_key: &SecretKey)
+                                   -> Message<T> {
+        T::try_from(Self::new(message, author, secret_key))
+            .expect("BUG: Newly created message matched not as transaction.")
+    }
+
+    /// Creates new raw transaction message.
+    ///
+    /// # Panics
+    ///
+    /// On serialization fail this method can panic.
+    pub(crate) fn sign_tx<T>(
+        transaction: T,
+        service_id: u16,
+        public_key: PublicKey,
+        secret_key: &SecretKey
+    ) -> Message<RawTransaction>
+    where T: Into<TransactionFromSet<T>> + Transaction,
+     {
+        let data = transaction.into()
+                                       .serialize()
+                                       .expect("Couldn't serialize transaction");
+        let raw_tx = RawTransaction::new(service_id, data);
+        Self::new(raw_tx, public_key, secret_key)
+            .try_into_transaction()
+            .expect("BUG: Newly created message matched not as transaction.")
+    }
+
+    ///Trying to convert `Protocol` to `RawTransaction`,
+    ///if ok returns message `Message<RawTransaction>` if fails, returns `Protocol` back.
+    pub fn try_into_transaction(self) -> Result<Message<RawTransaction>,Protocol> {
+        RawTransaction::try_from(self)
+    }
+}
 
 impl Requests {
     /// Returns public key of the message recipient.
     pub fn to(&self) -> &PublicKey {
         match *self {
-            Requests::Propose(ref msg) => msg.to(),
-            Requests::Transactions(ref msg) => msg.to(),
-            Requests::Prevotes(ref msg) => msg.to(),
-            Requests::Peers(ref msg) => msg.to(),
-            Requests::Block(ref msg) => msg.to(),
+            Requests::ProposeRequest(ref msg) => msg.to(),
+            Requests::TransactionsRequest(ref msg) => msg.to(),
+            Requests::PrevotesRequest(ref msg) => msg.to(),
+            Requests::PeersRequest(ref msg) => msg.to(),
+            Requests::BlockRequest(ref msg) => msg.to(),
+        }
+    }
+
+    /// Returns author public key of the message sender.
+    pub fn author(&self) -> &PublicKey {
+        match *self {
+            Requests::ProposeRequest(ref msg) => msg.author(),
+            Requests::TransactionsRequest(ref msg) => msg.author(),
+            Requests::PrevotesRequest(ref msg) => msg.author(),
+            Requests::PeersRequest(ref msg) => msg.author(),
+            Requests::BlockRequest(ref msg) => msg.author(),
         }
     }
 }
 
 impl Consensus {
+
+    /// Returns author public key of the message sender.
+    pub fn author(&self) -> &PublicKey {
+        match *self {
+            Consensus::Propose(ref msg) => msg.author(),
+            Consensus::Prevote(ref msg) => msg.author(),
+            Consensus::Precommit(ref msg) => msg.author(),
+        }
+    }
+
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
         match *self {
@@ -643,5 +626,35 @@ impl Consensus {
             Consensus::Prevote(ref msg) => msg.round(),
             Consensus::Precommit(ref msg) => msg.round(),
         }
+    }
+}
+
+impl<T: ProtocolMessage> Into<Protocol> for Message<T> {
+    fn into(self) -> Protocol {
+        ProtocolMessage::into_protocol(self)
+    }
+}
+
+impl StorageValue for Protocol {
+    fn into_bytes(self) -> Vec<u8> {
+        unimplemented!()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        unimplemented!()
+    }
+}
+
+impl CryptoHash for Protocol {
+    fn hash(&self) -> Hash {
+        unimplemented!()
+    }
+}
+
+
+
+impl<T: Transaction> From<T> for TransactionFromSet<T> {
+    fn from(t:T) -> Self {
+        unimplemented!()
     }
 }

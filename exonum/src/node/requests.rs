@@ -16,8 +16,8 @@ use super::NodeHandler;
 use blockchain::Schema;
 use failure;
 use messages::{
-    BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, RequestMessage,
-    TransactionsRequest, TransactionsResponse, UncheckedBuffer, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, Requests,
+    TransactionsRequest, TransactionsResponse, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
@@ -25,10 +25,11 @@ use messages::{
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_request(&mut self, msg: Message<RequestMessage>) -> Result<(), failure::Error> {
+    pub fn handle_request(&mut self, msg: Requests) {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
-            bail!("Received message addressed to other peer = {:?}.", msg.to());
+            error!("Received message addressed to other peer = {:?}.", msg.to());
+            return;
         }
 
         if !self.state.connect_list().is_peer_allowed(msg.author()) {
@@ -36,27 +37,16 @@ impl NodeHandler {
                 "Received request message from peer = {:?} which not in ConnectList.",
                 msg.author()
             );
+            return;
         }
 
-        let (msg, signed) = msg.into_parts();
         match msg {
-            RequestMessage::Propose(msg) => {
-                self.handle_request_propose(Message::from_parts(msg, signed)?)
-            }
-            RequestMessage::Transactions(msg) => {
-                self.handle_request_txs(Message::from_parts(msg, signed)?)
-            }
-            RequestMessage::Prevotes(msg) => {
-                self.handle_request_prevotes(Message::from_parts(msg, signed)?)
-            }
-            RequestMessage::Peers(msg) => {
-                self.handle_request_peers(Message::from_parts(msg, signed)?)
-            }
-            RequestMessage::Block(msg) => {
-                self.handle_request_block(Message::from_parts(msg, signed)?)
-            }
-        };
-        Ok(())
+            Requests::ProposeRequest(msg) => self.handle_request_propose(msg),
+            Requests::TransactionsRequest(msg) => self.handle_request_txs(msg),
+            Requests::PrevotesRequest(msg) => self.handle_request_prevotes(msg),
+            Requests::PeersRequest(msg) => self.handle_request_peers(msg),
+            Requests::BlockRequest(msg) => self.handle_request_block(msg)
+        }
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
@@ -94,8 +84,8 @@ impl NodeHandler {
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
-                let raw = UncheckedBuffer::new(tx.into_parts().1.to_vec());
-                if txs_size + raw.as_ref().len() as u32 + TX_HEADER > unoccupied_message_size {
+                let raw = tx.signed_message().raw().to_vec();
+                if txs_size + raw.len() as u32 + TX_HEADER > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
                         msg.author(),
                         mem::replace(&mut txs, vec![]),
@@ -104,7 +94,7 @@ impl NodeHandler {
                     self.send_to_peer(*msg.author(), txs_response);
                     txs_size = 0;
                 }
-                txs_size += raw.as_ref().len() as u32 + TX_HEADER;
+                txs_size += raw.len() as u32 + TX_HEADER;
                 txs.push(raw);
             }
         }
@@ -162,7 +152,7 @@ impl NodeHandler {
             block,
             precommits
                 .iter()
-                .map(|p| UncheckedBuffer::new(p.into_parts().1.to_vec()))
+                .map(|p| p.signed_message().raw().to_vec())
                 .collect(),
             &transactions.iter().collect::<Vec<_>>(),
         ));

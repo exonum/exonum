@@ -668,7 +668,7 @@ impl<'a> BlockchainExplorer<'a> {
             snapshot: blockchain.snapshot(),
             transaction_parser: Box::new(move |raw| {
                 let tx = blockchain.tx_from_raw(&raw)?;
-                Ok(TransactionMessage::new(raw, tx))
+                Ok(TransactionMessage::new(unimplemented!(), tx))
             }),
         }
     }

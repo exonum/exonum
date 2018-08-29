@@ -19,27 +19,28 @@ use std::net::SocketAddr;
 
 use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Protocol, Status};
+use messages::{Connect, Message, PeersRequest, Protocol, Status, Service};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, msg: Message<Protocol>) -> Result<(), failure::Error> {
-        let (payload, message) = msg.into_parts();
+    pub fn handle_message(&mut self, msg: Protocol) {
+        match msg {
 
-        match payload {
-            Protocol::Connect(msg) => self.handle_connect(Message::from_parts(msg, message)?),
-            Protocol::Status(msg) => self.handle_status(Message::from_parts(msg, message)?),
-            Protocol::Consensus(msg) => self.handle_consensus(Message::from_parts(msg, message)?)?,
-            Protocol::Request(msg) => self.handle_request(Message::from_parts(msg, message)?)?,
-            Protocol::Block(msg) => self.handle_block(Message::from_parts(msg, message)?)?,
+            Protocol::Consensus(msg) => self.handle_consensus(msg),
+            Protocol::Requests(msg) => self.handle_request(msg),
+
+            Protocol::Service(Service::Connect(msg)) => self.handle_connect(msg),
+            Protocol::Service(Service::Status(msg)) => self.handle_status(msg),
             // ignore tx duplication error,
-            Protocol::Transaction(msg) => drop(self.handle_tx(Message::from_parts(msg, message)?)),
-            Protocol::TransactionsBatch(msg) => {
-                self.handle_txs_batch(Message::from_parts(msg, message)?)?
-            }
-        };
-        Ok(())
+            Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
+//            Protocol::Block(msg) => self.handle_block(msg)?,
+//            Protocol::TransactionsBatch(msg) => {
+//                self.handle_txs_batch(Message::from_parts(msg, message)?)?
+//            }
+            _ => unimplemented!()
+        }
     }
+
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.

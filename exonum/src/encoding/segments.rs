@@ -17,8 +17,6 @@
 use bit_vec::BitVec;
 use byteorder::{ByteOrder, LittleEndian};
 
-use messages::UncheckedBuffer;
-
 use super::{CheckedOffset, Error, Field, Offset, Result};
 use crypto::Hash;
 
@@ -148,33 +146,6 @@ impl<'a> SegmentField<'a> for &'a str {
             });
         }
         Ok(latest_segment)
-    }
-}
-
-impl<'a> SegmentField<'a> for UncheckedBuffer {
-    fn item_size() -> Offset {
-        1
-    }
-
-    fn count(&self) -> Offset {
-        self.as_ref().count()
-    }
-
-    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        Self::new(<Vec<u8> as SegmentField>::from_buffer(buffer, from, to))
-    }
-
-    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        self.as_ref().extend_buffer(buffer)
-    }
-
-    fn check_data(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        count: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        <Vec<u8> as SegmentField>::check_data(buffer, from, count, latest_segment)
     }
 }
 

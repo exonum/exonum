@@ -26,7 +26,6 @@ use super::WriteBufferWrapper;
 use crypto::{Hash, PublicKey, Signature};
 use encoding::{Field, Offset};
 use helpers::{Height, Round, ValidatorId};
-use messages::UncheckedBuffer;
 
 // TODO: Should we implement serialize for: `SecretKey`, `Seed`. (ECR-156)
 
@@ -489,7 +488,7 @@ impl ExonumJson for Decimal {
         Ok(serde_json::to_value(&self)?)
     }
 }
-
+/*
 impl ExonumJson for Vec<UncheckedBuffer> {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -515,6 +514,7 @@ impl ExonumJson for Vec<UncheckedBuffer> {
         Ok(Value::Array(vec))
     }
 }
+*/
 
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.

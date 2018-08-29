@@ -37,21 +37,21 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 /// framework) that can be obtained through `Schema` `transaction_statuses` method.
 pub type TransactionResult = Result<(), TransactionError>;
 
-#[derive(Serialize, Deserialize)]
 /// Data transfer object for transaction.
 /// This structure is used to send api info about transaction,
 /// and take some new transaction into pool from user input.
+#[derive(Serialize, Deserialize)]
 pub struct TransactionMessage {
     #[serde(skip_deserializing)]
     #[serde(rename = "debug")]
     transaction: Option<Box<dyn Transaction>>,
     #[serde(with = "HexStringRepresentation")]
-    message: Message<RawTransaction>,
+    message: Vec<u8>, // FIXME: Replace by Message<RawTransaction>
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
         let mut debug = fmt.debug_struct("TransactionMessage");
-        debug.field("message", &self.message.to_hex_string());
+        debug.field("message", &::hex::encode(&self.message));
         if let Some(ref tx) = self.transaction {
             debug.field("debug", tx);
         }
@@ -60,17 +60,13 @@ impl ::std::fmt::Debug for TransactionMessage {
 }
 
 impl TransactionMessage {
-    /// Returns raw transaction.
-    pub fn raw(&self) -> &Message<RawTransaction> {
-        &self.message
-    }
     /// Returns transaction smart contract.
     pub fn transaction(&self) -> Option<&Box<dyn Transaction>> {
         self.transaction.as_ref()
     }
     /// Create new `TransactionMessage` from raw message.
     pub(crate) fn new(
-        message: Message<RawTransaction>,
+        message: Vec<u8>,
         transaction: Box<dyn Transaction>,
     ) -> TransactionMessage {
         TransactionMessage {

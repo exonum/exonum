@@ -27,7 +27,7 @@ use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
+    BlockResponse, Connect, Consensus as ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
 };
 use node::connect_list::ConnectList;
 use node::ConnectInfo;
@@ -75,7 +75,7 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), Votes<Message<Prevote>>>,
     precommits: HashMap<(Round, Hash), Votes<Message<Precommit>>>,
 
-    queued: Vec<Message<ConsensusMessage>>,
+    queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
@@ -755,14 +755,14 @@ impl State {
     }
 
     /// Returns a list of queued consensus messages.
-    pub fn queued(&mut self) -> Vec<Message<ConsensusMessage>> {
+    pub fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queued = Vec::new();
         ::std::mem::swap(&mut self.queued, &mut queued);
         queued
     }
 
     /// Add consensus message to the queue.
-    pub fn add_queued(&mut self, msg: Message<ConsensusMessage>) {
+    pub fn add_queued(&mut self, msg: ConsensusMessage) {
         self.queued.push(msg);
     }
 

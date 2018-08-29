@@ -20,8 +20,8 @@ use events::{error::LogError, InternalRequest};
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, RawTransaction, SignedMessage, TransactionsRequest,
+    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
+    Propose, ProposeRequest, RawTransaction, SignedMessage, TransactionsRequest, Protocol,
     TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
@@ -32,14 +32,13 @@ impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     pub fn handle_consensus(
         &mut self,
-        msg: Message<ConsensusMessage>,
-    ) -> Result<(), failure::Error> {
+        msg: ConsensusMessage) {
         if !self.is_enabled {
             info!(
                 "Ignoring a consensus message {:?} because the node is disabled",
                 msg
             );
-            return Ok(());
+            return;
         }
 
         // Warning for messages from previous and future height
@@ -55,7 +54,7 @@ impl NodeHandler {
 
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
-            return Ok(());
+            return;
         }
 
         // Queued messages from next height or round
@@ -78,24 +77,17 @@ impl NodeHandler {
                 let height = self.state.height();
                 self.execute_later(InternalRequest::JumpToRound(height, r));
             }
-            return Ok(());
+            return;
         }
         let key = *msg.author();
 
         trace!("Handle message={:?}", msg);
-        let (consensus_msg, signed) = msg.into_parts();
-        match consensus_msg {
-            ConsensusMessage::Propose(msg) => {
-                self.handle_propose(key, Message::from_parts(msg, signed)?)
-            }
-            ConsensusMessage::Prevote(msg) => {
-                self.handle_prevote(key, Message::from_parts(msg, signed)?)
-            }
-            ConsensusMessage::Precommit(msg) => {
-                self.handle_precommit(key, Message::from_parts(msg, signed)?)
-            }
+
+        match msg {
+            ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
+            ConsensusMessage::Precommit(msg) =>  self.handle_precommit(key, msg)
         }
-        Ok(())
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
@@ -420,8 +412,8 @@ impl NodeHandler {
                 self.check_propose_saved(round, &propose_hash);
                 let raw_messages = self.state
                     .prevotes(prevote_round, propose_hash)
-                    .iter()
-                    .map(|msg| msg.clone().downgrade())
+                    .into_iter()
+                    .map(| p| p.clone().into())
                     .collect::<Vec<_>>();
                 self.blockchain.save_messages(round, raw_messages);
 
@@ -530,7 +522,7 @@ impl NodeHandler {
 
         // Handle queued messages
         for msg in self.state.queued() {
-            self.handle_consensus(msg).log_error();
+            self.handle_consensus(msg);
         }
     }
 
@@ -645,7 +637,7 @@ impl NodeHandler {
 
         // Handle queued messages
         for msg in self.state.queued() {
-            self.handle_consensus(msg).log_error();
+            self.handle_consensus(msg);
         }
     }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it

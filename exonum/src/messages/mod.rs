@@ -11,42 +11,61 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//!
+//! Message represents object received from p2p network.
+//! There next flow between objects:
+//! ```text
+//! +---------+           +---------------+                 +------------+
+//! | Vec<u8> |    ->     | SignedMessage |        ->       |  Protocol  |
+//! +---------+  (verify) +---------------+  (deserialize)  +------------+
+//!                 |                             |
+//!                 V                             V
+//!              (      message dropped if failed       )
+//!
+//! ```
 
-//! Consensus and other messages and related utilities.
+#![allow(missing_docs, missing_debug_implementations)]
 use std::fmt;
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use failure::Error;
 
 use blockchain::{Transaction, TransactionSet};
-use crypto::{hash, Hash, PublicKey, SecretKey};
+use storage::StorageValue;
+use crypto::{hash, CryptoHash, Hash, PublicKey, SecretKey};
+use encoding;
 
 use hex::{FromHex, ToHex};
 
-pub use self::authorization::SignedMessage;
+pub(crate) use self::authorization::SignedMessage;
 pub use self::helpers::{BinaryForm, buffer_to_partial_enum, partial_enum_to_vec};
 pub(crate) use self::helpers::{HexStringRepresentation, BinaryFormSerialize};
 pub use self::protocol::*;
-pub(crate) use self::raw::UncheckedBuffer;
 
 #[macro_use]
 mod spec;
 mod authorization;
 mod helpers;
 mod protocol;
-mod raw;
+//mod raw;
 #[cfg(test)]
 mod test;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 /// Transaction raw buffer.
 /// This struct used to transfer transaction in network.
 pub struct RawTransaction {
     service_id: u16,
     payload: Vec<u8>,
+}
+
+pub struct TransactionFromSet<T> {
+    message_id: u16,
+    payload: T
 }
 
 impl RawTransaction {
@@ -65,165 +84,83 @@ impl RawTransaction {
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
-    /// Verify buffer and return safe message wrapper for it.
+
     pub(crate) fn verify_transaction(
-        buffer: UncheckedBuffer,
+        buffer: Vec<u8>,
     ) -> Result<Message<RawTransaction>, ::failure::Error> {
         let signed = SignedMessage::verify_buffer(buffer)?;
-        signed.into_message().map_into::<RawTransaction>()
+        Protocol::deserialize(signed)?
+                .try_into_transaction()
+            .map_err(|_| format_err!("Couldn't parse RawTransaction."))
     }
 }
 
-/// Wrappers around pair of deserialized message, and its binary form.
-// TODO: Rewrite using owning_ref
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Message<T = Protocol>
-where
-    T: ProtocolMessage,
+
+impl BinaryForm for RawTransaction {
+    fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
+        unimplemented!()
+    }
+
+    /// Converts serialized byte array into transaction.
+    fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error>{
+        unimplemented!()
+    }
+}
+
+impl<T> BinaryForm for TransactionFromSet<T>{
+    fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
+        unimplemented!()
+    }
+
+    /// Converts serialized byte array into transaction.
+    fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error>{
+        unimplemented!()
+    }
+}
+
+
+/// Wrappers around pair of concrete message payload, and full message binary form.
+/// Internally binary form saves message lossless,
+/// this important for use in a scheme with
+/// non-canonical serialization, for example with a `ProtoBuf`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+pub struct Message<T>
 {
+    //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
+    //if our serialisation format allows us
     payload: T,
     message: SignedMessage,
 }
 
-impl Message<Protocol> {
-    /// Makes new instance of map from existing,
-    /// trying convert internal payload to provided type U.
-    pub fn map_into<U: ProtocolMessage>(self) -> Result<Message<U>, Error> {
-        let (payload, message) = self.into_parts();
-        Message::from_parts(U::try_from_protocol(payload)?, message)
-    }
-}
-
-impl Message<RawTransaction> {
-    #[doc(hidden)]
-    pub fn create_raw_tx(
-        data: Vec<u8>,
-        service_id: u16,
-        service_keypair: (PublicKey, &SecretKey),
-    ) -> Message<RawTransaction> {
-        let raw = RawTransaction::new(service_id, data);
-        Message::new(raw, service_keypair.0, &service_keypair.1)
-    }
-
-    /// Creates message for transaction.
-    ///
-    /// # Panics
-    ///
-    /// On serialization fail this method can panic.
-    pub fn sign_tx<X: Transaction + BinaryForm>(
-        tx: X,
-        service_id: u16,
-        service_keypair: (PublicKey, &SecretKey),
-    ) -> Message<RawTransaction> {
-        let data = tx.serialize().unwrap();
-        Message::create_raw_tx(data, service_id, service_keypair)
-    }
-
-    #[doc(hidden)]
-    pub fn sign_tx_test<U, X>(
-        tx: X,
-        service_id: u16,
-        service_keypair: (PublicKey, &SecretKey),
-    ) -> Message<RawTransaction>
-        where
-        X: Into<U>,
-        U: TransactionSet + BinaryForm,
-    {
-        let tx = tx.into();
-        let data = BinaryForm::serialize(&tx).unwrap();
-        Message::create_raw_tx(data, service_id, service_keypair)
-    }
-    #[doc(hidden)]
-    pub fn sign_tx_set<X: TransactionSet + BinaryForm>(
-        tx: X,
-        service_id: u16,
-        service_keypair: (PublicKey, &SecretKey),
-    ) -> Message<RawTransaction> {
-        let data = BinaryForm::serialize(&tx).unwrap();
-        Message::create_raw_tx(data, service_id, service_keypair)
-    }
-}
-
 impl<T: ProtocolMessage> Message<T> {
     /// Creates new instance of message
-    pub fn new(payload: T, author: PublicKey, secret_key: &SecretKey) -> Message<T> {
-        let message =
-            SignedMessage::new(payload.clone(), author, secret_key).expect("Serialization error");
+    pub(in messages) fn new(payload: T, message: SignedMessage) -> Message<T> {
         Message { payload, message }
     }
 
-    /// Makes new instance of map from existing,
-    /// trying convert internal payload to provided type,
-    /// with helper converting method.
-    pub fn map<U, F>(self, func: F) -> Result<Message<U>, Error>
-    where
-        U: ProtocolMessage,
-        F: Fn(T) -> U,
-    {
-        let (payload, message) = self.into_parts();
-        Message::from_parts(func(payload), message)
-    }
-
-    /// Split message into payload and signed raw parts
-    pub(crate) fn into_parts(self) -> (T, SignedMessage) {
-        (self.payload, self.message)
-    }
-
-    /// Trying to convert pair of payload and signed raw message into safe message wrapper.
-    pub(crate) fn from_parts(payload: T, message: SignedMessage) -> Result<Message<T>, Error> {
-        if payload != message.authorized_message.protocol {
-            bail!("Type {:?} is not a part of exonum protocol", payload)
-        }
-        Ok(Message { payload, message })
-    }
-
-    /// Returns hahs of full message
+    /// Returns hash of full message
     pub fn hash(&self) -> Hash {
-        hash(&self.message.to_vec())
+        hash(self.message.raw())
     }
 
-    /// Returns hex representation of binary message form
-    pub fn to_hex_string(&self) -> String {
-        self.message.to_hex_string()
+//    /// Returns hex representation of binary message form
+//    pub fn to_hex_string(&self) -> String {
+//        self.message.to_hex_string()
+//    }
+
+    /// Return link to inner
+    pub fn inner(&self) -> &T {
+        &self.payload
     }
 
-    /// Downgrade `Message<T>` into root `Message<Protocol>`
-    pub fn downgrade(self) -> Message<Protocol> {
-        Message {
-            payload: self.message.authorized_message.protocol.clone(),
-            message: self.message,
-        }
-    }
-
-    /// Clones payload and returns as result
-    #[doc(hidden)]
-    pub fn clone_child(&self) -> T {
-        self.payload.clone()
+    /// Return link to signed message
+    pub(crate) fn signed_message(&self) -> &SignedMessage {
+        &self.message
     }
 
     /// Returns public key of message creator.
     pub fn author(&self) -> &PublicKey {
-        &self.message.authorized_message.author
-    }
-}
-
-impl<T: ProtocolMessage> ToHex for Message<T> {
-    fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-        self.message.write_hex(w)
-    }
-
-    fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-        self.message.write_hex_upper(w)
-    }
-}
-
-// Warning: This implementation checks signature
-impl<T: ProtocolMessage> FromHex for Message<T> {
-    type Error = Error;
-
-    fn from_hex<U: AsRef<[u8]>>(v: U) -> Result<Message<T>, Error> {
-        let s = SignedMessage::from_hex(v)?;
-        s.into_message().map_into::<T>()
+        &self.message.author()
     }
 }
 
@@ -258,5 +195,22 @@ impl<T: ProtocolMessage> Deref for Message<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.payload
+    }
+}
+
+
+impl<T> StorageValue for Message<T> {
+    fn into_bytes(self) -> Vec<u8> {
+        unimplemented!()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        unimplemented!()
+    }
+}
+
+impl<T> CryptoHash for Message<T> {
+    fn hash(&self) -> Hash {
+        unimplemented!()
     }
 }

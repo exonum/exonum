@@ -19,7 +19,7 @@ use tokio_io::codec::{Decoder, Encoder};
 use failure::Error;
 use std::mem::size_of;
 use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
-use messages::{SignedMessage, UncheckedBuffer};
+use messages::SignedMessage;
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -39,7 +39,7 @@ impl MessagesCodec {
 }
 
 impl Decoder for MessagesCodec {
-    type Item = UncheckedBuffer;
+    type Item = Vec<u8>;
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Error> {
@@ -50,16 +50,13 @@ impl Decoder for MessagesCodec {
 
         let len = LittleEndian::read_u32(buf) as usize;
 
-        // To fix some weird `decode()` behavior https://github.com/carllerche/bytes/issues/104
         if buf.len() < len + NOISE_HEADER_LENGTH {
             return Ok(None);
         }
 
         let buf = self.session.decrypt_msg(len, buf);
 
-        // Read message
-        let data = buf.to_vec();
-        Ok(Some(UncheckedBuffer::new(data)))
+        Ok(Some(buf.to_vec()))
     }
 }
 
@@ -68,8 +65,8 @@ impl Encoder for MessagesCodec {
     type Error = Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Error> {
-        let data = msg.to_vec();
-        self.session.encrypt_msg(&data, buf);
+
+        self.session.encrypt_msg(&msg.raw(), buf);
         Ok(())
     }
 }

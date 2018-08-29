@@ -186,7 +186,7 @@ where
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, Message<Protocol>> {
+    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, Protocol> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
@@ -468,7 +468,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.consensus_messages
     pub(crate) fn consensus_messages_cache_mut(
         &mut self,
-    ) -> ListIndex<&mut Fork, Message<Protocol>> {
+    ) -> ListIndex<&mut Fork, Protocol> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 

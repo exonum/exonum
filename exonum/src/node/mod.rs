@@ -46,7 +46,8 @@ use events::{
     SyncSender, TimeoutRequest,
 };
 use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{Connect, Message, ProtocolMessage, RawTransaction, SignedMessage, HexStringRepresentation};
+use messages::{Connect, Message, ProtocolMessage, Protocol,
+               RawTransaction, SignedMessage, HexStringRepresentation};
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -387,7 +388,7 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Message::new(
+        let connect = Protocol::concrete(
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
@@ -438,7 +439,7 @@ impl NodeHandler {
     }
 
     fn sign_message<T: ProtocolMessage>(&self, message: T) -> Message<T> {
-        Message::new(
+        Protocol::concrete(
             message,
             *self.state.consensus_public_key(),
             self.state.consensus_secret_key(),
@@ -524,7 +525,7 @@ impl NodeHandler {
         // the start of event processing.
         let messages = schema.consensus_messages_cache();
         for msg in messages.iter() {
-            self.handle_message(msg).log_error();
+            self.handle_message(msg);
         }
     }
 

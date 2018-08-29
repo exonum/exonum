@@ -67,7 +67,7 @@ macro_rules! encoding_struct {
         ),*
         $(,)*
     }) => (
-        #[derive(Clone, PartialEq)]
+        #[derive(Clone, PartialEq, Eq, Ord, PartialOrd)]
         $(#[$attr])*
         pub struct $name {
             raw: Vec<u8>

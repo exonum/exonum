@@ -23,7 +23,7 @@ use blockchain::Block;
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
-use messages::{Message, Precommit, RawTransaction, SignedMessage};
+use messages::{Message, Protocol, Precommit, RawTransaction, SignedMessage};
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -169,9 +169,9 @@ impl ExplorerApi {
     ) -> Result<(), ApiError> {
         use events::error::into_failure;
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::verify_buffer(buf)?
-            .into_message()
-            .map_into::<RawTransaction>()?;
+        let signed = Protocol::deserialize(SignedMessage::verify_buffer(buf)?)?
+                        .try_into_transaction()
+                        .map_err(|_|format_err!("Couldn't deserialize self message"))?;
         state
             .sender()
             .broadcast_transaction(signed)
