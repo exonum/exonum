@@ -103,8 +103,6 @@ jobs:
       apt:
         sources:
         - sourceline: 'ppa:giskou/librocksdb'
-        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
-          key_url: https://packages.microsoft.com/keys/microsoft.asc
         packages:
         - gcc
         - g++
@@ -116,7 +114,6 @@ jobs:
         - libiberty-dev
         - libsnappy-dev
         - librocksdb
-        - powershell
     install:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
@@ -127,7 +124,6 @@ jobs:
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
 
   # Benchmarks (compilation only)
