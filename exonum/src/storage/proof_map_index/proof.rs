@@ -460,6 +460,20 @@ impl<K, V> MapProof<K, V> {
     pub fn missing_keys_unchecked(&self) -> Vec<&K> {
         self.entries.iter().filter_map(|e| e.as_missing()).collect()
     }
+
+    /// Retrieves references to existing and non-existing entries in the proof.
+    ///
+    /// Existing entries have `Some` value, non-existing have `None`.
+    /// This method does not perform any integrity checks of the proof.
+    pub fn all_entries_unchecked(&self) -> Vec<(&K, Option<&V>)> {
+        self.entries
+            .iter()
+            .map(|e| match e {
+                OptionalEntry::Missing { ref missing } => (missing, None),
+                &OptionalEntry::KV { ref key, ref value } => (key, Some(value)),
+            })
+            .collect()
+    }
 }
 
 impl<K, V> MapProof<K, V>
