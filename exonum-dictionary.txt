@@ -48,6 +48,7 @@ gitter
 hashable
 healthcheck
 idempotence
+interlayer
 keepalive
 keypair
 keypairs
@@ -85,9 +86,12 @@ postvote
 precheck
 precommit
 precommits
+precommitters
 prevote
 prevotes
+prevoters
 println
+proptest
 pubkey
 pubkeys
 readonly
@@ -101,6 +105,7 @@ roadmap
 rocksdb
 roughtime
 roundtrip
+rtype
 runtimes
 rustfmt
 rustup
@@ -129,6 +134,7 @@ testdata
 testkit
 testnet
 testnetctl
+threadpool
 timestamping
 timestamps
 tlsdate
@@ -146,5 +152,6 @@ uuids
 validator
 validator's
 validators
+websockets
 whitelisted
 writeln

@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{RngCore, SeedableRng, XorShiftRng};
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
-use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
+use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use encoding::Error as MessageError;
 use messages::{Message, RawTransaction};
 use storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
+pub const DATA_SIZE: usize = 64;
 
 transactions! {
     pub TimestampingTransactions {
@@ -61,7 +62,7 @@ impl TimestampingTxGenerator {
         data_size: usize,
         keypair: (PublicKey, SecretKey),
     ) -> TimestampingTxGenerator {
-        let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
+        let rand = XorShiftRng::from_seed([9; 16]);
 
         TimestampingTxGenerator {
             rand,
@@ -103,7 +104,7 @@ impl Service for TimestampingService {
     }
 
     fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        vec![Hash::new([127; 32]), Hash::new([128; 32])]
+        vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {

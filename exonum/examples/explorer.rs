@@ -38,7 +38,7 @@ pub fn mempool_transaction() -> Message<RawTransaction> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    Message::sign_tx(
+    Protocol::sign_tx(
         CreateWallet::new(&pk_alex, "Alex"),
         SERVICE_ID,
         (pk_alex, &key_alex),
@@ -58,17 +58,17 @@ pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Message::sign_tx(
+    let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
         (pk_alice, &key_alice),
     );
-    let tx_bob = Message::sign_tx(
+    let tx_bob = Protocol::sign_tx(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
         (pk_bob, &key_bob),
     );
-    let tx_transfer = Message::sign_tx(
+    let tx_transfer = Protocol::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 100),
         SERVICE_ID,
         (pk_alice, &key_alice),
@@ -194,7 +194,7 @@ fn main() {
 
     // JSON serialization for committed transactions
     let committed_tx: TransactionInfo = explorer
-        .transaction(&block[0].content().raw().hash())
+        .transaction(&block[0].content().signed_message().hash())
         .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(

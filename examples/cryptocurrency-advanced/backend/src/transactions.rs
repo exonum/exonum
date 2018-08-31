@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Cryptocurrency transactions.
+
 // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
@@ -21,7 +23,7 @@ use exonum::{
     messages::Message, storage::Fork,
 };
 
-use schema::CurrencySchema;
+use schema::Schema;
 use CRYPTOCURRENCY_SERVICE_ID;
 
 /// Error codes emitted by wallet transactions during execution.
@@ -61,26 +63,41 @@ impl From<Error> for ExecutionError {
 }
 
 transactions! {
+    /// Transaction group.
     pub WalletTransactions {
+        const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
 
         /// Transfer `amount` of the currency from one wallet to another.
         struct Transfer {
+            /// `PublicKey` of sender's wallet.
             from:    &PublicKey,
+            /// `PublicKey` of receiver's wallet.
             to:      &PublicKey,
+            /// Amount of currency to transfer.
             amount:  u64,
+            /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+            ///
+            /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
             seed:    u64,
         }
 
         /// Issue `amount` of the currency to the `wallet`.
         struct Issue {
+            /// `PublicKey` of the wallet.
             pub_key:  &PublicKey,
+            /// Issued amount of currency.
             amount:  u64,
+            /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+            ///
+            /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
             seed:    u64,
         }
 
         /// Create wallet with the given `name`.
         struct CreateWallet {
+            /// `PublicKey` of the new wallet.
             pub_key: &PublicKey,
+            /// Name of the new wallet.
             name:    &str,
         }
     }

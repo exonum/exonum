@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Private part of the Exonum rest api.
+//! Private part of the Exonum REST API.
+//!
+//! Private API includes requests that are available only to the blockchain
+//! administrators, e.g. view the list of services on the current node.
 
 use std::{collections::HashMap, net::SocketAddr};
 
@@ -121,7 +124,8 @@ impl SystemApi {
             .handle_network_info("v1/network", api_scope)
             .handle_is_consensus_enabled("v1/consensus_enabled", api_scope)
             .handle_set_consensus_enabled("v1/consensus_enabled", api_scope)
-            .handle_shutdown("v1/shutdown", api_scope);
+            .handle_shutdown("v1/shutdown", api_scope)
+            .handle_rebroadcast("v1/rebroadcast", api_scope);
         api_scope
     }
 
@@ -198,12 +202,6 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |state: &ServiceApiState, query: ConsensusEnabledQuery| {
-                if self.shared_api_state.node_role().is_auditor() {
-                    let message = "Trying to enable consensus, but the current node is auditor\
-                                   and cannot affect consensus process";
-                    return Err(ApiError::BadRequest(message.to_owned()));
-                }
-
                 state
                     .sender()
                     .send_external_message(ExternalMessage::Enable(query.enabled))
@@ -218,6 +216,16 @@ impl SystemApi {
             state
                 .sender()
                 .send_external_message(ExternalMessage::Shutdown)
+                .map_err(ApiError::from)
+        });
+        self
+    }
+
+    fn handle_rebroadcast(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        api_scope.endpoint_mut(name, move |state: &ServiceApiState, _query: ()| {
+            state
+                .sender()
+                .send_external_message(ExternalMessage::Rebroadcast)
                 .map_err(ApiError::from)
         });
         self

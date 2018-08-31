@@ -469,7 +469,7 @@ where
 mod tests {
     use super::super::{Database, MemoryDB};
     use super::*;
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
 
@@ -505,6 +505,31 @@ mod tests {
 
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
+    }
+
+    fn methods(db: Box<dyn Database>) {
+        let mut fork = db.fork();
+        let mut map_index = MapIndex::new(IDX_NAME, &mut fork);
+
+        assert_eq!(map_index.get(&1u8), None);
+        assert!(!map_index.contains(&1u8));
+
+        map_index.put(&1u8, 1u8);
+
+        assert_eq!(map_index.get(&1u8), Some(1u8));
+        assert!(map_index.contains(&1u8));
+
+        map_index.remove(&1u8);
+
+        assert!(!map_index.contains(&1u8));
+        assert_eq!(map_index.get(&1u8), None);
+
+        map_index.put(&2u8, 2u8);
+        map_index.put(&3u8, 3u8);
+        map_index.clear();
+
+        assert!(!map_index.contains(&2u8));
+        assert!(!map_index.contains(&3u8));
     }
 
     fn iter(db: Box<dyn Database>) {
@@ -575,7 +600,7 @@ mod tests {
     }
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
     mod memorydb_tests {
@@ -585,6 +610,14 @@ mod tests {
 
         fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
+        }
+
+        #[test]
+        fn test_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::methods(db);
         }
 
         #[test]
@@ -605,6 +638,14 @@ mod tests {
             use storage::{DbOptions, RocksDB};
             let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
+        }
+
+        #[test]
+        fn test_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::methods(db);
         }
 
         #[test]

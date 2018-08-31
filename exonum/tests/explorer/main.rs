@@ -24,7 +24,7 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation}, crypto::{self, Hash},
-    explorer::*, helpers::Height, messages::{Message, RawTransaction},
+    explorer::*, helpers::Height, messages::{Message, RawTransaction, Protocol},
 };
 
 use blockchain::{

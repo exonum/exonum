@@ -14,8 +14,7 @@
 
 //! Mapping between peers public keys and IP-addresses.
 
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
+use std::{collections::BTreeMap, net::SocketAddr};
 
 use crypto::PublicKey;
 use node::{ConnectInfo, ConnectListConfig};
@@ -66,22 +65,26 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
-    use rand::{Rand, SeedableRng, XorShiftRng};
+    use rand::{RngCore, SeedableRng, XorShiftRng};
 
     use std::net::SocketAddr;
 
     use super::ConnectList;
-    use crypto::{gen_keypair, PublicKey};
+    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use node::ConnectInfo;
 
-    static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
-    static REGULAR_PEERS: [u32; 4] = [5, 6, 7, 9];
+    static VALIDATORS: [[u8; 16]; 2] = [[1; 16], [2; 16]];
+    static REGULAR_PEERS: [u8; 16] = [3; 16];
 
-    fn make_keys(source: [u32; 4], count: usize) -> Vec<PublicKey> {
+    fn make_keys(source: [u8; 16], count: usize) -> Vec<PublicKey> {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
             .into_iter()
-            .map(|_| PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap())
+            .map(|_| {
+                let mut key = [0; PUBLIC_KEY_LENGTH];
+                rng.fill_bytes(&mut key);
+                PublicKey::from_slice(&key).unwrap()
+            })
             .collect()
     }
 
@@ -175,4 +178,5 @@ mod test {
         });
         assert!(connect_list.is_address_allowed(&address));
     }
+
 }

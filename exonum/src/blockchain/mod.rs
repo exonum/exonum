@@ -232,7 +232,6 @@ impl Blockchain {
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
-            majority_count: None,
         };
 
         let patch = {
@@ -482,6 +481,12 @@ impl Blockchain {
                 // Consensus messages cache is useful only during one height, so it should be
                 // cleared when a new height is achieved.
                 schema.consensus_messages_cache_mut().clear();
+                let txs_in_block = schema.last_block().tx_count();
+                let txs_count = schema.transactions_pool_len_index().get().unwrap_or(0);
+                debug_assert!(txs_count >= u64::from(txs_in_block));
+                schema
+                    .transactions_pool_len_index_mut()
+                    .set(txs_count - u64::from(txs_in_block));
             }
             fork.into_patch()
         };
@@ -502,7 +507,7 @@ impl Blockchain {
     }
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Message<Connect>) {
+    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Message<Connect>) {
         let mut fork = self.fork();
 
         {
@@ -540,13 +545,13 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Message<T>) {
+    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Message<T>) {
         self.save_messages(round, iter::once(raw.into()));
     }
 
     /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
     /// `Fork` instance.
-    pub fn save_messages<I>(&mut self, round: Round, iter: I)
+    pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
     where
         I: IntoIterator<Item = Protocol>,
     {

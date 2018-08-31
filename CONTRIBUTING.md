@@ -60,6 +60,8 @@ but we have several additional conventions:
   Public method should be documented, but meaningful parameter names are also
   helpful for better understanding.
 
+- Prefer [nested imports] whenever possible.
+
 - Modules and imports (`use`) should be in the following order:
 
   - `extern crate`s.
@@ -86,3 +88,4 @@ but we have several additional conventions:
 [cspell]: https://github.com/Jason3S/cspell
 [markdownlint-cli]: https://github.com/igorshubovych/markdownlint-cli
 [Travis script]: .travis.yml
+[nested imports]: http://rust-lang.github.io/rfcs/2128-use-nested-groups.html

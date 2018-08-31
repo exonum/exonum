@@ -224,7 +224,7 @@ fn test_fuzz_transfers() {
             .map(|_| {
                 let (sender, receiver) = (rng.choose(keys).unwrap(), rng.choose(keys).unwrap());
                 let amount = rng.gen_range(0, 250);
-                TxTransfer::new(&sender.0, &receiver.0, amount, rng.next_u64(), &sender.1).into()
+                TxTransfer::new(&sender.0, &receiver.0, amount, rng.gen::<u64>(), &sender.1).into()
             })
             .collect();
 

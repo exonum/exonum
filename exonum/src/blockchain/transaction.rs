@@ -18,7 +18,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
-use messages::{HexStringRepresentation, Message, RawTransaction, BinaryForm};
+use messages::{HexStringRepresentation, SignedMessage, Message, RawTransaction, BinaryForm};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -60,6 +60,10 @@ impl ::std::fmt::Debug for TransactionMessage {
 }
 
 impl TransactionMessage {
+    /// Returns `SignedMessage`.
+    pub fn signed_message(&self) -> &SignedMessage {
+        unimplemented!()
+    }
     /// Returns transaction smart contract.
     pub fn transaction(&self) -> Option<&Box<dyn Transaction>> {
         self.transaction.as_ref()

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use blockchain::Schema;
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 use messages::{Protocol, SignedMessage};
 
@@ -35,12 +36,18 @@ impl NodeHandler {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
+            InternalEvent::TxVerified(tx) => {
+                // We don't care about result, because situation when transaction received twice
+                // is normal for internal messages (transaction may be received from 2+ nodes).
+               // let _ = self.handle_verified_tx(tx);
+                unimplemented!();
+            }
         }
     }
 
     fn handle_network_event(&mut self, event: NetworkEvent) -> Result<(), ::failure::Error> {
         match event {
-            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
+            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => {
@@ -60,12 +67,18 @@ impl NodeHandler {
                 info!("Send Connect message to {}", info);
                 self.state.add_peer_to_connect_list(info);
                 self.connect(&info.address);
+
+                if self.config_manager.is_some() {
+                    let connect_list_config =
+                        ConnectListConfig::from_connect_list(&self.state.connect_list());
+
+                    self.config_manager
+                        .as_ref()
+                        .unwrap()
+                        .store_connect_list(connect_list_config);
+                }
             }
             ExternalMessage::Enable(value) => {
-                if self.node_role.is_auditor() {
-                    error!("Trying to enable consensus, but the current node is auditor and cannot affect consensus process");
-                    return;
-                }
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
                     info!("Node is already {}", s);
@@ -74,11 +87,13 @@ impl NodeHandler {
                     self.api_state().set_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_enabled {
-                        self.add_round_timeout();
+                        self.add_timeouts();
+                        self.request_next_block();
                     }
                 }
             }
             ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
+            ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
         }
     }
 
@@ -103,5 +118,18 @@ impl NodeHandler {
     /// Schedule execution for later time
     pub(crate) fn execute_later(&mut self, event: InternalRequest) {
         self.channel.internal_requests.send(event).log_error();
+    }
+
+    /// Broadcasts all transactions from the pool to other validators.
+    pub(crate) fn handle_rebroadcast(&mut self) {
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(snapshot);
+        let pool = schema.transactions_pool();
+        for tx_hash in pool.iter() {
+            self.broadcast(schema
+                .transactions()
+                .get(&tx_hash)
+                .expect("Rebroadcast: invalid transaction hash"))
+        }
     }
 }

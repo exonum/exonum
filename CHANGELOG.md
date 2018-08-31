@@ -5,23 +5,141 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Breaking changes
+### Breaking Changes
+
+- `majority_count` parameter has been removed from `StoredConfiguration` and
+   moved to `ConfigurationService` configuration. (#828)
+
+- Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
 
 #### exonum
+
+- `api::Error::InternalError` now contains `failure::Error` instead of
+  `Box<::std::error::Error>`. (#879)
+
+- `TransactionSend::send` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
+
+- `ApiSender` methods `send_external_message` and `peer_add`
+   now returns `Result<(), failure::Error>` instead of `io::Result`. (#879)
+
+- `majority_count` parameter has been added to `generate-template` and
+  `generate-testnet` commands. (#828)
+
+- `NodePrivateConfig` fields have been renamed: `listen_addr` to `listen_address`
+  and `external_addr` to `external_address`. (#809)
+
+- `NodePublicConfig` `addr` field has been renamed to `address`. (#809)
+
+- Config parameter `external_address` is now a required value. (#826)
+
+- Config parameter `round_timeout` has been renamed to `first_round_timeout`.
+  Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`
+  where `round_timeout_increase` is determined as a some percentage of
+  `first_round_timeout`. Value of this percentage is defined in
+  `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
+
+### New Features
+
+#### exonum
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. (#826)
+
+- Added `v1/rebroadcast` endpoint that can be used to broadcast all transactions
+  from the pool to the other nodes. (#859)
+
+- Now each consecutive round is longer than previous by some constant percentage
+  of `first_round_timeout`. (#848)
+
+- Added `/v1/blocks/subscribe` endpoint for following block commit events
+  through WebSockets (#792).
+
+### Bug Fixes
+
+#### exonum
+
+- Bug with pool size overflow has been fixed. (#853)
+
+- Bug in `NoiseWrapper::decrypt_msg` caused by wrong calculation of
+  encrypted and decrypted message sizes has been fixed. (#873)
+
+- Transactions (signature) verification benchmark has been fixed. (#673)
+
+- Node no longer panics when transaction pool has a lot of transactions and
+  consensus is at round 0. (#673)
+
+- Node now works correctly after consensus re-enable via API. (#902)
+
+### Internal Improvements
+
+#### exonum
+
+- `NodeHandler::run_handler` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
+
+- Transactions (signature) verification benchmark has been added. (#808)
+
+- A new function `storage::proof_list_index::root_hash()` has been added
+  to efficiently compute Merkle root hash from a list of hashes without
+  an intermediate `ProofListIndex`. Verification of block root hashes
+  has been optimized as well. (#802)
+
+- `NoiseHandshake::finalize` now returns error if remote peer's public key is not
+  in `ConnectList`. (#811)
+
+- Now nodes will switch to `min_propose_timeout` for block proposal timeout
+  faster if they receive more than `propose_timeout_threshold` transactions
+  during `max_propose_timeout`. (#844)
+
+- Custom log formatting (along with `colored` and `term` dependencies) has been
+  removed in favor of `env_logger`. (#857).
+
+- Several dependencies have been updated. (#861, #865, #871)
+
+- Transactions are now verified in a thread pool. Thread pool size is set to
+  optimal value by default (CPU count) or can be configured manually. (#673)
+
+- The `finalize` command now does not include the node itself as its own
+  trusted peer in the generated configuration. (#892)
+
+## 0.9.1 - 2018-08-02
+
+### Bug Fixes
+
+#### exonum
+
+- `failure` version has been updated to `0.1.2` in order to fix the build issue
+  with `failure_derive`. (#845)
+
+- Bug with "unknown propose" execution has been fixed. (#841)
+
+## 0.9.0 - 2018-07-19
+
+### Breaking Changes
+
+#### exonum
+
+- `Command` trait in `helpers::fabric` module became public. (#778)
+
+  Migration path:
+
+  If you override `ServiceFactory::command` method and do a match by a command
+  name, just add `use helpers::fabric::Command` import.
 
 - `schema_version` field in `Block` has been removed. (#774)
 
 - Storage in exonum is now versioned. Old databases will not work with this
   update. (#707)
 
-- `Iron` based web API has been replaced by the new implementation based
-  on `actix-web`. (#727)
+- `Iron`-based web API has been replaced by the new implementation based on
+  `actix-web`. (#727)
 
   Migration path:
 
   For backend:
   - Remove old dependencies on `iron` and its companions `bodyparser`, `router`
-    and other.
+    and others.
   - Simplify the API handlers as follows:
     ```rust
     fn my_handler(state: &ServiceApiState, query: MyQueryType)
@@ -38,13 +156,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     API.
   - `get`, `get_err` and `post` methods in `TestKitApi` have been replaced
     by the more convenient `RequestBuilder`.
-    Don't forget to update your testkit based API tests.
+    Don't forget to update your testkit-based API tests.
 
   For frontend:
   - New API implementation supports only query parameters in `GET` requests.
     In this way requests like `GET api/my_method/:first/:second`
     should be replaced by the `GET api/my_method?first=value1&second=value2`.
-  - Json parser for `POST` requests became more strict.
+  - JSON parser for `POST` requests is now more strict.
     In this way you should send `null` in request body even for handlers
     without query parameters.
 
@@ -56,54 +174,88 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ServiceFactory` trait has been extended with `service_name` function.(#730)
 
 - Method `name` has been removed from `Run`, `GenerateCommonConfig`,
-  `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
-  (`helpers/fabric` module). (#731)
+  `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance`
+  structures (`helpers/fabric` module). (#731)
 
 - `Whitelist` has been replaced by `ConnectList`. Now connection between
-  nodes can only be established if nodes exist in each other connect lists. (#739)
+  nodes can only be established if nodes exist in each other's connect lists.
+  (#739)
 
   Migration path:
 
-  - Replace `[whitelist]` section in config to `[connect_list.peers]` section and
-  specify here all validator consensus public keys with corresponding ip-addresses.
+  - Replace `[whitelist]` section in config with `[connect_list.peers]` section
+  and specify here all validators' consensus public keys with corresponding
+  ip-addresses.
   For example `16ef83ca...da72 = "127.0.0.1:6333"`.
 
 - Healthcheck and consensus endpoints (`v1/healthcheck` and
   `v1/consensus_status`) have been merged to `v1/healthcheck`. (#736, #766)
 
-### New features
+- Node configuration file is now updated at `ConnectList` update. This is
+  achieved via new `ConfigManager` entity. (#777)
+
+  Migration path (required only if you create `Node` manually):
+
+  If you need to update `ConnectList` on file system, pass
+  `Some(path_to_node_config)` as the last argument of the `Node::new` method.
+  Otherwise, pass `None`.
+
+- `exonum::crypto` types now have truncated `Display`/`Debug` representations. (#797)
+
+  Migration path:
+
+  Use `encoding::serialize::ToHex` instead of `Display` to produce full hexadecimal
+  representation. You have to manually check if you need to switch or can keep using
+  the truncated representation.
+
+  Use `encoding::serialize::FromHex` instead of `FromStr` for reverse conversion.
+  `FromStr` implementation has been removed from crypto types to avoid errors.
+
+### New Features
 
 #### exonum
+
+- Existing sodiumoxide-based cryptographic backend behind opt-out
+  sodiumoxide-crypto feature. It also allows to use your own cryptographic
+  library with exonum. (#756)
 
 - New kind of CLI commands has been added: `info` command that can be used for
-  getting various information from not running node. (#731)
+  getting various information from a node that has not been started yet. (#731)
   Currently supported sub-commands:
   - `core-version` - prints Exonum version as a plain string.
-  - `list-services` - prints the list of the services the node is build with in
+  - `list-services` - prints the list of the services the node is built with in
     the JSON format.
 
-- `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
+- `exonum::crypto::x25519` module to convert keys from Ed25519 to X25519 format
   has been introduced. (#722)
 
-### Bug fixes
+- `storage::Entry` has been extended with `take` and `swap` methods. (#781)
+
+- Added remote public key validation when handling incoming `Connect` message. (#786)
+
+### Bug Fixes
 
 #### exonum
 
-- Fixed bug with incorrect peer status for turned off node. (#730)
+- Fixed bug with incorrect peer status for a turned-off node. (#730)
 
-- `handle_consensus` now does not write warning for message from previous
-  height. (#729)
+- `handle_consensus` does not write warning for message from previous
+  height any more. (#729)
 
-### Internal improvements
+- `new_in_family` constructor has been added to the `Entry` index. (#790)
+
+- Added missing `external_address` field to the auditor final configuration. (#805)
+
+### Internal Improvements
 
 - `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
   If the node does not have some transactions, requests are created
-  with the corresponding transactions. Due to these changes,
+  for the corresponding transactions. Due to these changes,
   the block size became significantly smaller. (#664)
 
 ## 0.8.1 - 2018-06-15
 
-### New features
+### New Features
 
 #### exonum
 
@@ -111,7 +263,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `RunDev` command now generates default values for api addresses in the config.
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -121,7 +273,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.8 - 2018-05-31
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
@@ -160,7 +312,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
   `ValidatorTime` to `exonum_time::api`. (#604)
 
-### New features
+### New Features
 
 #### exonum
 
@@ -200,7 +352,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Advanced cryptocurrency example becomes a public library (is published on
   crates.io). (#709)
 
-### Bug fixes
+### Bug Fixes
 
 #### exonum
 
@@ -225,7 +377,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -240,7 +392,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.7 - 2018-04-11
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
@@ -357,7 +509,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
   more predictable behavior on all systems. (#557)
 
-### New features
+### New Features
 
 #### exonum
 
@@ -406,7 +558,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - A more complex example has been added featuring best practices for service
   writing. (#595)
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -431,7 +583,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.6 - 2018-03-06
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
@@ -562,7 +714,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Renamed methods `validators_time`/`validators_time_mut` to
   `validators_times`/`validators_times_mut` in `Schema`. (#20)
 
-### New features
+### New Features
 
 #### exonum
 
@@ -597,7 +749,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Implemented error handling based on error codes (#496).
 
-### Bug fixes
+### Bug Fixes
 
 #### exonum
 
@@ -609,7 +761,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Fixed panic "can't cancel routine" during node shutdown. (#530)
 
-### Internal improvements
+### Internal Improvements
 
 #### exonum
 
@@ -620,13 +772,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.5.1 - 2018-02-01
 
-### Bug fixes
+### Bug Fixes
 
 - Fixed logger output. (#451)
 
 ## 0.5 - 2018-01-30
 
-### Breaking changes
+### Breaking Changes
 
 - The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became
   consistent. (#419)
@@ -668,7 +820,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Renamed `DBKey` to `ProofPath` and moved a part of its functionality
   to the `BitsRange` trait. (#420)
 
-### New features
+### New Features
 
 - Added `patch` method to the `Fork` structure. (#393)
 - Added a public `healthcheck` endpoint. (#405)
@@ -681,13 +833,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `run-dev` command that performs a simplified node launch
   for testing purposes. (#423)
 
-### Bug fixes
+### Bug Fixes
 
 - Fixed consensus on the threshold of 1/3 sleeping validators. (#388)
 - Fixed a bunch of inconsistencies and mistakes in the docs. (#439)
 - Fixed a bug with message header validation. (#430)
 
-### Internal improvements
+### Internal Improvements
 
 - The list of peer connections is now restored to the latest state
   after the process is restarted. (#378)

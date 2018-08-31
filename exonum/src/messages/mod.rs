@@ -44,13 +44,13 @@ pub(crate) use self::helpers::{HexStringRepresentation, BinaryFormSerialize};
 pub use self::protocol::*;
 
 #[macro_use]
-mod spec;
+mod compatibility;
 mod authorization;
 mod helpers;
 mod protocol;
 //mod raw;
 #[cfg(test)]
-mod test;
+mod tests;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;

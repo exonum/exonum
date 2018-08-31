@@ -15,14 +15,15 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
+use actix::Addr;
 use serde_json::Value;
 
 use std::{
-    collections::{HashMap, HashSet}, net::SocketAddr, sync::{Arc, RwLock},
+    collections::{HashMap, HashSet}, fmt, net::SocketAddr, sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
-use api::ServiceApiBuilder;
+use api::{websocket, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -167,9 +168,16 @@ pub trait Service: Send + Sync + 'static {
     /// [the `Service` example above](#examples).
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError>;
 
-    /// Initializes the information schema of the service
-    /// and generates an initial service configuration.
-    /// This method is called on genesis block creation.
+    /// Invoked for all deployed services during the blockchain initialization
+    /// on genesis block creation each time a node is started.
+    /// During the handling of the method the service is able to perform the following activities:
+    /// - store its own initial state to the storage [`&mut Fork`]
+    /// - return an initial [global configuration][doc:global_cfg] of the service in the JSON
+    /// format, if service has global configuration parameters. This configuration is used
+    /// to create a genesis block.
+    ///
+    /// [doc:global_cfg]: https://exonum.com/doc/architecture/services/#global-configuration.
+    /// [`&mut Fork`]: https://exonum.com/doc/architecture/storage/#forks
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
@@ -324,7 +332,7 @@ impl ServiceContext {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct ApiNodeState {
     incoming_connections: HashSet<SocketAddr>,
     outgoing_connections: HashSet<SocketAddr>,
@@ -335,6 +343,22 @@ pub struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
+    broadcast_server_address: Option<Addr<websocket::Server>>,
+}
+
+impl fmt::Debug for ApiNodeState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ApiNodeState")
+            .field("incoming_connections", &self.incoming_connections)
+            .field("outgoing_connections", &self.outgoing_connections)
+            .field("reconnects_timeout", &self.reconnects_timeout)
+            .field("peers_info", &self.peers_info)
+            .field("is_enabled", &self.is_enabled)
+            .field("node_role", &self.node_role)
+            .field("majority_count", &self.majority_count)
+            .field("validators", &self.validators)
+            .finish()
+    }
 }
 
 impl ApiNodeState {
@@ -466,11 +490,6 @@ impl SharedNodeState {
         state.is_enabled = is_enabled;
     }
 
-    pub(crate) fn node_role(&self) -> NodeRole {
-        let state = self.state.read().expect("Expected read lock.");
-        state.node_role
-    }
-
     pub(crate) fn set_node_role(&self, role: NodeRole) {
         let mut state = self.state.write().expect("Expected write lock.");
         state.node_role = role;
@@ -536,6 +555,24 @@ impl SharedNodeState {
             .expect("Expected write lock")
             .reconnects_timeout
             .remove(addr)
+    }
+
+    pub(crate) fn set_broadcast_server_address(&self, address: Addr<websocket::Server>) {
+        let mut state = self.state.write().expect("Expected write lock");
+        state.broadcast_server_address = Some(address);
+    }
+
+    /// Broadcast message to all subscribers.
+    pub(crate) fn broadcast(&self, block_hash: &Hash) {
+        if let Some(ref address) = self.state
+            .read()
+            .expect("Expected read lock")
+            .broadcast_server_address
+        {
+            address.do_send(websocket::Broadcast {
+                block_hash: *block_hash,
+            })
+        }
     }
 }
 

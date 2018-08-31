@@ -46,13 +46,14 @@ fn node_config() -> NodeConfig {
         consensus_public_key,
         consensus_secret_key,
         genesis,
-        external_address: None,
+        external_address: peer_address,
         network: Default::default(),
         connect_list: Default::default(),
         api: api_cfg,
         mempool: Default::default(),
         services_configs: Default::default(),
         database: Default::default(),
+        thread_pool_size: Default::default(),
     }
 }
 
@@ -64,6 +65,7 @@ fn main() {
         MemoryDB::new(),
         vec![Box::new(CurrencyService)],
         node_config(),
+        None,
     );
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");

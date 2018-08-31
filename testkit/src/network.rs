@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde::{Deserialize, Serialize};
+use serde_json;
+
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, CryptoHash}, helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Propose, Message},
 };
-use serde::{Deserialize, Serialize};
-use serde_json;
 
 /// Emulated test network.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -169,7 +170,7 @@ impl TestNode {
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
     ) -> Message<Propose> {
-        Message::new(Propose::new(
+        Protocol::concrete(Propose::new(
             self.validator_id
                 .expect("An attempt to create propose from a non-validator node."),
             height,
@@ -187,7 +188,7 @@ impl TestNode {
     ) -> Message<Precommit> {
         use std::time::SystemTime;
 
-        Message::new(Precommit::new(
+        Protocol::concrete(Precommit::new(
             self.validator_id
                 .expect("An attempt to create propose from a non-validator node."),
             propose.height(),
@@ -280,12 +281,6 @@ impl TestNetworkConfiguration {
     /// Modifies the height, starting from which this configuration becomes actual.
     pub fn set_actual_from(&mut self, actual_from: Height) {
         self.stored_configuration.actual_from = actual_from;
-    }
-
-    /// Modifies number of votes required to accept a new consensus configuration
-    /// (see majority_count field of the StoredConfiguration documentation).
-    pub fn set_majority_count(&mut self, majority_count: Option<u16>) {
-        self.stored_configuration.majority_count = majority_count;
     }
 
     /// Modifies the current consensus configuration.

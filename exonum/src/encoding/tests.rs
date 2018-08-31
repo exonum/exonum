@@ -363,7 +363,7 @@ fn test_connect(addr: &str) {
 
     // write
     let connect = Connect::new(socket_address, time, &user_agent::get());
-    let connect = Message::new(connect, public_key, &secret_key);
+    let connect = Protocol::concrete(connect, public_key, &secret_key);
     // read
     assert_eq!(connect.author(), &public_key);
     assert_eq!(connect.addr(), socket_address);

@@ -261,6 +261,7 @@ impl<'a> Schema<&'a mut Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use exonum::crypto::HASH_SIZE;
     use exonum::storage::{Database, MemoryDB};
 
     lazy_static! {
@@ -277,7 +278,7 @@ mod tests {
         assert_eq!(NO_VOTE.clone().into_bytes(), MaybeVote::none().into_bytes());
 
         let (pubkey, key) = crypto::gen_keypair();
-        let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
+        let vote = Vote::new(&pubkey, &Hash::new([1; HASH_SIZE]), &key);
         assert_eq!(
             vote.clone().into_bytes(),
             MaybeVote::from(vote.clone()).into_bytes()
@@ -323,8 +324,8 @@ mod tests {
     #[test]
     fn test_serialization_of_voting_decision() {
         let (pubkey, key) = crypto::gen_keypair();
-        let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
-        let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
+        let vote = Vote::new(&pubkey, &Hash::new([1; HASH_SIZE]), &key);
+        let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; HASH_SIZE]), &key);
         assert_eq!(
             vote.clone().into_bytes(),
             VotingDecision::Yea(vote.clone()).into_bytes()

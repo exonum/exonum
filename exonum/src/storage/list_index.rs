@@ -467,16 +467,17 @@ where
 #[cfg(test)]
 mod tests {
     use super::{Fork, ListIndex};
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
     fn list_index_methods(list_index: &mut ListIndex<&mut Fork, i32>) {
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.len());
         assert!(list_index.last().is_none());
+        assert_eq!(None, list_index.pop());
 
         let extended_by = vec![45, 3422, 234];
         list_index.extend(extended_by);
@@ -510,6 +511,9 @@ mod tests {
 
         assert_eq!(3, list_index.len());
         assert_eq!(Some(777), list_index.last());
+
+        list_index.clear();
+        assert_eq!(0, list_index.len());
     }
 
     fn list_index_iter(list_index: &mut ListIndex<&mut Fork, u8>) {

@@ -16,11 +16,13 @@
 extern crate exonum;
 extern crate futures;
 extern crate serde_json;
-extern crate tokio_timer;
+extern crate tokio;
+extern crate tokio_core;
 
-use futures::{sync::oneshot, Future};
+use futures::{sync::oneshot, Future, IntoFuture};
 use serde_json::Value;
-use tokio_timer::Timer;
+use tokio::util::FutureExt;
+use tokio_core::reactor::Core;
 
 use std::{
     sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
@@ -88,13 +90,13 @@ struct RunHandle {
     api_tx: ApiSender,
 }
 
-fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let node = Node::new(MemoryDB::new(), vec![service], node_cfg);
+        let node = Node::new(MemoryDB::new(), vec![service], node_cfg, None);
         let api_tx = node.channel();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || {
@@ -111,11 +113,11 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
 fn test_node_run() {
     let (nodes, commit_rxs) = run_nodes(4, 16_300);
 
-    let timer = Timer::default();
+    let mut core = Core::new().unwrap();
     let duration = Duration::from_secs(60);
     for rx in commit_rxs {
-        let rx = timer.timeout(rx.map_err(drop), duration);
-        rx.wait().unwrap();
+        let future = rx.into_future().timeout(duration).map_err(drop);
+        core.run(future).expect("failed commit");
     }
 
     for handle in nodes {
@@ -131,7 +133,7 @@ fn test_node_run() {
 fn test_node_restart_regression() {
     let start_node = |node_cfg, db, init_times| {
         let service = Box::new(InitializeCheckerService(init_times));
-        let node = Node::new(db, vec![service], node_cfg);
+        let node = Node::new(db, vec![service], node_cfg, None);
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();

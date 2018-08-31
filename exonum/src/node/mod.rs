@@ -24,30 +24,35 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
-    ApiAccess, ApiAggregator,
-};
 use failure::{self, Error};
 use futures::{sync::mpsc, Future, Sink};
+use serde::de::{self, Deserialize, Deserializer};
 use tokio_core::reactor::Core;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, net::SocketAddr, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys};
+use api::{
+    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    ApiAccess, ApiAggregator,
+};use blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_failure, log_error, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
+    error::{into_failure, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
     InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
     SyncSender, TimeoutRequest,
 };
-use helpers::{fabric::NodePublicConfig, user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{
+    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
+    Milliseconds, Round, ValidatorId,
+};
 use messages::{Connect, Message, ProtocolMessage, Protocol,
                RawTransaction, SignedMessage, HexStringRepresentation};
+use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
 mod basic;
@@ -67,6 +72,8 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
+    /// Rebroadcast transactions from the pool.
+    Rebroadcast,
 }
 
 /// Node timeout types.
@@ -117,6 +124,10 @@ pub struct NodeHandler {
     is_enabled: bool,
     /// Node role.
     node_role: NodeRole,
+    /// Configuration file manager.
+    config_manager: Option<ConfigManager>,
+    /// Can we speed up Propose with transaction pressure?
+    allow_expedited_propose: bool,
 }
 
 /// Service configuration.
@@ -148,8 +159,6 @@ pub struct ListenerConfig {
 pub struct NodeApiConfig {
     /// Timeout to update api state.
     pub state_update_timeout: usize,
-    /// Enable api endpoints for the `blockchain_explorer` on public api address.
-    pub enable_blockchain_explorer: bool,
     /// Listen address for public api endpoints.
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
@@ -170,7 +179,6 @@ impl Default for NodeApiConfig {
     fn default() -> Self {
         Self {
             state_update_timeout: 10_000,
-            enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
             public_allow_origin: None,
@@ -230,7 +238,8 @@ pub struct NodeConfig {
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
-    pub external_address: Option<SocketAddr>,
+    #[serde(deserialize_with = "deserialize_socket_address")]
+    pub external_address: SocketAddr,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Consensus public key.
@@ -253,6 +262,8 @@ pub struct NodeConfig {
     pub database: DbOptions,
     /// Node's ConnectList.
     pub connect_list: ConnectListConfig,
+    /// Transaction Verification Thread Pool size.
+    pub thread_pool_size: Option<u8>,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -322,7 +333,7 @@ impl NodeRole {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 /// ConnectList representation in node's config file.
 pub struct ConnectListConfig {
     /// Peers to which we can connect.
@@ -330,19 +341,20 @@ pub struct ConnectListConfig {
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectList` from validators public configs.
-    pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
+    /// Creates `ConnectListConfig` from validators public configs.
+    pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
         let peers = list.iter()
+            .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
-                address: config.addr,
+                address: config.address,
             })
             .collect();
 
         ConnectListConfig { peers }
     }
 
-    /// Creates `ConnectList` from validators keys and corresponding IP addresses.
+    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
         let peers = peers
             .iter()
@@ -354,6 +366,13 @@ impl ConnectListConfig {
             .collect();
 
         ConnectListConfig { peers }
+    }
+
+    /// Creates `ConnectListConfig` from `ConnectList`.
+    pub fn from_connect_list(connect_list: &SharedConnectList) -> Self {
+        ConnectListConfig {
+            peers: connect_list.peers(),
+        }
     }
 
     /// `ConnectListConfig` peers addresses.
@@ -371,6 +390,7 @@ impl NodeHandler {
         system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
+        config_file_path: Option<String>,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -416,15 +436,13 @@ impl NodeHandler {
         );
 
         let node_role = NodeRole::new(validator_id);
-
-        if node_role.is_auditor() && api_state.is_enabled() {
-            error!("Consensus is enabled but current node is auditor");
-            api_state.set_enabled(false);
-        }
-
         let is_enabled = api_state.is_enabled();
-
         api_state.set_node_role(node_role);
+
+        let config_manager = match config_file_path {
+            Some(path) => Some(ConfigManager::new(path)),
+            None => None,
+        };
 
         Self {
             blockchain,
@@ -435,6 +453,8 @@ impl NodeHandler {
             peer_discovery: config.peer_discovery,
             is_enabled,
             node_role,
+            config_manager,
+            allow_expedited_propose: true,
         }
     }
 
@@ -451,9 +471,15 @@ impl NodeHandler {
         &self.api_state
     }
 
-    /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
-    pub fn round_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().round_timeout
+    /// Returns value of the `first_round_timeout` field from the current `ConsensusConfig`.
+    pub fn first_round_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().first_round_timeout
+    }
+
+    /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
+    pub fn round_timeout_increase(&self) -> Milliseconds {
+        (self.state().consensus_config().first_round_timeout
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
@@ -516,10 +542,7 @@ impl NodeHandler {
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
-        self.add_round_timeout();
-        self.add_status_timeout();
-        self.add_peer_exchange_timeout();
-        self.add_update_api_state_timeout();
+        self.add_timeouts();
 
         // Recover cached consensus messages if any. We do this after main initialization and before
         // the start of event processing.
@@ -527,6 +550,14 @@ impl NodeHandler {
         for msg in messages.iter() {
             self.handle_message(msg);
         }
+    }
+
+    /// Runs the node's basic timers.
+    fn add_timeouts(&mut self) {
+        self.add_round_timeout();
+        self.add_status_timeout();
+        self.add_peer_exchange_timeout();
+        self.add_update_api_state_timeout();
     }
 
     /// Sends the given message to a peer by its public key.
@@ -557,27 +588,23 @@ impl NodeHandler {
         message: M,
     ) {
         trace!("Send to address: {}", address);
-        let public_key = self.state.connect_list().find_key_by_address(&address);
-
-        if let Some(public_key) = public_key {
-            trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(*address, message.into(), *public_key);
-            self.channel.network_requests.send(request).log_error();
-        } else {
-            warn!(
-                "Attempt to connect to the peer with address {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        trace!("Send to address: {}", address);
+        let request = NetworkRequest::SendMessage(*address, message.into());
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
     pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
         let peers: Vec<SocketAddr> = self.state
             .peers()
-            .values()
-            .map(|conn| conn.addr())
+            .iter()
+            .filter_map(|(pubkey, connection)| {
+                if self.state.connect_list().is_peer_allowed(pubkey) {
+                    Some(connection.addr())
+                } else {
+                    None
+                }
+            })
             .collect();
         let message = message.into();
         for address in peers {
@@ -588,16 +615,7 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-
-        if self.state.connect_list().is_address_allowed(&address) {
-            self.send_to_addr(address, connect.clone());
-        } else {
-            warn!(
-                "Attempt to connect to the peer {:?} which \
-                 is not in the ConnectList",
-                address
-            );
-        }
+        self.send_to_addr(address, connect.clone());
     }
 
     /// Add timeout request.
@@ -632,10 +650,7 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let snapshot = self.blockchain.snapshot();
-        let timeout = if Schema::new(&snapshot).transactions_pool_len()
-            >= self.propose_timeout_threshold() as usize
-        {
+        let timeout = if self.need_faster_propose() {
             self.min_propose_timeout()
         } else {
             self.max_propose_timeout()
@@ -651,6 +666,20 @@ impl NodeHandler {
         );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.add_timeout(timeout, time);
+    }
+
+    fn maybe_add_propose_timeout(&mut self) {
+        if self.allow_expedited_propose && self.need_faster_propose() {
+            info!("Add expedited propose timeout");
+            self.add_propose_timeout();
+            self.allow_expedited_propose = false;
+        }
+    }
+
+    fn need_faster_propose(&self) -> bool {
+        let snapshot = self.blockchain.snapshot();
+        let pending_tx_count = Schema::new(&snapshot).transactions_pool_len();
+        pending_tx_count >= u64::from(self.propose_timeout_threshold())
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
@@ -688,8 +717,15 @@ impl NodeHandler {
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
+        // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt
+        // Where:
+        // H - height start time
+        // t0 - Round(1) timeout length, dt - timeout increase value
+        // r - round number, r = 1,2,...
         let previous_round: u64 = round.previous().into();
-        let ms = previous_round * self.round_timeout();
+        let ms = previous_round * self.first_round_timeout()
+            + (previous_round * previous_round.saturating_sub(1)) / 2
+                * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
@@ -738,10 +774,28 @@ impl fmt::Debug for ApiSender {
     }
 }
 
+fn deserialize_socket_address<'de, D>(value: D) -> Result<SocketAddr, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let address_str: String = Deserialize::deserialize(value)?;
+    address_str
+        .to_socket_addrs()
+        .map_err(de::Error::custom)?
+        .next()
+        .ok_or_else(|| {
+            de::Error::custom(&format!(
+                "no one ip belongs to the hostname: {}",
+                address_str
+            ))
+        })
+}
+
 /// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct ConnectInfo {
     /// Peer address.
+    #[serde(deserialize_with = "deserialize_socket_address")]
     pub address: SocketAddr,
     /// Peer public key.
     pub public_key: PublicKey,
@@ -796,6 +850,7 @@ pub struct Node {
     handler: NodeHandler,
     channel: NodeChannel,
     max_message_len: u32,
+    thread_pool_size: Option<u8>,
 }
 
 impl NodeChannel {
@@ -826,6 +881,7 @@ impl Node {
         db: D,
         services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
+        config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
 
@@ -857,22 +913,17 @@ impl Node {
             peer_discovery: peers,
         };
 
-        let external_address = if let Some(v) = node_cfg.external_address {
-            v
-        } else {
-            warn!("Could not find 'external_address' in the config, using 'listen_address'");
-            node_cfg.listen_address
-        };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
-            external_address,
+            node_cfg.external_address,
             channel.node_sender(),
             system_state,
             config,
             api_state,
+            config_file_path,
         );
         Self {
             api_options: node_cfg.api,
@@ -880,6 +931,7 @@ impl Node {
             channel,
             network_config,
             max_message_len: node_cfg.genesis.consensus.max_message_len,
+            thread_pool_size: node_cfg.thread_pool_size,
         }
     }
 
@@ -888,14 +940,23 @@ impl Node {
     pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
-        let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let pool_size = self.thread_pool_size;
+        let (handler_part, network_part, internal_part) = self.into_reactor();
         let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new().map_err(into_failure)?;
             let handle = core.handle();
-            core.handle()
-                .spawn(timeouts_part.run(handle).map_err(log_error));
+
+            let mut pool_builder = ThreadPoolBuilder::new();
+            if let Some(pool_size) = pool_size {
+                pool_builder.pool_size(pool_size as usize);
+            }
+            let thread_pool = pool_builder.build();
+            let executor = thread_pool.sender().clone();
+
+            core.handle().spawn(internal_part.run(handle, executor));
+
             let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler)
                 .map(drop)
@@ -962,6 +1023,7 @@ impl Node {
         let handshake_params = HandshakeParams::new(
             *self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
+            self.state().connect_list().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
@@ -994,11 +1056,11 @@ impl Node {
             api_rx: self.channel.api_requests.1,
         };
 
-        let timeouts_part = InternalPart {
+        let internal_part = InternalPart {
             internal_tx,
             internal_requests_rx,
         };
-        (handler_part, network_part, timeouts_part)
+        (handler_part, network_part, internal_part)
     }
 
     /// Returns `Blockchain` instance.
@@ -1058,7 +1120,7 @@ mod tests {
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg);
+        let mut node = Node::new(db, services, node_cfg, None);
 
         let tx = Message::sign_tx_set::<SimpleTransactions>(
             TxSimple::new(&p_key, "Hello, World!").into(),

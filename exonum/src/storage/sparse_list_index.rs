@@ -633,13 +633,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::SparseListIndex;
-    use rand::{thread_rng, Rng};
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use storage::db::Database;
 
     const IDX_NAME: &'static str = "idx_name";
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
     fn list_index_methods(db: Box<dyn Database>) {
@@ -649,6 +649,7 @@ mod tests {
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.capacity());
         assert!(list_index.get(0).is_none());
+        assert_eq!(None, list_index.pop());
 
         let extended_by = vec![45, 3422, 234];
         list_index.extend(extended_by);
@@ -704,6 +705,9 @@ mod tests {
         // check that capacity gets overwritten by bigger index correctly
         assert_eq!(None, list_index.set(42, 1024));
         assert_eq!(43, list_index.capacity());
+
+        list_index.clear();
+        assert_eq!(0, list_index.len());
     }
 
     fn list_index_iter(db: Box<dyn Database>) {

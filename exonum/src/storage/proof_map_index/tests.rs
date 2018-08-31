@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{self, seq::sample_iter, Rng, XorShiftRng};
+use rand::{
+    self, distributions::Alphanumeric, seq::sample_iter, Rng, RngCore, SeedableRng, XorShiftRng,
+};
 use serde_json;
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
@@ -76,7 +78,35 @@ fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<([u8; KEY_S
 }
 
 fn gen_tempdir_name() -> String {
-    rand::thread_rng().gen_ascii_chars().take(10).collect()
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(10)
+        .collect()
+}
+
+fn map_methods(db: Box<dyn Database>) {
+    let mut fork = db.fork();
+    let mut index = ProofMapIndex::new(IDX_NAME, &mut fork);
+
+    assert_eq!(index.get(&[1; 32]), None);
+    assert!(!index.contains(&[1; 32]));
+
+    index.put(&[1; 32], 1u8);
+
+    assert_eq!(index.get(&[1; 32]), Some(1u8));
+    assert!(index.contains(&[1; 32]));
+
+    index.remove(&[1; 32]);
+
+    assert!(!index.contains(&[1; 32]));
+    assert_eq!(index.get(&[1; 32]), None);
+
+    index.put(&[2; 32], 2u8);
+    index.put(&[3; 32], 3u8);
+    index.clear();
+
+    assert!(!index.contains(&[2; 32]));
+    assert!(!index.contains(&[3; 32]));
 }
 
 fn insert_trivial(db1: Box<dyn Database>, db2: Box<dyn Database>) {
@@ -391,7 +421,7 @@ where
     let indexes = if batch_size < MAX_CHECKED_ELEMENTS {
         (0..batch_size).collect()
     } else {
-        let mut rng: XorShiftRng = rand::random();
+        let mut rng = XorShiftRng::from_seed(rand::random());
         sample_iter(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS).unwrap()
     };
 
@@ -424,7 +454,7 @@ fn check_multiproofs_for_data<K, V>(
         table.put(key, value.clone());
     }
 
-    let mut rng: XorShiftRng = rand::random();
+    let mut rng = XorShiftRng::from_seed(rand::random());
 
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
@@ -953,7 +983,7 @@ fn build_multiproof_simple(db: Box<dyn Database>) {
 }
 
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<dyn Database>) {
-    let mut rng: XorShiftRng = rand::random();
+    let mut rng = XorShiftRng::from_seed(rand::random());
     let batch_sizes = (7..9).map(|x| 1 << x);
 
     for batch_size in batch_sizes {
@@ -973,7 +1003,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<dyn Database>) {
 }
 
 fn fuzz_insert_build_proofs(db: Box<dyn Database>) {
-    let mut rng: XorShiftRng = rand::random();
+    let mut rng = XorShiftRng::from_seed(rand::random());
     let batch_sizes = (7..9).map(|x| (1 << x) - 1);
 
     for batch_size in batch_sizes {
@@ -990,7 +1020,7 @@ fn fuzz_insert_build_proofs(db: Box<dyn Database>) {
 }
 
 fn fuzz_insert_build_multiproofs(db: Box<dyn Database>) {
-    let mut rng: XorShiftRng = rand::random();
+    let mut rng = XorShiftRng::from_seed(rand::random());
     let batch_sizes = (7..9).map(|x| 1 << x);
 
     for batch_size in batch_sizes {
@@ -1009,7 +1039,7 @@ fn fuzz_insert_build_multiproofs(db: Box<dyn Database>) {
 fn fuzz_delete_build_proofs(db: Box<dyn Database>) {
     const SAMPLE_SIZE: usize = 200;
 
-    let mut rng: XorShiftRng = rand::random();
+    let mut rng = XorShiftRng::from_seed(rand::random());
     let data = generate_random_data_keys(SAMPLE_SIZE, &mut rng);
 
     let mut storage = db.fork();
@@ -1306,6 +1336,7 @@ macro_rules! test_on_2dbs {
 
 macro_rules! common_tests {
     {} => {
+        test_on_db!{test_map_methods, map_methods}
         test_on_2dbs!{test_insert_trivial, insert_trivial}
         test_on_db!{test_insert_same_key, insert_same_key}
         test_on_2dbs!{test_insert_simple, insert_simple}

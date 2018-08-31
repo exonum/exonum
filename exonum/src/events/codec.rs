@@ -14,11 +14,11 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use failure;
 use tokio_io::codec::{Decoder, Encoder};
+use std::mem;
 
-use failure::Error;
-use std::mem::size_of;
-use events::noise::wrapper::{NoiseWrapper, NOISE_HEADER_LENGTH};
+use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
 use messages::SignedMessage;
 
 #[derive(Debug)]
@@ -40,21 +40,22 @@ impl MessagesCodec {
 
 impl Decoder for MessagesCodec {
     type Item = Vec<u8>;
-    type Error = Error;
+    type Error = failure::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Error> {
-        // Read size
-        if buf.len() < size_of::<u32>() {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+
+        // Framing level
+        if buf.len() < mem::size_of::<u32>() {
             return Ok(None);
         }
 
         let len = LittleEndian::read_u32(buf) as usize;
 
-        if buf.len() < len + NOISE_HEADER_LENGTH {
+        if buf.len() <  NOISE_HEADER_LENGTH + len{
             return Ok(None);
         }
 
-        let buf = self.session.decrypt_msg(len, buf);
+        let mut buf = self.session.decrypt_msg(len, buf)?;
 
         Ok(Some(buf.to_vec()))
     }
@@ -62,11 +63,10 @@ impl Decoder for MessagesCodec {
 
 impl Encoder for MessagesCodec {
     type Item = SignedMessage;
-    type Error = Error;
+    type Error = failure::Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Error> {
-
-        self.session.encrypt_msg(&msg.raw(), buf);
+    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
+        self.session.encrypt_msg(msg.raw(), buf)?;
         Ok(())
     }
 }
@@ -76,43 +76,59 @@ mod test {
     use super::MessagesCodec;
 
     use bytes::BytesMut;
-    use crypto::{gen_keypair_from_seed, PublicKey, SecretKey, Seed};
-    use events::noise::wrapper::NoiseWrapper;
-    use events::noise::HandshakeParams;
-    use messages::{Message, SignedMessage};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+    use events::noise::{HandshakeParams, NoiseWrapper};
+    use messages::{MessageBuffer, RawMessage};
+    use node::state::SharedConnectList;
     use tokio_io::codec::{Decoder, Encoder};
 
-    pub fn raw_message(id: u16, tx: Vec<u8>, keypair: (PublicKey, &SecretKey)) -> SignedMessage {
-        Message::create_raw_tx(tx, id, keypair).into_parts().1
+    #[test]
+    fn decode_message_valid_header_size() {
+        let data = vec![0_u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let mut bytes: BytesMut = BytesMut::new();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data.clone()));
+        initiator.encode(raw, &mut bytes).unwrap();
+
+        match responder.decode(&mut bytes) {
+            Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
+            _ => panic!("Wrong input"),
+        };
     }
 
     #[test]
     fn decode_message_small_size_in_header() {
         let data = vec![0_u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
-        let (p, k) = gen_keypair_from_seed(&Seed::new([1; 32]));
-
-        let signed = raw_message(0, data, (p, &k));
-        let source = signed.to_vec();
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        initiator.encode(signed, &mut bytes).unwrap();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data));
+        initiator.encode(raw, &mut bytes).unwrap();
 
-        assert_eq!(
-            responder.decode(&mut bytes).unwrap().unwrap().get_vec(),
-            &source
-        );
+        assert!(responder.decode(&mut bytes).is_err());
+    }
+
+    #[test]
+    fn decode_message_zero_byte() {
+        let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let mut bytes: BytesMut = BytesMut::new();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
+        let raw = RawMessage::new(MessageBuffer::from_vec(data));
+
+        initiator.encode(raw, &mut bytes).unwrap();
+        assert!(responder.decode(&mut bytes).is_err());
     }
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-        let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+        let mut params =
+            HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
         params.set_remote_key(public_key);
 
         let mut initiator = NoiseWrapper::initiator(&params).session;
         let mut responder = NoiseWrapper::responder(&params).session;
 
-        let mut buffer_msg = vec![0u8; 1024];
-        let mut buffer_out = [0u8; 1024];
+        let mut buffer_msg = vec![0_u8; 1024];
+        let mut buffer_out = [0_u8; 1024];
 
         // Simple handshake for testing.
         let len = initiator

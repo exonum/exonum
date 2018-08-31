@@ -20,7 +20,7 @@ use serde_json::Value;
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr, ops::Deref,
-    time::{Duration, SystemTime},
+    sync::{Arc, RwLock}, time::{Duration, SystemTime},
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
@@ -29,8 +29,7 @@ use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, Consensus as ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
 };
-use node::connect_list::ConnectList;
-use node::ConnectInfo;
+use node::{connect_list::ConnectList, ConnectInfo};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -56,7 +55,7 @@ pub struct State {
     service_secret_key: SecretKey,
 
     config: StoredConfiguration,
-    connect_list: ConnectList,
+    connect_list: SharedConnectList,
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Message<Connect>>,
@@ -251,7 +250,6 @@ where
 impl RequestData {
     /// Returns timeout value of the data request.
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
             RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
@@ -381,6 +379,47 @@ impl IncompleteBlock {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+/// Shared `ConnectList` representation to be used in network.
+pub struct SharedConnectList {
+    connect_list: Arc<RwLock<ConnectList>>,
+}
+
+impl SharedConnectList {
+    /// Creates `SharedConnectList` from `ConnectList`.
+    pub fn from_connect_list(connect_list: ConnectList) -> Self {
+        SharedConnectList {
+            connect_list: Arc::new(RwLock::new(connect_list)),
+        }
+    }
+
+    /// Returns `true` if a peer with the given public key can connect.
+    pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
+        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        connect_list.is_peer_allowed(public_key)
+    }
+
+    /// Get public key corresponding to validator with `address`.
+    pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
+        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        connect_list.find_key_by_address(address).cloned()
+    }
+
+    /// Return `peers` from underlying `ConnectList`
+    pub fn peers(&self) -> Vec<ConnectInfo> {
+        self.connect_list
+            .read()
+            .expect("ConnectList read lock")
+            .peers
+            .iter()
+            .map(|(pk, a)| ConnectInfo {
+                address: *a,
+                public_key: *pk,
+            })
+            .collect()
+    }
+}
+
 impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -406,7 +445,7 @@ impl State {
             service_public_key,
             service_secret_key,
             tx_pool_capacity,
-            connect_list,
+            connect_list: SharedConnectList::from_connect_list(connect_list),
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -475,8 +514,8 @@ impl State {
     }
 
     /// Returns node's ConnectList.
-    pub fn connect_list(&self) -> &ConnectList {
-        &self.connect_list
+    pub fn connect_list(&self) -> SharedConnectList {
+        self.connect_list.clone()
     }
 
     /// Returns public (consensus and service) keys of known validators.
@@ -535,16 +574,27 @@ impl State {
         self.peers.insert(pubkey, msg).is_none()
     }
 
-    /// Removes a peer by the socket address.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
-        if let Some(pubkey) = self.connections.remove(addr) {
-            self.peers.remove(&pubkey);
-            return self.config
-                .validator_keys
-                .iter()
-                .any(|x| x.consensus_key == pubkey);
+    /// Removes a peer by the socket address. Returns `Some` public key of the peer if it was
+    /// indeed connected or `None` if there was no connection with given socket address.
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
+        let pubkey = self.connections.remove(addr);
+        if let Some(ref pubkey) = pubkey {
+            self.peers.remove(pubkey);
         }
-        false
+        pubkey
+    }
+
+    /// Checks if this node considers a peer to be a validator.
+    pub fn peer_is_validator(&self, pubkey: &PublicKey) -> bool {
+        self.config
+            .validator_keys
+            .iter()
+            .any(|x| x.consensus_key == *pubkey)
+    }
+
+    /// Checks if a peer is in this node's connection list.
+    pub fn peer_in_connect_list(&self, pubkey: &PublicKey) -> bool {
+        self.connect_list.is_peer_allowed(pubkey)
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
@@ -744,6 +794,7 @@ impl State {
         // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
+        self.unknown_proposes_with_precommits.clear();
         self.prevotes.clear();
         self.precommits.clear();
         self.validators_rounds.clear();
@@ -1053,7 +1104,10 @@ impl State {
     }
 
     /// Removes propose from the list of unknown proposes and returns its round and hash.
-    pub fn unknown_propose_with_precommits(&mut self, propose_hash: &Hash) -> Vec<(Round, Hash)> {
+    pub fn take_unknown_propose_with_precommits(
+        &mut self,
+        propose_hash: &Hash,
+    ) -> Vec<(Round, Hash)> {
         self.unknown_proposes_with_precommits
             .remove(propose_hash)
             .unwrap_or_default()
@@ -1132,6 +1186,10 @@ impl State {
 
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
-        self.connect_list.add(peer);
+        let mut list = self.connect_list
+            .connect_list
+            .write()
+            .expect("ConnectList write lock");
+        list.add(peer);
     }
 }

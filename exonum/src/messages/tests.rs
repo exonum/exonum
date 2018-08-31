@@ -12,7 +12,7 @@ fn test_blockresponse_empty_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let msg = TransactionsResponse::new(&public_key, vec![]);
-    let msg = Message::new(msg, public_key, &secret_key);
+    let msg = Protocol::concrete(msg, public_key, &secret_key);
     assert_eq!(
         TRANSACTION_RESPONSE_EMPTY_SIZE,
         msg.into_parts().1.to_vec().len()
@@ -25,7 +25,7 @@ fn test_empty_tx_size() {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
 
     let msg = RawTransaction::new(0, vec![]);
-    let msg = Message::new(msg, public_key, &secret_key);
+    let msg = Protocol::concrete(msg, public_key, &secret_key);
     assert_eq!(
         RAW_TRANSACTION_EMPTY_SIZE,
         msg.into_parts().1.to_vec().len()
@@ -49,7 +49,7 @@ fn test_block() {
     );
 
     let precommits = vec![
-        Message::new(
+        Protocol::concrete(
             Precommit::new(
                 ValidatorId(123),
                 Height(15),
@@ -61,7 +61,7 @@ fn test_block() {
             pub_key,
             &secret_key,
         ),
-        Message::new(
+        Protocol::concrete(
             Precommit::new(
                 ValidatorId(13),
                 Height(25),
@@ -73,7 +73,7 @@ fn test_block() {
             pub_key,
             &secret_key,
         ),
-        Message::new(
+        Protocol::concrete(
             Precommit::new(
                 ValidatorId(323),
                 Height(15),
@@ -87,15 +87,15 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Message::new(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
-        Message::new(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
-        Message::new(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
+        Protocol::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
+        Protocol::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
+        Protocol::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
     ];
     let precommits_buf: Vec<_> = precommits
         .iter()
         .map(|x| UncheckedBuffer::new(x.clone().into_parts().1.to_vec()))
         .collect();
-    let block = Message::new(
+    let block = Protocol::concrete(
         BlockResponse::new(
             &pub_key,
             content.clone(),

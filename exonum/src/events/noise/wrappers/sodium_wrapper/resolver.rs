@@ -1,15 +1,32 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// spell-checker:ignore chacha, privkey, authtext, ciphertext
+
 use byteorder::{ByteOrder, LittleEndian};
-use rand::{thread_rng, Rng};
-use snow::params::{CipherChoice, DHChoice, HashChoice};
-use snow::types::{Cipher, Dh, Hash, Random};
-use snow::{CryptoResolver, DefaultResolver};
+use rand::{thread_rng, RngCore};
+use snow::{
+    params::{CipherChoice, DHChoice, HashChoice}, resolvers::{CryptoResolver, DefaultResolver},
+    types::{Cipher, Dh, Hash, Random},
+};
 
-use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
-use sodiumoxide::crypto::hash::sha256 as sodium_sha256;
-
-use crypto::x25519;
 use crypto::{
-    PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+    x25519, PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
+    SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
+};
+use sodiumoxide::crypto::{
+    aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
 pub struct SodiumResolver {
@@ -31,25 +48,25 @@ impl Default for SodiumResolver {
 }
 
 impl CryptoResolver for SodiumResolver {
-    fn resolve_rng(&self) -> Option<Box<dyn Random + Send>> {
+    fn resolve_rng(&self) -> Option<Box<dyn Random>> {
         Some(Box::new(SodiumRandom::default()))
     }
 
-    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh + Send>> {
+    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
             _ => self.parent.resolve_dh(choice),
         }
     }
 
-    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash + Send>> {
+    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash>> {
         match *choice {
             HashChoice::SHA256 => Some(Box::new(SodiumSha256::default())),
             _ => self.parent.resolve_hash(choice),
         }
     }
 
-    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher + Send>> {
+    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher>> {
         match *choice {
             CipherChoice::ChaChaPoly => Some(Box::new(SodiumChaChaPoly::default())),
             _ => self.parent.resolve_cipher(choice),
@@ -68,8 +85,7 @@ impl Default for SodiumRandom {
 
 impl Random for SodiumRandom {
     fn fill_bytes(&mut self, out: &mut [u8]) {
-        let bytes: Vec<u8> = thread_rng().gen_iter::<u8>().take(out.len()).collect();
-        out.copy_from_slice(&bytes);
+        thread_rng().fill_bytes(out);
     }
 }
 
@@ -123,7 +139,7 @@ impl Dh for SodiumDh25519 {
         &self.privkey.as_ref()
     }
 
-    fn dh(&self, pubkey: &[u8], out: &mut [u8]) {
+    fn dh(&self, pubkey: &[u8], out: &mut [u8]) -> Result<(), ()> {
         assert_ne!(
             self.privkey,
             x25519::SecretKey::zero(),
@@ -134,19 +150,28 @@ impl Dh for SodiumDh25519 {
             .expect("Can't construct public key for Dh25519");
         let result = x25519::scalarmult(&self.privkey, &pubkey);
 
-        // FIXME: `snow` is able to pass incorrect public key, so this is a temporary workaround. (ECR-1726)
         if result.is_err() {
             error!("Can't calculate dh, public key {:?}", &pubkey[..]);
-            return;
+            return Err(());
         }
 
         out[..self.pub_len()].copy_from_slice(&result.unwrap()[..self.pub_len()]);
+        Ok(())
     }
 }
 
 // Chacha20poly1305 cipher.
 pub struct SodiumChaChaPoly {
     key: sodium_chacha20poly1305::Key,
+}
+
+impl SodiumChaChaPoly {
+    // In IETF version of `chacha20poly1305` nonce has 12 bytes instead of 8.
+    fn get_ietf_nonce(nonce: u64) -> sodium_chacha20poly1305::Nonce {
+        let mut nonce_bytes = [0_u8; 12];
+        LittleEndian::write_u64(&mut nonce_bytes[4..], nonce);
+        sodium_chacha20poly1305::Nonce(nonce_bytes)
+    }
 }
 
 impl Default for SodiumChaChaPoly {
@@ -174,9 +199,7 @@ impl Cipher for SodiumChaChaPoly {
             "Can't encrypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0_u8; 8];
-        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
-        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+        let nonce = Self::get_ietf_nonce(nonce);
 
         let buf = sodium_chacha20poly1305::seal(plaintext, Some(authtext), &nonce, &self.key);
 
@@ -194,12 +217,10 @@ impl Cipher for SodiumChaChaPoly {
         assert_ne!(
             self.key,
             Self::default().key,
-            "Can't dectypt with default key in SodiumChaChaPoly"
+            "Can't decrypt with default key in SodiumChaChaPoly"
         );
 
-        let mut nonce_bytes = [0_u8; 8];
-        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
-        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+        let nonce = Self::get_ietf_nonce(nonce);
 
         let result = sodium_chacha20poly1305::open(ciphertext, Some(authtext), &nonce, &self.key);
 
@@ -278,7 +299,7 @@ mod tests {
             "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
         ).unwrap();
         let mut output = [0_u8; 32];
-        keypair.dh(&public, &mut output);
+        keypair.dh(&public, &mut output).unwrap();
 
         assert_eq!(
             output,
@@ -301,10 +322,14 @@ mod tests {
 
         // Create shared secrets with public keys of each other.
         let mut our_shared_secret = [0_u8; 32];
-        keypair_a.dh(keypair_b.pubkey(), &mut our_shared_secret);
+        keypair_a
+            .dh(keypair_b.pubkey(), &mut our_shared_secret)
+            .unwrap();
 
         let mut remote_shared_secret = [0_u8; 32];
-        keypair_b.dh(keypair_a.pubkey(), &mut remote_shared_secret);
+        keypair_b
+            .dh(keypair_a.pubkey(), &mut remote_shared_secret)
+            .unwrap();
 
         // Results are expected to be the same.
         assert_eq!(our_shared_secret, remote_shared_secret);

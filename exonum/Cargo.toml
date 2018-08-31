@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -17,48 +17,50 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "=0.5.8"
-actix-web = "=0.6.13"
-log = "=0.4.1"
+actix = "=0.7.4"
+actix-web = "=0.7.3"
+log = "=0.4.4"
 byteorder = "1.2.3"
 hex = "=0.3.2"
 bit-vec = "=0.5.0"
 vec_map = "=0.8.1"
-rand = "=0.4.2"
+rand = "=0.5.5"
 serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
 erased-serde = "0.3"
+bincode = "1.0.1"
 toml = "=0.4.6"
 clap = "2.31.2"
-term = "=0.5.1"
-colored = "1.6.0"
-env_logger = "=0.5.10"
-atty = "=0.2.10"
-bytes = "=0.4.8"
-futures = "=0.1.21"
+env_logger = "=0.5.13"
+atty = "=0.2.11"
+bytes = "=0.4.9"
+futures = "=0.1.23"
+tokio = "=0.1.8"
+tokio-codec = "=0.1.0"
 tokio-core = "=0.1.17"
-tokio-io = "=0.1.6"
-tokio-retry = "=0.1.1"
-tokio-timer = "=0.1.2"
+tokio-executor = "=0.1.4"
+tokio-io = "=0.1.8"
+tokio-retry = "=0.2.0"
+tokio-threadpool = "=0.1.6"
 failure = "0.1.2"
 os_info = "1.0.1"
-chrono = { version = "=0.4.2", features = ["serde"] }
+chrono = { version = "=0.4.6", features = ["serde"] }
 uuid = { version = "=0.6.5", features = ["serde"] }
-snow = "=0.1.12"
-rust_decimal = "=0.9.0"
-bincode = "1.0.1"
+snow = "=0.3.1"
+rust_decimal = "=0.10.1"
 
 exonum_rocksdb = "0.7.4"
-exonum_sodiumoxide = "0.0.20"
+exonum_sodiumoxide = { version = "0.0.20", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "=0.5.1"
 tempdir = "=0.3.7"
 lazy_static = "1.0.1"
-proptest = "=0.7.0"
-criterion = "=0.2.3"
-num = "=0.1.42"
+proptest = "=0.8.6"
+modifier = "0.1.0"
+criterion = "=0.2.5"
+num = "=0.2.0"
 
 [[bench]]
 name = "criterion"
@@ -66,7 +68,8 @@ harness = false
 path = "benches/criterion/lib.rs"
 
 [features]
-default = []
+default = ["sodiumoxide-crypto"]
 float_serialize = []
 long_benchmarks = []
 metrics-log = []
+sodiumoxide-crypto = ["exonum_sodiumoxide"]

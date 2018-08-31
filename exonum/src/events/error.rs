@@ -14,29 +14,30 @@
 
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
-//TODO: Move this module into node helpers.
+
 use failure::Error;
-use std::error::Error as StdError;
+
+use std::{error::Error as StdError, fmt::Display};
 
 pub fn result_ok<T>(_: T) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn log_error(err: Error) {
-    error!("An error occurred: {}", err)
-}
-
-pub fn into_failure<E: StdError>(err: E) -> Error {
-    format_err!("{}", err)
+pub fn log_error<E: Display>(error: E) {
+    error!("An error occurred: {}", error)
 }
 
 pub trait LogError {
     fn log_error(self);
 }
 
+pub fn into_failure<E: StdError + Sync + Send + 'static>(error: E) -> Error {
+    Error::from_boxed_compat(Box::new(error))
+}
+
 impl<T, E> LogError for Result<T, E>
 where
-    E: ::std::fmt::Display,
+    E: Display,
 {
     fn log_error(self) {
         if let Err(error) = self {

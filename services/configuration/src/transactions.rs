@@ -14,14 +14,17 @@
 
 //! Transaction definitions for the configuration service.
 
+extern crate serde_json;
+
+use config::ConfigurationServiceConfig;
+use errors::Error as ServiceError;
 use exonum::{
     blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext},
     crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
     storage::{Fork, Snapshot},
 };
-
-use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
+use SERVICE_NAME;
 
 transactions! {
     /// Configuration Service transactions.
@@ -115,12 +118,23 @@ fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool {
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
     let votes_count = votes.iter().filter(|vote| vote.is_consent()).count();
-    let majority_count = match actual_config.majority_count {
+
+    let config: ConfigurationServiceConfig = get_service_config(&actual_config);
+
+    let majority_count = match config.majority_count {
         Some(majority_count) => majority_count as usize,
         _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
     };
 
     votes_count >= majority_count
+}
+
+fn get_service_config(config: &StoredConfiguration) -> ConfigurationServiceConfig {
+    config
+        .services
+        .get(SERVICE_NAME)
+        .map(|config| serde_json::from_value(config.clone()).expect("Configuration is invalid"))
+        .unwrap_or_default()
 }
 
 impl Propose {
@@ -175,8 +189,9 @@ impl Propose {
             return Err(ActivationInPast(current_height));
         }
 
-        if let Some(proposed_majority_count) = candidate.majority_count {
-            let proposed_majority_count = proposed_majority_count as usize;
+        let config: ConfigurationServiceConfig = get_service_config(candidate);
+
+        if let Some(proposed_majority_count) = config.majority_count.map(|count| count as usize) {
             let validators_num = candidate.validator_keys.len();
             let min_votes_count = State::byzantine_majority_count(validators_num);
 
@@ -421,6 +436,7 @@ mod tests {
     use exonum_testkit::{TestKit, TestKitBuilder};
 
     use super::{Hash, VotingDecisionRef};
+    use config::ConfigurationServiceConfig;
     use errors::Error as ServiceError;
     use tests::{new_tx_config_vote, new_tx_config_vote_against};
     use Service as ConfigurationService;
@@ -429,7 +445,9 @@ mod tests {
     fn test_vote_without_propose() {
         let testkit: TestKit = TestKitBuilder::validator()
             .with_validators(4)
-            .with_service(ConfigurationService {})
+            .with_service(ConfigurationService {
+                config: ConfigurationServiceConfig::default(),
+            })
             .create();
 
         let hash = Hash::default();

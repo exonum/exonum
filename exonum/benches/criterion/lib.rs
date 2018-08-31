@@ -17,18 +17,29 @@ extern crate criterion;
 #[macro_use]
 extern crate exonum;
 extern crate futures;
+extern crate log;
 extern crate num;
 extern crate rand;
 extern crate tempdir;
+extern crate tokio_core;
+extern crate tokio_threadpool;
 
 use block::bench_block;
 use criterion::Criterion;
 use crypto::bench_crypto;
 use storage::bench_storage;
+use transactions::bench_verify_transactions;
 
 mod block;
 mod crypto;
 mod storage;
+mod transactions;
 
-criterion_group!(benches, bench_crypto, bench_block, bench_storage);
+criterion_group!(
+    benches,
+    bench_crypto,
+    bench_block,
+    bench_storage,
+    bench_verify_transactions
+);
 criterion_main!(benches);

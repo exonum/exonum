@@ -17,7 +17,7 @@
 pub use self::{
     builder::NodeBuilder, context_key::ContextKey,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
-    maintenance::Maintenance,
+    internal::Command, maintenance::Maintenance,
     shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig},
 };
 
@@ -128,6 +128,10 @@ pub mod keys {
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.
     pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
+
+    /// Configuration file path for this node. If set, `ConfigManager` will be created.
+    /// Set by `run` command.
+    pub const NODE_CONFIG_PATH: ContextKey<String> = context_key!("node_config_path");
 
     /// Configurations for all nodes.
     /// Set by `generate-testnet` command.

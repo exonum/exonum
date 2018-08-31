@@ -257,7 +257,7 @@ impl NodeHandler {
         }
 
         // Commit propose
-        for (round, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
+        for (round, block_hash) in self.state.take_unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
             let our_block_hash = self.execute(&hash);
 
@@ -477,6 +477,8 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
+        self.api_state.broadcast(&block_hash);
+
         // Merge changes into storage
         let (committed_txs, proposer) = {
             // FIXME: Avoid of clone here. (ECR-171)
@@ -526,9 +528,11 @@ impl NodeHandler {
         }
     }
 
-    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
-    /// added to the transactions pool.
-    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) -> Result<(), failure::Error> {
+    /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
+    /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
+    pub fn handle_verified_tx(&mut self, msg: Message<RawTransaction>)
+        -> Result<(), failure::Error>
+    {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -545,6 +549,10 @@ impl NodeHandler {
             .merge(fork.into_patch())
             .expect("Unable to save transaction to persistent pool.");
 
+        if self.state.is_leader() && self.state.round() != Round::zero() {
+            self.maybe_add_propose_timeout();
+        }
+
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
         for (hash, round) in full_proposes {
@@ -559,6 +567,22 @@ impl NodeHandler {
             self.handle_full_block(block.message())?;
         }
         Ok(())
+    }
+
+    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
+    /// added to the transactions pool.
+    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) {
+        use std::error::Error;
+        let tx = match self.blockchain.tx_from_raw(&msg) {
+            Ok(tx) => tx,
+            Err(e) => {
+                let service_id = msg.service_id();
+                error!("{}, service_id={}", e.description(), service_id);
+                return;
+            }
+        };
+
+        self.execute_later(InternalRequest::VerifyTx(tx));
     }
 
     /// Handles raw transactions.
@@ -580,16 +604,20 @@ impl NodeHandler {
                 msg.author().to_hex()
             )
         }
-        let txs: Result<Vec<_>, _> = msg.transactions()
-            .into_iter()
-            .map(RawTransaction::verify_transaction)
-            .collect();
-        for tx in txs? {
-            // This is a valid case for node to receive two transactions
-            // so just ignore error about it.
-            drop(self.handle_tx(tx))
-        }
-        Ok(())
+        unimplemented!()
+//        let txs: Result<Vec<_>, _> = msg.transactions()
+//            .into_iter()
+//            .map(RawTransaction::verify_transaction)
+//            .collect();
+//        for tx in txs? {
+//            // This is a valid case for node to receive two transactions
+//            // so just ignore error about it.
+//            drop(self.handle_tx(tx))
+//        }
+//
+//        for tx in msg.transactions() {
+//            self.handle_tx(&tx);
+//        }
     }
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
@@ -597,7 +625,7 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Message<RawTransaction>) {
         trace!("Handle incoming transaction");
-        match self.handle_tx(msg.clone()) {
+        match self.handle_verified_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),
             Err(e) => error!("{}", e),
         }
@@ -686,9 +714,9 @@ impl NodeHandler {
             info!("LEADER: pool = {}", pool_len);
 
             let round = self.state.round();
-            let max_count = ::std::cmp::min(self.txs_block_limit() as usize, pool_len);
+            let max_count = ::std::cmp::min(u64::from(self.txs_block_limit()), pool_len);
 
-            let txs: Vec<Hash> = pool.iter().take(max_count).collect();
+            let txs: Vec<Hash> = pool.iter().take(max_count as usize).collect();
             let propose = self.sign_message(Propose::new(
                 validator_id,
                 self.state.height(),
@@ -701,6 +729,8 @@ impl NodeHandler {
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.clone());
+
+            self.allow_expedited_propose = true;
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);

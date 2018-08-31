@@ -23,7 +23,7 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::{Message, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
+    messages::{Message, RawTransaction, Protocol}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
 pub const SERVICE_ID: u16 = 0;
@@ -145,7 +145,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTr
     let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
-    let propose = Message::new(
+    let propose = Protocol::concrete(
         Propose::new(
             ValidatorId(0),
             height,
@@ -156,7 +156,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTr
         consensus_public_key,
         &consensus_secret_key,
     );
-    let precommit = Message::new(
+    let precommit = Protocol::concrete(
         Precommit::new(
             ValidatorId(0),
             propose.height(),

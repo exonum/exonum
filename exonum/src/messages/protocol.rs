@@ -43,12 +43,12 @@ use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 
 #[doc(hidden)]
-/// TransactionsResponse size with zero transactions inside.
-pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = 261;
+/// `SignedMessage` size with zero bytes payload.
+pub const EMPTY_SIGNED_MESSAGE_SIZE: usize = 0;
 
 #[doc(hidden)]
-/// RawTransaction size with zero transactions payload.
-pub const RAW_TRANSACTION_EMPTY_SIZE: usize = 0;
+/// `TransactionsResponse` size with zero transactions inside.
+pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + 0;
 
 encoding_struct! {
     /// Connect to a node.
@@ -496,7 +496,7 @@ impl_protocol!{
             Propose = 1,
             Prevote = 2,
         },
-        3 => Responses {
+        2 => Responses {
             TransactionsResponse = 0,
             BlockResponse = 1
         },
@@ -535,6 +535,11 @@ impl Protocol {
                                    -> Message<T> {
         T::try_from(Self::new(message, author, secret_key))
             .expect("BUG: Newly created message matched not as transaction.")
+    }
+
+    pub fn verify_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
+        let signed = SignedMessage::verify_buffer(buffer)?;
+        Self::deserialize(signed)
     }
 
     /// Creates new raw transaction message.
@@ -650,8 +655,6 @@ impl CryptoHash for Protocol {
         unimplemented!()
     }
 }
-
-
 
 impl<T: Transaction> From<T> for TransactionFromSet<T> {
     fn from(t:T) -> Self {

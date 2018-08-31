@@ -26,8 +26,8 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
-use messages::{HexStringRepresentation};
+use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
+use messages::{HexStringRepresentation, EMPTY_SIGNED_MESSAGE_SIZE};
 use helpers::{Height, Milliseconds};
 use storage::StorageValue;
 
@@ -67,10 +67,6 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Number of votes required to commit the new configuration.
-    /// This value should be greater than 2/3 and less or equal to the
-    /// validators count.
-    pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
     #[serde(default)]
@@ -92,16 +88,18 @@ pub struct StoredConfiguration {
 /// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
-    /// Interval between rounds. This interval defines the time that passes
+    /// Interval between first two rounds. This interval defines the time that passes
     /// between the moment a new block is committed to the blockchain and the
-    /// time when a new round starts, regardless of whether a new block has
+    /// time when second round starts, regardless of whether a new block has
     /// been committed during this period or not.
+    /// Each consecutive round will be longer then previous by constant factor determined
+    /// by ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT constant.
     ///
     /// Note that rounds in Exonum
     /// do not have a defined end time. Nodes in a new round can
     /// continue to vote for proposals and process messages related to previous
     /// rounds.
-    pub round_timeout: Milliseconds,
+    pub first_round_timeout: Milliseconds,
     /// Period of sending a Status message. This parameter defines the frequency
     /// with which a node broadcasts its status message to the network.
     pub status_timeout: Milliseconds,
@@ -132,6 +130,9 @@ impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
+    /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
+    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; //default value 10%
+
     /// Produces warnings if configuration contains non-optimal values.
     ///
     /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
@@ -141,11 +142,11 @@ impl ConsensusConfig {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 
-        if self.round_timeout <= 2 * self.max_propose_timeout {
+        if self.first_round_timeout <= 2 * self.max_propose_timeout {
             warn!(
-                "It is recommended that round_timeout ({}) be at least twice as large \
+                "It is recommended that first_round_timeout ({}) be at least twice as large \
                  as max_propose_timeout ({})",
-                self.round_timeout, self.max_propose_timeout
+                self.first_round_timeout, self.max_propose_timeout
             );
         }
 
@@ -156,13 +157,21 @@ impl ConsensusConfig {
                 self.txs_block_limit, MIN_TXS_BLOCK_LIMIT, MAX_TXS_BLOCK_LIMIT
             );
         }
+
+        if self.max_message_len < Self::DEFAULT_MAX_MESSAGE_LEN {
+            warn!(
+                "It is recommended that max_message_len ({}) is at least {}.",
+                self.max_message_len,
+                Self::DEFAULT_MAX_MESSAGE_LEN
+            );
+        }
     }
 }
 
 impl Default for ConsensusConfig {
     fn default() -> Self {
         Self {
-            round_timeout: 3000,
+            first_round_timeout: 3000,
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
@@ -185,6 +194,10 @@ impl StoredConfiguration {
     /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+        const MINIMAL_BODY_SIZE: usize = 256;
+        const MINIMAL_MESSAGE_LENGTH: u32 =
+            (MINIMAL_BODY_SIZE + EMPTY_SIGNED_MESSAGE_SIZE) as u32;
+
         let config: Self = serde_json::from_slice(serialized)?;
 
         // Check that there are no duplicated keys.
@@ -210,10 +223,10 @@ impl StoredConfiguration {
             )));
         }
 
-        if config.consensus.round_timeout <= config.consensus.max_propose_timeout {
+        if config.consensus.first_round_timeout <= config.consensus.max_propose_timeout {
             return Err(JsonError::custom(format!(
-                "round_timeout({}) must be strictly larger than max_propose_timeout({})",
-                config.consensus.round_timeout, config.consensus.max_propose_timeout
+                "first_round_timeout({}) must be strictly larger than max_propose_timeout({})",
+                config.consensus.first_round_timeout, config.consensus.max_propose_timeout
             )));
         }
 
@@ -222,6 +235,14 @@ impl StoredConfiguration {
             return Err(JsonError::custom(
                 "txs_block_limit should not be equal to zero",
             ));
+        }
+
+        // Check maximum message length for sanity.
+        if config.consensus.max_message_len < MINIMAL_MESSAGE_LENGTH {
+            return Err(JsonError::custom(format!(
+                "max_message_len ({}) must be at least {}",
+                config.consensus.max_message_len, MINIMAL_MESSAGE_LENGTH
+            )));
         }
 
         Ok(config)
@@ -250,7 +271,7 @@ mod tests {
     use toml;
 
     use super::*;
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
@@ -280,7 +301,7 @@ mod tests {
             service_key = "acdb0e29743f0ccb8686d0a104cb96e05abefec1538765e7595869f7dc8c49aa"
 
             [consensus]
-            round_timeout = 3000
+            first_round_timeout = 3000
             status_timeout = 5000
             peers_timeout = 10000
             txs_block_limit = 1000
@@ -327,7 +348,7 @@ mod tests {
     )]
     fn invalid_round_timeout() {
         let mut configuration = create_test_configuration();
-        configuration.consensus.round_timeout = 50;
+        configuration.consensus.first_round_timeout = 50;
         configuration.consensus.max_propose_timeout = 50;
         serialize_deserialize(&configuration);
     }
@@ -340,11 +361,19 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
+    #[test]
+    #[should_panic(expected = "max_message_len (128) must be at least 330")]
+    fn too_small_max_message_len() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.max_message_len = 128;
+        serialize_deserialize(&configuration);
+    }
+
     fn create_test_configuration() -> StoredConfiguration {
         let validator_keys = (1..4)
             .map(|i| ValidatorKeys {
-                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
-                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
+                consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
+                service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
             })
             .collect();
 
@@ -354,7 +383,6 @@ mod tests {
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
-            majority_count: None,
         }
     }
 

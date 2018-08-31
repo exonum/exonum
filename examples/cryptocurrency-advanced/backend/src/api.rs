@@ -22,16 +22,16 @@ use exonum::{
 
 use transactions::WalletTransactions;
 use wallet::Wallet;
-use {CurrencySchema, CRYPTOCURRENCY_SERVICE_ID};
+use {Schema, CRYPTOCURRENCY_SERVICE_ID};
 
-/// The structure describes the query parameters for the `get_wallet` endpoint.
+/// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct WalletQuery {
     /// Public key of the queried wallet.
     pub pub_key: PublicKey,
 }
 
-/// The structure returned by the REST API.
+/// Response to an incoming transaction returned by the REST API.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionResponse {
     /// Hash of the transaction.
@@ -41,37 +41,42 @@ pub struct TransactionResponse {
 /// Proof of existence for specific wallet.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
-    /// Proof to the whole database table.
+    /// Proof of the whole database table.
     pub to_table: MapProof<Hash, Hash>,
-    /// Proof to the specific wallet in this table.
+    /// Proof of the specific wallet in this table.
     pub to_wallet: MapProof<PublicKey, Wallet>,
 }
 
 /// Wallet history.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletHistory {
+    /// Proof of the list of transaction hashes.
     pub proof: ListProof<Hash>,
+    /// List of above transactions.
     pub transactions: Vec<WalletTransactions>,
 }
 
 /// Wallet information.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletInfo {
+    /// Proof of the last block.
     pub block_proof: BlockProof,
+    /// Proof of the appropriate wallet.
     pub wallet_proof: WalletProof,
+    /// History of the appropriate wallet.
     pub wallet_history: Option<WalletHistory>,
 }
 
-// TODO: Add documentation. (ECR-1638)
 /// Public service API description.
 #[derive(Debug, Clone, Copy)]
-pub struct CryptocurrencyApi;
+pub struct PublicApi;
 
-impl CryptocurrencyApi {
+impl PublicApi {
+    /// Endpoint for getting a single wallet.
     pub fn wallet_info(state: &ServiceApiState, query: WalletQuery) -> api::Result<WalletInfo> {
         let snapshot = state.snapshot();
         let general_schema = blockchain::Schema::new(&snapshot);
-        let currency_schema = CurrencySchema::new(&snapshot);
+        let currency_schema = Schema::new(&snapshot);
 
         let max_height = general_schema.block_hashes_by_height().len() - 1;
 
@@ -115,6 +120,7 @@ impl CryptocurrencyApi {
         })
     }
 
+    /// Endpoint for handling cryptocurrency transactions.
     pub fn post_transaction(
         state: &ServiceApiState,
         query: WalletTransactions,
@@ -125,6 +131,7 @@ impl CryptocurrencyApi {
         Ok(TransactionResponse { tx_hash })
     }
 
+    /// Wires the above endpoint to public scope of the given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()

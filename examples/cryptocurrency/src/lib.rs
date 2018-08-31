@@ -308,7 +308,7 @@ pub mod api {
             let schema = CurrencySchema::new(snapshot);
             schema
                 .wallet(&query.pub_key)
-                .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
+                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
         }
 
         /// Endpoint for dumping all wallets from the storage.

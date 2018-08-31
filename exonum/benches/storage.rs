@@ -22,20 +22,18 @@ extern crate test;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
-    use exonum::storage::{
-        proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, MemoryDB,
-        ProofListIndex, ProofMapIndex, RocksDB,
-    };
-    use rand::{Rng, SeedableRng, XorShiftRng};
-    use tempdir::TempDir;
     use test::Bencher;
+    use tempdir::TempDir;
+    use rand::{Rng, RngCore, SeedableRng, XorShiftRng};
+    use exonum::storage::{Database, DbOptions, MemoryDB, ProofListIndex, ProofMapIndex, RocksDB,
+        proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE};
 
     use std::collections::HashSet;
 
     const NAME: &str = "name";
 
     fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-        let mut rng = XorShiftRng::from_seed([1, 56, 168, 192]);
+        let mut rng = XorShiftRng::from_seed([56; 16]);
         let mut exists_keys = HashSet::new();
         let mut base = [0; KEY_SIZE];
         rng.fill_bytes(&mut base);

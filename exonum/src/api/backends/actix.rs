@@ -13,10 +13,13 @@
 // limitations under the License.
 
 //! Actix-web API backend.
+//!
+//! [Actix-web](https://github.com/actix/actix-web) is an asynchronous backend
+//! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
 pub use actix_web::middleware::cors::Cors;
 
-use actix::{msgs::SystemExit, Addr, Arbiter, Syn, System};
+use actix::{Addr, System};
 use actix_web::{
     self, error::ResponseError, server::{HttpServer, IntoHttpHandler, StopServer}, AsyncResponder,
     FromRequest, HttpMessage, HttpResponse, Query,
@@ -48,16 +51,14 @@ pub type App = actix_web::App<ServiceApiState>;
 pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
 
 /// Type alias for the `actix-web` HTTP server runtime address.
-type HttpServerAddr = Addr<Syn, HttpServer<<App as IntoHttpHandler>::Handler>>;
-/// Type alias for the `actix` system runtime address.
-type SystemAddr = Addr<Syn, System>;
+type HttpServerAddr = Addr<HttpServer<<App as IntoHttpHandler>::Handler>>;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
 pub struct RequestHandler {
     /// Endpoint name.
     pub name: String,
-    /// Endpoint http method.
+    /// Endpoint HTTP method.
     pub method: actix_web::http::Method,
     /// Inner handler.
     pub inner: Arc<RawHandler>,
@@ -90,7 +91,7 @@ impl ServiceApiBackend for ApiBuilder {
     type Backend = actix_web::Scope<ServiceApiState>;
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
-        self.handlers.push(handler);
+        self.handlers.push(sanitize(handler));
         self
     }
 
@@ -103,6 +104,14 @@ impl ServiceApiBackend for ApiBuilder {
         }
         output
     }
+}
+
+// TODO: remove this workaround for a regression in actix-web 0.7.3 (ECR-2149)
+fn sanitize(mut handler: RequestHandler) -> RequestHandler {
+    if !handler.name.starts_with('/') {
+        handler.name.insert(0, '/');
+    }
+    handler
 }
 
 impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
@@ -120,13 +129,13 @@ impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ApiError::BadRequest(err) => HttpResponse::BadRequest().json(err),
+            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
             ApiError::InternalError(err) => {
-                HttpResponse::InternalServerError().json(err.to_string())
+                HttpResponse::InternalServerError().body(err.to_string())
             }
-            ApiError::Io(err) => HttpResponse::InternalServerError().json(err.to_string()),
-            ApiError::Storage(err) => HttpResponse::InternalServerError().json(err.to_string()),
-            ApiError::NotFound(err) => HttpResponse::NotFound().json(err),
+            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
             ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
         }
     }
@@ -263,14 +272,14 @@ pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeC
 pub struct ApiRuntimeConfig {
     /// The socket address to bind.
     pub listen_address: SocketAddr,
-    /// Api access level.
+    /// API access level.
     pub access: ApiAccess,
     /// Optional App configuration.
     pub app_config: Option<AppConfig>,
 }
 
 impl ApiRuntimeConfig {
-    /// Creates api runtime configuration for the given address and access level.
+    /// Creates API runtime configuration for the given address and access level.
     pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
         Self {
             listen_address,
@@ -302,8 +311,8 @@ pub struct SystemRuntimeConfig {
 /// Actix system runtime handle.
 pub struct SystemRuntime {
     system_thread: JoinHandle<result::Result<(), failure::Error>>,
+    system: System,
     api_runtime_addresses: Vec<HttpServerAddr>,
-    system_address: SystemAddr,
 }
 
 impl SystemRuntimeConfig {
@@ -315,8 +324,8 @@ impl SystemRuntimeConfig {
 
 impl SystemRuntime {
     fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
-        // Creates system thread.
-        let (system_address_tx, system_address_rx) = mpsc::channel();
+        // Creates a system thread.
+        let (system_tx, system_rx) = mpsc::channel();
         let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
         let api_runtimes = config.api_runtimes.clone();
         let system_thread = thread::spawn(move || -> result::Result<(), failure::Error> {
@@ -340,7 +349,7 @@ impl SystemRuntime {
                     .map(|server| server.start())
             });
             // Sends addresses to the control thread.
-            system_address_tx.send(Arbiter::system())?;
+            system_tx.send(System::current())?;
             for api_handler in api_handlers {
                 api_runtime_tx.send(api_handler?)?;
             }
@@ -356,9 +365,9 @@ impl SystemRuntime {
             Ok(())
         });
         // Receives addresses of runtime items.
-        let system_address = system_address_rx
+        let system = system_rx
             .recv()
-            .map_err(|_| format_err!("Unable to receive actix system address"))?;
+            .map_err(|_| format_err!("Unable to receive actix system handle"))?;
         let api_runtime_addresses = {
             let mut api_runtime_addresses = Vec::new();
             for api_runtime in api_runtimes {
@@ -376,7 +385,7 @@ impl SystemRuntime {
 
         Ok(Self {
             system_thread,
-            system_address,
+            system,
             api_runtime_addresses,
         })
     }
@@ -392,8 +401,8 @@ impl SystemRuntime {
                     format_err!("Unable to send `StopServer` message to web api handler")
                 })?;
         }
-        self.system_address.send(SystemExit(0)).wait()?;
         // Stop actix system runtime.
+        self.system.stop();
         self.system_thread.join().map_err(|e| {
             format_err!(
                 "Unable to join actix web api thread, an error occurred: {:?}",
@@ -412,9 +421,9 @@ impl fmt::Debug for SystemRuntime {
 /// CORS header specification.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AllowOrigin {
-    /// Allow access from any host.
+    /// Allows access from any host.
     Any,
-    /// Allow access only from the following hosts.
+    /// Allows access only from the specified hosts.
     Whitelist(Vec<String>),
 }
 

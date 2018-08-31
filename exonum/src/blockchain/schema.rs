@@ -36,6 +36,7 @@ define_names!(
     TRANSACTIONS => "transactions";
     TRANSACTION_RESULTS => "transaction_results";
     TRANSACTIONS_POOL => "transactions_pool";
+    TRANSACTIONS_POOL_LEN => "transactions_pool_len";
     TRANSACTIONS_LOCATIONS => "transactions_locations";
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
@@ -110,13 +111,15 @@ where
         KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
+    /// Returns an entry that represents count of uncommitted transactions.
+    pub(crate) fn transactions_pool_len_index(&self) -> Entry<&T, u64> {
+        Entry::new(TRANSACTIONS_POOL_LEN, &self.view)
+    }
+
     /// Returns the number of transactions in the pool.
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    pub fn transactions_pool_len(&self) -> usize {
-        let pool = self.transactions_pool();
-        // TODO: Change count to other method with O(1) complexity. (ECR-977)
-        let count = pool.iter().count();
-        count
+    pub fn transactions_pool_len(&self) -> u64 {
+        let pool = self.transactions_pool_len_index();
+        pool.get().unwrap_or(0)
     }
 
     /// Returns a table that keeps the block height and transaction position inside the block for every
@@ -393,6 +396,13 @@ impl<'a> Schema<&'a mut Fork> {
         KeySetIndex::new(TRANSACTIONS_POOL, self.view)
     }
 
+    /// Mutable reference to the [`transactions_pool_len_index`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions_pool_len_index
+    pub(crate) fn transactions_pool_len_index_mut(&mut self) -> Entry<&mut Fork, u64> {
+        Entry::new(TRANSACTIONS_POOL_LEN, self.view)
+    }
+
     /// Mutable reference to the [`transactions_locations`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions_locations
@@ -516,24 +526,31 @@ impl<'a> Schema<&'a mut Fork> {
     }
 
     /// Adds transaction into the persistent pool.
+    /// This method increment `transactions_pool_len_index`,
+    /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Message<RawTransaction>) {
         self.transactions_pool_mut().insert(tx.hash());
+        let x = self.transactions_pool_len_index().get().unwrap_or(0);
+        self.transactions_pool_len_index_mut().set(x + 1);
         self.transactions_mut().put(&tx.hash(), tx);
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
-        self.transactions_pool_mut().remove(hash)
+        self.transactions_pool_mut().remove(hash);
     }
 
     /// Removes transaction from the persistent pool.
-    #[doc(hidden)]
-    pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
+    #[cfg(test)]
+    pub(crate) fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool_mut().contains(hash);
         self.transactions_pool_mut().remove(hash);
         self.transactions_mut().remove(hash);
+
         if contains {
+            let x = self.transactions_pool_len_index().get().unwrap();
+            self.transactions_pool_len_index_mut().set(x - 1);
             Ok(())
         } else {
             Err(())

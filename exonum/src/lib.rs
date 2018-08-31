@@ -29,9 +29,9 @@
           filter_map,
           // Next lints produce too much noise/false positives.
           stutter, similar_names,
-          // Variant name ends with the enum's name. Similar behavior to similar_names.
+          // Variant name ends with the enum name. Similar behavior to similar_names.
           pub_enum_variant_names,
-          // Next lints allowed due to false possitive.
+          // Next lints allowed due to false positive.
           doc_markdown,
           // Can be enabled when rust-lang-nursery/rust-clippy#2894 is fixed.
           use_self,
@@ -52,10 +52,10 @@ extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
-extern crate colored;
 extern crate env_logger;
 extern crate erased_serde;
 extern crate exonum_rocksdb as rocksdb;
+#[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
 extern crate failure;
@@ -72,12 +72,13 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate snow;
-extern crate term;
+extern crate tokio;
+extern crate tokio_codec;
 extern crate tokio_core;
+extern crate tokio_executor;
 extern crate tokio_io;
 extern crate tokio_retry;
-#[cfg(any(test, feature = "long_benchmarks"))]
-extern crate tokio_timer;
+extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;

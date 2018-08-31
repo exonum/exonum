@@ -32,8 +32,8 @@ impl NodeHandler {
             Protocol::Service(Service::Connect(msg)) => self.handle_connect(msg),
             Protocol::Service(Service::Status(msg)) => self.handle_status(msg),
             // ignore tx duplication error,
-            Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
-//            Protocol::Block(msg) => self.handle_block(msg)?,
+            //Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
+//            Protocol::Block(msg) => self.handle_block(&msg)?,
 //            Protocol::TransactionsBatch(msg) => {
 //                self.handle_txs_batch(Message::from_parts(msg, message)?)?
 //            }
@@ -44,8 +44,9 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, addr: SocketAddr, connect: Message<Connect>) {
-        info!("Received Connect message from peer: {}", addr);
+    pub fn handle_connected(&mut self, address: &SocketAddr, connect: Message<Connect>) {
+        info!("Received Connect message from peer: {:?}", address);
+        // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
         self.handle_connect(connect);
     }
 
@@ -66,9 +67,12 @@ impl NodeHandler {
     /// Removes peer from the state and from the cache. Node will try to connect to that address
     /// again if it was in the validators list.
     fn remove_peer_with_addr(&mut self, addr: SocketAddr) {
-        let need_reconnect = self.state.remove_peer_with_addr(&addr);
-        if need_reconnect {
-            self.connect(&addr);
+        if let Some(pubkey) = self.state.remove_peer_with_addr(&addr) {
+            let is_validator = self.state.peer_is_validator(&pubkey);
+            let in_connect_list = self.state.peer_in_connect_list(&pubkey);
+            if is_validator && in_connect_list {
+                self.connect(&addr);
+            }
         }
         self.blockchain.remove_peer_with_addr(&addr);
     }
@@ -76,6 +80,7 @@ impl NodeHandler {
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Message<Connect>) {
         // TODO Add spam protection (ECR-170)
+        // TODO: drop connection if checks have failed. (ECR-1837)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
             trace!("Received Connect with same address as our external_address.");

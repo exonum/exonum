@@ -38,7 +38,7 @@ use exonum_timestamping::{
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let mut testkit = TestKitBuilder::validator()
-        .with_service(Service::new())
+        .with_service(Service)
         .with_service(TimeService::with_provider(mock_provider.clone()))
         .create();
     testkit.create_blocks_until(Height(2)); // TimeService is None if no blocks were forged

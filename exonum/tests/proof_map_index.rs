@@ -30,7 +30,10 @@ use exonum::storage::{
     proof_map_index::{ProofMapKey, ProofPath}, Database, MapProof, MemoryDB, ProofMapIndex,
     Snapshot, StorageValue,
 };
-use proptest::{num::u8::BinarySearch as U8BinarySearch, prelude::*, test_runner::Config};
+use prop::{
+    array, collection::{btree_map, vec},
+};
+use proptest::{prelude::*, test_runner::Config};
 
 use std::{
     collections::{BTreeMap, BTreeSet}, fmt::Debug, ops::Range,
@@ -119,13 +122,9 @@ fn check_map_multiproof<T, K, V>(
 // Creates data a random-filled `ProofMapIndex<_, [u8; 32], u64>`.
 fn index_data<S>(key_bytes: S, elements_len: Range<usize>) -> BoxedStrategy<BTreeMap<[u8; 32], u64>>
 where
-    S: 'static + Strategy<Value = U8BinarySearch>,
+    S: 'static + Strategy<Value = u8>,
 {
-    prop::collection::btree_map(
-        prop::array::uniform32(key_bytes),
-        any::<u64>(),
-        elements_len,
-    ).boxed()
+    btree_map(array::uniform32(key_bytes), any::<u64>(), elements_len).boxed()
 }
 
 // Converts raw data to a database.
@@ -163,14 +162,13 @@ macro_rules! proof_map_tests {
 
 
             #[test]
-            #[cfg_attr(feature = "cargo-clippy", allow(useless_format))]
             fn proof_of_absence(
                 ref db in index_data($bytes, $sizes).prop_map(data_to_db),
-                key in prop::array::uniform32($bytes)
+                key in array::uniform32($bytes)
             ) {
                 let table: ProofMapIndex<_, [u8; 32], u64> =
                     ProofMapIndex::new(INDEX_NAME, db.snapshot());
-                prop_assert!(!table.contains(&key));
+                prop_assume!(!table.contains(&key));
 
                 let proof = table.get_proof(key);
                 check_map_proof(proof, None, &table);
@@ -180,7 +178,7 @@ macro_rules! proof_map_tests {
             fn multiproof_of_existing_elements(
                 (ref keys, ref db) in index_data($bytes, $sizes)
                     .prop_flat_map(|data| {
-                        (prop::collection::vec(0..data.len(), data.len() / 5), Just(data))
+                        (vec(0..data.len(), data.len() / 5), Just(data))
                     })
                     .prop_map(|(indexes, data)| {
                         // Note that keys may coincide; this is intentional.
@@ -200,14 +198,13 @@ macro_rules! proof_map_tests {
             }
 
             #[test]
-            #[cfg_attr(feature = "cargo-clippy", allow(useless_format))]
             fn multiproof_of_nonexisting_elements(
                 ref db in index_data($bytes, $sizes).prop_map(data_to_db),
-                ref keys in prop::collection::vec(prop::array::uniform32($bytes), 20)
+                ref keys in vec(array::uniform32($bytes), 20)
             ) {
                 let table: ProofMapIndex<_, [u8; 32], u64> =
                     ProofMapIndex::new(INDEX_NAME, db.snapshot());
-                prop_assert!(keys.iter().all(|key| !table.contains(key)));
+                prop_assume!(keys.iter().all(|key| !table.contains(key)));
 
                 let proof = table.get_multiproof(keys.clone());
                 let unique_keys: BTreeSet<_> = keys.iter().cloned().collect();
@@ -218,7 +215,7 @@ macro_rules! proof_map_tests {
             fn mixed_multiproof(
                 (ref keys, ref db) in index_data($bytes, $sizes)
                     .prop_flat_map(|data| {
-                        (prop::collection::vec(0..data.len(), data.len() / 5), Just(data))
+                        (vec(0..data.len(), data.len() / 5), Just(data))
                     })
                     .prop_map(|(indexes, data)| {
                         // Note that keys may coincide; this is intentional.
@@ -228,7 +225,7 @@ macro_rules! proof_map_tests {
                             .collect();
                         (keys, data_to_db(data))
                     }),
-                ref absent_keys in prop::collection::vec(prop::array::uniform32($bytes), 20)
+                ref absent_keys in vec(array::uniform32($bytes), 20)
             ) {
                 let table: ProofMapIndex<_, [u8; 32], u64> =
                     ProofMapIndex::new(INDEX_NAME, db.snapshot());

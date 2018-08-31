@@ -16,11 +16,10 @@ use test::Bencher;
 
 use std::{net::SocketAddr, thread};
 
-use crypto::{gen_keypair_from_seed, Seed};
 use events::{
-    network::NetworkConfiguration, tests::{connect_message, raw_message, TestEvents},
+    network::NetworkConfiguration, tests::{raw_message, ConnectionParams, TestEvents},
 };
-use node::EventsPoolCapacity;
+use node::{state::SharedConnectList, ConnectList, EventsPoolCapacity};
 
 struct BenchConfig {
     times: usize,
@@ -41,28 +40,36 @@ fn test_events(cfg: &BenchConfig, listen_address: SocketAddr) -> TestEvents {
 }
 
 fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
-    let (p, s) = gen_keypair_from_seed(&Seed::new([1; 32]));
-    let keypair = (p, &s);
-    let (p, k) = b.iter(|| {
+    b.iter(|| {
         let times = cfg.times;
         let len = cfg.len;
         let first = addrs[0];
         let second = addrs[1];
 
-        let c1 = connect_message(first, keypair);
-        let c2 = connect_message(second, keypair);
+        let mut connect_list = ConnectList::default();
 
-        let mut t1 = test_events(cfg, first).spawn();
-        let mut t2 = test_events(cfg, second).spawn();
+        let mut params1 = ConnectionParams::from_address(first);
+        connect_list.add(params1.connect_info);
 
-        t1.connect_with(second);
-        t2.connect_with(first);
-        assert_eq!(t1.wait_for_connect(), c2);
-        assert_eq!(t2.wait_for_connect(), c1);
+        let mut params2 = ConnectionParams::from_address(second);
+        connect_list.add(params2.connect_info);
+
+        let connect_list = SharedConnectList::from_connect_list(connect_list);
+
+        let e1 = test_events(cfg, first);
+        let e2 = test_events(cfg, second);
+
+        let mut t1 = params1.spawn(e1, connect_list.clone());
+        let mut t2 = params2.spawn(e2, connect_list);
+
+        t1.connect_with(second, params1.connect.clone());
+        t2.connect_with(first, params2.connect.clone());
+        assert_eq!(t1.wait_for_connect(), params2.connect.clone());
+        assert_eq!(t2.wait_for_connect(), params1.connect.clone());
 
         let t1 = thread::spawn(move || {
             for _ in 0..times {
-                let msg = raw_message(0, len, keypair);
+                let msg = raw_message(0, len);
                 t1.send_to(second, msg);
                 t1.wait_for_message();
             }
@@ -71,7 +78,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
 
         let t2 = thread::spawn(move || {
             for _ in 0..times {
-                let msg = raw_message(1, len, keypair);
+                let msg = raw_message(1, len);
                 t2.send_to(first, msg);
                 t2.wait_for_message();
             }
@@ -89,7 +96,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
 
         drop(t1);
         drop(t2);
-    });
+    })
 }
 
 #[bench]

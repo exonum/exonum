@@ -12,26 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use byteorder::{ByteOrder, LittleEndian};
+use bytes::BytesMut;
 use failure;
-use futures::sync::{mpsc, mpsc::Sender};
-use futures::{future::Either, Future, Sink, Stream};
-use snow::{types::Dh, wrappers::crypto_wrapper::Dh25519, NoiseBuilder};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Core;
-
-use std::net::SocketAddr;
-use std::thread;
-use std::time::Duration;
-
-use crypto::{
-    gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed, PUBLIC_KEY_LENGTH,
+use futures::{
+    future::Either, sync::{mpsc, mpsc::Sender}, Future, Sink, Stream,
 };
-use events::error::into_failure;
-use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
+use snow::{types::Dh, Builder};
+use tokio_core::{
+    net::{TcpListener, TcpStream}, reactor::Core,
+};
 use tokio_io::{AsyncRead, AsyncWrite};
 
+use std::{net::SocketAddr, thread, time::Duration};
+
+use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use events::{
+    error::into_failure,
+    noise::{
+        wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
+        HandshakeRawMessage, HandshakeResult, NoiseHandshake, NoiseWrapper, HEADER_LENGTH,
+        MAX_MESSAGE_LENGTH,
+    },
+    tests::raw_message,
+};
+use messages::RawMessage;
+use node::state::SharedConnectList;
+
 #[test]
-fn test_convert_ed_to_curve_dh() {
+#[cfg(feature = "sodiumoxide-crypto")]
+fn noise_convert_ed_to_curve_dh() {
+    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+
     // Generate Ed25519 keys for initiator and responder.
     let (public_key_i, secret_key_i) = gen_keypair();
     let (public_key_r, secret_key_r) = gen_keypair();
@@ -41,21 +53,24 @@ fn test_convert_ed_to_curve_dh() {
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
     // Do DH.
-    let mut keypair_i: Dh25519 = Default::default();
+    let mut keypair_i: SodiumDh25519 = Default::default();
     keypair_i.set(secret_key_i.as_ref());
     let mut output_i = [0_u8; PUBLIC_KEY_LENGTH];
-    keypair_i.dh(public_key_r.as_ref(), &mut output_i);
+    keypair_i.dh(public_key_r.as_ref(), &mut output_i).unwrap();
 
-    let mut keypair_r: Dh25519 = Default::default();
+    let mut keypair_r: SodiumDh25519 = Default::default();
     keypair_r.set(secret_key_r.as_ref());
     let mut output_r = [0_u8; PUBLIC_KEY_LENGTH];
-    keypair_r.dh(public_key_i.as_ref(), &mut output_r);
+    keypair_r.dh(public_key_i.as_ref(), &mut output_r).unwrap();
 
     assert_eq!(output_i, output_r);
 }
 
 #[test]
-fn test_converted_keys_handshake() {
+#[cfg(feature = "sodiumoxide-crypto")]
+fn noise_converted_keys_handshake() {
+    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+
     const MSG_SIZE: usize = 4096;
     static PATTERN: &'static str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
@@ -68,13 +83,13 @@ fn test_converted_keys_handshake() {
     let (_, secret_key_i) = into_x25519_keypair(public_key_i, secret_key_i).unwrap();
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
-    let mut h_i = NoiseBuilder::new(PATTERN.parse().unwrap())
+    let mut h_i = Builder::new(PATTERN.parse().unwrap())
         .local_private_key(secret_key_i.as_ref())
         .remote_public_key(public_key_r.as_ref())
         .build_initiator()
         .expect("Unable to create initiator");
 
-    let mut h_r = NoiseBuilder::new(PATTERN.parse().unwrap())
+    let mut h_r = Builder::new(PATTERN.parse().unwrap())
         .local_private_key(secret_key_r.as_ref())
         .build_responder()
         .expect("Unable to create responder");
@@ -94,6 +109,98 @@ fn test_converted_keys_handshake() {
 
     h_r.into_transport_mode()
         .expect("Unable to transition session into transport mode");
+}
+
+#[test]
+fn noise_encrypt_decrypt_max_message_len() {
+    let small_sizes = 0..100;
+
+    // Message sizes that must be tested:
+    // 1. 65_445 (MAX_MESSAGE_LENGTH - SIGNATURE_LENGTH - HEADER_LENGTH - 22)
+    // because in this case `raw_message_len` is divisible by (MAX_MESSAGE_LENGTH - TAG_LENGTH)
+    // 2. 65_446 (previous size + 1)
+    // from this size message is being split.
+    // 3. 130_964 - next message size when `raw_message_len` is divisible by
+    // (MAX_MESSAGE_LENGTH - TAG_LENGTH)
+    // 4. 130_965 - Size when message is being split by 3 chunks.
+    // To be sure we also test ranges near zero and near MAX_MESSAGE_LENGTH.
+    let lower_bound = MAX_MESSAGE_LENGTH - 100;
+    let upper_bound = MAX_MESSAGE_LENGTH + 100;
+
+    let near_max_sizes = lower_bound..upper_bound;
+    let big_size = vec![130964, 130965];
+
+    for size in small_sizes.chain(near_max_sizes).chain(big_size) {
+        check_encrypt_decrypt_message(size);
+    }
+}
+
+#[test]
+fn noise_encrypt_decrypt_bogus_message() {
+    let msg_size = 64;
+
+    let (mut initiator, mut responder) = create_noise_sessions();
+    let mut buffer_msg = BytesMut::with_capacity(msg_size);
+
+    initiator
+        .encrypt_msg(&vec![0_u8; msg_size], &mut buffer_msg)
+        .expect("Unable to encrypt message");
+
+    let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
+
+    // Wrong length.
+    let res = responder.decrypt_msg(len - 1, &mut buffer_msg);
+    assert!(res.unwrap_err().to_string().contains("decryption failed"));
+
+    // Wrong message.
+    let res = responder.decrypt_msg(len, &mut BytesMut::from(vec![0_u8; len + HEADER_LENGTH]));
+    assert!(res.unwrap_err().to_string().contains("decryption failed"));
+}
+
+fn check_encrypt_decrypt_message(msg_size: usize) {
+    let (mut initiator, mut responder) = create_noise_sessions();
+    let mut buffer_msg = BytesMut::with_capacity(msg_size);
+    let message = raw_message(1, msg_size);
+
+    initiator
+        .encrypt_msg(message.as_ref(), &mut buffer_msg)
+        .expect(format!("Unable to encrypt message with size {}", msg_size).as_str());
+
+    let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
+
+    let res = responder
+        .decrypt_msg(len, &mut buffer_msg)
+        .expect(format!("Unable to decrypt message with size {}", msg_size).as_str());
+    let decrypted_message = RawMessage::from_vec(res.to_vec());
+    assert_eq!(message, decrypted_message);
+}
+
+fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+
+    let mut params =
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+    params.set_remote_key(public_key);
+
+    let mut initiator = NoiseWrapper::initiator(&params);
+    let mut responder = NoiseWrapper::responder(&params);
+
+    let buffer_out = initiator.write_handshake_msg().unwrap();
+    responder.read_handshake_msg(&buffer_out).unwrap();
+
+    let buffer_out = responder.write_handshake_msg().unwrap();
+    initiator.read_handshake_msg(&buffer_out).unwrap();
+    let buffer_out = initiator.write_handshake_msg().unwrap();
+    responder.read_handshake_msg(&buffer_out).unwrap();
+
+    (
+        initiator
+            .into_transport_mode()
+            .expect("transit to transport mode"),
+        responder
+            .into_transport_mode()
+            .expect("transit to transport mode"),
+    )
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -133,13 +240,15 @@ const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-    let mut params = HandshakeParams::new(public_key, secret_key, 1024);
+    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+    let mut params =
+        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
     params.set_remote_key(public_key);
     params
 }
 
 #[test]
+#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
     let params = default_test_params();
@@ -149,15 +258,11 @@ fn test_noise_handshake_errors_ee_empty() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    //assert!(
-        listener_err
-            .unwrap();/*_err()
-            .to_string()
-            .contains("WrongMessageLength")*/
-   // );
+    listener_err.unwrap()
 }
 
 #[test]
+#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
     let params = default_test_params();
@@ -167,15 +272,11 @@ fn test_noise_handshake_errors_es_empty() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(
-        listener_err
-            .unwrap_err()
-            .to_string()
-            .contains("WrongMessageLength")
-    );
+    listener_err.unwrap()
 }
 
 #[test]
+#[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
     let params = default_test_params();
@@ -185,10 +286,11 @@ fn test_noise_handshake_errors_ee_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().to_string().contains("Decrypt"));
+    listener_err.unwrap()
 }
 
 #[test]
+#[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
     let params = default_test_params();
@@ -198,10 +300,11 @@ fn test_noise_handshake_errors_es_standard() {
     ));
     let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    assert!(listener_err.unwrap_err().to_string().contains("Decrypt"));
+    listener_err.unwrap();
 }
 
 #[test]
+#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
     let params = default_test_params();
@@ -211,15 +314,11 @@ fn test_noise_handshake_errors_ee_empty_listen() {
     ));
     let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    assert!(
-        sender_err
-            .unwrap_err()
-            .to_string()
-            .contains("WrongMessageLength")
-    );
+    sender_err.unwrap();
 }
 
 #[test]
+#[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
     let params = default_test_params();
@@ -229,19 +328,20 @@ fn test_noise_handshake_errors_ee_standard_listen() {
     ));
     let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    assert!(sender_err.unwrap_err().to_string().contains("Decrypt"));
+    sender_err.unwrap();
 }
 
 #[test]
+#[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = default_test_params();
-    let (remote_key, _) = gen_keypair();
+    let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
     params.set_remote_key(remote_key);
 
     let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);
 
-    assert!(listener_err.unwrap_err().to_string().contains("Decrypt"));
+    listener_err.unwrap();
 }
 
 // We need check result from both: sender and responder.
@@ -282,15 +382,15 @@ fn run_handshake_listener(
         TcpListener::bind(addr, &handle)
             .unwrap()
             .incoming()
-            .for_each(move |(stream, _)| {
+            .for_each(move |(stream, peer)| {
                 let err_sender = err_sender.clone();
 
                 handle.spawn({
                     let handshake = match bogus_message {
                         Some(message) => Either::A(
-                            NoiseErrorHandshake::responder(&params, message).listen(stream),
+                            NoiseErrorHandshake::responder(&params, &peer, message).listen(stream),
                         ),
-                        None => Either::B(NoiseHandshake::responder(&params).listen(stream)),
+                        None => Either::B(NoiseHandshake::responder(&params, &peer).listen(stream)),
                     };
 
                     handshake
@@ -300,7 +400,7 @@ fn run_handshake_listener(
                 });
                 Ok(())
             })
-            .map_err(|e| into_failure(e)),
+            .map_err(into_failure),
     )
 }
 
@@ -315,8 +415,8 @@ fn send_handshake(
     let stream = TcpStream::connect(&addr, &handle)
         .map_err(into_failure)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params).send(sock),
-            Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
+            None => NoiseHandshake::initiator(&params, addr).send(sock),
+            Some(message) => NoiseErrorHandshake::initiator(&params, addr, message).send(sock),
         })
         .map(|_| ());
 
@@ -332,19 +432,27 @@ struct NoiseErrorHandshake {
 }
 
 impl NoiseErrorHandshake {
-    fn initiator(params: &HandshakeParams, bogus_message: BogusMessage) -> Self {
+    fn initiator(
+        params: &HandshakeParams,
+        peer_address: &SocketAddr,
+        bogus_message: BogusMessage,
+    ) -> Self {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::initiator(params)),
+            inner: Some(NoiseHandshake::initiator(params, peer_address)),
         }
     }
 
-    fn responder(params: &HandshakeParams, bogus_message: BogusMessage) -> Self {
+    fn responder(
+        params: &HandshakeParams,
+        peer_address: &SocketAddr,
+        bogus_message: BogusMessage,
+    ) -> Self {
         NoiseErrorHandshake {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
-            inner: Some(NoiseHandshake::responder(params)),
+            inner: Some(NoiseHandshake::responder(params, peer_address)),
         }
     }
 
@@ -369,12 +477,16 @@ impl NoiseErrorHandshake {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 
-            Either::A(write(stream, msg, msg.len()).map(move |(stream, _)| {
-                self.current_step = self.current_step
-                    .next()
-                    .expect("Extra handshake step taken");
-                (stream, self)
-            }))
+            Either::A(
+                HandshakeRawMessage(msg.to_vec())
+                    .write(stream)
+                    .map(move |(stream, _)| {
+                        self.current_step = self.current_step
+                            .next()
+                            .expect("Extra handshake step taken");
+                        (stream, self)
+                    }),
+            )
         } else {
             let inner = self.inner.take().unwrap();
 

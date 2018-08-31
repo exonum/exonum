@@ -110,7 +110,7 @@ pub enum Error {
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields.
-    Other(Box<dyn StdError>),
+    Other(Box<dyn StdError + Send + Sync + 'static>),
 }
 
 impl fmt::Display for Error {
@@ -150,8 +150,8 @@ impl StdError for Error {
     }
 }
 
-impl From<Box<dyn StdError>> for Error {
-    fn from(t: Box<dyn StdError>) -> Self {
+impl From<Box<dyn StdError + Send + Sync + 'static>> for Error {
+    fn from(t: Box<dyn StdError + Send + Sync + 'static>) -> Self {
         Error::Other(t)
     }
 }
@@ -168,8 +168,3 @@ impl From<&'static str> for Error {
     }
 }
 
-impl From<Box<::bincode::ErrorKind>> for Error {
-    fn from(t: Box<::bincode::ErrorKind>) -> Error {
-        (t as Box<dyn StdError>).into()
-    }
-}
