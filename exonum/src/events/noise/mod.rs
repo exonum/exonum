@@ -44,7 +44,7 @@ pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
-type HandshakeResult<S, R> = Box<dyn Future<Item = (Framed<S, MessagesCodec>), Error = failure::Error>>;
+type HandshakeResult<S, R> = Box<dyn Future<Item = (Framed<S, MessagesCodec>, R), Error = failure::Error>>;
 
 pub trait Handshake {
     type Result;

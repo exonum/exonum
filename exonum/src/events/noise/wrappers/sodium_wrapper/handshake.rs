@@ -17,7 +17,7 @@ use futures::future::{done, Future};
 use tokio_codec::{Decoder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::{io, net::SocketAddr};
+use std::net::SocketAddr;
 
 use super::wrapper::NoiseWrapper;
 use crypto::{
@@ -216,6 +216,7 @@ impl Handshake for NoiseHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
+        let peer_address = self.peer_address;
         match self.peers_exchange.clone() {
             Some(peers_exchange) => {
                 let framed = self.write_handshake_msg(stream, &[])
@@ -230,7 +231,7 @@ impl Handshake for NoiseHandshake {
                 });
                 Box::new(framed)
             }
-            None => Box::new(future::err(other_error(
+            None => Box::new(future::err(format_err!(
                 "Can't send handshake request without PeersExchange",
             ))),
         }

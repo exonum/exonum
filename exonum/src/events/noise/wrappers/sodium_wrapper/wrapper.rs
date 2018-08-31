@@ -81,7 +81,7 @@ impl NoiseWrapper {
     pub fn write_handshake_msg(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         // Payload in handshake messages can be empty.
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
-        let len = self.write(&[], &mut buf)?;
+        let len = self.write(msg, &mut buf)?;
         buf.truncate(len);
         Ok(buf)
     }

@@ -33,7 +33,7 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
-    Borrow::Cow, collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
+    borrow::Cow, collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 
@@ -52,7 +52,7 @@ use events::{
     SyncSender, TimeoutRequest,
 };
 use helpers::{
-    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
+    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, Height,
     Milliseconds, Round, ValidatorId,
 };
 use messages::RawMessage;
@@ -591,7 +591,7 @@ impl NodeHandler {
             .iter()
             .filter_map(|(pubkey, connection)| {
                 if self.state.connect_list().is_peer_allowed(pubkey) {
-                    Some(connection.addr())
+                    Some(connection.address)
                 } else {
                     None
                 }

@@ -123,7 +123,7 @@ impl ConnectionsPool {
         handle: &Handle,
         network_config: NetworkConfiguration,
         handshake_params: &HandshakeParams,
-    ) -> Option<Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>> {
+    ) -> Option<Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error>>> {
         self.get(peer)
             .or_else(|| {
                 self.clone().connect_to_peer(
@@ -362,14 +362,14 @@ impl RequestHandler {
     fn send_unable_connect_event(
         peer: SocketAddr,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> Box<dyn Future<Item = (), Error = io::Error>> {
+    ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let event = NetworkEvent::UnableConnectToPeer(peer);
         Box::new(
             network_tx
                 .clone()
                 .send(event)
                 .map(drop)
-                .map_err(|_| other_error("can't send network event")),
+                .map_err(|_| format_err!("can't send network event")),
         )
     }
 }
@@ -418,7 +418,7 @@ impl Listener {
                 trace!("Accepted incoming connection with peer={}", address);
                 let network_tx = network_tx.clone();
 
-            let handshake = NoiseHandshake::responder(&handshake_params);
+                let handshake = NoiseHandshake::responder(&handshake_params, &address);
             let connection_handler = handshake
                 .listen(sock)
                 .and_then(|(stream, raw)| (Ok(stream), Self::parse_peers_exchange(raw)))
@@ -443,13 +443,13 @@ impl Listener {
         Ok(Listener(to_box(server)))
     }
 
-    fn parse_peers_exchange(raw: Vec<u8>) -> Result<PeersExchange, io::Error> {
+    fn parse_peers_exchange(raw: Vec<u8>) -> Result<PeersExchange, failure::Error> {
         let raw = RawMessage::from_vec(raw);
         let raw = Any::from_raw(raw);
         match raw {
             Ok(Any::PeersExchange(connect)) => Ok(connect),
-            _ => Err(other_error(
-                "Missing PeersExchange message from the remote peer".to_string(),
+            _ => Err(format_err!(
+                "Missing PeersExchange message from the remote peer",
             )),
         }
     }
@@ -483,10 +483,9 @@ impl Future for Listener {
     }
 }
 
-fn to_future<F, I, E>(fut: F) -> Box<dyn Future<Item = I, Error = E>>
+fn to_future<F, I>(fut: F) -> Box<dyn Future<Item = I, Error = failure::Error>>
 where
-    F: IntoFuture<Item = I, Error = E> + 'static,
-    E: failure::Error,
+    F: IntoFuture<Item = I, Error = failure::Error> + 'static,
 {
     Box::new(fut.into_future())
 }
