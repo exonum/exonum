@@ -170,7 +170,8 @@
         const seed = this.$blockchain.generateSeed()
 
         try {
-          const data = await this.$blockchain.addFunds(this.keyPair, this.amountToAdd, seed)
+          await this.$blockchain.addFunds(this.keyPair, this.amountToAdd, seed)
+          const data = await this.$blockchain.getWallet(this.keyPair.publicKey)
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false
@@ -195,7 +196,8 @@
         const seed = this.$blockchain.generateSeed()
 
         try {
-          const data = await this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer, seed)
+          await this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer, seed)
+          const data = await this.$blockchain.getWallet(this.keyPair.publicKey)
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false

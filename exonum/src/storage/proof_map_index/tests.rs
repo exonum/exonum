@@ -84,6 +84,31 @@ fn gen_tempdir_name() -> String {
         .collect()
 }
 
+fn map_methods(db: Box<dyn Database>) {
+    let mut fork = db.fork();
+    let mut index = ProofMapIndex::new(IDX_NAME, &mut fork);
+
+    assert_eq!(index.get(&[1; 32]), None);
+    assert!(!index.contains(&[1; 32]));
+
+    index.put(&[1; 32], 1u8);
+
+    assert_eq!(index.get(&[1; 32]), Some(1u8));
+    assert!(index.contains(&[1; 32]));
+
+    index.remove(&[1; 32]);
+
+    assert!(!index.contains(&[1; 32]));
+    assert_eq!(index.get(&[1; 32]), None);
+
+    index.put(&[2; 32], 2u8);
+    index.put(&[3; 32], 3u8);
+    index.clear();
+
+    assert!(!index.contains(&[2; 32]));
+    assert!(!index.contains(&[3; 32]));
+}
+
 fn insert_trivial(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     let mut storage1 = db1.fork();
     let mut storage2 = db2.fork();
@@ -1311,6 +1336,7 @@ macro_rules! test_on_2dbs {
 
 macro_rules! common_tests {
     {} => {
+        test_on_db!{test_map_methods, map_methods}
         test_on_2dbs!{test_insert_trivial, insert_trivial}
         test_on_db!{test_insert_same_key, insert_same_key}
         test_on_2dbs!{test_insert_simple, insert_simple}

@@ -29,7 +29,7 @@ impl NodeHandler {
             Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
             Ok(Any::Request(msg)) => self.handle_request(msg),
             Ok(Any::Block(msg)) => self.handle_block(&msg),
-            Ok(Any::Transaction(msg)) => self.handle_tx(msg),
+            Ok(Any::Transaction(msg)) => self.handle_tx(&msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
             Ok(Any::PeersExchange(msg)) => self.handle_peers_exchange(&msg),
             Err(err) => {
@@ -62,9 +62,12 @@ impl NodeHandler {
     /// Removes peer from the state and from the cache. Node will try to connect to that address
     /// again if it was in the validators list.
     fn remove_peer_with_addr(&mut self, addr: SocketAddr) {
-        let need_reconnect = self.state.remove_peer_with_addr(&addr);
-        if need_reconnect {
-            self.connect(&addr);
+        if let Some(pubkey) = self.state.remove_peer_with_addr(&addr) {
+            let is_validator = self.state.peer_is_validator(&pubkey);
+            let in_connect_list = self.state.peer_in_connect_list(&pubkey);
+            if is_validator && in_connect_list {
+                self.connect(&addr);
+            }
         }
         self.blockchain.remove_peer_with_addr(&addr);
     }

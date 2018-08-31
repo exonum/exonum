@@ -209,6 +209,7 @@ pub fn generate_testnet_config(
             mempool: Default::default(),
             services_configs: service_config.clone(),
             database: Default::default(),
+            thread_pool_size: Default::default(),
         })
         .collect::<Vec<_>>()
 }
