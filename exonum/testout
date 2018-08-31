@@ -1,0 +1,136 @@
+
+running 95 tests
+test sandbox::consensus::basic::test_one_validator ... ok
+ERROR 2018-08-31T14:23:46.949315000Z: exonum::node::consensus: Received propose with wrong last_block_hash msg=Propose { validator: ValidatorId(3), height: Height(1), round: Round(4), prev_hash: Hash(b2df4f32...), transactions: [] }
+test sandbox::consensus::basic::test_reach_actual_round ... ok
+test sandbox::consensus::basic::test_query_state_hash ... ok
+test sandbox::consensus::basic::test_reach_one_height ... ok
+test sandbox::consensus::basic::test_reach_one_height_repeatable ... ok
+test sandbox::consensus::basic::test_retrieve_block_and_precommits ... ok
+test sandbox::consensus::block_request::handle_block_response_tx_in_pool ... ok
+test sandbox::consensus::basic::test_check_leader ... ok
+test sandbox::consensus::block_request::handle_block_response_with_all_known_transactions ... ok
+ERROR 2018-08-31T14:23:47.829852000Z: exonum::node::consensus: Received precommit with wrong block_hash, precommit=Precommit { validator: ValidatorId(3), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(05f7cf60...), time: 2017-02-10T09:52:20Z }, block=BlockResponse { from: PublicKey(ed4928c6...), to: PublicKey(3b6a27bc...), block: Block { proposer_id: ValidatorId(2), height: Height(1), tx_count: 1, prev_hash: Hash(a1304518...), tx_hash: Hash(ec7b6c87...), state_hash: Hash(18c2f694...) }, precommits: [Precommit { validator: ValidatorId(1), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(d2f0aee6...), time: 2017-02-10T09:52:20Z }, Precommit { validator: ValidatorId(2), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(d2f0aee6...), time: 2017-02-10T09:52:20Z }, Precommit { validator: ValidatorId(3), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(05f7cf60...), time: 2017-02-10T09:52:20Z }], transactions: [Hash(ec7b6c87...)] }
+test sandbox::consensus::block_request::handle_block_response_with_invalid_precommits ... ok
+test sandbox::consensus::basic::test_reach_thirteen_height ... ok
+ERROR 2018-08-31T14:23:47.962294000Z: exonum::node::consensus: Received block has invalid tx_hash, msg=BlockResponse { from: PublicKey(ed4928c6...), to: PublicKey(3b6a27bc...), block: Block { proposer_id: ValidatorId(2), height: Height(1), tx_count: 2, prev_hash: Hash(a1304518...), tx_hash: Hash(13c9b689...), state_hash: Hash(c50126a8...) }, precommits: [Precommit { validator: ValidatorId(1), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(30b0312d...), time: 2017-02-10T09:52:20Z }, Precommit { validator: ValidatorId(2), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(30b0312d...), time: 2017-02-10T09:52:20Z }, Precommit { validator: ValidatorId(3), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(30b0312d...), time: 2017-02-10T09:52:20Z }], transactions: [Hash(b85839ef...), Hash(85f81e02...)] }
+test sandbox::consensus::block_request::handle_block_response_with_invalid_txs_order ... ok
+test sandbox::consensus::block_request::handle_block_response_with_known_transaction ... ok
+test sandbox::consensus::block_request::handle_block_response_with_unknown_tx ... ok
+test sandbox::consensus::block_request::transactions_request_to_multiple_nodes ... ignored
+test sandbox::consensus::block_request::received_block_while_there_is_full_propose ... ok
+ERROR 2018-08-31T14:23:48.181420000Z: exonum::node::consensus: Already there is an incomplete block, msg=BlockResponse { from: PublicKey(ed4928c6...), to: PublicKey(3b6a27bc...), block: Block { proposer_id: ValidatorId(2), height: Height(1), tx_count: 1, prev_hash: Hash(a1304518...), tx_hash: Hash(c655dba6...), state_hash: Hash(f023e56d...) }, precommits: [Precommit { validator: ValidatorId(1), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(9a0ddf7c...), time: 2017-02-10T09:52:20Z }, Precommit { validator: ValidatorId(2), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(9a0ddf7c...), time: 2017-02-10T09:52:20Z }, Precommit { validator: ValidatorId(3), height: Height(1), round: Round(1), propose_hash: Hash(ff660416...), block_hash: Hash(9a0ddf7c...), time: 2017-02-10T09:52:20Z }], transactions: [Hash(c655dba6...)] }
+test sandbox::consensus::block_request::received_block_while_there_is_pending_block ... ok
+test sandbox::consensus::config::test_exclude_validator_from_consensus ... ok
+test sandbox::consensus::invalid_message::handle_propose_that_sends_before_than_propose_timeout_exceeded ... ok
+test sandbox::consensus::config::test_schema_config_changes ... ok
+test sandbox::consensus::invalid_message::handle_propose_with_incorrect_time ... ok
+ERROR 2018-08-31T14:23:48.517539000Z: exonum::node::consensus: Wrong propose leader detected: actual=3, expected=2
+test sandbox::consensus::invalid_message::ignore_propose_from_non_leader ... ok
+test sandbox::consensus::invalid_message::ignore_propose_with_committed_transaction ... ok
+ERROR 2018-08-31T14:23:48.674476000Z: exonum::node::consensus: Received propose with wrong last_block_hash msg=Propose { validator: ValidatorId(2), height: Height(1), round: Round(1), prev_hash: Hash(00000000...), transactions: [] }
+test sandbox::consensus::invalid_message::ignore_propose_with_incorrect_prev_hash ... ok
+test sandbox::consensus::invalid_message::test_ignore_message_with_incorrect_signature ... ok
+test sandbox::consensus::invalid_message::test_ignore_message_with_incorrect_validator_id ... ok
+test sandbox::consensus::recovery::should_not_send_propose_and_prevote_after_node_restart ... ok
+test sandbox::consensus::recovery::should_not_vote_after_node_restart ... ok
+test sandbox::consensus::recovery::should_restore_peers_after_restart ... ok
+test sandbox::consensus::recovery::should_save_precommit_to_consensus_cache ... ok
+test sandbox::consensus::recovery::test_disable_and_enable ... ok
+test sandbox::consensus::recovery::test_recover_consensus_messages_in_other_round ... ok
+test sandbox::consensus::round_details::broadcast_prevote_with_tx_positive ... ok
+test sandbox::consensus::round_details::commit_as_leader_send_propose_round_timeout ... ok
+test sandbox::consensus::round_details::commit_using_unknown_propose_with_precommits ... ok
+test sandbox::consensus::round_details::do_not_commit_if_propose_is_unknown ... ok
+test sandbox::consensus::basic::test_store_txs_positions ... ok
+test sandbox::consensus::round_details::do_not_commit_if_tx_is_unknown ... ok
+test sandbox::consensus::round_details::do_not_send_precommit_if_has_incompatible_prevotes ... ok
+test sandbox::consensus::round_details::handle_precommit_positive_scenario_commit ... ok
+test sandbox::consensus::round_details::handle_precommit_positive_scenario_commit_with_queued_precommit ... ok
+test sandbox::consensus::round_details::handle_precommit_remove_propose_request ... ok
+test sandbox::consensus::round_details::handle_precommit_remove_propose_request_ask_precommitters ... ok
+test sandbox::consensus::round_details::handle_precommit_remove_propose_request_ask_prevoters ... ok
+test sandbox::consensus::round_details::handle_precommit_remove_request_prevotes ... ok
+test sandbox::consensus::round_details::handle_tx_handle_full_propose ... ok
+test sandbox::consensus::round_details::handle_tx_ignore_existing_tx_in_blockchain ... ok
+test sandbox::consensus::round_details::lock_not_send_prevotes_after_commit ... ok
+test sandbox::consensus::round_details::lock_remove_request_prevotes ... ok
+test sandbox::consensus::round_details::lock_to_past_round_broadcast_prevote ... ok
+test sandbox::consensus::round_details::lock_to_propose_and_send_prevote ... ok
+test sandbox::consensus::round_details::lock_to_propose_when_get_2_3_prevote_positive ... ok
+test sandbox::consensus::round_details::handle_full_propose_wrong_state_hash ... ok
+test sandbox::consensus::round_details::handle_precommit_different_block_hash ... ok
+test sandbox::consensus::round_details::positive_get_propose_send_prevote ... ok
+test sandbox::consensus::round_details::request_prevotes_when_get_prevote_message ... ok
+test sandbox::consensus::round_details::request_propose_when_get_prevote ... ok
+test sandbox::consensus::timeouts::handle_round_timeout_ignore_if_height_and_round_are_not_the_same ... ok
+test sandbox::consensus::timeouts::handle_round_timeout_increment_round_add_new_round_timeout ... ok
+test sandbox::consensus::timeouts::handle_round_timeout_send_prevote_if_locked_to_propose ... ok
+test sandbox::consensus::timeouts::test_handle_round_timeout_queue_prevote_message_from_next_round ... ok
+test sandbox::consensus::timeouts::test_round_timeout_increase ... ok
+test sandbox::consensus::timeouts::test_send_propose_and_prevote_when_we_are_leader ... ok
+test sandbox::consensus::transactions::empty_tx_request ... ok
+test sandbox::consensus::transactions::duplicate_tx_in_pool ... ok
+test sandbox::consensus::transactions::expedited_propose_on_transaction_pressure ... ok
+test sandbox::consensus::transactions::handle_tx_verify_signature ... ok
+test sandbox::consensus::transactions::not_request_txs_when_get_tx_and_propose ... ok
+test sandbox::consensus::transactions::incorrect_tx_in_request ... ok
+test sandbox::consensus::transactions::rebroadcast_transactions ... ok
+test sandbox::consensus::transactions::regular_propose_when_no_transaction_pressure ... ok
+test sandbox::consensus::transactions::request_txs_when_get_propose_or_prevote ... ok
+test sandbox::consensus::transactions::respond_to_request_tx_propose_prevotes_precommits ... ok
+test sandbox::consensus::transactions::response_size_larger_than_max_message_len ... ok
+test sandbox::consensus::transactions::response_to_request_txs ... ok
+test sandbox::consensus::transactions::tx_pool_size_overflow ... ok
+test sandbox::consensus::unsynchronized_message::test_ignore_message_from_far_height ... ok
+test sandbox::consensus::unsynchronized_message::test_queue_message_from_future_round ... ok
+test sandbox::consensus::unsynchronized_message::test_ignore_message_from_prev_height ... ok
+test sandbox::consensus::unsynchronized_message::test_queue_prevote_message_from_next_height ... ok
+test sandbox::old::received_unexpected_propose ... ok
+test sandbox::consensus::unsynchronized_message::test_queue_propose_message_from_next_height ... ok
+test sandbox::old::test_commit ... ok
+test sandbox::old::test_get_lock_and_send_precommit ... ok
+test sandbox::old::test_send_prevote ... ok
+test sandbox::sandbox::tests::test_sandbox_assert_status ... ok
+test sandbox::old::test_send_propose_and_prevote ... ok
+test sandbox::sandbox::tests::test_sandbox_init ... ok
+test sandbox::sandbox::tests::test_sandbox_expected_to_send_but_nothing_happened ... ok
+test sandbox::sandbox::tests::test_sandbox_expected_to_send_another_message ... ok
+test sandbox::sandbox::tests::test_sandbox_recv_and_send ... ok
+test sandbox::sandbox::tests::test_sandbox_service_after_commit ... ok
+test sandbox::sandbox::tests::test_sandbox_unexpected_message_when_drop ... ok
+test sandbox::sandbox::tests::test_sandbox_unexpected_message_when_handle_another_message ... ok
+test sandbox::sandbox::tests::test_sandbox_unexpected_message_when_time_changed ... ok
+
+test result: ok. 94 passed; 0 failed; 1 ignored; 0 measured; 299 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 159 filtered out
+

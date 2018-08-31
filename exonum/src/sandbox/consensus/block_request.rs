@@ -90,7 +90,7 @@ fn handle_block_response_tx_in_pool() {
     );
     sandbox.recv(&tx);
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -176,7 +176,7 @@ fn handle_block_response_with_unknown_tx() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -280,7 +280,7 @@ fn handle_block_response_with_invalid_txs_order() {
     );
 
     // Invalid transactions order.
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -362,7 +362,7 @@ fn handle_block_response_with_invalid_precommits() {
     );
     sandbox.recv(&tx);
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block1.clone(),
@@ -446,7 +446,7 @@ fn handle_block_response_with_known_transaction() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -553,7 +553,7 @@ fn handle_block_response_with_all_known_transactions() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -646,7 +646,7 @@ fn received_block_while_there_is_full_propose() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -766,7 +766,7 @@ fn received_block_while_there_is_pending_block() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -779,7 +779,7 @@ fn received_block_while_there_is_pending_block() {
         sandbox.s(ValidatorId(3)),
     ));
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),
@@ -898,7 +898,7 @@ fn transactions_request_to_multiple_nodes() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_blockresponse(
+    sandbox.recv(&sandbox.create_block_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
         block.clone(),

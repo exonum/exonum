@@ -225,7 +225,7 @@ impl Sandbox {
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_blockresponse<I: IntoIterator<Item = Precommit>>(
+    pub fn create_block_response<I: IntoIterator<Item = Precommit>>(
         &self,
         public_key: &PublicKey,
         to: &PublicKey,
@@ -373,7 +373,7 @@ impl Sandbox {
         TransactionsRequest::new(author, to, txs, secret_key)
     }
 
-    /// Creates a `TransactionsReponse` message signed by this validator.
+    /// Creates a `TransactionsResponse` message signed by this validator.
     pub fn create_transactions_response<I: IntoIterator<Item = RawTransaction>>(
         &self,
         author: &PublicKey,
