@@ -231,7 +231,8 @@ impl ConnectionsPool {
         stream: TcpStream,
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error> {
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
+    {
         let connect_list = &handshake_params.connect_list();
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
@@ -419,21 +420,21 @@ impl Listener {
                 let network_tx = network_tx.clone();
 
                 let handshake = NoiseHandshake::responder(&handshake_params, &address);
-            let connection_handler = handshake
-                .listen(sock)
-                .and_then(|(stream, raw)| (Ok(stream), Self::parse_peers_exchange(raw)))
-                .and_then(move |(sock, exchange)| {
-                    trace!("Remote connection established with socket={:?}", sock);
-                    let (_, stream) = sock.split();
+                let connection_handler = handshake
+                    .listen(sock)
+                    .and_then(|(stream, raw)| (Ok(stream), Self::parse_peers_exchange(raw)))
+                    .and_then(move |(sock, exchange)| {
+                        trace!("Remote connection established with socket={:?}", sock);
+                        let (_, stream) = sock.split();
 
-                    Self::process_incoming_messages(stream, network_tx, address, exchange).map(
-                        |_| {
-                            // Ensure that holder lives until the stream ends.
-                            let _holder = holder;
-                        },
-                    )
-                })
-                .map_err(log_error);
+                        Self::process_incoming_messages(stream, network_tx, address, exchange).map(
+                            |_| {
+                                // Ensure that holder lives until the stream ends.
+                                let _holder = holder;
+                            },
+                        )
+                    })
+                    .map_err(log_error);
 
                 handle.spawn(to_box(connection_handler));
                 to_box(future::ok(()))

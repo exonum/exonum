@@ -16,9 +16,7 @@ use futures::{sync::mpsc, Future, Sink, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
-use std::{
-    net::SocketAddr, thread, time::{Duration},
-};
+use std::{net::SocketAddr, thread, time::Duration};
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, PublicKey, SecretKey};

@@ -226,9 +226,9 @@ impl Handshake for NoiseHandshake {
                     })
                     .and_then(|(stream, handshake)| handshake.finalize(stream, Vec::new()))
                     .map_err(move |e| {
-                    e.context(format!("peer {} disconnected", peer_address))
-                        .into()
-                });
+                        e.context(format!("peer {} disconnected", peer_address))
+                            .into()
+                    });
                 Box::new(framed)
             }
             None => Box::new(future::err(format_err!(

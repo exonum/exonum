@@ -33,8 +33,8 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
-    borrow::Cow, collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
-    time::{Duration, SystemTime},
+    borrow::Cow, collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs},
+    sync::Arc, thread, time::{Duration, SystemTime},
 };
 
 use api::{
@@ -52,8 +52,8 @@ use events::{
     SyncSender, TimeoutRequest,
 };
 use helpers::{
-    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, Height,
-    Milliseconds, Round, ValidatorId,
+    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, Height, Milliseconds,
+    Round, ValidatorId,
 };
 use messages::RawMessage;
 use node::state::SharedConnectList;
@@ -823,7 +823,8 @@ impl ConnectInfo {
 
 impl StorageValue for ConnectInfo {
     fn into_bytes(self) -> Vec<u8> {
-        self.try_serialize().unwrap()
+//        self.try_serialize().unwrap()
+        self.serialize_field()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
