@@ -293,7 +293,7 @@ impl RequestHandler {
                     NetworkRequest::SendMessage(peer, msg) => {
                         let conn_tx = outgoing_connections
                             .get(peer)
-                            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
+                            .map(|conn_tx| to_future(Ok(conn_tx)))
                             .or_else(|| {
                                 outgoing_connections
                                     .clone()
@@ -307,9 +307,9 @@ impl RequestHandler {
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
                                         if &msg == connect_message.raw() {
-                                            conn_fut(Ok(conn_tx).into_future())
+                                            to_future(Ok(conn_tx))
                                         } else {
-                                            conn_fut(conn_tx.send(connect_message.raw().clone())
+                                            to_future(conn_tx.send(connect_message.raw().clone())
                                                 .map_err(|_| {
                                                     format_err!("can't send message to a connection")
                                                 }))
@@ -466,9 +466,9 @@ impl Future for Listener {
     }
 }
 
-fn conn_fut<F>(fut: F) -> Box<dyn Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error>>
+fn to_future<F, I>(fut: F) -> Box<dyn Future<Item = I, Error = failure::Error>>
 where
-    F: Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error> + 'static,
+    F: IntoFuture<Item = I, Error = failure::Error> + 'static,
 {
-    Box::new(fut)
+    Box::new(fut.into_future())
 }
