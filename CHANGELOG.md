@@ -71,6 +71,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Node now works correctly after consensus re-enable via API. (#902)
 
+- Bug with incorrect EOF handling while decoding network messages has been
+  fixed. (#917)
+
 ### Internal Improvements
 
 #### exonum
