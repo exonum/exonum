@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Precommit, Prevote, Propose, RawMessage, Status, CONSENSUS};
+use messages::{Message, Precommit, RawMessage, CONSENSUS};
 use sandbox::{
     sandbox::{self, timestamping_sandbox}, sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
@@ -64,7 +64,7 @@ fn test_check_leader() {
     add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(ValidatorId(0)),
         Height(1),
         &sandbox.last_block().hash(),
@@ -111,7 +111,7 @@ fn test_reach_actual_round() {
         .with_tx_hash(&tx.hash())
         .build();
 
-    let future_propose = Propose::new(
+    let future_propose = sandbox.create_propose(
         ValidatorId(3),
         Height(1),
         Round(4),
@@ -123,7 +123,7 @@ fn test_reach_actual_round() {
     sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&future_propose);
     sandbox.assert_state(Height(1), Round(1));
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(4),
