@@ -71,40 +71,40 @@ impl NodeHandler {
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: Message<TransactionsRequest>) {
-        unimplemented!()
-        //        use std::mem;
-        //        trace!("HANDLE TRANSACTIONS REQUEST");
-        //        let snapshot = self.blockchain.snapshot();
-        //        let schema = Schema::new(&snapshot);
-        //        const TX_HEADER: u32 = 8 + 2;
-        //        let mut txs = Vec::new();
-        //        let mut txs_size = 0;
-        //        let unoccupied_message_size =
-        //            self.state.config().consensus.max_message_len - TRANSACTION_RESPONSE_EMPTY_SIZE as u32;
-        //
-        //        for hash in msg.txs() {
-        //            let tx = schema.transactions().get(hash);
-        //            if let Some(tx) = tx {
-        //                let raw = tx.signed_message().raw().to_vec();
-        //                if txs_size + raw.len() as u32 + TX_HEADER > unoccupied_message_size {
-        //                    let txs_response = self.sign_message(TransactionsResponse::new(
-        //                        msg.author(),
-        //                        mem::replace(&mut txs, vec![]),
-        //                    ));
-        //
-        //                    self.send_to_peer(*msg.author(), txs_response);
-        //                    txs_size = 0;
-        //                }
-        //                txs_size += raw.len() as u32 + TX_HEADER;
-        //                txs.push(raw);
-        //            }
-        //        }
-        //
-        //        if !txs.is_empty() {
-        //            let txs_response = self.sign_message(TransactionsResponse::new(msg.author(), txs));
-        //
-        //            self.send_to_peer(*msg.author(), txs_response);
-        //        }
+        use std::mem;
+        trace!("HANDLE TRANSACTIONS REQUEST");
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+        const TX_HEADER: u32 = 8 + 2;
+        let mut txs = Vec::new();
+        let mut txs_size = 0;
+        let unoccupied_message_size =
+            self.state.config().consensus.max_message_len - TRANSACTION_RESPONSE_EMPTY_SIZE as u32;
+
+        for hash in msg.txs() {
+            let tx = schema.transactions().get(hash);
+            if let Some(tx) = tx {
+                let raw = tx.signed_message().raw().to_vec();
+                if txs_size + raw.len() as u32 + TX_HEADER > unoccupied_message_size {
+                    let txs_response =
+                    self.sign_message(TransactionsResponse::new(
+                        &msg.author(),
+                        mem::replace(&mut txs, vec![]),
+                    ));
+
+                    self.send_to_peer(msg.author(), txs_response);
+                    txs_size = 0;
+                }
+                txs_size += raw.len() as u32 + TX_HEADER;
+                txs.push(raw);
+            }
+        }
+
+        if !txs.is_empty() {
+            let txs_response = self.sign_message(TransactionsResponse::new(&msg.author(), txs));
+
+            self.send_to_peer(msg.author(), txs_response);
+        }
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.

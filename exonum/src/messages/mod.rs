@@ -50,8 +50,8 @@ mod compatibility;
 mod authorization;
 mod helpers;
 mod protocol;
-//#[cfg(test)]
-//mod tests;
+#[cfg(test)]
+mod tests;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
@@ -181,11 +181,6 @@ impl<T: ProtocolMessage> Message<T> {
     pub fn serialize(self) -> Vec<u8> {
         self.message.raw
     }
-
-    //    /// Returns hex representation of binary message form
-    //    pub fn to_hex_string(&self) -> String {
-    //        self.message.to_hex_string()
-    //    }
 
     /// Return link to inner.
     pub fn inner(&self) -> &T {
