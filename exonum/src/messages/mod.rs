@@ -33,8 +33,7 @@ use std::ops::Deref;
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 
-use blockchain::{Transaction, TransactionSet};
-use crypto::{hash, CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{hash, CryptoHash, Hash, PublicKey};
 use encoding;
 use storage::StorageValue;
 
@@ -104,14 +103,14 @@ impl RawTransaction {
         self.service_id
     }
 
-    pub(crate) fn verify_transaction(
-        buffer: Vec<u8>,
-    ) -> Result<Message<RawTransaction>, ::failure::Error> {
-        let signed = SignedMessage::verify_buffer(buffer)?;
-        Protocol::deserialize(signed)?
-            .try_into_transaction()
-            .map_err(|_| format_err!("Couldn't parse RawTransaction."))
-    }
+//    pub(crate) fn verify_transaction(
+//        buffer: Vec<u8>,
+//    ) -> Result<Message<RawTransaction>, ::failure::Error> {
+//        let signed = SignedMessage::verify_buffer(buffer)?;
+//        Protocol::deserialize(signed)?
+//            .try_into_transaction()
+//            .map_err(|_| format_err!("Couldn't parse RawTransaction."))
+//    }
 }
 
 impl BinaryForm for RawTransaction {

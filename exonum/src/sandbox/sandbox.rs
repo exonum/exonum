@@ -276,7 +276,11 @@ impl Sandbox {
         to: &PublicKey,
         secret_key: &SecretKey,
     ) -> Message<PeersRequest> {
-        unimplemented!()
+        Protocol::concrete(
+            PeersRequest::new(to),
+            *public_key,
+            secret_key,
+        )
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -400,14 +404,14 @@ impl Sandbox {
     where
         I: IntoIterator<Item = Message<RawTransaction>>,
     {
-        unimplemented!()
-        //        Protocol::concrete(
-        //            TransactionsResponse::new(to, txs.into_iter()
-        //                    .map(|x| x.into().to_vec())
-        //                    .collect()),
-        //            *author,
-        //            secret_key,
-        //        )
+
+            Protocol::concrete(
+                TransactionsResponse::new(to, txs.into_iter()
+                        .map(|x| x.serialize())
+                        .collect()),
+                *author,
+                secret_key,
+            )
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -1280,7 +1284,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Expected to send the message")]
+    #[should_panic(expected = "Expected to send message to other recipient")]
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.

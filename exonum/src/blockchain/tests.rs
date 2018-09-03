@@ -339,43 +339,23 @@ mod transactions_tests {
         round_trip::<MyTransactions>(&c.into());
     }
 
-    #[test]
-    fn deserialize_from_raw_as_set() {
-        use crypto::{PublicKey, SecretKey};
-        fn round_trip((pk, sk): (PublicKey, &SecretKey), t: Message<RawTransaction>) {
-            use std::ops::Deref;
-            let raw: &RawTransaction = t.deref();
-            println!("test tx_from_raw");
-            let parsed = MyTransactions::tx_from_raw(raw.clone()).unwrap();
-            let t_destination = Protocol::sign_tx(parsed, TEST_SERVICE_ID, pk, sk);
-            assert_eq!(t, t_destination);
-        }
-
-        let (pk, sec_key) = gen_keypair();
-        let a = Protocol::sign_tx(A::new(0), TEST_SERVICE_ID, pk, &sec_key);
-        let b = Protocol::sign_tx(B::new(1, 2), TEST_SERVICE_ID, pk, &sec_key);
-        let c = Protocol::sign_tx(C::new(0), TEST_SERVICE_ID, pk, &sec_key);
-        round_trip((pk, &sec_key), a);
-        round_trip((pk, &sec_key), b);
-        round_trip((pk, &sec_key), c);
-    }
 
     #[test]
-    fn deserialize_from_raw_single() {
+    fn deserialize_from_raw() {
         use messages::BinaryForm;
+        use blockchain::TransactionSet;
 
-        fn round_trip<T: Into<TransactionFromSet> + Serialize>(t: T) {
-            unimplemented!()
-            //            let (pk, sec_key) = gen_keypair();
-            //            use std::ops::Deref;
-            //            let initial = serde_json::to_value(&t).unwrap();
-            //            let msg = Protocol::sign_tx(t, TEST_SERVICE_ID, pk, &sec_key);
-            //            let raw: &RawTransaction = msg.deref();
-            //
-            //            println!("{:?}", raw.payload());
-            //            let parsed: T = BinaryForm::deserialize(raw.payload()).unwrap();
-            //            let round_tripped = serde_json::to_value(&parsed).unwrap();
-            //            assert_eq!(initial, round_tripped);
+        fn round_trip<T: Into<MyTransactions>>(t: T) {
+
+            let (pk, sec_key) = gen_keypair();
+            use std::ops::Deref;
+            let set = t.into();
+            let initial_json = serde_json::to_value(&set).unwrap();
+            let msg = Protocol::sign_tx(set, TEST_SERVICE_ID, pk, &sec_key);
+
+            let parsed = MyTransactions::tx_from_raw(msg.deref().clone()).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial_json, round_tripped);
         }
 
         let a = A::new(0);

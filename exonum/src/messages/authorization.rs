@@ -1,23 +1,15 @@
-use std::borrow::Cow;
-
-use bincode;
 use failure::Error;
 use serde::Serialize;
 
 use crypto::{
-    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
+    self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
     SIGNATURE_LENGTH,
 };
 use hex::{FromHex, ToHex};
 use messages::Message;
-use storage::StorageValue;
 
-use super::{
-    helpers::BinaryForm, protocol::{Protocol, ProtocolMessage}, EMPTY_SIGNED_MESSAGE_SIZE,
-    PROTOCOL_MAJOR_VERSION,
-};
+use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
-use encoding::serialize::encode_hex;
 
 /// Correct raw message that was deserialized and verifyied, from `UncheckedBuffer`;
 /// inner data should be formed according to the following layout:

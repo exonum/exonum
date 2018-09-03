@@ -336,10 +336,10 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let max_payload_length = max_message_length - ::messages::EMPTY_SIGNED_MESSAGE_SIZE;
-    let acceptable_message = raw_message(15, max_payload_length);
-    let too_big_message = raw_message(16, max_payload_length + 1000);
-
+    let acceptable_message = raw_message(15, max_message_length);
+    let too_big_message = raw_message(16, max_message_length + 1000);
+    assert!(too_big_message.raw().len() > max_message_length);
+    assert!(acceptable_message.raw().len() <= max_message_length);
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info);
@@ -363,7 +363,8 @@ fn test_network_max_message_len() {
     assert_eq!(e2.wait_for_message(), acceptable_message);
 
     e2.send_to(first, too_big_message.clone());
-    assert!(e1.wait_for_event().is_err());
+    let event = e1.wait_for_event();
+    assert!(event.is_err());
 }
 
 #[test]

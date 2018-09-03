@@ -127,7 +127,5 @@ fn test_block() {
     };
     let json_str = ::serde_json::to_string(&block_proof).unwrap();
     let block_proof_1: BlockProof = ::serde_json::from_str(&json_str).unwrap();
-    println!("proof = {}", json_str);
     assert_eq!(block_proof, block_proof_1);
-    panic!("Printl proof")
 }

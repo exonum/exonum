@@ -584,20 +584,10 @@ impl NodeHandler {
                 msg.author().to_hex()
             )
         }
-        unimplemented!()
-        //        let txs: Result<Vec<_>, _> = msg.transactions()
-        //            .into_iter()
-        //            .map(RawTransaction::verify_transaction)
-        //            .collect();
-        //        for tx in txs? {
-        //            // This is a valid case for node to receive two transactions
-        //            // so just ignore error about it.
-        //            drop(self.handle_tx(tx))
-        //        }
-        //
-        //        for tx in msg.transactions() {
-        //            self.handle_tx(&tx);
-        //        }
+        for tx in msg.transactions() {
+            self.execute_later(InternalRequest::VerifyMessage(tx));
+        }
+        Ok(())
     }
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the

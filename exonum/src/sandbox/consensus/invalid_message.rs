@@ -20,6 +20,28 @@ use helpers::{Height, Round, ValidatorId};
 use messages::{Protocol, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
+
+/// HANDLE message
+/// - verify signature
+/// - sandbox should panic on message verification
+
+#[test]
+#[should_panic]
+fn test_ignore_message_with_incorrect_signature() {
+    let sandbox = timestamping_sandbox();
+
+    let propose = sandbox.create_propose(
+        ValidatorId(0),
+        Height(0),
+        Round(1),
+        &sandbox.last_hash(),
+        &[],
+        sandbox.s(ValidatorId(1)),
+    );
+
+    sandbox.recv(&propose);
+}
+
 #[test]
 fn test_ignore_message_with_incorrect_validator_id() {
     let sandbox = timestamping_sandbox();
@@ -35,22 +57,6 @@ fn test_ignore_message_with_incorrect_validator_id() {
             &[]),
         sandbox.p(ValidatorId(1)),
         sandbox.s(ValidatorId(1))
-    );
-
-    sandbox.recv(&propose);
-}
-
-#[test]
-fn test_ignore_message_with_incorrect_signature() {
-    let sandbox = timestamping_sandbox();
-
-    let propose = sandbox.create_propose(
-        ValidatorId(0),
-        Height(0),
-        Round(1),
-        &sandbox.last_hash(),
-        &[],
-        sandbox.s(ValidatorId(1)),
     );
 
     sandbox.recv(&propose);

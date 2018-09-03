@@ -57,7 +57,7 @@ fn test_queue_message_from_future_round() {
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
+#[should_panic(expected = "Send unexpected message Requests(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();

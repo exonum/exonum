@@ -258,7 +258,10 @@ fn rebroadcast_transactions() {
     }
 }
 
+// TODO: transaction verification logic is duplicated,
+// in sandbox so this test is testing sandbox
 #[test]
+#[ignore]
 #[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
 fn incorrect_tx_in_request() {
     let sandbox = timestamping_sandbox();
@@ -319,7 +322,7 @@ fn response_size_larger_than_max_message_len() {
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
-
+    const TX_HEADER: usize = 8 + 2;
     // Create 4 transactions.
     // The size of the fourth transactions is 1 more than size of the first three.
     let tx1 = gen_timestamping_tx();
@@ -337,8 +340,8 @@ fn response_size_larger_than_max_message_len() {
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
-            + tx1.signed_message().raw().len()
-            + tx2.signed_message().raw().len())
+            + tx1.signed_message().raw().len() + TX_HEADER
+            + tx2.signed_message().raw().len() + TX_HEADER)
             as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
@@ -616,26 +619,6 @@ fn not_request_txs_when_get_tx_and_propose() {
     sandbox.recv(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
-}
-
-/// HANDLE TX
-/// - verify signature
-/// - should panic on transaction verification
-#[cfg_attr(rustfmt, rustfmt_skip)]
-#[test]
-#[should_panic]
-fn handle_tx_verify_signature() {
-    //TODO: Its a bit strange test case,
-    //because we verify tx in sandbox logic, so we probably testing sandbox
-    let sandbox = timestamping_sandbox();
-
-    // generate incorrect tx
-    let (public_key, _) = gen_keypair();
-    let (_, wrong_secret_key) = gen_keypair();
-    let tx = TimestampingTxGenerator::with_keypair(DATA_SIZE, (public_key, wrong_secret_key))
-        .next()
-        .unwrap();
-    sandbox.recv(&tx);
 }
 
 /// - request txs when get propose

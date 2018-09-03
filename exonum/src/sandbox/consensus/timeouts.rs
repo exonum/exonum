@@ -236,7 +236,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
+#[should_panic(expected = "Send unexpected message Requests(ProposeRequest")]
 fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 
