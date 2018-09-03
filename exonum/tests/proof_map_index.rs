@@ -98,7 +98,10 @@ fn check_map_multiproof<T, K, V>(
 
     let unchecked_proof = proof.clone();
     let proof = proof.check().unwrap();
-    assert_eq!(proof.all_entries().collect::<Vec<_>>(), unchecked_proof.all_entries_unchecked().collect::<Vec<_>>());
+    assert_eq!(
+        proof.all_entries().collect::<Vec<_>>(),
+        unchecked_proof.all_entries_unchecked().collect::<Vec<_>>()
+    );
     assert_eq!(proof.merkle_root(), table.merkle_root());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();

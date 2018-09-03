@@ -262,12 +262,7 @@ impl CryptocurrencyApi {
             .unwrap();
 
         let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
-        assert!(
-            to_wallet
-                .missing_keys()
-                .find(|v| **v == pub_key)
-                .is_some()
-        )
+        assert!(to_wallet.missing_keys().find(|v| **v == pub_key).is_some())
     }
 
     /// Asserts that the transaction with the given hash has a specified status.

@@ -466,12 +466,10 @@ impl<K, V> MapProof<K, V> {
     /// Existing entries have `Some` value, non-existing have `None`.
     /// This method does not perform any integrity checks of the proof.
     pub fn all_entries_unchecked(&self) -> impl Iterator<Item = (&K, Option<&V>)> {
-        self.entries
-            .iter()
-            .map(|e| match e {
-                OptionalEntry::Missing { ref missing } => (missing, None),
-                OptionalEntry::KV { ref key, ref value } => (key, Some(value)),
-            })
+        self.entries.iter().map(|e| match e {
+            OptionalEntry::Missing { ref missing } => (missing, None),
+            OptionalEntry::KV { ref key, ref value } => (key, Some(value)),
+        })
     }
 }
 
@@ -599,30 +597,24 @@ where
 impl<K, V> CheckedMapProof<K, V> {
     /// Retrieves references to keys that the proof shows as missing from the map.
     pub fn missing_keys(&self) -> impl Iterator<Item = &K> {
-        self.entries
-            .iter()
-            .filter_map(|kv| match *kv {
-                (ref key, None) => Some(key),
-                _ => None,
-            })
+        self.entries.iter().filter_map(|kv| match *kv {
+            (ref key, None) => Some(key),
+            _ => None,
+        })
     }
 
     /// Retrieves references to key-value pairs that the proof shows as present in the map.
     pub fn entries(&self) -> impl Iterator<Item = (&K, &V)> {
-        self.entries
-            .iter()
-            .filter_map(|kv| match *kv {
-                (ref key, Some(ref value)) => Some((key, value)),
-                _ => None,
-            })
+        self.entries.iter().filter_map(|kv| match *kv {
+            (ref key, Some(ref value)) => Some((key, value)),
+            _ => None,
+        })
     }
 
     /// Retrieves references to existing and non-existing entries in the proof.
     /// Existing entries have `Some` value, non-existing have `None`.
     pub fn all_entries(&self) -> impl Iterator<Item = (&K, Option<&V>)> {
-        self.entries
-            .iter()
-            .map(|&(ref k, ref v)| (k, v.as_ref()))
+        self.entries.iter().map(|&(ref k, ref v)| (k, v.as_ref()))
     }
 
     /// Returns a hash of the map that this proof is constructed for.

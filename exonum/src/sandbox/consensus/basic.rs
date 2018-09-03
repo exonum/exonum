@@ -187,7 +187,10 @@ fn test_query_state_hash() {
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.merkle_root(), state_hash);
         assert_ne!(configs_rh, Hash::zero());
-        assert_eq!(proof.entries().collect::<Vec<_>>(), vec![(&configs_key, &configs_rh)]);
+        assert_eq!(
+            proof.entries().collect::<Vec<_>>(),
+            vec![(&configs_key, &configs_rh)]
+        );
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
         let proof = proof_configs.check().unwrap();

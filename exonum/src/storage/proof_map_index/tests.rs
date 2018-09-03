@@ -345,7 +345,10 @@ fn check_map_proof<K, V>(
     assert_eq!(proof.merkle_root(), table.merkle_root());
 
     let deserialized_proof = deserialized_proof.check().unwrap();
-    assert_eq!(deserialized_proof.entries().collect::<Vec<_>>(), proof.entries().collect::<Vec<_>>());
+    assert_eq!(
+        deserialized_proof.entries().collect::<Vec<_>>(),
+        proof.entries().collect::<Vec<_>>()
+    );
     assert_eq!(deserialized_proof.merkle_root(), proof.merkle_root());
 }
 
