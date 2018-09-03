@@ -41,7 +41,7 @@ use events::{
 };
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    Any, BlockRequest, PeerList, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+    Any, BlockRequest, BlockResponse, Message, PeerList, PeersRequest, Precommit, Prevote,
     PrevotesRequest, Propose, ProposeRequest, RawMessage, RawTransaction, Status,
     TransactionsRequest, TransactionsResponse,
 };
@@ -230,18 +230,6 @@ impl Sandbox {
         )
     }
 
-    /// Creates a `Connect` message signed by this validator.
-    pub fn create_connect(
-        &self,
-        public_key: &PublicKey,
-        addr: SocketAddr,
-        time: chrono::DateTime<::chrono::Utc>,
-        user_agent: &str,
-        secret_key: &SecretKey,
-    ) -> Connect {
-        Connect::new(public_key, addr, time, user_agent, secret_key)
-    }
-
     /// Creates a `Propose` message signed by this validator.
     pub fn create_propose(
         &self,
@@ -346,6 +334,17 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> PeersRequest {
         PeersRequest::new(author, to, secret_key)
+    }
+
+    /// Creates a `PeersRequest` message signed by this validator.
+    pub fn create_peer_list(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        peers: &[ConnectInfo],
+        secret_key: &SecretKey,
+    ) -> PeerList {
+        PeerList::new(author, to, peers.to_vec(), secret_key)
     }
 
     /// Creates a `TransactionsRequest` message signed by this validator.

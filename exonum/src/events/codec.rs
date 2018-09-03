@@ -127,8 +127,6 @@ mod test {
     use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use events::noise::{HandshakeParams, NoiseWrapper};
     use messages::{MessageBuffer, RawMessage};
-    use node::state::SharedConnectList;
-    use tokio_io::codec::{Decoder, Encoder};
 
     #[test]
     fn decode_message_valid_header_size() {
