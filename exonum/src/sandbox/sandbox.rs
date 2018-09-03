@@ -14,6 +14,8 @@
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+use bit_vec::BitVec;
+use chrono;
 use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
@@ -38,7 +40,11 @@ use events::{
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Any, Message, PeerList, PeersRequest, RawMessage, RawTransaction, Status};
+use messages::{
+    Any, BlockRequest, PeerList, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, RawMessage, RawTransaction, Status,
+    TransactionsRequest, TransactionsResponse,
+};
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
@@ -180,6 +186,188 @@ impl Sandbox {
     pub fn a(&self, id: ValidatorId) -> SocketAddr {
         let id: usize = id.into();
         self.addresses[id]
+    }
+
+    /// Creates a `BlockRequest` message signed by this validator.
+    pub fn create_block_request(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        height: Height,
+        secret_key: &SecretKey,
+    ) -> BlockRequest {
+        BlockRequest::new(author, to, height, secret_key)
+    }
+
+    /// Creates a `Status` message signed by this validator.
+    pub fn create_status(
+        &self,
+        author: &PublicKey,
+        height: Height,
+        last_hash: &Hash,
+        secret_key: &SecretKey,
+    ) -> Status {
+        Status::new(author, height, last_hash, secret_key)
+    }
+
+    /// Creates a `BlockResponse` message signed by this validator.
+    pub fn create_block_response<I: IntoIterator<Item = Precommit>>(
+        &self,
+        public_key: &PublicKey,
+        to: &PublicKey,
+        block: Block,
+        precommits: I,
+        tx_hashes: &[Hash],
+        secret_key: &SecretKey,
+    ) -> BlockResponse {
+        BlockResponse::new(
+            public_key,
+            to,
+            block,
+            precommits.into_iter().collect(),
+            tx_hashes,
+            secret_key,
+        )
+    }
+
+    /// Creates a `Connect` message signed by this validator.
+    pub fn create_connect(
+        &self,
+        public_key: &PublicKey,
+        addr: SocketAddr,
+        time: chrono::DateTime<::chrono::Utc>,
+        user_agent: &str,
+        secret_key: &SecretKey,
+    ) -> Connect {
+        Connect::new(public_key, addr, time, user_agent, secret_key)
+    }
+
+    /// Creates a `Propose` message signed by this validator.
+    pub fn create_propose(
+        &self,
+        validator_id: ValidatorId,
+        height: Height,
+        round: Round,
+        last_hash: &Hash,
+        tx_hashes: &[Hash],
+        secret_key: &SecretKey,
+    ) -> Propose {
+        Propose::new(
+            validator_id,
+            height,
+            round,
+            last_hash,
+            tx_hashes,
+            secret_key,
+        )
+    }
+
+    /// Creates a `Precommit` message signed by this validator.
+    pub fn create_precommit(
+        &self,
+        validator_id: ValidatorId,
+        propose_height: Height,
+        propose_round: Round,
+        propose_hash: &Hash,
+        block_hash: &Hash,
+        system_time: chrono::DateTime<::chrono::Utc>,
+        secret_key: &SecretKey,
+    ) -> Precommit {
+        Precommit::new(
+            validator_id,
+            propose_height,
+            propose_round,
+            propose_hash,
+            block_hash,
+            system_time,
+            secret_key,
+        )
+    }
+
+    /// Creates a `Precommit` message signed by this validator.
+    pub fn create_prevote(
+        &self,
+        validator_id: ValidatorId,
+        propose_height: Height,
+        propose_round: Round,
+        propose_hash: &Hash,
+        locked_round: Round,
+        secret_key: &SecretKey,
+    ) -> Prevote {
+        Prevote::new(
+            validator_id,
+            propose_height,
+            propose_round,
+            &propose_hash,
+            locked_round,
+            secret_key,
+        )
+    }
+
+    /// Creates a `PrevoteRequest` message signed by this validator.
+    pub fn create_prevote_request(
+        &self,
+        from: &PublicKey,
+        to: &PublicKey,
+        height: Height,
+        round: Round,
+        propose_hash: &Hash,
+        validators: BitVec,
+        secret_key: &SecretKey,
+    ) -> PrevotesRequest {
+        PrevotesRequest::new(
+            from,
+            to,
+            height,
+            round,
+            propose_hash,
+            validators,
+            secret_key,
+        )
+    }
+
+    /// Creates a `ProposeRequest` message signed by this validator.
+    pub fn create_propose_request(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        height: Height,
+        propose_hash: &Hash,
+        secret_key: &SecretKey,
+    ) -> ProposeRequest {
+        ProposeRequest::new(author, to, height, propose_hash, secret_key)
+    }
+
+    /// Creates a `PeersRequest` message signed by this validator.
+    pub fn create_peers_request(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> PeersRequest {
+        PeersRequest::new(author, to, secret_key)
+    }
+
+    /// Creates a `TransactionsRequest` message signed by this validator.
+    pub fn create_transactions_request(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        txs: &[Hash],
+        secret_key: &SecretKey,
+    ) -> TransactionsRequest {
+        TransactionsRequest::new(author, to, txs, secret_key)
+    }
+
+    /// Creates a `TransactionsResponse` message signed by this validator.
+    pub fn create_transactions_response<I: IntoIterator<Item = RawTransaction>>(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        txs: I,
+        secret_key: &SecretKey,
+    ) -> TransactionsResponse {
+        TransactionsResponse::new(author, to, txs.into_iter().collect(), secret_key)
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -352,7 +540,7 @@ impl Sandbox {
     }
 
     pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
-        self.broadcast(&Status::new(
+        self.broadcast(&self.create_status(
             &self.node_public_key(),
             height,
             block_hash,

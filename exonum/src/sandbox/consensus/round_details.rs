@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Precommit, Prevote, PrevotesRequest, ProposeRequest, TransactionsRequest};
+use messages::{Message, PrevotesRequest, TransactionsRequest};
 use node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
@@ -47,7 +47,7 @@ fn positive_get_propose_send_prevote() {
     // HANDLE FULL PROPOSE
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(NOT_LOCKED, None);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -79,7 +79,7 @@ fn positive_get_propose_send_prevote() {
 fn request_propose_when_get_prevote() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -90,7 +90,7 @@ fn request_propose_when_get_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &ProposeRequest::new(
+        &sandbox.create_propose_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             Height(1),
@@ -106,7 +106,7 @@ fn request_propose_when_get_prevote() {
 fn request_prevotes_when_get_prevote_message() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -117,7 +117,7 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &ProposeRequest::new(
+        &sandbox.create_propose_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             Height(1),
@@ -131,7 +131,7 @@ fn request_prevotes_when_get_prevote_message() {
 
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &PrevotesRequest::new(
+        &sandbox.create_prevote_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             Height(1),
@@ -165,7 +165,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -174,7 +174,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         sandbox.s(ValidatorId(0)),
     ));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -184,7 +184,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -194,7 +194,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
-    sandbox.broadcast(&Precommit::new(
+    sandbox.broadcast(&sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -210,7 +210,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
         // Send prevote even if current round > locked + 1
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-        sandbox.broadcast(&Prevote::new(
+        sandbox.broadcast(&sandbox.create_prevote(
             ValidatorId(0),
             Height(1),
             Round(2),
@@ -221,7 +221,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
 
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-        sandbox.broadcast(&Prevote::new(
+        sandbox.broadcast(&sandbox.create_prevote(
             ValidatorId(0),
             Height(1),
             Round(3),
@@ -255,7 +255,7 @@ fn lock_to_past_round_broadcast_prevote() {
     ));
     sandbox.assert_state(Height(1), Round(2));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -265,7 +265,7 @@ fn lock_to_past_round_broadcast_prevote() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -275,7 +275,7 @@ fn lock_to_past_round_broadcast_prevote() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
-    sandbox.broadcast(&Precommit::new(
+    sandbox.broadcast(&sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -286,7 +286,7 @@ fn lock_to_past_round_broadcast_prevote() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     // ! here broadcast of
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -300,7 +300,7 @@ fn lock_to_past_round_broadcast_prevote() {
         // Send prevote even if current round > locked + 1
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-        sandbox.broadcast(&Prevote::new(
+        sandbox.broadcast(&sandbox.create_prevote(
             ValidatorId(0),
             Height(1),
             Round(3),
@@ -311,7 +311,7 @@ fn lock_to_past_round_broadcast_prevote() {
 
         // add round
         sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-        sandbox.broadcast(&Prevote::new(
+        sandbox.broadcast(&sandbox.create_prevote(
             ValidatorId(0),
             Height(1),
             Round(4),
@@ -339,7 +339,7 @@ fn handle_precommit_remove_request_prevotes() {
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -348,7 +348,7 @@ fn handle_precommit_remove_request_prevotes() {
         sandbox.s(ValidatorId(0)),
     ));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -360,7 +360,7 @@ fn handle_precommit_remove_request_prevotes() {
 
     {
         // in this block lock is obtained; without this lock requestPrevotes would have been sent
-        sandbox.recv(&Prevote::new(
+        sandbox.recv(&sandbox.create_prevote(
             ValidatorId(2),
             Height(1),
             Round(1),
@@ -370,7 +370,7 @@ fn handle_precommit_remove_request_prevotes() {
         ));
         sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
-        sandbox.broadcast(&Precommit::new(
+        sandbox.broadcast(&sandbox.create_precommit(
             ValidatorId(0),
             Height(1),
             Round(1),
@@ -383,7 +383,7 @@ fn handle_precommit_remove_request_prevotes() {
         sandbox.add_time(Duration::from_millis(0));
     }
 
-    sandbox.recv(&Precommit::new(
+    sandbox.recv(&sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -436,7 +436,7 @@ fn lock_to_propose_and_send_prevote() {
     // inc round
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(2),
@@ -446,7 +446,7 @@ fn lock_to_propose_and_send_prevote() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(2),
@@ -456,7 +456,7 @@ fn lock_to_propose_and_send_prevote() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None);
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(1),
         Round(2),
@@ -467,7 +467,7 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.assert_lock(Round(2), Some(propose.hash())); //only if round > locked round
 
     // !! here broadcast, of prevote from lock() function, occurs
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -476,7 +476,7 @@ fn lock_to_propose_and_send_prevote() {
         sandbox.s(ValidatorId(0)),
     ));
 
-    sandbox.broadcast(&Precommit::new(
+    sandbox.broadcast(&sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -511,7 +511,7 @@ fn lock_remove_request_prevotes() {
     sandbox.recv(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -519,7 +519,7 @@ fn lock_remove_request_prevotes() {
         Round(1),
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -530,7 +530,7 @@ fn lock_remove_request_prevotes() {
 
     {
         // without this block RequestPrevotes would have been broadcast
-        sandbox.recv(&Prevote::new(
+        sandbox.recv(&sandbox.create_prevote(
             ValidatorId(1),
             Height(1),
             Round(1),
@@ -538,7 +538,7 @@ fn lock_remove_request_prevotes() {
             Round(1),
             sandbox.s(ValidatorId(1)),
         ));
-        sandbox.broadcast(&Prevote::new(
+        sandbox.broadcast(&sandbox.create_prevote(
             ValidatorId(0),
             Height(1),
             Round(1),
@@ -546,7 +546,7 @@ fn lock_remove_request_prevotes() {
             NOT_LOCKED,
             sandbox.s(ValidatorId(0)),
         ));
-        sandbox.broadcast(&Precommit::new(
+        sandbox.broadcast(&sandbox.create_precommit(
             ValidatorId(0),
             Height(1),
             Round(1),
@@ -577,7 +577,7 @@ fn handle_precommit_different_block_hash() {
     // without tx
     let block = BlockBuilder::new(&sandbox).build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -586,7 +586,7 @@ fn handle_precommit_different_block_hash() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -595,7 +595,7 @@ fn handle_precommit_different_block_hash() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -640,7 +640,7 @@ fn handle_precommit_positive_scenario_commit() {
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -649,7 +649,7 @@ fn handle_precommit_positive_scenario_commit() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -658,7 +658,7 @@ fn handle_precommit_positive_scenario_commit() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -734,7 +734,7 @@ fn lock_not_send_prevotes_after_commit() {
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox).build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -743,7 +743,7 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -788,7 +788,7 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.recv(&propose);
         sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
-        sandbox.recv(&Prevote::new(
+        sandbox.recv(&sandbox.create_prevote(
             ValidatorId(2),
             Height(1),
             Round(1),
@@ -798,7 +798,7 @@ fn lock_not_send_prevotes_after_commit() {
         ));
         sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-        sandbox.recv(&Prevote::new(
+        sandbox.recv(&sandbox.create_prevote(
             ValidatorId(3),
             Height(1),
             Round(1),
@@ -807,7 +807,7 @@ fn lock_not_send_prevotes_after_commit() {
             sandbox.s(ValidatorId(3)),
         ));
 
-        sandbox.broadcast(&Precommit::new(
+        sandbox.broadcast(&sandbox.create_precommit(
             ValidatorId(0),
             Height(1),
             Round(1),
@@ -828,7 +828,7 @@ fn lock_not_send_prevotes_after_commit() {
         // if block with precommit_2 is uncommented, then during lock commit will occur and
         // lock will disappear and prevotes for disappeared lock (these prevotes are the
         // primary goal of the test) will not be sent
-        //  !!!      sandbox.broadcast(&Prevote::new(ValidatorId(0), Height(0), Round(2),
+        //  !!!      sandbox.broadcast(&sandbox.create_prevote(ValidatorId(0), Height(0), Round(2),
         // &propose.hash(), Round(1), sandbox.s(ValidatorId(0))));
     }
 }
@@ -850,7 +850,7 @@ fn do_not_commit_if_propose_is_unknown() {
     // this block with transactions should be in real
     let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -859,7 +859,7 @@ fn do_not_commit_if_propose_is_unknown() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -868,7 +868,7 @@ fn do_not_commit_if_propose_is_unknown() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -928,7 +928,7 @@ fn do_not_commit_if_tx_is_unknown() {
     // this block with transactions should be in real
     let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -937,7 +937,7 @@ fn do_not_commit_if_tx_is_unknown() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -946,7 +946,7 @@ fn do_not_commit_if_tx_is_unknown() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -1019,7 +1019,7 @@ fn commit_using_unknown_propose_with_precommits() {
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -1028,7 +1028,7 @@ fn commit_using_unknown_propose_with_precommits() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -1037,7 +1037,7 @@ fn commit_using_unknown_propose_with_precommits() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -1088,7 +1088,7 @@ fn commit_using_unknown_propose_with_precommits() {
     // !! if this tx would be received, commit would occur and last assert will require height one
     sandbox.recv(&tx);
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -1131,7 +1131,7 @@ fn handle_full_propose_wrong_state_hash() {
         .with_state_hash(&empty_hash())
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -1140,7 +1140,7 @@ fn handle_full_propose_wrong_state_hash() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -1149,7 +1149,7 @@ fn handle_full_propose_wrong_state_hash() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -1200,7 +1200,7 @@ fn handle_full_propose_wrong_state_hash() {
     // !! if this tx would be received, commit would occur and last assert will require height one
     sandbox.recv(&tx);
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -1222,7 +1222,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
     let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -1231,7 +1231,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         sandbox.s(ValidatorId(0)),
     ));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -1247,7 +1247,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         .with_round(Round(2))
         .build();
     sandbox.recv(&future_propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -1256,7 +1256,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
         sandbox.s(ValidatorId(0)),
     ));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -1267,7 +1267,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
     // !! lock is obtained, but broadcast(Precommit is absent
-    //    sandbox.broadcast(&Precommit::new(ValidatorId(0), Height(0), Round(1), &propose.hash(),
+    //    sandbox.broadcast(&sandbox.create_precommit(ValidatorId(0), Height(0), Round(1), &propose.hash(),
     //          &block.hash(), sandbox.s(ValidatorId(0))));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -1321,7 +1321,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(2),
         Round(1),
@@ -1330,7 +1330,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(2),
         Round(1),
@@ -1339,7 +1339,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(2),
         Round(1),
@@ -1382,7 +1382,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     );
 
     sandbox.recv(&height_one_propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(2),
         Round(1),
@@ -1444,7 +1444,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         current_height,
         current_round,
@@ -1453,7 +1453,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         current_height,
         current_round,
@@ -1462,7 +1462,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         current_height,
         current_round,
@@ -1546,7 +1546,7 @@ fn handle_tx_handle_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
@@ -1587,7 +1587,7 @@ fn broadcast_prevote_with_tx_positive() {
     // HANDLE FULL PROPOSE
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(NOT_LOCKED, None);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(2),
         Round(1),
@@ -1641,7 +1641,7 @@ fn handle_precommit_remove_propose_request() {
 
     let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
-    let precommit = Precommit::new(
+    let precommit = sandbox.create_precommit(
         propose.validator(),
         Height(1),
         Round(1),
@@ -1659,7 +1659,7 @@ fn handle_precommit_remove_propose_request() {
 
     sandbox.send(
         sandbox.a(propose.validator()),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(propose.validator()),
             &[tx.hash()],
@@ -1672,7 +1672,7 @@ fn handle_precommit_remove_propose_request() {
 
     sandbox.send(
         sandbox.a(propose.validator()),
-        &PrevotesRequest::new(
+        &sandbox.create_prevote_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(propose.validator()),
             Height(1),
@@ -1696,7 +1696,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 
     let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
-    let precommit = Precommit::new(
+    let precommit = sandbox.create_precommit(
         propose.validator(),
         Height(1),
         Round(1),
@@ -1710,7 +1710,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 
     let mut prevoters = BitVec::from_elem(sandbox.n_validators(), false);
     for i in 1..sandbox.n_validators() as u16 {
-        sandbox.recv(&Prevote::new(
+        sandbox.recv(&sandbox.create_prevote(
             ValidatorId(i),
             Height(1),
             Round(1),
@@ -1744,7 +1744,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
         if i == 1 {
             sandbox.send(
                 sandbox.a(propose.validator()),
-                &PrevotesRequest::new(
+                &sandbox.create_prevote_request(
                     &sandbox.p(ValidatorId(0)),
                     &sandbox.p(propose.validator()),
                     Height(1),
@@ -1776,7 +1776,7 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
     let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
     for i in 1..sandbox.n_validators() as u16 {
-        sandbox.recv(&Precommit::new(
+        sandbox.recv(&sandbox.create_precommit(
             ValidatorId(i),
             Height(1),
             Round(1),

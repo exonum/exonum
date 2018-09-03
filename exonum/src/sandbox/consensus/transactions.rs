@@ -20,10 +20,7 @@ use std::time::Duration;
 
 use crypto::{gen_keypair, CryptoHash, Hash};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{
-    Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
-    TransactionsRequest, TransactionsResponse,
-};
+use messages::Message;
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
@@ -76,7 +73,7 @@ fn response_to_request_txs() {
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
 
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(ValidatorId(1)),
         &sandbox.p(ValidatorId(0)),
         &[tx.hash()],
@@ -85,7 +82,7 @@ fn response_to_request_txs() {
 
     sandbox.send(
         sandbox.a(ValidatorId(1)),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
             vec![tx.raw().clone()],
@@ -98,7 +95,7 @@ fn response_to_request_txs() {
 fn empty_tx_request() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(ValidatorId(1)),
         &sandbox.p(ValidatorId(0)),
         &[],
@@ -121,7 +118,7 @@ fn tx_pool_size_overflow() {
 
     sandbox.recv(&tx1);
 
-    let propose = Propose::new(
+    let propose = sandbox.create_propose(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -139,7 +136,7 @@ fn tx_pool_size_overflow() {
         .build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -147,7 +144,7 @@ fn tx_pool_size_overflow() {
         NOT_LOCKED,
         sandbox.s(ValidatorId(0)),
     ));
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -156,7 +153,7 @@ fn tx_pool_size_overflow() {
         sandbox.s(ValidatorId(1)),
     ));
     sandbox.assert_lock(NOT_LOCKED, None);
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -164,7 +161,7 @@ fn tx_pool_size_overflow() {
         NOT_LOCKED,
         sandbox.s(ValidatorId(2)),
     ));
-    sandbox.broadcast(&Precommit::new(
+    sandbox.broadcast(&sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -177,7 +174,7 @@ fn tx_pool_size_overflow() {
     sandbox.recv(&tx2);
     sandbox.assert_pool_len(2);
 
-    sandbox.recv(&Precommit::new(
+    sandbox.recv(&sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -186,7 +183,7 @@ fn tx_pool_size_overflow() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.recv(&Precommit::new(
+    sandbox.recv(&sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -198,7 +195,7 @@ fn tx_pool_size_overflow() {
 
     //first tx should be committed and removed from pool
     sandbox.assert_pool_len(1);
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(ValidatorId(0)),
         Height(2),
         &block.hash(),
@@ -222,7 +219,7 @@ fn duplicate_tx_in_pool() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             &[tx1.hash()],
@@ -234,7 +231,7 @@ fn duplicate_tx_in_pool() {
 
     sandbox.recv(&tx2);
 
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(2)),
         &sandbox.p(ValidatorId(0)),
         vec![tx1.raw().clone()],
@@ -280,7 +277,7 @@ fn incorrect_tx_in_request() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             &[tx0.hash()],
@@ -289,7 +286,7 @@ fn incorrect_tx_in_request() {
     );
 
     // Receive response with invalid `tx0`.
-    sandbox.recv(&TransactionsResponse::new(
+    sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(2)),
         &sandbox.p(ValidatorId(0)),
         vec![tx0.raw().clone()],
@@ -359,7 +356,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&tx2);
 
     // Send request with `tx1` and `tx2`.
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(ValidatorId(1)),
         &sandbox.p(ValidatorId(0)),
         &[tx1.hash(), tx2.hash()],
@@ -369,7 +366,7 @@ fn response_size_larger_than_max_message_len() {
     // Receive response with `tx1` and `tx2`.
     sandbox.send(
         sandbox.a(ValidatorId(1)),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
             vec![tx1.raw().clone(), tx2.raw().clone()],
@@ -381,7 +378,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&tx4);
 
     // Send request with `tx3` and `tx4`.
-    sandbox.recv(&TransactionsRequest::new(
+    sandbox.recv(&sandbox.create_transactions_request(
         &sandbox.p(ValidatorId(1)),
         &sandbox.p(ValidatorId(0)),
         &[tx3.hash(), tx4.hash()],
@@ -391,7 +388,7 @@ fn response_size_larger_than_max_message_len() {
     // Receive separate responses with `tx3` and `tx4`.
     sandbox.send(
         sandbox.a(ValidatorId(1)),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
             vec![tx3.raw().clone()],
@@ -401,7 +398,7 @@ fn response_size_larger_than_max_message_len() {
 
     sandbox.send(
         sandbox.a(ValidatorId(1)),
-        &TransactionsResponse::new(
+        &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
             vec![tx4.raw().clone()],
@@ -445,7 +442,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         .with_tx_hash(&tx.hash())
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(3),
@@ -454,7 +451,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(3),
@@ -471,7 +468,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose
-        sandbox.recv(&ProposeRequest::new(
+        sandbox.recv(&sandbox.create_propose_request(
             &sandbox.p(ValidatorId(3)),
             &sandbox.p(ValidatorId(0)),
             Height(1),
@@ -487,7 +484,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(ValidatorId(3).into(), true);
 
-        sandbox.recv(&PrevotesRequest::new(
+        sandbox.recv(&sandbox.create_prevote_request(
             &sandbox.p(ValidatorId(3)),
             &sandbox.p(ValidatorId(0)),
             Height(1),
@@ -503,7 +500,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         );
     }
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(3),
@@ -511,7 +508,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         NOT_LOCKED,
         sandbox.s(ValidatorId(1)),
     ));
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(3),
@@ -520,7 +517,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         sandbox.s(ValidatorId(2)),
     ));
 
-    sandbox.broadcast(&Precommit::new(
+    sandbox.broadcast(&sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(3),
@@ -538,7 +535,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestTransactions
-        sandbox.recv(&TransactionsRequest::new(
+        sandbox.recv(&sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(1)),
             &sandbox.p(ValidatorId(0)),
             &[tx.hash()],
@@ -547,7 +544,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
         sandbox.send(
             sandbox.a(ValidatorId(1)),
-            &TransactionsResponse::new(
+            &sandbox.create_transactions_response(
                 &sandbox.p(ValidatorId(0)),
                 &sandbox.p(ValidatorId(1)),
                 vec![tx.raw().clone()],
@@ -558,7 +555,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose negative
-        sandbox.recv(&ProposeRequest::new(
+        sandbox.recv(&sandbox.create_propose_request(
             &sandbox.p(ValidatorId(3)),
             &sandbox.p(ValidatorId(0)),
             Height(1),
@@ -578,7 +575,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(ValidatorId(3).into(), true);
 
-        sandbox.recv(&PrevotesRequest::new(
+        sandbox.recv(&sandbox.create_prevote_request(
             &sandbox.p(ValidatorId(3)),
             &sandbox.p(ValidatorId(0)),
             Height(1),
@@ -669,7 +666,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.send(
         sandbox.a(ValidatorId(2)),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
             &[tx.hash()],
@@ -679,7 +676,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.add_time(Duration::from_millis(0));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -692,7 +689,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.send(
         sandbox.a(ValidatorId(3)),
-        &TransactionsRequest::new(
+        &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
             &[tx.hash()],
