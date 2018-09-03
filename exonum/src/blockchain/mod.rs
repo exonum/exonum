@@ -69,7 +69,8 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
-const CORE_SERVICE: u16 = 0;
+/// Id of core service table family.
+pub const CORE_SERVICE: u16 = 0;
 
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
@@ -408,7 +409,7 @@ impl Blockchain {
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let context =
-                TransactionContext::new(&mut *fork, raw.service_id(), raw.hash(), *raw.author());
+                TransactionContext::new(&mut *fork, raw.service_id(), raw.hash(), raw.author());
             tx.execute(context)
         }));
 

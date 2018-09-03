@@ -1,4 +1,3 @@
-
 // Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,6 @@
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 use bit_vec::BitVec;
-
 use chrono;
 use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
@@ -45,7 +43,7 @@ use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, PrevotesRequest, Propose,
     ProposeRequest, Protocol, ProtocolMessage, RawTransaction, Status, TransactionsRequest,
-    TransactionsResponse, UncheckedBuffer
+    TransactionsResponse, PeersRequest
 };
 use node::ConnectInfo;
 use node::{
@@ -78,7 +76,7 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 pub struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
-    pub sent: VecDeque<(SocketAddr, Message<Protocol>)>,
+    pub sent: VecDeque<(SocketAddr, Protocol)>,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
@@ -104,7 +102,8 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => {
-                        self.sent.push_back((peer, msg.into()))
+                        let protocol_msg = Protocol::deserialize(msg).expect("Expected valid message.");
+                        self.sent.push_back((peer, protocol_msg))
                     }
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
@@ -123,10 +122,11 @@ impl SandboxInner {
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyTx(tx) => {
-                        if tx.verify() {
-                            self.handler
-                                .handle_event(InternalEvent::TxVerified(tx.raw().clone()).into());
-                        }
+                        unimplemented!();
+//                        if tx.verify() {
+//                            self.handler
+//                                .handle_event(InternalEvent::TxVerified(tx.clone()).into());
+//                        }
                     }
                 }
             }
@@ -213,7 +213,7 @@ impl Sandbox {
         height: Height,
         secret_key: &SecretKey,
     ) -> Message<BlockRequest> {
-        Portocol::concrete(BlockRequest::new(to, height), *author, secret_key)
+        Protocol::concrete(BlockRequest::new(to, height), *author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
@@ -228,7 +228,7 @@ impl Sandbox {
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_blockresponse<I: IntoIterator<Item = Message<Precommit>>>(
+    pub fn create_block_response<I: IntoIterator<Item = Message<Precommit>>>(
         &self,
         public_key: &PublicKey,
         to: &PublicKey,
@@ -237,16 +237,17 @@ impl Sandbox {
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
     ) -> Message<BlockResponse> {
-        Protocol::concrete(
-            BlockResponse::new(
-                to,
-                block,
-                precommits.into_iter().map(|x| x.into()).collect(),
-                tx_hashes,
-            ),
-            *public_key,
-            secret_key,
-        )
+        unimplemented!()
+//        Protocol::concrete(
+//            BlockResponse::new(
+//                to,
+//                block,
+//                precommits.into_iter().map(|x| x.into()).collect(),
+//                tx_hashes,
+//            ),
+//            *public_key,
+//            secret_key,
+//        )
     }
 
     /// Creates a `Connect` message signed by this validator.
@@ -263,6 +264,14 @@ impl Sandbox {
             *public_key,
             secret_key,
         )
+    }
+
+    /// Creates a `PeersRequest` message signed by this validator.
+    pub fn create_peers_request(&self,
+                                public_key: &PublicKey,
+                                to: &PublicKey,
+                                secret_key: &SecretKey) -> Message<PeersRequest> {
+        unimplemented!()
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -376,18 +385,23 @@ impl Sandbox {
     }
 
     /// Creates a `TransactionsReponse` message signed by this validator.
-    pub fn create_transactions_response<U: Into<UncheckedBuffer>, I: IntoIterator<Item = U>>(
+    pub fn create_transactions_response<I>(
         &self,
         author: &PublicKey,
         to: &PublicKey,
         txs: I,
         secret_key: &SecretKey,
-    ) -> Message<TransactionsResponse> {
-        Protocol::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(|x| x.into()).collect()),
-            *author,
-            secret_key,
-        )
+    ) -> Message<TransactionsResponse>
+    where I: IntoIterator<Item = Message<RawTransaction>>
+    {
+        unimplemented!()
+//        Protocol::concrete(
+//            TransactionsResponse::new(to, txs.into_iter()
+//                    .map(|x| x.into().to_vec())
+//                    .collect()),
+//            *author,
+//            secret_key,
+//        )
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -397,6 +411,7 @@ impl Sandbox {
             .map(|x| x.consensus_key)
             .collect()
     }
+
     pub fn n_validators(&self) -> usize {
         self.validators().len()
     }
@@ -438,7 +453,7 @@ impl Sandbox {
     pub fn recv<T: ProtocolMessage>(&self, msg: &Message<T>) {
         self.check_unexpected_message();
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
-        let event = NetworkEvent::MessageReceived(dummy_addr, msg.clone().into());
+        let event = NetworkEvent::MessageReceived(dummy_addr, msg.serialize());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -453,12 +468,12 @@ impl Sandbox {
         self.inner.borrow_mut().process_events();
     }
 
-    pub fn pop_sent(&self) -> Option<(SocketAddr, RawMessage)> {
+    pub fn pop_sent(&self) -> Option<(SocketAddr, Protocol)> {
         self.inner.borrow_mut().sent.pop_front()
     }
 
     pub fn send<T: ProtocolMessage>(&self, addr: SocketAddr, msg: &Message<T>) {
-        let expected_msg = msg.clone().downgrade();
+        let expected_msg = T::into_protocol(msg.clone());
         self.process_events();
         let send = self.pop_sent();
         if let Some((real_addr, real_msg)) = send {
@@ -478,8 +493,8 @@ impl Sandbox {
         let send = self.pop_sent();
 
         if let Some((addr, msg)) = send {
-            let peers_request =
-                PeersRequest::from_raw(msg).expect("Incorrect message. PeersRequest was expected");
+            let peers_request = PeersRequest::try_from(msg)
+                                    .expect("Incorrect message. PeersRequest was expected");
 
             let id = self.addresses.iter().position(|&a| a == addr);
             if let Some(id) = id {
@@ -515,7 +530,7 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
-        let expected_msg = msg.clone().downgrade();
+        let expected_msg = msg.signed_message();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -524,7 +539,7 @@ impl Sandbox {
         for _ in 0..expected_set.len() {
             let send = self.pop_sent();
             if let Some((real_addr, real_msg)) = send {
-                assert_eq!(expected_msg, real_msg, "Expected to broadcast other message");
+                assert_eq!(expected_msg, real_msg.signed_message(), "Expected to broadcast other message");
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
@@ -770,7 +785,7 @@ impl Sandbox {
     pub fn restart_with_time(self, time: SystemTime) -> Self {
         let connect = self.connect().map(|c| {
             self.create_connect(
-                c.author(),
+                &c.author(),
                 c.addr(),
                 time.into(),
                 c.user_agent(),
@@ -1116,7 +1131,7 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, ServiceContext, TransactionSet};
+    use blockchain::{ExecutionResult, ServiceContext, TransactionSet, TransactionContext};
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
     use messages::RawTransaction;
@@ -1137,9 +1152,10 @@ mod tests {
     }
 
     impl TxAfterCommit {
-        pub fn new_with_height(height: Height) -> TxAfterCommit {
+        pub fn new_with_height(height: Height) -> Message<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            TxAfterCommit::new(height, &keypair.1)
+            Protocol::sign_tx(TxAfterCommit::new(height),
+                              SERVICE_ID, keypair.0, &keypair.1)
         }
     }
 
@@ -1233,7 +1249,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Expected to send other message")]
+    #[should_panic(expected = "Expected to send the message")]
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
         s.send(
@@ -1249,7 +1265,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Expected to send other message")]
+    #[should_panic(expected = "Expected to send the message")]
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.

@@ -39,7 +39,7 @@ fn test_after_commit() {
         let block = testkit.create_block();
         if i > 1 {
             assert_eq!(
-                block[0].content().raw(),
+                block[0].content().signed_message(),
                 TxAfterCommit::new_with_signature(Height(i - 1), &Signature::zero()).raw()
             );
         }

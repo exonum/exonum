@@ -19,14 +19,14 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Prevote, Propose};
+use messages::Message;
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 #[test]
 fn test_queue_message_from_future_round() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(
+    let propose = sandbox.create_propose(
         ValidatorId(3),
         Height(1),
         Round(2),
@@ -40,7 +40,7 @@ fn test_queue_message_from_future_round() {
     sandbox.assert_state(Height(1), Round(1));
     sandbox.add_time(Duration::from_millis(1));
     sandbox.assert_state(Height(1), Round(2));
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -62,7 +62,7 @@ fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(2),
         Round(1),
@@ -95,10 +95,10 @@ fn test_queue_propose_message_from_next_height() {
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(0))
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
-    let future_propose = Propose::new(
+    let future_propose = sandbox.create_propose(
         ValidatorId(0),
         Height(2),
         Round(2),
@@ -109,7 +109,7 @@ fn test_queue_propose_message_from_next_height() {
 
     sandbox.recv(&future_propose);
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
 
     info!(
         "last_block={:#?}, hash={:?}",

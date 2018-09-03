@@ -24,7 +24,7 @@ use blockchain::{
 use crypto::{gen_keypair, Hash};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
-use messages::{Message, RawTransaction};
+use messages::{Message, RawTransaction, Protocol};
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
@@ -189,10 +189,10 @@ fn gen_tempdir_name() -> String {
 
 fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_tx_set::<TestServiceTxs>(Tx::new(3).into(), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_ok2 = Message::sign_tx_set::<TestServiceTxs>(Tx::new(4).into(), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_failed = Message::sign_tx_set::<TestServiceTxs>(Tx::new(0).into(), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_storage_error = Message::sign_tx_set::<TestServiceTxs>(Tx::new(42).into(), TEST_SERVICE_ID, (pk, &sec_key));
+    let tx_ok1 = Protocol::sign_tx(Tx::new(3), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok2 = Protocol::sign_tx(Tx::new(4), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_failed = Protocol::sign_tx(Tx::new(0), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_storage_error = Protocol::sign_tx(Tx::new(42), TEST_SERVICE_ID, pk, &sec_key);
 
     let patch = {
         let mut fork = blockchain.fork();
@@ -242,10 +242,10 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
 
 fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
     let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_tx(Tx::new(3), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_ok2 = Message::sign_tx(Tx::new(4), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_failed = Message::sign_tx(Tx::new(0), TEST_SERVICE_ID, (pk, &sec_key));
-    let tx_storage_error = Message::sign_tx(Tx::new(42), TEST_SERVICE_ID, (pk, &sec_key));
+    let tx_ok1 = Protocol::sign_tx(Tx::new(3), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok2 = Protocol::sign_tx(Tx::new(4), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_failed = Protocol::sign_tx(Tx::new(0), TEST_SERVICE_ID, pk, &sec_key);
+    let tx_storage_error = Protocol::sign_tx(Tx::new(42), TEST_SERVICE_ID, pk, &sec_key);
 
     let patch = {
         let mut fork = blockchain.fork();
@@ -270,7 +270,7 @@ mod transactions_tests {
     use super::TEST_SERVICE_ID;
     use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crypto::gen_keypair;
-    use messages::{Message, RawTransaction};
+    use messages::{Message, RawTransaction, Protocol, TransactionFromSet};
     use serde::Serialize;
     use serde_json;
 
@@ -347,17 +347,17 @@ mod transactions_tests {
             let raw: &RawTransaction = t.deref();
             println!("test tx_from_raw");
             let parsed = MyTransactions::tx_from_raw(raw.clone()).unwrap();
-            let t_destination = Message::sign_tx_set(parsed, TEST_SERVICE_ID,(pk,sk));
+            let t_destination = Protocol::sign_tx(parsed, TEST_SERVICE_ID,pk,sk);
             assert_eq!(t, t_destination);
         }
 
         let (pk, sec_key) = gen_keypair();
-        let a = Message::sign_tx_set::<MyTransactions>(A::new(0).into(),
-                                     TEST_SERVICE_ID, (pk, &sec_key));
-        let b = Message::sign_tx_set::<MyTransactions>(B::new(1, 2).into(),
-                                     TEST_SERVICE_ID, (pk, &sec_key));
-        let c = Message::sign_tx_set::<MyTransactions>(C::new(0).into(),
-                                     TEST_SERVICE_ID, (pk, &sec_key));
+        let a = Protocol::sign_tx(A::new(0),
+                                     TEST_SERVICE_ID, pk, &sec_key);
+        let b = Protocol::sign_tx(B::new(1, 2),
+                                     TEST_SERVICE_ID, pk, &sec_key);
+        let c = Protocol::sign_tx(C::new(0),
+                                     TEST_SERVICE_ID, pk, &sec_key);
         round_trip((pk, &sec_key),a);
         round_trip((pk, &sec_key),b);
         round_trip((pk, &sec_key),c);
@@ -367,17 +367,18 @@ mod transactions_tests {
     fn deserialize_from_raw_single() {
         use messages::BinaryForm;
 
-        fn round_trip<T: BinaryForm + Transaction + Serialize>(t: T) {
-            let (pk, sec_key) = gen_keypair();
-            use std::ops::Deref;
-            let initial = serde_json::to_value(&t).unwrap();
-            let msg = Message::sign_tx(t, TEST_SERVICE_ID, (pk, &sec_key));
-            let raw: &RawTransaction = msg.deref();
-
-            println!("{:?}", raw.payload());
-            let parsed: T = BinaryForm::deserialize(raw.payload()).unwrap();
-            let round_tripped = serde_json::to_value(&parsed).unwrap();
-            assert_eq!(initial, round_tripped);
+        fn round_trip<T: Into<TransactionFromSet> + Serialize>(t: T) {
+            unimplemented!()
+//            let (pk, sec_key) = gen_keypair();
+//            use std::ops::Deref;
+//            let initial = serde_json::to_value(&t).unwrap();
+//            let msg = Protocol::sign_tx(t, TEST_SERVICE_ID, pk, &sec_key);
+//            let raw: &RawTransaction = msg.deref();
+//
+//            println!("{:?}", raw.payload());
+//            let parsed: T = BinaryForm::deserialize(raw.payload()).unwrap();
+//            let round_tripped = serde_json::to_value(&parsed).unwrap();
+//            assert_eq!(initial, round_tripped);
         }
 
         let a = A::new(0);
@@ -559,6 +560,7 @@ mod rocksdb_tests {
     use node::ApiSender;
     use std::path::Path;
     use storage::{Database, DbOptions, RocksDB};
+    use messages::{Protocol};
     use tempdir::TempDir;
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
@@ -642,47 +644,49 @@ mod rocksdb_tests {
         super::assert_service_execute(&blockchain, &mut db);
     }
 
-    #[test]
-    fn test_new_tx() {
-        use crypto::{gen_keypair_from_seed, Seed, PublicKey};
-        use messages::{Message};
-        use storage::StorageValue;
-        use hex::FromHex;
-
-        encoding_struct! {
-            struct NewTx {
-                public_key: &PublicKey,
-                login: &str,
-                name: &str,
-                url: &str,
-                avatar_url: &str,
-            }
-        }
-
-        use blockchain::{ExecutionResult, Transaction, TransactionContext};
-
-        impl Transaction for NewTx {
-            fn verify(&self) -> bool {
-                true
-            }
-
-            fn execute(&self, _: TransactionContext) -> ExecutionResult {
-                Ok(())
-            }
-        }
-        {
-            let (p, s) = gen_keypair_from_seed(&Seed::new([210; 32]));
-            let message = Message::sign_tx(NewTx::new(
-                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
-                                                      "login", "name", "url", "avatar_url"), 0, (p, &s));
-            println!("pk = {}", ::hex::encode(p));
-            println!("new tx newstruct = {}", message.to_hex_string());
-            println!("new tx bytearray = {:?}", message.into_parts().1.to_vec());
-            println!("new struct, inner = {}", ::hex::encode(NewTx::new(
-                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
-                "login", "name", "url", "avatar_url").into_bytes()));
-
-        }
-        panic!();
-    }
+//    #[test]
+//    fn test_new_tx() {
+//        use crypto::{gen_keypair_from_seed, Seed, PublicKey};
+//        use messages::{Message};
+//        use storage::StorageValue;
+//        use hex::FromHex;
+//
+//        transactions! {
+//            NewTxSet {
+//                struct NewTx {
+//                    public_key: &PublicKey,
+//                    login: &str,
+//                    name: &str,
+//                    url: &str,
+//                    avatar_url: &str,
+//                }
+//            }
+//        }
+//
+//        use blockchain::{ExecutionResult, Transaction, TransactionContext};
+//
+//        impl Transaction for NewTx {
+//            fn verify(&self) -> bool {
+//                true
+//            }
+//
+//            fn execute(&self, _: TransactionContext) -> ExecutionResult {
+//                Ok(())
+//            }
+//        }
+//        {
+//            let (p, s) = gen_keypair_from_seed(&Seed::new([210; 32]));
+//            let message = Protocol::sign_tx(NewTx::new(
+//                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
+//                                                      "login", "name", "url", "avatar_url"), 0, p, &s);
+//            println!("pk = {}", ::hex::encode(p));
+//            println!("new tx newstruct = {}", message.to_hex_string());
+//            println!("new tx bytearray = {:?}", message.into_parts().1.to_vec());
+//            println!("new struct, inner = {}", ::hex::encode(NewTx::new(
+//                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
+//                "login", "name", "url", "avatar_url").into_bytes()));
+//
+//        }
+//        panic!();
+//    }
 }

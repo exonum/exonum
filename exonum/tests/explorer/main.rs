@@ -40,20 +40,20 @@ fn test_explorer_basics() {
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
-    let tx_alice = Message::sign_tx(
+    let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
-    let tx_bob = Message::sign_tx(
+    let tx_bob = Protocol::sign_tx(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
-        (pk_bob, &key_bob),
+        pk_bob, &key_bob,
     );
-    let tx_transfer = Message::sign_tx(
+    let tx_transfer = Protocol::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
 
     {
@@ -79,16 +79,16 @@ fn test_explorer_basics() {
         let tx_info = block.transaction(0).unwrap();
         assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
         assert_eq!(tx_info.status(), Ok(()));
-        assert_eq!(tx_info.content().raw(), &tx_alice);
+        assert_eq!(tx_info.content().signed_message(), &tx_alice);
         assert_eq!(
-            tx_info.content().raw().hash(),
+            tx_info.content().signed_message().hash(),
             block.transaction_hashes()[0]
         );
 
         let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
         assert!(!tx_info.is_in_pool());
         assert!(tx_info.is_committed());
-        assert_eq!(tx_info.content().raw(), &tx_alice);
+        assert_eq!(tx_info.content().signed_message(), &tx_alice);
 
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => info,
@@ -165,10 +165,10 @@ fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
 
     let (pk_alice, key_alice) = crypto::gen_keypair();
-    let tx_alice = Message::sign_tx(
+    let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
     let tx_hash = tx_alice.hash();
 
@@ -188,16 +188,16 @@ fn test_explorer_pool_transaction() {
     let tx_info = explorer.transaction(&tx_hash).unwrap();
     assert!(tx_info.is_in_pool());
     assert!(!tx_info.is_committed());
-    assert_eq!(tx_info.content().raw(), &tx_alice);
+    assert_eq!(tx_info.content().signed_message(), &tx_alice);
 }
 
 fn tx_generator() -> Box<Iterator<Item = Message<RawTransaction>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
-        Message::sign_tx(
+        Protocol::sign_tx(
             CreateWallet::new(&pk, &format!("Alice #{}", i)),
             SERVICE_ID,
-            (pk, &key),
+            pk, &key,
         )
     }))
 }
@@ -330,8 +330,8 @@ fn test_transaction_iterator() {
             assert_eq!(tx.status(), Ok(()));
         }
         for (i, tx) in block.iter().enumerate() {
-            let raw_tx = tx.content().raw().clone();
-            let tx = ExplorerTransactions::tx_from_raw(raw_tx.clone_child()).unwrap();
+            let raw_tx = tx.content().raw_transaction();
+            let tx = ExplorerTransactions::tx_from_raw(raw_tx).unwrap();
             match tx {
                 ExplorerTransactions::CreateWallet(parsed_tx) => {
                     assert_eq!(parsed_tx.name(), &format!("Alice #{}", i))
@@ -345,20 +345,20 @@ fn test_transaction_iterator() {
 
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Message::sign_tx(
+    let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
-    let tx_bob = Message::sign_tx(
+    let tx_bob = Protocol::sign_tx(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
-        (pk_bob, &key_bob),
+        pk_bob, &key_bob,
     );
-    let tx_transfer = Message::sign_tx(
+    let tx_transfer = Protocol::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
     create_block(
         &mut blockchain,
@@ -371,7 +371,7 @@ fn test_transaction_iterator() {
     let failed_tx_hashes: Vec<_> = block
         .iter()
         .filter(|tx| tx.status().is_err())
-        .map(|tx| tx.content().raw().hash())
+        .map(|tx| tx.content().signed_message().hash())
         .collect();
     assert_eq!(failed_tx_hashes, vec![tx_bob.hash(), tx_transfer.hash()]);
 
@@ -379,7 +379,7 @@ fn test_transaction_iterator() {
         .iter()
         .filter(|tx| {
             if let ExplorerTransactions::CreateWallet(_) =
-                ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap()
+                ExplorerTransactions::tx_from_raw(tx.content().raw_transaction()).unwrap()
             {
                 true
             } else {
@@ -405,7 +405,7 @@ fn test_block_with_transactions() {
 
     assert!(block.iter().all(|tx| {
         if let ExplorerTransactions::CreateWallet(_) =
-            ExplorerTransactions::tx_from_raw(tx.content().raw().clone_child()).unwrap()
+            ExplorerTransactions::tx_from_raw(tx.content().raw_transaction()).unwrap()
         {
             true
         } else {
@@ -437,7 +437,7 @@ fn test_block_with_transactions_index_overflow() {
 //    let json = serde_json::to_value(tx_copy).unwrap();
 //    let tx_copy: CommittedTransaction = serde_json::from_value(json).unwrap();
 //
-//    assert_eq!(tx_copy.content().raw(), tx);
+//    assert_eq!(tx_copy.content().signed_message(), tx);
 //}
 //
 //#[test]
@@ -457,7 +457,7 @@ fn test_block_with_transactions_index_overflow() {
 //    let json = serde_json::to_value(&info).unwrap();
 //    let info: TransactionInfo = serde_json::from_value(json).unwrap();
 //
-//    assert_eq!(info.content().raw(), tx);
+//    assert_eq!(info.content().signed_message(), tx);
 //}
 //
 //#[test]
@@ -472,7 +472,7 @@ fn test_block_with_transactions_index_overflow() {
 //    let block_json = serde_json::to_value(&block).unwrap();
 //    let block_copy: BlockWithTransactions = serde_json::from_value(block_json).unwrap();
 //    assert_eq!(
-//        *block_copy[0].content().raw(),
-//        block[0].content().raw()
+//        *block_copy[0].content().signed_message(),
+//        block[0].content().signed_message()
 //    );
 //}

@@ -17,7 +17,7 @@ use bit_vec::BitVec;
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
-use super::{sandbox::Sandbox, timestamping::TimestampingTxGenerator, DATA_SIZE};
+use super::{sandbox::Sandbox, timestamping::TimestampingTxGenerator};
 use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -25,6 +25,7 @@ use messages::{
     Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction,
 };
 use storage::Database;
+use super::timestamping::DATA_SIZE;
 
 pub type TimestampingSandbox = Sandbox;
 
@@ -518,7 +519,7 @@ fn get_propose_with_transactions(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
 ) -> Message<Propose> {
-    get_propose_with_transactions_for_validator(sandbox, transactions, VALIDATOR_0)
+    get_propose_with_transactions_for_validator(sandbox, transactions, ValidatorId(0))
 }
 
 fn get_propose_with_transactions_for_validator(

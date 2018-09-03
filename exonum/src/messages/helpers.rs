@@ -12,23 +12,6 @@ pub trait BinaryForm: Sized {
     fn deserialize(buffer: &[u8]) -> Result<Self, Error>;
 }
 
-
-#[doc(hidden)]
-pub fn partial_enum_to_vec(tag: u8, vec: Vec<u8>) -> Vec<u8> {
-    ::std::iter::once(tag).chain(vec).collect()
-}
-
-#[doc(hidden)]
-pub fn buffer_to_partial_enum( vec: &[u8]) -> Option<(u8, Vec<u8>)> {
-    if vec.len() <= 1 {
-        None
-    }
-    else {
-        let tag = vec[0];
-        Some((tag, vec.into_iter().skip(1).cloned().collect()))
-    }
-}
-
 /// Use `ToHex`/`FromHex` to serialize arbitrary type `T` as hex string rather than real Serde::serialize.
 pub(crate) struct HexStringRepresentation;
 impl HexStringRepresentation {

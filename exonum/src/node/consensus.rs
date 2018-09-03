@@ -79,7 +79,7 @@ impl NodeHandler {
             }
             return;
         }
-        let key = *msg.author();
+        let key = msg.author();
 
         trace!("Handle message={:?}", msg);
 
@@ -156,7 +156,7 @@ impl NodeHandler {
             );
         }
 
-        if !self.state.connect_list().is_peer_allowed(msg.author()) {
+        if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             bail!(
                 "Received request message from peer = {} which not in ConnectList.",
                 msg.author().to_hex()
@@ -216,7 +216,7 @@ impl NodeHandler {
 
             if has_unknown_txs {
                 trace!("REQUEST TRANSACTIONS");
-                self.request(RequestData::BlockTransactions, *msg.author());
+                self.request(RequestData::BlockTransactions, msg.author());
 
                 for node in known_nodes {
                     self.request(RequestData::BlockTransactions, node);
@@ -530,7 +530,7 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
-    pub fn handle_verified_tx(&mut self, msg: Message<RawTransaction>)
+    pub fn handle_tx(&mut self, msg: Message<RawTransaction>)
         -> Result<(), failure::Error>
     {
         let hash = msg.hash();
@@ -569,22 +569,6 @@ impl NodeHandler {
         Ok(())
     }
 
-    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
-    /// added to the transactions pool.
-    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) {
-        use std::error::Error;
-        let tx = match self.blockchain.tx_from_raw(&msg) {
-            Ok(tx) => tx,
-            Err(e) => {
-                let service_id = msg.service_id();
-                error!("{}, service_id={}", e.description(), service_id);
-                return;
-            }
-        };
-
-        self.execute_later(InternalRequest::VerifyTx(tx));
-    }
-
     /// Handles raw transactions.
     pub fn handle_txs_batch(
         &mut self,
@@ -598,7 +582,7 @@ impl NodeHandler {
             )
         }
 
-        if !self.state.connect_list().is_peer_allowed(msg.author()) {
+        if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             bail!(
                 "Received response message from peer = {} which not in ConnectList.",
                 msg.author().to_hex()
@@ -625,7 +609,7 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Message<RawTransaction>) {
         trace!("Handle incoming transaction");
-        match self.handle_verified_tx(msg.clone()) {
+        match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),
             Err(e) => error!("{}", e),
         }
@@ -962,7 +946,7 @@ impl NodeHandler {
         precommit: &Message<Precommit>,
     ) -> Result<(), failure::Error> {
         if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator()) {
-            if &pub_key != precommit.author() {
+            if pub_key != precommit.author() {
                 bail!(
                     "Received precommit with different validator id,\
                      validator_id = {}, validator_key: {:?},\

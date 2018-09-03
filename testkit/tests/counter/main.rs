@@ -709,5 +709,5 @@ fn test_boxed_tx() {
     api.send(tx);
     let block = testkit.create_block();
     assert_eq!(block.len(), 1);
-    assert_eq!(block[0].content().raw().service_id(), counter::SERVICE_ID);
+    assert_eq!(block[0].content().signed_message().service_id(), counter::SERVICE_ID);
 }

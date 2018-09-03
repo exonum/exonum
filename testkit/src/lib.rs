@@ -690,7 +690,7 @@ impl TestKit {
                     .map(|tx| blockchain.tx_from_raw(tx).unwrap())
                     .filter(|tx| tx.transaction().verify())
                     .map(|tx| {
-                        let tx_id = tx.raw().hash();
+                        let tx_id = tx.hash();
                         let tx_not_found = !schema.transactions().contains(&tx_id);
                         let tx_in_pool = schema.transactions_pool().contains(&tx_id);
                         assert!(
@@ -699,7 +699,7 @@ impl TestKit {
                             tx
                         );
                         if tx_not_found {
-                            schema.add_transaction_into_pool(tx.raw().clone());
+                            schema.add_transaction_into_pool(tx.clone());
                         }
                         tx_id
                     })

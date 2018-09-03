@@ -28,7 +28,7 @@ use events::{
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, MessageWriter, RawMessage};
+use messages::{Connect, Message, SignedMessage, Protocol};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
@@ -72,15 +72,15 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn connect_with(&self, addr: SocketAddr, connect: Connect) {
+    pub fn connect_with(&self, addr: SocketAddr, connect: Message<Connect>) {
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
+            .send(NetworkRequest::SendMessage(addr, connect.into()))
             .wait()
             .unwrap();
     }
 
-    pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
+    pub fn send_to(&self, addr: SocketAddr, raw: SignedMessage) {
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(addr, raw))
@@ -88,7 +88,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn wait_for_connect(&mut self) -> Connect {
+    pub fn wait_for_connect(&mut self) -> Message<Connect> {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
@@ -104,9 +104,9 @@ impl TestHandler {
         }
     }
 
-    pub fn wait_for_message(&mut self) -> RawMessage {
+    pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
-            Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
+            Ok(NetworkEvent::MessageReceived(_addr, msg)) => SignedMessage::unchecked_from_vec(msg),
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
@@ -146,7 +146,7 @@ impl TestEvents {
         }
     }
 
-    pub fn spawn(self, handshake_params: &HandshakeParams, connect: Connect) -> TestHandler {
+    pub fn spawn(self, handshake_params: &HandshakeParams, connect: Message<Connect>) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
@@ -158,7 +158,7 @@ impl TestEvents {
         handler_part
     }
 
-    fn into_reactor(self, connect: Connect) -> (TestHandler, NetworkPart) {
+    fn into_reactor(self, connect: Message<Connect>) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
@@ -182,25 +182,23 @@ pub fn connect_message(
     addr: SocketAddr,
     public_key: &PublicKey,
     secret_key: &SecretKey,
-) -> Connect {
+) -> Message<Connect> {
     let time = time::UNIX_EPOCH;
-    Connect::new(
-        public_key,
+    Protocol::concrete(Connect::new(
         addr,
         time.into(),
         &user_agent::get(),
-        secret_key,
-    )
+    ), *public_key, secret_key)
 }
 
-pub fn raw_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, 0, id, len);
-    RawMessage::new(writer.sign(&gen_keypair().1))
+pub fn raw_message(_id: u16, len: usize) -> SignedMessage {
+    let buffer = vec![0u8;len];
+    SignedMessage::unchecked_from_vec(buffer)
 }
 
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub connect: Connect,
+    pub connect: Message<Connect>,
     pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,
@@ -335,7 +333,7 @@ fn test_network_max_message_len() {
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
     let max_payload_length =
-        max_message_length - ::messages::HEADER_LENGTH - ::crypto::SIGNATURE_LENGTH;
+        max_message_length - ::messages::EMPTY_SIGNED_MESSAGE_SIZE;
     let acceptable_message = raw_message(15, max_payload_length);
     let too_big_message = raw_message(16, max_payload_length + 1000);
 

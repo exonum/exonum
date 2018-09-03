@@ -28,8 +28,10 @@
 use std::fmt;
 use std::borrow::Cow;
 use std::ops::Deref;
+use std::cmp::PartialEq;
 
 use failure::Error;
+use byteorder::{LittleEndian, ByteOrder};
 
 use blockchain::{Transaction, TransactionSet};
 use storage::StorageValue;
@@ -39,7 +41,7 @@ use encoding;
 use hex::{FromHex, ToHex};
 
 pub(crate) use self::authorization::SignedMessage;
-pub use self::helpers::{BinaryForm, buffer_to_partial_enum, partial_enum_to_vec};
+pub use self::helpers::BinaryForm;
 pub(crate) use self::helpers::{HexStringRepresentation, BinaryFormSerialize};
 pub use self::protocol::*;
 
@@ -48,37 +50,52 @@ mod compatibility;
 mod authorization;
 mod helpers;
 mod protocol;
-//mod raw;
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//mod tests;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 /// Transaction raw buffer.
 /// This struct used to transfer transaction in network.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RawTransaction {
     service_id: u16,
-    payload: Vec<u8>,
+    transaction_set: TransactionFromSet,
 }
 
-pub struct TransactionFromSet<T> {
+/// Concrete raw transaction payload inside `TransactionSet` linked with `message_id` in this set.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct TransactionFromSet {
     message_id: u16,
-    payload: T
+    payload: Vec<u8>
+}
+
+impl TransactionFromSet {
+    pub fn from_raw_unchecked(message_id: u16, payload: Vec<u8>) -> Self {
+        TransactionFromSet {
+            message_id,
+            payload
+        }
+    }
+
+    pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
+        (self.message_id, self.payload)
+    }
 }
 
 impl RawTransaction {
     /// Creates new instance of RawTransaction.
-    pub(crate) fn new(service_id: u16, payload: Vec<u8>) -> RawTransaction {
+    pub(in messages) fn new(service_id: u16,
+                            transaction_set: TransactionFromSet) -> RawTransaction {
         RawTransaction {
             service_id,
-            payload,
+            transaction_set,
         }
     }
     /// Returns user defined data that should be used for deserialization.
-    pub fn payload(&self) -> &[u8] {
-        &self.payload
+    pub fn transaction_set(self) -> TransactionFromSet {
+        self.transaction_set
     }
     /// Returns service_id specified for current transaction.
     pub fn service_id(&self) -> u16 {
@@ -98,23 +115,41 @@ impl RawTransaction {
 
 impl BinaryForm for RawTransaction {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
-        unimplemented!()
+        let mut buffer = Vec::new();
+        buffer.resize(2,0);
+        LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
+        let value = self.transaction_set.serialize()?;
+        buffer.extend_from_slice(&value);
+        Ok(buffer)
     }
 
     /// Converts serialized byte array into transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error>{
-        unimplemented!()
+        let service_id = LittleEndian::read_u16(&buffer[0..2]);
+        let transaction_set = TransactionFromSet::deserialize(&buffer[2..])?;
+        Ok(RawTransaction {
+            service_id,
+            transaction_set
+        })
     }
 }
 
-impl<T> BinaryForm for TransactionFromSet<T>{
+impl<> BinaryForm for TransactionFromSet{
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
-        unimplemented!()
+        let mut buffer = Vec::new();
+        buffer.resize(2,0);
+        LittleEndian::write_u16(&mut buffer[0..2], self.message_id);
+        buffer.extend_from_slice(&self.payload);
+        Ok(buffer)
     }
 
-    /// Converts serialized byte array into transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error>{
-        unimplemented!()
+        let message_id = LittleEndian::read_u16(&buffer[0..2]);
+        let payload = buffer[2..].to_vec();
+        Ok(TransactionFromSet {
+            message_id,
+            payload
+        })
     }
 }
 
@@ -133,14 +168,19 @@ pub struct Message<T>
 }
 
 impl<T: ProtocolMessage> Message<T> {
-    /// Creates new instance of message
+    /// Creates new instance of message.
     pub(in messages) fn new(payload: T, message: SignedMessage) -> Message<T> {
         Message { payload, message }
     }
 
-    /// Returns hash of full message
+    /// Returns hash of full message.
     pub fn hash(&self) -> Hash {
         hash(self.message.raw())
+    }
+
+    /// Returns serialized buffer.
+    pub fn serialize(&self) -> Vec<u8> {
+        self.signed_message().raw.clone()
     }
 
 //    /// Returns hex representation of binary message form
@@ -148,26 +188,26 @@ impl<T: ProtocolMessage> Message<T> {
 //        self.message.to_hex_string()
 //    }
 
-    /// Return link to inner
+    /// Return link to inner.
     pub fn inner(&self) -> &T {
         &self.payload
     }
 
-    /// Return link to signed message
+    /// Return link to signed message.
     pub(crate) fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
 
     /// Returns public key of message creator.
-    pub fn author(&self) -> &PublicKey {
-        &self.message.author()
+    pub fn author(&self) -> PublicKey {
+        self.message.author()
     }
 }
 
-impl fmt::Debug for RawTransaction {
+impl fmt::Debug for TransactionFromSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Transaction")
-            .field("service_id", &self.service_id)
+            .field("message_id", &self.message_id)
             .field("payload_len", &self.payload.len())
             .finish()
     }
@@ -198,19 +238,28 @@ impl<T: ProtocolMessage> Deref for Message<T> {
     }
 }
 
-
-impl<T> StorageValue for Message<T> {
+impl<T: ProtocolMessage> StorageValue for Message<T> {
     fn into_bytes(self) -> Vec<u8> {
-        unimplemented!()
+        self.message.raw
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        unimplemented!()
+        let message = SignedMessage::unchecked_from_vec(value.into_owned());
+        //TODO: Remove additional deserialization
+        let msg = Protocol::deserialize(message).unwrap();
+        T::try_from(msg).unwrap()
     }
 }
 
-impl<T> CryptoHash for Message<T> {
+impl<T: ProtocolMessage> CryptoHash for Message<T> {
     fn hash(&self) -> Hash {
-        unimplemented!()
+        self.hash()
+    }
+}
+
+
+impl PartialEq<Message<RawTransaction>> for SignedMessage {
+    fn eq(&self, other: &Message<RawTransaction>) -> bool {
+        self.eq(other.signed_message())
     }
 }

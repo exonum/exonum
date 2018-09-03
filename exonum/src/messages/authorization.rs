@@ -10,8 +10,9 @@ use messages::Message;
 use storage::StorageValue;
 use hex::{FromHex, ToHex};
 
-use super::protocol::{Protocol, ProtocolMessage};
-use super::PROTOCOL_MAJOR_VERSION;
+use super::{EMPTY_SIGNED_MESSAGE_SIZE, PROTOCOL_MAJOR_VERSION,
+            helpers::{BinaryForm},
+            protocol::{Protocol, ProtocolMessage}};
 
 use encoding::serialize::encode_hex;
 
@@ -32,49 +33,73 @@ use encoding::serialize::encode_hex;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SignedMessage {
-    raw: Vec<u8>,
+    pub(in messages) raw: Vec<u8>,
 }
 
 impl SignedMessage {
 
-    pub(crate) fn new<T>(
-        value: T,
+    pub(crate) fn new(
+        cls:u8,
+        tag:u8,
+        value: Vec<u8>,
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> SignedMessage {
-        unimplemented!()
-//        let authorized_message = AuthorizedMessage::new(value, author)?;
-//        let signature = Self::sign(&authorized_message, secret_key);
-//
-//        SignedMessage {
-//            authorized_message,
-//            signature,
-//        })
+        let mut buffer = Vec::new();
+        let signature = Self::sign(&value, secret_key)
+            .expect("Couldn't form signature");
+        buffer.extend_from_slice(author.as_ref());
+        buffer.push(cls);
+        buffer.push(tag);
+        buffer.extend_from_slice(value.as_ref());
+        buffer.extend_from_slice(signature.as_ref());
+        SignedMessage {
+            raw: buffer
+        }
     }
 
     /// Create `SignedMessage` wrapper from raw buffer.
     /// Checks binary format and signature.
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
-        unimplemented!();
-//
-//        if message.authorized_message.version != PROTOCOL_MAJOR_VERSION {
-//            bail!(
-//                "Message version differ from our supported, msg_version = {}",
-//                message.authorized_message.version
-//            )
-//        }
-//        Self::verify(
-//            &message.authorized_message,
-//            &message.signature,
-//            &message.authorized_message.author,
-//        )?;
+        if buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
+            bail!(
+                "Message too short message_len = {}",
+                buffer.len()
+            )
+        }
+        let signed = SignedMessage { raw: buffer };
 
-//        Ok(message)
+        {
+            let pk = signed.author();
+            let signature = signed.signature();
+            let payload = signed.payload();
+
+            Self::verify(
+                payload,
+                &signature,
+                &pk,
+            )?;
+        }
+
+        Ok(signed)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
+        SignedMessage {
+            raw: buffer
+        }
+    }
+    #[cfg(not(test))]
+    pub(in messages) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
+        SignedMessage {
+            raw: buffer
+        }
     }
 
     #[allow(unsafe_code)]
-    pub(in messages) fn author(&self) -> &PublicKey {
-        unsafe { &*(&self.raw[0] as *const u8 as *const PublicKey) }
+    pub(in messages) fn author(&self) -> PublicKey {
+        PublicKey::from_slice(&self.raw[0..PUBLIC_KEY_LENGTH]).expect("Couldn't read PublicKey")
     }
 
     pub(in messages) fn message_class(&self) -> u8 {
@@ -92,9 +117,9 @@ impl SignedMessage {
     }
 
     #[allow(unsafe_code)]
-    pub(in messages) fn signature(&self) -> &Signature {
+    pub(in messages) fn signature(&self) -> Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
-        unsafe { &*(&self.raw[sign_idx] as *const u8 as *const Signature) }
+        Signature::from_slice(&self.raw[sign_idx..]).expect("Couldn't read signature")
     }
 
     /// Return byte array representation of internal data.
@@ -102,24 +127,23 @@ impl SignedMessage {
         &self.raw
     }
 
-    fn sign<T: Serialize>(val: &T, secret_key: &SecretKey) -> Result<Signature, Error> {
-        unimplemented!();
-//        // TODO: limit bincode max_message_length using config
-//        let full_buffer = bincode::config().no_limit().serialize(&val)?;
-//        let signature = crypto::sign(&full_buffer, secret_key);
-//        Ok(signature)
+    pub fn hash(&self) -> Hash {
+        hash(self.raw())
     }
 
-    fn verify<T: Serialize>(
-        val: &T,
+    fn sign(full_buffer: &[u8], secret_key: &SecretKey) -> Result<Signature, Error> {
+        let signature = crypto::sign(&full_buffer, secret_key);
+        Ok(signature)
+    }
+
+    fn verify(
+        full_buffer: &[u8],
         signature: &Signature,
         public_key: &PublicKey,
     ) -> Result<(), Error> {
-        unimplemented!();
-//        let full_buffer = bincode::config().no_limit().serialize(&val)?;
-//        if !crypto::verify(signature, &full_buffer, &public_key) {
-//            bail!("Can't verify message.");
-//        }
+        if !crypto::verify(signature, &full_buffer, &public_key) {
+            bail!("Can't verify message.");
+        }
         Ok(())
     }
 }
@@ -144,22 +168,3 @@ impl FromHex for SignedMessage {
     }
 }
 
-//
-//
-//impl<T: ProtocolMessage> StorageValue for Message<T> {
-//    fn into_bytes(self) -> Vec<u8> {
-//        self.message.to_vec()
-//    }
-//
-//    fn from_bytes(value: Cow<[u8]>) -> Self {
-//        //TODO: Remove signature checks and type checks (Getting value from database should be safe)
-//        let message = SignedMessage::verify_buffer(&value).unwrap().into_message();
-//        message.map_into().unwrap()
-//    }
-//}
-//
-//impl<T: ProtocolMessage> CryptoHash for Message<T> {
-//    fn hash(&self) -> Hash {
-//        self.hash()
-//    }
-//}

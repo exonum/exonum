@@ -20,10 +20,10 @@ use rand::{thread_rng, Rng};
 
 use std::collections::BTreeMap;
 
-use blockchain::{Blockchain, Schema};
+use blockchain::{Blockchain, Schema, CORE_SERVICE};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Precommit, Prevote, Propose, RawMessage, Status, CONSENSUS};
+use messages::{Message, Precommit};
 use sandbox::{
     sandbox::{self, timestamping_sandbox}, sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
@@ -64,7 +64,7 @@ fn test_check_leader() {
     add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
-    sandbox.broadcast(&Status::new(
+    sandbox.broadcast(&sandbox.create_status(
         &sandbox.p(ValidatorId(0)),
         Height(1),
         &sandbox.last_block().hash(),
@@ -111,7 +111,7 @@ fn test_reach_actual_round() {
         .with_tx_hash(&tx.hash())
         .build();
 
-    let future_propose = Propose::new(
+    let future_propose = sandbox.create_propose(
         ValidatorId(3),
         Height(1),
         Round(4),
@@ -123,7 +123,7 @@ fn test_reach_actual_round() {
     sandbox.assert_state(Height(1), Round(1));
     sandbox.recv(&future_propose);
     sandbox.assert_state(Height(1), Round(1));
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(4),
@@ -179,11 +179,11 @@ fn test_query_state_hash() {
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
-        let configs_key = Blockchain::service_table_unique_key(CONSENSUS, 0);
+        let configs_key = Blockchain::service_table_unique_key(CORE_SERVICE, 0);
         let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
-        let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0);
+        let proof_configs = sandbox.get_proof_to_service_table(CORE_SERVICE, 0);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.merkle_root(), state_hash);
         assert_ne!(configs_rh, Hash::zero());
@@ -226,7 +226,7 @@ fn test_retrieve_block_and_precommits() {
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
     let block = block_proof.block;
-    let precommits: Vec<Precommit> = block_proof.precommits;
+    let precommits: Vec<Message<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
     let expected_block_hash = block.hash();
 
@@ -234,11 +234,6 @@ fn test_retrieve_block_and_precommits() {
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
         assert_eq!(expected_block_hash, *precommit.block_hash());
-        assert!(
-            precommit
-                .raw()
-                .verify_signature(&sandbox.p(precommit.validator()),)
-        );
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
@@ -264,8 +259,8 @@ fn test_store_txs_positions() {
     let num_txs = rng.gen_range(3, 100);
     let committed_block1 = generator
         .take(num_txs)
-        .map(|tx| (tx.hash(), tx.raw().clone()))
-        .collect::<BTreeMap<Hash, RawMessage>>();
+        .map(|tx| (tx.hash(), tx))
+        .collect::<BTreeMap<_, _>>();
 
     let hashes =
         add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());

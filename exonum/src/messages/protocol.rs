@@ -47,8 +47,11 @@ use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 pub const EMPTY_SIGNED_MESSAGE_SIZE: usize = 0;
 
 #[doc(hidden)]
-/// `TransactionsResponse` size with zero transactions inside.
+/// `Message<TransactionsResponse>` size without transactions inside.
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + 0;
+
+/// `Message<RawTransaction>` size with empty transaction inside.
+pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + 0;
 
 encoding_struct! {
     /// Connect to a node.
@@ -375,6 +378,8 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm
 
     fn into_protocol(this: Message<Self>) -> Protocol;
 
+    fn into_message_from_parts(self, sm: SignedMessage) -> Message<Self>;
+
 }
 
 /// Implement Exonum message protocol.
@@ -434,6 +439,10 @@ macro_rules! impl_protocol {
 
                 fn into_protocol(this: Message<Self>) -> Protocol {
                     $proto_name::$cls($cls::$typ(this))
+                }
+
+                fn into_message_from_parts(self, sm: SignedMessage) -> Message<Self> {
+                    Message::new(self, sm)
                 }
             }
             )+
@@ -521,8 +530,7 @@ impl Protocol {
     /// On serialization fail this method can panic.
     pub fn new<T: ProtocolMessage>(message: T, author: PublicKey, secret_key: &SecretKey)
                                 -> Protocol {
-        let signed = SignedMessage::new(message, author, secret_key);
-        Self::deserialize(signed).expect("Couldn't deserialize newly created message.")
+        T::into_protocol(Protocol::concrete(message, author, secret_key))
     }
 
     /// Creates new protocol message.
@@ -533,8 +541,10 @@ impl Protocol {
     /// On serialization fail this method can panic.
     pub fn concrete<T: ProtocolMessage>(message: T, author: PublicKey, secret_key: &SecretKey)
                                    -> Message<T> {
-        T::try_from(Self::new(message, author, secret_key))
-            .expect("BUG: Newly created message matched not as transaction.")
+        let value = message.serialize().expect("Couldn't serialize data.");
+        let (cls, typ) = T::message_type();
+        let signed = SignedMessage::new(cls, typ, value, author, secret_key);
+        T::into_message_from_parts(message, signed)
     }
 
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
@@ -542,39 +552,37 @@ impl Protocol {
         Self::deserialize(signed)
     }
 
+    pub fn try_into_transaction(self) -> Result<Message<RawTransaction>, failure::Error> {
+        RawTransaction::try_from(self)
+            .map_err(|m|
+                format_err!("Couldn't convert message {:?} into transaction", m))
+    }
+
     /// Creates new raw transaction message.
     ///
     /// # Panics
     ///
     /// On serialization fail this method can panic.
-    pub(crate) fn sign_tx<T>(
+//    #[cfg(test)]
+    pub fn sign_tx<T>(
         transaction: T,
         service_id: u16,
         public_key: PublicKey,
         secret_key: &SecretKey
     ) -> Message<RawTransaction>
-    where T: Into<TransactionFromSet<T>> + Transaction,
-     {
-        let data = transaction.into()
-                                       .serialize()
-                                       .expect("Couldn't serialize transaction");
-        let raw_tx = RawTransaction::new(service_id, data);
-        Self::new(raw_tx, public_key, secret_key)
-            .try_into_transaction()
-            .expect("BUG: Newly created message matched not as transaction.")
+    where T: Into<TransactionFromSet>,
+    {
+        let set: TransactionFromSet = transaction.into();
+        let raw_tx = RawTransaction::new(service_id, set);
+        Self::concrete(raw_tx, public_key, secret_key)
     }
 
-    ///Trying to convert `Protocol` to `RawTransaction`,
-    ///if ok returns message `Message<RawTransaction>` if fails, returns `Protocol` back.
-    pub fn try_into_transaction(self) -> Result<Message<RawTransaction>,Protocol> {
-        RawTransaction::try_from(self)
-    }
 }
 
 impl Requests {
     /// Returns public key of the message recipient.
-    pub fn to(&self) -> &PublicKey {
-        match *self {
+    pub fn to(&self) -> PublicKey {
+        *match *self {
             Requests::ProposeRequest(ref msg) => msg.to(),
             Requests::TransactionsRequest(ref msg) => msg.to(),
             Requests::PrevotesRequest(ref msg) => msg.to(),
@@ -584,7 +592,7 @@ impl Requests {
     }
 
     /// Returns author public key of the message sender.
-    pub fn author(&self) -> &PublicKey {
+    pub fn author(&self) -> PublicKey {
         match *self {
             Requests::ProposeRequest(ref msg) => msg.author(),
             Requests::TransactionsRequest(ref msg) => msg.author(),
@@ -598,7 +606,7 @@ impl Requests {
 impl Consensus {
 
     /// Returns author public key of the message sender.
-    pub fn author(&self) -> &PublicKey {
+    pub fn author(&self) -> PublicKey {
         match *self {
             Consensus::Propose(ref msg) => msg.author(),
             Consensus::Prevote(ref msg) => msg.author(),
@@ -642,22 +650,19 @@ impl<T: ProtocolMessage> Into<Protocol> for Message<T> {
 
 impl StorageValue for Protocol {
     fn into_bytes(self) -> Vec<u8> {
-        unimplemented!()
+        self.signed_message().raw().to_vec()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        unimplemented!()
+        let message = SignedMessage::unchecked_from_vec(value.into_owned());
+        //TODO: Remove additional deserialization
+        Protocol::deserialize(message).unwrap()
     }
 }
 
 impl CryptoHash for Protocol {
     fn hash(&self) -> Hash {
-        unimplemented!()
+        self.signed_message().hash()
     }
 }
 
-impl<T: Transaction> From<T> for TransactionFromSet<T> {
-    fn from(t:T) -> Self {
-        unimplemented!()
-    }
-}

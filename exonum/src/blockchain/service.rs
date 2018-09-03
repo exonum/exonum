@@ -302,7 +302,7 @@ impl ServiceContext {
 
     /// Signs and broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction<T>(&self, tx: T)
-        where T: Into<TransactionFromSet<T>> + Transaction
+        where T: Into<TransactionFromSet> + Transaction
     {
         let tx_process = move || -> Result<(), ::failure::Error> {
             let msg = Protocol::sign_tx(

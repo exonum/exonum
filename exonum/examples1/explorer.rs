@@ -23,7 +23,7 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
-    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction},
+    helpers::{Height, ValidatorId}, messages::{Protocol, Message, RawTransaction},
 };
 
 use blockchain::{
@@ -41,7 +41,7 @@ pub fn mempool_transaction() -> Message<RawTransaction> {
     Protocol::sign_tx(
         CreateWallet::new(&pk_alex, "Alex"),
         SERVICE_ID,
-        (pk_alex, &key_alex),
+        pk_alex, &key_alex,
     )
 }
 
@@ -61,17 +61,17 @@ pub fn sample_blockchain() -> Blockchain {
     let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
     let tx_bob = Protocol::sign_tx(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
-        (pk_bob, &key_bob),
+        pk_bob, &key_bob,
     );
     let tx_transfer = Protocol::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 100),
         SERVICE_ID,
-        (pk_alice, &key_alice),
+        pk_alice, &key_alice,
     );
 
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);

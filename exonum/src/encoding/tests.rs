@@ -27,8 +27,7 @@ use blockchain::Block;
 use crypto::{gen_keypair, hash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, Status,
-    UncheckedBuffer,
+    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, Status, Protocol
 };
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -340,7 +339,7 @@ fn test_segments_of_raw_buffers() {
 
 #[test]
 fn test_empty_segments() {
-    let dat: Vec<UncheckedBuffer> = vec![];
+    let dat: Vec<Vec<u8>> = vec![];
     assert_write_check_read(dat, 8);
 }
 
@@ -365,7 +364,7 @@ fn test_connect(addr: &str) {
     let connect = Connect::new(socket_address, time, &user_agent::get());
     let connect = Protocol::concrete(connect, public_key, &secret_key);
     // read
-    assert_eq!(connect.author(), &public_key);
+    assert_eq!(connect.author(), public_key);
     assert_eq!(connect.addr(), socket_address);
     assert_eq!(connect.time(), time);
 }

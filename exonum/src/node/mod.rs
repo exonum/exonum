@@ -1122,10 +1122,10 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Message::sign_tx_set::<SimpleTransactions>(
-            TxSimple::new(&p_key, "Hello, World!").into(),
+        let tx = Protocol::sign_tx(
+            TxSimple::new(&p_key, "Hello, World!"),
             SERVICE_ID,
-            (p_key, &s_key),
+            p_key, &s_key,
         );
 
         // Create original transaction.

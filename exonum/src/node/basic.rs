@@ -32,8 +32,8 @@ impl NodeHandler {
             Protocol::Service(Service::Connect(msg)) => self.handle_connect(msg),
             Protocol::Service(Service::Status(msg)) => self.handle_status(msg),
             // ignore tx duplication error,
-            //Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
-//            Protocol::Block(msg) => self.handle_block(&msg)?,
+            Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
+//            Protocol::Block(msg) => self.handle_block(msg)?,
 //            Protocol::TransactionsBatch(msg) => {
 //                self.handle_txs_batch(Message::from_parts(msg, message)?)?
 //            }
@@ -87,8 +87,8 @@ impl NodeHandler {
             return;
         }
 
-        let public_key = *message.author();
-        if public_key == *self.state.our_connect_message().author() {
+        let public_key = message.author();
+        if public_key == self.state.our_connect_message().author() {
             trace!("Received Connect with same pub_key as ours.");
             return;
         }
@@ -139,7 +139,7 @@ impl NodeHandler {
             msg.height()
         );
 
-        if !self.state.connect_list().is_peer_allowed(msg.author()) {
+        if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             error!(
                 "Received status message from peer = {:?} which not in ConnectList.",
                 msg.author()
@@ -152,13 +152,13 @@ impl NodeHandler {
             let peer = msg.author();
 
             // Check validator height info
-            if msg.height() > self.state.node_height(peer) {
+            if msg.height() > self.state.node_height(&peer) {
                 // Update validator height
-                self.state.set_node_height(*peer, msg.height());
+                self.state.set_node_height(peer, msg.height());
             }
 
             // Request block
-            self.request(RequestData::Block(height), *peer);
+            self.request(RequestData::Block(height), peer);
         }
     }
 
@@ -173,7 +173,7 @@ impl NodeHandler {
         );
 
         for peer in peers {
-            self.send_to_peer(*msg.author(), peer);
+            self.send_to_peer(msg.author(), peer);
         }
     }
 
@@ -201,10 +201,10 @@ impl NodeHandler {
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = PeersRequest::new(peer.author());
+            let msg = PeersRequest::new(&peer.author());
             trace!("Request peers from peer with addr {:?}", peer.addr());
             let message = self.sign_message(msg);
-            self.send_to_peer(*peer.author(), message);
+            self.send_to_peer(peer.author(), message);
         }
         self.add_peer_exchange_timeout();
     }

@@ -64,6 +64,10 @@ impl TransactionMessage {
     pub fn signed_message(&self) -> &SignedMessage {
         unimplemented!()
     }
+    /// Returns `RawTransaction`.
+    pub fn raw_transaction(&self) -> RawTransaction {
+        unimplemented!()
+    }
     /// Returns transaction smart contract.
     pub fn transaction(&self) -> Option<&Box<dyn Transaction>> {
         self.transaction.as_ref()
@@ -449,12 +453,10 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
 pub trait TransactionSet:
-    Into<Box<dyn Transaction>> + BinaryForm + Clone + Serialize + DeserializeOwned
+    Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
     /// Parses a transaction from this set from a `RawTransaction`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
-    /// Serialize current transaction into RawTransaction
-    fn tx_into_raw(&self) -> Result<Vec<u8>, encoding::Error>;
 }
 
 /// `transactions!` is used to declare a set of transactions of a particular service.
@@ -640,17 +642,29 @@ macro_rules! transactions {
             fn tx_from_raw(
                 raw: $crate::messages::RawTransaction
             ) -> ::std::result::Result<Self, $crate::encoding::Error> {
-                Ok($crate::messages::BinaryForm::deserialize(raw.payload())?)
-            }
-            fn tx_into_raw(&self) -> ::std::result::Result<::std::vec::Vec<u8>, $crate::encoding::Error> {
-                <Self as $crate::messages::BinaryForm>::serialize(self)
+                let (id, vec) = raw.transaction_set().into_raw_parts();
+                __enum_from_id_vec!($transaction_set (id, vec), $( $name )*)
             }
         }
 
+        impl Into<$crate::messages::TransactionFromSet> for $transaction_set {
+            fn into(self) -> $crate::messages::TransactionFromSet {
+                let (id, vec) = __enum_to_vec_id!($transaction_set &self, $( $name )*);
+                $crate::messages::TransactionFromSet::from_raw_unchecked(id, vec)
+
+            }
+        }
         $(
         impl Into<$transaction_set> for $name {
             fn into(self) -> $transaction_set {
                 $transaction_set::$name(self)
+            }
+        }
+
+        impl Into<$crate::messages::TransactionFromSet> for $name {
+            fn into(self) -> $crate::messages::TransactionFromSet {
+                let set: $transaction_set = self.into();
+                set.into()
             }
         }
         )*
@@ -661,42 +675,26 @@ macro_rules! transactions {
                 )*}
             }
         }
-
-        impl $crate::messages::BinaryForm for $transaction_set
-        {
-            fn serialize(&self) -> Result<Vec<u8>, $crate::encoding::Error> {
-            let (id, vec) = __enum_to_vec!($transaction_set self, $( $name )*);
-                Ok($crate::messages::partial_enum_to_vec(id,vec?))
-            }
-            #[allow(unsafe_code)]
-            fn deserialize(buffer: &[u8]) -> Result<Self, $crate::encoding::Error> {
-
-                let (id, vec) = $crate::messages::buffer_to_partial_enum(buffer)
-                            .ok_or($crate::encoding::Error::Basic("Buffer size to short.".into()))?;
-                __enum_from_id_vec!($transaction_set (id,vec), $( $name )*)
-
-            }
-        }
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __enum_to_vec {
+macro_rules! __enum_to_vec_id{
     ($set:ident $this:expr, $($field_type:ident)*) => {
-        __enum_to_vec!(@inner $set $this, (0) (); $($field_type)* );
+        __enum_to_vec_id!(@inner $set $this, (0) (); $($field_type)* );
     };
     (@create $set:ident $this:expr, ( $((($name:ident) => ($num:expr)))* ) ) => {
         match $this {
             $(
-                &$set::$name( ref tx) => ($num, <$name as $crate::messages::BinaryForm>::serialize(&tx))
+                &$set::$name(ref tx) => ($num, $crate::messages::BinaryForm::serialize(tx).unwrap())
             ),*
         }
     };
     (@inner $set:ident $this:expr, ($num:expr) ($($processed:tt)*);
         $field_type:ident $($rest:tt)*
     ) => {
-        __enum_to_vec!(
+        __enum_to_vec_id!(
             @inner $set $this,
             ($num + 1)
             ($($processed)* (($field_type) => ($num)));
@@ -705,7 +703,7 @@ macro_rules! __enum_to_vec {
     };
 
     (@inner $set:ident $this:expr, ($num:expr) ($($processed:tt)*);) => {
-        __enum_to_vec!(@create $set $this, ($($processed)*) );
+        __enum_to_vec_id!(@create $set $this, ($($processed)*) );
     };
 }
 
@@ -764,6 +762,7 @@ mod tests {
     use crypto;
     use encoding;
     use helpers::{Height, ValidatorId};
+    use messages::{Protocol};
     use node::ApiSender;
     use storage::{Database, Entry, MemoryDB, Snapshot};
 
@@ -894,7 +893,7 @@ mod tests {
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
             let transaction =
-                Message::sign_tx_set::<TestTxs>(TxResult::new(index).into(), TX_RESULT_SERVICE_ID, (pk, &sec_key));
+                Protocol::sign_tx(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();

@@ -62,7 +62,7 @@ pub enum InternalRequest {
     JumpToRound(Height, Round),
     Shutdown,
     /// Async request to verify a transaction in the thread pool.
-    VerifyTx(Box<dyn Transaction>),
+    VerifyTx(RawTransaction),
 }
 
 #[derive(Debug, PartialEq, Eq)]
