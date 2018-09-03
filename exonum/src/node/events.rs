@@ -36,12 +36,7 @@ impl NodeHandler {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
-            InternalEvent::TxVerified(tx) => {
-                // We don't care about result, because situation when transaction received twice
-                // is normal for internal messages (transaction may be received from 2+ nodes).
-                // let _ = self.handle_verified_tx(tx);
-                unimplemented!();
-            }
+            InternalEvent::MessageVerified(msg) => self.handle_message(msg),
         }
     }
 
@@ -51,8 +46,7 @@ impl NodeHandler {
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(_, raw) => {
-                let msg = Protocol::deserialize(SignedMessage::verify_buffer(raw)?)?;
-                self.handle_message(msg);
+                self.execute_later(InternalRequest::VerifyMessage(raw));
             }
         }
         Ok(())

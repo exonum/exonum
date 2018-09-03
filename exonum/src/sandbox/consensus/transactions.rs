@@ -620,11 +620,13 @@ fn not_request_txs_when_get_tx_and_propose() {
 
 /// HANDLE TX
 /// - verify signature
-/// - should panic because tx has wrong signature and is not considered
+/// - should panic on transaction verification
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
+#[should_panic]
 fn handle_tx_verify_signature() {
+    //TODO: Its a bit strange test case,
+    //because we verify tx in sandbox logic, so we probably testing sandbox
     let sandbox = timestamping_sandbox();
 
     // generate incorrect tx
@@ -634,13 +636,6 @@ fn handle_tx_verify_signature() {
         .next()
         .unwrap();
     sandbox.recv(&tx);
-
-    let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
-        .build();
-
-    sandbox.recv(&propose);
-    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 }
 
 /// - request txs when get propose

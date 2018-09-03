@@ -15,12 +15,15 @@
 use futures::{
     future::{self, Either, Executor}, sync::mpsc, Future, Sink, Stream,
 };
+use failure;
+
 use tokio_core::reactor::{Handle, Timeout};
 
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
 use blockchain::{Transaction, TransactionContext};
+use messages::{SignedMessage, Protocol};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -43,13 +46,15 @@ impl InternalPart {
         })
     }
 
-    fn verify_transaction(
-        tx: Box<dyn Transaction>,
+    fn verify_message(
+        raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(move || {
-            if tx.verify() {
-                let event = future::ok(InternalEvent::TxVerified(unimplemented!(/*tx.clone()*/)));
+            let handler = move || -> Result<Protocol, failure::Error> {
+                Protocol::deserialize(SignedMessage::verify_buffer(raw)?)};
+            if let Ok(protocol) = handler() {
+                let event = future::ok(InternalEvent::MessageVerified(protocol));
                 Either::A(Self::send_event(event, internal_tx))
             } else {
                 Either::B(future::ok(()))
@@ -69,13 +74,12 @@ impl InternalPart {
         self.internal_requests_rx
             .map(move |request| {
                 let event = match request {
-                    InternalRequest::VerifyTx(tx) => {
-                        unimplemented!()
-                        //                        let fut = Self::verify_transaction(tx, internal_tx.clone());
-                        //                        verify_executor
-                        //                            .execute(Box::new(fut))
-                        //                            .expect("cannot schedule transaction verification");
-                        //                        return;
+                    InternalRequest::VerifyMessage(tx) => {
+                        let fut = Self::verify_message(tx, internal_tx.clone());
+                        verify_executor
+                            .execute(Box::new(fut))
+                            .expect("cannot schedule message verification");
+                        return;
                     }
 
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {

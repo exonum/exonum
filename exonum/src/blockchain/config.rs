@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "max_message_len (128) must be at least 330")]
+    #[should_panic(expected = "max_message_len (128) must be at least 256")]
     fn too_small_max_message_len() {
         let mut configuration = create_test_configuration();
         configuration.consensus.max_message_len = 128;

@@ -43,7 +43,7 @@ use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
     PrevotesRequest, Propose, ProposeRequest, Protocol, ProtocolMessage, RawTransaction, Status,
-    TransactionsRequest, TransactionsResponse,
+    TransactionsRequest, TransactionsResponse, SignedMessage,
 };
 use node::ConnectInfo;
 use node::{
@@ -122,12 +122,14 @@ impl SandboxInner {
                     InternalRequest::JumpToRound(height, round) => self.handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
-                    InternalRequest::VerifyTx(tx) => {
-                        unimplemented!();
-                        //                        if tx.verify() {
-                        //                            self.handler
-                        //                                .handle_event(InternalEvent::TxVerified(tx.clone()).into());
-                        //                        }
+                    InternalRequest::VerifyMessage(message) => {
+
+                        let protocol = Protocol::deserialize(
+                                SignedMessage::verify_buffer(message).unwrap()
+                            ).unwrap();
+                        self.handler
+                            .handle_event(InternalEvent::MessageVerified(protocol).into());
+
                     }
                 }
             }
@@ -238,17 +240,17 @@ impl Sandbox {
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
     ) -> Message<BlockResponse> {
-        unimplemented!()
-        //        Protocol::concrete(
-        //            BlockResponse::new(
-        //                to,
-        //                block,
-        //                precommits.into_iter().map(|x| x.into()).collect(),
-        //                tx_hashes,
-        //            ),
-        //            *public_key,
-        //            secret_key,
-        //        )
+                Protocol::concrete(
+                    BlockResponse::new(
+                        to,
+                        block,
+                        precommits.into_iter()
+                            .map(|x| x.serialize()).collect(),
+                        tx_hashes,
+                    ),
+                    *public_key,
+                    secret_key,
+                )
     }
 
     /// Creates a `Connect` message signed by this validator.
@@ -457,7 +459,7 @@ impl Sandbox {
     pub fn recv<T: ProtocolMessage>(&self, msg: &Message<T>) {
         self.check_unexpected_message();
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
-        let event = NetworkEvent::MessageReceived(dummy_addr, msg.serialize());
+        let event = NetworkEvent::MessageReceived(dummy_addr, msg.clone().serialize());
         self.inner.borrow_mut().handle_event(event);
     }
 

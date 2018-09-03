@@ -178,8 +178,8 @@ impl<T: ProtocolMessage> Message<T> {
     }
 
     /// Returns serialized buffer.
-    pub fn serialize(&self) -> Vec<u8> {
-        self.signed_message().raw.clone()
+    pub fn serialize(self) -> Vec<u8> {
+        self.message.raw
     }
 
     //    /// Returns hex representation of binary message form
