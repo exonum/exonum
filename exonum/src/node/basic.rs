@@ -31,7 +31,7 @@ impl NodeHandler {
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(&msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
-            Ok(Any::PeerList(msg)) => self.handle_peers_exchange(&msg),
+            Ok(Any::PeerList(msg)) => self.handle_peer_list(&msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
             }
@@ -40,9 +40,9 @@ impl NodeHandler {
 
     /// Handles the incoming connection. Node connects to the sender
     /// if received `PeerList` is correct.
-    pub fn handle_connected(&mut self, peers_exchange: &PeerList) {
-        info!("Received PeerList  from peer: {:?}", peers_exchange);
-        self.handle_peers_exchange(&peers_exchange);
+    pub fn handle_connected(&mut self, peer_list: &PeerList) {
+        info!("Received PeerList  from peer: {:?}", peer_list);
+        self.handle_peer_list(&peer_list);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
@@ -73,20 +73,17 @@ impl NodeHandler {
     }
 
     /// Handles the `ConnectInfo` and connects to a peer as result.
-    pub fn handle_peers_exchange(&mut self, peers_exchange: &PeerList) {
+    pub fn handle_peer_list(&mut self, peer_list: &PeerList) {
         // TODO Add spam protection. (ECR-170)
-        if !self.state
-            .connect_list()
-            .is_peer_allowed(peers_exchange.from())
-        {
+        if !self.state.connect_list().is_peer_allowed(peer_list.from()) {
             error!(
                 "Received PeerList message from peer = {:?} which not in ConnectList.",
-                peers_exchange.from()
+                peer_list.from()
             );
             return;
         }
 
-        for peer in peers_exchange.peers() {
+        for peer in peer_list.peers() {
             let address = peer.address;
             if address == self.state.our_connect_info().address {
                 trace!("Received ConnectInfo with same address as our external_address.");

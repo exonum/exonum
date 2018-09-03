@@ -77,7 +77,7 @@ impl HandshakeParams {
         self.remote_key_x25519 = Some(into_x25519_public_key(remote_key));
     }
 
-    pub fn peers_exchange(&self) -> Option<PeerList> {
+    pub fn peer_list(&self) -> Option<PeerList> {
         self.remote_key.map(|key| {
             PeerList::new(
                 &self.public_key,
@@ -111,7 +111,7 @@ pub struct NoiseHandshake {
     peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
-    peers_exchange: Option<PeerList>,
+    peer_list: Option<PeerList>,
 }
 
 impl NoiseHandshake {
@@ -122,7 +122,7 @@ impl NoiseHandshake {
             peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
-            peers_exchange: params.peers_exchange(),
+            peer_list: params.peer_list(),
         }
     }
 
@@ -133,7 +133,7 @@ impl NoiseHandshake {
             peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
-            peers_exchange: params.peers_exchange(),
+            peer_list: params.peer_list(),
         }
     }
 
@@ -161,7 +161,7 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-        peers_exchange: Vec<u8>,
+        peer_list: Vec<u8>,
     ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
@@ -179,7 +179,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_mode()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok((framed, peers_exchange))
+        Ok((framed, peer_list))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
@@ -202,9 +202,7 @@ impl Handshake for NoiseHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake, _)| handshake.write_handshake_msg(stream, &[]))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake, peers_exchange)| {
-                handshake.finalize(stream, peers_exchange)
-            })
+            .and_then(|(stream, handshake, peer_list)| handshake.finalize(stream, peer_list))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
                     .into()
@@ -217,12 +215,12 @@ impl Handshake for NoiseHandshake {
         S: AsyncRead + AsyncWrite + 'static,
     {
         let peer_address = self.peer_address;
-        match self.peers_exchange.clone() {
-            Some(peers_exchange) => {
+        match self.peer_list.clone() {
+            Some(peer_list) => {
                 let framed = self.write_handshake_msg(stream, &[])
                     .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
                     .and_then(move |(stream, handshake, _)| {
-                        handshake.write_handshake_msg(stream, &peers_exchange.into_bytes())
+                        handshake.write_handshake_msg(stream, &peer_list.into_bytes())
                     })
                     .and_then(|(stream, handshake)| handshake.finalize(stream, Vec::new()))
                     .map_err(move |e| {

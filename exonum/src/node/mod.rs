@@ -809,9 +809,9 @@ pub struct ConnectInfo {
     pub public_key: PublicKey,
 }
 
-impl ConnectInfo {
+impl StorageValue for ConnectInfo {
     /// Tries to serialize the given `ConnectInfo` into vector of bytes.
-    pub fn try_serialize(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut vec_bytes = vec![0_u8; Self::field_size() as usize];
         self.write(&mut vec_bytes, 0, Self::field_size());
         vec_bytes
@@ -819,24 +819,15 @@ impl ConnectInfo {
 
     /// Tries to deserialize the given `value` into `ConnectInfo`.
     #[allow(unsafe_code)]
-    pub fn try_deserialize(value: &[u8]) -> Self {
-        unsafe { Self::read(&value, 0, Self::field_size()) }
-    }
-}
-
-impl StorageValue for ConnectInfo {
-    fn into_bytes(self) -> Vec<u8> {
-        self.try_serialize()
-    }
-
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::try_deserialize(value.as_ref())
+        assert_eq!(value.len(), Self::field_size() as usize);
+        unsafe { Self::read(value.as_ref(), 0, Self::field_size()) }
     }
 }
 
 impl CryptoHash for ConnectInfo {
     fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize();
+        let vec_bytes = self.into_bytes();
         hash(&vec_bytes)
     }
 }

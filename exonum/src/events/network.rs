@@ -422,12 +422,12 @@ impl Listener {
                 let handshake = NoiseHandshake::responder(&handshake_params, &address);
                 let connection_handler = handshake
                     .listen(sock)
-                    .and_then(|(stream, raw)| (Ok(stream), Self::parse_peers_exchange(raw)))
-                    .and_then(move |(sock, exchange)| {
+                    .and_then(|(stream, raw)| (Ok(stream), Self::parse_peer_list(raw)))
+                    .and_then(move |(sock, peer_list)| {
                         trace!("Remote connection established with socket={:?}", sock);
                         let (_, stream) = sock.split();
 
-                        Self::process_incoming_messages(stream, network_tx, address, exchange).map(
+                        Self::process_incoming_messages(stream, network_tx, address, peer_list).map(
                             |_| {
                                 // Ensure that holder lives until the stream ends.
                                 let _holder = holder;
@@ -444,7 +444,7 @@ impl Listener {
         Ok(Listener(to_box(server)))
     }
 
-    fn parse_peers_exchange(raw: Vec<u8>) -> Result<PeerList, failure::Error> {
+    fn parse_peer_list(raw: Vec<u8>) -> Result<PeerList, failure::Error> {
         let raw = RawMessage::from_vec(raw);
         let raw = Any::from_raw(raw);
         match raw {
@@ -457,12 +457,12 @@ impl Listener {
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
         address: SocketAddr,
-        peers_exchange: PeerList,
+        peer_list: PeerList,
     ) -> impl Future<Item = (), Error = failure::Error>
     where
         S: Stream<Item = RawMessage, Error = failure::Error>,
     {
-        let event = NetworkEvent::PeerConnected(peers_exchange);
+        let event = NetworkEvent::PeerConnected(peer_list);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));
 
         network_tx
