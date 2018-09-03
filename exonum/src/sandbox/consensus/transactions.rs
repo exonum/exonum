@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use crypto::{gen_keypair, CryptoHash, Hash};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Message, RawTransaction, Protocol};
+use messages::{Message, Protocol, RawTransaction};
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
@@ -54,10 +54,10 @@ fn tx_hashes(transactions: &[Message<RawTransaction>]) -> Vec<Hash> {
 }
 
 /// sends transactions into pool and returns this transactions in processing order
-fn send_txs_into_pool(sandbox: &Sandbox,
-                      mut transactions: Vec<Message<RawTransaction>>)
-    -> Vec<Message<RawTransaction>>
-{
+fn send_txs_into_pool(
+    sandbox: &Sandbox,
+    mut transactions: Vec<Message<RawTransaction>>,
+) -> Vec<Message<RawTransaction>> {
     for tx in &transactions {
         sandbox.recv(tx);
     }
@@ -336,9 +336,10 @@ fn response_size_larger_than_max_message_len() {
     // that is exactly equal to the message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.consensus.max_message_len =
-            (TRANSACTION_RESPONSE_EMPTY_SIZE + tx1.signed_message().raw().len()
-                + tx2.signed_message().raw().len()) as u32;
+        consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
+            + tx1.signed_message().raw().len()
+            + tx2.signed_message().raw().len())
+            as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
@@ -346,7 +347,8 @@ fn response_size_larger_than_max_message_len() {
             &sandbox.p(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
-            sandbox.s(ValidatorId(0)))
+            sandbox.s(ValidatorId(0)),
+        )
     };
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);

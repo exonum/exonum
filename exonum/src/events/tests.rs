@@ -28,7 +28,7 @@ use events::{
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, SignedMessage, Protocol};
+use messages::{Connect, Message, Protocol, SignedMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
@@ -146,7 +146,11 @@ impl TestEvents {
         }
     }
 
-    pub fn spawn(self, handshake_params: &HandshakeParams, connect: Message<Connect>) -> TestHandler {
+    pub fn spawn(
+        self,
+        handshake_params: &HandshakeParams,
+        connect: Message<Connect>,
+    ) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
@@ -184,15 +188,15 @@ pub fn connect_message(
     secret_key: &SecretKey,
 ) -> Message<Connect> {
     let time = time::UNIX_EPOCH;
-    Protocol::concrete(Connect::new(
-        addr,
-        time.into(),
-        &user_agent::get(),
-    ), *public_key, secret_key)
+    Protocol::concrete(
+        Connect::new(addr, time.into(), &user_agent::get()),
+        *public_key,
+        secret_key,
+    )
 }
 
 pub fn raw_message(_id: u16, len: usize) -> SignedMessage {
-    let buffer = vec![0u8;len];
+    let buffer = vec![0u8; len];
     SignedMessage::unchecked_from_vec(buffer)
 }
 
@@ -332,8 +336,7 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let max_payload_length =
-        max_message_length - ::messages::EMPTY_SIGNED_MESSAGE_SIZE;
+    let max_payload_length = max_message_length - ::messages::EMPTY_SIGNED_MESSAGE_SIZE;
     let acceptable_message = raw_message(15, max_payload_length);
     let too_big_message = raw_message(16, max_payload_length + 1000);
 

@@ -39,7 +39,7 @@ impl NodeHandler {
             InternalEvent::TxVerified(tx) => {
                 // We don't care about result, because situation when transaction received twice
                 // is normal for internal messages (transaction may be received from 2+ nodes).
-               // let _ = self.handle_verified_tx(tx);
+                // let _ = self.handle_verified_tx(tx);
                 unimplemented!();
             }
         }
@@ -126,10 +126,12 @@ impl NodeHandler {
         let schema = Schema::new(snapshot);
         let pool = schema.transactions_pool();
         for tx_hash in pool.iter() {
-            self.broadcast(schema
-                .transactions()
-                .get(&tx_hash)
-                .expect("Rebroadcast: invalid transaction hash"))
+            self.broadcast(
+                schema
+                    .transactions()
+                    .get(&tx_hash)
+                    .expect("Rebroadcast: invalid transaction hash"),
+            )
         }
     }
 }

@@ -167,4 +167,3 @@ impl From<&'static str> for Error {
         Error::Basic(t.into())
     }
 }
-

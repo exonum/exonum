@@ -19,7 +19,7 @@ use blockchain::{
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::Height;
-use messages::{Message, RawTransaction, Protocol};
+use messages::{Message, Protocol, RawTransaction};
 use storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
@@ -45,7 +45,8 @@ impl TxConfig {
         Protocol::sign_tx(
             TxConfig::new(from, config, actual_from),
             CONFIG_SERVICE,
-            *from, signer,
+            *from,
+            signer,
         )
     }
 }

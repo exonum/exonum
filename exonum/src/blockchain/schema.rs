@@ -476,9 +476,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
-    pub(crate) fn consensus_messages_cache_mut(
-        &mut self,
-    ) -> ListIndex<&mut Fork, Protocol> {
+    pub(crate) fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, Protocol> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 

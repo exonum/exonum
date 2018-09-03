@@ -15,8 +15,8 @@
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use failure;
-use tokio_io::codec::{Decoder, Encoder};
 use std::mem;
+use tokio_io::codec::{Decoder, Encoder};
 
 use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
 use messages::SignedMessage;
@@ -43,7 +43,6 @@ impl Decoder for MessagesCodec {
     type Error = failure::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-
         // Framing level
         if buf.len() < mem::size_of::<u32>() {
             return Ok(None);
@@ -51,7 +50,7 @@ impl Decoder for MessagesCodec {
 
         let len = LittleEndian::read_u32(buf) as usize;
 
-        if buf.len() <  NOISE_HEADER_LENGTH + len{
+        if buf.len() < NOISE_HEADER_LENGTH + len {
             return Ok(None);
         }
 

@@ -23,7 +23,7 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::{Message, RawTransaction, Protocol}, node::ApiSender, storage::{MemoryDB, Snapshot},
+    messages::{Message, Protocol, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
 pub const SERVICE_ID: u16 = 0;

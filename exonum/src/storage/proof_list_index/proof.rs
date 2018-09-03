@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{de::Error, ser::Error as SerError, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::{from_value, Value};
 use hex::{FromHex, ToHex};
+use serde::{
+    de::Error, ser::Error as SerError, ser::SerializeStruct, Deserialize, Deserializer, Serialize,
+    Serializer,
+};
+use serde_json::{from_value, Value};
 
 use std::fmt::Display;
 
@@ -142,7 +145,7 @@ where
     where
         D: Deserializer<'a>,
     {
-        fn format_err_string<E:Display>(type_str: &str, value: &Value, err: &E) -> String {
+        fn format_err_string<E: Display>(type_str: &str, value: &Value, err: &E) -> String {
             format!(
                 "Couldn't deserialize {} from serde_json::Value: {}, error: {}",
                 type_str, value, err

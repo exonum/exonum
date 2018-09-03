@@ -13,12 +13,12 @@
 // limitations under the License.
 
 //! `Transaction` related types.
+use serde::{de::DeserializeOwned, Serialize};
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
-use serde::{Serialize, de::DeserializeOwned};
 
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
-use messages::{HexStringRepresentation, SignedMessage, Message, RawTransaction, BinaryForm};
+use messages::{BinaryForm, HexStringRepresentation, Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -73,10 +73,7 @@ impl TransactionMessage {
         self.transaction.as_ref()
     }
     /// Create new `TransactionMessage` from raw message.
-    pub(crate) fn new(
-        message: Vec<u8>,
-        transaction: Box<dyn Transaction>,
-    ) -> TransactionMessage {
+    pub(crate) fn new(message: Vec<u8>, transaction: Box<dyn Transaction>) -> TransactionMessage {
         TransactionMessage {
             transaction: Some(transaction),
             message,
@@ -762,7 +759,7 @@ mod tests {
     use crypto;
     use encoding;
     use helpers::{Height, ValidatorId};
-    use messages::{Protocol};
+    use messages::Protocol;
     use node::ApiSender;
     use storage::{Database, Entry, MemoryDB, Snapshot};
 

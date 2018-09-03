@@ -39,7 +39,10 @@ use std::{
 use api::{
     backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
     ApiAccess, ApiAggregator,
-};use blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys};
+};
+use blockchain::{
+    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
+};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
     error::{into_failure, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
@@ -50,8 +53,10 @@ use helpers::{
     config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
     Milliseconds, Round, ValidatorId,
 };
-use messages::{Connect, Message, ProtocolMessage, Protocol,
-               RawTransaction, SignedMessage, HexStringRepresentation};
+use messages::{
+    Connect, HexStringRepresentation, Message, Protocol, ProtocolMessage, RawTransaction,
+    SignedMessage,
+};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
@@ -1125,7 +1130,8 @@ mod tests {
         let tx = Protocol::sign_tx(
             TxSimple::new(&p_key, "Hello, World!"),
             SERVICE_ID,
-            p_key, &s_key,
+            p_key,
+            &s_key,
         );
 
         // Create original transaction.

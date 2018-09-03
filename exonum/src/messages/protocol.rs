@@ -29,16 +29,17 @@
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 
+use std::borrow::Cow;
 use std::fmt::Debug;
 use std::net::SocketAddr;
-use std::borrow::Cow;
 
 use failure;
 
-use super::{TransactionFromSet, Message, RawTransaction, BinaryForm,
-            SignedMessage, BinaryFormSerialize};
+use super::{
+    BinaryForm, BinaryFormSerialize, Message, RawTransaction, SignedMessage, TransactionFromSet,
+};
 use blockchain::{self, Transaction};
-use crypto::{Hash, PublicKey, SecretKey, CryptoHash};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 
@@ -362,15 +363,14 @@ impl Precommit {
         buffer: Vec<u8>,
     ) -> Result<Message<Precommit>, ::failure::Error> {
         unimplemented!()
-//        let signed = SignedMessage::verify_buffer(buffer)?;
-//        signed.into_message().map_into::<Precommit>()
+        //        let signed = SignedMessage::verify_buffer(buffer)?;
+        //        signed.into_message().map_into::<Precommit>()
     }
 }
 
 /// Full message constraints list.
 #[doc(hidden)]
-pub trait ProtocolMessage: Debug + Clone + BinaryForm
-{
+pub trait ProtocolMessage: Debug + Clone + BinaryForm {
     fn message_type() -> (u8, u8);
     ///Trying to convert `Protocol` to concrete message,
     ///if ok returns message `Message<Self>` if fails, returns `Protocol` back.
@@ -379,7 +379,6 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm
     fn into_protocol(this: Message<Self>) -> Protocol;
 
     fn into_message_from_parts(self, sm: SignedMessage) -> Message<Self>;
-
 }
 
 /// Implement Exonum message protocol.
@@ -520,16 +519,17 @@ impl_protocol!{
     }
 }
 
-
 impl Protocol {
-
     /// Creates new protocol message.
     ///
     /// # Panics
     ///
     /// On serialization fail this method can panic.
-    pub fn new<T: ProtocolMessage>(message: T, author: PublicKey, secret_key: &SecretKey)
-                                -> Protocol {
+    pub fn new<T: ProtocolMessage>(
+        message: T,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Protocol {
         T::into_protocol(Protocol::concrete(message, author, secret_key))
     }
 
@@ -539,8 +539,11 @@ impl Protocol {
     /// # Panics
     ///
     /// On serialization fail this method can panic.
-    pub fn concrete<T: ProtocolMessage>(message: T, author: PublicKey, secret_key: &SecretKey)
-                                   -> Message<T> {
+    pub fn concrete<T: ProtocolMessage>(
+        message: T,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Message<T> {
         let value = message.serialize().expect("Couldn't serialize data.");
         let (cls, typ) = T::message_type();
         let signed = SignedMessage::new(cls, typ, value, author, secret_key);
@@ -554,8 +557,7 @@ impl Protocol {
 
     pub fn try_into_transaction(self) -> Result<Message<RawTransaction>, failure::Error> {
         RawTransaction::try_from(self)
-            .map_err(|m|
-                format_err!("Couldn't convert message {:?} into transaction", m))
+            .map_err(|m| format_err!("Couldn't convert message {:?} into transaction", m))
     }
 
     /// Creates new raw transaction message.
@@ -563,20 +565,20 @@ impl Protocol {
     /// # Panics
     ///
     /// On serialization fail this method can panic.
-//    #[cfg(test)]
+    //    #[cfg(test)]
     pub fn sign_tx<T>(
         transaction: T,
         service_id: u16,
         public_key: PublicKey,
-        secret_key: &SecretKey
+        secret_key: &SecretKey,
     ) -> Message<RawTransaction>
-    where T: Into<TransactionFromSet>,
+    where
+        T: Into<TransactionFromSet>,
     {
         let set: TransactionFromSet = transaction.into();
         let raw_tx = RawTransaction::new(service_id, set);
         Self::concrete(raw_tx, public_key, secret_key)
     }
-
 }
 
 impl Requests {
@@ -604,7 +606,6 @@ impl Requests {
 }
 
 impl Consensus {
-
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
         match *self {
@@ -665,4 +666,3 @@ impl CryptoHash for Protocol {
         self.signed_message().hash()
     }
 }
-

@@ -17,7 +17,7 @@ use rand::{RngCore, SeedableRng, XorShiftRng};
 use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use encoding::Error as MessageError;
-use messages::{Message, RawTransaction, Protocol};
+use messages::{Message, Protocol, RawTransaction};
 use storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
@@ -83,7 +83,8 @@ impl Iterator for TimestampingTxGenerator {
         Some(Protocol::sign_tx(
             buf,
             TIMESTAMPING_SERVICE,
-            self.public_key, &self.secret_key,
+            self.public_key,
+            &self.secret_key,
         ))
     }
 }

@@ -461,5 +461,3 @@ macro_rules! __ex_deserialize_field {
         <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
     };
 }
-
-

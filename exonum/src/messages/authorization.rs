@@ -4,15 +4,18 @@ use bincode;
 use failure::Error;
 use serde::Serialize;
 
-use crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature,
-             SIGNATURE_LENGTH, PUBLIC_KEY_LENGTH};
+use crypto::{
+    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
+    SIGNATURE_LENGTH,
+};
+use hex::{FromHex, ToHex};
 use messages::Message;
 use storage::StorageValue;
-use hex::{FromHex, ToHex};
 
-use super::{EMPTY_SIGNED_MESSAGE_SIZE, PROTOCOL_MAJOR_VERSION,
-            helpers::{BinaryForm},
-            protocol::{Protocol, ProtocolMessage}};
+use super::{
+    helpers::BinaryForm, protocol::{Protocol, ProtocolMessage}, EMPTY_SIGNED_MESSAGE_SIZE,
+    PROTOCOL_MAJOR_VERSION,
+};
 
 use encoding::serialize::encode_hex;
 
@@ -30,42 +33,34 @@ use encoding::serialize::encode_hex;
 /// Every creation of `SignedMessage` lead to signature verification, or data signing procedure,
 /// which can slowdown your code. Beware `SignedMessage` message, this procedure is not free.
 
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SignedMessage {
     pub(in messages) raw: Vec<u8>,
 }
 
 impl SignedMessage {
-
     pub(crate) fn new(
-        cls:u8,
-        tag:u8,
+        cls: u8,
+        tag: u8,
         value: Vec<u8>,
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> SignedMessage {
         let mut buffer = Vec::new();
-        let signature = Self::sign(&value, secret_key)
-            .expect("Couldn't form signature");
+        let signature = Self::sign(&value, secret_key).expect("Couldn't form signature");
         buffer.extend_from_slice(author.as_ref());
         buffer.push(cls);
         buffer.push(tag);
         buffer.extend_from_slice(value.as_ref());
         buffer.extend_from_slice(signature.as_ref());
-        SignedMessage {
-            raw: buffer
-        }
+        SignedMessage { raw: buffer }
     }
 
     /// Create `SignedMessage` wrapper from raw buffer.
     /// Checks binary format and signature.
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
         if buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
-            bail!(
-                "Message too short message_len = {}",
-                buffer.len()
-            )
+            bail!("Message too short message_len = {}", buffer.len())
         }
         let signed = SignedMessage { raw: buffer };
 
@@ -74,11 +69,7 @@ impl SignedMessage {
             let signature = signed.signature();
             let payload = signed.payload();
 
-            Self::verify(
-                payload,
-                &signature,
-                &pk,
-            )?;
+            Self::verify(payload, &signature, &pk)?;
         }
 
         Ok(signed)
@@ -86,15 +77,11 @@ impl SignedMessage {
 
     #[cfg(test)]
     pub(crate) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
-        SignedMessage {
-            raw: buffer
-        }
+        SignedMessage { raw: buffer }
     }
     #[cfg(not(test))]
     pub(in messages) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
-        SignedMessage {
-            raw: buffer
-        }
+        SignedMessage { raw: buffer }
     }
 
     #[allow(unsafe_code)]
@@ -109,7 +96,6 @@ impl SignedMessage {
     pub(in messages) fn message_type(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH + 1]
     }
-
 
     pub(in messages) fn payload(&self) -> &[u8] {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
@@ -167,4 +153,3 @@ impl FromHex for SignedMessage {
         Self::verify_buffer(bytes)
     }
 }
-

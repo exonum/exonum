@@ -16,7 +16,6 @@
 //!
 //! For more information see the project readme.
 #![feature(trace_macros)]
-
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 #![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
@@ -37,7 +36,6 @@
           use_self,
     )
 )]
-
 
 #[cfg(test)]
 #[macro_use]
@@ -100,11 +98,11 @@ pub mod messages;
 pub mod helpers;
 #[macro_use]
 pub mod blockchain;
+pub mod api;
 pub mod crypto;
+pub mod explorer;
 pub mod node;
 pub mod storage;
-pub mod api;
-pub mod explorer;
 
 #[doc(hidden)]
 pub mod events;

@@ -20,7 +20,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use blockchain::{TransactionContext, Transaction};
+use blockchain::{Transaction, TransactionContext};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -71,11 +71,11 @@ impl InternalPart {
                 let event = match request {
                     InternalRequest::VerifyTx(tx) => {
                         unimplemented!()
-//                        let fut = Self::verify_transaction(tx, internal_tx.clone());
-//                        verify_executor
-//                            .execute(Box::new(fut))
-//                            .expect("cannot schedule transaction verification");
-//                        return;
+                        //                        let fut = Self::verify_transaction(tx, internal_tx.clone());
+                        //                        verify_executor
+                        //                            .execute(Box::new(fut))
+                        //                            .expect("cannot schedule transaction verification");
+                        //                        return;
                     }
 
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {

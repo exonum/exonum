@@ -27,7 +27,8 @@ use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockResponse, Connect, Consensus as ConsensusMessage, Message, Precommit, Prevote, Propose, RawTransaction,
+    BlockResponse, Connect, Consensus as ConsensusMessage, Message, Precommit, Prevote, Propose,
+    RawTransaction,
 };
 use node::{connect_list::ConnectList, ConnectInfo};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};

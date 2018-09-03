@@ -24,7 +24,7 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation}, crypto::{self, Hash},
-    explorer::*, helpers::Height, messages::{Message, RawTransaction, Protocol},
+    explorer::*, helpers::Height, messages::{Message, Protocol, RawTransaction},
 };
 
 use blockchain::{
@@ -43,17 +43,20 @@ fn test_explorer_basics() {
     let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        pk_alice, &key_alice,
+        pk_alice,
+        &key_alice,
     );
     let tx_bob = Protocol::sign_tx(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
-        pk_bob, &key_bob,
+        pk_bob,
+        &key_bob,
     );
     let tx_transfer = Protocol::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
         SERVICE_ID,
-        pk_alice, &key_alice,
+        pk_alice,
+        &key_alice,
     );
 
     {
@@ -168,7 +171,8 @@ fn test_explorer_pool_transaction() {
     let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        pk_alice, &key_alice,
+        pk_alice,
+        &key_alice,
     );
     let tx_hash = tx_alice.hash();
 
@@ -197,7 +201,8 @@ fn tx_generator() -> Box<Iterator<Item = Message<RawTransaction>>> {
         Protocol::sign_tx(
             CreateWallet::new(&pk, &format!("Alice #{}", i)),
             SERVICE_ID,
-            pk, &key,
+            pk,
+            &key,
         )
     }))
 }
@@ -348,17 +353,20 @@ fn test_transaction_iterator() {
     let tx_alice = Protocol::sign_tx(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
-        pk_alice, &key_alice,
+        pk_alice,
+        &key_alice,
     );
     let tx_bob = Protocol::sign_tx(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
-        pk_bob, &key_bob,
+        pk_bob,
+        &key_bob,
     );
     let tx_transfer = Protocol::sign_tx(
         Transfer::new(&pk_alice, &pk_bob, 2),
         SERVICE_ID,
-        pk_alice, &key_alice,
+        pk_alice,
+        &key_alice,
     );
     create_block(
         &mut blockchain,

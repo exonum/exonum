@@ -41,9 +41,9 @@ use events::{
 };
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, PrevotesRequest, Propose,
-    ProposeRequest, Protocol, ProtocolMessage, RawTransaction, Status, TransactionsRequest,
-    TransactionsResponse, PeersRequest
+    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, Protocol, ProtocolMessage, RawTransaction, Status,
+    TransactionsRequest, TransactionsResponse,
 };
 use node::ConnectInfo;
 use node::{
@@ -102,7 +102,8 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => {
-                        let protocol_msg = Protocol::deserialize(msg).expect("Expected valid message.");
+                        let protocol_msg =
+                            Protocol::deserialize(msg).expect("Expected valid message.");
                         self.sent.push_back((peer, protocol_msg))
                     }
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
@@ -123,10 +124,10 @@ impl SandboxInner {
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyTx(tx) => {
                         unimplemented!();
-//                        if tx.verify() {
-//                            self.handler
-//                                .handle_event(InternalEvent::TxVerified(tx.clone()).into());
-//                        }
+                        //                        if tx.verify() {
+                        //                            self.handler
+                        //                                .handle_event(InternalEvent::TxVerified(tx.clone()).into());
+                        //                        }
                     }
                 }
             }
@@ -238,16 +239,16 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Message<BlockResponse> {
         unimplemented!()
-//        Protocol::concrete(
-//            BlockResponse::new(
-//                to,
-//                block,
-//                precommits.into_iter().map(|x| x.into()).collect(),
-//                tx_hashes,
-//            ),
-//            *public_key,
-//            secret_key,
-//        )
+        //        Protocol::concrete(
+        //            BlockResponse::new(
+        //                to,
+        //                block,
+        //                precommits.into_iter().map(|x| x.into()).collect(),
+        //                tx_hashes,
+        //            ),
+        //            *public_key,
+        //            secret_key,
+        //        )
     }
 
     /// Creates a `Connect` message signed by this validator.
@@ -267,10 +268,12 @@ impl Sandbox {
     }
 
     /// Creates a `PeersRequest` message signed by this validator.
-    pub fn create_peers_request(&self,
-                                public_key: &PublicKey,
-                                to: &PublicKey,
-                                secret_key: &SecretKey) -> Message<PeersRequest> {
+    pub fn create_peers_request(
+        &self,
+        public_key: &PublicKey,
+        to: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> Message<PeersRequest> {
         unimplemented!()
     }
 
@@ -392,16 +395,17 @@ impl Sandbox {
         txs: I,
         secret_key: &SecretKey,
     ) -> Message<TransactionsResponse>
-    where I: IntoIterator<Item = Message<RawTransaction>>
+    where
+        I: IntoIterator<Item = Message<RawTransaction>>,
     {
         unimplemented!()
-//        Protocol::concrete(
-//            TransactionsResponse::new(to, txs.into_iter()
-//                    .map(|x| x.into().to_vec())
-//                    .collect()),
-//            *author,
-//            secret_key,
-//        )
+        //        Protocol::concrete(
+        //            TransactionsResponse::new(to, txs.into_iter()
+        //                    .map(|x| x.into().to_vec())
+        //                    .collect()),
+        //            *author,
+        //            secret_key,
+        //        )
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -478,8 +482,11 @@ impl Sandbox {
         let send = self.pop_sent();
         if let Some((real_addr, real_msg)) = send {
             //assert_eq!(real_msg.into_parts().1.to_vec(), expected_msg.into_parts().1.to_vec());
-            assert_eq!(expected_msg, real_msg,"Expected to send other message");
-            assert_eq!(addr, real_addr, "Expected to send message to other recipient");
+            assert_eq!(expected_msg, real_msg, "Expected to send other message");
+            assert_eq!(
+                addr, real_addr,
+                "Expected to send message to other recipient"
+            );
         } else {
             panic!(
                 "Expected to send the message {:?} to {} but nothing happened",
@@ -493,8 +500,8 @@ impl Sandbox {
         let send = self.pop_sent();
 
         if let Some((addr, msg)) = send {
-            let peers_request = PeersRequest::try_from(msg)
-                                    .expect("Incorrect message. PeersRequest was expected");
+            let peers_request =
+                PeersRequest::try_from(msg).expect("Incorrect message. PeersRequest was expected");
 
             let id = self.addresses.iter().position(|&a| a == addr);
             if let Some(id) = id {
@@ -539,7 +546,11 @@ impl Sandbox {
         for _ in 0..expected_set.len() {
             let send = self.pop_sent();
             if let Some((real_addr, real_msg)) = send {
-                assert_eq!(expected_msg, real_msg.signed_message(), "Expected to broadcast other message");
+                assert_eq!(
+                    expected_msg,
+                    real_msg.signed_message(),
+                    "Expected to broadcast other message"
+                );
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
@@ -1131,13 +1142,11 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, ServiceContext, TransactionSet, TransactionContext};
+    use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
     use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{
-        add_one_height, SandboxState,
-    };
+    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::{Fork, Snapshot};
 
     const SERVICE_ID: u16 = 1;
@@ -1154,8 +1163,12 @@ mod tests {
     impl TxAfterCommit {
         pub fn new_with_height(height: Height) -> Message<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            Protocol::sign_tx(TxAfterCommit::new(height),
-                              SERVICE_ID, keypair.0, &keypair.1)
+            Protocol::sign_tx(
+                TxAfterCommit::new(height),
+                SERVICE_ID,
+                keypair.0,
+                &keypair.1,
+            )
         }
     }
 

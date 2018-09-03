@@ -34,7 +34,7 @@ use events::{
     codec::MessagesCodec, error::into_failure, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use messages::{Protocol, Service, SignedMessage, Message, Connect};
+use messages::{Connect, Message, Protocol, Service, SignedMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 

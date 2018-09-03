@@ -19,13 +19,12 @@ use std::net::SocketAddr;
 
 use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Protocol, Status, Service};
+use messages::{Connect, Message, PeersRequest, Protocol, Service, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, msg: Protocol) {
         match msg {
-
             Protocol::Consensus(msg) => self.handle_consensus(msg),
             Protocol::Requests(msg) => self.handle_request(msg),
 
@@ -33,14 +32,13 @@ impl NodeHandler {
             Protocol::Service(Service::Status(msg)) => self.handle_status(msg),
             // ignore tx duplication error,
             Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
-//            Protocol::Block(msg) => self.handle_block(msg)?,
-//            Protocol::TransactionsBatch(msg) => {
-//                self.handle_txs_batch(Message::from_parts(msg, message)?)?
-//            }
-            _ => unimplemented!()
+            //            Protocol::Block(msg) => self.handle_block(msg)?,
+            //            Protocol::TransactionsBatch(msg) => {
+            //                self.handle_txs_batch(Message::from_parts(msg, message)?)?
+            //            }
+            _ => unimplemented!(),
         }
     }
-
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.

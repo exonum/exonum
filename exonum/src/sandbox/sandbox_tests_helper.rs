@@ -17,6 +17,7 @@ use bit_vec::BitVec;
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
+use super::timestamping::DATA_SIZE;
 use super::{sandbox::Sandbox, timestamping::TimestampingTxGenerator};
 use blockchain::Block;
 use crypto::{CryptoHash, Hash, HASH_SIZE};
@@ -25,7 +26,6 @@ use messages::{
     Message, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction,
 };
 use storage::Database;
-use super::timestamping::DATA_SIZE;
 
 pub type TimestampingSandbox = Sandbox;
 

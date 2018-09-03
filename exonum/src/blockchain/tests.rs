@@ -24,7 +24,7 @@ use blockchain::{
 use crypto::{gen_keypair, Hash};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
-use messages::{Message, RawTransaction, Protocol};
+use messages::{Message, Protocol, RawTransaction};
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
@@ -270,7 +270,7 @@ mod transactions_tests {
     use super::TEST_SERVICE_ID;
     use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crypto::gen_keypair;
-    use messages::{Message, RawTransaction, Protocol, TransactionFromSet};
+    use messages::{Message, Protocol, RawTransaction, TransactionFromSet};
     use serde::Serialize;
     use serde_json;
 
@@ -342,25 +342,22 @@ mod transactions_tests {
     #[test]
     fn deserialize_from_raw_as_set() {
         use crypto::{PublicKey, SecretKey};
-        fn round_trip((pk, sk) :(PublicKey, &SecretKey), t: Message<RawTransaction>) {
+        fn round_trip((pk, sk): (PublicKey, &SecretKey), t: Message<RawTransaction>) {
             use std::ops::Deref;
             let raw: &RawTransaction = t.deref();
             println!("test tx_from_raw");
             let parsed = MyTransactions::tx_from_raw(raw.clone()).unwrap();
-            let t_destination = Protocol::sign_tx(parsed, TEST_SERVICE_ID,pk,sk);
+            let t_destination = Protocol::sign_tx(parsed, TEST_SERVICE_ID, pk, sk);
             assert_eq!(t, t_destination);
         }
 
         let (pk, sec_key) = gen_keypair();
-        let a = Protocol::sign_tx(A::new(0),
-                                     TEST_SERVICE_ID, pk, &sec_key);
-        let b = Protocol::sign_tx(B::new(1, 2),
-                                     TEST_SERVICE_ID, pk, &sec_key);
-        let c = Protocol::sign_tx(C::new(0),
-                                     TEST_SERVICE_ID, pk, &sec_key);
-        round_trip((pk, &sec_key),a);
-        round_trip((pk, &sec_key),b);
-        round_trip((pk, &sec_key),c);
+        let a = Protocol::sign_tx(A::new(0), TEST_SERVICE_ID, pk, &sec_key);
+        let b = Protocol::sign_tx(B::new(1, 2), TEST_SERVICE_ID, pk, &sec_key);
+        let c = Protocol::sign_tx(C::new(0), TEST_SERVICE_ID, pk, &sec_key);
+        round_trip((pk, &sec_key), a);
+        round_trip((pk, &sec_key), b);
+        round_trip((pk, &sec_key), c);
     }
 
     #[test]
@@ -369,16 +366,16 @@ mod transactions_tests {
 
         fn round_trip<T: Into<TransactionFromSet> + Serialize>(t: T) {
             unimplemented!()
-//            let (pk, sec_key) = gen_keypair();
-//            use std::ops::Deref;
-//            let initial = serde_json::to_value(&t).unwrap();
-//            let msg = Protocol::sign_tx(t, TEST_SERVICE_ID, pk, &sec_key);
-//            let raw: &RawTransaction = msg.deref();
-//
-//            println!("{:?}", raw.payload());
-//            let parsed: T = BinaryForm::deserialize(raw.payload()).unwrap();
-//            let round_tripped = serde_json::to_value(&parsed).unwrap();
-//            assert_eq!(initial, round_tripped);
+            //            let (pk, sec_key) = gen_keypair();
+            //            use std::ops::Deref;
+            //            let initial = serde_json::to_value(&t).unwrap();
+            //            let msg = Protocol::sign_tx(t, TEST_SERVICE_ID, pk, &sec_key);
+            //            let raw: &RawTransaction = msg.deref();
+            //
+            //            println!("{:?}", raw.payload());
+            //            let parsed: T = BinaryForm::deserialize(raw.payload()).unwrap();
+            //            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            //            assert_eq!(initial, round_tripped);
         }
 
         let a = A::new(0);
@@ -557,10 +554,10 @@ mod rocksdb_tests {
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
     use futures::sync::mpsc;
+    use messages::Protocol;
     use node::ApiSender;
     use std::path::Path;
     use storage::{Database, DbOptions, RocksDB};
-    use messages::{Protocol};
     use tempdir::TempDir;
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
@@ -644,49 +641,49 @@ mod rocksdb_tests {
         super::assert_service_execute(&blockchain, &mut db);
     }
 
-//    #[test]
-//    fn test_new_tx() {
-//        use crypto::{gen_keypair_from_seed, Seed, PublicKey};
-//        use messages::{Message};
-//        use storage::StorageValue;
-//        use hex::FromHex;
-//
-//        transactions! {
-//            NewTxSet {
-//                struct NewTx {
-//                    public_key: &PublicKey,
-//                    login: &str,
-//                    name: &str,
-//                    url: &str,
-//                    avatar_url: &str,
-//                }
-//            }
-//        }
-//
-//        use blockchain::{ExecutionResult, Transaction, TransactionContext};
-//
-//        impl Transaction for NewTx {
-//            fn verify(&self) -> bool {
-//                true
-//            }
-//
-//            fn execute(&self, _: TransactionContext) -> ExecutionResult {
-//                Ok(())
-//            }
-//        }
-//        {
-//            let (p, s) = gen_keypair_from_seed(&Seed::new([210; 32]));
-//            let message = Protocol::sign_tx(NewTx::new(
-//                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
-//                                                      "login", "name", "url", "avatar_url"), 0, p, &s);
-//            println!("pk = {}", ::hex::encode(p));
-//            println!("new tx newstruct = {}", message.to_hex_string());
-//            println!("new tx bytearray = {:?}", message.into_parts().1.to_vec());
-//            println!("new struct, inner = {}", ::hex::encode(NewTx::new(
-//                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
-//                "login", "name", "url", "avatar_url").into_bytes()));
-//
-//        }
-//        panic!();
-//    }
+    //    #[test]
+    //    fn test_new_tx() {
+    //        use crypto::{gen_keypair_from_seed, Seed, PublicKey};
+    //        use messages::{Message};
+    //        use storage::StorageValue;
+    //        use hex::FromHex;
+    //
+    //        transactions! {
+    //            NewTxSet {
+    //                struct NewTx {
+    //                    public_key: &PublicKey,
+    //                    login: &str,
+    //                    name: &str,
+    //                    url: &str,
+    //                    avatar_url: &str,
+    //                }
+    //            }
+    //        }
+    //
+    //        use blockchain::{ExecutionResult, Transaction, TransactionContext};
+    //
+    //        impl Transaction for NewTx {
+    //            fn verify(&self) -> bool {
+    //                true
+    //            }
+    //
+    //            fn execute(&self, _: TransactionContext) -> ExecutionResult {
+    //                Ok(())
+    //            }
+    //        }
+    //        {
+    //            let (p, s) = gen_keypair_from_seed(&Seed::new([210; 32]));
+    //            let message = Protocol::sign_tx(NewTx::new(
+    //                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
+    //                                                      "login", "name", "url", "avatar_url"), 0, p, &s);
+    //            println!("pk = {}", ::hex::encode(p));
+    //            println!("new tx newstruct = {}", message.to_hex_string());
+    //            println!("new tx bytearray = {:?}", message.into_parts().1.to_vec());
+    //            println!("new struct, inner = {}", ::hex::encode(NewTx::new(
+    //                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
+    //                "login", "name", "url", "avatar_url").into_bytes()));
+    //
+    //        }
+    //        panic!();
+    //    }
 }

@@ -20,9 +20,9 @@ use events::{error::LogError, InternalRequest};
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Message, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, RawTransaction, SignedMessage, TransactionsRequest, Protocol,
-    TransactionsResponse,
+    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Message, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, Protocol, RawTransaction, SignedMessage,
+    TransactionsRequest, TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;
@@ -30,9 +30,7 @@ use storage::Patch;
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_consensus(
-        &mut self,
-        msg: ConsensusMessage) {
+    pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         if !self.is_enabled {
             info!(
                 "Ignoring a consensus message {:?} because the node is disabled",
@@ -86,7 +84,7 @@ impl NodeHandler {
         match msg {
             ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
             ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
-            ConsensusMessage::Precommit(msg) =>  self.handle_precommit(key, msg)
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, msg),
         }
     }
 
@@ -413,7 +411,7 @@ impl NodeHandler {
                 let raw_messages = self.state
                     .prevotes(prevote_round, propose_hash)
                     .into_iter()
-                    .map(| p| p.clone().into())
+                    .map(|p| p.clone().into())
                     .collect::<Vec<_>>();
                 self.blockchain.save_messages(round, raw_messages);
 
@@ -530,9 +528,7 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
-    pub fn handle_tx(&mut self, msg: Message<RawTransaction>)
-        -> Result<(), failure::Error>
-    {
+    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) -> Result<(), failure::Error> {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -589,19 +585,19 @@ impl NodeHandler {
             )
         }
         unimplemented!()
-//        let txs: Result<Vec<_>, _> = msg.transactions()
-//            .into_iter()
-//            .map(RawTransaction::verify_transaction)
-//            .collect();
-//        for tx in txs? {
-//            // This is a valid case for node to receive two transactions
-//            // so just ignore error about it.
-//            drop(self.handle_tx(tx))
-//        }
-//
-//        for tx in msg.transactions() {
-//            self.handle_tx(&tx);
-//        }
+        //        let txs: Result<Vec<_>, _> = msg.transactions()
+        //            .into_iter()
+        //            .map(RawTransaction::verify_transaction)
+        //            .collect();
+        //        for tx in txs? {
+        //            // This is a valid case for node to receive two transactions
+        //            // so just ignore error about it.
+        //            drop(self.handle_tx(tx))
+        //        }
+        //
+        //        for tx in msg.transactions() {
+        //            self.handle_tx(&tx);
+        //        }
     }
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
