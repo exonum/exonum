@@ -812,7 +812,7 @@ pub struct ConnectInfo {
 impl ConnectInfo {
     /// Tries to serialize the given `ConnectInfo` into vector of bytes.
     pub fn try_serialize(self) -> Vec<u8> {
-        let mut vec_bytes = Vec::with_capacity(Self::field_size() as usize);
+        let mut vec_bytes = vec![0_u8; Self::field_size() as usize];
         self.write(&mut vec_bytes, 0, Self::field_size());
         vec_bytes
     }
