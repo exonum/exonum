@@ -187,16 +187,30 @@ pub struct ConnectionParams {
     handshake_params: HandshakeParams,
 }
 
-impl ConnectionParams {
-    pub fn from_address(address: SocketAddr) -> Self {
-        let (public_key, secret_key) = gen_keypair();
-        let handshake_params = HandshakeParams::new(
+impl HandshakeParams {
+    // Helper method to create `HandshakeParams` with empty `ConnectList` and
+    // default `max_message_len`.
+    #[doc(hidden)]
+    pub fn with_default_params(
+        public_key: PublicKey,
+        secret_key: SecretKey,
+        address: SocketAddr,
+    ) -> Self {
+        HandshakeParams::new(
             public_key,
             secret_key.clone(),
             SharedConnectList::default(),
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
             address.clone(),
-        );
+        )
+    }
+}
+
+impl ConnectionParams {
+    pub fn from_address(address: SocketAddr) -> Self {
+        let (public_key, secret_key) = gen_keypair();
+        let handshake_params =
+            HandshakeParams::with_default_params(public_key, secret_key.clone(), address.clone());
         let connect_info = ConnectInfo {
             address,
             public_key,

@@ -27,7 +27,6 @@ pub mod state;
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use serde::de::{self, Deserialize, Deserializer};
-use serde_json;
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
@@ -46,6 +45,7 @@ use blockchain::{
     ValidatorKeys,
 };
 use crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey};
+use encoding::Field;
 use events::{
     error::{into_failure, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
     InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
@@ -810,31 +810,33 @@ pub struct ConnectInfo {
 }
 
 impl ConnectInfo {
-    /// Tries to serialize the given `ConnectInfo` into a UTF-8 encoded JSON.
-    pub fn try_serialize(self) -> serde_json::Result<Vec<u8>> {
-        serde_json::to_vec(&self)
+    /// Tries to serialize the given `ConnectInfo` into vector of bytes.
+    pub fn try_serialize(self) -> Vec<u8> {
+        let mut vec_bytes = Vec::with_capacity(Self::field_size() as usize);
+        self.write(&mut vec_bytes, 0, Self::field_size());
+        vec_bytes
     }
 
     /// Tries to deserialize the given `value` into `ConnectInfo`.
-    pub fn try_deserialize(value: &[u8]) -> serde_json::Result<Self> {
-        serde_json::from_slice(value)
+    #[allow(unsafe_code)]
+    pub fn try_deserialize(value: &[u8]) -> Self {
+        unsafe { Self::read(&value, 0, Self::field_size()) }
     }
 }
 
 impl StorageValue for ConnectInfo {
     fn into_bytes(self) -> Vec<u8> {
-//        self.try_serialize().unwrap()
-        self.serialize_field()
+        self.try_serialize()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::try_deserialize(value.as_ref()).unwrap()
+        Self::try_deserialize(value.as_ref())
     }
 }
 
 impl CryptoHash for ConnectInfo {
     fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
+        let vec_bytes = self.try_serialize();
         hash(&vec_bytes)
     }
 }

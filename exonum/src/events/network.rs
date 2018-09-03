@@ -34,14 +34,14 @@ use events::{
     codec::MessagesCodec, error::into_failure, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use messages::{Any, PeersExchange, RawMessage};
+use messages::{Any, PeerList, RawMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(PeersExchange),
+    PeerConnected(PeerList),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -444,14 +444,12 @@ impl Listener {
         Ok(Listener(to_box(server)))
     }
 
-    fn parse_peers_exchange(raw: Vec<u8>) -> Result<PeersExchange, failure::Error> {
+    fn parse_peers_exchange(raw: Vec<u8>) -> Result<PeerList, failure::Error> {
         let raw = RawMessage::from_vec(raw);
         let raw = Any::from_raw(raw);
         match raw {
-            Ok(Any::PeersExchange(connect)) => Ok(connect),
-            _ => Err(format_err!(
-                "Missing PeersExchange message from the remote peer",
-            )),
+            Ok(Any::PeerList(connect)) => Ok(connect),
+            _ => Err(format_err!("Missing PeerList message from the remote peer",)),
         }
     }
 
@@ -459,7 +457,7 @@ impl Listener {
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
         address: SocketAddr,
-        peers_exchange: PeersExchange,
+        peers_exchange: PeerList,
     ) -> impl Future<Item = (), Error = failure::Error>
     where
         S: Stream<Item = RawMessage, Error = failure::Error>,

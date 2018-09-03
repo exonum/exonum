@@ -62,8 +62,8 @@ pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
-/// `PeersExchange` message id.
-pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeersExchange::MESSAGE_ID;
+/// `PeerList` message id.
+pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeerList::MESSAGE_ID;
 
 messages! {
     const SERVICE_ID = CONSENSUS;
@@ -78,8 +78,8 @@ messages! {
     /// Peer connects to the received peers.
     ///
     /// ### Generation
-    /// `PeersExchange` is sent as response to incoming `PeersRequest`.
-    struct PeersExchange {
+    /// `PeerList` is sent as response to incoming `PeersRequest`.
+    struct PeerList {
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.

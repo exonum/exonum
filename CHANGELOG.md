@@ -36,10 +36,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Connect`-messages have been removed from the protocol. Now handshake between
   peers are handled by noise protocol. (#866)
 
-- New message type `PeersExchange` has been added. Peers sends it as the
+- New message type `PeerList` has been added. Peers sends it as the
   response to `PeersRequest`. (#866)
-
-### New features
 
 - Config parameter `round_timeout` has been renamed to `first_round_timeout`.
   Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`

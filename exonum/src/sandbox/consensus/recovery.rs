@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{PeersExchange, PeersRequest, Precommit, Prevote};
+use messages::{PeerList, PeersRequest, Precommit, Prevote};
 use node::{self, ConnectInfo};
 
 use blockchain::ValidatorKeys;
@@ -424,7 +424,7 @@ fn should_restore_peers_after_restart() {
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
     let peers_request = PeersRequest::new(&p1, &p0, &s1);
-    let peers_response = PeersExchange::new(
+    let peers_response = PeerList::new(
         &p0,
         &p1,
         vec![ConnectInfo {

@@ -18,7 +18,7 @@ use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
 use helpers::Height;
-use messages::{Any, Message, PeersExchange, PeersRequest, RawMessage, Status};
+use messages::{Any, Message, PeerList, PeersRequest, RawMessage, Status};
 use node::ConnectInfo;
 
 impl NodeHandler {
@@ -31,7 +31,7 @@ impl NodeHandler {
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(&msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
-            Ok(Any::PeersExchange(msg)) => self.handle_peers_exchange(&msg),
+            Ok(Any::PeerList(msg)) => self.handle_peers_exchange(&msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
             }
@@ -39,9 +39,9 @@ impl NodeHandler {
     }
 
     /// Handles the incoming connection. Node connects to the sender
-    /// if received `PeersExchange` is correct.
-    pub fn handle_connected(&mut self, peers_exchange: &PeersExchange) {
-        info!("Received PeersExchange  from peer: {:?}", peers_exchange);
+    /// if received `PeerList` is correct.
+    pub fn handle_connected(&mut self, peers_exchange: &PeerList) {
+        info!("Received PeerList  from peer: {:?}", peers_exchange);
         self.handle_peers_exchange(&peers_exchange);
     }
 
@@ -73,14 +73,14 @@ impl NodeHandler {
     }
 
     /// Handles the `ConnectInfo` and connects to a peer as result.
-    pub fn handle_peers_exchange(&mut self, peers_exchange: &PeersExchange) {
+    pub fn handle_peers_exchange(&mut self, peers_exchange: &PeerList) {
         // TODO Add spam protection. (ECR-170)
         if !self.state
             .connect_list()
             .is_peer_allowed(peers_exchange.from())
         {
             error!(
-                "Received PeersExchange message from peer = {:?} which not in ConnectList.",
+                "Received PeerList message from peer = {:?} which not in ConnectList.",
                 peers_exchange.from()
             );
             return;
@@ -173,7 +173,7 @@ impl NodeHandler {
             msg.from()
         );
 
-        let peers_request = PeersExchange::new(
+        let peers_request = PeerList::new(
             &self.state().consensus_public_key(),
             &msg.from(),
             peers,

@@ -178,11 +178,9 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 
-    let mut params = HandshakeParams::new(
+    let mut params = HandshakeParams::with_default_params(
         public_key,
         secret_key,
-        SharedConnectList::default(),
-        1024,
         "127.0.0.1:8000".parse().unwrap(),
     );
     params.set_remote_key(public_key);

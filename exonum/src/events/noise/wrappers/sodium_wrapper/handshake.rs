@@ -27,7 +27,7 @@ use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
 use futures::future;
-use messages::PeersExchange;
+use messages::PeerList;
 use node::{state::SharedConnectList, ConnectInfo};
 use storage::StorageValue;
 
@@ -77,9 +77,9 @@ impl HandshakeParams {
         self.remote_key_x25519 = Some(into_x25519_public_key(remote_key));
     }
 
-    pub fn peers_exchange(&self) -> Option<PeersExchange> {
+    pub fn peers_exchange(&self) -> Option<PeerList> {
         self.remote_key.map(|key| {
-            PeersExchange::new(
+            PeerList::new(
                 &self.public_key,
                 &key,
                 vec![self.connect_info],
@@ -111,7 +111,7 @@ pub struct NoiseHandshake {
     peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
-    peers_exchange: Option<PeersExchange>,
+    peers_exchange: Option<PeerList>,
 }
 
 impl NoiseHandshake {
@@ -232,7 +232,7 @@ impl Handshake for NoiseHandshake {
                 Box::new(framed)
             }
             None => Box::new(future::err(format_err!(
-                "Can't send handshake request without PeersExchange",
+                "Can't send handshake request without PeerList",
             ))),
         }
     }
