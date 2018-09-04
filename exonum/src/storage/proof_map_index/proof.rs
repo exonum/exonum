@@ -213,8 +213,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// // Check the proof consistency
 /// let checked_proof = proof.check().unwrap();
-/// assert_eq!(checked_proof.entries(), vec![(&h1, &100u32)]);
-/// assert_eq!(checked_proof.missing_keys(), vec![&h3]);
+/// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h1, &100u32)]);
+/// assert_eq!(checked_proof.missing_keys().collect::<Vec<_>>(), vec![&h3]);
 /// assert_eq!(checked_proof.merkle_root(), map.merkle_root());
 /// ```
 ///
@@ -457,8 +457,19 @@ impl<K, V> MapProof<K, V> {
 
     /// Retrieves references to keys that the proof shows as missing from the map.
     /// This method does not perform any integrity checks of the proof.
-    pub fn missing_keys_unchecked(&self) -> Vec<&K> {
-        self.entries.iter().filter_map(|e| e.as_missing()).collect()
+    pub fn missing_keys_unchecked(&self) -> impl Iterator<Item = &K> {
+        self.entries.iter().filter_map(|e| e.as_missing())
+    }
+
+    /// Retrieves references to existing and non-existing entries in the proof.
+    ///
+    /// Existing entries have `Some` value, non-existing have `None`.
+    /// This method does not perform any integrity checks of the proof.
+    pub fn all_entries_unchecked(&self) -> impl Iterator<Item = (&K, Option<&V>)> {
+        self.entries.iter().map(|e| match e {
+            OptionalEntry::Missing { ref missing } => (missing, None),
+            OptionalEntry::KV { ref key, ref value } => (key, Some(value)),
+        })
     }
 }
 
@@ -542,7 +553,7 @@ where
     ///
     /// let proof = map.get_proof(h2);
     /// let checked_proof = proof.check().unwrap();
-    /// assert_eq!(checked_proof.entries(), vec![(&h2, &200u32)]);
+    /// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h2, &200u32)]);
     /// assert_eq!(checked_proof.merkle_root(), map.merkle_root());
     /// ```
     ///
@@ -585,34 +596,25 @@ where
 
 impl<K, V> CheckedMapProof<K, V> {
     /// Retrieves references to keys that the proof shows as missing from the map.
-    pub fn missing_keys(&self) -> Vec<&K> {
-        self.entries
-            .iter()
-            .filter_map(|kv| match *kv {
-                (ref key, None) => Some(key),
-                _ => None,
-            })
-            .collect()
+    pub fn missing_keys(&self) -> impl Iterator<Item = &K> {
+        self.entries.iter().filter_map(|kv| match *kv {
+            (ref key, None) => Some(key),
+            _ => None,
+        })
     }
 
     /// Retrieves references to key-value pairs that the proof shows as present in the map.
-    pub fn entries(&self) -> Vec<(&K, &V)> {
-        self.entries
-            .iter()
-            .filter_map(|kv| match *kv {
-                (ref key, Some(ref value)) => Some((key, value)),
-                _ => None,
-            })
-            .collect()
+    pub fn entries(&self) -> impl Iterator<Item = (&K, &V)> {
+        self.entries.iter().filter_map(|kv| match *kv {
+            (ref key, Some(ref value)) => Some((key, value)),
+            _ => None,
+        })
     }
 
     /// Retrieves references to existing and non-existing entries in the proof.
     /// Existing entries have `Some` value, non-existing have `None`.
-    pub fn all_entries(&self) -> Vec<(&K, Option<&V>)> {
-        self.entries
-            .iter()
-            .map(|&(ref k, ref v)| (k, v.as_ref()))
-            .collect()
+    pub fn all_entries(&self) -> impl Iterator<Item = (&K, Option<&V>)> {
+        self.entries.iter().map(|&(ref k, ref v)| (k, v.as_ref()))
     }
 
     /// Returns a hash of the map that this proof is constructed for.

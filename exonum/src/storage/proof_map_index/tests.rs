@@ -336,7 +336,7 @@ fn check_map_proof<K, V>(
 
     let proof = proof.check().unwrap();
     assert_eq!(
-        proof.entries(),
+        proof.entries().collect::<Vec<_>>(),
         entries
             .iter()
             .map(|&(ref k, ref v)| (k, v))
@@ -345,7 +345,10 @@ fn check_map_proof<K, V>(
     assert_eq!(proof.merkle_root(), table.merkle_root());
 
     let deserialized_proof = deserialized_proof.check().unwrap();
-    assert_eq!(deserialized_proof.entries(), proof.entries());
+    assert_eq!(
+        deserialized_proof.entries().collect::<Vec<_>>(),
+        proof.entries().collect::<Vec<_>>()
+    );
     assert_eq!(deserialized_proof.merkle_root(), proof.merkle_root());
 }
 
@@ -384,7 +387,7 @@ fn check_map_multiproof<K, V>(
     let proof = proof.check().unwrap();
     assert_eq!(proof.merkle_root(), table.merkle_root());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
-        let mut actual_keys = proof.missing_keys();
+        let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
         actual_keys
             .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
         actual_keys
@@ -395,7 +398,7 @@ fn check_map_multiproof<K, V>(
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>(),
         {
-            let mut actual_entries = proof.entries();
+            let mut actual_entries = proof.entries().collect::<Vec<_>>();
             actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
                 ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
             });
@@ -1289,7 +1292,7 @@ fn tree_with_hashed_key(db: Box<dyn Database>) {
     );
     let proof = proof.check().unwrap();
     assert_eq!(
-        proof.all_entries(),
+        proof.all_entries().collect::<Vec<_>>(),
         vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]
     );
     assert_eq!(proof.merkle_root(), table.merkle_root());
