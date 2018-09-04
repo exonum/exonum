@@ -88,7 +88,7 @@ impl ServiceApiBackend for ApiBuilder {
     type Backend = actix_web::Scope<ServiceApiState>;
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
-        self.handlers.push(sanitize(handler));
+        self.handlers.push(handler);
         self
     }
 
@@ -101,14 +101,6 @@ impl ServiceApiBackend for ApiBuilder {
         }
         output
     }
-}
-
-// TODO: remove this workaround for a regression in actix-web 0.7.3 (ECR-2149)
-fn sanitize(mut handler: RequestHandler) -> RequestHandler {
-    if !handler.name.starts_with('/') {
-        handler.name.insert(0, '/');
-    }
-    handler
 }
 
 impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
