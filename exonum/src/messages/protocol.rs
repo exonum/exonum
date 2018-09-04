@@ -359,7 +359,7 @@ impl BlockResponse {
 }
 
 impl Precommit {
-    /// Verify precommit's signature and return it's safer wrapper
+    /// Verify precommits signature and return it's safer wrapper
     pub(crate) fn verify_precommit(
         buffer: Vec<u8>,
     ) -> Result<Message<Precommit>, ::failure::Error> {
@@ -409,37 +409,37 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm {
 /// Each `$MessageType` should implement `Clone` and `Debug`.
 ///
 macro_rules! impl_protocol {
-    ($signed_message:ident => $proto_name:ident{
-        $($cls_num:expr => $cls:ident{
-            $( $typ:ident = $typ_num:expr),+ $(,)*
+    ($signed_message:ident => $protocol_name:ident{
+        $($class_num:expr => $class:ident{
+            $( $type:ident = $type_num:expr),+ $(,)*
         } $(,)*)+
     }
     ) => {
 
         $(
             #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
-            pub enum $cls {
+            pub enum $class {
             $(
-                $typ(Message<$typ>)
+                $type(Message<$type>)
             ),+
             }
 
             $(
 
-            impl ProtocolMessage for $typ {
+            impl ProtocolMessage for $type {
                 fn message_type() -> (u8, u8) {
-                    ($cls_num, $typ_num)
+                    ($class_num, $type_num)
                 }
 
-                fn try_from(p: $proto_name) -> Result<Message<Self>,Protocol> {
+                fn try_from(p: $protocol_name) -> Result<Message<Self>,Protocol> {
                     match p {
-                        $proto_name::$cls($cls::$typ(s)) => Ok(s),
+                        $protocol_name::$class($class::$type(s)) => Ok(s),
                         p => Err(p)
                     }
                 }
 
                 fn into_protocol(this: Message<Self>) -> Protocol {
-                    $proto_name::$cls($cls::$typ(this))
+                    $protocol_name::$class($class::$type(this))
                 }
 
                 fn into_message_from_parts(self, sm: SignedMessage) -> Message<Self> {
@@ -450,23 +450,23 @@ macro_rules! impl_protocol {
         )+
 
         #[derive(PartialEq, Eq, Debug, Clone)]
-        pub enum $proto_name {
+        pub enum $protocol_name {
             $(
-                $cls($cls)
+                $class($class)
             ),+
         }
 
-        impl $proto_name {
+        impl $protocol_name {
             pub fn deserialize(message: SignedMessage) -> Result<Protocol, failure::Error> {
             use $crate::events::error::into_failure;
                 match message.message_class() {
-                    $($cls_num =>
+                    $($class_num =>
                         match message.message_type() {
-                            $($typ_num =>{
-                                let payload = $typ::deserialize(message.payload())
+                            $($type_num =>{
+                                let payload = $type::deserialize(message.payload())
                                                 .map_err(into_failure)?;
                                 let message = Message::new(payload, message);
-                                Ok($proto_name::$cls($cls::$typ(message)))
+                                Ok($protocol_name::$class($class::$type(message)))
                             }),+
                             _ => bail!("Not found message with this type {}", message.message_type())
                         }
@@ -478,10 +478,10 @@ macro_rules! impl_protocol {
             pub fn signed_message(&self) -> &SignedMessage {
                 match *self {
                     $(
-                        $proto_name::$cls(ref c) => {
+                        $protocol_name::$class(ref c) => {
                             match *c {
                                 $(
-                                    $cls::$typ(ref t) => {
+                                    $class::$type(ref t) => {
                                         t.signed_message()
                                     }
                                 ),+
