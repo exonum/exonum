@@ -3,6 +3,8 @@
 This project demonstrates how to bootstrap own cryptocurrency
 with [Exonum blockchain](https://github.com/exonum/exonum).
 
+![Cryptocurrency demo](Screenshot.png)
+
 Exonum blockchain keeps balances of users and handles secure
 transactions between them.
 
