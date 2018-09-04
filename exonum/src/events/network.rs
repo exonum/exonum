@@ -25,7 +25,7 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::{Rc, Weak}, time::Duration};
 
 use super::{
     error::{log_error, result_ok}, to_box,
@@ -148,46 +148,29 @@ impl ConnectionsPool {
         let action = move || TcpStream::connect(&peer, &handle_cloned);
         let connect_handle = Retry::spawn(strategy, action)
             .map_err(into_failure)
-            // Configure socket
-            .and_then(move |sock| {
-                sock.set_nodelay(network_config.tcp_nodelay)?;
-                let duration =
-                    network_config.tcp_keep_alive.map(Duration::from_millis);
-                sock.set_keepalive(duration)?;
-                Ok(sock)
-            })
-            .and_then(move |sock| {
-                Self::build_handshake_initiator(sock, &peer, &handshake_params)
-            })
-            // Connect socket with the outgoing channel
+            .and_then(move |socket| Self::configure_socket(socket, network_config))
+            .and_then(move |sock| Self::build_handshake_initiator(sock, &peer, &handshake_params))
             .and_then(move |stream| {
                 trace!("Established connection with peer={}", peer);
-                let (sink, stream) = stream.split();
-
-                let writer = conn_rx
-                    .map_err(|_| format_err!("Can't send data into socket"))
-                    .forward(sink);
-                let reader = stream.for_each(result_ok);
-
-                reader
-                    .select2(writer)
-                    .map_err(|_| format_err!("Socket error"))
-                    .and_then(|res| match res {
-                        Either::A((_, _reader)) => Ok("by reader"),
-                        Either::B((_, _writer)) => Ok("by writer"),
-                    })
+                Self::process_outgoing_messages(stream, conn_rx)
             })
             .then(move |res| {
-                trace!(
-                    "Disconnection with peer={}, reason={:?}",
-                    peer,
-                    res
-                );
+                trace!("Disconnection with peer={}, reason={:?}", peer, res);
                 self.disconnect_with_peer(peer, network_tx.clone())
             })
             .map_err(log_error);
         handle.spawn(connect_handle);
         Some(conn_tx)
+    }
+
+    fn configure_socket(
+        socket: TcpStream,
+        network_config: NetworkConfiguration,
+    ) -> Result<TcpStream, failure::Error> {
+        socket.set_nodelay(network_config.tcp_nodelay)?;
+        let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
+        socket.set_keepalive(duration)?;
+        Ok(socket)
     }
 
     fn disconnect_with_peer(
@@ -223,6 +206,27 @@ impl ConnectionsPool {
                 peer
             )))
         }
+    }
+
+    // Connect socket with the outgoing channel
+    fn process_outgoing_messages(
+        stream: Framed<TcpStream, MessagesCodec>,
+        conn_rx: mpsc::Receiver<RawMessage>,
+    ) -> impl Future<Item = &'static str, Error = failure::Error> {
+        let (sink, stream) = stream.split();
+
+        let writer = conn_rx
+            .map_err(|_| format_err!("Can't send data into socket"))
+            .forward(sink);
+        let reader = stream.for_each(result_ok);
+
+        reader
+            .select2(writer)
+            .map_err(|_| format_err!("Socket error"))
+            .and_then(|res| match res {
+                Either::A((_, _reader)) => Ok("by reader"),
+                Either::B((_, _writer)) => Ok("by writer"),
+            })
     }
 }
 
@@ -290,48 +294,16 @@ impl RequestHandler {
             .map_err(|_| format_err!("no network requests"))
             .for_each(move |request| {
                 match request {
-                    NetworkRequest::SendMessage(peer, msg) => {
-                        let conn_tx = outgoing_connections
-                            .get(peer)
-                            .map(|conn_tx| to_future(Ok(conn_tx)))
-                            .or_else(|| {
-                                outgoing_connections
-                                    .clone()
-                                    .connect_to_peer(
-                                        network_config,
-                                        peer,
-                                        network_tx.clone(),
-                                        &handle,
-                                        &handshake_params,
-                                    )
-                                    .map(|conn_tx|
-                                        // if we create new connect, we should send connect message
-                                        if &msg == connect_message.raw() {
-                                            to_future(Ok(conn_tx))
-                                        } else {
-                                            to_future(conn_tx.send(connect_message.raw().clone())
-                                                .map_err(|_| {
-                                                    format_err!("can't send message to a connection")
-                                                }))
-                                        })
-                            });
-                        if let Some(conn_tx) = conn_tx {
-                            let fut = conn_tx.and_then(|conn_tx| {
-                                conn_tx
-                                    .send(msg)
-                                    .map_err(|_| format_err!("can't send message to a connection"))
-                            });
-                            to_box(fut)
-                        } else {
-                            let event = NetworkEvent::UnableConnectToPeer(peer);
-                            let fut = network_tx
-                                .clone()
-                                .send(event)
-                                .map_err(|_| format_err!("can't send network event"))
-                                .into_future();
-                            to_box(fut)
-                        }
-                    }
+                    NetworkRequest::SendMessage(peer, message) => Self::handle_send_message(
+                        peer,
+                        message,
+                        &connect_message,
+                        &outgoing_connections,
+                        network_config,
+                        &network_tx,
+                        &handle,
+                        &handshake_params,
+                    ),
                     NetworkRequest::DisconnectWithPeer(peer) => {
                         outgoing_connections.disconnect_with_peer(peer, network_tx.clone())
                     }
@@ -345,6 +317,59 @@ impl RequestHandler {
                 }
             });
         RequestHandler(to_box(requests_handler))
+    }
+
+    #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+    fn handle_send_message(
+        peer: SocketAddr,
+        msg: RawMessage,
+        connect_message: &Connect,
+        outgoing_connections: &ConnectionsPool,
+        network_config: NetworkConfiguration,
+        network_tx: &mpsc::Sender<NetworkEvent>,
+        handle: &Handle,
+        handshake_params: &HandshakeParams,
+    ) -> Box<dyn Future<Error = failure::Error, Item = ()> + 'static> {
+        let conn_tx = outgoing_connections
+            .get(peer)
+            .map(|conn_tx| to_future(Ok(conn_tx)))
+            .or_else(|| {
+                outgoing_connections
+                    .clone()
+                    .connect_to_peer(
+                        network_config,
+                        peer,
+                        network_tx.clone(),
+                        &handle,
+                        &handshake_params,
+                    )
+                    .map(|conn_tx|
+                        // if we create new connect, we should send connect message
+                        if &msg == connect_message.raw() {
+                            to_future(Ok(conn_tx))
+                        } else {
+                            to_future(conn_tx.send(connect_message.raw().clone())
+                                .map_err(|_| {
+                                    format_err!("can't send message to a connection")
+                                }))
+                        })
+            });
+        if let Some(conn_tx) = conn_tx {
+            let fut = conn_tx.and_then(|conn_tx| {
+                conn_tx
+                    .send(msg)
+                    .map_err(|_| format_err!("can't send message to a connection"))
+            });
+            to_box(fut)
+        } else {
+            let event = NetworkEvent::UnableConnectToPeer(peer);
+            let fut = network_tx
+                .clone()
+                .send(event)
+                .map_err(|_| format_err!("can't send network event"))
+                .into_future();
+            to_box(fut)
+        }
     }
 }
 
@@ -396,22 +421,7 @@ impl Listener {
                 let connection_handler = handshake
                     .listen(sock)
                     .and_then(move |sock| {
-                        let (_, stream) = sock.split();
-                        stream
-                            .into_future()
-                            .map_err(|e| e.0)
-                            .and_then(|(raw, stream)| (Self::parse_connect_msg(raw), Ok(stream)))
-                            .and_then(move |(connect, stream)| {
-                                trace!("Received handshake message={:?}", connect);
-
-                                Self::process_incoming_messages(
-                                    stream, network_tx, connect, address,
-                                )
-                            })
-                            .map(|_| {
-                                // Ensure that holder lives until the stream ends.
-                                let _holder = holder;
-                            })
+                        Self::handle_incoming_connection(sock, holder, address, network_tx)
                     })
                     .map_err(|e| {
                         error!("Connection terminated: {}: {}", e, e.find_root_cause());
@@ -425,7 +435,28 @@ impl Listener {
         Ok(Listener(to_box(server)))
     }
 
-    fn parse_connect_msg(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
+    fn handle_incoming_connection(
+        sock: Framed<TcpStream, MessagesCodec>,
+        holder: Weak<()>,
+        address: SocketAddr,
+        network_tx: mpsc::Sender<NetworkEvent>,
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        let (_, stream) = sock.split();
+        stream
+            .into_future()
+            .map_err(|e| e.0)
+            .and_then(|(raw, stream)| (Self::parse_connect_message(raw), Ok(stream)))
+            .and_then(move |(connect, stream)| {
+                trace!("Received handshake message={:?}", connect);
+                Self::process_incoming_messages(stream, network_tx, connect, address)
+            })
+            .map(|_| {
+                // Ensure that holder lives until the stream ends.
+                let _holder = holder;
+            })
+    }
+
+    fn parse_connect_message(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Any::from_raw(raw).map_err(into_failure)?;
         match message {
