@@ -21,7 +21,7 @@ pub use actix_web::middleware::cors::Cors;
 
 use actix::{Addr, System};
 use actix_web::{
-    self, error::ResponseError, server::{HttpServer, IntoHttpHandler, StopServer}, AsyncResponder,
+    self, error::ResponseError, server::{HttpServer, Server, StopServer}, AsyncResponder,
     FromRequest, HttpMessage, HttpResponse, Query,
 };
 use failure;
@@ -49,9 +49,6 @@ pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + S
 pub type App = actix_web::App<ServiceApiState>;
 /// Type alias for the `actix-web::App` configuration.
 pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
-
-/// Type alias for the `actix-web` HTTP server runtime address.
-type HttpServerAddr = Addr<HttpServer<<App as IntoHttpHandler>::Handler>>;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -312,7 +309,7 @@ pub struct SystemRuntimeConfig {
 pub struct SystemRuntime {
     system_thread: JoinHandle<result::Result<(), failure::Error>>,
     system: System,
-    api_runtime_addresses: Vec<HttpServerAddr>,
+    api_runtime_addresses: Vec<Addr<Server>>,
 }
 
 impl SystemRuntimeConfig {
