@@ -11,7 +11,7 @@ use messages::Message;
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
 
-/// Correct raw message that was deserialized and verifyied, from `UncheckedBuffer`;
+/// Correct raw message that was deserialized and verified, from `UncheckedBuffer`;
 /// inner data should be formed according to the following layout:
 /// | Position | Stored data |
 /// | - - - - - - - -| - - - - - - |

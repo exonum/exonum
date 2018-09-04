@@ -9,7 +9,7 @@ use crypto::{gen_keypair, hash};
 use helpers::{Height, Round, ValidatorId};
 
 #[test]
-fn test_blockresponse_empty_size() {
+fn test_block_response_empty_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let msg = TransactionsResponse::new(&public_key, vec![]);
