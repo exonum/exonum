@@ -1,6 +1,7 @@
 use super::{
     BlockResponse, Message, Precommit, RawTransaction, SignedMessage, Status, TransactionsResponse,
-    UncheckedBuffer, RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    TransactionFromSet, Protocol, ProtocolMessage
 };
 use blockchain::{Block, BlockProof};
 use chrono::Utc;
@@ -12,10 +13,10 @@ fn test_blockresponse_empty_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let msg = TransactionsResponse::new(&public_key, vec![]);
-    let msg = Message::new(msg, public_key, &secret_key);
+    let msg = Protocol::concrete(msg, public_key, &secret_key);
     assert_eq!(
         TRANSACTION_RESPONSE_EMPTY_SIZE,
-        msg.into_parts().1.to_vec().len()
+        msg.signed_message().raw().len()
     )
 }
 
@@ -23,12 +24,12 @@ fn test_blockresponse_empty_size() {
 fn test_empty_tx_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-
-    let msg = RawTransaction::new(0, vec![]);
-    let msg = Message::new(msg, public_key, &secret_key);
+    let set = TransactionFromSet::from_raw_unchecked(0, vec![]);
+    let msg = RawTransaction::new(0, set);
+    let msg = Protocol::concrete(msg, public_key, &secret_key);
     assert_eq!(
         RAW_TRANSACTION_EMPTY_SIZE,
-        msg.into_parts().1.to_vec().len()
+        msg.signed_message().raw().len()
     )
 }
 
@@ -49,7 +50,7 @@ fn test_block() {
     );
 
     let precommits = vec![
-        Message::new(
+        Protocol::concrete(
             Precommit::new(
                 ValidatorId(123),
                 Height(15),
@@ -61,7 +62,7 @@ fn test_block() {
             pub_key,
             &secret_key,
         ),
-        Message::new(
+        Protocol::concrete(
             Precommit::new(
                 ValidatorId(13),
                 Height(25),
@@ -73,7 +74,7 @@ fn test_block() {
             pub_key,
             &secret_key,
         ),
-        Message::new(
+        Protocol::concrete(
             Precommit::new(
                 ValidatorId(323),
                 Height(15),
@@ -87,15 +88,15 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Message::new(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
-        Message::new(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
-        Message::new(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
+        Protocol::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
+        Protocol::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
+        Protocol::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
     ];
     let precommits_buf: Vec<_> = precommits
         .iter()
-        .map(|x| UncheckedBuffer::new(x.clone().into_parts().1.to_vec()))
+        .map(|x| x.clone().serialize())
         .collect();
-    let block = Message::new(
+    let block = Protocol::concrete(
         BlockResponse::new(
             &pub_key,
             content.clone(),
@@ -106,19 +107,16 @@ fn test_block() {
         &secret_key,
     );
 
-    assert_eq!(block.author(), &pub_key);
+    assert_eq!(block.author(), pub_key);
     assert_eq!(block.to(), &pub_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits_buf);
     assert_eq!(block.transactions().to_vec(), transactions);
 
-    let block2 = SignedMessage::verify_buffer(block.clone().into_parts().1.to_vec())
-        .unwrap()
-        .into_message()
-        .map_into::<BlockResponse>()
-        .unwrap();
+    let block2: Message<BlockResponse> = ProtocolMessage::try_from(Protocol::deserialize(SignedMessage::verify_buffer(block.serialize())
+        .unwrap()).unwrap()).unwrap();
 
-    assert_eq!(block2.author(), &pub_key);
+    assert_eq!(block2.author(), pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits_buf);
@@ -129,7 +127,5 @@ fn test_block() {
     };
     let json_str = ::serde_json::to_string(&block_proof).unwrap();
     let block_proof_1: BlockProof = ::serde_json::from_str(&json_str).unwrap();
-    println!("proof = {}", json_str);
     assert_eq!(block_proof, block_proof_1);
-    panic!("Printl proof")
 }
