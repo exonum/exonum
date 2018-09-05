@@ -46,7 +46,7 @@ pub struct TransactionMessage {
     #[serde(rename = "debug")]
     transaction: Option<Box<dyn Transaction>>,
     #[serde(with = "HexStringRepresentation")]
-    message: Message<RawTransaction>
+    message: Vec<u8>, // FIXME: Replace by Message<RawTransaction>
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
