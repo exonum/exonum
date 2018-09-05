@@ -113,7 +113,7 @@ impl Transaction for Transfer {
         let to = self.to();
         let amount = self.amount();
 
-        if from != to {
+        if from == to {
             return Err(ExecutionError::new(ERROR_FROM_EQUAL_TO))
         }
 
