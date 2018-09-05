@@ -13,16 +13,16 @@
 // limitations under the License.
 
 //! API and corresponding utilities.
-
-pub use self::error::Error;
-pub use self::state::ServiceApiState;
-pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
+pub use self::{
+    error::Error, state::ServiceApiState,
+    with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
+};
 
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
-use self::backends::actix;
+use self::{backends::actix, node::public::ExplorerApi};
 use blockchain::{Blockchain, SharedNodeState};
 
 pub mod backends;
@@ -336,8 +336,6 @@ impl ApiAggregator {
         blockchain: &Blockchain,
         shared_node_state: SharedNodeState,
     ) -> ServiceApiBuilder {
-        use self::node::public::ExplorerApi;
-
         let mut builder = ServiceApiBuilder::new();
         let service_api_state = ServiceApiState::new(blockchain.clone());
         ExplorerApi::wire(builder.public_scope(), service_api_state, shared_node_state);
