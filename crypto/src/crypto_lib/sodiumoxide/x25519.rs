@@ -14,21 +14,21 @@
 
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
-use super::sodiumoxide::crypto::scalarmult::curve25519::{
-    scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
-    GroupElement as Curve25519GroupElement, Scalar as Curve25519Scalar,
+use std::{
+    fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
-use super::sodiumoxide::crypto::sign::ed25519::{
-    convert_ed_keypair_to_curve25519, convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
-    PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
-};
-
-use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
 use write_short_hex;
-use PublicKey as crypto_PublicKey;
-use SecretKey as crypto_SecretKey;
+use super::sodiumoxide::crypto::{
+    scalarmult::curve25519::{
+        scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
+        GroupElement as Curve25519GroupElement, Scalar as Curve25519Scalar,
+    },
+    sign::ed25519::{
+        convert_ed_keypair_to_curve25519, convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
+        PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
+    },
+};
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
@@ -54,8 +54,8 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 pub fn into_x25519_keypair(
-    pk: crypto_PublicKey,
-    sk: crypto_SecretKey,
+    pk: PublicKey,
+    sk: SecretKey,
 ) -> Option<(PublicKey, SecretKey)> {
     let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
     let sk_sod = SecretKeySodium::from_slice(&sk[..])?;
@@ -89,7 +89,7 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 ///
 /// See: [`into_x25519_keypair()`][1]
 /// [1]: fn.into_x25519_public_key.html
-pub fn into_x25519_public_key(pk: crypto_PublicKey) -> PublicKey {
+pub fn into_x25519_public_key(pk: PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
     let public_key = convert_ed_pk_to_curve25519(&public_key);

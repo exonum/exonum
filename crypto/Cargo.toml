@@ -9,8 +9,7 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "cryptography", "library"]
 categories = ["cryptography", "hashing"]
-description = "Cryptography related types, constants, traits and functions. "
-autobenches = false
+description = "Cryptography related types, constants, traits and functions."
 
 [dependencies]
 byteorder = "1.2.3"
