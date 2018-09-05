@@ -31,29 +31,29 @@ use chrono::{DateTime, Utc};
 
 use std::borrow::Cow;
 use std::fmt::Debug;
-use std::net::SocketAddr;
 use std::mem;
+use std::net::SocketAddr;
 
 use failure;
 
-use super::{
-    BinaryForm, BinaryFormSerialize, Message, RawTransaction, SignedMessage, TransactionFromSet,
-};
-use blockchain::{self, Transaction};
+use super::{BinaryForm, Message, RawTransaction, SignedMessage, TransactionFromSet};
+use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 
 #[doc(hidden)]
 /// `SignedMessage` size with zero bytes payload.
-pub const EMPTY_SIGNED_MESSAGE_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>()* 2;
+pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
+    PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>() * 2;
 
 #[doc(hidden)]
 /// `Message<TransactionsResponse>` size without transactions inside.
-pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + 40;
+pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
+    EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u32>() * 2;
 
 /// `Message<RawTransaction>` size with empty transaction inside.
-pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::size_of::<u16>()* 2;
+pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::size_of::<u16>() * 2;
 
 encoding_struct! {
     /// Connect to a node.
@@ -366,7 +366,7 @@ impl Precommit {
         let signed = SignedMessage::verify_buffer(buffer)?;
         let protocol = Protocol::deserialize(signed)?;
         ProtocolMessage::try_from(protocol)
-            .map_err(|_| format_err!("Couldn't verify precommit from message") )
+            .map_err(|_| format_err!("Couldn't verify precommit from message"))
     }
 }
 

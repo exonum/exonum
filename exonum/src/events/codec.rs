@@ -57,8 +57,11 @@ impl Decoder for MessagesCodec {
         let mut buf = self.session.decrypt_msg(len, buf)?;
 
         if buf.len() > NOISE_HEADER_LENGTH + self.max_message_len as usize {
-            bail!("Message too big received_len = {}, allowd_len = {}",
-                buf.len() - NOISE_HEADER_LENGTH, self.max_message_len  )
+            bail!(
+                "Message too big received_len = {}, allowd_len = {}",
+                buf.len() - NOISE_HEADER_LENGTH,
+                self.max_message_len
+            )
         }
 
         Ok(Some(buf.to_vec()))

@@ -42,8 +42,8 @@ use events::{
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, Protocol, ProtocolMessage, RawTransaction, Status,
-    TransactionsRequest, TransactionsResponse, SignedMessage,
+    PrevotesRequest, Propose, ProposeRequest, Protocol, ProtocolMessage, RawTransaction,
+    SignedMessage, Status, TransactionsRequest, TransactionsResponse,
 };
 use node::ConnectInfo;
 use node::{
@@ -123,13 +123,11 @@ impl SandboxInner {
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
-
                         let protocol = Protocol::deserialize(
-                                SignedMessage::verify_buffer(message).unwrap()
-                            ).unwrap();
+                            SignedMessage::verify_buffer(message).unwrap(),
+                        ).unwrap();
                         self.handler
                             .handle_event(InternalEvent::MessageVerified(protocol).into());
-
                     }
                 }
             }
@@ -240,17 +238,16 @@ impl Sandbox {
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
     ) -> Message<BlockResponse> {
-                Protocol::concrete(
-                    BlockResponse::new(
-                        to,
-                        block,
-                        precommits.into_iter()
-                            .map(|x| x.serialize()).collect(),
-                        tx_hashes,
-                    ),
-                    *public_key,
-                    secret_key,
-                )
+        Protocol::concrete(
+            BlockResponse::new(
+                to,
+                block,
+                precommits.into_iter().map(|x| x.serialize()).collect(),
+                tx_hashes,
+            ),
+            *public_key,
+            secret_key,
+        )
     }
 
     /// Creates a `Connect` message signed by this validator.
@@ -276,11 +273,7 @@ impl Sandbox {
         to: &PublicKey,
         secret_key: &SecretKey,
     ) -> Message<PeersRequest> {
-        Protocol::concrete(
-            PeersRequest::new(to),
-            *public_key,
-            secret_key,
-        )
+        Protocol::concrete(PeersRequest::new(to), *public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -404,14 +397,11 @@ impl Sandbox {
     where
         I: IntoIterator<Item = Message<RawTransaction>>,
     {
-
-            Protocol::concrete(
-                TransactionsResponse::new(to, txs.into_iter()
-                        .map(|x| x.serialize())
-                        .collect()),
-                *author,
-                secret_key,
-            )
+        Protocol::concrete(
+            TransactionsResponse::new(to, txs.into_iter().map(|x| x.serialize()).collect()),
+            *author,
+            secret_key,
+        )
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {

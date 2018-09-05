@@ -18,9 +18,9 @@ use rand::{self, Rng};
 use std::net::SocketAddr;
 
 use super::{NodeHandler, NodeRole, RequestData};
-use helpers::Height;
 use events::error::LogError;
-use messages::{Connect, Message, PeersRequest, Responses, Protocol, Service, Status};
+use helpers::Height;
+use messages::{Connect, Message, PeersRequest, Protocol, Responses, Service, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -33,8 +33,12 @@ impl NodeHandler {
             Protocol::Service(Service::Status(msg)) => self.handle_status(msg),
             // ignore tx duplication error,
             Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
-            Protocol::Responses(Responses::BlockResponse(msg)) => self.handle_block(msg).log_error(),
-            Protocol::Responses(Responses::TransactionsResponse(msg)) => self.handle_txs_batch(msg).log_error()
+            Protocol::Responses(Responses::BlockResponse(msg)) => {
+                self.handle_block(msg).log_error()
+            }
+            Protocol::Responses(Responses::TransactionsResponse(msg)) => {
+                self.handle_txs_batch(msg).log_error()
+            }
         }
     }
 

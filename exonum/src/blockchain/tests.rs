@@ -339,14 +339,12 @@ mod transactions_tests {
         round_trip::<MyTransactions>(&c.into());
     }
 
-
     #[test]
     fn deserialize_from_raw() {
-        use messages::BinaryForm;
         use blockchain::TransactionSet;
+        use messages::BinaryForm;
 
         fn round_trip<T: Into<MyTransactions>>(t: T) {
-
             let (pk, sec_key) = gen_keypair();
             use std::ops::Deref;
             let set = t.into();

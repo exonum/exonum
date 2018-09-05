@@ -1,15 +1,11 @@
 use failure::Error;
-use serde::Serialize;
 
 use crypto::{
-    self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
-    SIGNATURE_LENGTH,
+    self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
 use hex::{FromHex, ToHex};
-use messages::Message;
 
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
-
 
 /// Correct raw message that was deserialized and verified, from `UncheckedBuffer`;
 /// inner data should be formed according to the following layout:
@@ -61,7 +57,6 @@ impl SignedMessage {
         let signature = signed.signature();
 
         Self::verify(&signed.raw[0..sign_idx], &signature, &pk)?;
-
 
         Ok(signed)
     }

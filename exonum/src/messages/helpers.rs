@@ -38,24 +38,3 @@ impl HexStringRepresentation {
     }
 }
 
-/// Serialized Internal messages as BinaryForm
-pub(crate) struct BinaryFormSerialize;
-impl BinaryFormSerialize {
-    pub(crate) fn serialize<S, T>(v: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: BinaryForm,
-    {
-        let byn_form = v.serialize().map_err(ser::Error::custom)?;
-        <Vec<u8> as Serialize>::serialize(&byn_form, serializer)
-    }
-
-    pub(crate) fn deserialize<'a, D, T>(deserializer: D) -> Result<T, D::Error>
-    where
-        D: Deserializer<'a>,
-        T: BinaryForm,
-    {
-        let buffer = <Vec<u8> as Deserialize>::deserialize(deserializer)?;
-        <T as BinaryForm>::deserialize(&buffer).map_err(de::Error::custom)
-    }
-}

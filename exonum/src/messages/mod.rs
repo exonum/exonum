@@ -103,14 +103,14 @@ impl RawTransaction {
         self.service_id
     }
 
-//    pub(crate) fn verify_transaction(
-//        buffer: Vec<u8>,
-//    ) -> Result<Message<RawTransaction>, ::failure::Error> {
-//        let signed = SignedMessage::verify_buffer(buffer)?;
-//        Protocol::deserialize(signed)?
-//            .try_into_transaction()
-//            .map_err(|_| format_err!("Couldn't parse RawTransaction."))
-//    }
+    //    pub(crate) fn verify_transaction(
+    //        buffer: Vec<u8>,
+    //    ) -> Result<Message<RawTransaction>, ::failure::Error> {
+    //        let signed = SignedMessage::verify_buffer(buffer)?;
+    //        Protocol::deserialize(signed)?
+    //            .try_into_transaction()
+    //            .map_err(|_| format_err!("Couldn't parse RawTransaction."))
+    //    }
 }
 
 impl BinaryForm for RawTransaction {
@@ -223,8 +223,7 @@ impl<X: ProtocolMessage> FromHex for Message<X> {
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
         let protocol = Protocol::deserialize(SignedMessage::verify_buffer(bytes)?)?;
-        ProtocolMessage::try_from(protocol)
-            .map_err(|_| format_err!("Couldn't deserialize mesage."))
+        ProtocolMessage::try_from(protocol).map_err(|_| format_err!("Couldn't deserialize mesage."))
     }
 }
 

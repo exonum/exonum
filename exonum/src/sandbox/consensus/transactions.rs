@@ -340,9 +340,10 @@ fn response_size_larger_than_max_message_len() {
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
-            + tx1.signed_message().raw().len() + TX_HEADER
-            + tx2.signed_message().raw().len() + TX_HEADER)
-            as u32;
+            + tx1.signed_message().raw().len()
+            + TX_HEADER
+            + tx2.signed_message().raw().len()
+            + TX_HEADER) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 

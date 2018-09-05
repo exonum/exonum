@@ -18,9 +18,9 @@ use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
+use hex::ToHex;
 use messages::{BinaryForm, HexStringRepresentation, Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
-use hex::ToHex;
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
@@ -52,9 +52,10 @@ pub struct TransactionMessage {
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
-
         let mut signed_message_debug = String::new();
-        self.message.signed_message().write_hex(&mut signed_message_debug)?;
+        self.message
+            .signed_message()
+            .write_hex(&mut signed_message_debug)?;
 
         let mut debug = fmt.debug_struct("TransactionMessage");
         debug.field("message", &signed_message_debug);
@@ -79,7 +80,10 @@ impl TransactionMessage {
         self.transaction.as_ref()
     }
     /// Create new `TransactionMessage` from raw message.
-    pub(crate) fn new(message: Message<RawTransaction>, transaction: Box<dyn Transaction>) -> TransactionMessage {
+    pub(crate) fn new(
+        message: Message<RawTransaction>,
+        transaction: Box<dyn Transaction>,
+    ) -> TransactionMessage {
         TransactionMessage {
             transaction: Some(transaction),
             message,

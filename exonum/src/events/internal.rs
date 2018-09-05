@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::{
     future::{self, Either, Executor}, sync::mpsc, Future, Sink, Stream,
 };
-use failure;
 
 use tokio_core::reactor::{Handle, Timeout};
 
@@ -23,7 +23,7 @@ use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
 use blockchain::{Transaction, TransactionContext};
-use messages::{SignedMessage, Protocol};
+use messages::{Protocol, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -52,7 +52,8 @@ impl InternalPart {
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(move || {
             let handler = move || -> Result<Protocol, failure::Error> {
-                Protocol::deserialize(SignedMessage::verify_buffer(raw)?)};
+                Protocol::deserialize(SignedMessage::verify_buffer(raw)?)
+            };
             if let Ok(protocol) = handler() {
                 let event = future::ok(InternalEvent::MessageVerified(protocol));
                 Either::A(Self::send_event(event, internal_tx))

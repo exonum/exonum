@@ -86,8 +86,7 @@ impl NodeHandler {
             if let Some(tx) = tx {
                 let raw = tx.signed_message().raw().to_vec();
                 if txs_size + raw.len() as u32 + TX_HEADER > unoccupied_message_size {
-                    let txs_response =
-                    self.sign_message(TransactionsResponse::new(
+                    let txs_response = self.sign_message(TransactionsResponse::new(
                         &msg.author(),
                         mem::replace(&mut txs, vec![]),
                     ));

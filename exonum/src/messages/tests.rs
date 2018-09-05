@@ -1,7 +1,7 @@
 use super::{
-    BlockResponse, Message, Precommit, RawTransaction, SignedMessage, Status, TransactionsResponse,
-    RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
-    TransactionFromSet, Protocol, ProtocolMessage
+    BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
+    Status, TransactionFromSet, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
+    TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 use blockchain::{Block, BlockProof};
 use chrono::Utc;
@@ -28,16 +28,19 @@ encoding_struct! {
     }
 }
 
-
 #[test]
 fn test_known_transaction() {
     let res = "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d\
     00008000020057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d280000000b000000\
     746573745f77616c6c6574ff86a65814128dd86b2d267f7dd2de443c484139ae936e7c7405884c97619251f6a3d878d0ca140f026583a88777e074586d590388757159de3617f799959706";
 
-    let pk = PublicKey::from_hex("57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d").unwrap();
-    let sk = SecretKey::from_hex("d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
-    57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d").unwrap();
+    let pk = PublicKey::from_hex(
+        "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",
+    ).unwrap();
+    let sk = SecretKey::from_hex(
+        "d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
+         57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",
+    ).unwrap();
     let data = CreateWallet::new(&pk, "test_wallet");
 
     let set = TransactionFromSet::from_raw_unchecked(2, data.raw);
@@ -54,10 +57,7 @@ fn test_empty_tx_size() {
     let set = TransactionFromSet::from_raw_unchecked(0, vec![]);
     let msg = RawTransaction::new(0, set);
     let msg = Protocol::concrete(msg, public_key, &secret_key);
-    assert_eq!(
-        RAW_TRANSACTION_EMPTY_SIZE,
-        msg.signed_message().raw().len()
-    )
+    assert_eq!(RAW_TRANSACTION_EMPTY_SIZE, msg.signed_message().raw().len())
 }
 
 #[test]
@@ -119,10 +119,7 @@ fn test_block() {
         Protocol::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
         Protocol::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
     ];
-    let precommits_buf: Vec<_> = precommits
-        .iter()
-        .map(|x| x.clone().serialize())
-        .collect();
+    let precommits_buf: Vec<_> = precommits.iter().map(|x| x.clone().serialize()).collect();
     let block = Protocol::concrete(
         BlockResponse::new(
             &pub_key,
@@ -140,8 +137,9 @@ fn test_block() {
     assert_eq!(block.precommits(), precommits_buf);
     assert_eq!(block.transactions().to_vec(), transactions);
 
-    let block2: Message<BlockResponse> = ProtocolMessage::try_from(Protocol::deserialize(SignedMessage::verify_buffer(block.serialize())
-        .unwrap()).unwrap()).unwrap();
+    let block2: Message<BlockResponse> = ProtocolMessage::try_from(
+        Protocol::deserialize(SignedMessage::verify_buffer(block.serialize()).unwrap()).unwrap(),
+    ).unwrap();
 
     assert_eq!(block2.author(), pub_key);
     assert_eq!(block2.to(), &pub_key);
