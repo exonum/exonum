@@ -46,7 +46,7 @@ pub struct TransactionMessage {
     #[serde(rename = "debug")]
     transaction: Option<Box<dyn Transaction>>,
     #[serde(with = "HexStringRepresentation")]
-    message: Vec<u8>, // FIXME: Replace by Message<RawTransaction>
+    message: Message<RawTransaction>
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
@@ -111,8 +111,6 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
     ///
-    /// [`verify_signature`]: ../messages/trait.Message.html#method.verify_signature
-    ///
     /// # Examples
     ///
     /// ```
@@ -135,7 +133,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     /// impl Transaction for MyTransaction {
     ///     fn verify(&self) -> bool {
-    ///         self.verify_signature(self.public_key())
+    ///         true
     ///     }
     ///
     ///     // Other methods...
@@ -227,8 +225,8 @@ impl<'a> TransactionContext<'a> {
         self.service_id
     }
     /// Returns transaction author public key
-    pub fn author(&self) -> &PublicKey {
-        &self.author
+    pub fn author(&self) -> PublicKey {
+        self.author
     }
     /// Returns current transaction message hash.
     /// This hash could be used to link some data in storage for external usage.

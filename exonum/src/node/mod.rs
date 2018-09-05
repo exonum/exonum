@@ -980,6 +980,7 @@ impl Node {
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> Result<(), failure::Error> {
+        trace!("Running node.");
         // Runs actix-web api.
         let actix_api_runtime = SystemRuntimeConfig {
             api_runtimes: {

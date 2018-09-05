@@ -162,6 +162,7 @@ pub struct Message<T> {
     //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
     //if our serialisation format allows us
     payload: T,
+    #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
 }
 
@@ -218,9 +219,9 @@ impl<T: ProtocolMessage> AsRef<T> for Message<T> {
     }
 }
 
-impl<T: ProtocolMessage> Into<SignedMessage> for Message<T> {
-    fn into(self) -> SignedMessage {
-        self.message
+impl<T> From<Message<T>> for SignedMessage {
+    fn from(message: Message<T>) -> Self {
+        message.message
     }
 }
 

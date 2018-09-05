@@ -111,7 +111,7 @@ impl Transaction for TxCreateWallet {
     /// Verify integrity of the transaction by checking the transaction
     /// signature.
     fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
+        true
     }
 
     /// Apply logic to the storage when executing the transaction.
@@ -131,7 +131,7 @@ impl Transaction for TxTransfer {
     /// Check if the sender is not the receiver. Check correctness of the
     /// sender's signature.
     fn verify(&self) -> bool {
-        (*self.from() != *self.to()) && self.verify_signature(self.from())
+        (*self.from() != *self.to())
     }
 
     /// Retrieve two wallets to apply the transfer. Check the sender's

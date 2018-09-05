@@ -15,7 +15,8 @@
 //! Storage schema for the configuration service.
 
 use exonum::{
-    crypto::{self, CryptoHash, Hash, PublicKey, Signature}, messages::{RawMessage, ServiceMessage},
+    crypto::{self, CryptoHash, Hash, PublicKey, Signature},
+    messages::{Protocol},
     storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 
@@ -49,9 +50,7 @@ encoding_struct! {
 }
 
 lazy_static! {
-    static ref NO_VOTE_BYTES: Vec<u8> =
-        Vote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero(),)
-            .into_bytes();
+    static ref NO_VOTE_BYTES: Vec<u8> = vec![];
 }
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
@@ -82,7 +81,7 @@ impl StorageValue for VotingDecision {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let raw_msg = RawMessage::from_vec(bytes.to_vec());
+        let raw_msg = Protocol::from_vec(bytes.to_vec());
         if raw_msg.message_type() == <Vote as ServiceMessage>::MESSAGE_ID {
             VotingDecision::Yea(Vote::from_bytes(bytes))
         } else {

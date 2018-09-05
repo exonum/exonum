@@ -39,11 +39,11 @@ impl SignedMessage {
         secret_key: &SecretKey,
     ) -> SignedMessage {
         let mut buffer = Vec::new();
-        let signature = Self::sign(&value, secret_key).expect("Couldn't form signature");
         buffer.extend_from_slice(author.as_ref());
         buffer.push(cls);
         buffer.push(tag);
         buffer.extend_from_slice(value.as_ref());
+        let signature = Self::sign(&buffer, secret_key).expect("Couldn't form signature");
         buffer.extend_from_slice(signature.as_ref());
         SignedMessage { raw: buffer }
     }
@@ -51,18 +51,18 @@ impl SignedMessage {
     /// Create `SignedMessage` wrapper from raw buffer.
     /// Checks binary format and signature.
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
+        info!("verify message = {:?}", buffer);
         if buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
             bail!("Message too short message_len = {}", buffer.len())
         }
         let signed = SignedMessage { raw: buffer };
+        let sign_idx = signed.raw.len() - SIGNATURE_LENGTH;
 
-        {
-            let pk = signed.author();
-            let signature = signed.signature();
-            let payload = signed.payload();
+        let pk = signed.author();
+        let signature = signed.signature();
 
-            Self::verify(payload, &signature, &pk)?;
-        }
+        Self::verify(&signed.raw[0..sign_idx], &signature, &pk)?;
+
 
         Ok(signed)
     }

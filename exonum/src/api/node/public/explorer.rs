@@ -176,6 +176,7 @@ impl ExplorerApi {
     /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
     pub fn add_transaction(state: &ServiceApiState, query: TransactionHex) -> Result<(), ApiError> {
         use events::error::into_failure;
+        error!("tx_body= {}", query.tx_body);
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = Protocol::deserialize(SignedMessage::verify_buffer(buf)?)?
             .try_into_transaction()
@@ -223,6 +224,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             shared_node_state,
         );
+        error!("ACTIX INIT");
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
