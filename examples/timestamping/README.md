@@ -3,6 +3,8 @@
 This project demonstrates how to create simple timestamping service
 using [Exonum blockchain](https://github.com/exonum/exonum).
 
+![Timestamping demo](Screenshot.png)
+
 ## Getting started
 
 Be sure you installed necessary packages:
