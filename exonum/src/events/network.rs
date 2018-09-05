@@ -444,7 +444,6 @@ impl Listener {
                 trace!("Received handshake message={:?}", connect);
                 Self::process_incoming_messages(stream, network_tx, connect, address)
             })
-
     }
 
     fn parse_connect_message(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
