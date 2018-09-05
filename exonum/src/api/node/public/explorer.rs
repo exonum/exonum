@@ -92,6 +92,13 @@ pub struct TransactionHex {
     pub tx_body: String,
 }
 
+/// Transaction response.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct TransactionResponse {
+    /// The hex value of the transaction to be broadcasted.
+    pub tx_hash: Hash,
+}
+
 /// Transaction query parameters.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct TransactionQuery {
@@ -174,17 +181,22 @@ impl ExplorerApi {
             })
     }
     /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
-    pub fn add_transaction(state: &ServiceApiState, query: TransactionHex) -> Result<(), ApiError> {
+    pub fn add_transaction(state: &ServiceApiState, query: TransactionHex) -> Result<TransactionResponse, ApiError> {
         use events::error::into_failure;
         error!("tx_body= {}", query.tx_body);
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = Protocol::deserialize(SignedMessage::verify_buffer(buf)?)?
+        let signed = SignedMessage::verify_buffer(buf)?;
+        let tx_hash = signed.hash();
+        let signed = Protocol::deserialize(signed)?
             .try_into_transaction()
-            .map_err(|_| format_err!("Couldn't deserialize self message"))?;
+            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
         state
             .sender()
             .broadcast_transaction(signed)
-            .map_err(ApiError::from)
+            .map_err(ApiError::from);
+        Ok(TransactionResponse {
+            tx_hash
+        })
     }
 
     /// Subscribes to block commits events.

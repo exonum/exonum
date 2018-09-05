@@ -87,12 +87,12 @@ impl TransactionMessage {
     }
 }
 
-impl ::serde::Serialize for Box<dyn Transaction> {
+impl ::serde::Serialize for dyn Transaction {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ::serde::Serializer,
     {
-        ::erased_serde::serialize(&self, serializer)
+        ::erased_serde::serialize(self, serializer)
     }
 }
 
