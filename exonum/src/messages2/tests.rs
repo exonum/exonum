@@ -5,8 +5,9 @@ use super::{
 };
 use blockchain::{Block, BlockProof};
 use chrono::Utc;
-use crypto::{gen_keypair, hash};
+use crypto::{gen_keypair, hash, PublicKey, SecretKey};
 use helpers::{Height, Round, ValidatorId};
+use hex::{self, FromHex};
 
 #[test]
 fn test_block_response_empty_size() {
@@ -18,6 +19,32 @@ fn test_block_response_empty_size() {
         TRANSACTION_RESPONSE_EMPTY_SIZE,
         msg.signed_message().raw().len()
     )
+}
+
+encoding_struct! {
+    struct CreateWallet {
+        pk: &PublicKey,
+        name: &str,
+    }
+}
+
+
+#[test]
+fn test_known_transaction() {
+    let res = "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d\
+    00008000020057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d280000000b000000\
+    746573745f77616c6c6574ff86a65814128dd86b2d267f7dd2de443c484139ae936e7c7405884c97619251f6a3d878d0ca140f026583a88777e074586d590388757159de3617f799959706";
+
+    let pk = PublicKey::from_hex("57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d").unwrap();
+    let sk = SecretKey::from_hex("d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
+    57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d").unwrap();
+    let data = CreateWallet::new(&pk, "test_wallet");
+
+    let set = TransactionFromSet::from_raw_unchecked(2, data.raw);
+    let msg = RawTransaction::new(128, set);
+    let msg = Protocol::concrete(msg, pk, &sk);
+    SignedMessage::verify_buffer(hex::decode(res).unwrap()).unwrap();
+    assert_eq!(res, hex::encode(msg.signed_message().raw()));
 }
 
 #[test]
