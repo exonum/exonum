@@ -13,16 +13,16 @@
 // limitations under the License.
 
 //! API and corresponding utilities.
-
-pub use self::error::Error;
-pub use self::state::ServiceApiState;
-pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
+pub use self::{
+    error::Error, state::ServiceApiState,
+    with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
+};
 
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
-use self::backends::actix;
+use self::{backends::actix, node::public::ExplorerApi};
 use blockchain::{Blockchain, SharedNodeState};
 
 pub mod backends;
@@ -288,7 +288,7 @@ impl ApiAggregator {
         );
         inner.insert(
             "explorer".to_owned(),
-            Self::explorer_api(node_state.clone()),
+            Self::explorer_api(&blockchain, node_state.clone()),
         );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
@@ -332,9 +332,13 @@ impl ApiAggregator {
         self.inner.insert(prefix.into(), builder);
     }
 
-    fn explorer_api(shared_node_state: SharedNodeState) -> ServiceApiBuilder {
+    fn explorer_api(
+        blockchain: &Blockchain,
+        shared_node_state: SharedNodeState,
+    ) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_node_state);
+        let service_api_state = ServiceApiState::new(blockchain.clone());
+        ExplorerApi::wire(builder.public_scope(), service_api_state, shared_node_state);
         builder
     }
 
