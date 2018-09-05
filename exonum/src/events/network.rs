@@ -25,7 +25,9 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::{Rc, Weak}, time::Duration};
+use std::{
+    cell::RefCell, collections::HashMap, net::SocketAddr, rc::{Rc, Weak}, time::Duration,
+};
 
 use super::{
     error::{log_error, result_ok}, to_box,
@@ -319,7 +321,7 @@ impl RequestHandler {
         RequestHandler(to_box(requests_handler))
     }
 
-    #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     fn handle_send_message(
         peer: SocketAddr,
         msg: RawMessage,
