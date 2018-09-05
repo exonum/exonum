@@ -207,6 +207,27 @@ impl fmt::Debug for TransactionFromSet {
     }
 }
 
+impl<T> ToHex for Message<T> {
+    fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+        self.message.raw().write_hex(w)
+    }
+
+    fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+        self.message.raw().write_hex_upper(w)
+    }
+}
+
+impl<X: ProtocolMessage> FromHex for Message<X> {
+    type Error = Error;
+
+    fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
+        let bytes = Vec::<u8>::from_hex(v)?;
+        let protocol = Protocol::deserialize(SignedMessage::verify_buffer(bytes)?)?;
+        ProtocolMessage::try_from(protocol)
+            .map_err(|_| format_err!("Couldn't deserialize mesage."))
+    }
+}
+
 impl<T: ProtocolMessage> AsRef<SignedMessage> for Message<T> {
     fn as_ref(&self) -> &SignedMessage {
         &self.message

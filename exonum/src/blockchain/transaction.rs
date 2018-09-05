@@ -20,6 +20,7 @@ use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
 use messages::{BinaryForm, HexStringRepresentation, Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
+use hex::ToHex;
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
@@ -45,13 +46,18 @@ pub struct TransactionMessage {
     #[serde(skip_deserializing)]
     #[serde(rename = "debug")]
     transaction: Option<Box<dyn Transaction>>,
+
     #[serde(with = "HexStringRepresentation")]
-    message: Vec<u8>, // FIXME: Replace by Message<RawTransaction>
+    message: Message<RawTransaction>,
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+
+        let mut signed_message_debug = String::new();
+        self.message.signed_message().write_hex(&mut signed_message_debug)?;
+
         let mut debug = fmt.debug_struct("TransactionMessage");
-        debug.field("message", &::hex::encode(&self.message));
+        debug.field("message", &signed_message_debug);
         if let Some(ref tx) = self.transaction {
             debug.field("debug", tx);
         }
@@ -73,7 +79,7 @@ impl TransactionMessage {
         self.transaction.as_ref()
     }
     /// Create new `TransactionMessage` from raw message.
-    pub(crate) fn new(message: Vec<u8>, transaction: Box<dyn Transaction>) -> TransactionMessage {
+    pub(crate) fn new(message: Message<RawTransaction>, transaction: Box<dyn Transaction>) -> TransactionMessage {
         TransactionMessage {
             transaction: Some(transaction),
             message,
