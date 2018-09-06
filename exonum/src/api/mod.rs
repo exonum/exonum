@@ -206,7 +206,7 @@ impl ServiceApiScope {
 ///     }
 /// }
 ///
-/// # let mut builder = ServiceApiBuilder::default();
+/// # let mut builder = ServiceApiBuilder::new();
 /// // Adds `MyApi` handlers to the corresponding builder.
 /// builder.public_scope()
 ///     .endpoint("v1/ping", MyApi::ping)
@@ -216,8 +216,9 @@ impl ServiceApiScope {
 /// builder.private_scope()
 ///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ServiceApiBuilder {
+    blockchain: Option<Blockchain>,
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
 }
@@ -225,7 +226,19 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            blockchain: None,
+            public_scope: Default::default(),
+            private_scope: Default::default(),
+        }
+    }
+
+    fn with_blockchain(blockchain: Blockchain) -> Self {
+        Self {
+            blockchain: Some(blockchain),
+            public_scope: Default::default(),
+            private_scope: Default::default(),
+        }
     }
 
     /// Returns a mutable reference to the public API scope builder.
@@ -292,7 +305,7 @@ impl ApiAggregator {
         );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
-            let mut builder = ServiceApiBuilder::new();
+            let mut builder = ServiceApiBuilder::with_blockchain(blockchain.clone());
             service.wire_api(&mut builder);
             // TODO think about prefixes for non web backends. (ECR-1758)
             let prefix = format!("services/{}", service.service_name());

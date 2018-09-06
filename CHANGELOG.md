@@ -12,6 +12,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
 
+### Internal Improvements
+
+- Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
+
 #### exonum
 
 - `api::Error::InternalError` now contains `failure::Error` instead of
