@@ -5,7 +5,7 @@ use std::fmt::Display;
 
 use encoding::Error;
 
-/// Helper trait to define serialisation format.
+/// Helper trait to define serialization format.
 pub trait BinaryForm: Sized {
     /// Converts transaction into serialized form.
     fn serialize(&self) -> Result<Vec<u8>, Error>;

@@ -493,7 +493,7 @@ macro_rules! impl_protocol {
                 }
             }
 
-            /// Returns refference to inner `SignedMessage`.
+            /// Returns reference to inner `SignedMessage`.
             pub fn signed_message(&self) -> &SignedMessage {
                 match *self {
                     $(

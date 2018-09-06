@@ -28,7 +28,7 @@ use hex::{FromHex, ToHex};
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 
-use std::{borrow::Cow, cmp::PartialEq, fmt, ops::Deref};
+use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use encoding;
@@ -115,6 +115,9 @@ impl BinaryForm for RawTransaction {
 
     /// Converts a serialized byte array into a transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
+        if buffer.len() < mem::size_of::<u16>() {
+            Err("Buffer too short in RawTransaction deserialization.")?
+        }
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
         let transaction_set = TransactionSetPart::deserialize(&buffer[2..])?;
         Ok(RawTransaction {
@@ -134,6 +137,9 @@ impl BinaryForm for TransactionSetPart {
     }
 
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
+        if buffer.len() < mem::size_of::<u16>() {
+            Err("Buffer too short in TransactionSetPart deserialization.")?
+        }
         let message_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
         Ok(TransactionSetPart {
@@ -146,11 +152,11 @@ impl BinaryForm for TransactionSetPart {
 /// Wrappers around pair of concrete message payload, and full message binary form.
 /// Internally binary form saves message lossless,
 /// this important for use in a scheme with
-/// non-canonical serialization, for example with a `ProtoBuf`.
+/// non-canonical serialization, for example with a `Protobuf`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Message<T> {
     //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    //if our serialisation format allows us (ECR-2315).
+    //if our serialization format allows us (ECR-2315).
     payload: T,
     #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
@@ -213,7 +219,7 @@ impl<X: ProtocolMessage> FromHex for Message<X> {
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
         let protocol = Protocol::deserialize(SignedMessage::verify_buffer(bytes)?)?;
-        ProtocolMessage::try_from(protocol).map_err(|_| format_err!("Couldn't deserialize mesage."))
+        ProtocolMessage::try_from(protocol).map_err(|_| format_err!("Couldn't deserialize message."))
     }
 }
 

@@ -5,6 +5,7 @@ use super::{
     BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
     Status, TransactionSetPart, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
+    BinaryForm,
 };
 use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, PublicKey, SecretKey};
@@ -154,4 +155,15 @@ fn test_block() {
     let json_str = ::serde_json::to_string(&block_proof).unwrap();
     let block_proof_1: BlockProof = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(block_proof, block_proof_1);
+}
+
+#[test]
+fn test_raw_transaction_small_size() {
+    let buffer = vec![0;1];
+    assert!(TransactionSetPart::deserialize(&vec![0;1]).is_err());
+    assert!(RawTransaction::deserialize(&vec![0;1]).is_err());
+    assert!(RawTransaction::deserialize(&vec![0;3]).is_err());
+    let tx = RawTransaction::deserialize(&vec![0;4]).unwrap();
+    assert_eq!(tx.service_id, 0);
+    assert_eq!(tx.transaction_set.message_id, 0);
 }
