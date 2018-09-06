@@ -29,6 +29,8 @@ use super::sodiumoxide::crypto::{
     },
 };
 use write_short_hex;
+use PublicKey as crypto_PublicKey;
+use SecretKey as crypto_SecretKey;
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
@@ -53,7 +55,10 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-pub fn into_x25519_keypair(pk: PublicKey, sk: SecretKey) -> Option<(PublicKey, SecretKey)> {
+pub fn into_x25519_keypair(
+    pk: crypto_PublicKey,
+    sk: crypto_SecretKey,
+) -> Option<(PublicKey, SecretKey)> {
     let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
     let sk_sod = SecretKeySodium::from_slice(&sk[..])?;
 
@@ -86,7 +91,7 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 ///
 /// See: [`into_x25519_keypair()`][1]
 /// [1]: fn.into_x25519_public_key.html
-pub fn into_x25519_public_key(pk: PublicKey) -> PublicKey {
+pub fn into_x25519_public_key(pk: crypto_PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
     let public_key = convert_ed_pk_to_curve25519(&public_key);
