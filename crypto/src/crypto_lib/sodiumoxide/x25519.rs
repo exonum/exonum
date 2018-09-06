@@ -18,7 +18,6 @@ use std::{
     fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
-use write_short_hex;
 use super::sodiumoxide::crypto::{
     scalarmult::curve25519::{
         scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
@@ -29,6 +28,7 @@ use super::sodiumoxide::crypto::{
         PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
     },
 };
+use write_short_hex;
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
@@ -53,10 +53,7 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-pub fn into_x25519_keypair(
-    pk: PublicKey,
-    sk: SecretKey,
-) -> Option<(PublicKey, SecretKey)> {
+pub fn into_x25519_keypair(pk: PublicKey, sk: SecretKey) -> Option<(PublicKey, SecretKey)> {
     let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
     let sk_sod = SecretKeySodium::from_slice(&sk[..])?;
 
