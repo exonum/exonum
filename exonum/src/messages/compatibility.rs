@@ -71,7 +71,6 @@ macro_rules! __ex_message {
             }
         }
 
-
         __ex_message!(
             $($tt)*
         );

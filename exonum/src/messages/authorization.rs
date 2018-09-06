@@ -1,9 +1,9 @@
 use failure::Error;
+use hex::{FromHex, ToHex};
 
 use crypto::{
     self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
-use hex::{FromHex, ToHex};
 
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
@@ -44,33 +44,38 @@ impl SignedMessage {
         SignedMessage { raw: buffer }
     }
 
-    /// Create `SignedMessage` wrapper from raw buffer.
+    /// Creates `SignedMessage` wrapper from the raw buffer.
     /// Checks binary format and signature.
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
         if buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
             bail!("Message too short message_len = {}", buffer.len())
         }
         let signed = SignedMessage { raw: buffer };
-        let sign_idx = signed.raw.len() - SIGNATURE_LENGTH;
 
         let pk = signed.author();
         let signature = signed.signature();
 
-        Self::verify(&signed.raw[0..sign_idx], &signature, &pk)?;
+        Self::verify(signed.data_without_signature(), &signature, &pk)?;
 
         Ok(signed)
+    }
+
+    fn data_without_signature(&self) -> &[u8]{
+        debug_assert!(self.raw.len() > EMPTY_SIGNED_MESSAGE_SIZE);
+        let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
+        &self.raw[0..sign_idx]
     }
 
     #[cfg(test)]
     pub(crate) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
         SignedMessage { raw: buffer }
     }
+
     #[cfg(not(test))]
     pub(in messages) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
         SignedMessage { raw: buffer }
     }
 
-    #[allow(unsafe_code)]
     pub(in messages) fn author(&self) -> PublicKey {
         PublicKey::from_slice(&self.raw[0..PUBLIC_KEY_LENGTH]).expect("Couldn't read PublicKey")
     }
@@ -88,7 +93,6 @@ impl SignedMessage {
         &self.raw[PUBLIC_KEY_LENGTH + 2..sign_idx]
     }
 
-    #[allow(unsafe_code)]
     pub(in messages) fn signature(&self) -> Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         Signature::from_slice(&self.raw[sign_idx..]).expect("Couldn't read signature")
@@ -100,7 +104,7 @@ impl SignedMessage {
     }
 
     pub fn hash(&self) -> Hash {
-        hash(self.raw())
+        hash(&self.raw)
     }
 
     fn sign(full_buffer: &[u8], secret_key: &SecretKey) -> Result<Signature, Error> {
@@ -122,15 +126,15 @@ impl SignedMessage {
 
 impl ToHex for SignedMessage {
     fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-        self.raw().write_hex(w)
+        self.raw.write_hex(w)
     }
 
     fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-        self.raw().write_hex_upper(w)
+        self.raw.write_hex_upper(w)
     }
 }
 
-// Warning: This implementation checks signature
+/// Warning: This implementation checks signature which is slow operation.
 impl FromHex for SignedMessage {
     type Error = Error;
 

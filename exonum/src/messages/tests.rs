@@ -1,13 +1,14 @@
+use hex::{self, FromHex};
+use chrono::Utc;
+
 use super::{
     BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
-    Status, TransactionFromSet, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
+    Status, TransactionSetPart, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 use blockchain::{Block, BlockProof};
-use chrono::Utc;
 use crypto::{gen_keypair, hash, PublicKey, SecretKey};
 use helpers::{Height, Round, ValidatorId};
-use hex::{self, FromHex};
 
 #[test]
 fn test_block_response_empty_size() {
@@ -43,7 +44,7 @@ fn test_known_transaction() {
     ).unwrap();
     let data = CreateWallet::new(&pk, "test_wallet");
 
-    let set = TransactionFromSet::from_raw_unchecked(2, data.raw);
+    let set = TransactionSetPart::from_raw_unchecked(2, data.raw);
     let msg = RawTransaction::new(128, set);
     let msg = Protocol::concrete(msg, pk, &sk);
     SignedMessage::verify_buffer(hex::decode(res).unwrap()).unwrap();
@@ -54,7 +55,7 @@ fn test_known_transaction() {
 fn test_empty_tx_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-    let set = TransactionFromSet::from_raw_unchecked(0, vec![]);
+    let set = TransactionSetPart::from_raw_unchecked(0, vec![]);
     let msg = RawTransaction::new(0, set);
     let msg = Protocol::concrete(msg, public_key, &secret_key);
     assert_eq!(RAW_TRANSACTION_EMPTY_SIZE, msg.signed_message().raw().len())

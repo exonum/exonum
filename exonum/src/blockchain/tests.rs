@@ -270,7 +270,7 @@ mod transactions_tests {
     use super::TEST_SERVICE_ID;
     use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crypto::gen_keypair;
-    use messages::{Message, Protocol, RawTransaction, TransactionFromSet};
+    use messages::{Message, Protocol, RawTransaction, TransactionSetPart};
     use serde::Serialize;
     use serde_json;
 

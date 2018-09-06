@@ -1,19 +1,23 @@
-use encoding::Error;
 use hex::{FromHex, ToHex};
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
+
 use std::fmt::Display;
 
-///Transaction binary form, can be converted
+use encoding::Error;
+
+/// Helper trait to define serialisation format.
 pub trait BinaryForm: Sized {
     /// Converts transaction into serialized form.
     fn serialize(&self) -> Result<Vec<u8>, Error>;
 
-    /// Converts serialized byte array into transaction.
+    /// Converts a serialized byte array into a transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, Error>;
 }
 
-/// Use `ToHex`/`FromHex` to serialize arbitrary type `T` as hex string rather than real Serde::serialize.
+/// Uses `ToHex`/`FromHex` to serialize arbitrary type `T` as
+/// hex string rather than real Serde::serialize.
 pub(crate) struct HexStringRepresentation;
+
 impl HexStringRepresentation {
     pub(crate) fn serialize<S, T>(message: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
