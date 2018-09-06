@@ -10,7 +10,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `majority_count` parameter has been removed from `StoredConfiguration` and
    moved to `ConfigurationService` configuration. (#828)
 
+- Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
+
 #### exonum
+
+- `api::Error::InternalError` now contains `failure::Error` instead of
+  `Box<::std::error::Error>`. (#879)
+
+- `TransactionSend::send` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
+
+- `ApiSender` methods `send_external_message` and `peer_add`
+   now returns `Result<(), failure::Error>` instead of `io::Result`. (#879)
 
 - `majority_count` parameter has been added to `generate-template` and
   `generate-testnet` commands. (#828)
@@ -28,6 +39,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `first_round_timeout`. Value of this percentage is defined in
   `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
 
+- `missing_keys`, `entries`, `all_entries` methods of `CheckedMapProof` and
+  `MapProof::missing_keys_unchecked` method now return `impl Iterator` instead
+  of `Vec`. (#918)
+
 ### New Features
 
 #### exonum
@@ -44,20 +59,35 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `/v1/blocks/subscribe` endpoint for following block commit events
   through WebSockets (#792).
 
+- Added `MapProof::all_entries_unchecked` method. It is used for more efficient
+  calculations in Exonum Java Bindings, but can be used for debug purposes
+  as well. (#918)
+
 ### Bug Fixes
 
 #### exonum
 
 - Bug with pool size overflow has been fixed. (#853)
 
+- Bug in `NoiseWrapper::decrypt_msg` caused by wrong calculation of
+  encrypted and decrypted message sizes has been fixed. (#873)
+
 - Transactions (signature) verification benchmark has been fixed. (#673)
 
 - Node no longer panics when transaction pool has a lot of transactions and
   consensus is at round 0. (#673)
 
+- Node now works correctly after consensus re-enable via API. (#902)
+
+- Bug with incorrect EOF handling while decoding network messages has been
+  fixed. (#917)
+
 ### Internal Improvements
 
 #### exonum
+
+- `NodeHandler::run_handler` now returns `Result<(), failure::Error>`
+  instead of `io::Result`. (#879)
 
 - Transactions (signature) verification benchmark has been added. (#808)
 
@@ -80,6 +110,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Transactions are now verified in a thread pool. Thread pool size is set to
   optimal value by default (CPU count) or can be configured manually. (#673)
+
+- The `finalize` command now does not include the node itself as its own
+  trusted peer in the generated configuration. (#892)
 
 ## 0.9.1 - 2018-08-02
 

@@ -30,9 +30,4 @@ app.use(express.static(__dirname + '/'));
 var api = require('./routes/api');
 app.use('/api', api);
 
-// Single Page Application entry point
-app.get('/', function(req, res) {
-  res.sendFile('index.html');
-});
-
 app.listen(port);

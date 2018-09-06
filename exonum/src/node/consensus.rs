@@ -482,8 +482,6 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
-        self.api_state.broadcast(&block_hash);
-
         // Merge changes into storage
         let (committed_txs, proposer) = {
             // FIXME: Avoid of clone here. (ECR-171)
@@ -500,6 +498,9 @@ impl NodeHandler {
                 .new_height(&block_hash, self.system_state.current_time());
             (block_state.txs().len(), block_state.proposer_id())
         };
+
+        self.api_state.broadcast(&block_hash);
+
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();

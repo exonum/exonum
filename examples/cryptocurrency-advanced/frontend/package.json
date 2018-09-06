@@ -22,7 +22,7 @@
     "axios": "^0.18.0",
     "big-integer": "^1.6.27",
     "bootstrap": "^4.0.0",
-    "exonum-client": "^0.12.3",
+    "exonum-client": "^0.12.4",
     "jquery": "^3.3.1",
     "noty": "^3.2.0-beta",
     "numeral": "^2.0.6",
@@ -47,9 +47,9 @@
     "jest": "^23.1.0",
     "regenerator-runtime": "^0.12.1",
     "request": "^2.85.0",
-    "vue-loader": "^15.2.4",
+    "vue-loader": "^15.4.0",
     "vue-template-compiler": "^2.5.16",
-    "webpack": "^4.16.3",
+    "webpack": "^4.17.1",
     "webpack-cli": "^3.1.0",
     "yargs-parser": "^9.0.2"
   }

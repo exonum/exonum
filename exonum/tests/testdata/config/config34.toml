@@ -6,7 +6,6 @@ service_public_key = "066f9874c7b32fca4c1ad4dacbe9bc9aa0de38b480d8c71ea05e5b3c70
 service_secret_key = "422acb782a4430c7dd982f73b88c29f03440248a010119410c7f522871919110066f9874c7b32fca4c1ad4dacbe9bc9aa0de38b480d8c71ea05e5b3c70422152"
 
 [api]
-enable_blockchain_explorer = true
 state_update_timeout = 10000
 [[genesis.validator_keys]]
 consensus_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
@@ -55,10 +54,6 @@ create_if_missing = true
 [[connect_list.peers]]
 address = "127.0.0.1:6333"
 public_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
-
-[[connect_list.peers]]
-address = "127.0.0.1:6333"
-public_key = "41dd7940903ca3102c041222a4c51f9f7978499b082833c733c3b15165202f80"
 
 [[connect_list.peers]]
 address = "127.0.0.1:6333"

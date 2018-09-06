@@ -535,11 +535,12 @@ impl<'a> Schema<&'a mut Fork> {
     }
 
     /// Removes transaction from the persistent pool.
-    #[doc(hidden)]
-    pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
+    #[cfg(test)]
+    pub(crate) fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool_mut().contains(hash);
         self.transactions_pool_mut().remove(hash);
         self.transactions_mut().remove(hash);
+
         if contains {
             let x = self.transactions_pool_len_index().get().unwrap();
             self.transactions_pool_len_index_mut().set(x - 1);

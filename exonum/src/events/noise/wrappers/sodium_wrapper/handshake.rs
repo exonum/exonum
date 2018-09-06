@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure;
 use futures::future::{done, Future};
 use tokio_codec::{Decoder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
 
-use std::io;
+use std::net::SocketAddr;
 
 use super::wrapper::NoiseWrapper;
 use crypto::{
     x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
 };
 use events::{
-    codec::MessagesCodec, error::other_error,
-    noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+    codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
 use node::state::SharedConnectList;
 
@@ -64,24 +64,27 @@ impl HandshakeParams {
 #[derive(Debug)]
 pub struct NoiseHandshake {
     noise: NoiseWrapper,
+    peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams) -> Self {
+    pub fn initiator(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
         let noise = NoiseWrapper::initiator(params);
         NoiseHandshake {
             noise,
+            peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
         }
     }
 
-    pub fn responder(params: &HandshakeParams) -> Self {
+    pub fn responder(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
         let noise = NoiseWrapper::responder(params);
         NoiseHandshake {
             noise,
+            peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
         }
@@ -90,7 +93,7 @@ impl NoiseHandshake {
     pub fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
             self.noise.read_handshake_msg(&msg.0)?;
             Ok((stream, self))
@@ -100,7 +103,7 @@ impl NoiseHandshake {
     pub fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         done(self.noise.write_handshake_msg())
             .map_err(|e| e.into())
             .and_then(|buf| HandshakeRawMessage(buf).write(stream))
@@ -110,7 +113,7 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+    ) -> Result<Framed<S, MessagesCodec>, failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -122,7 +125,7 @@ impl NoiseHandshake {
         };
 
         if !self.is_peer_allowed(&remote_static_key) {
-            return Err(other_error("Peer is not in ConnectList"));
+            bail!("peer is not in ConnectList")
         }
 
         let noise = self.noise.into_transport_mode()?;
@@ -144,10 +147,15 @@ impl Handshake for NoiseHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
+        let peer_address = self.peer_address;
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
+            .and_then(|(stream, handshake)| handshake.finalize(stream))
+            .map_err(move |e| {
+                e.context(format!("peer {} disconnected", peer_address))
+                    .into()
+            });
         Box::new(framed)
     }
 
@@ -155,10 +163,15 @@ impl Handshake for NoiseHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
+        let peer_address = self.peer_address;
         let framed = self.write_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream));
+            .and_then(|(stream, handshake)| handshake.finalize(stream))
+            .map_err(move |e| {
+                e.context(format!("peer {} disconnected", peer_address))
+                    .into()
+            });
         Box::new(framed)
     }
 }

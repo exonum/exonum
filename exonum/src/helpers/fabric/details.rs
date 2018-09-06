@@ -612,6 +612,8 @@ impl Command for Finalize {
 
         let genesis = Self::genesis_from_template(common.clone(), &list);
 
+        let connect_list = ConnectListConfig::from_node_config(&list, &secret_config);
+
         let config = {
             NodeConfig {
                 listen_address: secret_config.listen_address,
@@ -632,7 +634,7 @@ impl Command for Finalize {
                 mempool: Default::default(),
                 services_configs: Default::default(),
                 database: Default::default(),
-                connect_list: ConnectListConfig::from_node_config(&list),
+                connect_list,
                 thread_pool_size: Default::default(),
             }
         };

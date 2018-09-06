@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Precommit, Prevote};
+use messages::Message;
 use node::state::PROPOSE_REQUEST_TIMEOUT;
 
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
@@ -45,7 +45,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
-    let precommit_1 = Precommit::new(
+    let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -54,7 +54,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(1)),
     );
-    let precommit_2 = Precommit::new(
+    let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -63,7 +63,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         sandbox.time().into(),
         sandbox.s(ValidatorId(2)),
     );
-    let precommit_3 = Precommit::new(
+    let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
         Height(1),
         Round(1),
@@ -174,7 +174,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -183,7 +183,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         sandbox.s(ValidatorId(0)),
     ));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -193,7 +193,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -203,7 +203,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
-    sandbox.broadcast(&Precommit::new(
+    sandbox.broadcast(&sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -218,7 +218,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
     // trigger round_timeout
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     //    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -240,7 +240,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(2),
