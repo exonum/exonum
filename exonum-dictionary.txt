@@ -92,6 +92,7 @@ prevotes
 prevoters
 println
 proptest
+protobuf
 pubkey
 pubkeys
 readonly

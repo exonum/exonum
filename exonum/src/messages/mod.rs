@@ -152,11 +152,11 @@ impl BinaryForm for TransactionSetPart {
 /// Wrappers around pair of concrete message payload, and full message binary form.
 /// Internally binary form saves message lossless,
 /// this important for use in a scheme with
-/// non-canonical serialization, for example with a `ProtoBuf`.
+/// non-canonical serialization, for example with a `Protobuf`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Message<T> {
     //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    //if our serialisation format allows us (ECR-2315).
+    //if our serialization format allows us (ECR-2315).
     payload: T,
     #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
@@ -219,7 +219,7 @@ impl<X: ProtocolMessage> FromHex for Message<X> {
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
         let protocol = Protocol::deserialize(SignedMessage::verify_buffer(bytes)?)?;
-        ProtocolMessage::try_from(protocol).map_err(|_| format_err!("Couldn't deserialize mesage."))
+        ProtocolMessage::try_from(protocol).map_err(|_| format_err!("Couldn't deserialize message."))
     }
 }
 
