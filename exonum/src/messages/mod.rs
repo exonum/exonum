@@ -28,7 +28,7 @@ use hex::{FromHex, ToHex};
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 
-use std::{borrow::Cow, cmp::PartialEq, fmt, ops::Deref};
+use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use encoding;
@@ -115,6 +115,9 @@ impl BinaryForm for RawTransaction {
 
     /// Converts a serialized byte array into a transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
+        if buffer.len() < mem::size_of::<u16>() {
+            Err("Buffer too short in RawTransaction deserialization.")?
+        }
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
         let transaction_set = TransactionSetPart::deserialize(&buffer[2..])?;
         Ok(RawTransaction {
@@ -134,6 +137,9 @@ impl BinaryForm for TransactionSetPart {
     }
 
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
+        if buffer.len() < mem::size_of::<u16>() {
+            Err("Buffer too short in TransactionSetPart deserialization.")?
+        }
         let message_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
         Ok(TransactionSetPart {
