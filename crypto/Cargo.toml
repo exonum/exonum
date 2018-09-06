@@ -13,7 +13,7 @@ description = "Cryptography related types, constants, traits and functions."
 
 [dependencies]
 byteorder = "1.2.3"
-chrono = "=0.4.5"
+chrono = "=0.4.6"
 hex = "=0.3.2"
 rust_decimal = "=0.10.1"
 serde = "1.0.10"
