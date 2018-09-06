@@ -206,7 +206,7 @@ impl ServiceApiScope {
 ///     }
 /// }
 ///
-/// # let mut builder = ServiceApiBuilder::new();
+/// # let mut builder = ServiceApiBuilder::default();
 /// // Adds `MyApi` handlers to the corresponding builder.
 /// builder.public_scope()
 ///     .endpoint("v1/ping", MyApi::ping)
@@ -216,7 +216,7 @@ impl ServiceApiScope {
 /// builder.private_scope()
 ///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ServiceApiBuilder {
     blockchain: Option<Blockchain>,
     public_scope: ServiceApiScope,
@@ -228,16 +228,14 @@ impl ServiceApiBuilder {
     pub fn new() -> Self {
         Self {
             blockchain: None,
-            public_scope: Default::default(),
-            private_scope: Default::default(),
+            ..Default::default()
         }
     }
 
     fn with_blockchain(blockchain: Blockchain) -> Self {
         Self {
             blockchain: Some(blockchain),
-            public_scope: Default::default(),
-            private_scope: Default::default(),
+            ..Default::default()
         }
     }
 
