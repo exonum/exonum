@@ -14,19 +14,23 @@
 
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
-use sodiumoxide::crypto::scalarmult::curve25519::{
-    scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
-    GroupElement as Curve25519GroupElement, Scalar as Curve25519Scalar,
-};
-use sodiumoxide::crypto::sign::ed25519::{
-    convert_ed_keypair_to_curve25519, convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
-    PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
+use std::{
+    fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
-use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-
-use crypto;
+use super::sodiumoxide::crypto::{
+    scalarmult::curve25519::{
+        scalarmult as sodium_scalarmult, scalarmult_base as sodium_scalarmult_base,
+        GroupElement as Curve25519GroupElement, Scalar as Curve25519Scalar,
+    },
+    sign::ed25519::{
+        convert_ed_keypair_to_curve25519, convert_ed_pk_to_curve25519, convert_ed_sk_to_curve25519,
+        PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
+    },
+};
+use write_short_hex;
+use PublicKey as crypto_PublicKey;
+use SecretKey as crypto_SecretKey;
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;
@@ -44,16 +48,16 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// converts it to pair of Curve25519 keys.
 ///
 /// ```
-/// use exonum::crypto;
-/// # crypto::init();
+/// # extern crate exonum_crypto;
+/// # exonum_crypto::init();
 ///
-/// let (pk, sk) = crypto::gen_keypair();
-/// let (public_key, secret_key) = crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
+/// let (pk, sk) = exonum_crypto::gen_keypair();
+/// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 pub fn into_x25519_keypair(
-    pk: crypto::PublicKey,
-    sk: crypto::SecretKey,
+    pk: crypto_PublicKey,
+    sk: crypto_SecretKey,
 ) -> Option<(PublicKey, SecretKey)> {
     let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
     let sk_sod = SecretKeySodium::from_slice(&sk[..])?;
@@ -87,7 +91,7 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 ///
 /// See: [`into_x25519_keypair()`][1]
 /// [1]: fn.into_x25519_public_key.html
-pub fn into_x25519_public_key(pk: crypto::PublicKey) -> PublicKey {
+pub fn into_x25519_public_key(pk: crypto_PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
     let public_key = convert_ed_pk_to_curve25519(&public_key);
@@ -135,7 +139,7 @@ macro_rules! implement_x25519_type {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            crypto::write_short_hex(f, &self.0[..])?;
+            write_short_hex(f, &self.0[..])?;
             write!(f, ")")
         }
     }

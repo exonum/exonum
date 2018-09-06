@@ -31,9 +31,3 @@ impl<T: CryptoHash> UniqueHash for T {
         CryptoHash::hash(self)
     }
 }
-
-impl UniqueHash for Hash {
-    fn hash(&self) -> Self {
-        *self
-    }
-}

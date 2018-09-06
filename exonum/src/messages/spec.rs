@@ -124,6 +124,13 @@ macro_rules! __ex_message {
             }
         }
 
+        impl $crate::crypto::CryptoHash for $name {
+            fn hash(&self) -> $crate::crypto::Hash {
+                use $crate::messages::Message;
+                $crate::crypto::hash(self.raw().as_ref())
+            }
+        }
+
         #[allow(unsafe_code)]
         impl<'a> $crate::encoding::SegmentField<'a> for $name {
 

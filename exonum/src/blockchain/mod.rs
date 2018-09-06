@@ -411,7 +411,7 @@ impl Blockchain {
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
 
-        let tx_result = match catch_result {
+        let tx_result = TransactionResult(match catch_result {
             Ok(execution_result) => {
                 match execution_result {
                     Ok(()) => {
@@ -441,7 +441,7 @@ impl Blockchain {
                 );
                 Err(TransactionError::from_panic(&err))
             }
-        };
+        });
 
         let mut schema = Schema::new(fork);
         schema.transaction_results_mut().put(&tx_hash, tx_result);

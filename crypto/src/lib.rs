@@ -13,12 +13,20 @@
 // limitations under the License.
 
 //! Cryptography related types, constants, traits and functions. The functions
-//! in this module are used for key generation, hashing, signing and signature
+//! in this library are used for key generation, hashing, signing and signature
 //! verification.
 //!
-//! The Crypto module makes it possible to potentially change the type of
+//! The Crypto library makes it possible to potentially change the type of
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
+
+extern crate byteorder;
+extern crate chrono;
+extern crate hex;
+extern crate rust_decimal;
+extern crate serde;
+extern crate serde_json;
+extern crate uuid;
 
 #[doc(inline)]
 pub use self::crypto_impl::{
@@ -40,10 +48,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use encoding::{
-    serialize::{encode_hex, FromHex, FromHexError, ToHex}, Field, Offset,
-};
-use helpers::Round;
+use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
+
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
 use self::crypto_lib::sodiumoxide as crypto_impl;
@@ -77,13 +83,13 @@ fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
 /// secret key.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair();
+/// # exonum_crypto::init();
+/// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// let data = [1, 2, 3];
-/// let signature = crypto::sign(&data, &secret_key);
-/// assert!(crypto::verify(&signature, &data, &public_key));
+/// let signature = exonum_crypto::sign(&data, &secret_key);
+/// assert!(exonum_crypto::verify(&signature, &data, &public_key));
 /// ```
 pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
     let impl_signature = crypto_impl::sign(data, &secret_key.0);
@@ -98,10 +104,11 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// Indicating the same seed value always results in the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, SEED_LENGTH, Seed};
+/// # extern crate exonum_crypto;
+/// use exonum_crypto::{SEED_LENGTH, Seed};
 ///
-/// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+/// # exonum_crypto::init();
+/// let (public_key, secret_key) = exonum_crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (impl_pub_key, impl_secret_key) = crypto_impl::gen_keypair_from_seed(&seed.0);
@@ -116,10 +123,10 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// The example below generates a unique keypair.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair();
+/// # exonum_crypto::init();
+/// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secret_key) = crypto_impl::gen_keypair();
@@ -136,13 +143,13 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// verifies that the data have been signed with the corresponding secret key.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair();
+/// # exonum_crypto::init();
+/// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// let data = [1, 2, 3];
-/// let signature = crypto::sign(&data, &secret_key);
-/// assert!(crypto::verify(&signature, &data, &public_key));
+/// let signature = exonum_crypto::sign(&data, &secret_key);
+/// assert!(exonum_crypto::verify(&signature, &data, &public_key));
 /// ```
 pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     crypto_impl::verify(&sig.0, data, &pubkey.0)
@@ -157,11 +164,11 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// The example below calculates the hash of the indicated data.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
+/// # exonum_crypto::init();
 /// let data = [1, 2, 3];
-/// let hash = crypto::hash(&data);
+/// let hash = exonum_crypto::hash(&data);
 /// ```
 pub fn hash(data: &[u8]) -> Hash {
     let dig = crypto_impl::hash(data);
@@ -187,9 +194,9 @@ pub trait CryptoHash {
 /// # Examples
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// crypto::init();
+/// exonum_crypto::init();
 /// ```
 pub fn init() {
     if !crypto_impl::init() {
@@ -210,7 +217,8 @@ pub fn init() {
 /// and calculates the resulting hash of the system.
 ///
 /// ```rust
-/// use exonum::crypto::HashStream;
+/// # extern crate exonum_crypto;
+/// use exonum_crypto::HashStream;
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
 /// let mut hash_stream = HashStream::new();
@@ -253,7 +261,8 @@ impl HashStream {
 /// of random public and secret keys, signs the data and verifies the signature.
 ///
 /// ```rust
-/// use exonum::crypto::{SignStream, gen_keypair};
+/// # extern crate exonum_crypto;
+/// use exonum_crypto::{SignStream, gen_keypair};
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
 /// let (public_key, secret_key) = gen_keypair();
@@ -275,7 +284,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::SignStream;
+    /// # extern crate exonum_crypto;
+    /// use exonum_crypto::SignStream;
     ///
     /// let stream = SignStream::new();
     /// ```
@@ -288,7 +298,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::SignStream;
+    /// # extern crate exonum_crypto;
+    /// use exonum_crypto::SignStream;
     ///
     /// let mut stream = SignStream::new();
     ///
@@ -308,7 +319,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::{SignStream, gen_keypair};
+    /// # extern crate exonum_crypto;
+    /// use exonum_crypto::{SignStream, gen_keypair};
     ///
     /// let mut stream = SignStream::new();
     ///
@@ -330,7 +342,8 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// use exonum::crypto::{SignStream, gen_keypair};
+    /// # extern crate exonum_crypto;
+    /// use exonum_crypto::{SignStream, gen_keypair};
     ///
     /// let mut stream = SignStream::new();
     /// let mut verify_stream = SignStream::new();
@@ -367,10 +380,10 @@ implement_public_crypto_wrapper! {
 /// secret keys.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
-/// let (public_key, _) = crypto::gen_keypair();
+/// # exonum_crypto::init();
+/// let (public_key, _) = exonum_crypto::gen_keypair();
 /// ```
     struct PublicKey, PUBLIC_KEY_LENGTH
 }
@@ -392,10 +405,10 @@ implement_private_crypto_wrapper! {
 /// secret keys.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
-/// let (_, secret_key) = crypto::gen_keypair();
+/// # exonum_crypto::init();
+/// let (_, secret_key) = exonum_crypto::gen_keypair();
 /// ```
     struct SecretKey, SECRET_KEY_LENGTH
 }
@@ -412,10 +425,11 @@ implement_public_crypto_wrapper! {
 /// The example below generates the hash of the indicated data.
 ///
 /// ```
-/// use exonum::crypto::{self, Hash};
+/// # extern crate exonum_crypto;
+/// use exonum_crypto::Hash;
 ///
 /// let data = [1, 2, 3];
-/// let hash_from_data = crypto::hash(&data);
+/// let hash_from_data = exonum_crypto::hash(&data);
 /// let default_hash = Hash::default();
 /// ```
     struct Hash, HASH_SIZE
@@ -436,13 +450,13 @@ implement_public_crypto_wrapper! {
 /// that the data have been signed with that secret key.
 ///
 /// ```
-/// use exonum::crypto;
+/// # extern crate exonum_crypto;
 ///
-/// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair();
+/// # exonum_crypto::init();
+/// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// let data = [1, 2, 3];
-/// let signature = crypto::sign(&data, &secret_key);
-/// assert!(crypto::verify(&signature, &data, &public_key));
+/// let signature = exonum_crypto::sign(&data, &secret_key);
+/// assert!(exonum_crypto::verify(&signature, &data, &public_key));
 /// ```
     struct Signature, SIGNATURE_LENGTH
 }
@@ -464,10 +478,11 @@ implement_private_crypto_wrapper! {
 /// generation of the same keypair.
 ///
 /// ```
-/// use exonum::crypto::{self, SEED_LENGTH, Seed};
+/// # extern crate exonum_crypto;
+/// use exonum_crypto::{SEED_LENGTH, Seed};
 ///
-/// # crypto::init();
-/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+/// # exonum_crypto::init();
+/// let (public_key, secret_key) = exonum_crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
     struct Seed, SEED_LENGTH
 }
@@ -488,6 +503,12 @@ implement_index_traits! {Signature}
 impl Default for Hash {
     fn default() -> Self {
         Self::zero()
+    }
+}
+
+impl CryptoHash for Hash {
+    fn hash(&self) -> Hash {
+        *self
     }
 }
 
@@ -607,19 +628,17 @@ impl CryptoHash for DateTime<Utc> {
     }
 }
 
+// TODO: think about move it anywhere (ECR-2217).
 impl CryptoHash for Duration {
     fn hash(&self) -> Hash {
-        let mut buffer = vec![0; Self::field_size() as usize];
-        let from: Offset = 0;
-        let to: Offset = Self::field_size();
-        self.write(&mut buffer, from, to);
-        buffer.hash()
-    }
-}
+        let secs = self.num_seconds();
+        let nanos_as_duration = *self - Self::seconds(secs);
+        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
 
-impl CryptoHash for Round {
-    fn hash(&self) -> Hash {
-        self.0.hash()
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_i64(&mut buffer[0..8], secs);
+        LittleEndian::write_i32(&mut buffer[8..12], nanos);
+        buffer.hash()
     }
 }
 
@@ -642,7 +661,7 @@ mod tests {
     use serde::de::DeserializeOwned;
     use serde_json;
 
-    use encoding::serialize::FromHex;
+    use hex::FromHex;
 
     #[test]
     fn to_from_hex_hash() {
