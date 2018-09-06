@@ -28,19 +28,16 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
-
-use std::borrow::Cow;
-use std::fmt::Debug;
-use std::mem;
-use std::net::SocketAddr;
-
 use failure;
 
-use super::{BinaryForm, Message, RawTransaction, SignedMessage, TransactionFromSet};
+use std::{borrow::Cow, fmt::Debug, mem, net::SocketAddr};
+
 use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
+
+use super::{BinaryForm, Message, RawTransaction, SignedMessage, TransactionSetPart};
 
 #[doc(hidden)]
 /// `SignedMessage` size with zero bytes payload.
@@ -387,13 +384,21 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm {
 ///
 /// Protocol should be described according to format:
 /// ```
-/// $SignedMessage => $ProtocolName {
-///     $($cls_num => $MessageClass {
-///         $(
-///         $MessageType = $typ_num
-///         )+
-///     }
-///     )+
+/// /// type of SignedMessage => new name of Protocol enum.
+/// SignedMessage => Protocol {
+///       // class ID => class name
+///       0 => Service {
+///            // message = message type ID
+///            RawTransaction = 0,
+///            Connect = 1,
+///            Status = 2,
+///            // ...
+///        },п
+///        1 => Consensus {
+///            Precommit = 0,
+///            Propose = 1,
+///            Prevote = 2,
+///        },
 /// }
 /// ```
 /// where:
@@ -409,17 +414,26 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm {
 /// Each `$MessageType` should implement `Clone` and `Debug`.
 ///
 macro_rules! impl_protocol {
-    ($signed_message:ident => $protocol_name:ident{
-        $($class_num:expr => $class:ident{
-            $( $type:ident = $type_num:expr),+ $(,)*
+
+    (
+    $(#[$attr:meta])+
+    $signed_message:ident => $protocol_name:ident{
+        $($(#[$attr_class:meta])+
+        $class_num:expr => $class:ident{
+            $(
+                $(#[$attr_type:meta])+
+                $type:ident = $type_num:expr
+            ),+ $(,)*
         } $(,)*)+
     }
     ) => {
 
         $(
             #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+            $(#[$attr_class])+
             pub enum $class {
             $(
+                $(#[$attr_type])+
                 $type(Message<$type>)
             ),+
             }
@@ -450,13 +464,17 @@ macro_rules! impl_protocol {
         )+
 
         #[derive(PartialEq, Eq, Debug, Clone)]
+        $(#[$attr])+
         pub enum $protocol_name {
             $(
+             $(#[$attr_class])+
                 $class($class)
             ),+
         }
 
         impl $protocol_name {
+            /// Converts raw `SignedMessage` into concrete `Protocol` message.
+            /// Returns error if fails.
             pub fn deserialize(message: SignedMessage) -> Result<Protocol, failure::Error> {
             use $crate::events::error::into_failure;
                 match message.message_class() {
@@ -475,6 +493,7 @@ macro_rules! impl_protocol {
                 }
             }
 
+            /// Returns refference to inner `SignedMessage`.
             pub fn signed_message(&self) -> &SignedMessage {
                 match *self {
                     $(
@@ -495,26 +514,46 @@ macro_rules! impl_protocol {
 }
 
 impl_protocol!{
+    /// Composition of every exonum protocol messages.
+    /// This messages used in network p2p communications.
     SignedMessage => Protocol {
+        /// Exonum basic node messages.
         0 => Service {
+            /// `RawTransaction` representation.
             RawTransaction = 0,
+            /// Handshake to other node.
             Connect = 1,
+            /// `Status` information of other node.
             Status = 2,
         },
+        /// Exonum consensus specific node messages.
         1 => Consensus {
+            /// Consensus `Precommit` message.
             Precommit = 0,
+            /// Consensus `Propose` message.
             Propose = 1,
+            /// Consensus `Prevote` message.
             Prevote = 2,
         },
+        /// Exonum node responses.
         2 => Responses {
+            /// Information about transactions, that sent as response to `TransactionsRequest`.
             TransactionsResponse = 0,
-            BlockResponse = 1
+            /// Information about block, that sent as response to `BlockRequest`.
+            BlockResponse = 1,
         },
+        /// Exonum node requests.
         3 => Requests {
+
+            /// Request of some propose which hash is known.
             ProposeRequest = 0,
+            /// Request of unknown transactions.
             TransactionsRequest = 1,
+            /// Request of prevotes for some propose.
             PrevotesRequest = 2,
+            /// Request of peer exchange.
             PeersRequest = 3,
+            /// Request of some future block.
             BlockRequest = 4,
         },
 
@@ -551,12 +590,13 @@ impl Protocol {
         let signed = SignedMessage::new(cls, typ, value, author, secret_key);
         T::into_message_from_parts(message, signed)
     }
-
+    /// Checks buffer and return instance of `Protocol`.
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
         let signed = SignedMessage::verify_buffer(buffer)?;
         Self::deserialize(signed)
     }
 
+    /// Trying to convert instance of `Protocol` into `Message<RawTransaction>`.
     pub fn try_into_transaction(self) -> Result<Message<RawTransaction>, failure::Error> {
         RawTransaction::try_from(self)
             .map_err(|m| format_err!("Couldn't convert message {:?} into transaction", m))
@@ -567,7 +607,6 @@ impl Protocol {
     /// # Panics
     ///
     /// On serialization fail this method can panic.
-    //    #[cfg(test)]
     pub fn sign_tx<T>(
         transaction: T,
         service_id: u16,
@@ -575,9 +614,9 @@ impl Protocol {
         secret_key: &SecretKey,
     ) -> Message<RawTransaction>
     where
-        T: Into<TransactionFromSet>,
+        T: Into<TransactionSetPart>,
     {
-        let set: TransactionFromSet = transaction.into();
+        let set: TransactionSetPart = transaction.into();
         let raw_tx = RawTransaction::new(service_id, set);
         Self::concrete(raw_tx, public_key, secret_key)
     }

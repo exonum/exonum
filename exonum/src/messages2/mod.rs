@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 //!
 //! Message represents object received from p2p network.
 //! There next flow between objects:
@@ -23,26 +24,18 @@
 //!              (      message dropped if failed       )
 //!
 //! ```
-
-#![allow(missing_docs, missing_debug_implementations)]
-use std::borrow::Cow;
-use std::cmp::PartialEq;
-use std::fmt;
-use std::ops::Deref;
-
+use hex::{FromHex, ToHex};
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
+
+use std::{borrow::Cow, cmp::PartialEq, fmt, ops::Deref};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use encoding;
 use storage::StorageValue;
 
-use hex::{FromHex, ToHex};
-
-pub(crate) use self::authorization::SignedMessage;
-pub use self::helpers::BinaryForm;
-pub(crate) use self::helpers::{BinaryFormSerialize, HexStringRepresentation};
-pub use self::protocol::*;
+pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
+pub use self::{helpers::BinaryForm, protocol::*};
 
 #[macro_use]
 mod compatibility;
@@ -56,28 +49,31 @@ mod tests;
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 
 /// Transaction raw buffer.
-/// This struct used to transfer transaction in network.
+/// This struct is used to transfer transactions in network.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RawTransaction {
     service_id: u16,
-    transaction_set: TransactionFromSet,
+    transaction_set: TransactionSetPart,
 }
 
-/// Concrete raw transaction payload inside `TransactionSet` linked with `message_id` in this set.
+/// Concrete raw transaction transaction inside `TransactionSet`.
+/// This type used inner inside `transactions!` to transfer some set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct TransactionFromSet {
+pub struct TransactionSetPart {
     message_id: u16,
     payload: Vec<u8>,
 }
 
-impl TransactionFromSet {
+impl TransactionSetPart {
+    /// Creates TransactionSetPart from unchecked raw data.
     pub fn from_raw_unchecked(message_id: u16, payload: Vec<u8>) -> Self {
-        TransactionFromSet {
+        TransactionSetPart {
             message_id,
             payload,
         }
     }
 
+    /// Converts `TransactionSetPart` back to raw data.
     pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
         (self.message_id, self.payload)
     }
@@ -87,21 +83,24 @@ impl RawTransaction {
     /// Creates new instance of RawTransaction.
     pub(in messages) fn new(
         service_id: u16,
-        transaction_set: TransactionFromSet,
+        transaction_set: TransactionSetPart,
     ) -> RawTransaction {
         RawTransaction {
             service_id,
             transaction_set,
         }
     }
+
     /// Returns user defined data that should be used for deserialization.
-    pub fn transaction_set(self) -> TransactionFromSet {
+    pub fn transaction_set(self) -> TransactionSetPart {
         self.transaction_set
     }
+
     /// Returns service_id specified for current transaction.
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
+
 }
 
 impl BinaryForm for RawTransaction {
@@ -114,10 +113,10 @@ impl BinaryForm for RawTransaction {
         Ok(buffer)
     }
 
-    /// Converts serialized byte array into transaction.
+    /// Converts a serialized byte array into a transaction.
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
-        let transaction_set = TransactionFromSet::deserialize(&buffer[2..])?;
+        let transaction_set = TransactionSetPart::deserialize(&buffer[2..])?;
         Ok(RawTransaction {
             service_id,
             transaction_set,
@@ -125,7 +124,7 @@ impl BinaryForm for RawTransaction {
     }
 }
 
-impl BinaryForm for TransactionFromSet {
+impl BinaryForm for TransactionSetPart {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
         let mut buffer = Vec::new();
         buffer.resize(2, 0);
@@ -137,7 +136,7 @@ impl BinaryForm for TransactionFromSet {
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
         let message_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
-        Ok(TransactionFromSet {
+        Ok(TransactionSetPart {
             message_id,
             payload,
         })
@@ -151,45 +150,45 @@ impl BinaryForm for TransactionFromSet {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Message<T> {
     //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    //if our serialisation format allows us
+    //if our serialisation format allows us (ECR-2315).
     payload: T,
     #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
 }
 
 impl<T: ProtocolMessage> Message<T> {
-    /// Creates new instance of message.
+    /// Creates new instance of the message.
     pub(in messages) fn new(payload: T, message: SignedMessage) -> Message<T> {
         Message { payload, message }
     }
 
-    /// Returns hash of full message.
+    /// Returns hash of the full message.
     pub fn hash(&self) -> Hash {
         hash(self.message.raw())
     }
 
-    /// Returns serialized buffer.
+    /// Returns a serialized buffer.
     pub fn serialize(self) -> Vec<u8> {
         self.message.raw
     }
 
-    /// Return link to inner.
-    pub fn inner(&self) -> &T {
+    /// Return reference to payload.
+    pub fn payload(&self) -> &T {
         &self.payload
     }
 
-    /// Return link to signed message.
+    /// Return reference to signed message.
     pub(crate) fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
 
-    /// Returns public key of message creator.
+    /// Returns public key of the message creator.
     pub fn author(&self) -> PublicKey {
         self.message.author()
     }
 }
 
-impl fmt::Debug for TransactionFromSet {
+impl fmt::Debug for TransactionSetPart {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Transaction")
             .field("message_id", &self.message_id)
