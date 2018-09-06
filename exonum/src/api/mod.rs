@@ -24,6 +24,7 @@ use std::{collections::BTreeMap, fmt};
 
 use self::{backends::actix, node::public::ExplorerApi};
 use blockchain::{Blockchain, SharedNodeState};
+use node::ApiSender;
 
 pub mod backends;
 pub mod error;
@@ -247,6 +248,16 @@ impl ServiceApiBuilder {
     /// Returns a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
+    }
+
+    /// Returns an optional reference to the Blockchain.
+    pub fn blockchain(&self) -> Option<&Blockchain> {
+        self.blockchain.as_ref()
+    }
+
+    /// Returns an optional reference to the ApiSender.
+    pub fn api_sender(&self) -> Option<&ApiSender> {
+        self.blockchain().map(|blockchain| &blockchain.api_sender)
     }
 }
 
