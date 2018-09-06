@@ -263,7 +263,8 @@ impl ServiceApiBuilder {
 
     /// Returns an optional value to the PublicKey.
     pub fn public_key(&self) -> Option<PublicKey> {
-        self.blockchain().map(|blockchain| blockchain.service_keypair.0)
+        self.blockchain()
+            .map(|blockchain| blockchain.service_keypair.0)
     }
 }
 
