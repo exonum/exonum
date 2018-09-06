@@ -24,6 +24,7 @@ use std::{collections::BTreeMap, fmt};
 
 use self::{backends::actix, node::public::ExplorerApi};
 use blockchain::{Blockchain, SharedNodeState};
+use crypto::PublicKey;
 use node::ApiSender;
 
 pub mod backends;
@@ -258,6 +259,11 @@ impl ServiceApiBuilder {
     /// Returns an optional reference to the ApiSender.
     pub fn api_sender(&self) -> Option<&ApiSender> {
         self.blockchain().map(|blockchain| &blockchain.api_sender)
+    }
+
+    /// Returns an optional value to the PublicKey.
+    pub fn public_key(&self) -> Option<PublicKey> {
+        self.blockchain().map(|blockchain| blockchain.service_keypair.0)
     }
 }
 
