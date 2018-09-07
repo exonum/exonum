@@ -21,6 +21,7 @@ pub mod codec;
 pub mod error;
 pub mod internal;
 pub mod network;
+pub mod network2;
 pub mod noise;
 
 use futures::{

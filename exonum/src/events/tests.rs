@@ -151,7 +151,7 @@ impl TestEvents {
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let fut = network_part.run(&core.handle(), &handshake_params);
+            let fut = network_part.run2(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });
         handler_part.handle = Some(handle);

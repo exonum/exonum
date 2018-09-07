@@ -268,13 +268,13 @@ impl NetworkPart {
     }
 }
 
-struct RequestHandler(
+pub struct RequestHandler(
     // TODO: Replace with concrete type. (ECR-1634)
     Box<dyn Future<Item = (), Error = failure::Error>>,
 );
 
 impl RequestHandler {
-    fn new(
+    pub fn new(
         connect_message: Connect,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
@@ -357,10 +357,10 @@ impl Future for RequestHandler {
     }
 }
 
-struct Listener(Box<dyn Future<Item = (), Error = failure::Error>>);
+pub struct Listener(Box<dyn Future<Item = (), Error = failure::Error>>);
 
 impl Listener {
-    fn bind(
+    pub fn bind(
         network_config: NetworkConfiguration,
         listen_address: SocketAddr,
         handle: Handle,
