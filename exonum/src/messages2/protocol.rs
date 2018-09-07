@@ -37,7 +37,7 @@ use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATUR
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 
-use super::{BinaryForm, Message, RawTransaction, SignedMessage, TransactionSetPart};
+use super::{BinaryForm, Message, RawTransaction, SignedMessage, ServiceTransaction};
 
 #[doc(hidden)]
 /// `SignedMessage` size with zero bytes payload.
@@ -393,7 +393,7 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm {
 ///            Connect = 1,
 ///            Status = 2,
 ///            // ...
-///        },п
+///        },
 ///        1 => Consensus {
 ///            Precommit = 0,
 ///            Propose = 1,
@@ -401,17 +401,8 @@ pub trait ProtocolMessage: Debug + Clone + BinaryForm {
 ///        },
 /// }
 /// ```
-/// where:
-/// `$ProtocolName` is an name of protocol which is described by this schema,
-///     enum with same name will be created. All message classes are encapsulate by this enum;
-/// `$MessageClass` is a module name which is designed to handle messages,
-///     enum with same name will be crated. All message within `MessageClass` should be unique;
-/// `$MessageType` is a concrete messages within some `$MessageClass`;
-/// `$SignedMessage` is a typename of `SignedMessage` from which $ProtocolName could be created;
-/// `$cls_num` and `$typ_num` is a constant which represent
-///     message class and message type respectively
 ///
-/// Each `$MessageType` should implement `Clone` and `Debug`.
+/// Each message should implement `Clone` and `Debug`.
 ///
 macro_rules! impl_protocol {
 
@@ -544,7 +535,6 @@ impl_protocol!{
         },
         /// Exonum node requests.
         3 => Requests {
-
             /// Request of some propose which hash is known.
             ProposeRequest = 0,
             /// Request of unknown transactions.
@@ -565,7 +555,7 @@ impl Protocol {
     ///
     /// # Panics
     ///
-    /// On serialization fail this method can panic.
+    /// This method can panic on serialization failure.
     pub fn new<T: ProtocolMessage>(
         message: T,
         author: PublicKey,
@@ -579,7 +569,7 @@ impl Protocol {
     ///
     /// # Panics
     ///
-    /// On serialization fail this method can panic.
+    /// This method can panic on serialization failure.
     pub fn concrete<T: ProtocolMessage>(
         message: T,
         author: PublicKey,
@@ -596,17 +586,11 @@ impl Protocol {
         Self::deserialize(signed)
     }
 
-    /// Trying to convert instance of `Protocol` into `Message<RawTransaction>`.
-    pub fn try_into_transaction(self) -> Result<Message<RawTransaction>, failure::Error> {
-        RawTransaction::try_from(self)
-            .map_err(|m| format_err!("Couldn't convert message {:?} into transaction", m))
-    }
-
     /// Creates new raw transaction message.
     ///
     /// # Panics
     ///
-    /// On serialization fail this method can panic.
+    /// This method can panic on serialization failure.
     pub fn sign_tx<T>(
         transaction: T,
         service_id: u16,
@@ -614,9 +598,9 @@ impl Protocol {
         secret_key: &SecretKey,
     ) -> Message<RawTransaction>
     where
-        T: Into<TransactionSetPart>,
+        T: Into<ServiceTransaction>,
     {
-        let set: TransactionSetPart = transaction.into();
+        let set: ServiceTransaction = transaction.into();
         let raw_tx = RawTransaction::new(service_id, set);
         Self::concrete(raw_tx, public_key, secret_key)
     }
@@ -696,8 +680,8 @@ impl StorageValue for Protocol {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        let message = SignedMessage::unchecked_from_vec(value.into_owned());
-        //TODO: Remove additional deserialization
+        let message = SignedMessage::from_vec_unchecked(value.into_owned());
+        //TODO: Remove additional deserialization [ECR-2315]
         Protocol::deserialize(message).unwrap()
     }
 }

@@ -12,18 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Handling messages received from P2P node network.
 //!
-//! Message represents object received from p2p network.
-//! There next flow between objects:
+//! Every message passes through three phases:
+//!
+//!   * `Vec<u8>`: raw bytes as received from the network
+//!   * `SignedMessage`: integrity and signature of the message has been verified
+//!   * `Protocol`: the message has been completely parsed and has correct structure
+//!
+//! Graphical representation of the message processing flow:
+//!
 //! ```text
-//! +---------+           +---------------+                 +------------+
-//! | Vec<u8> |    ->     | SignedMessage |        ->       |  Protocol  |
-//! +---------+  (verify) +---------------+  (deserialize)  +------------+
-//!                 |                             |
-//!                 V                             V
-//!              (      message dropped if failed       )
-//!
+//! +---------+             +---------------+                  +----------+
+//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Protocol |-->(handle)
+//! +---------+     |       +---------------+        |         +----------+
+//!                 |                                |
+//!                 V                                V
+//!              (drop)                           (drop)
 //! ```
+
 use hex::{FromHex, ToHex};
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
@@ -53,29 +60,29 @@ pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RawTransaction {
     service_id: u16,
-    transaction_set: TransactionSetPart,
+    transaction_set: ServiceTransaction,
 }
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
 /// This type used inner inside `transactions!` to transfer some set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct TransactionSetPart {
-    message_id: u16,
+pub struct ServiceTransaction {
+    service_id: u16,
     payload: Vec<u8>,
 }
 
-impl TransactionSetPart {
-    /// Creates TransactionSetPart from unchecked raw data.
+impl ServiceTransaction {
+    /// Creates `ServiceTransaction` from unchecked raw data.
     pub fn from_raw_unchecked(message_id: u16, payload: Vec<u8>) -> Self {
-        TransactionSetPart {
-            message_id,
+        ServiceTransaction {
+            service_id,
             payload,
         }
     }
 
-    /// Converts `TransactionSetPart` back to raw data.
+    /// Converts `ServiceTransaction` back to raw data.
     pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
-        (self.message_id, self.payload)
+        (self.service_id, self.payload)
     }
 }
 
@@ -83,7 +90,7 @@ impl RawTransaction {
     /// Creates new instance of RawTransaction.
     pub(in messages) fn new(
         service_id: u16,
-        transaction_set: TransactionSetPart,
+        transaction_set: ServiceTransaction,
     ) -> RawTransaction {
         RawTransaction {
             service_id,
@@ -92,7 +99,7 @@ impl RawTransaction {
     }
 
     /// Returns user defined data that should be used for deserialization.
-    pub fn transaction_set(self) -> TransactionSetPart {
+    pub fn transaction_set(self) -> ServiceTransaction {
         self.transaction_set
     }
 
@@ -105,8 +112,7 @@ impl RawTransaction {
 
 impl BinaryForm for RawTransaction {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
-        let mut buffer = Vec::new();
-        buffer.resize(2, 0);
+        let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
         let value = self.transaction_set.serialize()?;
         buffer.extend_from_slice(&value);
@@ -119,7 +125,7 @@ impl BinaryForm for RawTransaction {
             Err("Buffer too short in RawTransaction deserialization.")?
         }
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
-        let transaction_set = TransactionSetPart::deserialize(&buffer[2..])?;
+        let transaction_set = ServiceTransaction::deserialize(&buffer[2..])?;
         Ok(RawTransaction {
             service_id,
             transaction_set,
@@ -127,7 +133,7 @@ impl BinaryForm for RawTransaction {
     }
 }
 
-impl BinaryForm for TransactionSetPart {
+impl BinaryForm for ServiceTransaction {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
         let mut buffer = Vec::new();
         buffer.resize(2, 0);
@@ -138,21 +144,24 @@ impl BinaryForm for TransactionSetPart {
 
     fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
         if buffer.len() < mem::size_of::<u16>() {
-            Err("Buffer too short in TransactionSetPart deserialization.")?
+            Err("Buffer too short in ServiceTransaction deserialization.")?
         }
         let message_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
-        Ok(TransactionSetPart {
-            message_id,
+        Ok(ServiceTransaction {
+            service_id,
             payload,
         })
     }
 }
-
-/// Wrappers around pair of concrete message payload, and full message binary form.
-/// Internally binary form saves message lossless,
-/// this important for use in a scheme with
-/// non-canonical serialization, for example with a `Protobuf`.
+/// Wraps a `Payload` together with corresponding `SignedMessage`.
+///
+/// Usually one wants to work with fully parsed messages (i.e., `Payload`). However, occasionally
+/// we need to retransmit the message into the network or save its serialized form. We could
+/// serialize the `Payload` back, but Protobuf does not have a canonical form so the resulting
+/// payload may have different binary representation (thus invalidating the message signature).
+///
+/// So we use `Message` to keep the original byte buffer around with the parsed `Payload`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Message<T> {
     //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
@@ -194,7 +203,7 @@ impl<T: ProtocolMessage> Message<T> {
     }
 }
 
-impl fmt::Debug for TransactionSetPart {
+impl fmt::Debug for ServiceTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Transaction")
             .field("message_id", &self.message_id)
@@ -254,8 +263,8 @@ impl<T: ProtocolMessage> StorageValue for Message<T> {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        let message = SignedMessage::unchecked_from_vec(value.into_owned());
-        //TODO: Remove additional deserialization
+        let message = SignedMessage::from_vec_unchecked(value.into_owned());
+        //TODO: Remove additional deserialization [ECR-2315]
         let msg = Protocol::deserialize(message).unwrap();
         T::try_from(msg).unwrap()
     }
