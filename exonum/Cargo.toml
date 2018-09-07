@@ -44,7 +44,7 @@ tokio-threadpool = "=0.1.6"
 failure = "0.1.2"
 os_info = "1.0.1"
 chrono = { version = "=0.4.6", features = ["serde"] }
-uuid = { version = "=0.6.5", features = ["serde"] }
+uuid = { version = "=0.7.0", features = ["serde"] }
 snow = "=0.3.1"
 rust_decimal = "=0.10.1"
 
