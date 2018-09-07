@@ -189,8 +189,7 @@ impl ExplorerApi {
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::verify_buffer(buf)?;
         let tx_hash = signed.hash();
-        let signed = Protocol::deserialize(signed)?
-            .try_into_transaction()
+        let signed = RawTransaction::try_from(Protocol::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
         let _ = state
             .sender()

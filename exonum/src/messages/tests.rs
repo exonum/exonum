@@ -3,7 +3,7 @@ use chrono::Utc;
 
 use super::{
     BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
-    Status, TransactionSetPart, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
+    Status, ServiceTransaction, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
     BinaryForm,
 };
@@ -45,7 +45,7 @@ fn test_known_transaction() {
     ).unwrap();
     let data = CreateWallet::new(&pk, "test_wallet");
 
-    let set = TransactionSetPart::from_raw_unchecked(2, data.raw);
+    let set = ServiceTransaction::from_raw_unchecked(2, data.raw);
     let msg = RawTransaction::new(128, set);
     let msg = Protocol::concrete(msg, pk, &sk);
     SignedMessage::verify_buffer(hex::decode(res).unwrap()).unwrap();
@@ -56,7 +56,7 @@ fn test_known_transaction() {
 fn test_empty_tx_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-    let set = TransactionSetPart::from_raw_unchecked(0, vec![]);
+    let set = ServiceTransaction::from_raw_unchecked(0, vec![]);
     let msg = RawTransaction::new(0, set);
     let msg = Protocol::concrete(msg, public_key, &secret_key);
     assert_eq!(RAW_TRANSACTION_EMPTY_SIZE, msg.signed_message().raw().len())
@@ -160,7 +160,7 @@ fn test_block() {
 #[test]
 fn test_raw_transaction_small_size() {
     let buffer = vec![0;1];
-    assert!(TransactionSetPart::deserialize(&vec![0;1]).is_err());
+    assert!(ServiceTransaction::deserialize(&vec![0;1]).is_err());
     assert!(RawTransaction::deserialize(&vec![0;1]).is_err());
     assert!(RawTransaction::deserialize(&vec![0;3]).is_err());
     let tx = RawTransaction::deserialize(&vec![0;4]).unwrap();

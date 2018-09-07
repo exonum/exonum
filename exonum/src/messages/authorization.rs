@@ -7,21 +7,22 @@ use crypto::{
 
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
-/// Correct raw message that was deserialized and verified, from `UncheckedBuffer`;
+message with verified structure and signature.
 ///
-/// inner data should be formed according to the following layout:
+/// `SignedMessage` can be constructed from a raw byte buffer which must have the following
+/// data layout:
 ///
-/// | Position | Stored data |
-/// | - - - - - - - -| - - - - - - |
-/// | `0..32`  | author's PublicKey     |
-/// | `32`     | message class          |
-/// | `33`     | message type           |
-/// | `34..N`  | Payload                |
-/// | `N..N+64`| Signature              |
+/// | Position  | Stored data             |
+/// | - - - - - | - - - - - - - - - - - - |
+/// | `0..32`   | author's public key     |
+/// | `32`      | message class           |
+/// | `33`      | message type            |
+/// | `34..N`   | payload                 |
+/// | `N..N+64` | signature               |
 ///
-///
-/// Every creation of `SignedMessage` lead to signature verification, or data signing procedure,
-/// which can slowdown your code.
+/// `SignedMessage` will verify the size of the buffer and the signature provided in it.
+/// This allows to keep the raw message buffer, but avoid verifying its signature again
+/// as every `SignedMessage` instance is guaranteed to have a correct signature.
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SignedMessage {
@@ -29,8 +30,9 @@ pub struct SignedMessage {
 }
 
 impl SignedMessage {
+    /// Creates `SignedMessage` from parts.
     pub(crate) fn new(
-        cls: u8,
+        class: u8,
         tag: u8,
         value: Vec<u8>,
         author: PublicKey,
@@ -38,7 +40,7 @@ impl SignedMessage {
     ) -> SignedMessage {
         let mut buffer = Vec::new();
         buffer.extend_from_slice(author.as_ref());
-        buffer.push(cls);
+        buffer.push(class);
         buffer.push(tag);
         buffer.extend_from_slice(value.as_ref());
         let signature = Self::sign(&buffer, secret_key).expect("Couldn't form signature");
@@ -49,9 +51,8 @@ impl SignedMessage {
     /// Creates `SignedMessage` wrapper from the raw buffer.
     /// Checks binary format and signature.
     pub fn verify_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
-        if buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
-            bail!("Message too short message_len = {}", buffer.len())
-        }
+        ensure!(buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE,
+            "Message too short message_len = {}", buffer.len());
         let signed = SignedMessage { raw: buffer };
 
         let pk = signed.author();
@@ -62,39 +63,39 @@ impl SignedMessage {
         Ok(signed)
     }
 
-    fn data_without_signature(&self) -> &[u8]{
+    fn data_without_signature(&self) -> &[u8] {
         debug_assert!(self.raw.len() > EMPTY_SIGNED_MESSAGE_SIZE);
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         &self.raw[0..sign_idx]
     }
 
-    #[cfg(test)]
-    pub(crate) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
+    /// Creates `SignedMessage` from buffer, didn't verify buffer size nor signature.
+    pub(crate) fn from_vec_unchecked(buffer: Vec<u8>) -> Self {
         SignedMessage { raw: buffer }
     }
 
-    #[cfg(not(test))]
-    pub(in messages) fn unchecked_from_vec(buffer: Vec<u8>) -> Self {
-        SignedMessage { raw: buffer }
-    }
-
+    /// Returns `PublicKey` of message author.
     pub(in messages) fn author(&self) -> PublicKey {
         PublicKey::from_slice(&self.raw[0..PUBLIC_KEY_LENGTH]).expect("Couldn't read PublicKey")
     }
 
+    /// Returns message class, which is an ID inside protocol.
     pub(in messages) fn message_class(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH]
     }
 
+    /// Returns message type, which is an ID inside some class of messages.
     pub(in messages) fn message_type(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH + 1]
     }
 
+    /// Returns serialised payload of the message.
     pub(in messages) fn payload(&self) -> &[u8] {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         &self.raw[PUBLIC_KEY_LENGTH + 2..sign_idx]
     }
 
+    /// Returns ed25519 signature for this message.
     pub(in messages) fn signature(&self) -> Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         Signature::from_slice(&self.raw[sign_idx..]).expect("Couldn't read signature")
@@ -105,15 +106,19 @@ impl SignedMessage {
         &self.raw
     }
 
+    /// Calculates a hash of inner data.
     pub fn hash(&self) -> Hash {
         hash(&self.raw)
     }
 
+    /// Signs buffer with secret_key.
+    /// This method returns ed25519 signature.
     fn sign(full_buffer: &[u8], secret_key: &SecretKey) -> Result<Signature, Error> {
         let signature = crypto::sign(&full_buffer, secret_key);
         Ok(signature)
     }
 
+    /// Verify buffer integrity, and authenticate buffer.
     fn verify(
         full_buffer: &[u8],
         signature: &Signature,
