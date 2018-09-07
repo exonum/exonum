@@ -63,7 +63,7 @@ impl ConnectionPool2 {
 
 #[derive(Clone)]
 pub struct Node {
-    address: SocketAddr,
+    pub address: SocketAddr,
     pool: ConnectionPool2,
 }
 
@@ -75,7 +75,10 @@ impl Node {
         }
     }
 
-    pub fn listen(&self, network_tx: mpsc::Sender<String>) -> impl Future<Item = (), Error=failure::Error> {
+    pub fn listen(
+        &self,
+        network_tx: mpsc::Sender<String>,
+    ) -> impl Future<Item = (), Error = failure::Error> {
         let server = TcpListener::bind(&self.address).unwrap().incoming();
         let pool = self.pool.clone();
         let mut connection_counter = 0;
@@ -100,26 +103,16 @@ impl Node {
         fut
     }
 
-    pub fn process_pool(&self, receiver_rx: mpsc::Receiver<String>) -> impl Future<Item = (), Error=failure::Error>  {
-        let mut read_pool = self.pool.clone();
-            let sender = receiver_rx.for_each(move |message| {
-                let sender_tx: Vec<mpsc::Sender<String>> =
-                    read_pool.peers.read().unwrap().values().cloned().collect();
-
-                println!("pool count {}", sender_tx.len());
-
-                sender_tx.iter().for_each(move |sen| {
-                    let fut = sen.clone()
-                        .send(message.clone())
-                        .map(drop)
-                        .map_err(log_error);
-                    tokio::spawn(fut);
-                });
-
-                Ok(())
-            }).map_err(|e| format_err!("pool processing failed {:?}", e));
+    fn send_message(pool: ConnectionPool2, message: String, address: &SocketAddr) -> impl Future<Item = (), Error = failure::Error> {
+        let mut read_pool = pool.clone();
+        let sender_tx = read_pool.peers.read().unwrap();
+        let sender = sender_tx.get(&address).unwrap();
 
         sender
+            .clone()
+            .send(message.clone())
+            .map_err(into_failure)
+            .map(drop)
     }
 
     fn process_connection(
@@ -142,7 +135,7 @@ impl Node {
                     .map_err(|e| format_err!("error! "))
                     .forward(sink)
                     .map(drop)
-                    .map_err(log_error)
+                    .map_err(|e| println!("error!"))
             });
 
         let fut = stream
@@ -168,10 +161,44 @@ impl Node {
         Ok(())
     }
 
-    pub fn connect(&self, address: &SocketAddr, network_tx: mpsc::Sender<String>) ->
-        impl Future<Item=(), Error= failure::Error> {
+    pub fn request_handler(
+        &self,
+        receiver: mpsc::Receiver<String>,
+        network_tx: mpsc::Sender<String>,
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        let address = self.address.clone();
+        let pool = self.pool.clone();
+
+        let handler = receiver.for_each(move |line| {
+            let fut = match line.as_str() {
+                "connect" => future::Either::A(Self::connect(
+                    pool.clone(),
+                    &address,
+                    &"127.0.0.1:9000".parse().unwrap(),
+                    network_tx.clone(),
+                )),
+                _ => future::Either::B(Self::send_message(pool.clone(), line, &"127.0.0.1:9000".parse().unwrap())),
+            }.map_err(log_error);
+
+            tokio::spawn(fut);
+            Ok(())
+        });
+
+        handler.map_err(|e| format_err!(""))
+    }
+
+    pub fn ok() -> impl Future<Item = (), Error = failure::Error> {
+        future::ok::<(), failure::Error>(())
+    }
+
+    pub fn connect(
+        pool: ConnectionPool2,
+        self_address: &SocketAddr,
+        address: &SocketAddr,
+        network_tx: mpsc::Sender<String>,
+    ) -> impl Future<Item = (), Error = failure::Error> {
         let address = address.clone();
-        let self_address = self.address.clone();
+        let self_address = self_address.clone();
         let timeout = 1000;
         let max_tries = 5000;
         let strategy = FixedInterval::from_millis(timeout)
@@ -179,30 +206,21 @@ impl Node {
             .take(max_tries);
 
         let action = move || TcpStream::connect(&address);
-        let pool = self.pool.clone();
+        let pool = pool.clone();
 
-        let future = Retry::spawn(strategy, action)
-            .map_err(into_failure)
-            .and_then(move |outgoing_connection| {
-                Self::process_connection(&self_address, outgoing_connection, pool, network_tx, false)
-            });
+        let future = Retry::spawn(strategy, action).map_err(into_failure).and_then(
+            move |outgoing_connection| {
+                Self::process_connection(
+                    &self_address,
+                    outgoing_connection,
+                    pool,
+                    network_tx,
+                    false,
+                )
+            },
+        );
 
         future
-    }
-
-    pub fn request_handler(&self, receiver: mpsc::Receiver<String>) -> impl Future<Item=(), Error=failure::Error> {
-
-        let handler = receiver.for_each(|line| {
-            match line.as_str() {
-                "connect" => {
-
-                }
-                _ => {}
-            }
-        });
-
-
-        future::ok::<(), failure::Error>(())
     }
 }
 
@@ -214,31 +232,32 @@ impl NetworkPart {
         handshake_params: &HandshakeParams,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let network_config = self.network_config;
+        let listen_address = self.listen_address;
         // Cancellation token
-        let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
+        let (cancel_sender, cancel_handler) = unsync::oneshot::channel::<()>();
 
         let pool = ConnectionPool2::new();
 
-        let listen_address = self.listen_address.clone();
         let (connect_sender_tx, connect_receiver_rx) = mpsc::channel::<String>(1024);
         let (sender_tx, receiver_rx) = mpsc::channel::<String>(1024);
 
-        let node = Node::new(listen_address, pool);
+        let node = Node::new(listen_address, pool.clone());
         let connector = node.clone();
 
         let remote_sender = sender_tx.clone();
 
-        let connect = connector.connect(&remote_address, remote_sender);
-
         let listener = node.clone();
 
-        let server =
-            listener.listen(sender_tx);
+        let server = listener.listen(sender_tx.clone());
+        let handler = node.request_handler(connect_receiver_rx, sender_tx);
+        thread::spawn(|| tokio::run(server.join(handler).map_err(log_error).map(drop)));
 
-        let pool_processor = node.process_pool(connect_receiver_rx);
-
-        thread::spawn(|| {
-            tokio::run(server.join3(connect, pool_processor).map_err(log_error).map(drop))
+        thread::spawn(move || {
+            let receiver = receiver_rx.for_each(|line| {
+                println!("> {}", line);
+                Ok(())
+            });
+            tokio::run(receiver);
         });
 
         future::ok::<(), failure::Error>(())
