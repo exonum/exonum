@@ -135,7 +135,7 @@ impl BinaryForm for RawTransaction {
 
 impl BinaryForm for ServiceTransaction {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
-        let mut buffer = Vec::new();
+        let mut buffer = vec![0; mem::size_of::<u16>()];
         buffer.resize(2, 0);
         LittleEndian::write_u16(&mut buffer[0..2], self.message_id);
         buffer.extend_from_slice(&self.payload);
