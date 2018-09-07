@@ -51,10 +51,6 @@
 //! struct TimestampingService;
 //!
 //! impl Transaction for TxTimestamp {
-//!     fn verify(&self) -> bool {
-//!         self.verify_signature(self.from())
-//!     }
-//!
 //!     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
 //!         Ok(())
 //!     }
@@ -521,7 +517,6 @@ impl TestKit {
     /// #     }
     /// # }
     /// # impl Transaction for MyTransaction {
-    /// #     fn verify(&self) -> bool { true }
     /// #     fn execute(&self, _: &mut exonum::storage::Fork) -> ExecutionResult { Ok(()) }
     /// # }
     /// #

@@ -44,10 +44,6 @@ transactions! {
 }
 
 impl Transaction for CreateWallet {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
         if self.name().starts_with("Al") {
             Ok(())
@@ -61,10 +57,6 @@ impl Transaction for CreateWallet {
 }
 
 impl Transaction for Transfer {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
         panic!("oops")
     }

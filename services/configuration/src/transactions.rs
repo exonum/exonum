@@ -247,10 +247,6 @@ impl Propose {
 }
 
 impl Transaction for Propose {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let fork = tc.fork();
         let (cfg, cfg_hash) = self.precheck(fork.as_ref()).map_err(|err| {
@@ -383,10 +379,6 @@ impl<'a> From<&'a VoteAgainst> for VotingDecisionRef<'a> {
 }
 
 impl Transaction for Vote {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let fork = tc.fork();
         let vote = VotingDecisionRef::from(self);
@@ -409,10 +401,6 @@ impl Transaction for Vote {
 }
 
 impl Transaction for VoteAgainst {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let fork = tc.fork();
         let vote_against = VotingDecisionRef::from(self);

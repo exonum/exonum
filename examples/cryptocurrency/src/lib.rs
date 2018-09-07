@@ -208,12 +208,6 @@ pub mod contracts {
     const INIT_BALANCE: u64 = 100;
 
     impl Transaction for TxCreateWallet {
-        /// Verifies integrity of the transaction by checking the transaction
-        /// signature.
-        fn verify(&self) -> bool {
-            true
-        }
-
         /// If a wallet with the specified public key is not registered, then creates a new wallet
         /// with the specified public key and name, and an initial balance of 100.
         /// Otherwise, performs no op.
@@ -232,8 +226,7 @@ pub mod contracts {
     }
 
     impl Transaction for TxTransfer {
-        /// Checks if the sender is not the receiver, and checks correctness of the
-        /// sender's signature.
+        /// Checks if the sender is not the receiver
         fn verify(&self) -> bool {
             (*self.from() != *self.to())
         }

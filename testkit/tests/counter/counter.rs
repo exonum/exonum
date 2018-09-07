@@ -77,10 +77,6 @@ transactions! {
 }
 
 impl Transaction for TxIncrement {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.author())
-    }
-
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
@@ -106,7 +102,7 @@ impl TxReset {
 
 impl Transaction for TxReset {
     fn verify(&self) -> bool {
-        self.verify_author() && self.verify_signature(self.author())
+        self.verify_author()
     }
 
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {

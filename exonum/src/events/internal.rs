@@ -134,10 +134,6 @@ impl InternalPart {
 //    }
 //
 //    impl Transaction for Tx {
-//        fn verify(&self) -> bool {
-//            true
-//        }
-//
 //        fn execute(&self, _:TransactionContext) -> ExecutionResult {
 //            Ok(())
 //        }

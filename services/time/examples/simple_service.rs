@@ -82,10 +82,6 @@ transactions! {
 }
 
 impl Transaction for TxMarker {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let view = tc.fork();
         let time = TimeSchema::new(&view).time().get();

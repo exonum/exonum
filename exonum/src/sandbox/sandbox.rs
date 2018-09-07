@@ -1169,10 +1169,6 @@ mod tests {
     }
 
     impl Transaction for TxAfterCommit {
-        fn verify(&self) -> bool {
-            true
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }

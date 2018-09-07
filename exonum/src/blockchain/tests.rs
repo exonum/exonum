@@ -59,10 +59,6 @@ transactions! {
 }
 
 impl Transaction for Tx {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         if self.value() == 42 {
             panic!(Error::new("42"))
@@ -292,30 +288,18 @@ mod transactions_tests {
     }
 
     impl Transaction for A {
-        fn verify(&self) -> bool {
-            true
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
 
     impl Transaction for B {
-        fn verify(&self) -> bool {
-            true
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
 
     impl Transaction for C {
-        fn verify(&self) -> bool {
-            true
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
@@ -641,10 +625,6 @@ mod rocksdb_tests {
     //        use blockchain::{ExecutionResult, Transaction, TransactionContext};
     //
     //        impl Transaction for NewTx {
-    //            fn verify(&self) -> bool {
-    //                true
-    //            }
-    //
     //            fn execute(&self, _: TransactionContext) -> ExecutionResult {
     //                Ok(())
     //            }

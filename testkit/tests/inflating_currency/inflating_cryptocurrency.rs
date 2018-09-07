@@ -108,12 +108,6 @@ transactions! {
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
 impl Transaction for TxCreateWallet {
-    /// Verify integrity of the transaction by checking the transaction
-    /// signature.
-    fn verify(&self) -> bool {
-        true
-    }
-
     /// Apply logic to the storage when executing the transaction.
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let view = tc.fork();

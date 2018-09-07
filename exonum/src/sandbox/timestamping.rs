@@ -33,10 +33,6 @@ transactions! {
 }
 
 impl Transaction for TimestampTx {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
         Ok(())
     }

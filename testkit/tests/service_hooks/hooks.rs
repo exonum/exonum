@@ -32,10 +32,6 @@ transactions! {
 }
 
 impl Transaction for TxAfterCommit {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
         Ok(())
     }

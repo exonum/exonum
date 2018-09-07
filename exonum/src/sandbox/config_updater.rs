@@ -60,10 +60,6 @@ impl ConfigUpdateService {
 }
 
 impl Transaction for TxConfig {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = Schema::new(tc.fork());
         schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());

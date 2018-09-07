@@ -42,10 +42,6 @@ transactions! {
 struct TimestampingService;
 
 impl Transaction for TxTimestamp {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
         Ok(())
     }

@@ -118,8 +118,7 @@ impl Service for TimeService {
             .broadcast_transaction(TxTime::new(
                 self.time.current_time(),
                 &pub_key,
-            ))
-            .unwrap();
+            ));
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

@@ -8,14 +8,16 @@ use crypto::{
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
 /// Correct raw message that was deserialized and verified, from `UncheckedBuffer`;
+///
 /// inner data should be formed according to the following layout:
+///
 /// | Position | Stored data |
 /// | - - - - - - - -| - - - - - - |
 /// | `0..32`  | author's PublicKey     |
 /// | `32`     | message class          |
 /// | `33`     | message type           |
 /// | `34..N`  | Payload                |
-/// | `N..N+64`| Signature                |
+/// | `N..N+64`| Signature              |
 ///
 ///
 /// Every creation of `SignedMessage` lead to signature verification, or data signing procedure,

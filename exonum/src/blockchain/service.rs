@@ -92,12 +92,10 @@ use storage::{Fork, Snapshot};
 ///
 /// impl Transaction for TxA {
 ///     // Business logic implementation
-/// #   fn verify(&self) -> bool { true }
 /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// impl Transaction for TxB {
-/// #   fn verify(&self) -> bool { true }
 /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// }
 ///

@@ -398,7 +398,6 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///     }
 /// }
 /// # impl Transaction for CreateWallet {
-/// #     fn verify(&self) -> bool { true }
 /// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 ///
@@ -568,7 +567,6 @@ impl CommittedTransaction {
 ///     }
 /// }
 /// # impl Transaction for CreateWallet {
-/// #     fn verify(&self) -> bool { true }
 /// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 ///

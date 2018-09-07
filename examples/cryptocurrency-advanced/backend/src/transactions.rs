@@ -100,10 +100,6 @@ transactions! {
 }
 
 impl Transaction for Transfer {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let ref from = tc.author();
         let hash = tc.tx_hash();
@@ -133,10 +129,6 @@ impl Transaction for Transfer {
 }
 
 impl Transaction for Issue {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let ref pub_key = tc.author();
         let hash = tc.tx_hash();
@@ -154,10 +146,6 @@ impl Transaction for Issue {
 }
 
 impl Transaction for CreateWallet {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let ref pub_key = tc.author();
         let hash = tc.tx_hash();

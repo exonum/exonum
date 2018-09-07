@@ -123,10 +123,6 @@ impl TxTime {
 }
 
 impl Transaction for TxTime {
-    fn verify(&self) -> bool {
-        true
-    }
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let view = tc.fork();
         self.check_signed_by_validator(view.as_ref())?;

@@ -142,16 +142,12 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn verify(&self) -> bool {
-    ///         true
-    ///     }
-    ///
     ///     // Other methods...
     ///     // ...
     /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
     /// }
     /// # fn main() {}
-    fn verify(&self) -> bool;
+    fn verify(&self) -> bool { true }
 
     /// Receives a `TransactionContext` witch contain fork
     /// of the current blockchain state and can modify it depending on the contents
@@ -196,7 +192,6 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn verify(&self) -> bool { true }
     /// }
     /// # fn main() {}
     fn execute<'a>(&self, context: TransactionContext<'a>) -> ExecutionResult;
@@ -526,12 +521,10 @@ pub trait TransactionSet:
 ///     }
 /// }
 /// # impl Transaction for Create {
-/// #   fn verify(&self) -> bool { true }
 /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 /// #
 /// # impl Transaction for Transfer {
-/// #   fn verify(&self) -> bool { true }
 /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 /// #
@@ -999,10 +992,6 @@ mod tests {
     }
 
     impl Transaction for TxResult {
-        fn verify(&self) -> bool {
-            true
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let mut entry = create_entry(context.fork());
             entry.set(self.index());
