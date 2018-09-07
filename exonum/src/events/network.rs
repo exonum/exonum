@@ -385,8 +385,7 @@ impl Listener {
     ) -> Result<Self, failure::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
-        // The reference counter is used to automatically count the number of the open connections.
-        let incoming_connections_counter: Rc<()> = Rc::default();
+        let mut incoming_connections_counter = 0;
         // Incoming connections handler
         let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
@@ -394,10 +393,9 @@ impl Listener {
         let server = listener
             .incoming()
             .for_each(move |(sock, address)| {
-                let holder = Rc::downgrade(&incoming_connections_counter);
                 // Check incoming connections count
-                let connections_count = Rc::weak_count(&incoming_connections_counter);
-                if connections_count > incoming_connections_limit {
+                incoming_connections_counter += 1;
+                if incoming_connections_counter > incoming_connections_limit {
                     warn!(
                         "Rejected incoming connection with peer={}, \
                          connections limit reached.",
@@ -414,9 +412,9 @@ impl Listener {
                     .and_then(move |sock| {
                         Self::handle_incoming_connection(sock, address, network_tx)
                     })
-                    .map(|_| {
-                        // Ensure that holder lives until the stream ends.
-                        let _holder = holder;
+                    .then(move |result| {
+                        incoming_connections_counter -= 1;
+                        result
                     })
                     .map_err(|e| {
                         error!("Connection terminated: {}: {}", e, e.find_root_cause());
