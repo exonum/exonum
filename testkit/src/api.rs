@@ -24,10 +24,9 @@ use serde_urlencoded;
 use std::fmt::{self, Display};
 
 use exonum::{
-    api::{self, ApiAggregator, ServiceApiState},
-    blockchain::{SharedNodeState},
-    messages::{Message, RawTransaction},
-    encoding::serialize::reexport::{DeserializeOwned, Serialize}, node::ApiSender,
+    api::{self, ApiAggregator, ServiceApiState}, blockchain::SharedNodeState,
+    encoding::serialize::reexport::{DeserializeOwned, Serialize},
+    messages::{Message, RawTransaction}, node::ApiSender,
 };
 
 use TestKit;
@@ -269,8 +268,10 @@ where
             StatusCode::Forbidden => Err(api::Error::Unauthorized),
             StatusCode::BadRequest => Err(api::Error::BadRequest(error(response))),
             StatusCode::NotFound => Err(api::Error::NotFound(error(response))),
-            s if s.is_server_error() => Err(api::Error::InternalError(
-                format_err!("{}", error(response)))),
+            s if s.is_server_error() => Err(api::Error::InternalError(format_err!(
+                "{}",
+                error(response)
+            ))),
             s => panic!("Received non-error response status: {}", s.as_u16()),
         }
     }

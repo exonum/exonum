@@ -18,7 +18,7 @@ use serde_json;
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, CryptoHash}, helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Propose, Message},
+    messages::{Message, Precommit, Propose, Protocol},
 };
 
 /// Emulated test network.
@@ -170,14 +170,18 @@ impl TestNode {
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
     ) -> Message<Propose> {
-        Protocol::concrete(Propose::new(
-            self.validator_id
-                .expect("An attempt to create propose from a non-validator node."),
-            height,
-            Round::first(),
-            last_hash,
-            tx_hashes,
-        ), self.consensus_public_key, &self.consensus_secret_key)
+        Protocol::concrete(
+            Propose::new(
+                self.validator_id
+                    .expect("An attempt to create propose from a non-validator node."),
+                height,
+                Round::first(),
+                last_hash,
+                tx_hashes,
+            ),
+            self.consensus_public_key,
+            &self.consensus_secret_key,
+        )
     }
 
     /// Creates a `Precommit` message signed by this validator.
@@ -188,15 +192,19 @@ impl TestNode {
     ) -> Message<Precommit> {
         use std::time::SystemTime;
 
-        Protocol::concrete(Precommit::new(
-            self.validator_id
-                .expect("An attempt to create propose from a non-validator node."),
-            propose.height(),
-            propose.round(),
-            &propose.hash(),
-            block_hash,
-            SystemTime::now().into(),
-        ), self.consensus_public_key, &self.consensus_secret_key)
+        Protocol::concrete(
+            Precommit::new(
+                self.validator_id
+                    .expect("An attempt to create propose from a non-validator node."),
+                propose.height(),
+                propose.round(),
+                &propose.hash(),
+                block_hash,
+                SystemTime::now().into(),
+            ),
+            self.consensus_public_key,
+            &self.consensus_secret_key,
+        )
     }
 
     /// Returns public keys of the node.

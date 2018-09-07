@@ -14,8 +14,8 @@
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::{SharedNodeState}, crypto,
-    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
+    blockchain::SharedNodeState, crypto, explorer::{BlockWithTransactions, BlockchainExplorer},
+    helpers::Height,
 };
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -79,10 +79,7 @@ impl TestkitServerApi {
         Ok(block_info)
     }
 
-    fn rollback(
-        &self,
-        height: Height,
-    ) -> api::Result<Option<BlockWithTransactions>> {
+    fn rollback(&self, height: Height) -> api::Result<Option<BlockWithTransactions>> {
         if height == Height(0) {
             Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
@@ -159,19 +156,21 @@ mod tests {
     use serde_json;
 
     use exonum::api;
-    use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
+    use exonum::blockchain::{
+        ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
+    };
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
-    use exonum::messages::{Message, RawTransaction};
+    use exonum::messages::{Message, Protocol, RawTransaction};
     use exonum::storage::{Fork, Snapshot};
 
     use super::*;
     use {TestKitApi, TestKitBuilder};
 
-    type DeBlock = BlockWithTransactions<serde_json::Value>;
-
+    type DeBlock = BlockWithTransactions;
+    const TIMESTAMP_SERVICE_ID: u16 = 0;
     transactions! {
         Any {
 
@@ -183,9 +182,14 @@ mod tests {
     }
 
     impl TxTimestamp {
-        fn for_str(s: &str) -> Self {
+        fn for_str(s: &str) -> Message<RawTransaction> {
             let (pubkey, key) = crypto::gen_keypair();
-            TxTimestamp::new(&pubkey, s, &key)
+            Protocol::sign_tx(
+                TxTimestamp::new(&pubkey, s),
+                TIMESTAMP_SERVICE_ID,
+                pubkey,
+                &key,
+            )
         }
     }
 
@@ -258,10 +262,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(
-            *block_info.transactions[0].content(),
-            tx.serialize_field().unwrap()
-        );
+        assert_eq!(*block_info.transactions[0].content(), tx);
 
         // Requests with a body that invoke `create_block`
         let bodies = vec![None, Some(CreateBlockQuery { tx_hashes: None })];
@@ -282,10 +283,7 @@ mod tests {
 
             assert_eq!(block_info.header.height(), Height(1));
             assert_eq!(block_info.transactions.len(), 1);
-            assert_eq!(
-                *block_info.transactions[0].content(),
-                tx.serialize_field().unwrap()
-            );
+            assert_eq!(*block_info.transactions[0].content(), tx);
         }
     }
 

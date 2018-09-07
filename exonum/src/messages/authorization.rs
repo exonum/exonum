@@ -21,7 +21,7 @@ use super::EMPTY_SIGNED_MESSAGE_SIZE;
 ///
 ///
 /// Every creation of `SignedMessage` lead to signature verification, or data signing procedure,
-/// which can slowdown your code. Beware `SignedMessage` message, this procedure is not free.
+/// which can slowdown your code.
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SignedMessage {

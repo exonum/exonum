@@ -267,7 +267,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 
 //TODO: impl Deserialize
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]

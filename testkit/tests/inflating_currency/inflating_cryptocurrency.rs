@@ -16,8 +16,11 @@ extern crate serde;
 extern crate serde_json;
 
 use exonum::{
-    api, blockchain::{ExecutionResult, Schema as CoreSchema, Service, Transaction,
-                      TransactionSet, TransactionContext},
+    api,
+    blockchain::{
+        ExecutionResult, Schema as CoreSchema, Service, Transaction, TransactionContext,
+        TransactionSet,
+    },
     crypto::{Hash, PublicKey}, encoding, helpers::Height, messages::{Message, RawTransaction},
     storage::{Fork, MapIndex, Snapshot},
 };

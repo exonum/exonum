@@ -165,8 +165,7 @@ use exonum::{
     },
     blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration},
     crypto::{self, Hash}, explorer::{BlockWithTransactions, BlockchainExplorer},
-    helpers::{Height, ValidatorId},
-    messages::{RawTransaction, Message},
+    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction},
     node::{ApiSender, ExternalMessage, State as NodeState}, storage::{MemoryDB, Patch, Snapshot},
 };
 
@@ -682,8 +681,6 @@ impl TestKit {
                 let mut schema = CoreSchema::new(&mut fork);
 
                 txs.into_iter()
-                    .map(|tx| blockchain.tx_from_raw(tx).unwrap())
-                    .filter(|tx| tx.transaction().verify())
                     .map(|tx| {
                         let tx_id = tx.hash();
                         let tx_not_found = !schema.transactions().contains(&tx_id);

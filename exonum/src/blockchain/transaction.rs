@@ -69,11 +69,15 @@ impl ::std::fmt::Debug for TransactionMessage {
 impl TransactionMessage {
     /// Returns `SignedMessage`.
     pub fn signed_message(&self) -> &SignedMessage {
-        unimplemented!()
+        self.message.signed_message()
     }
     /// Returns `RawTransaction`.
     pub fn raw_transaction(&self) -> RawTransaction {
-        unimplemented!()
+        self.message.payload().clone()
+    }
+    /// Returns raw transaction message.
+    pub fn message(&self) -> &Message<RawTransaction> {
+        &self.message
     }
     /// Returns transaction smart contract.
     pub fn transaction(&self) -> Option<&Box<dyn Transaction>> {
