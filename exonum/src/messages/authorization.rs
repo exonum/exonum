@@ -89,7 +89,7 @@ impl SignedMessage {
         self.raw[PUBLIC_KEY_LENGTH + 1]
     }
 
-    /// Returns serialised payload of the message.
+    /// Returns serialized payload of the message.
     pub(in messages) fn payload(&self) -> &[u8] {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         &self.raw[PUBLIC_KEY_LENGTH + 2..sign_idx]
