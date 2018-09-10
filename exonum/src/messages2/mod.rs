@@ -73,7 +73,7 @@ pub struct ServiceTransaction {
 
 impl ServiceTransaction {
     /// Creates `ServiceTransaction` from unchecked raw data.
-    pub fn from_raw_unchecked(message_id: u16, payload: Vec<u8>) -> Self {
+    pub fn from_raw_unchecked(transaction_id: u16, payload: Vec<u8>) -> Self {
         ServiceTransaction {
             transaction_id,
             payload,
@@ -136,7 +136,7 @@ impl BinaryForm for RawTransaction {
 impl BinaryForm for ServiceTransaction {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
-        LittleEndian::write_u16(&mut buffer[0..2], self.message_id);
+        LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
         buffer.extend_from_slice(&self.payload);
         Ok(buffer)
     }
@@ -145,10 +145,10 @@ impl BinaryForm for ServiceTransaction {
         if buffer.len() < mem::size_of::<u16>() {
             Err("Buffer too short in ServiceTransaction deserialization.")?
         }
-        let message_id = LittleEndian::read_u16(&buffer[0..2]);
+        let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
         Ok(ServiceTransaction {
-            service_id,
+            transaction_id,
             payload,
         })
     }
@@ -205,7 +205,7 @@ impl<T: ProtocolMessage> Message<T> {
 impl fmt::Debug for ServiceTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Transaction")
-            .field("message_id", &self.message_id)
+            .field("message_id", &self.transaction_id)
             .field("payload_len", &self.payload.len())
             .finish()
     }
