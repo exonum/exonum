@@ -31,9 +31,9 @@
 //!              (drop)                           (drop)
 //! ```
 
-use hex::{FromHex, ToHex};
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
+use hex::{FromHex, ToHex};
 
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
@@ -107,7 +107,6 @@ impl RawTransaction {
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
-
 }
 
 impl BinaryForm for RawTransaction {
@@ -226,8 +225,9 @@ impl<X: ProtocolMessage> FromHex for Message<X> {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = Protocol::deserialize(SignedMessage::verify_buffer(bytes)?)?;
-        ProtocolMessage::try_from(protocol).map_err(|_| format_err!("Couldn't deserialize message."))
+        let protocol = Protocol::deserialize(SignedMessage::from_raw_buffer(bytes)?)?;
+        ProtocolMessage::try_from(protocol)
+            .map_err(|_| format_err!("Couldn't deserialize message."))
     }
 }
 

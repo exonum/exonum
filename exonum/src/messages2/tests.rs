@@ -1,11 +1,10 @@
-use hex::{self, FromHex};
 use chrono::Utc;
+use hex::{self, FromHex};
 
 use super::{
-    BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction, SignedMessage,
-    Status, ServiceTransaction, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
+    BinaryForm, BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction,
+    ServiceTransaction, SignedMessage, Status, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
-    BinaryForm,
 };
 use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, PublicKey, SecretKey};
@@ -48,7 +47,7 @@ fn test_known_transaction() {
     let set = ServiceTransaction::from_raw_unchecked(2, data.raw);
     let msg = RawTransaction::new(128, set);
     let msg = Protocol::concrete(msg, pk, &sk);
-    SignedMessage::verify_buffer(hex::decode(res).unwrap()).unwrap();
+    SignedMessage::from_raw_buffer(hex::decode(res).unwrap()).unwrap();
     assert_eq!(res, hex::encode(msg.signed_message().raw()));
 }
 
@@ -140,7 +139,7 @@ fn test_block() {
     assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2: Message<BlockResponse> = ProtocolMessage::try_from(
-        Protocol::deserialize(SignedMessage::verify_buffer(block.serialize()).unwrap()).unwrap(),
+        Protocol::deserialize(SignedMessage::from_raw_buffer(block.serialize()).unwrap()).unwrap(),
     ).unwrap();
 
     assert_eq!(block2.author(), pub_key);
@@ -159,11 +158,11 @@ fn test_block() {
 
 #[test]
 fn test_raw_transaction_small_size() {
-    let buffer = vec![0;1];
-    assert!(ServiceTransaction::deserialize(&vec![0;1]).is_err());
-    assert!(RawTransaction::deserialize(&vec![0;1]).is_err());
-    assert!(RawTransaction::deserialize(&vec![0;3]).is_err());
-    let tx = RawTransaction::deserialize(&vec![0;4]).unwrap();
+    let buffer = vec![0; 1];
+    assert!(ServiceTransaction::deserialize(&vec![0; 1]).is_err());
+    assert!(RawTransaction::deserialize(&vec![0; 1]).is_err());
+    assert!(RawTransaction::deserialize(&vec![0; 3]).is_err());
+    let tx = RawTransaction::deserialize(&vec![0; 4]).unwrap();
     assert_eq!(tx.service_id, 0);
     assert_eq!(tx.transaction_set.message_id, 0);
 }

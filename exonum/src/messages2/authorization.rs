@@ -6,7 +6,6 @@ use std::fmt;
 use crypto::{
     self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
-
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
 /// `SignedMessage` can be constructed from a raw byte buffer which must have the following
@@ -23,7 +22,6 @@ use super::EMPTY_SIGNED_MESSAGE_SIZE;
 /// `SignedMessage` will verify the size of the buffer and the signature provided in it.
 /// This allows to keep the raw message buffer, but avoid verifying its signature again
 /// as every `SignedMessage` instance is guaranteed to have a correct signature.
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SignedMessage {
     pub(in messages) raw: Vec<u8>,
@@ -38,7 +36,7 @@ impl SignedMessage {
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> SignedMessage {
-        let mut buffer = Vec::new();
+        let mut buffer = Vec::with_capacity(2 + value.len() + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH);
         buffer.extend_from_slice(author.as_ref());
         buffer.push(class);
         buffer.push(tag);
@@ -50,9 +48,12 @@ impl SignedMessage {
 
     /// Creates `SignedMessage` wrapper from the raw buffer.
     /// Checks binary format and signature.
-    pub fn verify_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
-        ensure!(buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE,
-            "Message too short message_len = {}", buffer.len());
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
+        ensure!(
+            buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE,
+            "Message too short message_len = {}",
+            buffer.len()
+        );
         let signed = SignedMessage { raw: buffer };
 
         let pk = signed.author();
@@ -147,6 +148,6 @@ impl FromHex for SignedMessage {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<SignedMessage, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        Self::verify_buffer(bytes)
+        Self::from_raw_buffer(bytes)
     }
 }
