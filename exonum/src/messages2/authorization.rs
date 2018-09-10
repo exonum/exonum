@@ -3,10 +3,10 @@ use hex::{FromHex, ToHex};
 
 use std::fmt;
 
+use super::EMPTY_SIGNED_MESSAGE_SIZE;
 use crypto::{
     self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
-use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
 /// `SignedMessage` can be constructed from a raw byte buffer which must have the following
 /// data layout:
