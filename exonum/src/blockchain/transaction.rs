@@ -649,10 +649,10 @@ macro_rules! transactions {
             }
         }
 
-        impl Into<$crate::messages::TransactionSetPart> for $transaction_set {
-            fn into(self) -> $crate::messages::TransactionSetPart {
+        impl Into<$crate::messages::ServiceTransaction> for $transaction_set {
+            fn into(self) -> $crate::messages::ServiceTransaction {
                 let (id, vec) = __enum_to_vec_id!($transaction_set &self, $( $name )*);
-                $crate::messages::TransactionSetPart::from_raw_unchecked(id, vec)
+                $crate::messages::ServiceTransaction::from_raw_unchecked(id, vec)
 
             }
         }
@@ -663,8 +663,8 @@ macro_rules! transactions {
             }
         }
 
-        impl Into<$crate::messages::TransactionSetPart> for $name {
-            fn into(self) -> $crate::messages::TransactionSetPart {
+        impl Into<$crate::messages::ServiceTransaction> for $name {
+            fn into(self) -> $crate::messages::ServiceTransaction {
                 let set: $transaction_set = self.into();
                 set.into()
             }

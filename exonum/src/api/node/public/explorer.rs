@@ -186,6 +186,8 @@ impl ExplorerApi {
         query: TransactionHex,
     ) -> Result<TransactionResponse, ApiError> {
         use events::error::into_failure;
+        use messages::ProtocolMessage;
+
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::verify_buffer(buf)?;
         let tx_hash = signed.hash();

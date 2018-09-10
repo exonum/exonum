@@ -28,7 +28,7 @@ use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
-use messages::{BinaryForm, Message, Protocol, RawTransaction, TransactionSetPart};
+use messages::{BinaryForm, Message, Protocol, RawTransaction, ServiceTransaction};
 use node::{ApiSender, NodeRole, State};
 use storage::{Fork, Snapshot};
 
@@ -301,7 +301,7 @@ impl ServiceContext {
     /// Signs and broadcast transaction to other nodes in the network.
     pub fn broadcast_transaction<T>(&self, tx: T)
     where
-        T: Into<TransactionSetPart> + Transaction,
+        T: Into<ServiceTransaction> + Transaction,
     {
         let tx_process = move || -> Result<(), ::failure::Error> {
             let msg = Protocol::sign_tx(
