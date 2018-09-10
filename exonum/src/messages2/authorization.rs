@@ -1,6 +1,8 @@
 use failure::Error;
 use hex::{FromHex, ToHex};
 
+use std::fmt;
+
 use crypto::{
     self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
@@ -130,11 +132,11 @@ impl SignedMessage {
 }
 
 impl ToHex for SignedMessage {
-    fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         self.raw.write_hex(w)
     }
 
-    fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         self.raw.write_hex_upper(w)
     }
 }
