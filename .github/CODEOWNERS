@@ -11,14 +11,14 @@ crypto/* @darkeld3r @aleksuss @pavel-mukhanov @vldm @slowli
 examples/cryptocurrency/* @darkeld3r @aleksuss @vitvakatu @ilammy
 examples/cryptocurrency-advanced/* @darkeld3r @aleksuss @vitvakatu @ilammy
 
-# Timestemping:
-examples/timestemping/* @darkeld3r @aleksuss @ozkriff @mvlabat @vitvakatu
+# Timestamping:
+examples/timestamping/* @darkeld3r @aleksuss @ozkriff @mvlabat @vitvakatu
 
 # Configuration service:
-services/* @darkeld3r @aleksuss @alekseysidorov @vldm @slowli
+services/configuration/* @darkeld3r @aleksuss @alekseysidorov @vldm @slowli
 
 # Time-oracle service:
-testkit/* @darkeld3r @aleksuss @alekseysidorov @slowli
+services/time/* @darkeld3r @aleksuss @alekseysidorov @slowli
 
 # Testkit:
 testkit/* @darkeld3r @aleksuss @alekseysidorov @slowli
