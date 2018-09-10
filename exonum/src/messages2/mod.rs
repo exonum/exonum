@@ -67,7 +67,7 @@ pub struct RawTransaction {
 /// This type used inner inside `transactions!` to transfer some set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ServiceTransaction {
-    service_id: u16,
+    transaction_id: u16,
     payload: Vec<u8>,
 }
 
@@ -75,14 +75,14 @@ impl ServiceTransaction {
     /// Creates `ServiceTransaction` from unchecked raw data.
     pub fn from_raw_unchecked(message_id: u16, payload: Vec<u8>) -> Self {
         ServiceTransaction {
-            service_id,
+            transaction_id,
             payload,
         }
     }
 
     /// Converts `ServiceTransaction` back to raw data.
     pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
-        (self.service_id, self.payload)
+        (self.transaction_id, self.payload)
     }
 }
 
