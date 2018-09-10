@@ -427,7 +427,7 @@ impl Listener {
 
     fn parse_connect_msg(raw: Option<Vec<u8>>) -> Result<Message<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
-        let message = Protocol::verify_buffer(raw)?;
+        let message = Protocol::from_raw_buffer(raw)?;
         match message {
             Protocol::Service(Service::Connect(connect)) => Ok(connect),
             other => bail!(

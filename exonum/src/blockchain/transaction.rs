@@ -151,7 +151,9 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
     /// }
     /// # fn main() {}
-    fn verify(&self) -> bool { true }
+    fn verify(&self) -> bool {
+        true
+    }
 
     /// Receives a `TransactionContext` witch contain fork
     /// of the current blockchain state and can modify it depending on the contents

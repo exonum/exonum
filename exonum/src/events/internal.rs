@@ -52,7 +52,7 @@ impl InternalPart {
     ) -> impl Future<Item = (), Error = ()> {
         future::lazy(move || {
             let handler = move || -> Result<Protocol, failure::Error> {
-                Protocol::deserialize(SignedMessage::verify_buffer(raw)?)
+                Protocol::deserialize(SignedMessage::from_raw_buffer(raw)?)
             };
             if let Ok(protocol) = handler() {
                 let event = future::ok(InternalEvent::MessageVerified(protocol));

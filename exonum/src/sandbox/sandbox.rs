@@ -124,7 +124,7 @@ impl SandboxInner {
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
                         let protocol = Protocol::deserialize(
-                            SignedMessage::verify_buffer(message).unwrap(),
+                            SignedMessage::from_raw_buffer(message).unwrap(),
                         ).unwrap();
                         self.handler
                             .handle_event(InternalEvent::MessageVerified(protocol).into());

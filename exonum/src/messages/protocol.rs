@@ -37,7 +37,7 @@ use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATUR
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 
-use super::{BinaryForm, Message, RawTransaction, SignedMessage, ServiceTransaction};
+use super::{BinaryForm, Message, RawTransaction, ServiceTransaction, SignedMessage};
 
 #[doc(hidden)]
 /// `SignedMessage` size with zero bytes payload.
@@ -360,7 +360,7 @@ impl Precommit {
     pub(crate) fn verify_precommit(
         buffer: Vec<u8>,
     ) -> Result<Message<Precommit>, ::failure::Error> {
-        let signed = SignedMessage::verify_buffer(buffer)?;
+        let signed = SignedMessage::from_raw_buffer(buffer)?;
         let protocol = Protocol::deserialize(signed)?;
         ProtocolMessage::try_from(protocol)
             .map_err(|_| format_err!("Couldn't verify precommit from message"))
@@ -581,8 +581,8 @@ impl Protocol {
         T::into_message_from_parts(message, signed)
     }
     /// Checks buffer and return instance of `Protocol`.
-    pub fn verify_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
-        let signed = SignedMessage::verify_buffer(buffer)?;
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
+        let signed = SignedMessage::from_raw_buffer(buffer)?;
         Self::deserialize(signed)
     }
 

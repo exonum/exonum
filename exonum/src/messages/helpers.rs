@@ -41,4 +41,3 @@ impl HexStringRepresentation {
         FromHex::from_hex(&hex_string).map_err(de::Error::custom)
     }
 }
-
