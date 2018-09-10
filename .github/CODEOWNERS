@@ -2,7 +2,7 @@
 * @darkeld3r @aleksuss
 
 # Javascript specific changes:
-* @darkeld3r @boguslavsky
+*.js @darkeld3r @boguslavsky
 
 # Cryptography:
 crypto/* @darkeld3r @aleksuss @pavel-mukhanov @vldm @slowli
