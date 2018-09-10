@@ -7,8 +7,6 @@ use crypto::{
 
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 
-message with verified structure and signature.
-///
 /// `SignedMessage` can be constructed from a raw byte buffer which must have the following
 /// data layout:
 ///
