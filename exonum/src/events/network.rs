@@ -230,7 +230,9 @@ impl NetworkPart {
         handshake_params: &HandshakeParams,
     ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
         let network_config = self.network_config;
-        // Cancellation token
+        // `cancel_sender` is converted to future when we receive
+        // `NetworkRequest::Shutdown` causing its being completed with error.
+        // After that completes `cancel_handler` and event loop stopped.
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
 
         let request_handler = RequestHandler::from(
@@ -435,7 +437,7 @@ impl<'a> Listener<'a> {
         listener
             .incoming()
             .for_each(move |(sock, address)| {
-                let holder = Rc::downgrade(&incoming_connections_counter);
+                let holder = Rc::clone(&incoming_connections_counter);
                 // Check incoming connections count
                 let connections_count = Rc::weak_count(&incoming_connections_counter);
                 info!("connections_count {}", connections_count);
