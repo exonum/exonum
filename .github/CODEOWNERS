@@ -36,4 +36,4 @@ exonum/src/encoding/* @darkeld3r @aleksuss @vldm
 exonum/src/events/* @darkeld3r @aleksuss @alekseysidorov @andreyluchin @ilammy
 
 # Node (consensus):
-exonum/src/events/* @darkeld3r @aleksuss @slowli
+exonum/src/node/* @darkeld3r @aleksuss @slowli
