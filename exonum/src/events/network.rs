@@ -437,10 +437,9 @@ impl<'a> Listener<'a> {
         listener
             .incoming()
             .for_each(move |(sock, address)| {
-                let holder = Rc::clone(&incoming_connections_counter);
+                let holder = incoming_connections_counter.clone();
                 // Check incoming connections count
-                let connections_count = Rc::weak_count(&incoming_connections_counter);
-                info!("connections_count {}", connections_count);
+                let connections_count = Rc::strong_count(&incoming_connections_counter) - 1;
                 if connections_count > incoming_connections_limit {
                     warn!(
                         "Rejected incoming connection with peer={}, \
@@ -457,8 +456,7 @@ impl<'a> Listener<'a> {
                     .listen(sock)
                     .and_then(move |sock| Self::handle_single_connection(sock, address, network_tx))
                     .map(|_| {
-                        // Ensure that holder lives until the stream ends.
-                        let _holder = holder;
+                        drop(holder);
                     })
                     .map_err(|e| {
                         error!("Connection terminated: {}: {}", e, e.find_root_cause());
