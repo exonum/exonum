@@ -3,7 +3,13 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.9.2 - 2018-09-10
+
+### Internal Improvements
+
+#### exonum
+
+- Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
 
 ## 0.9.1 - 2018-08-02
 
