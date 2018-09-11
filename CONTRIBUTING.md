@@ -62,6 +62,20 @@ but we have several additional conventions:
 
 - Prefer [nested imports] whenever possible.
 
+- Don't try to minimize imports scope (for example don't put it inside a
+  function), place them at the beginning of the file.
+
+- Avoid leading `::` in the type names (for example `::std::path::Path`),
+  instead import a type and use a shorter form:
+
+  ```rust
+  // Import type:
+  use std::path::Path;
+  
+  // Use it:
+  let path = Path::new("...");
+  ```
+
 - Modules and imports (`use`) should be in the following order:
 
   - `extern crate`s.
