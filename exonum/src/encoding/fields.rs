@@ -24,8 +24,9 @@ use std::{
 };
 
 use super::{CheckedOffset, Error, Offset, Result};
-use crypto::{Hash, PublicKey, Signature};
+use crypto::{Hash, PublicKey, Signature, PUBLIC_KEY_LENGTH};
 use helpers::{Height, Round, ValidatorId};
+use node::ConnectInfo;
 
 const SOCKET_ADDR_HEADER_SIZE: usize = 1;
 const PORT_SIZE: usize = 2;
@@ -456,6 +457,56 @@ impl<'a> Field<'a> for SocketAddr {
             });
         }
         Ok(latest_segment)
+    }
+}
+
+impl<'a> Field<'a> for ConnectInfo {
+    fn field_size() -> u32 {
+        SocketAddr::field_size() + PUBLIC_KEY_LENGTH as u32
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: u32, to: u32) -> Self {
+        let public_key_offset = from + SocketAddr::field_size();
+
+        let address = SocketAddr::read(buffer, from, public_key_offset);
+
+        debug_assert_eq!(to - public_key_offset, PUBLIC_KEY_LENGTH as u32);
+        let public_key = PublicKey::from_slice(&buffer[public_key_offset as usize..to as usize])
+            .expect("Unable to create PublicKey");
+
+        ConnectInfo {
+            address,
+            public_key,
+        }
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: u32, to: u32) {
+        let public_key_offset = from + SocketAddr::field_size();
+        self.address.write(buffer, from, public_key_offset);
+
+        buffer[public_key_offset as usize..to as usize].copy_from_slice(&self.public_key.as_ref());
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
+        let public_key_offset =
+            CheckedOffset::new(from.unchecked_offset() + SocketAddr::field_size());
+        let public_key_length = (to - public_key_offset)?.unchecked_offset() as usize;
+
+        if public_key_length != PUBLIC_KEY_LENGTH {
+            return Err(Error::IncorrectPublicKeyLength {
+                expected_length: PUBLIC_KEY_LENGTH,
+                actual_length: public_key_length,
+            });
+        }
+
+        SocketAddr::check(buffer, from, public_key_offset, latest_segment)
     }
 }
 

@@ -62,10 +62,10 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
         let mut t1 = params1.spawn(e1, connect_list.clone());
         let mut t2 = params2.spawn(e2, connect_list);
 
-        t1.connect_with(second, params1.connect.clone());
-        t2.connect_with(first, params2.connect.clone());
-        assert_eq!(t1.wait_for_connect(), params2.connect.clone());
-        assert_eq!(t2.wait_for_connect(), params1.connect.clone());
+        t1.connect_with(second);
+        t2.connect_with(first);
+        t1.wait_for_connect();
+        t2.wait_for_connect();
 
         let t1 = thread::spawn(move || {
             for _ in 0..times {

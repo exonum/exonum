@@ -26,15 +26,22 @@ use crypto::{
 use events::{
     codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
-use node::state::SharedConnectList;
+use futures::future;
+use messages::PeerList;
+use node::{state::SharedConnectList, ConnectInfo};
+use storage::StorageValue;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: x25519::PublicKey,
-    pub secret_key: x25519::SecretKey,
-    pub remote_key: Option<x25519::PublicKey>,
     pub connect_list: SharedConnectList,
+    connect_info: ConnectInfo,
+    public_key: PublicKey,
+    secret_key: SecretKey,
+    remote_key: Option<PublicKey>,
+    public_key_x25519: x25519::PublicKey,
+    secret_key_x25519: x25519::SecretKey,
+    remote_key_x25519: Option<x25519::PublicKey>,
     max_message_len: u32,
 }
 
@@ -44,20 +51,57 @@ impl HandshakeParams {
         secret_key: SecretKey,
         connect_list: SharedConnectList,
         max_message_len: u32,
+        address: SocketAddr,
     ) -> Self {
-        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+        let (public_key_x25519, secret_key_x25519) =
+            into_x25519_keypair(public_key, secret_key.clone()).unwrap();
 
         HandshakeParams {
-            public_key,
-            secret_key,
+            public_key_x25519,
+            secret_key_x25519,
             max_message_len,
             remote_key: None,
+            remote_key_x25519: None,
             connect_list,
+            connect_info: ConnectInfo {
+                address,
+                public_key,
+            },
+            public_key,
+            secret_key,
         }
     }
 
     pub fn set_remote_key(&mut self, remote_key: PublicKey) {
-        self.remote_key = Some(into_x25519_public_key(remote_key));
+        self.remote_key = Some(remote_key);
+        self.remote_key_x25519 = Some(into_x25519_public_key(remote_key));
+    }
+
+    pub fn peer_list(&self) -> Option<PeerList> {
+        self.remote_key.map(|key| {
+            PeerList::new(
+                &self.public_key,
+                &key,
+                vec![self.connect_info],
+                &self.secret_key,
+            )
+        })
+    }
+
+    pub fn public_key(&self) -> &x25519::PublicKey {
+        &self.public_key_x25519
+    }
+
+    pub fn secret_key(&self) -> &x25519::SecretKey {
+        &self.secret_key_x25519
+    }
+
+    pub fn remote_key(&self) -> &Option<x25519::PublicKey> {
+        &self.remote_key_x25519
+    }
+
+    pub fn connect_list(&self) -> SharedConnectList {
+        self.connect_list.clone()
     }
 }
 
@@ -67,6 +111,7 @@ pub struct NoiseHandshake {
     peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
+    peer_list: Option<PeerList>,
 }
 
 impl NoiseHandshake {
@@ -77,6 +122,7 @@ impl NoiseHandshake {
             peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
+            peer_list: params.peer_list(),
         }
     }
 
@@ -87,24 +133,26 @@ impl NoiseHandshake {
             peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
+            peer_list: params.peer_list(),
         }
     }
 
     pub fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Self, Vec<u8>), Error = failure::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
-            self.noise.read_handshake_msg(&msg.0)?;
-            Ok((stream, self))
+            let message = self.noise.read_handshake_msg(&msg.0)?;
+            Ok((stream, self, message))
         })
     }
 
     pub fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
+        msg: &[u8],
     ) -> impl Future<Item = (S, Self), Error = failure::Error> {
-        done(self.noise.write_handshake_msg())
+        done(self.noise.write_handshake_msg(msg))
             .map_err(|e| e.into())
             .and_then(|buf| HandshakeRawMessage(buf).write(stream))
             .map(move |(stream, _)| (stream, self))
@@ -113,7 +161,8 @@ impl NoiseHandshake {
     pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
         self,
         stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, failure::Error> {
+        peer_list: Vec<u8>,
+    ) -> Result<(Framed<S, MessagesCodec>, Vec<u8>), failure::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -130,7 +179,7 @@ impl NoiseHandshake {
 
         let noise = self.noise.into_transport_mode()?;
         let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok(framed)
+        Ok((framed, peer_list))
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
@@ -143,15 +192,17 @@ impl NoiseHandshake {
 }
 
 impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    type Result = Vec<u8>;
+
+    fn listen<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
         let peer_address = self.peer_address;
         let framed = self.read_handshake_msg(stream)
-            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake, _)| handshake.write_handshake_msg(stream, &[]))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream))
+            .and_then(|(stream, handshake, peer_list)| handshake.finalize(stream, peer_list))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
                     .into()
@@ -159,19 +210,28 @@ impl Handshake for NoiseHandshake {
         Box::new(framed)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    fn send<S>(self, stream: S) -> HandshakeResult<S, Self::Result>
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
         let peer_address = self.peer_address;
-        let framed = self.write_handshake_msg(stream)
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.finalize(stream))
-            .map_err(move |e| {
-                e.context(format!("peer {} disconnected", peer_address))
-                    .into()
-            });
-        Box::new(framed)
+        match self.peer_list.clone() {
+            Some(peer_list) => {
+                let framed = self.write_handshake_msg(stream, &[])
+                    .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+                    .and_then(move |(stream, handshake, _)| {
+                        handshake.write_handshake_msg(stream, &peer_list.into_bytes())
+                    })
+                    .and_then(|(stream, handshake)| handshake.finalize(stream, Vec::new()))
+                    .map_err(move |e| {
+                        e.context(format!("peer {} disconnected", peer_address))
+                            .into()
+                    });
+                Box::new(framed)
+            }
+            None => Box::new(future::err(format_err!(
+                "Can't send handshake request without PeerList",
+            ))),
+        }
     }
 }

@@ -20,14 +20,14 @@ use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use std::{net::SocketAddr, str::FromStr};
+use std::str::FromStr;
 
 use super::{CheckedOffset, Field, Offset};
 use blockchain::{Block, BlockProof};
-use crypto::{gen_keypair, hash, CryptoHash};
-use helpers::{user_agent, Height, Round, ValidatorId};
+use crypto::{gen_keypair, hash, CryptoHash, PublicKey};
+use helpers::{Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, RawMessage, Status,
+    BlockRequest, BlockResponse, Message, Precommit, Prevote, Propose, RawMessage, Status,
 };
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -53,6 +53,7 @@ mod ignore_new {
 }
 
 use self::ignore_new::*;
+use node::ConnectInfo;
 
 #[test]
 #[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
@@ -367,38 +368,6 @@ fn test_segments_of_status_messages() {
     assert_write_check_read(dat, 8);
 }
 
-fn test_connect(addr: &str) {
-    use std::str::FromStr;
-
-    let socket_address = SocketAddr::from_str(addr).unwrap();
-    let time = Utc::now();
-    let (public_key, secret_key) = gen_keypair();
-
-    // write
-    let connect = Connect::new(
-        &public_key,
-        socket_address,
-        time,
-        &user_agent::get(),
-        &secret_key,
-    );
-    // read
-    assert_eq!(connect.pub_key(), &public_key);
-    assert_eq!(connect.addr(), socket_address);
-    assert_eq!(connect.time(), time);
-    assert!(connect.verify_signature(&public_key));
-}
-
-#[test]
-fn test_connect_ipv4() {
-    test_connect("18.34.3.4:7777");
-}
-
-#[test]
-fn test_connect_ipv6() {
-    test_connect("[::1]:7777");
-}
-
 #[test]
 fn test_propose() {
     let prev_hash = hash(&[1, 2, 3]);
@@ -653,4 +622,16 @@ fn test_correct_encoding_struct() {
         }
     }
     drop(ThreeFields::new(0, 0, 0));
+}
+
+#[test]
+fn test_connect_info() {
+    let address = "127.0.0.1:8000".parse().unwrap();
+    let public_key = PublicKey::zero();
+    let connect_info = ConnectInfo {
+        address,
+        public_key,
+    };
+
+    assert_write_check_read(connect_info, 51);
 }

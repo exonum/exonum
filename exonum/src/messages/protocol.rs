@@ -28,19 +28,16 @@
 
 use chrono::{DateTime, Utc};
 
-use std::net::SocketAddr;
-
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
+use node::ConnectInfo;
 use storage::proof_list_index::root_hash;
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
 
-/// `Connect` message id.
-pub const CONNECT_MESSAGE_ID: u16 = Connect::MESSAGE_ID;
 /// `Status` message id.
 pub const STATUS_MESSAGE_ID: u16 = Status::MESSAGE_ID;
 
@@ -65,34 +62,31 @@ pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
+/// `PeerList` message id.
+pub const PEERS_RESPONSE_MESSAGE_ID: u16 = PeerList::MESSAGE_ID;
 
 messages! {
     const SERVICE_ID = CONSENSUS;
 
-    /// Connect to a node.
+    /// Send current node's connected peers to the sender.
     ///
     /// ### Validation
-    /// The message is ignored if its time is earlier than in the previous
-    /// `Connect` message received from the same peer.
+    /// Request is considered valid if the sender of the message on the network
+    /// level corresponds to the `from` field.
     ///
     /// ### Processing
-    /// Connect to the peer.
+    /// Peer connects to the received peers.
     ///
     /// ### Generation
-    /// A node sends `Connect` message to all known addresses during
-    /// initialization. Additionally, the node responds by its own `Connect`
-    /// message after receiving `node::Event::Connected`.
-    struct Connect {
+    /// `PeerList` is sent as response to incoming `PeersRequest`.
+    struct PeerList {
         /// The sender's public key.
-        pub_key: &PublicKey,
-        /// The node's address.
-        addr: SocketAddr,
-        /// Time when the message was created.
-        time: DateTime<Utc>,
-        /// String containing information about this node including Exonum, Rust and OS versions.
-        user_agent: &str,
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+        /// List of known peers.
+        peers: Vec<ConnectInfo>,
     }
-
 
     /// Current node status.
     ///

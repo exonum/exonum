@@ -18,9 +18,10 @@
 use std::time::Duration;
 
 use crypto::CryptoHash;
-use helpers::{user_agent, Height, Round, ValidatorId};
-use node;
+use helpers::{Height, Round, ValidatorId};
+use node::{self, ConnectInfo};
 
+use blockchain::ValidatorKeys;
 use sandbox::{
     sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
 };
@@ -418,28 +419,39 @@ fn should_restore_peers_after_restart() {
         .build();
 
     let (v0, v1) = (ValidatorId(0), ValidatorId(1));
-    let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
+    let (p0, s0) = (sandbox.p(v0), sandbox.s(v0).clone());
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
-    let time = sandbox.time();
-    let connect_from_0 = sandbox.create_connect(&p0, a0, time.into(), &user_agent::get(), &s0);
-    let connect_from_1 = sandbox.create_connect(&p1, a1, time.into(), &user_agent::get(), &s1);
     let peers_request = sandbox.create_peers_request(&p1, &p0, &s1);
+    let peers_list = sandbox.create_peer_list(
+        &p0,
+        &p1,
+        &vec![ConnectInfo {
+            public_key: p1,
+            address: a1,
+        }],
+        &s0,
+    );
 
     // check that peers are absent
     sandbox.recv(&peers_request);
 
-    // receive a `Connect` message and the respond on it
-    sandbox.recv(&connect_from_1);
-    sandbox.send(a1, &connect_from_0);
-
     // restart the node
     let sandbox_restarted = sandbox.restart_uninitialized();
 
-    // check that the node is connecting with the peer
-    sandbox_restarted.send(a1, &connect_from_0);
+    sandbox_restarted.add_peer_to_connect_list(
+        a1,
+        ValidatorKeys {
+            consensus_key: p1,
+            service_key: p1,
+        },
+    );
+    sandbox_restarted.connect(ConnectInfo {
+        address: a1,
+        public_key: p1,
+    });
 
     // check that the peer is restored
     sandbox_restarted.recv(&peers_request);
-    sandbox_restarted.send(a1, &connect_from_1);
+    sandbox_restarted.send(a1, &peers_list);
 }

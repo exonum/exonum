@@ -26,9 +26,7 @@ use std::{
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{
-    BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
-};
+use messages::{BlockResponse, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
 use node::{connect_list::ConnectList, ConnectInfo};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
@@ -47,7 +45,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: Connect,
+    our_connect_info: ConnectInfo,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -58,7 +56,7 @@ pub struct State {
     connect_list: SharedConnectList,
     tx_pool_capacity: usize,
 
-    peers: HashMap<PublicKey, Connect>,
+    peers: HashMap<PublicKey, ConnectInfo>,
     connections: HashMap<SocketAddr, PublicKey>,
     height_start_time: SystemTime,
     height: Height,
@@ -432,8 +430,8 @@ impl State {
         tx_pool_capacity: usize,
         connect_list: ConnectList,
         stored: StoredConfiguration,
-        connect: Connect,
-        peers: HashMap<PublicKey, Connect>,
+        connect_info: ConnectInfo,
+        peers: HashMap<PublicKey, ConnectInfo>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -468,7 +466,7 @@ impl State {
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
 
-            our_connect_message: connect,
+            our_connect_info: connect_info,
 
             requests: HashMap::new(),
 
@@ -569,8 +567,8 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        self.connections.insert(msg.addr(), pubkey);
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: ConnectInfo) -> bool {
+        self.connections.insert(msg.address, pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
 
@@ -598,7 +596,7 @@ impl State {
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
-    pub fn peers(&self) -> &HashMap<PublicKey, Connect> {
+    pub fn peers(&self) -> &HashMap<PublicKey, ConnectInfo> {
         &self.peers
     }
 
@@ -1174,14 +1172,9 @@ impl State {
         state.map(|s| s.known_nodes).unwrap_or_default()
     }
 
-    /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Connect {
-        &self.our_connect_message
-    }
-
-    /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Connect) {
-        self.our_connect_message = msg;
+    /// Returns the `ConnectInfo` of the current node.
+    pub fn our_connect_info(&self) -> &ConnectInfo {
+        &self.our_connect_info
     }
 
     /// Add peer to node's `ConnectList`.

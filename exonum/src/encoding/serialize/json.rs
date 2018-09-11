@@ -27,6 +27,7 @@ use crypto::{Hash, PublicKey, Signature};
 use encoding::{Field, Offset};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
+use node::ConnectInfo;
 
 // TODO: Should we implement serialize for: `SecretKey`, `Seed`. (ECR-156)
 
@@ -269,6 +270,41 @@ impl ExonumJson for SocketAddr {
 
     fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
         Ok(serde_json::to_value(&self)?)
+    }
+}
+
+impl ExonumJsonDeserialize for SocketAddr {
+    fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>>
+    where
+        Self: Sized,
+    {
+        serde_json::from_value(value.clone()).map_err(|e| e.into())
+    }
+}
+
+impl ExonumJson for ConnectInfo {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<dyn Error>> {
+        let addr: Self = serde_json::from_value(value.clone())?;
+        buffer.write(from, to, addr);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
+        Ok(serde_json::to_value(&self)?)
+    }
+}
+
+impl ExonumJsonDeserialize for ConnectInfo {
+    fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>>
+    where
+        Self: Sized,
+    {
+        serde_json::from_value(value.clone()).map_err(|e| e.into())
     }
 }
 

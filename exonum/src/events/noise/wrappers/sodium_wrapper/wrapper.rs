@@ -26,8 +26,8 @@ use std::fmt::{self, Error, Formatter};
 use super::{handshake::HandshakeParams, resolver::SodiumResolver};
 use events::noise::{error::NoiseError, HEADER_LENGTH, MAX_MESSAGE_LENGTH, TAG_LENGTH};
 
-pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
-pub const MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
+pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
+pub const MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 65535;
 pub const MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
 
 // We choose XK pattern since it provides mutual authentication,
@@ -43,9 +43,9 @@ pub struct NoiseWrapper {
 
 impl NoiseWrapper {
     pub fn initiator(params: &HandshakeParams) -> Self {
-        if let Some(ref remote_key) = params.remote_key {
+        if let Some(ref remote_key) = params.remote_key() {
             let builder: Builder = Self::noise_builder()
-                .local_private_key(params.secret_key.as_ref())
+                .local_private_key(params.secret_key().as_ref())
                 .remote_public_key(remote_key.as_ref());
             let session = builder
                 .build_initiator()
@@ -60,7 +60,7 @@ impl NoiseWrapper {
         let builder: Builder = Self::noise_builder();
 
         let session = builder
-            .local_private_key(params.secret_key.as_ref())
+            .local_private_key(params.secret_key().as_ref())
             .build_responder()
             .expect("Noise session responder failed to initialize");
 
@@ -78,10 +78,9 @@ impl NoiseWrapper {
         Ok(buf)
     }
 
-    pub fn write_handshake_msg(&mut self) -> Result<Vec<u8>, NoiseError> {
-        // Payload in handshake messages can be empty.
+    pub fn write_handshake_msg(&mut self, msg: &[u8]) -> Result<Vec<u8>, NoiseError> {
         let mut buf = vec![0_u8; MAX_MESSAGE_LENGTH];
-        let len = self.write(&[], &mut buf)?;
+        let len = self.write(msg, &mut buf)?;
         buf.truncate(len);
         Ok(buf)
     }

@@ -423,8 +423,8 @@ impl SharedNodeState {
         lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
-            lock.peers_info.insert(c.addr(), *p);
-            lock.outgoing_connections.insert(c.addr());
+            lock.peers_info.insert(c.address, *p);
+            lock.outgoing_connections.insert(c.address);
         }
 
         for addr in state.connections().keys() {

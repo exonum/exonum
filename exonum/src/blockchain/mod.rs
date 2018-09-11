@@ -56,8 +56,8 @@ use std::{
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
-use node::ApiSender;
+use messages::{Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
+use node::{ApiSender, ConnectInfo};
 use storage::{self, Database, Error, Fork, Patch, Snapshot};
 
 mod block;
@@ -506,7 +506,7 @@ impl Blockchain {
     }
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: ConnectInfo) {
         let mut fork = self.fork();
 
         {
@@ -525,7 +525,7 @@ impl Blockchain {
         {
             let mut schema = Schema::new(&mut fork);
             let mut peers = schema.peers_cache_mut();
-            let peer = peers.iter().find(|&(_, ref v)| v.addr() == *addr);
+            let peer = peers.iter().find(|&(_, ref v)| v.address == *addr);
             if let Some(pubkey) = peer.map(|(k, _)| k) {
                 peers.remove(&pubkey);
             }
@@ -536,10 +536,10 @@ impl Blockchain {
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, ConnectInfo> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
-        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
+        let it = peers_cache.iter();
         it.collect()
     }
 

@@ -34,14 +34,14 @@ use blockchain::{
     Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
     SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
 };
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use events::{
     network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
     NetworkEvent, NetworkRequest, TimeoutRequest,
 };
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    Any, BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+    Any, BlockRequest, BlockResponse, Message, PeerList, PeersRequest, Precommit, Prevote,
     PrevotesRequest, Propose, ProposeRequest, RawMessage, RawTransaction, Status,
     TransactionsRequest, TransactionsResponse,
 };
@@ -102,6 +102,7 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::ConnectToPeer(_peer) => {}
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
@@ -146,39 +147,24 @@ pub struct Sandbox {
     pub services_map: HashMap<PublicKey, SecretKey>,
     inner: RefCell<SandboxInner>,
     addresses: Vec<SocketAddr>,
-    /// Connect message used during initialization.
-    connect: Option<Connect>,
 }
 
 impl Sandbox {
     pub fn initialize(
         &mut self,
-        connect_message_time: SystemTime,
+        _connect_message_time: SystemTime,
         start_index: usize,
         end_index: usize,
     ) {
-        let connect = self.create_connect(
-            &self.p(ValidatorId(0)),
-            self.a(ValidatorId(0)),
-            connect_message_time.into(),
-            &user_agent::get(),
-            self.s(ValidatorId(0)),
-        );
-
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
-            self.recv(&self.create_connect(
-                &self.p(validator),
-                self.a(validator),
-                self.time().into(),
-                &user_agent::get(),
-                self.s(validator),
-            ));
-            self.send(self.a(validator), &connect);
+            self.connect(ConnectInfo {
+                address: self.a(validator),
+                public_key: self.p(validator),
+            });
         }
 
         self.check_unexpected_message();
-        self.connect = Some(connect);
     }
 
     fn check_unexpected_message(&self) {
@@ -242,18 +228,6 @@ impl Sandbox {
             tx_hashes,
             secret_key,
         )
-    }
-
-    /// Creates a `Connect` message signed by this validator.
-    pub fn create_connect(
-        &self,
-        public_key: &PublicKey,
-        addr: SocketAddr,
-        time: chrono::DateTime<::chrono::Utc>,
-        user_agent: &str,
-        secret_key: &SecretKey,
-    ) -> Connect {
-        Connect::new(public_key, addr, time, user_agent, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -362,6 +336,17 @@ impl Sandbox {
         PeersRequest::new(author, to, secret_key)
     }
 
+    /// Creates a `PeersRequest` message signed by this validator.
+    pub fn create_peer_list(
+        &self,
+        author: &PublicKey,
+        to: &PublicKey,
+        peers: &[ConnectInfo],
+        secret_key: &SecretKey,
+    ) -> PeerList {
+        PeerList::new(author, to, peers.to_vec(), secret_key)
+    }
+
     /// Creates a `TransactionsRequest` message signed by this validator.
     pub fn create_transactions_request(
         &self,
@@ -425,11 +410,6 @@ impl Sandbox {
         })
     }
 
-    /// Returns connect message used during initialization.
-    pub fn connect(&self) -> Option<&Connect> {
-        self.connect.as_ref()
-    }
-
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
@@ -470,6 +450,15 @@ impl Sandbox {
                 any_expected_msg, addr
             );
         }
+    }
+
+    pub fn connect(&self, info: ConnectInfo) {
+        info!("connecting to {:?}", info);
+        self.inner
+            .borrow_mut()
+            .handler
+            .state
+            .add_peer(info.public_key, info);
     }
 
     pub fn send_peers_request(&self) {
@@ -773,18 +762,13 @@ impl Sandbox {
 
     /// Creates new sandbox with "restarted" node initialized by the given time.
     pub fn restart_with_time(self, time: SystemTime) -> Self {
-        let connect = self.connect().map(|c| {
-            self.create_connect(
-                c.pub_key(),
-                c.addr(),
-                time.into(),
-                c.user_agent(),
-                self.s(ValidatorId(0)),
-            )
-        });
         let sandbox = self.restart_uninitialized_with_time(time);
-        if let Some(connect) = connect {
-            sandbox.broadcast(&connect);
+
+        for id in 1..sandbox.n_validators() {
+            sandbox.connect(ConnectInfo {
+                address: sandbox.a(ValidatorId(id as u16)),
+                public_key: sandbox.p(ValidatorId(id as u16)),
+            });
         }
 
         sandbox
@@ -849,6 +833,11 @@ impl Sandbox {
             inner.handler.api_state.clone(),
             None,
         );
+
+        for peer in inner.handler.state.peers().values() {
+            handler.state.add_peer(peer.public_key, *peer);
+        }
+
         handler.initialize();
 
         let inner = SandboxInner {
@@ -866,8 +855,8 @@ impl Sandbox {
             validators_map: self.validators_map.clone(),
             services_map: self.services_map.clone(),
             addresses: self.addresses.clone(),
-            connect: None,
         };
+
         sandbox.process_events();
         sandbox
     }
@@ -880,7 +869,7 @@ impl Sandbox {
         self.node_state().consensus_secret_key().clone()
     }
 
-    fn add_peer_to_connect_list(&self, addr: SocketAddr, validator_keys: ValidatorKeys) {
+    pub fn add_peer_to_connect_list(&self, address: SocketAddr, validator_keys: ValidatorKeys) {
         let public_key = validator_keys.consensus_key;
         let config = {
             let inner = &self.inner.borrow_mut();
@@ -896,13 +885,24 @@ impl Sandbox {
             .handler
             .state
             .add_peer_to_connect_list(ConnectInfo {
-                address: addr,
+                address,
                 public_key,
             });
     }
 
     fn update_config(&self, config: StoredConfiguration) {
         self.inner.borrow_mut().handler.state.update_config(config);
+    }
+
+    fn peers(&self) -> Vec<ConnectInfo> {
+        self.inner
+            .borrow_mut()
+            .handler
+            .state
+            .peers()
+            .values()
+            .cloned()
+            .collect()
     }
 }
 
@@ -918,9 +918,9 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
+    pub fn from_peers(peers: &HashMap<PublicKey, ConnectInfo>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =
-            peers.iter().map(|(p, c)| (*p, c.addr())).collect();
+            peers.iter().map(|(p, c)| (*p, c.address)).collect();
         ConnectList { peers }
     }
 }
@@ -1098,7 +1098,6 @@ fn sandbox_with_services_uninitialized(
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
         addresses,
-        connect: None,
     };
 
     // General assumption; necessary for correct work of consensus algorithm
@@ -1194,36 +1193,15 @@ mod tests {
     #[test]
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
-        // As far as all validators have connected to each other during
-        // sandbox initialization, we need to use connect-message with unknown
-        // keypair.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
-        };
-        // We also need to add public key from this keypair to the ConnectList.
-        // Socket address doesn't matter in this case.
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
 
-        s.recv(&s.create_connect(
-            &public,
-            s.a(ValidatorId(2)),
-            s.time().into(),
-            &user_agent::get(),
-            &secret,
-        ));
-        s.send(
-            s.a(ValidatorId(2)),
-            &s.create_connect(
-                &s.p(ValidatorId(0)),
-                s.a(ValidatorId(0)),
-                s.time().into(),
-                &user_agent::get(),
-                s.s(ValidatorId(0)),
-            ),
-        );
+        let (sender_pk, sender_sk) = (&s.p(ValidatorId(1)), &s.s(ValidatorId(1)));
+        let (receiver_pk, receiver_sk) = (&s.p(ValidatorId(0)), &s.s(ValidatorId(0)));
+
+        let peers_request = PeersRequest::new(sender_pk, receiver_pk, sender_sk);
+        let peers_response = PeerList::new(receiver_pk, &sender_pk, s.peers(), receiver_sk);
+
+        s.recv(&peers_request);
+        s.send(s.a(ValidatorId(1)), &peers_response);
     }
 
     #[test]
@@ -1240,13 +1218,13 @@ mod tests {
     #[should_panic(expected = "Expected to send the message")]
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
+
         s.send(
             s.a(ValidatorId(1)),
-            &s.create_connect(
+            &Status::new(
                 &s.p(ValidatorId(0)),
-                s.a(ValidatorId(0)),
-                s.time().into(),
-                &user_agent::get(),
+                Height::zero(),
+                &Hash::zero(),
                 s.s(ValidatorId(0)),
             ),
         );
@@ -1256,80 +1234,49 @@ mod tests {
     #[should_panic(expected = "Expected to send the message")]
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
-        // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
-        };
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&s.create_connect(
-            &public,
-            s.a(ValidatorId(2)),
-            s.time().into(),
-            &user_agent::get(),
-            &secret,
-        ));
-        s.send(
-            s.a(ValidatorId(1)),
-            &s.create_connect(
-                &s.p(ValidatorId(0)),
-                s.a(ValidatorId(0)),
-                s.time().into(),
-                &user_agent::get(),
-                s.s(ValidatorId(0)),
-            ),
-        );
+
+        let (sender_pk, sender_sk) = (&s.p(ValidatorId(1)), &s.s(ValidatorId(1)));
+        let (receiver_pk, receiver_sk) = (&s.p(ValidatorId(0)), &s.s(ValidatorId(0)));
+
+        let peers_request = PeersRequest::new(sender_pk, receiver_pk, sender_sk);
+        let peers_response = PeerList::new(receiver_pk, &sender_pk, vec![], receiver_sk);
+
+        s.recv(&peers_request);
+        s.send(s.a(ValidatorId(1)), &peers_response);
     }
 
     #[test]
     #[should_panic(expected = "Send unexpected message")]
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
-        // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
-        };
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&s.create_connect(
-            &public,
-            s.a(ValidatorId(2)),
-            s.time().into(),
-            &user_agent::get(),
-            &secret,
-        ));
+
+        let peers_request = PeersRequest::new(
+            &s.p(ValidatorId(1)),
+            &s.p(ValidatorId(0)),
+            &s.s(ValidatorId(1)),
+        );
+
+        s.recv(&peers_request);
     }
 
     #[test]
     #[should_panic(expected = "Send unexpected message")]
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
-        // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
-        };
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&s.create_connect(
-            &public,
-            s.a(ValidatorId(2)),
-            s.time().into(),
-            &user_agent::get(),
-            &secret,
-        ));
-        s.recv(&s.create_connect(
-            &public,
-            s.a(ValidatorId(3)),
-            s.time().into(),
-            &user_agent::get(),
-            &secret,
-        ));
+
+        let peers_request_1 = PeersRequest::new(
+            &s.p(ValidatorId(1)),
+            &s.p(ValidatorId(0)),
+            &s.s(ValidatorId(1)),
+        );
+        let peers_request_2 = PeersRequest::new(
+            &s.p(ValidatorId(2)),
+            &s.p(ValidatorId(1)),
+            &s.s(ValidatorId(2)),
+        );
+
+        s.recv(&peers_request_1);
+        s.recv(&peers_request_2);
         panic!("Oops! We don't catch unexpected message");
     }
 
@@ -1337,21 +1284,14 @@ mod tests {
     #[should_panic(expected = "Send unexpected message")]
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
-        // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
-        };
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
-        s.recv(&s.create_connect(
-            &public,
-            s.a(ValidatorId(2)),
-            s.time().into(),
-            &user_agent::get(),
-            &secret,
-        ));
+
+        let peers_request_1 = PeersRequest::new(
+            &s.p(ValidatorId(1)),
+            &s.p(ValidatorId(0)),
+            &s.s(ValidatorId(1)),
+        );
+
+        s.recv(&peers_request_1);
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
     }

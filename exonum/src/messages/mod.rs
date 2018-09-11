@@ -59,8 +59,6 @@ impl fmt::Debug for RawTransaction {
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Any {
-    /// `Connect` message.
-    Connect(Connect),
     /// `Status` message.
     Status(Status),
     /// `Block` message.
@@ -73,6 +71,8 @@ pub enum Any {
     Transaction(RawTransaction),
     /// A batch of the transactions.
     TransactionsBatch(TransactionsResponse),
+    /// Response containing know peers.
+    PeerList(PeerList),
 }
 
 /// Consensus message.
@@ -222,7 +222,6 @@ impl Any {
         // TODO: check input message size (ECR-166)
         let msg = if raw.service_id() == CONSENSUS {
             match raw.message_type() {
-                CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
                 STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
                 BLOCK_RESPONSE_MESSAGE_ID => Any::Block(BlockResponse::from_raw(raw)?),
                 TRANSACTIONS_RESPONSE_MESSAGE_ID => {
@@ -254,6 +253,7 @@ impl Any {
                 BLOCK_REQUEST_MESSAGE_ID => {
                     Any::Request(RequestMessage::Block(BlockRequest::from_raw(raw)?))
                 }
+                PEERS_RESPONSE_MESSAGE_ID => Any::PeerList(PeerList::from_raw(raw)?),
 
                 message_type => {
                     return Err(Error::IncorrectMessageType { message_type });
