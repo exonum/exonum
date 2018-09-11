@@ -49,6 +49,7 @@ pub enum NetworkEvent {
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
     SendMessage(SocketAddr, RawMessage),
+    ConnectToPeer(SocketAddr),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
