@@ -152,7 +152,7 @@ impl BinaryForm for ServiceTransaction {
         })
     }
 }
-///
+
 /// Wraps a `Payload` together with the corresponding `SignedMessage`.
 ///
 /// Usually one wants to work with fully parsed messages (i.e., `Payload`). However, occasionally
