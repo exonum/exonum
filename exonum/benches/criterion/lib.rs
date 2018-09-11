@@ -29,17 +29,20 @@ use criterion::Criterion;
 use crypto::bench_crypto;
 use storage::bench_storage;
 use transactions::bench_verify_transactions;
+use indexes::key_value_set_index;
 
 mod block;
 mod crypto;
 mod storage;
 mod transactions;
+mod indexes;
 
 criterion_group!(
     benches,
     bench_crypto,
     bench_block,
     bench_storage,
-    bench_verify_transactions
+    bench_verify_transactions,
+    key_value_set_index,
 );
 criterion_main!(benches);
