@@ -477,7 +477,7 @@ impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
     fn from(result: &'a TransactionResult) -> TxStatus {
         use self::TransactionErrorType::*;
 
-        match *result {
+        match (*result).0 {
             Ok(()) => TxStatus::Success,
             Err(ref e) => {
                 let description = e.description().unwrap_or_default();
@@ -500,13 +500,13 @@ impl<'a> From<TxStatus<'a>> for TransactionResult {
             }
         };
 
-        match status {
+        TransactionResult(match status {
             TxStatus::Success => Ok(()),
             TxStatus::Panic { description } => Err(TransactionError::panic(to_option(description))),
             TxStatus::Error { code, description } => {
                 Err(TransactionError::code(code, to_option(description)))
             }
-        }
+        })
     }
 }
 
@@ -528,7 +528,7 @@ impl<T> CommittedTransaction<T> {
 
     /// Returns the status of the transaction execution.
     pub fn status(&self) -> Result<(), &TransactionError> {
-        self.status.as_ref().map(|_| ())
+        self.status.0.as_ref().map(|_| ())
     }
 }
 

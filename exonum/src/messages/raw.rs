@@ -283,9 +283,9 @@ pub trait Message: CryptoHash + Debug + Send + Sync {
     }
 }
 
-impl<T: Message> CryptoHash for T {
+impl CryptoHash for RawMessage {
     fn hash(&self) -> Hash {
-        hash(self.raw().as_ref())
+        hash(self.as_ref())
     }
 }
 
