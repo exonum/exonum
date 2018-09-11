@@ -36,16 +36,15 @@ use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
-
 use super::{BinaryForm, Message, RawTransaction, ServiceTransaction, SignedMessage};
 
-#[doc(hidden)]
 /// `SignedMessage` size with zero bytes payload.
+#[doc(hidden)]
 pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
     PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>() * 2;
 
-#[doc(hidden)]
 /// `Message<TransactionsResponse>` size without transactions inside.
+#[doc(hidden)]
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
     EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u32>() * 2;
 
@@ -580,13 +579,14 @@ impl Protocol {
         let signed = SignedMessage::new(cls, typ, value, author, secret_key);
         T::into_message_from_parts(message, signed)
     }
+
     /// Checks buffer and return instance of `Protocol`.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
         let signed = SignedMessage::from_raw_buffer(buffer)?;
         Self::deserialize(signed)
     }
 
-    /// Creates new raw transaction message.
+    /// Creates a new raw transaction message.
     ///
     /// # Panics
     ///
@@ -681,7 +681,7 @@ impl StorageValue for Protocol {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let message = SignedMessage::from_vec_unchecked(value.into_owned());
-        //TODO: Remove additional deserialization [ECR-2315]
+        // TODO: Remove additional deserialization. [ECR-2315]
         Protocol::deserialize(message).unwrap()
     }
 }

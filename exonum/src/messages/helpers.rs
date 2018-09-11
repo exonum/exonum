@@ -15,7 +15,7 @@ pub trait BinaryForm: Sized {
 }
 
 /// Uses `ToHex`/`FromHex` to serialize arbitrary type `T` as
-/// hex string rather than real Serde::serialize.
+/// hexadecimal string rather than real Serde::serialize.
 pub(crate) struct HexStringRepresentation;
 
 impl HexStringRepresentation {

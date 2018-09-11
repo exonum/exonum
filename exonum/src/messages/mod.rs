@@ -87,7 +87,7 @@ impl ServiceTransaction {
 }
 
 impl RawTransaction {
-    /// Creates new instance of RawTransaction.
+    /// Creates a new instance of RawTransaction.
     pub(in messages) fn new(
         service_id: u16,
         transaction_set: ServiceTransaction,
@@ -98,12 +98,12 @@ impl RawTransaction {
         }
     }
 
-    /// Returns user defined data that should be used for deserialization.
+    /// Returns the user defined data that should be used for deserialization.
     pub fn transaction_set(self) -> ServiceTransaction {
         self.transaction_set
     }
 
-    /// Returns service_id specified for current transaction.
+    /// Returns `service_id` specified for current transaction.
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
@@ -152,7 +152,8 @@ impl BinaryForm for ServiceTransaction {
         })
     }
 }
-/// Wraps a `Payload` together with corresponding `SignedMessage`.
+///
+/// Wraps a `Payload` together with the corresponding `SignedMessage`.
 ///
 /// Usually one wants to work with fully parsed messages (i.e., `Payload`). However, occasionally
 /// we need to retransmit the message into the network or save its serialized form. We could
@@ -162,7 +163,7 @@ impl BinaryForm for ServiceTransaction {
 /// So we use `Message` to keep the original byte buffer around with the parsed `Payload`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Message<T> {
-    //TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
+    // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
     //if our serialization format allows us (ECR-2315).
     payload: T,
     #[serde(with = "HexStringRepresentation")]
@@ -170,7 +171,7 @@ pub struct Message<T> {
 }
 
 impl<T: ProtocolMessage> Message<T> {
-    /// Creates new instance of the message.
+    /// Creates a new instance of the message.
     pub(in messages) fn new(payload: T, message: SignedMessage) -> Message<T> {
         Message { payload, message }
     }
@@ -185,12 +186,12 @@ impl<T: ProtocolMessage> Message<T> {
         self.message.raw
     }
 
-    /// Return reference to payload.
+    /// Returns reference to the payload.
     pub fn payload(&self) -> &T {
         &self.payload
     }
 
-    /// Return reference to signed message.
+    /// Returns reference to the signed message.
     pub(crate) fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
@@ -211,11 +212,11 @@ impl fmt::Debug for ServiceTransaction {
 }
 
 impl<T> ToHex for Message<T> {
-    fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         self.message.raw().write_hex(w)
     }
 
-    fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         self.message.raw().write_hex_upper(w)
     }
 }
@@ -263,7 +264,7 @@ impl<T: ProtocolMessage> StorageValue for Message<T> {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let message = SignedMessage::from_vec_unchecked(value.into_owned());
-        //TODO: Remove additional deserialization [ECR-2315]
+        // TODO: Remove additional deserialization. [ECR-2315]
         let msg = Protocol::deserialize(message).unwrap();
         T::try_from(msg).unwrap()
     }

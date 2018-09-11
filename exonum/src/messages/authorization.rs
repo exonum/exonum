@@ -102,7 +102,7 @@ impl SignedMessage {
         Signature::from_slice(&self.raw[sign_idx..]).expect("Couldn't read signature")
     }
 
-    /// Return byte array representation of internal data.
+    /// Returns byte array representation of internal data.
     pub fn raw(&self) -> &[u8] {
         &self.raw
     }
@@ -112,14 +112,14 @@ impl SignedMessage {
         hash(&self.raw)
     }
 
-    /// Signs buffer with secret_key.
+    /// Signs buffer with `secret_key`.
     /// This method returns ed25519 signature.
     fn sign(full_buffer: &[u8], secret_key: &SecretKey) -> Result<Signature, Error> {
         let signature = crypto::sign(&full_buffer, secret_key);
         Ok(signature)
     }
 
-    /// Verify buffer integrity, and authenticate buffer.
+    /// Verifies buffer integrity, and authenticate buffer.
     fn verify(
         full_buffer: &[u8],
         signature: &Signature,
