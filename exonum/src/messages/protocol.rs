@@ -668,9 +668,9 @@ impl Consensus {
     }
 }
 
-impl<T: ProtocolMessage> Into<Protocol> for Message<T> {
-    fn into(self) -> Protocol {
-        ProtocolMessage::into_protocol(self)
+impl<T: ProtocolMessage> From<Message<T>> for Protocol {
+    fn from(other: Message<T>) -> Self {
+        ProtocolMessage::into_protocol(other)
     }
 }
 
