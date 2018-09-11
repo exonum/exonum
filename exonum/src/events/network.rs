@@ -143,14 +143,8 @@ impl ConnectionsPool {
             .and_then(move |socket| {
                 Self::build_handshake_initiator(socket, &peer, &handshake_params)
             })
-            .and_then(move |stream| {
-                trace!("Established connection with peer={}", peer);
-                Self::process_outgoing_messages(stream, conn_rx)
-            })
-            .then(move |res| {
-                trace!("Disconnection with peer={}, reason={:?}", peer, res);
-                self.disconnect_with_peer(peer, network_tx.clone())
-            })
+            .and_then(move |stream| Self::process_outgoing_messages(peer, stream, conn_rx))
+            .then(move |_| self.disconnect_with_peer(peer, network_tx.clone()))
             .map_err(log_error);
         handle.spawn(connect_handle);
         conn_tx
@@ -203,9 +197,11 @@ impl ConnectionsPool {
 
     // Connect socket with the outgoing channel
     fn process_outgoing_messages(
+        peer: SocketAddr,
         stream: Framed<TcpStream, MessagesCodec>,
         conn_rx: mpsc::Receiver<RawMessage>,
-    ) -> impl Future<Item = &'static str, Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        trace!("Established connection with peer={}", peer);
         let (sink, stream) = stream.split();
 
         let writer = conn_rx
@@ -216,10 +212,19 @@ impl ConnectionsPool {
         reader
             .select2(writer)
             .map_err(|_| format_err!("Socket error"))
-            .and_then(|res| match res {
-                Either::A(_) => Ok("by reader"),
-                Either::B(_) => Ok("by writer"),
+            .and_then(move |reason| {
+                Self::log_disconnect_reason(peer, &reason);
+                Ok(())
             })
+    }
+
+    fn log_disconnect_reason<A, B>(peer: SocketAddr, reason: &Either<A, B>) {
+        let reason = match reason {
+            Either::A(_) => "by reader",
+            Either::B(_) => "by writer",
+        };
+
+        trace!("Disconnection with peer={}, reason={:?}", peer, reason);
     }
 }
 
@@ -328,7 +333,7 @@ impl RequestHandler {
         } else {
             warn!(
                 "Rejected outgoing connection with peer={}, \
-             connections limit reached.",
+                 connections limit reached.",
                 peer
             );
 
@@ -353,8 +358,8 @@ impl RequestHandler {
             Either::B(to_future(
                 connection
                     .send(self.connect_message.raw().clone())
-                    .map_err(|_| format_err!("can't send message to a connection"))),
-            )
+                    .map_err(|_| format_err!("can't send message to a connection")),
+            ))
         }
     }
 
@@ -373,7 +378,7 @@ impl RequestHandler {
         message: RawMessage,
     ) -> impl Future<Item = (), Error = failure::Error>
     where
-        S: Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error>
+        S: Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error>,
     {
         connection
             .and_then(|sender| {
@@ -452,7 +457,7 @@ impl<'a> Listener<'a> {
                          connections limit reached.",
                         address
                     );
-                    return Ok(())
+                    return Ok(());
                 }
                 trace!("Accepted incoming connection with peer={}", address);
                 let network_tx = network_tx.clone();
@@ -523,8 +528,8 @@ impl<'a> Listener<'a> {
 }
 
 fn to_future<F, I>(fut: F) -> impl Future<Item = I, Error = failure::Error>
-    where
-        F: IntoFuture<Item = I, Error = failure::Error>,
+where
+    F: IntoFuture<Item = I, Error = failure::Error>,
 {
     fut.into_future()
 }
