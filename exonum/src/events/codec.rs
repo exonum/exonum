@@ -210,8 +210,7 @@ mod test {
 
     fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-        let mut params =
-            HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+        let mut params = HandshakeParams::with_default_params(public_key, secret_key);
         params.set_remote_key(public_key);
 
         let mut initiator = NoiseWrapper::initiator(&params).session;

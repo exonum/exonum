@@ -178,19 +178,18 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 
-    let mut params =
-        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+    let mut params = HandshakeParams::with_default_params(public_key, secret_key);
     params.set_remote_key(public_key);
 
     let mut initiator = NoiseWrapper::initiator(&params);
     let mut responder = NoiseWrapper::responder(&params);
 
-    let buffer_out = initiator.write_handshake_msg().unwrap();
+    let buffer_out = initiator.write_handshake_msg(&[]).unwrap();
     responder.read_handshake_msg(&buffer_out).unwrap();
 
-    let buffer_out = responder.write_handshake_msg().unwrap();
+    let buffer_out = responder.write_handshake_msg(&[]).unwrap();
     initiator.read_handshake_msg(&buffer_out).unwrap();
-    let buffer_out = initiator.write_handshake_msg().unwrap();
+    let buffer_out = initiator.write_handshake_msg(&[]).unwrap();
     responder.read_handshake_msg(&buffer_out).unwrap();
 
     (
@@ -241,8 +240,7 @@ const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 pub fn default_test_params() -> HandshakeParams {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-    let mut params =
-        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
+    let mut params = HandshakeParams::with_default_params(public_key, secret_key);
     params.set_remote_key(public_key);
     params
 }
@@ -464,7 +462,7 @@ impl NoiseErrorHandshake {
 
         inner
             .read_handshake_msg(stream)
-            .map(move |(stream, inner)| {
+            .map(move |(stream, inner, _)| {
                 self.inner = Some(inner);
                 (stream, self)
             })
@@ -492,7 +490,7 @@ impl NoiseErrorHandshake {
 
             Either::B(
                 inner
-                    .write_handshake_msg(stream)
+                    .write_handshake_msg(stream, &[])
                     .map(move |(stream, inner)| {
                         self.inner = Some(inner);
                         self.current_step = self.current_step
@@ -513,7 +511,7 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, Vec::new()));
         Box::new(framed)
     }
 
@@ -524,7 +522,7 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.write_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, Vec::new()));
         Box::new(framed)
     }
 }

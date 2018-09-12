@@ -30,6 +30,7 @@ use events::{
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
+use std::time::SystemTime;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -76,14 +77,6 @@ impl TestHandler {
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
-            .wait()
-            .unwrap();
-    }
-
-    pub fn connect_with2(&self, addr: SocketAddr, connect: Connect) {
-        self.network_requests_tx
-            .clone()
-            .send(NetworkRequest::ConnectToPeer(addr))
             .wait()
             .unwrap();
     }
@@ -216,6 +209,31 @@ pub struct ConnectionParams {
     handshake_params: HandshakeParams,
 }
 
+impl HandshakeParams {
+    // Helper method to create `HandshakeParams` with empty `ConnectList` and
+    // default `max_message_len`.
+    #[doc(hidden)]
+    pub fn with_default_params(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        let address = "127.0.0.1".parse().unwrap();
+
+        let connect = Connect::new(
+            &public_key,
+            address,
+            SystemTime::now().into(),
+            &user_agent::get(),
+            &secret_key,
+        );
+
+        HandshakeParams::new(
+            public_key,
+            secret_key.clone(),
+            SharedConnectList::default(),
+            connect,
+            ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
+        )
+    }
+}
+
 impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
@@ -224,6 +242,7 @@ impl ConnectionParams {
             public_key,
             secret_key.clone(),
             SharedConnectList::default(),
+            connect.clone(),
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
         );
         let connect_info = ConnectInfo {
@@ -312,7 +331,7 @@ fn test_network_big_message() {
     e1.connect_with(second, t1.connect.clone());
     e2.wait_for_connect();
 
-    e2.connect_with(first, t2.connect.clone());
+//    e2.connect_with(first, t2.connect.clone());
     e1.wait_for_connect();
 
     e1.send_to(second, m1.clone());
@@ -367,7 +386,7 @@ fn test_network_max_message_len() {
     e1.connect_with(second, t1.connect.clone());
     e2.wait_for_connect();
 
-    e2.connect_with(first, t2.connect.clone());
+//    e2.connect_with(first, t2.connect.clone());
     e1.wait_for_connect();
 
     e1.send_to(second, acceptable_message.clone());
@@ -529,6 +548,7 @@ fn test_new_network() {
 
     e1.connect_with(second, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
+    e1.wait_for_connect();
 
     let message = raw_message(11, 128);
 
@@ -536,5 +556,9 @@ fn test_new_network() {
 
     e2.send_to(first, message.clone());
 
-    e1.wait_for_message();
+    assert_eq!(e1.wait_for_message(), message.clone());
+
+    e1.send_to(second, message.clone());
+    e2.wait_for_message();
+
 }

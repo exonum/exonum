@@ -143,7 +143,7 @@ impl ConnectionsPool {
             .and_then(move |socket| {
                 Self::build_handshake_initiator(socket, &peer, &handshake_params)
             })
-            .and_then(move |stream| Self::process_outgoing_messages(peer, stream, conn_rx))
+            .and_then(move |(stream, _)| Self::process_outgoing_messages(peer, stream, conn_rx))
             .then(move |_| self.disconnect_with_peer(peer, network_tx.clone()))
             .map_err(log_error);
         handle.spawn(connect_handle);
@@ -180,7 +180,8 @@ impl ConnectionsPool {
         stream: TcpStream,
         peer: &SocketAddr,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = Framed<TcpStream, MessagesCodec>, Error = failure::Error> {
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, RawMessage), Error = failure::Error>
+    {
         let connect_list = &handshake_params.connect_list.clone();
         if let Some(remote_public_key) = connect_list.find_key_by_address(&peer) {
             let mut handshake_params = handshake_params.clone();
@@ -465,7 +466,9 @@ impl<'a> Listener<'a> {
                 let handshake = NoiseHandshake::responder(&handshake_params, &address);
                 let connection_handler = handshake
                     .listen(sock)
-                    .and_then(move |sock| Self::handle_single_connection(sock, address, network_tx))
+                    .and_then(move |(sock, _)| {
+                        Self::handle_single_connection(sock, address, network_tx)
+                    })
                     .map(|_| {
                         drop(holder);
                     })
