@@ -77,6 +77,7 @@ jobs:
     - cargo fmt --all -- --write-mode=check
     - npm run cspell
     - npm run md
+    - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
     - mkdir -p target/std/string
