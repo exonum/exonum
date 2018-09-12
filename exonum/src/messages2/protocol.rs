@@ -32,11 +32,11 @@ use failure;
 
 use std::{borrow::Cow, fmt::Debug, mem, net::SocketAddr};
 
+use super::{BinaryForm, Message, RawTransaction, ServiceTransaction, SignedMessage};
 use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
-use super::{BinaryForm, Message, RawTransaction, ServiceTransaction, SignedMessage};
 
 /// `SignedMessage` size with zero bytes payload.
 #[doc(hidden)]

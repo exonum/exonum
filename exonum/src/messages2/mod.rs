@@ -60,11 +60,12 @@ pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RawTransaction {
     service_id: u16,
-    transaction_set: ServiceTransaction,
+    service_transaction: ServiceTransaction,
 }
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
-/// This type used inner inside `transactions!` to transfer some set.
+/// This type used inner inside `transactions!`
+/// to return raw transaction payload as part of service transaction set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ServiceTransaction {
     transaction_id: u16,
@@ -90,17 +91,17 @@ impl RawTransaction {
     /// Creates a new instance of RawTransaction.
     pub(in messages) fn new(
         service_id: u16,
-        transaction_set: ServiceTransaction,
+        service_transaction: ServiceTransaction,
     ) -> RawTransaction {
         RawTransaction {
             service_id,
-            transaction_set,
+            service_transaction,
         }
     }
 
     /// Returns the user defined data that should be used for deserialization.
-    pub fn transaction_set(self) -> ServiceTransaction {
-        self.transaction_set
+    pub fn service_transaction(self) -> ServiceTransaction {
+        self.service_transaction
     }
 
     /// Returns `service_id` specified for current transaction.
@@ -113,7 +114,7 @@ impl BinaryForm for RawTransaction {
     fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
-        let value = self.transaction_set.serialize()?;
+        let value = self.service_transaction.serialize()?;
         buffer.extend_from_slice(&value);
         Ok(buffer)
     }
@@ -124,10 +125,10 @@ impl BinaryForm for RawTransaction {
             Err("Buffer too short in RawTransaction deserialization.")?
         }
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
-        let transaction_set = ServiceTransaction::deserialize(&buffer[2..])?;
+        let service_transaction = ServiceTransaction::deserialize(&buffer[2..])?;
         Ok(RawTransaction {
             service_id,
-            transaction_set,
+            service_transaction,
         })
     }
 }
