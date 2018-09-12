@@ -112,6 +112,7 @@ macro_rules! __ex_message {
                 let body_len = <Self>::check_fields(&raw)?;
                 if body_len.unchecked_offset() as usize +
                     $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                    info!("fuck body_len {:?}", body_len.unchecked_offset());
                     return Err("Incorrect raw message length.".into())
                 }
 

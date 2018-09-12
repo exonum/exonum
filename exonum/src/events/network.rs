@@ -291,6 +291,7 @@ impl RequestHandler {
             .map_err(|_| format_err!("no network requests"))
             .for_each(move |request| {
                 match request {
+                    NetworkRequest::ConnectToPeer(_peer) => unimplemented!(),
                     NetworkRequest::SendMessage(peer, msg) => {
                         let conn_tx = outgoing_connections
                             .get(peer)

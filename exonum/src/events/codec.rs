@@ -42,6 +42,7 @@ impl Decoder for MessagesCodec {
     type Error = failure::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        info!("decoding message {}", buf.len());
         // Read header
         if buf.len() < HEADER_LENGTH {
             return Ok(None);
@@ -55,12 +56,16 @@ impl Decoder for MessagesCodec {
 
         let mut buf = self.session.decrypt_msg(len, buf)?;
 
+        info!("decoded message {:?}", &buf[..]);
+
         if buf[0] != 0 {
             bail!("A first byte of the message must be set to 0");
         }
 
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
+
+        info!("decoded message total_len {}", total_len);
 
         if total_len as u32 > self.max_message_len {
             bail!(
@@ -90,6 +95,7 @@ impl Decoder for MessagesCodec {
 
         let data = buf.split_to(total_len).to_vec();
         let raw = RawMessage::new(MessageBuffer::from_vec(data));
+        info!("message converted to raw");
         Ok(Some(raw))
     }
 
@@ -110,6 +116,7 @@ impl Encoder for MessagesCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
+        info!("encoding message {:?}", msg.as_ref());
         self.session.encrypt_msg(msg.as_ref(), buf)?;
         Ok(())
     }

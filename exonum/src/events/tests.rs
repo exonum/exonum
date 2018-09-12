@@ -80,6 +80,14 @@ impl TestHandler {
             .unwrap();
     }
 
+    pub fn connect_with2(&self, addr: SocketAddr, connect: Connect) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::ConnectToPeer(addr))
+            .wait()
+            .unwrap();
+    }
+
     pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
         self.network_requests_tx
             .clone()
@@ -263,8 +271,12 @@ fn test_network_handshake() {
     e1.connect_with(second, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
 
+    info!("e1.connect_with(second");
+
     e2.connect_with(first, t2.connect.clone());
     assert_eq!(e1.wait_for_connect(), t2.connect.clone());
+
+    info!("e2.connect_with(first");
 
     e1.disconnect_with(second);
     assert_eq!(e1.wait_for_disconnect(), second);
@@ -415,7 +427,6 @@ fn test_network_reconnect() {
 
 #[test]
 fn test_network_multiple_connect() {
-    env_logger::init();
     let main = "127.0.0.1:19600".parse().unwrap();
 
     let nodes = [
@@ -492,4 +503,38 @@ fn test_send_first_not_connect() {
 
     assert_eq!(node.wait_for_connect(), t2.connect);
     assert_eq!(node.wait_for_message(), message);
+}
+
+#[test]
+fn test_new_network() {
+    env_logger::init();
+    let first = "127.0.0.1:17230".parse().unwrap();
+    let second = "127.0.0.1:17231".parse().unwrap();
+
+    let mut connect_list = ConnectList::default();
+
+    let mut t1 = ConnectionParams::from_address(first);
+    connect_list.add(t1.connect_info);
+
+    let mut t2 = ConnectionParams::from_address(second);
+    connect_list.add(t2.connect_info);
+
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
+
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
+
+    let mut e1 = t1.spawn(e1, connect_list.clone());
+    let mut e2 = t2.spawn(e2, connect_list);
+
+    e1.connect_with(second, t1.connect.clone());
+    assert_eq!(e2.wait_for_connect(), t1.connect.clone());
+
+    let message = raw_message(11, 128);
+
+    info!("original message {:?}", message.as_ref());
+
+    e2.send_to(first, message.clone());
+
+    e1.wait_for_message();
 }
