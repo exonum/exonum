@@ -50,7 +50,7 @@ impl SignedMessage {
     /// Checks binary format and signature.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Self, Error> {
         ensure!(
-            buffer.len() <= EMPTY_SIGNED_MESSAGE_SIZE,
+            buffer.len() > EMPTY_SIGNED_MESSAGE_SIZE,
             "Message too short message_len = {}",
             buffer.len()
         );

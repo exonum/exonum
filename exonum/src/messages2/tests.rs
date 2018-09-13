@@ -159,10 +159,10 @@ fn test_block() {
 #[test]
 fn test_raw_transaction_small_size() {
     let buffer = vec![0; 1];
-    assert!(ServiceTransaction::deserialize(&vec![0; 1]).is_err());
-    assert!(RawTransaction::deserialize(&vec![0; 1]).is_err());
-    assert!(RawTransaction::deserialize(&vec![0; 3]).is_err());
-    let tx = RawTransaction::deserialize(&vec![0; 4]).unwrap();
+    assert!(ServiceTransaction::decode(&vec![0; 1]).is_err());
+    assert!(RawTransaction::decode(&vec![0; 1]).is_err());
+    assert!(RawTransaction::decode(&vec![0; 3]).is_err());
+    let tx = RawTransaction::decode(&vec![0; 4]).unwrap();
     assert_eq!(tx.service_id, 0);
-    assert_eq!(tx.transaction_set.message_id, 0);
+    assert_eq!(tx.service_transaction.transaction_id, 0);
 }
