@@ -24,7 +24,10 @@ use node::{ConnectInfo, ConnectListConfig};
 pub struct PeerAddress {
     /// External address of the peer hostname:port.
     pub address: String,
+    /// Currently used address resolution.
     resolved: Option<SocketAddr>,
+    /// Backup address resolutions.
+    resolved_cache: Vec<SocketAddr>,
 }
 
 impl PeerAddress {
@@ -33,6 +36,7 @@ impl PeerAddress {
         PeerAddress {
             address,
             resolved: None,
+            resolved_cache: Vec::new(),
         }
     }
 }
@@ -92,10 +96,20 @@ impl ConnectList {
     /// Resolves network address and stores it in the `ConnectList`.
     pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
         let key = *self.find_key_by_unresolved_address(address)?;
-        let address = self.peers[&key].address.clone();
-        let address = address.to_socket_addrs().ok()?.next();
-        self.peers.get_mut(&key).unwrap().resolved = address;
-        address
+        let entry = self.peers.get_mut(&key).unwrap();
+
+        if entry.resolved_cache.is_empty() {
+            let resolved_vec: Vec<SocketAddr> = entry
+                .address
+                .to_socket_addrs()
+                .map(|i| i.collect())
+                .unwrap_or_default();
+            entry.resolved_cache = resolved_vec;
+        }
+
+        let resolved = entry.resolved_cache.pop();
+        entry.resolved = resolved;
+        resolved
     }
 
     /// Returns cached resolved network address of the peer.
