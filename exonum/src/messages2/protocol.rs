@@ -471,7 +471,7 @@ macro_rules! impl_protocol {
                     $($class_num =>
                         match message.message_type() {
                             $($type_num =>{
-                                let payload = $type::deserialize(message.payload())
+                                let payload = $type::decode(message.payload())
                                                 .map_err(into_failure)?;
                                 let message = Message::new(payload, message);
                                 Ok($protocol_name::$class($class::$type(message)))
@@ -574,7 +574,7 @@ impl Protocol {
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> Message<T> {
-        let value = message.serialize().expect("Couldn't serialize data.");
+        let value = message.encode().expect("Couldn't serialize data.");
         let (cls, typ) = T::message_type();
         let signed = SignedMessage::new(cls, typ, value, author, secret_key);
         T::into_message_from_parts(message, signed)

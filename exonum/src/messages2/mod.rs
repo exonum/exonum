@@ -111,21 +111,21 @@ impl RawTransaction {
 }
 
 impl BinaryForm for RawTransaction {
-    fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
+    fn encode(&self) -> Result<Vec<u8>, encoding::Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
-        let value = self.service_transaction.serialize()?;
+        let value = self.service_transaction.encode()?;
         buffer.extend_from_slice(&value);
         Ok(buffer)
     }
 
     /// Converts a serialized byte array into a transaction.
-    fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
+    fn decode(buffer: &[u8]) -> Result<Self, encoding::Error> {
         if buffer.len() < mem::size_of::<u16>() {
             Err("Buffer too short in RawTransaction deserialization.")?
         }
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
-        let service_transaction = ServiceTransaction::deserialize(&buffer[2..])?;
+        let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
         Ok(RawTransaction {
             service_id,
             service_transaction,
@@ -134,14 +134,14 @@ impl BinaryForm for RawTransaction {
 }
 
 impl BinaryForm for ServiceTransaction {
-    fn serialize(&self) -> Result<Vec<u8>, encoding::Error> {
+    fn encode(&self) -> Result<Vec<u8>, encoding::Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
         buffer.extend_from_slice(&self.payload);
         Ok(buffer)
     }
 
-    fn deserialize(buffer: &[u8]) -> Result<Self, encoding::Error> {
+    fn decode(buffer: &[u8]) -> Result<Self, encoding::Error> {
         if buffer.len() < mem::size_of::<u16>() {
             Err("Buffer too short in ServiceTransaction deserialization.")?
         }
