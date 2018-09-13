@@ -42,7 +42,7 @@ use encoding;
 use storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
-pub use self::{helpers::BinaryForm, protocol::*};
+pub use self::{helpers::{BinaryForm, to_hex_string}, protocol::*};
 
 #[macro_use]
 mod compatibility;
@@ -193,7 +193,7 @@ impl<T: ProtocolMessage> Message<T> {
     }
 
     /// Returns reference to the signed message.
-    pub(crate) fn signed_message(&self) -> &SignedMessage {
+    pub fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
 

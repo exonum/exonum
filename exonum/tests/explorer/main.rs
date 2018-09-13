@@ -22,9 +22,13 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
+
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation}, crypto::{self, Hash},
-    explorer::*, helpers::Height, messages::{Message, Protocol, RawTransaction},
+    explorer::*, helpers::Height, messages::{self, Message, Protocol, RawTransaction},
 };
 
 use blockchain::{
@@ -40,20 +44,25 @@ fn test_explorer_basics() {
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
+    let payload_alice = CreateWallet::new(&pk_alice, "Alice");
     let tx_alice = Protocol::sign_tx(
-        CreateWallet::new(&pk_alice, "Alice"),
+        payload_alice.clone(),
         SERVICE_ID,
         pk_alice,
         &key_alice,
     );
+
+    let payload_bob = CreateWallet::new(&pk_bob, "Bob");
     let tx_bob = Protocol::sign_tx(
-        CreateWallet::new(&pk_bob, "Bob"),
+        payload_bob.clone(),
         SERVICE_ID,
         pk_bob,
         &key_bob,
     );
+
+    let payload_transfer = Transfer::new(&pk_alice, &pk_bob, 2);
     let tx_transfer = Protocol::sign_tx(
-        Transfer::new(&pk_alice, &pk_bob, 2),
+        payload_transfer.clone(),
         SERVICE_ID,
         pk_alice,
         &key_alice,
@@ -101,7 +110,10 @@ fn test_explorer_basics() {
         assert_eq!(
             serde_json::to_value(&tx_info).unwrap(),
             json!({
-                "content": tx_alice,
+                "content": {
+                    "debug": payload_alice,
+                    "message": messages::to_hex_string(&tx_alice).unwrap()
+                },
                 "location": {
                     "block_height": "1",
                     "position_in_block": "0",
@@ -128,7 +140,10 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": tx_bob,
+            "content": {
+                    "debug": payload_bob,
+                    "message": messages::to_hex_string(&tx_bob).unwrap()
+            },
             "location": {
                 "block_height": "2",
                 "position_in_block": "0",
@@ -149,7 +164,10 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": tx_transfer,
+            "content": {
+                    "debug": payload_transfer,
+                    "message": messages::to_hex_string(&tx_transfer).unwrap()
+            },
             "location": {
                 "block_height": "2",
                 "position_in_block": "1",
@@ -433,54 +451,60 @@ fn test_block_with_transactions_index_overflow() {
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert!(block[6].status().is_ok());
 }
-//
-//#[test]
-//fn test_committed_transaction_roundtrip() {
-//    let mut blockchain = create_blockchain();
-//    let tx = tx_generator().next().unwrap();
-//    create_block(&mut blockchain, vec![tx]);
-//
-//    let explorer = BlockchainExplorer::new(&blockchain);
-//    let tx_copy: &CommittedTransaction = &explorer.block_with_txs(Height(1)).unwrap()[0];
-//    let json = serde_json::to_value(tx_copy).unwrap();
-//    let tx_copy: CommittedTransaction = serde_json::from_value(json).unwrap();
-//
-//    assert_eq!(tx_copy.content().signed_message(), tx);
-//}
-//
-//#[test]
-//fn test_transaction_info_roundtrip() {
-//    let mut blockchain = create_blockchain();
-//    let tx = tx_generator().next().unwrap();
-//
-//    let mut fork = blockchain.fork();
-//    {
-//        let mut schema = Schema::new(&mut fork);
-//        schema.add_transaction_into_pool(tx.raw().clone());
-//    }
-//    blockchain.merge(fork.into_patch()).unwrap();
-//
-//    let explorer = BlockchainExplorer::new(&blockchain);
-//    let info: TransactionInfo = explorer.transaction(&tx.hash()).unwrap();
-//    let json = serde_json::to_value(&info).unwrap();
-//    let info: TransactionInfo = serde_json::from_value(json).unwrap();
-//
-//    assert_eq!(info.content().signed_message(), tx);
-//}
-//
-//#[test]
-//fn test_block_with_transactions_roundtrip() {
-//    let mut blockchain = create_blockchain();
-//    let (pk_alice, key_alice) = crypto::gen_keypair();
-//    let tx = CreateWallet::new(&pk_alice, "Alice", &key_alice);
-//    create_block(&mut blockchain, vec![tx.clone()]);
-//
-//    let explorer = BlockchainExplorer::new(&blockchain);
-//    let block = explorer.block_with_txs(Height(1)).unwrap();
-//    let block_json = serde_json::to_value(&block).unwrap();
-//    let block_copy: BlockWithTransactions = serde_json::from_value(block_json).unwrap();
-//    assert_eq!(
-//        *block_copy[0].content().signed_message(),
-//        block[0].content().signed_message()
-//    );
-//}
+
+#[test]
+fn test_committed_transaction_roundtrip() {
+    let mut blockchain = create_blockchain();
+    let tx = tx_generator().next().unwrap();
+    create_block(&mut blockchain, vec![tx.clone()]);
+
+    let explorer = BlockchainExplorer::new(&blockchain);
+    let tx_copy: &CommittedTransaction = &explorer.block_with_txs(Height(1)).unwrap()[0];
+    let json = serde_json::to_value(tx_copy).unwrap();
+    let tx_copy: CommittedTransaction = serde_json::from_value(json).unwrap();
+
+    assert_eq!(tx_copy.content().message(), &tx);
+}
+
+#[test]
+fn test_transaction_info_roundtrip() {
+    let mut blockchain = create_blockchain();
+    let tx = tx_generator().next().unwrap();
+
+    let mut fork = blockchain.fork();
+    {
+        let mut schema = Schema::new(&mut fork);
+        schema.add_transaction_into_pool(tx.clone());
+    }
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    let explorer = BlockchainExplorer::new(&blockchain);
+    let info: TransactionInfo = explorer.transaction(&tx.hash()).unwrap();
+    let json = serde_json::to_value(&info).unwrap();
+    let info: TransactionInfo = serde_json::from_value(json).unwrap();
+
+    assert_eq!(info.content().message(), &tx);
+}
+
+#[test]
+fn test_block_with_transactions_roundtrip() {
+    let mut blockchain = create_blockchain();
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let payload = CreateWallet::new(&pk_alice, "Alice");
+    let tx = Protocol::sign_tx(
+        payload.clone(),
+        SERVICE_ID,
+        pk_alice,
+        &key_alice,
+    );
+    create_block(&mut blockchain, vec![tx.clone()]);
+
+    let explorer = BlockchainExplorer::new(&blockchain);
+    let block = explorer.block_with_txs(Height(1)).unwrap();
+    let block_json = serde_json::to_value(&block).unwrap();
+    let block_copy: BlockWithTransactions = serde_json::from_value(block_json).unwrap();
+    assert_eq!(
+        block_copy[0].content().message(),
+        block[0].content().message()
+    );
+}
