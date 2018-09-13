@@ -21,7 +21,7 @@ use crypto;
 use toml;
 
 use std::{
-    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
+    collections::{BTreeMap, HashMap}, fs, net::SocketAddr, path::{Path, PathBuf},
 };
 
 use super::{
@@ -335,26 +335,18 @@ impl Command for GenerateCommonConfig {
 pub struct GenerateNodeConfig;
 
 impl GenerateNodeConfig {
-    fn addresses(context: &Context) -> (SocketAddr, SocketAddr) {
+    fn addresses(context: &Context) -> (String, SocketAddr) {
         let address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
 
-        let external_address = address_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            let ip = address_str.parse::<IpAddr>().unwrap_or_else(|_| {
-                panic!(
-                    "Expected an ip address in {}: {:?}",
-                    PEER_ADDRESS, address_str
-                )
-            });
-            SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
-        });
+        let listen_port = address_str
+            .rsplitn(2, ':')
+            .next()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(DEFAULT_EXONUM_LISTEN_PORT);
 
-        let listen_ip = match external_address {
-            SocketAddr::V4(_) => "0.0.0.0".parse().unwrap(),
-            SocketAddr::V6(_) => "::".parse().unwrap(),
-        };
-        let listen_address = SocketAddr::new(listen_ip, external_address.port());
+        let listen_address = SocketAddr::new("0.0.0.0".parse().unwrap(), listen_port);
 
-        (external_address, listen_address)
+        (address_str.clone(), listen_address)
     }
 }
 
@@ -423,7 +415,7 @@ impl Command for GenerateNodeConfig {
             service_key: service_public_key,
         };
         let node_pub_config = NodePublicConfig {
-            address: addresses.0,
+            address: addresses.0.clone(),
             validator_keys,
             services_public_configs,
         };
@@ -437,7 +429,7 @@ impl Command for GenerateNodeConfig {
 
         let private_config = NodePrivateConfig {
             listen_address: addresses.1,
-            external_address: addresses.0,
+            external_address: addresses.0.clone(),
             consensus_public_key,
             consensus_secret_key,
             service_public_key,

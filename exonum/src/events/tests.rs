@@ -186,7 +186,7 @@ pub fn connect_message(
     let time = time::UNIX_EPOCH;
     Connect::new(
         public_key,
-        addr,
+        &addr.to_string(),
         time.into(),
         &user_agent::get(),
         secret_key,
@@ -219,7 +219,7 @@ impl ConnectionParams {
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
         );
         let connect_info = ConnectInfo {
-            address,
+            address: address.to_string(),
             public_key,
         };
 
@@ -247,12 +247,14 @@ fn test_network_handshake() {
     let mut connect_list = ConnectList::default();
 
     let mut t1 = ConnectionParams::from_address(first);
-    connect_list.add(t1.connect_info);
+    connect_list.add(t1.connect_info.clone());
 
     let mut t2 = ConnectionParams::from_address(second);
-    connect_list.add(t2.connect_info);
+    connect_list.add(t2.connect_info.clone());
 
-    let connect_list = SharedConnectList::from_connect_list(connect_list);
+    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.resolve_peer(&first.to_string());
+    connect_list.resolve_peer(&second.to_string());
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
@@ -284,12 +286,14 @@ fn test_network_big_message() {
     let mut connect_list = ConnectList::default();
 
     let mut t1 = ConnectionParams::from_address(first);
-    connect_list.add(t1.connect_info);
+    connect_list.add(t1.connect_info.clone());
 
     let mut t2 = ConnectionParams::from_address(second);
-    connect_list.add(t2.connect_info);
+    connect_list.add(t2.connect_info.clone());
 
-    let connect_list = SharedConnectList::from_connect_list(connect_list);
+    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.resolve_peer(&first.to_string());
+    connect_list.resolve_peer(&second.to_string());
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
@@ -341,10 +345,12 @@ fn test_network_max_message_len() {
 
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
-    connect_list.add(t1.connect_info);
+    connect_list.add(t1.connect_info.clone());
     let mut t2 = ConnectionParams::from_address(second);
-    connect_list.add(t2.connect_info);
-    let connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.add(t2.connect_info.clone());
+    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.resolve_peer(&first.to_string());
+    connect_list.resolve_peer(&second.to_string());
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
@@ -374,11 +380,13 @@ fn test_network_reconnect() {
 
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
-    connect_list.add(t1.connect_info);
+    connect_list.add(t1.connect_info.clone());
 
     let mut t2 = ConnectionParams::from_address(second);
-    connect_list.add(t2.connect_info);
-    let connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.add(t2.connect_info.clone());
+    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.resolve_peer(&first.to_string());
+    connect_list.resolve_peer(&second.to_string());
 
     let e1 = TestEvents::with_addr(first);
     let e2 = TestEvents::with_addr(second);
@@ -433,15 +441,20 @@ fn test_network_multiple_connect() {
         .collect();
 
     for params in connection_params.iter().cloned() {
-        connect_list.add(params.connect_info);
+        connect_list.add(params.connect_info.clone());
     }
 
     let mut t1 = ConnectionParams::from_address(main);
     let events = TestEvents::with_addr(t1.address);
 
-    connect_list.add(t1.connect_info);
+    connect_list.add(t1.connect_info.clone());
 
-    let connect_list = SharedConnectList::from_connect_list(connect_list);
+    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.resolve_peer(&main.to_string());
+    for a in &nodes {
+        connect_list.resolve_peer(&a.to_string());
+    }
+
     let mut node = t1.spawn(events, connect_list.clone());
 
     let connectors: Vec<_> = connection_params
@@ -476,10 +489,12 @@ fn test_send_first_not_connect() {
 
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(main);
-    connect_list.add(t1.connect_info);
+    connect_list.add(t1.connect_info.clone());
     let mut t2 = ConnectionParams::from_address(other);
-    connect_list.add(t2.connect_info);
-    let connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.add(t2.connect_info.clone());
+    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    connect_list.resolve_peer(&main.to_string());
+    connect_list.resolve_peer(&other.to_string());
 
     let node = TestEvents::with_addr(main);
     let other_node = TestEvents::with_addr(other);

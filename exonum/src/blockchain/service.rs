@@ -423,8 +423,10 @@ impl SharedNodeState {
         lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
-            lock.peers_info.insert(c.addr(), *p);
-            lock.outgoing_connections.insert(c.addr());
+            if let Some(addr) = state.get_resolved_peer_address(c.pub_addr()) {
+                lock.peers_info.insert(addr, *p);
+                lock.outgoing_connections.insert(addr);
+            }
         }
 
         for addr in state.connections().keys() {

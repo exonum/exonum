@@ -413,10 +413,18 @@ impl SharedConnectList {
             .peers
             .iter()
             .map(|(pk, a)| ConnectInfo {
-                address: *a,
+                address: a.address.clone(),
                 public_key: *pk,
             })
             .collect()
+    }
+
+    /// Resolves peer network address and stores result.
+    pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
+        self.connect_list
+            .write()
+            .expect("ConnectList write lock")
+            .resolve_and_cache_peer_address(address)
     }
 }
 
@@ -570,18 +578,27 @@ impl State {
 
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        self.connections.insert(msg.addr(), pubkey);
+        // This code is temporary solution until `Connect` message is removed,
+        // we should use ip address of the incoming message here but we use resolved public address instead.
+        let mut addr = self.get_resolved_peer_address(msg.pub_addr());
+        if addr.is_none() {
+            addr = self.resolve_and_cache_peer_address(msg.pub_addr());
+        }
+        let addr = addr.expect("Fail to add peer with unknown address");
+        self.connections.insert(addr, pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
 
-    /// Removes a peer by the socket address. Returns `Some` public key of the peer if it was
+    /// Removes a peer by the socket address. Returns `Some` (connect message) of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<Connect> {
         let pubkey = self.connections.remove(addr);
         if let Some(ref pubkey) = pubkey {
-            self.peers.remove(pubkey);
+            if let Some(c) = self.peers.remove(pubkey) {
+                return Some(c);
+            }
         }
-        pubkey
+        None
     }
 
     /// Checks if this node considers a peer to be a validator.
@@ -1191,5 +1208,23 @@ impl State {
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
+    }
+
+    /// Resolve hostname of peer and cache result
+    pub fn resolve_and_cache_peer_address(&mut self, hostanme: &str) -> Option<SocketAddr> {
+        self.connect_list
+            .connect_list
+            .write()
+            .expect("Connect list write lock")
+            .resolve_and_cache_peer_address(hostanme)
+    }
+
+    /// Resolve hostname of peer
+    pub fn get_resolved_peer_address(&self, hostanme: &str) -> Option<SocketAddr> {
+        self.connect_list
+            .connect_list
+            .read()
+            .expect("Connect list read lock")
+            .get_resolved_peer_address(hostanme)
     }
 }

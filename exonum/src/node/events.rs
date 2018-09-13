@@ -59,7 +59,7 @@ impl NodeHandler {
             }
             ExternalMessage::PeerAdd(info) => {
                 info!("Send Connect message to {}", info);
-                self.state.add_peer_to_connect_list(info);
+                self.state.add_peer_to_connect_list(info.clone());
                 self.connect(&info.address);
 
                 if self.config_manager.is_some() {

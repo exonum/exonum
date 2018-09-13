@@ -154,7 +154,7 @@ impl ServiceApiScope {
 ///
 /// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
 /// use exonum::blockchain::{Schema};
-/// use exonum::crypto::Hash;
+/// use exonum::crypto::{Hash, PublicKey};
 ///
 /// // Declares a type which describes an API specification and implementation.
 /// pub struct MyApi;
@@ -184,10 +184,10 @@ impl ServiceApiScope {
 ///         )
 ///     }
 ///
-///     // Mutable handler which removes the peer with the given address from the cache.
-///     pub fn remove_peer(state: &ServiceApiState, query: SocketAddr) -> api::Result<()> {
+///     // Mutable handler which removes the peer with the given key from the cache.
+///     pub fn remove_peer(state: &ServiceApiState, query: PublicKey) -> api::Result<()> {
 ///         let mut blockchain = state.blockchain().clone();
-///         Ok(blockchain.remove_peer_with_addr(&query))
+///         Ok(blockchain.remove_peer_with_pubkey(&query))
 ///     }
 ///
 ///     // Simple handler without any parameters.

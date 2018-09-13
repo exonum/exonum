@@ -48,7 +48,7 @@ use messages::{
 use node::ConnectInfo;
 use node::{
     ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
-    NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
+    NodeHandler, NodeSender, PeerAddress, ServiceConfig, State, SystemStateProvider,
 };
 use storage::{MapProof, MemoryDB};
 
@@ -253,7 +253,7 @@ impl Sandbox {
         user_agent: &str,
         secret_key: &SecretKey,
     ) -> Connect {
-        Connect::new(public_key, addr, time, user_agent, secret_key)
+        Connect::new(public_key, &addr.to_string(), time, user_agent, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -776,7 +776,7 @@ impl Sandbox {
         let connect = self.connect().map(|c| {
             self.create_connect(
                 c.pub_key(),
-                c.addr(),
+                c.pub_addr().parse().expect("Expected resolved address"),
                 time.into(),
                 c.user_agent(),
                 self.s(ValidatorId(0)),
@@ -842,7 +842,7 @@ impl Sandbox {
 
         let mut handler = NodeHandler::new(
             blockchain,
-            address,
+            &address.to_string(),
             node_sender,
             Box::new(system_state),
             config,
@@ -896,7 +896,7 @@ impl Sandbox {
             .handler
             .state
             .add_peer_to_connect_list(ConnectInfo {
-                address: addr,
+                address: addr.to_string(),
                 public_key,
             });
     }
@@ -919,8 +919,10 @@ impl ConnectList {
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
     pub fn from_peers(peers: &HashMap<PublicKey, Connect>) -> Self {
-        let peers: BTreeMap<PublicKey, SocketAddr> =
-            peers.iter().map(|(p, c)| (*p, c.addr())).collect();
+        let peers: BTreeMap<PublicKey, PeerAddress> = peers
+            .iter()
+            .map(|(p, c)| (*p, PeerAddress::new(c.pub_addr().to_owned())))
+            .collect();
         ConnectList { peers }
     }
 }
@@ -1035,8 +1037,9 @@ fn sandbox_with_services_uninitialized(
             }),
     );
 
+    let str_addresses: Vec<String> = addresses.iter().map(|ref a| a.to_string()).collect();
     let connect_list_config =
-        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &addresses);
+        ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
     blockchain.initialize(genesis).unwrap();
 
@@ -1074,7 +1077,7 @@ fn sandbox_with_services_uninitialized(
 
     let mut handler = NodeHandler::new(
         blockchain.clone(),
-        addresses[0],
+        &str_addresses[0],
         node_sender,
         Box::new(system_state),
         config.clone(),

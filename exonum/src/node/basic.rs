@@ -62,22 +62,22 @@ impl NodeHandler {
     /// Removes peer from the state and from the cache. Node will try to connect to that address
     /// again if it was in the validators list.
     fn remove_peer_with_addr(&mut self, addr: SocketAddr) {
-        if let Some(pubkey) = self.state.remove_peer_with_addr(&addr) {
-            let is_validator = self.state.peer_is_validator(&pubkey);
-            let in_connect_list = self.state.peer_in_connect_list(&pubkey);
+        if let Some(connect) = self.state.remove_peer_with_addr(&addr) {
+            let is_validator = self.state.peer_is_validator(connect.pub_key());
+            let in_connect_list = self.state.peer_in_connect_list(connect.pub_key());
             if is_validator && in_connect_list {
-                self.connect(&addr);
+                self.connect(connect.pub_addr());
             }
+            self.blockchain.remove_peer_with_pubkey(connect.pub_key());
         }
-        self.blockchain.remove_peer_with_addr(&addr);
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO Add spam protection. (ECR-170)
         // TODO: drop connection if checks have failed. (ECR-1837)
-        let address = message.addr();
-        if address == self.state.our_connect_message().addr() {
+        let address = message.pub_addr().to_owned();
+        if address == self.state.our_connect_message().pub_addr() {
             trace!("Received Connect with same address as our external_address.");
             return;
         }
@@ -111,8 +111,8 @@ impl NodeHandler {
                 error!("Received outdated Connect message from {}", address);
                 return;
             } else if saved_message.time() < message.time() {
-                need_connect = saved_message.addr() != message.addr();
-            } else if saved_message.addr() == message.addr() {
+                need_connect = saved_message.pub_addr() != message.pub_addr();
+            } else if saved_message.pub_addr() == message.pub_addr() {
                 need_connect = false;
             } else {
                 error!("Received weird Connect message from {}", address);
@@ -215,7 +215,7 @@ impl NodeHandler {
                 peer.pub_key(),
                 self.state.consensus_secret_key(),
             );
-            trace!("Request peers from peer with addr {:?}", peer.addr());
+            trace!("Request peers from peer with addr {:?}", peer.pub_addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();
