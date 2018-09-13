@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use hex::{FromHex, ToHex};
 use serde::{
-    de::Error, ser::Error as SerError, ser::SerializeStruct, Deserialize, Deserializer, Serialize,
+    de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize,
     Serializer,
 };
-use serde_json::{from_value, Value};
-
-use std::fmt::Display;
+use serde_json::{from_value, Value, Error as SerdeJsonError};
 
 use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
 use crypto::Hash;
@@ -110,23 +107,17 @@ impl<V: Serialize> Serialize for ListProof<V> {
             }
             Left(ref left_proof, ref option_hash) => {
                 if let Some(ref hash) = *option_hash {
-                    let mut hex_hash = String::new();
-                    hash.write_hex(&mut hex_hash).map_err(SerError::custom)?;
-
                     state = ser.serialize_struct("Left", 2)?;
                     state.serialize_field("left", left_proof)?;
-                    state.serialize_field("right", &hex_hash)?;
+                    state.serialize_field("right", &hash)?;
                 } else {
                     state = ser.serialize_struct("Left", 1)?;
                     state.serialize_field("left", left_proof)?;
                 }
             }
             Right(ref hash, ref right_proof) => {
-                let mut hex_hash = String::new();
-                hash.write_hex(&mut hex_hash).map_err(SerError::custom)?;
-
                 state = ser.serialize_struct("Right", 2)?;
-                state.serialize_field("left", &hex_hash)?;
+                state.serialize_field("left", &hash)?;
                 state.serialize_field("right", right_proof)?;
             }
             Leaf(ref val) => {
@@ -145,7 +136,7 @@ where
     where
         D: Deserializer<'a>,
     {
-        fn format_err_string<E: Display>(type_str: &str, value: &Value, err: &E) -> String {
+        fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
             format!(
                 "Couldn't deserialize {} from serde_json::Value: {}, error: {}",
                 type_str, value, err
@@ -187,12 +178,7 @@ where
                     let left_proof: Self = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", left_value, &err))
                     })?;
-                    // take hex string
-                    let right_hash: String = from_value(right_value.clone()).map_err(|err| {
-                        D::Error::custom(format_err_string("Hash", right_value, &err))
-                    })?;
-                    // convert from hex
-                    let right_hash: Hash = FromHex::from_hex(&right_hash).map_err(|err| {
+                    let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", right_value, &err))
                     })?;
                     ListProof::Left(Box::new(left_proof), Some(right_hash))
@@ -200,12 +186,7 @@ where
                     let right_proof: Self = from_value(right_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", right_value, &err))
                     })?;
-                    // take hex string
-                    let left_hash: String = from_value(left_value.clone()).map_err(|err| {
-                        D::Error::custom(format_err_string("Hash", left_value, &err))
-                    })?;
-                    // convert from hex
-                    let left_hash: Hash = FromHex::from_hex(&left_hash).map_err(|err| {
+                    let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", left_value, &err))
                     })?;
                     ListProof::Right(left_hash, Box::new(right_proof))
