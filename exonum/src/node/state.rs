@@ -1212,11 +1212,7 @@ impl State {
 
     /// Resolve network address of the peer and cache result.
     pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
-        self.connect_list
-            .connect_list
-            .write()
-            .expect("Connect list write lock")
-            .resolve_and_cache_peer_address(address)
+        self.connect_list.resolve_and_cache_peer_address(address)
     }
 
     /// Resolve network address of the peer.
