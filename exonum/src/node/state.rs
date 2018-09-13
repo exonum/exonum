@@ -574,16 +574,27 @@ impl State {
         self.peers.insert(pubkey, msg).is_none()
     }
 
-    /// Removes a peer by the socket address.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
-        if let Some(pubkey) = self.connections.remove(addr) {
-            self.peers.remove(&pubkey);
-            return self.config
-                .validator_keys
-                .iter()
-                .any(|x| x.consensus_key == pubkey);
+    /// Removes a peer by the socket address. Returns `Some` public key of the peer if it was
+    /// indeed connected or `None` if there was no connection with given socket address.
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
+        let pubkey = self.connections.remove(addr);
+        if let Some(ref pubkey) = pubkey {
+            self.peers.remove(pubkey);
         }
-        false
+        pubkey
+    }
+
+    /// Checks if this node considers a peer to be a validator.
+    pub fn peer_is_validator(&self, pubkey: &PublicKey) -> bool {
+        self.config
+            .validator_keys
+            .iter()
+            .any(|x| x.consensus_key == *pubkey)
+    }
+
+    /// Checks if a peer is in this node's connection list.
+    pub fn peer_in_connect_list(&self, pubkey: &PublicKey) -> bool {
+        self.connect_list.is_peer_allowed(pubkey)
     }
 
     /// Returns the keys of known peers with their `Connect` messages.

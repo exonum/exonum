@@ -8,6 +8,9 @@ target
 rls
 Cargo.lock
 
+# Exonum artifact folder
+.exonum
+
 # fuzz testing
 exonum/fuzz/corpus
 exonum/fuzz/artifacts

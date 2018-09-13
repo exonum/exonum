@@ -10,6 +10,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `majority_count` parameter has been removed from `StoredConfiguration` and
    moved to `ConfigurationService` configuration. (#828)
 
+- Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
+
 #### exonum
 
 - `api::Error::InternalError` now contains `failure::Error` instead of
@@ -37,6 +39,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `first_round_timeout`. Value of this percentage is defined in
   `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
 
+- `missing_keys`, `entries`, `all_entries` methods of `CheckedMapProof` and
+  `MapProof::missing_keys_unchecked` method now return `impl Iterator` instead
+  of `Vec`. (#918)
+
 ### New Features
 
 #### exonum
@@ -53,11 +59,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `/v1/blocks/subscribe` endpoint for following block commit events
   through WebSockets (#792).
 
+- Added `MapProof::all_entries_unchecked` method. It is used for more efficient
+  calculations in Exonum Java Bindings, but can be used for debug purposes
+  as well. (#918)
+
 ### Bug Fixes
 
 #### exonum
 
 - Bug with pool size overflow has been fixed. (#853)
+
+- Bug in `NoiseWrapper::decrypt_msg` caused by wrong calculation of
+  encrypted and decrypted message sizes has been fixed. (#873)
 
 - Transactions (signature) verification benchmark has been fixed. (#673)
 
@@ -65,6 +78,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   consensus is at round 0. (#673)
 
 - Node now works correctly after consensus re-enable via API. (#902)
+
+- Bug with incorrect EOF handling while decoding network messages has been
+  fixed. (#917)
 
 ### Internal Improvements
 
@@ -97,6 +113,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - The `finalize` command now does not include the node itself as its own
   trusted peer in the generated configuration. (#892)
+
+- Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
 
 ## 0.9.1 - 2018-08-02
 

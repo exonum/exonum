@@ -158,7 +158,7 @@ impl<'a> ProposeBuilder<'a> {
     }
 
     pub fn build(&self) -> Propose {
-        Propose::new(
+        self.sandbox.create_propose(
             self.validator_id
                 .unwrap_or_else(|| self.sandbox.current_leader()),
             self.height.unwrap_or_else(|| self.sandbox.current_height()),
@@ -350,7 +350,7 @@ where
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Prevote::new(
+                sandbox.recv(&sandbox.create_prevote(
                     val_idx,
                     initial_height,
                     round,
@@ -377,7 +377,7 @@ where
                 *sandbox_state.accepted_block_hash.borrow_mut() = block.hash();
             }
 
-            sandbox.broadcast(&Precommit::new(
+            sandbox.broadcast(&sandbox.create_precommit(
                 ValidatorId(0),
                 initial_height,
                 round,
@@ -390,7 +390,7 @@ where
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Precommit::new(
+                sandbox.recv(&sandbox.create_precommit(
                     val_idx,
                     initial_height,
                     round,
@@ -465,7 +465,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.recv(&propose);
             for val_idx in 0..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Prevote::new(
+                sandbox.recv(&sandbox.create_prevote(
                     val_idx,
                     initial_height,
                     round,
@@ -490,7 +490,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 
             for val_idx in 0..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(&Precommit::new(
+                sandbox.recv(&sandbox.create_precommit(
                     val_idx,
                     initial_height,
                     round,
@@ -528,7 +528,7 @@ fn get_propose_with_transactions_for_validator(
     validator: ValidatorId,
 ) -> Propose {
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
-    Propose::new(
+    sandbox.create_propose(
         validator,
         sandbox.current_height(),
         sandbox.current_round(),
@@ -584,7 +584,7 @@ fn try_check_and_broadcast_propose_and_prevote(
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
     sandbox.try_broadcast(&propose)?;
 
-    sandbox.broadcast(&Prevote::new(
+    sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
         sandbox.current_height(),
         sandbox.current_round(),
@@ -601,7 +601,7 @@ pub fn receive_valid_propose_with_transactions(
     sandbox: &TimestampingSandbox,
     transactions: &[Hash],
 ) -> Propose {
-    let propose = Propose::new(
+    let propose = sandbox.create_propose(
         sandbox.current_leader(),
         sandbox.current_height(),
         sandbox.current_round(),
@@ -617,7 +617,7 @@ pub fn make_request_propose_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
 ) -> ProposeRequest {
-    ProposeRequest::new(
+    sandbox.create_propose_request(
         &sandbox.p(ValidatorId(0)),
         &sandbox.p(precommit.validator()),
         precommit.height(),
@@ -631,7 +631,7 @@ pub fn make_request_prevote_from_precommit(
     precommit: &Precommit,
 ) -> PrevotesRequest {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
-    PrevotesRequest::new(
+    sandbox.create_prevote_request(
         &sandbox.p(ValidatorId(0)),
         &sandbox.p(precommit.validator()),
         precommit.height(),
@@ -645,7 +645,7 @@ pub fn make_request_prevote_from_precommit(
 /// idea of the method is to return valid Prevote using provided Propose.
 /// locked round is set to 0; may be need to take it from somewhere (from sandbox?)
 pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propose) -> Prevote {
-    Prevote::new(
+    sandbox.create_prevote(
         ValidatorId(0),
         propose.height(),
         propose.round(),

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "exonum",
+    "crypto",
     "testkit",
     "testkit/server",
     "services/configuration",

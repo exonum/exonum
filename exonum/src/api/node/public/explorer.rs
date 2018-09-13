@@ -171,15 +171,18 @@ impl ExplorerApi {
     pub fn handle_subscribe(
         name: &'static str,
         backend: &mut actix::ApiBuilder,
+        service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) {
         let server = Arc::new(Mutex::new(None));
+        let service_api_state = Arc::new(service_api_state);
 
         let index = move |req: HttpRequest| -> FutureResponse {
             let server = server.clone();
+            let service_api_state = service_api_state.clone();
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::default()));
+                *address = Some(Arbiter::start(|_| Server::new(service_api_state)));
 
                 shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
             }
@@ -197,11 +200,13 @@ impl ExplorerApi {
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(
         api_scope: &mut ServiceApiScope,
+        service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) -> &mut ServiceApiScope {
         Self::handle_subscribe(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
+            service_api_state,
             shared_node_state,
         );
         api_scope

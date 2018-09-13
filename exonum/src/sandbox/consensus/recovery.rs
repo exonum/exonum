@@ -19,7 +19,6 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{user_agent, Height, Round, ValidatorId};
-use messages::{Connect, PeersRequest, Precommit, Prevote};
 use node;
 
 use sandbox::{
@@ -133,7 +132,7 @@ fn should_not_vote_after_node_restart() {
 
     sandbox.broadcast(&prevote);
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -143,7 +142,7 @@ fn should_not_vote_after_node_restart() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); // Do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -153,7 +152,7 @@ fn should_not_vote_after_node_restart() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 
-    let precommit = Precommit::new(
+    let precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -202,7 +201,7 @@ fn should_save_precommit_to_consensus_cache() {
 
     sandbox.broadcast(&prevote);
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -212,7 +211,7 @@ fn should_save_precommit_to_consensus_cache() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -222,7 +221,7 @@ fn should_save_precommit_to_consensus_cache() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 
-    let precommit = Precommit::new(
+    let precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -246,7 +245,7 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
 
-    sandbox_restarted.recv(&Precommit::new(
+    sandbox_restarted.recv(&sandbox_restarted.create_precommit(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -256,7 +255,7 @@ fn should_save_precommit_to_consensus_cache() {
         sandbox_restarted.s(ValidatorId(1)),
     ));
 
-    sandbox_restarted.recv(&Precommit::new(
+    sandbox_restarted.recv(&sandbox_restarted.create_precommit(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -289,7 +288,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.broadcast(&first_prevote);
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(1),
@@ -299,7 +298,7 @@ fn test_recover_consensus_messages_in_other_round() {
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(1),
@@ -309,7 +308,7 @@ fn test_recover_consensus_messages_in_other_round() {
     ));
     sandbox.assert_lock(Round(1), Some(first_propose.hash()));
 
-    let first_precommit = Precommit::new(
+    let first_precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(1),
@@ -326,7 +325,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.assert_state(Height(1), Round(2));
 
     // make sure we broadcasted same Prevote for second round
-    let first_updated_prevote = Prevote::new(
+    let first_updated_prevote = sandbox.create_prevote(
         first_prevote.validator(),
         first_prevote.height(),
         Round(2),
@@ -341,7 +340,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.recv(&second_propose);
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
         Round(2),
@@ -350,7 +349,7 @@ fn test_recover_consensus_messages_in_other_round() {
         sandbox.s(ValidatorId(1)),
     ));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(2),
         Height(1),
         Round(2),
@@ -361,7 +360,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.assert_lock(Round(1), Some(first_propose.hash()));
 
-    sandbox.recv(&Prevote::new(
+    sandbox.recv(&sandbox.create_prevote(
         ValidatorId(3),
         Height(1),
         Round(2),
@@ -372,7 +371,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.assert_lock(Round(2), Some(second_propose.hash()));
 
-    let second_precommit = Precommit::new(
+    let second_precommit = sandbox.create_precommit(
         ValidatorId(0),
         Height(1),
         Round(2),
@@ -391,7 +390,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox_new.assert_state(Height(1), Round(2));
     sandbox_new.broadcast(&first_prevote);
 
-    let first_precommit_new_time = Precommit::new(
+    let first_precommit_new_time = sandbox_new.create_precommit(
         first_precommit.validator(),
         first_precommit.height(),
         first_precommit.round(),
@@ -423,9 +422,9 @@ fn should_restore_peers_after_restart() {
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
     let time = sandbox.time();
-    let connect_from_0 = Connect::new(&p0, a0, time.into(), &user_agent::get(), &s0);
-    let connect_from_1 = Connect::new(&p1, a1, time.into(), &user_agent::get(), &s1);
-    let peers_request = PeersRequest::new(&p1, &p0, &s1);
+    let connect_from_0 = sandbox.create_connect(&p0, a0, time.into(), &user_agent::get(), &s0);
+    let connect_from_1 = sandbox.create_connect(&p1, a1, time.into(), &user_agent::get(), &s1);
+    let peers_request = sandbox.create_peers_request(&p1, &p0, &s1);
 
     // check that peers are absent
     sandbox.recv(&peers_request);

@@ -54,7 +54,7 @@ where
 
     let proof = proof.check().unwrap();
     assert_eq!(
-        proof.entries(),
+        proof.entries().collect::<Vec<_>>(),
         entries
             .iter()
             .map(|&(ref k, ref v)| (k, v))
@@ -70,7 +70,7 @@ fn check_map_multiproof<T, K, V>(
 ) where
     T: AsRef<Snapshot>,
     K: ProofMapKey + Clone + PartialEq + Debug,
-    V: StorageValue + PartialEq + Debug,
+    V: StorageValue + Clone + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -96,10 +96,15 @@ fn check_map_multiproof<T, K, V>(
         (entries, missing_keys)
     };
 
+    let unchecked_proof = proof.clone();
     let proof = proof.check().unwrap();
+    assert_eq!(
+        proof.all_entries().collect::<Vec<_>>(),
+        unchecked_proof.all_entries_unchecked().collect::<Vec<_>>()
+    );
     assert_eq!(proof.merkle_root(), table.merkle_root());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
-        let mut actual_keys = proof.missing_keys();
+        let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
         actual_keys
             .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
         actual_keys
@@ -110,7 +115,7 @@ fn check_map_multiproof<T, K, V>(
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>(),
         {
-            let mut actual_entries = proof.entries();
+            let mut actual_entries = proof.entries().collect::<Vec<_>>();
             actual_entries.sort_unstable_by(|&(x, _), &(y, _)| {
                 ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
             });

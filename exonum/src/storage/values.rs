@@ -317,7 +317,7 @@ impl StorageValue for Uuid {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        Uuid::from_bytes(&value).unwrap()
+        Uuid::from_slice(&value).unwrap()
     }
 }
 

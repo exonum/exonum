@@ -18,7 +18,7 @@ macro_rules! implement_public_crypto_wrapper {
     ($(#[$attr:meta])* struct $name:ident, $size:expr) => (
     #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
     $(#[$attr])*
-    pub struct $name($crate::crypto::crypto_impl::$name);
+    pub struct $name($crate::crypto_impl::$name);
 
     impl $name {
         /// Creates a new instance filled with zeros.
@@ -30,12 +30,12 @@ macro_rules! implement_public_crypto_wrapper {
     impl $name {
         /// Creates a new instance from bytes array.
         pub fn new(bytes_array: [u8; $size]) -> Self {
-            $name($crate::crypto::crypto_impl::$name(bytes_array))
+            $name($crate::crypto_impl::$name(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
-            $crate::crypto::crypto_impl::$name::from_slice(bytes_slice).map($name)
+            $crate::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
         /// Returns a hex representation of binary data.
@@ -72,7 +72,7 @@ macro_rules! implement_private_crypto_wrapper {
     ($(#[$attr:meta])* struct $name:ident, $size:expr) => (
     #[derive(Clone, PartialEq, Eq)]
     $(#[$attr])*
-    pub struct $name($crate::crypto::crypto_impl::$name);
+    pub struct $name($crate::crypto_impl::$name);
 
     impl $name {
         /// Creates a new instance filled with zeros.
@@ -84,12 +84,12 @@ macro_rules! implement_private_crypto_wrapper {
     impl $name {
         /// Creates a new instance from bytes array.
         pub fn new(bytes_array: [u8; $size]) -> Self {
-            $name($crate::crypto::crypto_impl::$name(bytes_array))
+            $name($crate::crypto_impl::$name(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
-            $crate::crypto::crypto_impl::$name::from_slice(bytes_slice).map($name)
+            $crate::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
         /// Returns a hex representation of binary data.

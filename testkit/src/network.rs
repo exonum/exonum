@@ -17,7 +17,7 @@ use serde_json;
 
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
-    crypto::{self, CryptoHash}, helpers::{Height, Round, ValidatorId},
+    crypto::{self, CryptoHash, PublicKey, SecretKey}, helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Propose},
 };
 
@@ -95,14 +95,14 @@ impl TestNetwork {
     }
 
     /// Returns service public key of the validator with given id.
-    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
         self.validators()
             .get(id.0 as usize)
             .map(|x| &x.service_public_key)
     }
 
     /// Returns consensus public key of the validator with given id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
         self.validators()
             .get(id.0 as usize)
             .map(|x| &x.consensus_public_key)
@@ -112,10 +112,10 @@ impl TestNetwork {
 /// An emulated node in the test network.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TestNode {
-    consensus_secret_key: crypto::SecretKey,
-    consensus_public_key: crypto::PublicKey,
-    service_secret_key: crypto::SecretKey,
-    service_public_key: crypto::PublicKey,
+    consensus_secret_key: SecretKey,
+    consensus_public_key: PublicKey,
+    service_secret_key: SecretKey,
+    service_public_key: PublicKey,
     validator_id: Option<ValidatorId>,
 }
 
@@ -150,8 +150,8 @@ impl TestNode {
 
     /// Constructs a new node from the given keypairs.
     pub fn from_parts(
-        consensus_keypair: (crypto::PublicKey, crypto::SecretKey),
-        service_keypair: (crypto::PublicKey, crypto::SecretKey),
+        consensus_keypair: (PublicKey, SecretKey),
+        service_keypair: (PublicKey, SecretKey),
         validator_id: Option<ValidatorId>,
     ) -> TestNode {
         TestNode {
@@ -216,7 +216,7 @@ impl TestNode {
     }
 
     /// Returns the service keypair.
-    pub fn service_keypair(&self) -> (&crypto::PublicKey, &crypto::SecretKey) {
+    pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
         (&self.service_public_key, &self.service_secret_key)
     }
 }
