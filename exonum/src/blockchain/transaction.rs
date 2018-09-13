@@ -129,6 +129,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     /// ```
     /// # #[macro_use] extern crate exonum;
+    /// # #[macro_use] extern crate serde_derive;
     /// #
     /// use exonum::blockchain::{Transaction, TransactionContext};
     /// use exonum::crypto::PublicKey;
@@ -172,6 +173,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     /// ```
     /// # #[macro_use] extern crate exonum;
+    /// # #[macro_use] extern crate serde_derive;
     /// #
     /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
@@ -508,6 +510,7 @@ pub trait TransactionSet:
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
+/// #[macro_use] extern crate serde_derive;
 /// use exonum::crypto::PublicKey;
 /// # use exonum::storage::Fork;
 /// # use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};

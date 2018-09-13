@@ -46,6 +46,7 @@ use storage::{Fork, Snapshot};
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
+/// #[macro_use] extern crate serde_derive;
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;

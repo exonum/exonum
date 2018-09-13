@@ -384,6 +384,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// ```
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
+/// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
@@ -554,6 +555,7 @@ impl CommittedTransaction {
 /// ```
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
+/// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{PublicKey, Signature};
 /// # use exonum::explorer::TransactionInfo;
