@@ -121,9 +121,11 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use rand::{RngCore, SeedableRng, XorShiftRng};
 
-    use super::ConnectList;
+    use super::*;
     use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use node::ConnectInfo;
 
@@ -233,4 +235,55 @@ mod test {
         assert!(connect_list.is_address_allowed(&address));
     }
 
+    #[test]
+    fn test_network_address_resolve_trivial() {
+        let key = PublicKey::new([1; PUBLIC_KEY_LENGTH]);
+        let address = "127.0.0.1:80";
+        let resolved: SocketAddr = address.parse().unwrap();
+
+        let mut connect_list = ConnectList::default();
+        connect_list
+            .peers
+            .insert(key, PeerAddress::new(address.to_string()));
+
+        assert_eq!(connect_list.get_resolved_peer_address(address), None);
+        assert_eq!(
+            connect_list.find_key_by_unresolved_address(address),
+            Some(&key)
+        );
+
+        let test_address = connect_list.resolve_and_cache_peer_address(address);
+        assert_eq!(test_address, Some(resolved));
+        assert_eq!(
+            connect_list.get_resolved_peer_address(address),
+            Some(resolved)
+        );
+
+        assert_eq!(
+            connect_list.find_key_by_resolved_address(&resolved),
+            Some(&key)
+        );
+    }
+
+    #[test]
+    fn test_network_address_resolve_hostname() {
+        let key = PublicKey::new([1; PUBLIC_KEY_LENGTH]);
+        let address = "localhost:80";
+        let resolved: HashSet<SocketAddr> = address
+            .to_socket_addrs()
+            .map(|i| i.collect())
+            .unwrap_or_default();
+
+        let mut connect_list = ConnectList::default();
+        connect_list
+            .peers
+            .insert(key, PeerAddress::new(address.to_string()));
+
+        for _ in 0..resolved.len() {
+            let test_address = connect_list
+                .resolve_and_cache_peer_address(address)
+                .expect("Address should be resolved");
+            assert!(resolved.contains(&test_address));
+        }
+    }
 }
