@@ -8,10 +8,10 @@ use encoding::Error;
 /// Helper trait to define serialization format.
 pub trait BinaryForm: Sized {
     /// Converts transaction into serialized form.
-    fn serialize(&self) -> Result<Vec<u8>, Error>;
+    fn encode(&self) -> Result<Vec<u8>, Error>;
 
     /// Converts a serialized byte array into a transaction.
-    fn deserialize(buffer: &[u8]) -> Result<Self, Error>;
+    fn decode(buffer: &[u8]) -> Result<Self, Error>;
 }
 
 /// Uses `ToHex`/`FromHex` to serialize arbitrary type `T` as

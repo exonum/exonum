@@ -262,11 +262,11 @@ macro_rules! encoding_struct {
 
         impl $crate::messages::BinaryForm for $name
         {
-            fn serialize(&self) -> Result<Vec<u8>, $crate::encoding::Error> {
+            fn encode(&self) -> Result<Vec<u8>, $crate::encoding::Error> {
                 Ok(self.raw.clone())
             }
 
-            fn deserialize(buffer: &[u8]) -> Result<Self, $crate::encoding::Error> {
+            fn decode(buffer: &[u8]) -> Result<Self, $crate::encoding::Error> {
                 let vec: Vec<u8> = buffer.to_vec(); // TODO: Remove to_vec() (which clones data).
                 let latest_segment: $crate::encoding::CheckedOffset = $name::__ex_header_size().into();
 

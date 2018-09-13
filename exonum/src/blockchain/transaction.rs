@@ -691,7 +691,7 @@ macro_rules! __enum_to_vec_id{
     (@create $set:ident $this:expr, ( $((($name:ident) => ($num:expr)))* ) ) => {
         match $this {
             $(
-                &$set::$name(ref tx) => ($num, $crate::messages::BinaryForm::serialize(tx).unwrap())
+                &$set::$name(ref tx) => ($num, $crate::messages::BinaryForm::encode(tx).unwrap())
             ),*
         }
     };
@@ -720,7 +720,7 @@ macro_rules! __enum_from_id_vec {
     (@create $set:ident ($id:expr, $vec:expr), ( $((($name:ident) => ($num:expr)))* ) ) => {
         match $id {
             $(
-                num if num == $num => return <$name as $crate::messages::BinaryForm>::deserialize(&$vec).map($set::$name),
+                num if num == $num => return <$name as $crate::messages::BinaryForm>::decode(&$vec).map($set::$name),
             )*
             num => Err($crate::encoding::Error::Basic(format!("Tag {} not found for enum {}.",num, stringify!($set)).into()))
         }
