@@ -19,7 +19,7 @@ use events::{error::LogError, Event, EventHandler, InternalEvent, InternalReques
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
         match event {
-            Event::Network(network) => self.handle_network_event(network),
+            Event::Network(network) => self.handle_network_event(network).log_error(),
             Event::Api(api) => self.handle_api_event(api),
             Event::Internal(internal) => self.handle_internal_event(internal),
         }
@@ -35,21 +35,20 @@ impl NodeHandler {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
-            InternalEvent::TxVerified(tx) => {
-                // We don't care about result, because situation when transaction received twice
-                // is normal for internal messages (transaction may be received from 2+ nodes).
-                let _ = self.handle_verified_tx(tx);
-            }
+            InternalEvent::MessageVerified(msg) => self.handle_message(msg),
         }
     }
 
-    fn handle_network_event(&mut self, event: NetworkEvent) {
+    fn handle_network_event(&mut self, event: NetworkEvent) -> Result<(), ::failure::Error> {
         match event {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
-            NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
+            NetworkEvent::MessageReceived(_, raw) => {
+                self.execute_later(InternalRequest::VerifyMessage(raw));
+            }
         }
+        Ok(())
     }
 
     fn handle_api_event(&mut self, event: ExternalMessage) {
@@ -120,10 +119,12 @@ impl NodeHandler {
         let schema = Schema::new(snapshot);
         let pool = schema.transactions_pool();
         for tx_hash in pool.iter() {
-            self.broadcast(&schema
-                .transactions()
-                .get(&tx_hash)
-                .expect("Rebroadcast: invalid transaction hash"))
+            self.broadcast(
+                schema
+                    .transactions()
+                    .get(&tx_hash)
+                    .expect("Rebroadcast: invalid transaction hash"),
+            )
         }
     }
 }

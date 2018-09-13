@@ -37,9 +37,13 @@
     )
 )]
 
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 extern crate actix;
 extern crate actix_web;
 extern crate atty;
+extern crate bincode;
 extern crate bit_vec;
 extern crate byteorder;
 extern crate bytes;
@@ -47,6 +51,7 @@ extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate env_logger;
+extern crate erased_serde;
 pub extern crate exonum_crypto as crypto;
 extern crate exonum_rocksdb as rocksdb;
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -92,13 +97,12 @@ pub mod encoding;
 pub mod messages;
 #[macro_use]
 pub mod helpers;
-pub mod node;
-pub mod storage;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
 pub mod explorer;
-
+pub mod node;
+pub mod storage;
 #[doc(hidden)]
 pub mod events;
 

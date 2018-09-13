@@ -20,12 +20,12 @@ use std::time::Duration;
 
 use crypto::{gen_keypair, CryptoHash, Hash};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::Message;
+use messages::{Message, RawTransaction};
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
     sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
-    sandbox_tests_helper::*, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
+    sandbox_tests_helper::*, timestamping::{TimestampingTxGenerator, DATA_SIZE},
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
@@ -47,14 +47,17 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
     sandbox
 }
 
-fn tx_hashes(transactions: &[TimestampTx]) -> Vec<Hash> {
+fn tx_hashes(transactions: &[Message<RawTransaction>]) -> Vec<Hash> {
     let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
     hashes.sort();
     hashes
 }
 
 /// sends transactions into pool and returns this transactions in processing order
-fn send_txs_into_pool(sandbox: &Sandbox, mut transactions: Vec<TimestampTx>) -> Vec<TimestampTx> {
+fn send_txs_into_pool(
+    sandbox: &Sandbox,
+    mut transactions: Vec<Message<RawTransaction>>,
+) -> Vec<Message<RawTransaction>> {
     for tx in &transactions {
         sandbox.recv(tx);
     }
@@ -85,7 +88,7 @@ fn response_to_request_txs() {
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
-            vec![tx.raw().clone()],
+            vec![tx.clone()],
             sandbox.s(ValidatorId(0)),
         ),
     );
@@ -131,7 +134,7 @@ fn tx_pool_size_overflow() {
         .with_proposer_id(ValidatorId(2))
         .with_height(Height(1))
         .with_tx_hash(&tx1.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone()]))
         .with_prev_hash(&sandbox.last_hash())
         .build();
 
@@ -234,7 +237,7 @@ fn duplicate_tx_in_pool() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(2)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx1.raw().clone()],
+        vec![tx1.clone()],
         sandbox.s(ValidatorId(2)),
     ));
 }
@@ -255,7 +258,10 @@ fn rebroadcast_transactions() {
     }
 }
 
+// TODO: transaction verification logic is duplicated,
+// in sandbox so this test is testing sandbox
 #[test]
+#[ignore]
 #[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
 fn incorrect_tx_in_request() {
     let sandbox = timestamping_sandbox();
@@ -289,7 +295,7 @@ fn incorrect_tx_in_request() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(2)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx0.raw().clone()],
+        vec![tx0.clone()],
         sandbox.s(ValidatorId(2)),
     ));
 
@@ -311,16 +317,12 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-    use messages::HEADER_LENGTH;
+    use messages::TRANSACTION_RESPONSE_EMPTY_SIZE;
     use storage::StorageValue;
-
-    const EMPTY_RESPONSE_SIZE: usize =
-        (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8);
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
-
+    const TX_HEADER: usize = 8 + 2;
     // Create 4 transactions.
     // The size of the fourth transactions is 1 more than size of the first three.
     let tx1 = gen_timestamping_tx();
@@ -329,20 +331,23 @@ fn response_size_larger_than_max_message_len() {
     let tx4 = TimestampingTxGenerator::new(DATA_SIZE + 1).next().unwrap();
 
     assert_eq!(
-        tx1.raw().len() + tx2.raw().len() + 1,
-        tx3.raw().len() + tx4.raw().len()
+        tx1.signed_message().raw().len() + tx2.signed_message().raw().len() + 1,
+        tx3.signed_message().raw().len() + tx4.signed_message().raw().len()
     );
 
     // Create new config. Set the size of the message to a size
     // that is exactly equal to the message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.consensus.max_message_len =
-            (EMPTY_RESPONSE_SIZE + tx1.raw().len() + tx2.raw().len()) as u32;
+        consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
+            + tx1.signed_message().raw().len()
+            + TX_HEADER
+            + tx2.signed_message().raw().len()
+            + TX_HEADER) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
-        TxConfig::new(
+        TxConfig::create_signed(
             &sandbox.p(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
@@ -350,7 +355,7 @@ fn response_size_larger_than_max_message_len() {
         )
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
 
     sandbox.recv(&tx1);
     sandbox.recv(&tx2);
@@ -369,7 +374,7 @@ fn response_size_larger_than_max_message_len() {
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
-            vec![tx1.raw().clone(), tx2.raw().clone()],
+            vec![tx1.clone(), tx2.clone()],
             sandbox.s(ValidatorId(0)),
         ),
     );
@@ -391,7 +396,7 @@ fn response_size_larger_than_max_message_len() {
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
-            vec![tx3.raw().clone()],
+            vec![tx3.clone()],
             sandbox.s(ValidatorId(0)),
         ),
     );
@@ -401,7 +406,7 @@ fn response_size_larger_than_max_message_len() {
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
-            vec![tx4.raw().clone()],
+            vec![tx4.clone()],
             sandbox.s(ValidatorId(0)),
         ),
     );
@@ -438,7 +443,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         .build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .with_tx_hash(&tx.hash())
         .build();
 
@@ -547,7 +552,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             &sandbox.create_transactions_response(
                 &sandbox.p(ValidatorId(0)),
                 &sandbox.p(ValidatorId(1)),
-                vec![tx.raw().clone()],
+                vec![tx.clone()],
                 sandbox.s(ValidatorId(0)),
             ),
         );
@@ -614,31 +619,6 @@ fn not_request_txs_when_get_tx_and_propose() {
 
     sandbox.recv(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
-    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
-}
-
-/// HANDLE TX
-/// - verify signature
-/// - should panic because tx has wrong signature and is not considered
-#[cfg_attr(rustfmt, rustfmt_skip)]
-#[test]
-#[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
-fn handle_tx_verify_signature() {
-    let sandbox = timestamping_sandbox();
-
-    // generate incorrect tx
-    let (public_key, _) = gen_keypair();
-    let (_, wrong_secret_key) = gen_keypair();
-    let tx = TimestampingTxGenerator::with_keypair(DATA_SIZE, (public_key, wrong_secret_key))
-        .next()
-        .unwrap();
-    sandbox.recv(&tx);
-
-    let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
-        .build();
-
-    sandbox.recv(&propose);
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 }
 

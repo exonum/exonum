@@ -26,9 +26,9 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
+use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
-use messages::HEADER_LENGTH;
+use messages::{HexStringRepresentation, EMPTY_SIGNED_MESSAGE_SIZE};
 use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -37,9 +37,11 @@ use storage::StorageValue;
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
+    #[serde(with = "HexStringRepresentation")]
     pub consensus_key: PublicKey,
     /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
+    #[serde(with = "HexStringRepresentation")]
     pub service_key: PublicKey,
 }
 
@@ -53,6 +55,7 @@ pub struct StoredConfiguration {
     /// Hash of the previous configuration, which can be used to find that
     /// configuration. For the configuration in the genesis block,
     /// `hash` is just an array of zeros.
+    #[serde(with = "HexStringRepresentation")]
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual. Note
     /// that this height should be big enough for the nodes to accept the new
@@ -192,8 +195,7 @@ impl StoredConfiguration {
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
         const MINIMAL_BODY_SIZE: usize = 256;
-        const MINIMAL_MESSAGE_LENGTH: u32 =
-            (HEADER_LENGTH + MINIMAL_BODY_SIZE + SIGNATURE_LENGTH) as u32;
+        const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + EMPTY_SIGNED_MESSAGE_SIZE) as u32;
 
         let config: Self = serde_json::from_slice(serialized)?;
 
@@ -359,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "max_message_len (128) must be at least 330")]
+    #[should_panic(expected = "max_message_len (128) must be at least 354")]
     fn too_small_max_message_len() {
         let mut configuration = create_test_configuration();
         configuration.consensus.max_message_len = 128;

@@ -20,7 +20,6 @@ pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError,
 
 use super::Offset;
 use encoding::Field;
-use messages::MessageWriter;
 
 /// Implements Exonum serialization / deserialization based on Serde `Serialize` / `Deserialize`.
 ///
@@ -92,12 +91,6 @@ pub trait WriteBufferWrapper {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T);
 }
 
-impl WriteBufferWrapper for MessageWriter {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
-        self.write(val, from, to)
-    }
-}
-
 impl WriteBufferWrapper for Vec<u8> {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
         val.write(self, from, to)
@@ -107,8 +100,14 @@ impl WriteBufferWrapper for Vec<u8> {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde` version.
 pub mod reexport {
-    pub use serde::de::{DeserializeOwned, Error as DeError};
+    pub use serde::de::{
+        self as de, DeserializeOwned, Error as DeError, MapAccess, SeqAccess, Visitor,
+    };
     pub use serde::ser::Error as SerError;
     pub use serde::ser::SerializeStruct;
     pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    #[doc(hidden)]
+    pub mod bincode {
+        pub use bincode::config;
+    }
 }

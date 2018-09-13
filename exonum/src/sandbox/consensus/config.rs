@@ -17,7 +17,6 @@
 use blockchain::Schema;
 use crypto::CryptoHash;
 use helpers::{Height, ValidatorId};
-use messages::Message;
 use sandbox::{config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 /// - exclude validator from consensus
@@ -38,7 +37,7 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.actual_from = sandbox.current_height().next().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
-        TxConfig::new(
+        TxConfig::create_signed(
             &sandbox.p(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
@@ -46,7 +45,7 @@ fn test_exclude_validator_from_consensus() {
         )
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
     add_one_height(&sandbox, &sandbox_state);
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
@@ -69,7 +68,7 @@ fn test_schema_config_changes() {
         consensus_cfg.actual_from = sandbox.current_height().next().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
-        let tx = TxConfig::new(
+        let tx = TxConfig::create_signed(
             &sandbox.p(ValidatorId(0)),
             &consensus_cfg.clone().into_bytes(),
             consensus_cfg.actual_from,
@@ -90,7 +89,7 @@ fn test_schema_config_changes() {
         prev_cfg
     );
     // Commit a new configuration
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
     // Check that following configuration is visible
     assert_eq!(
         Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),

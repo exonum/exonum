@@ -18,7 +18,6 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::Message;
 use node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
@@ -40,7 +39,7 @@ fn handle_block_response_tx_in_pool() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -127,7 +126,7 @@ fn handle_block_response_with_unknown_tx() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -199,7 +198,7 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
@@ -230,7 +229,7 @@ fn handle_block_response_with_invalid_txs_order() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -309,7 +308,7 @@ fn handle_block_response_with_invalid_precommits() {
 
     let block1 = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let block2 = BlockBuilder::new(&sandbox).build();
@@ -397,7 +396,7 @@ fn handle_block_response_with_known_transaction() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -469,7 +468,7 @@ fn handle_block_response_with_known_transaction() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx2.raw().clone()],
+        vec![tx2.clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
@@ -504,7 +503,7 @@ fn handle_block_response_with_all_known_transactions() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_txs_hashes(&[tx1.hash(), tx2.hash()])
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone(), tx2.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -596,7 +595,7 @@ fn received_block_while_there_is_full_propose() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     sandbox.recv(&sandbox.create_status(
@@ -682,7 +681,7 @@ fn received_block_while_there_is_full_propose() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
@@ -716,7 +715,7 @@ fn received_block_while_there_is_pending_block() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     sandbox.recv(&sandbox.create_status(
@@ -802,7 +801,7 @@ fn received_block_while_there_is_pending_block() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(3)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(ValidatorId(3)),
     ));
 
@@ -841,7 +840,7 @@ fn transactions_request_to_multiple_nodes() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     sandbox.recv(&sandbox.create_status(
@@ -932,7 +931,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.recv(&sandbox.create_transactions_response(
         &sandbox.p(ValidatorId(2)),
         &sandbox.p(ValidatorId(0)),
-        vec![tx.raw().clone()],
+        vec![tx.clone()],
         sandbox.s(ValidatorId(2)),
     ));
 

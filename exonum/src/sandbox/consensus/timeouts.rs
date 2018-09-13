@@ -18,7 +18,6 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::Message;
 use node::state::PROPOSE_REQUEST_TIMEOUT;
 
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
@@ -42,7 +41,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     // this block with transactions should be in real
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -236,7 +235,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
+#[should_panic(expected = "Send unexpected message Requests(ProposeRequest")]
 fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 

@@ -26,7 +26,6 @@ use super::WriteBufferWrapper;
 use crypto::{Hash, PublicKey, Signature};
 use encoding::{Field, Offset};
 use helpers::{Height, Round, ValidatorId};
-use messages::RawMessage;
 
 // TODO: Should we implement serialize for: `SecretKey`, `Seed`. (ECR-156)
 
@@ -316,33 +315,6 @@ impl<'a> ExonumJson for &'a [u8] {
     }
 }
 
-impl ExonumJson for Vec<RawMessage> {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<dyn Error>> {
-        use messages::MessageBuffer;
-        let bytes = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Vec<_> = Vec::new();
-        for el in bytes {
-            let string = el.as_str().ok_or("Can't cast json as string")?;
-            let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
-            vec.push(RawMessage::new(MessageBuffer::from_vec(str_hex)));
-        }
-        buffer.write(from, to, vec);
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
-        let vec = self.iter()
-            .map(|slice| Value::String(::encoding::serialize::encode_hex(slice)))
-            .collect();
-        Ok(Value::Array(vec))
-    }
-}
-
 impl<T> ExonumJsonDeserialize for Vec<T>
 where
     T: ExonumJsonDeserialize,
@@ -516,6 +488,33 @@ impl ExonumJson for Decimal {
         Ok(serde_json::to_value(&self)?)
     }
 }
+/*
+impl ExonumJson for Vec<UncheckedBuffer> {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<dyn Error>> {
+        let bytes = value.as_array().ok_or("Can't cast json as array")?;
+        let mut vec: Vec<_> = Vec::new();
+        for el in bytes {
+            let string = el.as_str().ok_or("Can't cast json as string")?;
+            let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
+            vec.push(UncheckedBuffer::new(str_hex));
+        }
+        buffer.write(from, to, vec);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
+        let vec = self.iter()
+            .map(|slice| Value::String(::encoding::serialize::encode_hex(slice.as_ref())))
+            .collect();
+        Ok(Value::Array(vec))
+    }
+}
+*/
 
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.

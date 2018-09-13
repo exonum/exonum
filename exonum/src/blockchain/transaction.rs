@@ -13,14 +13,13 @@
 // limitations under the License.
 
 //! `Transaction` related types.
-
 use serde::{de::DeserializeOwned, Serialize};
-
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
-use crypto::{CryptoHash, Hash};
-use encoding::{self, serialize::json::ExonumJson};
-use messages::{Message, RawTransaction};
+use crypto::{CryptoHash, Hash, PublicKey};
+use encoding;
+use hex::ToHex;
+use messages::{HexStringRepresentation, Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -40,7 +39,73 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 #[derive(Clone, Debug, PartialEq)]
 pub struct TransactionResult(pub Result<(), TransactionError>);
 
-/// Transaction processing functionality for `Message`, which allows applying authenticated, atomic,
+/// Data transfer object for transaction.
+/// This structure is used to send api info about transaction,
+/// and take some new transaction into pool from user input.
+#[derive(Serialize, Deserialize)]
+pub struct TransactionMessage {
+    #[serde(skip_deserializing)]
+    #[serde(rename = "debug")]
+    transaction: Option<Box<dyn Transaction>>,
+
+    #[serde(with = "HexStringRepresentation")]
+    message: Message<RawTransaction>,
+}
+impl ::std::fmt::Debug for TransactionMessage {
+    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+        let mut signed_message_debug = String::new();
+        self.message
+            .signed_message()
+            .write_hex(&mut signed_message_debug)?;
+
+        let mut debug = fmt.debug_struct("TransactionMessage");
+        debug.field("message", &signed_message_debug);
+        if let Some(ref tx) = self.transaction {
+            debug.field("debug", tx);
+        }
+        debug.finish()
+    }
+}
+
+impl TransactionMessage {
+    /// Returns `SignedMessage`.
+    pub fn signed_message(&self) -> &SignedMessage {
+        self.message.signed_message()
+    }
+    /// Returns `RawTransaction`.
+    pub fn raw_transaction(&self) -> RawTransaction {
+        self.message.payload().clone()
+    }
+    /// Returns raw transaction message.
+    pub fn message(&self) -> &Message<RawTransaction> {
+        &self.message
+    }
+    /// Returns transaction smart contract.
+    pub fn transaction(&self) -> Option<&Box<dyn Transaction>> {
+        self.transaction.as_ref()
+    }
+    /// Create new `TransactionMessage` from raw message.
+    pub(crate) fn new(
+        message: Message<RawTransaction>,
+        transaction: Box<dyn Transaction>,
+    ) -> TransactionMessage {
+        TransactionMessage {
+            transaction: Some(transaction),
+            message,
+        }
+    }
+}
+
+impl ::serde::Serialize for dyn Transaction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        ::erased_serde::serialize(self, serializer)
+    }
+}
+
+/// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
 ///
 /// A transaction in Exonum is a group of sequential operations with the data.
@@ -50,10 +115,10 @@ pub struct TransactionResult(pub Result<(), TransactionError>);
 /// See also [the documentation page on transactions][doc:transactions].
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
-pub trait Transaction: Message + ExonumJson + 'static {
-    /// Verifies the internal consistency of the transaction. `verify` should usually include
-    /// checking the message signature (via [`verify_signature`]) and, possibly,
-    /// other internal constraints. `verify` has no access to the blockchain state;
+pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
+    /// Verifies the internal consistency of the transaction. `verify` should include
+    /// only invariant checking. The message signature is checked internaly.
+    /// `verify` has no access to the blockchain state;
     /// checks involving the blockchain state must be preformed in [`execute`](#tymethod.execute).
     ///
     /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
@@ -61,22 +126,19 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
     ///
-    /// [`verify_signature`]: ../messages/trait.Message.html#method.verify_signature
-    ///
     /// # Examples
     ///
     /// ```
     /// # #[macro_use] extern crate exonum;
+    /// # #[macro_use] extern crate serde_derive;
     /// #
-    /// use exonum::blockchain::Transaction;
+    /// use exonum::blockchain::{Transaction, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum::messages::Message;
     /// # use exonum::blockchain::ExecutionResult;
-    /// # use exonum::storage::Fork;
     ///
     /// transactions! {
     ///     MyTransactions {
-    ///         const SERVICE_ID = 1;
     ///
     ///         struct MyTransaction {
     ///             // Transaction definition...
@@ -86,18 +148,17 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn verify(&self) -> bool {
-    ///         self.verify_signature(self.public_key())
-    ///     }
-    ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+    /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
     /// }
     /// # fn main() {}
-    fn verify(&self) -> bool;
+    fn verify(&self) -> bool {
+        true
+    }
 
-    /// Receives a fork of the current blockchain state and can modify it depending on the contents
+    /// Receives a `TransactionContext` witch contain fork
+    /// of the current blockchain state and can modify it depending on the contents
     /// of the transaction.
     ///
     /// # Notes
@@ -113,14 +174,14 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///
     /// ```
     /// # #[macro_use] extern crate exonum;
+    /// # #[macro_use] extern crate serde_derive;
     /// #
-    /// use exonum::blockchain::{Transaction, ExecutionResult};
+    /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
     /// transactions! {
     ///     MyTransactions {
-    ///         const SERVICE_ID = 1;
     ///
     ///         struct MyTransaction {
     ///             // Transaction definition...
@@ -130,7 +191,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+    ///     fn execute(&self, _: TransactionContext) -> ExecutionResult {
     ///         // Read and/or write into storage.
     ///         // ...
     ///
@@ -140,10 +201,52 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn verify(&self) -> bool { true }
     /// }
     /// # fn main() {}
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult;
+    fn execute<'a>(&self, context: TransactionContext<'a>) -> ExecutionResult;
+}
+
+//TODO: Add doc/examples.
+/// Wrapper around database and tx hash.
+#[derive(Debug)]
+pub struct TransactionContext<'a> {
+    fork: &'a mut Fork,
+    service_id: u16,
+    tx_hash: Hash,
+    author: PublicKey,
+}
+
+impl<'a> TransactionContext<'a> {
+    pub(crate) fn new(
+        fork: &'a mut Fork,
+        service_id: u16,
+        tx_hash: Hash,
+        author: PublicKey,
+    ) -> Self {
+        TransactionContext {
+            fork,
+            service_id,
+            tx_hash,
+            author,
+        }
+    }
+    /// Returns fork of current blockchain state.
+    pub fn fork(&mut self) -> &mut Fork {
+        self.fork
+    }
+    /// Returns id of service that own this transaction.
+    pub fn service_id(&self) -> u16 {
+        self.service_id
+    }
+    /// Returns transaction author public key
+    pub fn author(&self) -> PublicKey {
+        self.author
+    }
+    /// Returns current transaction message hash.
+    /// This hash could be used to link some data in storage for external usage.
+    pub fn tx_hash(&self) -> Hash {
+        self.tx_hash
+    }
 }
 
 /// Result of unsuccessful transaction execution.
@@ -359,9 +462,9 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
 pub trait TransactionSet:
-    Into<Box<dyn Transaction>> + DeserializeOwned + Serialize + Clone
+    Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
-    /// Parses a transaction from this set from a `RawMessage`.
+    /// Parses a transaction from this set from a `RawTransaction`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
 
@@ -376,25 +479,15 @@ pub trait TransactionSet:
 /// Each transaction is specified as a Rust struct. For additional information about
 /// data layout, see the documentation on the [`encoding` module](./encoding/index.html).
 ///
-/// Additionally, the macro must define the identifier of a service, which will be used
-/// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
-/// within the Exonum blockchain.
-///
 /// For each transaction, the macro creates getter methods for all defined fields.
 /// The names of the methods coincide with the field names. In addition,
 /// two constructors are defined:
 ///
 /// - `new` accepts as arguments all fields in the order of their declaration in
-///   the macro, and a [`SecretKey`] as the last argument. A `SecretKey` is used
-///   to sign the message. The constructor returns a transaction which contains
-///   the fields and a signature. In this case, the constructor creates a signature
-///   for the message using the secret key.
-/// - `new_with_signature` accepts as arguments all fields in the order of their
-///   declaration in the macro, and a message [`Signature`]. The constructor returns
-///   a transaction which contains the fields and a signature. In this case, the
-///   constructor signs the message using the indicated signature.
+///   the macro. The constructor returns a transaction which contains
+///   the fields. This transaction could be converted into [`Message<RawTransaction>`]
 ///
-/// Each transaction also implements [`Message`], [`ServiceMessage`], [`SegmentField`],
+/// Each transaction also implements [`SegmentField`],
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
 ///
 ///
@@ -408,8 +501,8 @@ pub trait TransactionSet:
 /// [`SegmentField`]: ./encoding/trait.SegmentField.html
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
-/// [`Message`]: ./messages/trait.Message.html
-/// [`ServiceMessage`]: ./messages/trait.ServiceMessage.html
+/// [`Message`]: ./messages/struct.Message.html
+/// [`Message<RawTransaction>`]: ./messages/struct.Message.html
 /// [`Service`]: ./blockchain/trait.Service.html
 /// # Examples
 ///
@@ -418,13 +511,13 @@ pub trait TransactionSet:
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
+/// #[macro_use] extern crate serde_derive;
 /// use exonum::crypto::PublicKey;
 /// # use exonum::storage::Fork;
-/// # use exonum::blockchain::{Transaction, ExecutionResult};
+/// # use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
 ///
 /// transactions! {
 ///     WalletTransactions {
-///         const SERVICE_ID = 1;
 ///
 ///         struct Create {
 ///             key: &PublicKey
@@ -438,13 +531,11 @@ pub trait TransactionSet:
 ///     }
 /// }
 /// # impl Transaction for Create {
-/// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 /// #
 /// # impl Transaction for Transfer {
-/// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 /// #
 /// # fn main() { }
@@ -457,7 +548,6 @@ macro_rules! transactions {
     {
         $(#[$tx_set_attr:meta])*
         $transaction_set:ident {
-            const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
@@ -468,7 +558,6 @@ macro_rules! transactions {
         }
     } => {
         messages! {
-            const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
@@ -477,7 +566,7 @@ macro_rules! transactions {
             )*
         }
 
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, Serialize, Deserialize)]
         $(#[$tx_set_attr])*
         enum $transaction_set {
             $(
@@ -492,7 +581,6 @@ macro_rules! transactions {
     {
         $(#[$tx_set_attr:meta])*
         pub $transaction_set:ident {
-            const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
@@ -503,7 +591,6 @@ macro_rules! transactions {
         }
     } => {
         messages! {
-            const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
@@ -512,7 +599,7 @@ macro_rules! transactions {
             )*
         }
 
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, Serialize, Deserialize)]
         $(#[$tx_set_attr])*
         pub enum $transaction_set {
             $(
@@ -527,7 +614,6 @@ macro_rules! transactions {
     {
         $(#[$tx_set_attr:meta])*
         pub($($vis:tt)+) $transaction_set:ident {
-            const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
@@ -538,7 +624,6 @@ macro_rules! transactions {
         }
     } => {
         messages! {
-            const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
@@ -547,7 +632,7 @@ macro_rules! transactions {
             )*
         }
 
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, Serialize, Deserialize)]
         $(#[$tx_set_attr])*
         pub($($vis)+) enum $transaction_set {
             $(
@@ -565,19 +650,32 @@ macro_rules! transactions {
             fn tx_from_raw(
                 raw: $crate::messages::RawTransaction
             ) -> ::std::result::Result<Self, $crate::encoding::Error> {
-                let message_type = raw.message_type();
-                match message_type {
-                    $(
-                    <$name as $crate::messages::ServiceMessage>::MESSAGE_ID => {
-                        let tx = $crate::messages::Message::from_raw(raw)?;
-                        Ok($transaction_set::$name(tx))
-                    }
-                    )*
-                    _ => return Err($crate::encoding::Error::IncorrectMessageType { message_type })
-                }
+                let (id, vec) = raw.service_transaction().into_raw_parts();
+                __enum_from_id_vec!($transaction_set (id, vec), $( $name )*)
             }
         }
 
+        impl Into<$crate::messages::ServiceTransaction> for $transaction_set {
+            fn into(self) -> $crate::messages::ServiceTransaction {
+                let (id, vec) = __enum_to_vec_id!($transaction_set &self, $( $name )*);
+                $crate::messages::ServiceTransaction::from_raw_unchecked(id, vec)
+
+            }
+        }
+        $(
+        impl Into<$transaction_set> for $name {
+            fn into(self) -> $transaction_set {
+                $transaction_set::$name(self)
+            }
+        }
+
+        impl Into<$crate::messages::ServiceTransaction> for $name {
+            fn into(self) -> $crate::messages::ServiceTransaction {
+                let set: $transaction_set = self.into();
+                set.into()
+            }
+        }
+        )*
         impl Into<Box<dyn $crate::blockchain::Transaction>> for $transaction_set {
             fn into(self) -> Box<dyn $crate::blockchain::Transaction> {
                 match self {$(
@@ -585,51 +683,65 @@ macro_rules! transactions {
                 )*}
             }
         }
+    };
+}
 
-        impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $transaction_set {
-            fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-            where
-                D: $crate::encoding::serialize::reexport::Deserializer<'de>,
-            {
-                use $crate::encoding::serialize::json::reexport::{Value, from_value};
-                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
-
-                let value = <Value as Deserialize>::deserialize(deserializer)?;
-                let message_id: Value = value.get("message_id")
-                    .ok_or(D::Error::custom("Can't get message_id from json"))?
-                    .clone();
-                let message_id: u16 = from_value(message_id)
-                    .map_err(|e| D::Error::custom(
-                        format!("Can't deserialize message_id: {}", e)
-                    ))?;
-
-                match message_id {
-                    $(
-                    <$name as $crate::messages::ServiceMessage>::MESSAGE_ID =>
-                        <$name as $crate::encoding::serialize::json::ExonumJsonDeserialize>
-                            ::deserialize(&value)
-                            .map_err(|e| D::Error::custom(
-                                format!("Can't deserialize a value: {}", e.description())
-                            ))
-                            .map($transaction_set::$name),
-                    )*
-                    _ => Err(D::Error::custom(format!("invalid message_id: {}", message_id))),
-                }
-            }
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __enum_to_vec_id{
+    ($set:ident $this:expr, $($field_type:ident)*) => {
+        __enum_to_vec_id!(@inner $set $this, (0) (); $($field_type)* );
+    };
+    (@create $set:ident $this:expr, ( $((($name:ident) => ($num:expr)))* ) ) => {
+        match $this {
+            $(
+                &$set::$name(ref tx) => ($num, $crate::messages::BinaryForm::encode(tx).unwrap())
+            ),*
         }
+    };
+    (@inner $set:ident $this:expr, ($num:expr) ($($processed:tt)*);
+        $field_type:ident $($rest:tt)*
+    ) => {
+        __enum_to_vec_id!(
+            @inner $set $this,
+            ($num + 1)
+            ($($processed)* (($field_type) => ($num)));
+            $($rest)*
+        );
+    };
 
-        impl $crate::encoding::serialize::reexport::Serialize for $transaction_set {
-            fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
-            where
-                S: $crate::encoding::serialize::reexport::Serializer,
-            {
-                use $crate::encoding::serialize::reexport::Serialize;
+    (@inner $set:ident $this:expr, ($num:expr) ($($processed:tt)*);) => {
+        __enum_to_vec_id!(@create $set $this, ($($processed)*) );
+    };
+}
 
-                match self {$(
-                    &$transaction_set::$name(ref tx) => Serialize::serialize(tx, serializer),
-                )*}
-            }
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __enum_from_id_vec {
+    ($set:ident $this:tt, $($field_type:ident)*) => {
+        __enum_from_id_vec!(@inner $set $this, (0) (); $($field_type)* );
+    };
+    (@create $set:ident ($id:expr, $vec:expr), ( $((($name:ident) => ($num:expr)))* ) ) => {
+        match $id {
+            $(
+                num if num == $num => return <$name as $crate::messages::BinaryForm>::decode(&$vec).map($set::$name),
+            )*
+            num => Err($crate::encoding::Error::Basic(format!("Tag {} not found for enum {}.",num, stringify!($set)).into()))
         }
+    };
+    (@inner $set:ident $this:tt, ($num:expr) ($($processed:tt)*);
+        $field_type:ident $($rest:tt)*
+    ) => {
+        __enum_from_id_vec!(
+            @inner $set $this,
+            ($num + 1)
+            ($($processed)* (($field_type) => ($num)));
+            $($rest)*
+        );
+    };
+
+    (@inner $set:ident $this:tt, ($num:expr) ($($processed:tt)*);) => {
+        __enum_from_id_vec!(@create $set $this, ($($processed)*) );
     };
 }
 
@@ -658,6 +770,7 @@ mod tests {
     use crypto;
     use encoding;
     use helpers::{Height, ValidatorId};
+    use messages::Protocol;
     use node::ApiSender;
     use storage::{Database, Entry, MemoryDB, Snapshot};
 
@@ -780,7 +893,7 @@ mod tests {
             Ok(()),
         ];
 
-        let (_, sec_key) = crypto::gen_keypair();
+        let (pk, sec_key) = crypto::gen_keypair();
         let mut blockchain = create_blockchain();
         let db = Box::new(MemoryDB::new());
 
@@ -789,13 +902,14 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction = TxResult::new(index, &sec_key);
+            let transaction =
+                Protocol::sign_tx(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();
                 {
                     let mut schema = Schema::new(&mut fork);
-                    schema.add_transaction_into_pool(transaction.raw().clone());
+                    schema.add_transaction_into_pool(transaction.clone());
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
             }
@@ -877,14 +991,12 @@ mod tests {
             &self,
             raw: RawTransaction,
         ) -> Result<Box<dyn Transaction>, encoding::Error> {
-            Ok(Box::new(TxResult::from_raw(raw)?))
+            Ok(TestTxs::tx_from_raw(raw)?.into())
         }
     }
 
     transactions! {
         TestTxs {
-            const SERVICE_ID = TX_RESULT_SERVICE_ID;
-
             struct TxResult {
                 index: u64,
             }
@@ -892,12 +1004,8 @@ mod tests {
     }
 
     impl Transaction for TxResult {
-        fn verify(&self) -> bool {
-            true
-        }
-
-        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            let mut entry = create_entry(fork);
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let mut entry = create_entry(context.fork());
             entry.set(self.index());
             EXECUTION_STATUS.lock().unwrap().clone()
         }

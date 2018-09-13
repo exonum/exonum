@@ -158,7 +158,6 @@ fn test_block() {
 
 #[test]
 fn test_raw_transaction_small_size() {
-    let buffer = vec![0; 1];
     assert!(ServiceTransaction::decode(&vec![0; 1]).is_err());
     assert!(RawTransaction::decode(&vec![0; 1]).is_err());
     assert!(RawTransaction::decode(&vec![0; 3]).is_err());
