@@ -24,7 +24,7 @@ use blockchain::{
 use crypto::{gen_keypair, Hash};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
-use messages::{Message, Protocol, RawTransaction};
+use messages::{Protocol, RawTransaction};
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
@@ -266,8 +266,7 @@ mod transactions_tests {
     use super::TEST_SERVICE_ID;
     use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crypto::gen_keypair;
-    use messages::{Message, Protocol, RawTransaction, ServiceTransaction};
-    use serde::Serialize;
+    use messages::Protocol;
     use serde_json;
 
     transactions! {
@@ -326,7 +325,6 @@ mod transactions_tests {
     #[test]
     fn deserialize_from_raw() {
         use blockchain::TransactionSet;
-        use messages::BinaryForm;
 
         fn round_trip<T: Into<MyTransactions>>(t: T) {
             let (pk, sec_key) = gen_keypair();
@@ -516,7 +514,6 @@ mod rocksdb_tests {
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
     use futures::sync::mpsc;
-    use messages::Protocol;
     use node::ApiSender;
     use std::path::Path;
     use storage::{Database, DbOptions, RocksDB};

@@ -36,7 +36,6 @@ use events::{
     },
     tests::raw_message,
 };
-use messages::SignedMessage;
 use node::state::SharedConnectList;
 
 #[test]

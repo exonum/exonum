@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, PrevotesRequest, ProtocolMessage, TransactionsRequest};
+use messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest};
 use node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };

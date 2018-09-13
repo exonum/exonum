@@ -66,7 +66,7 @@ struct MyService;
 
 impl Service for MyService {
     fn service_id(&self) -> u16 {
-        10_000
+        SERVICE_ID
     }
 
     fn service_name(&self) -> &str {

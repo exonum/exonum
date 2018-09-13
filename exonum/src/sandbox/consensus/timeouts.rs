@@ -18,7 +18,6 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::Message;
 use node::state::PROPOSE_REQUEST_TIMEOUT;
 
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};

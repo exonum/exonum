@@ -15,7 +15,6 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
-use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Propose, Protocol};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};

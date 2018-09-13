@@ -1143,7 +1143,7 @@ mod tests {
     use encoding;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use storage::{Fork, Snapshot};
+    use storage::Snapshot;
 
     const SERVICE_ID: u16 = 1;
 

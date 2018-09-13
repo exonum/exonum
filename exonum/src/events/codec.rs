@@ -54,7 +54,7 @@ impl Decoder for MessagesCodec {
             return Ok(None);
         }
 
-        let mut buf = self.session.decrypt_msg(len, buf)?;
+        let buf = self.session.decrypt_msg(len, buf)?;
 
         if buf.len() > NOISE_HEADER_LENGTH + self.max_message_len as usize {
             bail!(

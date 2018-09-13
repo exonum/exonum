@@ -320,7 +320,6 @@ where
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
-    let mut propose: Option<Message<Propose>>;
 
     let n_validators = sandbox.n_validators();
     let new_height = initial_height.next();

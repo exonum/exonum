@@ -17,7 +17,6 @@
 use blockchain::Schema;
 use crypto::CryptoHash;
 use helpers::{Height, ValidatorId};
-use messages::Message;
 use sandbox::{config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 /// - exclude validator from consensus

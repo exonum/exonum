@@ -22,7 +22,6 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use blockchain::{Transaction, TransactionContext};
 use messages::{Protocol, SignedMessage};
 
 #[derive(Debug)]

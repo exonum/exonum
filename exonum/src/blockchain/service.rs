@@ -28,7 +28,7 @@ use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
-use messages::{BinaryForm, Message, Protocol, RawTransaction, ServiceTransaction};
+use messages::{Message, Protocol, RawTransaction, ServiceTransaction};
 use node::{ApiSender, NodeRole, State};
 use storage::{Fork, Snapshot};
 

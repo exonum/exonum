@@ -14,7 +14,6 @@
 
 use super::NodeHandler;
 use blockchain::Schema;
-use failure;
 use messages::{
     BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, Requests,
     TransactionsRequest, TransactionsResponse, TRANSACTION_RESPONSE_EMPTY_SIZE,

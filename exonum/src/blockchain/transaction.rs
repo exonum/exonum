@@ -19,7 +19,7 @@ use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
 use hex::ToHex;
-use messages::{BinaryForm, HexStringRepresentation, Message, RawTransaction, SignedMessage};
+use messages::{HexStringRepresentation, Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.

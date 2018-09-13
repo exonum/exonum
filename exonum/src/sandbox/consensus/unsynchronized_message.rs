@@ -19,7 +19,6 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::Message;
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 #[test]

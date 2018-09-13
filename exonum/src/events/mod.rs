@@ -29,7 +29,6 @@ use futures::{
 
 use std::{cmp::Ordering, time::SystemTime};
 
-use blockchain::Transaction;
 use helpers::{Height, Round};
 use messages::Protocol;
 use node::{ExternalMessage, NodeTimeout};

@@ -16,12 +16,12 @@ use std::collections::HashSet;
 
 use blockchain::Schema;
 use crypto::{CryptoHash, Hash, PublicKey};
-use events::{error::LogError, InternalRequest};
+use events::InternalRequest;
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Consensus as ConsensusMessage, Message, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, Protocol, RawTransaction, SignedMessage,
+    PrevotesRequest, Propose, ProposeRequest, RawTransaction, SignedMessage,
     TransactionsRequest, TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};

@@ -15,7 +15,6 @@
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 use blockchain::Schema;
 use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
-use messages::{Protocol, SignedMessage};
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {

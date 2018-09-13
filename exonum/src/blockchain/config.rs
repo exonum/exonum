@@ -26,7 +26,7 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey, SIGNATURE_LENGTH};
+use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
 use messages::{HexStringRepresentation, EMPTY_SIGNED_MESSAGE_SIZE};
 use storage::StorageValue;

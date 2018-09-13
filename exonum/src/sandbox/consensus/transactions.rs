@@ -20,12 +20,12 @@ use std::time::Duration;
 
 use crypto::{gen_keypair, CryptoHash, Hash};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Message, Protocol, RawTransaction};
+use messages::{Message, RawTransaction};
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
     sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
-    sandbox_tests_helper::*, timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
+    sandbox_tests_helper::*, timestamping::{TimestampingTxGenerator, DATA_SIZE},
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
