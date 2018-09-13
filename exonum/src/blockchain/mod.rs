@@ -49,12 +49,11 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, fmt, iter, mem, net::SocketAddr, ops::Deref, panic, sync::Arc,
+    collections::{BTreeMap, HashMap}, fmt, iter, mem, error::Error as StdError, net::SocketAddr, ops::Deref, panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
-use events::error::into_failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction};
 use node::ApiSender;

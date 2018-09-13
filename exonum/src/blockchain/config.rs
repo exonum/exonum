@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
-use messages::{HexStringRepresentation, EMPTY_SIGNED_MESSAGE_SIZE};
+use messages::EMPTY_SIGNED_MESSAGE_SIZE;
 use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the

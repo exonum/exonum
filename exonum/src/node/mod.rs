@@ -54,7 +54,7 @@ use helpers::{
     Milliseconds, Round, ValidatorId,
 };
 use messages::{
-    Connect, HexStringRepresentation, Message, Protocol, ProtocolMessage, RawTransaction,
+    Connect, Message, Protocol, ProtocolMessage, RawTransaction,
     SignedMessage,
 };
 use node::state::SharedConnectList;
