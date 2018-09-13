@@ -74,7 +74,7 @@ impl ConnectList {
     }
 
     /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
+    pub fn find_key_by_resolved_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
         self.peers
             .iter()
             .find(|(_, a)| a.resolved.as_ref() == Some(address))
@@ -82,25 +82,25 @@ impl ConnectList {
     }
 
     /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_hostname(&self, hostname: &str) -> Option<&PublicKey> {
+    pub fn find_key_by_unresolved_address(&self, address: &str) -> Option<&PublicKey> {
         self.peers
             .iter()
-            .find(|(_, a)| a.address.as_str() == hostname)
+            .find(|(_, a)| a.address.as_str() == address)
             .map(|(p, _)| p)
     }
 
     /// Resolves network address and stores it in the `ConnectList`.
-    pub fn resolve_and_cache_peer_address(&mut self, hostname: &str) -> Option<SocketAddr> {
-        let key = *self.find_key_by_hostname(hostname)?;
-        let hostname = self.peers[&key].address.clone();
-        let address = hostname.to_socket_addrs().ok()?.next();
+    pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
+        let key = *self.find_key_by_unresolved_address(address)?;
+        let address = self.peers[&key].address.clone();
+        let address = address.to_socket_addrs().ok()?.next();
         self.peers.get_mut(&key).unwrap().resolved = address;
         address
     }
 
     /// Returns cached resolved network address of the peer.
-    pub fn get_resolved_peer_address(&self, hostname: &str) -> Option<SocketAddr> {
-        let key = self.find_key_by_hostname(hostname)?;
+    pub fn get_resolved_peer_address(&self, address: &str) -> Option<SocketAddr> {
+        let key = self.find_key_by_unresolved_address(address)?;
         self.peers[key].resolved
     }
 }

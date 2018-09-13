@@ -402,7 +402,7 @@ impl SharedConnectList {
     /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
         let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        connect_list.find_key_by_address(address).cloned()
+        connect_list.find_key_by_resolved_address(address).cloned()
     }
 
     /// Return `peers` from underlying `ConnectList`
@@ -1210,21 +1210,21 @@ impl State {
         list.add(peer);
     }
 
-    /// Resolve hostname of peer and cache result
-    pub fn resolve_and_cache_peer_address(&mut self, hostanme: &str) -> Option<SocketAddr> {
+    /// Resolve network address of the peer and cache result.
+    pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
         self.connect_list
             .connect_list
             .write()
             .expect("Connect list write lock")
-            .resolve_and_cache_peer_address(hostanme)
+            .resolve_and_cache_peer_address(address)
     }
 
-    /// Resolve hostname of peer
-    pub fn get_resolved_peer_address(&self, hostanme: &str) -> Option<SocketAddr> {
+    /// Resolve network address of the peer.
+    pub fn get_resolved_peer_address(&self, address: &str) -> Option<SocketAddr> {
         self.connect_list
             .connect_list
             .read()
             .expect("Connect list read lock")
-            .get_resolved_peer_address(hostanme)
+            .get_resolved_peer_address(address)
     }
 }

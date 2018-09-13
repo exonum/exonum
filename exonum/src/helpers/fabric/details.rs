@@ -15,7 +15,7 @@
 #![allow(missing_debug_implementations)]
 
 //! This module implement all core commands.
-// spell-checker:ignore exts
+// spell-checker:ignore exts, rsplitn
 
 use crypto;
 use toml;

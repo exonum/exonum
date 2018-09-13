@@ -567,7 +567,7 @@ impl NodeHandler {
             if let Some(conn) = self.state.peers().get(&public_key) {
                 self.state
                     .get_resolved_peer_address(conn.pub_addr())
-                    .expect("Sending message to peer with unresolved hostname")
+                    .expect("Sending message to peer with unresolved net address")
             } else {
                 warn!(
                     "Attempt to send message to peer with key {:?} without connection",
@@ -607,13 +607,13 @@ impl NodeHandler {
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&mut self, hostname: &str) {
+    pub fn connect(&mut self, address: &str) {
         let connect = self.state.our_connect_message().clone();
-        let address = self.state.resolve_and_cache_peer_address(hostname);
-        if let Some(socket) = address {
+        let resolved = self.state.resolve_and_cache_peer_address(address);
+        if let Some(socket) = resolved {
             self.send_to_addr(&socket, connect.raw());
         } else {
-            info!("Failed to resolve hostname of peer: {}", hostname);
+            info!("Failed to resolve hostname of peer: {}", address);
             return;
         }
     }
