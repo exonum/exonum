@@ -94,7 +94,6 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
 
         let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
             move |event| {
-                info!("received event in aggregator {:?}", event);
                 handler.handle_event(event);
                 Ok(())
             },

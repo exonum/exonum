@@ -152,7 +152,6 @@ impl MessageBuffer {
         to: CheckedOffset,
         latest_segment: CheckedOffset,
     ) -> StreamStructResult {
-        info!("checking message");
         F::check(
             self.body(),
             (from + HEADER_LENGTH as u32)?,

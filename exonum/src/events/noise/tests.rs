@@ -37,7 +37,6 @@ use events::{
     tests::raw_message,
 };
 use messages::RawMessage;
-use node::state::SharedConnectList;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
