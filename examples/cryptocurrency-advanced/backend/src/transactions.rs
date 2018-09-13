@@ -26,7 +26,7 @@ use exonum::{
 use schema::Schema;
 use CRYPTOCURRENCY_SERVICE_ID;
 
-const ERROR_FROM_EQUAL_TO: u8 = 0;
+const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
 
 
 /// Error codes emitted by wallet transactions during execution.
@@ -110,7 +110,7 @@ impl Transaction for Transfer {
         let amount = self.amount();
 
         if from == to {
-            return Err(ExecutionError::new(ERROR_FROM_EQUAL_TO))
+            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER))
         }
 
         let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;

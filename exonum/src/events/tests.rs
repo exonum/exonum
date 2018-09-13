@@ -106,7 +106,7 @@ impl TestHandler {
 
     pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
-            Ok(NetworkEvent::MessageReceived(_addr, msg)) => SignedMessage::unchecked_from_vec(msg),
+            Ok(NetworkEvent::MessageReceived(_addr, msg)) => SignedMessage::from_vec_unchecked(msg),
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
@@ -197,7 +197,7 @@ pub fn connect_message(
 
 pub fn raw_message(_id: u16, len: usize) -> SignedMessage {
     let buffer = vec![0u8; len];
-    SignedMessage::unchecked_from_vec(buffer)
+    SignedMessage::from_vec_unchecked(buffer)
 }
 
 #[derive(Debug, Clone)]

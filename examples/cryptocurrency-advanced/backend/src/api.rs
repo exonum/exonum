@@ -123,23 +123,11 @@ impl PublicApi {
             wallet_history,
         })
     }
-//
-//    /// Endpoint for handling cryptocurrency transactions.
-//    pub fn post_transaction(
-//        state: &ServiceApiState,
-//        query: WalletTransactions,
-//    ) -> api::Result<TransactionResponse> {
-//        let transaction: Box<dyn Transaction> = query.into();
-//        let tx_hash = transaction.hash();
-//        state.sender().send(transaction)?;
-//        Ok(TransactionResponse { tx_hash })
-//    }
 
     /// Wires the above endpoint to public scope of the given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/wallets/info", Self::wallet_info);
-            //.endpoint_mut("v1/wallets/transaction", Self::post_transaction);
     }
 }

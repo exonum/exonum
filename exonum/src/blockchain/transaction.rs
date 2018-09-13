@@ -646,7 +646,7 @@ macro_rules! transactions {
             fn tx_from_raw(
                 raw: $crate::messages::RawTransaction
             ) -> ::std::result::Result<Self, $crate::encoding::Error> {
-                let (id, vec) = raw.transaction_set().into_raw_parts();
+                let (id, vec) = raw.service_transaction().into_raw_parts();
                 __enum_from_id_vec!($transaction_set (id, vec), $( $name )*)
             }
         }

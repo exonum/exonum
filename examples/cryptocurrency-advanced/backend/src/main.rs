@@ -13,11 +13,11 @@
 // limitations under the License.
 
 extern crate exonum;
-//extern crate exonum_configuration;
+extern crate exonum_configuration;
 extern crate exonum_cryptocurrency_advanced;
 
 use exonum::helpers::{self, fabric::NodeBuilder};
-//use exonum_configuration as configuration;
+use exonum_configuration as configuration;
 use exonum_cryptocurrency_advanced as cryptocurrency;
 
 fn main() {
@@ -25,7 +25,7 @@ fn main() {
     helpers::init_logger().unwrap();
 
     let node = NodeBuilder::new()
-        //.with_service(Box::new(configuration::ServiceFactory))
+        .with_service(Box::new(configuration::ServiceFactory))
         .with_service(Box::new(cryptocurrency::ServiceFactory));
     node.run();
 }
