@@ -206,7 +206,7 @@ pub fn init() {
 
 /// This structure provides a possibility to calculate a hash digest
 /// for a stream of data. Unlike the
-/// [`Hash` structure](https://docs.rs/exonum/0.7.0/exonum/crypto/struct.Hash.html),
+/// [`Hash` structure](struct.Hash.html),
 /// the given structure lets the code process several data chunks without
 /// the need to copy them into a single buffer.
 ///
