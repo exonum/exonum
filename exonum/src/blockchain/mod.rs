@@ -139,8 +139,8 @@ impl Blockchain {
         self.db.fork()
     }
 
-    /// Tries to create a `TransactionMessage` object from the given raw message.
-    /// A raw message can be converted into a `TransactionMessage` only
+    /// Tries to create a `Transaction` object from the given raw message.
+    /// A raw message can be converted into a `Transaction` object only
     /// if the following conditions are met:
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
@@ -401,8 +401,15 @@ impl Blockchain {
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
 
-            let transaction = self.tx_from_raw(&raw).map_err(into_failure)?;
-            (transaction, raw, service_name)
+            let tx = self.tx_from_raw(&raw).or_else(|error| {
+                Err(failure::err_msg(format!(
+                "Service <{}>: {}, tx: {:?}",
+                service_name,
+                error.description(),
+                tx_hash
+                )))
+            })?;
+            (tx, raw, service_name)
         };
 
         fork.checkpoint();
