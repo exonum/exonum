@@ -148,10 +148,8 @@ pub struct ServiceConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
     /// Public key.
-    #[serde(with = "HexStringRepresentation")]
     pub consensus_public_key: PublicKey,
     /// Secret key.
-    #[serde(with = "HexStringRepresentation")]
     pub consensus_secret_key: SecretKey,
     /// ConnectList.
     pub connect_list: ConnectList,
