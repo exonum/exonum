@@ -98,12 +98,15 @@ impl ConnectList {
         let key = *self.find_key_by_unresolved_address(address)?;
         let entry = self.peers.get_mut(&key).unwrap();
 
+        let resolved_vec: Vec<SocketAddr> = entry
+            .address
+            .to_socket_addrs()
+            .map(|i| i.collect())
+            .unwrap_or_default();
+
+        entry.resolved_cache.retain(|a| resolved_vec.contains(a));
+
         if entry.resolved_cache.is_empty() {
-            let resolved_vec: Vec<SocketAddr> = entry
-                .address
-                .to_socket_addrs()
-                .map(|i| i.collect())
-                .unwrap_or_default();
             entry.resolved_cache = resolved_vec;
         }
 
