@@ -102,7 +102,7 @@ impl HeightRange {
 ///
 /// [`Block`]: ../blockchain/struct.Block.html
 /// [`Precommit`]: ../messages/struct.Precommit.html
-/// [`Hash`]: ../crypto/struct.Hash.html
+/// [`Hash`]: ../../exonum_crypto/struct.Hash.html
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
@@ -375,8 +375,8 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// [`Transaction`]: ../blockchain/trait.Transaction.html
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
 /// [`ListProof`]: ../storage/enum.ListProof.html
-/// [`Hash`]: ../crypto/struct.Hash.html
-/// [`TransactionResult`]: ../blockchain/type.TransactionResult.html
+/// [`Hash`]: ../../exonum_crypto/struct.Hash.html
+/// [`TransactionResult`]: ../blockchain/struct.TransactionResult.html
 /// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
