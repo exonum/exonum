@@ -49,10 +49,10 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
         let mut connect_list = ConnectList::default();
 
         let mut params1 = ConnectionParams::from_address(first);
-        connect_list.add(params1.connect_info);
+        connect_list.add(params1.connect_info.clone());
 
         let mut params2 = ConnectionParams::from_address(second);
-        connect_list.add(params2.connect_info);
+        connect_list.add(params2.connect_info.clone());
 
         let connect_list = SharedConnectList::from_connect_list(connect_list);
 
