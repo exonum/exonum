@@ -15,7 +15,7 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
-//#![feature(trace_macros)]
+
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 #![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
@@ -52,6 +52,7 @@ extern crate chrono;
 extern crate clap;
 extern crate env_logger;
 extern crate erased_serde;
+pub extern crate exonum_crypto as crypto;
 extern crate exonum_rocksdb as rocksdb;
 #[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
@@ -99,11 +100,9 @@ pub mod helpers;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
-pub mod crypto;
 pub mod explorer;
 pub mod node;
 pub mod storage;
-
 #[doc(hidden)]
 pub mod events;
 

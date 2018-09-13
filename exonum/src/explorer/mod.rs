@@ -102,7 +102,7 @@ impl HeightRange {
 ///
 /// [`Block`]: ../blockchain/struct.Block.html
 /// [`Precommit`]: ../messages/struct.Precommit.html
-/// [`Hash`]: ../crypto/struct.Hash.html
+/// [`Hash`]: ../../exonum_crypto/struct.Hash.html
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
@@ -371,8 +371,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`Transaction`]: ../blockchain/trait.Transaction.html
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
 /// [`ListProof`]: ../storage/enum.ListProof.html
-/// [`Hash`]: ../crypto/struct.Hash.html
-/// [`TransactionResult`]: ../blockchain/type.TransactionResult.html
+/// [`Hash`]: ../../exonum_crypto/struct.Hash.html
+/// [`TransactionResult`]: ../blockchain/struct.TransactionResult.html
 /// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
@@ -468,7 +468,7 @@ impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
     fn from(result: &'a TransactionResult) -> TxStatus {
         use self::TransactionErrorType::*;
 
-        match *result {
+        match (*result).0 {
             Ok(()) => TxStatus::Success,
             Err(ref e) => {
                 let description = e.description().unwrap_or_default();
@@ -491,13 +491,13 @@ impl<'a> From<TxStatus<'a>> for TransactionResult {
             }
         };
 
-        match status {
+        TransactionResult(match status {
             TxStatus::Success => Ok(()),
             TxStatus::Panic { description } => Err(TransactionError::panic(to_option(description))),
             TxStatus::Error { code, description } => {
                 Err(TransactionError::code(code, to_option(description)))
             }
-        }
+        })
     }
 }
 
@@ -519,7 +519,7 @@ impl CommittedTransaction {
 
     /// Returns the status of the transaction execution.
     pub fn status(&self) -> Result<(), &TransactionError> {
-        self.status.as_ref().map(|_| ())
+        self.status.0.as_ref().map(|_| ())
     }
 }
 

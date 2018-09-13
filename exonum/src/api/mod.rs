@@ -13,17 +13,19 @@
 // limitations under the License.
 
 //! API and corresponding utilities.
-
-pub use self::error::Error;
-pub use self::state::ServiceApiState;
-pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
+pub use self::{
+    error::Error, state::ServiceApiState,
+    with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
+};
 
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
-use self::backends::actix;
+use self::{backends::actix, node::public::ExplorerApi};
 use blockchain::{Blockchain, SharedNodeState};
+use crypto::PublicKey;
+use node::ApiSender;
 
 pub mod backends;
 pub mod error;
@@ -218,6 +220,7 @@ impl ServiceApiScope {
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct ServiceApiBuilder {
+    blockchain: Option<Blockchain>,
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
 }
@@ -225,7 +228,17 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            blockchain: None,
+            ..Default::default()
+        }
+    }
+
+    fn with_blockchain(blockchain: Blockchain) -> Self {
+        Self {
+            blockchain: Some(blockchain),
+            ..Default::default()
+        }
     }
 
     /// Returns a mutable reference to the public API scope builder.
@@ -236,6 +249,22 @@ impl ServiceApiBuilder {
     /// Returns a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
+    }
+
+    /// Returns an optional reference to the Blockchain.
+    pub fn blockchain(&self) -> Option<&Blockchain> {
+        self.blockchain.as_ref()
+    }
+
+    /// Returns an optional reference to the ApiSender.
+    pub fn api_sender(&self) -> Option<&ApiSender> {
+        self.blockchain().map(|blockchain| &blockchain.api_sender)
+    }
+
+    /// Returns an optional value to the PublicKey.
+    pub fn public_key(&self) -> Option<PublicKey> {
+        self.blockchain()
+            .map(|blockchain| blockchain.service_keypair.0)
     }
 }
 
@@ -288,11 +317,11 @@ impl ApiAggregator {
         );
         inner.insert(
             "explorer".to_owned(),
-            Self::explorer_api(node_state.clone()),
+            Self::explorer_api(&blockchain, node_state.clone()),
         );
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
-            let mut builder = ServiceApiBuilder::new();
+            let mut builder = ServiceApiBuilder::with_blockchain(blockchain.clone());
             service.wire_api(&mut builder);
             // TODO think about prefixes for non web backends. (ECR-1758)
             let prefix = format!("services/{}", service.service_name());
@@ -332,9 +361,13 @@ impl ApiAggregator {
         self.inner.insert(prefix.into(), builder);
     }
 
-    fn explorer_api(shared_node_state: SharedNodeState) -> ServiceApiBuilder {
+    fn explorer_api(
+        blockchain: &Blockchain,
+        shared_node_state: SharedNodeState,
+    ) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        self::node::public::ExplorerApi::wire(builder.public_scope(), shared_node_state);
+        let service_api_state = ServiceApiState::new(blockchain.clone());
+        ExplorerApi::wire(builder.public_scope(), service_api_state, shared_node_state);
         builder
     }
 

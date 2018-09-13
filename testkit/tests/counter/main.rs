@@ -661,15 +661,15 @@ fn test_explorer_transaction_statuses() {
     ]);
 
     fn check_statuses(statuses: &[TransactionResult]) {
-        assert!(statuses[0].is_ok());
+        assert!(statuses[0].0.is_ok());
         assert_matches!(
             statuses[1],
-            Err(ref err) if err.error_type() == ErrorType::Code(0)
+            TransactionResult(Err(ref err)) if err.error_type() == ErrorType::Code(0)
                 && err.description() == Some("Adding zero does nothing!")
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.error_type() == ErrorType::Panic
+            TransactionResult(Err(ref err)) if err.error_type() == ErrorType::Panic
                 && err.description() == Some("attempt to add with overflow")
         );
     }
@@ -678,7 +678,7 @@ fn test_explorer_transaction_statuses() {
     let statuses: Vec<_> = block
         .transactions
         .iter()
-        .map(|tx| tx.status().map_err(Clone::clone))
+        .map(|tx| TransactionResult(tx.status().map_err(Clone::clone)))
         .collect();
     check_statuses(&statuses);
 
@@ -690,7 +690,7 @@ fn test_explorer_transaction_statuses() {
                 .query(&TransactionQuery::new(*hash))
                 .get("v1/transactions")
                 .unwrap();
-            info.as_committed().unwrap().status().map_err(Clone::clone)
+            TransactionResult(info.as_committed().unwrap().status().map_err(Clone::clone))
         })
         .collect();
     check_statuses(&statuses);

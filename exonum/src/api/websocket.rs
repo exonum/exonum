@@ -16,13 +16,14 @@
 
 use actix::*;
 use actix_web::ws;
+use serde_json;
 
 use rand::{self, Rng, ThreadRng};
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use api::ServiceApiState;
+use blockchain::Schema;
 use crypto::Hash;
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
@@ -47,13 +48,15 @@ pub(crate) struct Broadcast {
 
 pub(crate) struct Server {
     pub subscribers: HashMap<usize, Recipient<Message>>,
+    service_api_state: Arc<ServiceApiState>,
     rng: RefCell<ThreadRng>,
 }
 
-impl Default for Server {
-    fn default() -> Self {
+impl Server {
+    pub fn new(service_api_state: Arc<ServiceApiState>) -> Self {
         Self {
             subscribers: HashMap::new(),
+            service_api_state,
             rng: RefCell::new(rand::thread_rng()),
         }
     }
@@ -86,8 +89,12 @@ impl Handler<Broadcast> for Server {
     type Result = ();
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
+        let snapshot = self.service_api_state.snapshot();
+        let schema = Schema::new(snapshot);
+        let block_header = schema.blocks().get(&block_hash);
+        let block_header_json = serde_json::to_value(block_header).unwrap().to_string();
         for address in self.subscribers.values() {
-            let _ = address.do_send(Message(format!("Committed new block {:?}", block_hash)));
+            let _ = address.do_send(Message(block_header_json.clone()));
         }
     }
 }

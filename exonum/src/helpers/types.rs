@@ -16,6 +16,7 @@
 
 use std::{fmt, num::ParseIntError, str::FromStr};
 
+use crypto::{CryptoHash, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Number of milliseconds.
@@ -270,6 +271,12 @@ impl From<Height> for u64 {
 impl fmt::Display for Round {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl CryptoHash for Round {
+    fn hash(&self) -> Hash {
+        self.0.hash()
     }
 }
 

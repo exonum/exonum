@@ -14,7 +14,7 @@
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::SharedNodeState, crypto, explorer::{BlockWithTransactions, BlockchainExplorer},
+    blockchain::SharedNodeState, crypto::Hash, explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
 };
 
@@ -24,7 +24,7 @@ use super::{TestKit, TestNetworkConfiguration};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct CreateBlockQuery {
-    tx_hashes: Option<Vec<crypto::Hash>>,
+    tx_hashes: Option<Vec<Hash>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,7 +57,7 @@ impl TestkitServerApi {
 
     fn create_block(
         &self,
-        tx_hashes: Option<Vec<crypto::Hash>>,
+        tx_hashes: Option<Vec<Hash>>,
     ) -> api::Result<BlockWithTransactions> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
@@ -159,7 +159,7 @@ mod tests {
     use exonum::blockchain::{
         ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     };
-    use exonum::crypto::{CryptoHash, Hash, PublicKey};
+    use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
     use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
@@ -183,7 +183,7 @@ mod tests {
 
     impl TxTimestamp {
         fn for_str(s: &str) -> Message<RawTransaction> {
-            let (pubkey, key) = crypto::gen_keypair();
+            let (pubkey, key) = gen_keypair();
             Protocol::sign_tx(
                 TxTimestamp::new(&pubkey, s),
                 TIMESTAMP_SERVICE_ID,

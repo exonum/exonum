@@ -49,8 +49,8 @@ mod tests;
 ///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
-/// [`Hash`]: ../../crypto/struct.Hash.html
-/// [`PublicKey`]: ../../crypto/struct.PublicKey.html
+/// [`Hash`]: ../../../exonum_crypto/struct.Hash.html
+/// [`PublicKey`]: ../../../exonum_crypto/struct.PublicKey.html
 pub struct ProofMapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
