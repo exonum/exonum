@@ -315,15 +315,15 @@ impl ServiceContext {
         };
 
         if let Err(e) = tx_process() {
-            error!("Could't broadcast transaction {}.", e);
+            error!("Couldn't broadcast transaction {}.", e);
         }
     }
 
     /// Broadcast transaction to other nodes in the network.
-    /// This transaction sould be signed externally.
+    /// This transaction should be signed externally.
     pub fn broadcast_signed_transaction(&self, msg: Message<RawTransaction>) {
         if let Err(e) = self.api_sender.broadcast_transaction(msg) {
-            error!("Could't broadcast transaction {}.", e);
+            error!("Couldn't broadcast transaction {}.", e);
         }
     }
 

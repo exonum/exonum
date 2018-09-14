@@ -117,7 +117,7 @@ impl ::serde::Serialize for dyn Transaction {
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
 pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
     /// Verifies the internal consistency of the transaction. `verify` should include
-    /// only invariant checking. The message signature is checked internaly.
+    /// only invariant checking. The message signature is checked internally.
     /// `verify` has no access to the blockchain state;
     /// checks involving the blockchain state must be preformed in [`execute`](#tymethod.execute).
     ///

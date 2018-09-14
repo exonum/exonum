@@ -43,7 +43,6 @@ extern crate pretty_assertions;
 extern crate actix;
 extern crate actix_web;
 extern crate atty;
-extern crate bincode;
 extern crate bit_vec;
 extern crate byteorder;
 extern crate bytes;

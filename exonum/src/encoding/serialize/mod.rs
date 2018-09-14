@@ -106,8 +106,4 @@ pub mod reexport {
     pub use serde::ser::Error as SerError;
     pub use serde::ser::SerializeStruct;
     pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    #[doc(hidden)]
-    pub mod bincode {
-        pub use bincode::config;
-    }
 }
