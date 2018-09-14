@@ -58,7 +58,7 @@ impl Decoder for MessagesCodec {
 
         if buf.len() > NOISE_HEADER_LENGTH + self.max_message_len as usize {
             bail!(
-                "Message too big received_len = {}, allowd_len = {}",
+                "Message too big received_len = {}, allowed_len = {}",
                 buf.len() - NOISE_HEADER_LENGTH,
                 self.max_message_len
             )

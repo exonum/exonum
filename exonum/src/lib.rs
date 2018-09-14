@@ -43,7 +43,6 @@ extern crate pretty_assertions;
 extern crate actix;
 extern crate actix_web;
 extern crate atty;
-extern crate bincode;
 extern crate bit_vec;
 extern crate byteorder;
 extern crate bytes;
@@ -100,11 +99,11 @@ pub mod helpers;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
+#[doc(hidden)]
+pub mod events;
 pub mod explorer;
 pub mod node;
 pub mod storage;
-#[doc(hidden)]
-pub mod events;
 
 #[cfg(test)]
 mod sandbox;

@@ -632,7 +632,7 @@ mod rocksdb_tests {
     //                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
     //                                                      "login", "name", "url", "avatar_url"), 0, p, &s);
     //            println!("pk = {}", ::hex::encode(p));
-    //            println!("new tx newstruct = {}", message.to_hex_string());
+    //            println!("new tx new struct = {}", message.to_hex_string());
     //            println!("new tx bytearray = {:?}", message.into_parts().1.to_vec());
     //            println!("new struct, inner = {}", ::hex::encode(NewTx::new(
     //                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),

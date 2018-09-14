@@ -49,7 +49,8 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, fmt, iter, mem, error::Error as StdError, net::SocketAddr, ops::Deref, panic, sync::Arc,
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
+    ops::Deref, panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -402,10 +403,10 @@ impl Blockchain {
 
             let tx = self.tx_from_raw(&raw).or_else(|error| {
                 Err(failure::err_msg(format!(
-                "Service <{}>: {}, tx: {:?}",
-                service_name,
-                error.description(),
-                tx_hash
+                    "Service <{}>: {}, tx: {:?}",
+                    service_name,
+                    error.description(),
+                    tx_hash
                 )))
             })?;
             (tx, raw, service_name)

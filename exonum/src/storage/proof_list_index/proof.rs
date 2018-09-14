@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{
-    de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize,
-    Serializer,
-};
-use serde_json::{from_value, Value, Error as SerdeJsonError};
+use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
 use crypto::Hash;

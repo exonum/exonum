@@ -53,10 +53,7 @@ use helpers::{
     config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
     Milliseconds, Round, ValidatorId,
 };
-use messages::{
-    Connect, Message, Protocol, ProtocolMessage, RawTransaction,
-    SignedMessage,
-};
+use messages::{Connect, Message, Protocol, ProtocolMessage, RawTransaction, SignedMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 

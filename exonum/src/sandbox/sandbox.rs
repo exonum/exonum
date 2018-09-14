@@ -386,7 +386,7 @@ impl Sandbox {
         Protocol::concrete(TransactionsRequest::new(to, txs), *author, secret_key)
     }
 
-    /// Creates a `TransactionsReponse` message signed by this validator.
+    /// Creates a `TransactionsResponse` message signed by this validator.
     pub fn create_transactions_response<I>(
         &self,
         author: &PublicKey,
