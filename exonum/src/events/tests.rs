@@ -30,7 +30,6 @@ use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 use std::time::SystemTime;
-use env_logger;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -152,7 +151,7 @@ impl TestEvents {
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let fut = network_part.run2(&core.handle(), &handshake_params);
+            let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });
         handler_part.handle = Some(handle);
@@ -300,7 +299,6 @@ fn test_network_handshake() {
 
 #[test]
 fn test_network_big_message() {
-    env_logger::try_init();
     let first = "127.0.0.1:17200".parse().unwrap();
     let second = "127.0.0.1:17201".parse().unwrap();
 
