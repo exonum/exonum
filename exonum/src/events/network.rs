@@ -522,7 +522,7 @@ impl NetworkPart {
         });
 
         listener
-            .join(handler)
+            .join(request_handler)
             .map(drop)
             .select(cancel_handler)
             .map_err(|(e, _)| e)
