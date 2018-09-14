@@ -43,9 +43,8 @@ impl HexStringRepresentation {
 }
 
 /// Returns hexadecimal string representation of `message`.
-pub fn to_hex_string<T: ToHex> (message: &T) -> Result<String, fmt::Error> {
+pub fn to_hex_string<T: ToHex>(message: &T) -> Result<String, fmt::Error> {
     let mut hex_string = String::new();
-    message
-        .write_hex(&mut hex_string)?;
+    message.write_hex(&mut hex_string)?;
     Ok(hex_string)
 }

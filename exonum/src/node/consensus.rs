@@ -21,8 +21,8 @@ use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Consensus as ConsensusMessage, Message, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawTransaction, SignedMessage,
-    TransactionsRequest, TransactionsResponse,
+    PrevotesRequest, Propose, ProposeRequest, RawTransaction, SignedMessage, TransactionsRequest,
+    TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;

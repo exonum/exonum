@@ -42,7 +42,9 @@ use encoding;
 use storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
-pub use self::{helpers::{BinaryForm, to_hex_string}, protocol::*};
+pub use self::{
+    helpers::{to_hex_string, BinaryForm}, protocol::*,
+};
 
 #[macro_use]
 mod compatibility;
