@@ -486,8 +486,8 @@ impl<'a> Field<'a> for Uuid {
     }
 }
 
-fn try_read_uuid(buffer: &[u8], from: Offset, to: Offset) -> StdResult<Uuid, uuid::ParseError> {
-    Uuid::from_bytes(&buffer[from as usize..to as usize])
+fn try_read_uuid(buffer: &[u8], from: Offset, to: Offset) -> StdResult<Uuid, uuid::BytesError> {
+    Uuid::from_slice(&buffer[from as usize..to as usize])
 }
 
 impl<'a> Field<'a> for Decimal {

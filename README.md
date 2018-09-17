@@ -1,7 +1,7 @@
 # Exonum
 
 **Status:**
-[![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.org/exonum/exonum)
+[![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.com/exonum/exonum)
 [![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum/master.svg?label=MacOS)](https://circleci.com/gh/exonum/exonum/tree/master)
 [![Appveyor Build Status](https://img.shields.io/appveyor/ci/exonum-org/exonum/master.svg?label=Windows)](https://ci.appveyor.com/project/exonum-org/exonum)
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)

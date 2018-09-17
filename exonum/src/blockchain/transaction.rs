@@ -403,8 +403,8 @@ pub trait TransactionSet:
 ///
 /// [`Transaction`]: ./blockchain/trait.Transaction.html
 /// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
-/// [`SecretKey`]: ./crypto/struct.SecretKey.html
-/// [`Signature`]: ./crypto/struct.Signature.html
+/// [`SecretKey`]: ../exonum_crypto/struct.SecretKey.html
+/// [`Signature`]: ../exonum_crypto/struct.Signature.html
 /// [`SegmentField`]: ./encoding/trait.SegmentField.html
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
