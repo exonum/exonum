@@ -578,8 +578,6 @@ impl State {
 
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        // This code is temporary solution until `Connect` message is removed,
-        // we should use ip address of the incoming message here but we use resolved public address instead.
         let mut addr = self.get_resolved_peer_address(msg.pub_addr());
         if addr.is_none() {
             addr = self.resolve_and_cache_peer_address(msg.pub_addr());
