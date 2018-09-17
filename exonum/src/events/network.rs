@@ -211,7 +211,8 @@ impl NetworkHandler {
                     .listen(incoming_connection)
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
-                        let receiver_rx = Self::add_incoming_address_to_pool(&pool, &message.addr());
+                        let receiver_rx =
+                            Self::add_incoming_address_to_pool(&pool, &message.addr());
                         Ok((socket, message, receiver_rx))
                     })
                     .and_then(move |(socket, message, receiver_rx)| {
