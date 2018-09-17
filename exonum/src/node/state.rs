@@ -382,32 +382,32 @@ impl IncompleteBlock {
 #[derive(Clone, Debug, Default)]
 /// Shared `ConnectList` representation to be used in network.
 pub struct SharedConnectList {
-    connect_list: Arc<RwLock<ConnectList>>,
+    inner: Arc<RwLock<ConnectList>>,
 }
 
 impl SharedConnectList {
     /// Creates `SharedConnectList` from `ConnectList`.
     pub fn from_connect_list(connect_list: ConnectList) -> Self {
         SharedConnectList {
-            connect_list: Arc::new(RwLock::new(connect_list)),
+            inner: Arc::new(RwLock::new(connect_list)),
         }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
-        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.is_peer_allowed(public_key)
     }
 
     /// Get public key corresponding to validator with `address`.
     pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
-        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.find_key_by_resolved_address(address).cloned()
     }
 
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
-        self.connect_list
+        self.inner
             .read()
             .expect("ConnectList read lock")
             .peers
@@ -421,7 +421,7 @@ impl SharedConnectList {
 
     /// Resolves peer network address and stores result.
     pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
-        self.connect_list
+        self.inner
             .write()
             .expect("ConnectList write lock")
             .resolve_and_cache_peer_address(address)
@@ -1204,7 +1204,7 @@ impl State {
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
         let mut list = self.connect_list
-            .connect_list
+            .inner
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
@@ -1218,7 +1218,7 @@ impl State {
     /// Resolve network address of the peer.
     pub fn get_resolved_peer_address(&self, address: &str) -> Option<SocketAddr> {
         self.connect_list
-            .connect_list
+            .inner
             .read()
             .expect("Connect list read lock")
             .get_resolved_peer_address(address)
