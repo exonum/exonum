@@ -190,7 +190,7 @@ impl NetworkHandler {
                 let listen_address = listen_address.clone();
                 let address = incoming_connection
                     .peer_addr()
-                    .expect("Remote peer resolve failed");
+                    .expect("Remote peer address resolve failed");
                 let pool = pool.clone();
                 let network_tx = network_tx.clone();
                 let handle = handle.clone();
@@ -223,6 +223,7 @@ impl NetworkHandler {
                     .map(|_| {
                         drop(holder);
                     });
+
                 Either::B(listener)
             })
     }
@@ -273,15 +274,19 @@ impl NetworkHandler {
         let incoming_connection = network_tx
             .sink_map_err(into_failure)
             .send_all(stream.map(move |message| NetworkEvent::MessageReceived(address, message)))
-            .map_err(log_error)
+            .map_err(|e| {
+                error!("Connection terminated: {}: {}", e, e.find_root_cause());
+            })
             .map(drop);
 
         let outgoing_connection = connection
             .receiver_rx
-            .map_err(|_| format_err!("Remote peer has disconnected."))
+            .map_err(|_| format_err!("Receiver is gone."))
             .forward(sink)
             .map(drop)
-            .map_err(log_error);
+            .map_err(|e| {
+                error!("Connection terminated: {}: {}", e, e.find_root_cause());
+            });
 
         handle.spawn(incoming_connection);
         handle.spawn(outgoing_connection);
@@ -312,6 +317,7 @@ impl NetworkHandler {
         message: Connect,
         network_tx: mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = failure::Error> {
+        trace!("Established connection with peer={}", connection.address);
         let handle = connection.handle.clone();
         Self::send_peer_connected_event(&connection.address, message, network_tx)
             .and_then(move |network_tx| Self::process_messages(&handle, connection, network_tx))
@@ -487,7 +493,9 @@ impl NetworkPart {
         handshake_params: &HandshakeParams,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let listen_address = self.listen_address;
-        // Cancellation token
+        // `cancel_sender` is converted to future when we receive
+        // `NetworkRequest::Shutdown` causing its being completed with error.
+        // After that completes `cancel_handler` and event loop stopped.
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel::<()>();
 
         let handler = NetworkHandler::new(
