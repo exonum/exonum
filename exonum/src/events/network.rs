@@ -88,37 +88,37 @@ pub struct NetworkPart {
 
 #[derive(Clone, Debug)]
 struct ConnectionPool {
-    pub peers: Arc<RwLock<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
+    peers: Arc<RwLock<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
 }
 
 impl ConnectionPool {
-    pub fn new() -> Self {
+    fn new() -> Self {
         ConnectionPool {
             peers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.peers.read().expect("ConnectionPool read lock").len()
     }
 
-    pub fn add(&self, address: &SocketAddr, sender: mpsc::Sender<RawMessage>) {
+    fn add(&self, address: &SocketAddr, sender: mpsc::Sender<RawMessage>) {
         let mut peers = self.peers.write().expect("ConnectionPool write lock");
         peers.insert(*address, sender);
     }
 
-    pub fn contains(&self, address: &SocketAddr) -> bool {
+    fn contains(&self, address: &SocketAddr) -> bool {
         let peers = self.peers.read().expect("ConnectionPool read lock");
         peers.get(address).is_some()
     }
 
-    pub fn remove(&self, address: &SocketAddr) {
+    fn remove(&self, address: &SocketAddr) {
         let mut peers = self.peers.write().expect("ConnectionPool write lock");
         peers.remove(address);
     }
 }
 
-pub struct Connection {
+struct Connection {
     handle: Handle,
     address: SocketAddr,
     socket: Framed<TcpStream, MessagesCodec>,
@@ -142,7 +142,7 @@ impl Connection {
 }
 
 #[derive(Clone)]
-pub struct NetworkHandler {
+struct NetworkHandler {
     listen_address: SocketAddr,
     pool: ConnectionPool,
     handle: Handle,
@@ -170,10 +170,7 @@ impl NetworkHandler {
         }
     }
 
-    //TODO: move self
-    pub fn listener(
-        &self,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    fn listener(self) -> impl Future<Item = (), Error = failure::Error> {
         let listen_address = self.listen_address.clone();
         let server = TcpListener::bind(&listen_address).unwrap().incoming();
         let pool = self.pool.clone();
@@ -187,7 +184,7 @@ impl NetworkHandler {
         // The reference counter is used to automatically count the number of the open connections.
         let incoming_connections_counter: Rc<()> = Rc::default();
 
-        let fut = server
+        server
             .map_err(into_failure)
             .for_each(move |incoming_connection| {
                 let listen_address = listen_address.clone();
@@ -214,82 +211,58 @@ impl NetworkHandler {
                 let listener = handshake
                     .listen(incoming_connection)
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
-                    .and_then(move |(socket, message)| {
-                        let (sender_tx, receiver_rx) =
-                            mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
-                        let remote_address = message.addr();
-                        pool.add(&remote_address, sender_tx);
-
-                        (
-                            Ok(Connection::new(
-                                handle.clone(),
-                                remote_address,
-                                socket,
-                                receiver_rx,
-                            )),
-                            Ok(message),
-                        )
+                    .and_then(|(socket, message)| {
+                        let receiver_rx = Self::add_incoming_address_to_pool(pool, &message.addr());
+                        Ok((socket, message, receiver_rx))
                     })
-                    .and_then(move |(connection, message)| {
-                        Self::process_connection_init(connection, message, network_tx)
+                    .and_then(move |(socket, message, receiver_rx)| {
+                        let connection =
+                            Connection::new(handle.clone(), message.addr(), socket, receiver_rx);
+                        Self::handle_connection(connection, message, network_tx)
                     })
                     .map(|_| {
                         drop(holder);
                     });
                 Either::B(listener)
-            });
-
-        fut
+            })
     }
 
-    fn configure_socket(
-        socket: TcpStream,
-        network_config: NetworkConfiguration,
-    ) -> Result<TcpStream, failure::Error> {
-        socket.set_nodelay(network_config.tcp_nodelay)?;
-        let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
-        socket.set_keepalive(duration)?;
-        Ok(socket)
-    }
-
-    fn process_connection_init(
-        connection: Connection,
-        message: Connect,
-        network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        let handle = connection.handle.clone();
-        Self::send_peer_connected_event(&connection.address, message, network_tx)
-            .and_then(move |network_tx| Self::process_connection(&handle, connection, network_tx))
-    }
-
-    fn send_message(
-        pool: ConnectionPool,
-        message: RawMessage,
+    fn connect(
+        &self,
         address: &SocketAddr,
+        handshake_params: &HandshakeParams,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let address = address.clone();
-        let sender_tx = pool.peers.read().expect("ConnectionPool read lock");
-        let write_pool = pool.clone();
+        let handshake_params = handshake_params.clone();
+        let handle = self.handle.clone();
+        let network_tx = self.network_tx.clone();
+        let network_config = self.network_config;
+        let timeout = self.network_config.tcp_connect_retry_timeout;
+        let max_tries = self.network_config.tcp_connect_max_retries as usize;
+        let strategy = FixedInterval::from_millis(timeout)
+            .map(jitter)
+            .take(max_tries);
 
-        if let Some(sender) = sender_tx.get(&address) {
-            Either::A(
-                sender
-                    .clone()
-                    .send(message.clone())
-                    .map(drop)
-                    .or_else(move |e| {
-                        log_error(e);
-                        write_pool.remove(&address);
-                        Ok(())
-                    })
-                    .map(drop),
-            )
-        } else {
-            Either::B(future::ok(()))
-        }
+        let action = move || TcpStream::connect(&address);
+
+        let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
+        self.pool.add(&address, sender_tx);
+
+        Retry::spawn(strategy, action)
+            .map_err(into_failure)
+            .and_then(move |socket| Self::configure_socket(socket, network_config))
+            .and_then(move |outgoing_connection| {
+                Self::build_handshake_initiator(outgoing_connection, &address, &handshake_params)
+            })
+            .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
+            .and_then(move |(socket, message)| {
+                let connection = Connection::new(handle.clone(), address, socket, receiver_rx);
+                Self::handle_connection(connection, message, network_tx)
+            })
+            .map(drop)
     }
 
-    fn process_connection(
+    fn process_messages(
         handle: &Handle,
         connection: Connection,
         network_tx: mpsc::Sender<NetworkEvent>,
@@ -313,6 +286,62 @@ impl NetworkHandler {
         handle.spawn(incoming_connection);
         handle.spawn(outgoing_connection);
         Ok(())
+    }
+
+    fn add_incoming_address_to_pool(
+        pool: ConnectionPool,
+        remote_address: &SocketAddr,
+    ) -> mpsc::Receiver<RawMessage> {
+        let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
+        pool.add(&remote_address, sender_tx);
+        receiver_rx
+    }
+
+    fn configure_socket(
+        socket: TcpStream,
+        network_config: NetworkConfiguration,
+    ) -> Result<TcpStream, failure::Error> {
+        socket.set_nodelay(network_config.tcp_nodelay)?;
+        let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
+        socket.set_keepalive(duration)?;
+        Ok(socket)
+    }
+
+    fn handle_connection(
+        connection: Connection,
+        message: Connect,
+        network_tx: mpsc::Sender<NetworkEvent>,
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        let handle = connection.handle.clone();
+        Self::send_peer_connected_event(&connection.address, message, network_tx)
+            .and_then(move |network_tx| Self::process_messages(&handle, connection, network_tx))
+    }
+
+    fn send_message(
+        pool: ConnectionPool,
+        address: &SocketAddr,
+        message: RawMessage,
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        let address = address.clone();
+        let sender_tx = pool.peers.read().expect("ConnectionPool read lock");
+        let write_pool = pool.clone();
+
+        if let Some(sender) = sender_tx.get(&address) {
+            Either::A(
+                sender
+                    .clone()
+                    .send(message.clone())
+                    .map(drop)
+                    .or_else(move |e| {
+                        log_error(e);
+                        write_pool.remove(&address);
+                        Ok(())
+                    })
+                    .map(drop),
+            )
+        } else {
+            Either::B(future::ok(()))
+        }
     }
 
     fn parse_connect_msg(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
@@ -340,7 +369,7 @@ impl NetworkHandler {
                 NetworkRequest::SendMessage(address, message) => {
                     to_box(self.handle_send_message(&address, message))
                 }
-                NetworkRequest::DisconnectWithPeer(peer) => self.disconnect_with_peer(peer),
+                NetworkRequest::DisconnectWithPeer(peer) => to_box(self.disconnect_with_peer(peer)),
                 NetworkRequest::Shutdown => to_box(
                     cancel_sender
                         .take()
@@ -353,7 +382,7 @@ impl NetworkHandler {
             Ok(())
         });
 
-        handler.map_err(|_| format_err!("unknown error in request handler"))
+        handler.map_err(|_| format_err!("Error while processing outgoing Network Requests"))
     }
 
     fn handle_send_message(
@@ -362,25 +391,32 @@ impl NetworkHandler {
         message: RawMessage,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let pool = self.pool.clone();
-        let connect = self.handshake_params.connect.clone();
-        let address = address.clone();
 
         if pool.contains(&address) {
-            to_box(Self::send_message(self.pool.clone(), message, &address))
+            to_box(Self::send_message(pool, &address, message))
         } else if self.can_create_connections() {
-            to_box(
-                self.connect(&address, &self.handshake_params)
-                    .and_then(move |_| {
-                        if &message != connect.raw() {
-                            to_box(Self::send_message(pool, message, &address))
-                        } else {
-                            to_box(future::ok(()))
-                        }
-                    }),
-            )
+            let address = address.clone();
+            to_box(self.create_new_connection(address, message))
         } else {
             to_box(self.send_unable_connect_event(&address))
         }
+    }
+
+    fn create_new_connection(
+        &self,
+        address: SocketAddr,
+        message: RawMessage,
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        let pool = self.pool.clone();
+        let connect = self.handshake_params.connect.clone();
+        self.connect(&address, &self.handshake_params)
+            .and_then(move |_| {
+                if &message != connect.raw() {
+                    Either::A(Self::send_message(pool, &address, message))
+                } else {
+                    Either::B(future::ok(()))
+                }
+            })
     }
 
     fn send_peer_connected_event(
@@ -402,14 +438,13 @@ impl NetworkHandler {
     fn disconnect_with_peer(
         &self,
         peer: SocketAddr,
-    ) -> Box<dyn Future<Item = (), Error = failure::Error>> {
+    ) -> impl Future<Item = (), Error = failure::Error> {
         self.pool.remove(&peer);
-        let fut = self.network_tx
+        self.network_tx
             .clone()
             .send(NetworkEvent::PeerDisconnected(peer))
             .map_err(|_| format_err!("can't send disconnect"))
-            .map(drop);
-        to_box(fut)
+            .map(drop)
     }
 
     fn send_unable_connect_event(
@@ -422,55 +457,6 @@ impl NetworkHandler {
             .send(event)
             .map(drop)
             .map_err(|_| format_err!("can't send network event"))
-    }
-
-    pub fn connect(
-        &self,
-        address: &SocketAddr,
-        handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        let address = address.clone();
-        let handshake_params = handshake_params.clone();
-        let timeout = self.network_config.tcp_connect_retry_timeout;
-        let max_tries = self.network_config.tcp_connect_max_retries as usize;
-        let strategy = FixedInterval::from_millis(timeout)
-            .map(jitter)
-            .take(max_tries);
-
-        let action = move || TcpStream::connect(&address);
-        let pool = self.pool.clone();
-        let handle = self.handle.clone();
-        let network_tx = self.network_tx.clone();
-        let network_config = self.network_config;
-
-        let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
-        pool.add(&address, sender_tx);
-
-        let future = Retry::spawn(strategy, action)
-            .map_err(into_failure)
-            .and_then(move |socket| Self::configure_socket(socket, network_config))
-            .and_then(move |outgoing_connection| {
-                Self::build_handshake_initiator(outgoing_connection, &address, &handshake_params)
-            })
-            .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
-            .and_then(move |(socket, message)| {
-                let remote_address = message.addr();
-                (
-                    Ok(Connection::new(
-                        handle.clone(),
-                        remote_address,
-                        socket,
-                        receiver_rx,
-                    )),
-                    Ok(message),
-                )
-            })
-            .and_then(move |(connection, message)| {
-                Self::process_connection_init(connection, message, network_tx)
-            })
-            .map(drop);
-
-        future
     }
 
     fn build_handshake_initiator(
@@ -513,7 +499,7 @@ impl NetworkPart {
             handshake_params.clone(),
         );
 
-        let listener = handler.listener();
+        let listener = handler.clone().listener();
         let request_handler = handler.request_handler(self.network_requests.1, cancel_sender);
 
         let cancel_handler = cancel_handler.or_else(|e| {
