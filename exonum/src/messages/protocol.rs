@@ -503,7 +503,7 @@ macro_rules! impl_protocol {
     };
 }
 
-impl_protocol!{
+impl_protocol! {
     /// Composition of every exonum protocol messages.
     /// This messages used in network p2p communications.
     SignedMessage => Protocol {
