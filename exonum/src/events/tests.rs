@@ -21,7 +21,7 @@ use std::{
 };
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, PublicKey, SecretKey};
+use crypto::{gen_keypair, PublicKey, SecretKey, Seed, gen_keypair_from_seed, SEED_LENGTH};
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
@@ -212,7 +212,8 @@ impl HandshakeParams {
     // Helper method to create `HandshakeParams` with empty `ConnectList` and
     // default `max_message_len`.
     #[doc(hidden)]
-    pub fn with_default_params(public_key: PublicKey, secret_key: SecretKey) -> Self {
+    pub fn with_default_params() -> Self {
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let address = "127.0.0.1:8000".parse().unwrap();
 
         let connect = Connect::new(
@@ -223,13 +224,16 @@ impl HandshakeParams {
             &secret_key,
         );
 
-        HandshakeParams::new(
+        let mut params = HandshakeParams::new(
             public_key,
             secret_key.clone(),
             SharedConnectList::default(),
             connect,
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
-        )
+        );
+
+        params.set_remote_key(public_key);
+        params
     }
 }
 
