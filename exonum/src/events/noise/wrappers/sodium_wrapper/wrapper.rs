@@ -26,6 +26,8 @@ use std::fmt::{self, Error, Formatter};
 use super::{handshake::HandshakeParams, resolver::SodiumResolver};
 use events::noise::{error::NoiseError, HEADER_LENGTH, MAX_MESSAGE_LENGTH, TAG_LENGTH};
 
+// Maximum allowed handshake message length is 65535,
+// therefore HANDSHAKE_HEADER_LENGTH cannot exceed 2.
 pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
 pub const MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 65535;
 pub const MIN_HANDSHAKE_MESSAGE_LENGTH: usize = 32;
