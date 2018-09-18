@@ -21,7 +21,7 @@ use std::{
 };
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, PublicKey, SecretKey, Seed, gen_keypair_from_seed, SEED_LENGTH};
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
