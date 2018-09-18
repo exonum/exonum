@@ -74,7 +74,7 @@ impl NodeHandler {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        const TX_HEADER: u32 = 8 + 2;
+        const TX_HEADER: u32 = 4; // service_id + message_id
         let mut txs = Vec::new();
         let mut txs_size = 0;
         let unoccupied_message_size =

@@ -264,7 +264,7 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 
 mod transactions_tests {
     use super::TEST_SERVICE_ID;
-    use blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
+    use blockchain::{ExecutionResult, Transaction, TransactionContext};
     use crypto::gen_keypair;
     use messages::Protocol;
     use serde_json;
@@ -306,7 +306,8 @@ mod transactions_tests {
 
     #[test]
     fn deserialize_from_json() {
-        fn round_trip<T: TransactionSet>(t: &T) {
+        fn round_trip<T: Into<MyTransactions>>(t: T) {
+            let t = t.into();
             let initial = serde_json::to_value(&t).unwrap();
             println!("{:?}", initial);
             let parsed: MyTransactions = serde_json::from_value(initial.clone()).unwrap();
@@ -317,9 +318,9 @@ mod transactions_tests {
         let a = A::new(0);
         let b = B::new(1, 2);
         let c = C::new(0);
-        round_trip::<MyTransactions>(&a.into());
-        round_trip::<MyTransactions>(&b.into());
-        round_trip::<MyTransactions>(&c.into());
+        round_trip(a);
+        round_trip(b);
+        round_trip(c);
     }
 
     #[test]
@@ -353,7 +354,6 @@ impl Service for ServiceGood {
     fn service_id(&self) -> u16 {
         1
     }
-
     fn service_name(&self) -> &'static str {
         "some_service"
     }
@@ -599,46 +599,4 @@ mod rocksdb_tests {
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);
     }
-
-    //    #[test]
-    //    fn test_new_tx() {
-    //        use crypto::{gen_keypair_from_seed, Seed, PublicKey};
-    //        use messages::{Message};
-    //        use storage::StorageValue;
-    //        use hex::FromHex;
-    //
-    //        transactions! {
-    //            NewTxSet {
-    //                struct NewTx {
-    //                    public_key: &PublicKey,
-    //                    login: &str,
-    //                    name: &str,
-    //                    url: &str,
-    //                    avatar_url: &str,
-    //                }
-    //            }
-    //        }
-    //
-    //        use blockchain::{ExecutionResult, Transaction, TransactionContext};
-    //
-    //        impl Transaction for NewTx {
-    //            fn execute(&self, _: TransactionContext) -> ExecutionResult {
-    //                Ok(())
-    //            }
-    //        }
-    //        {
-    //            let (p, s) = gen_keypair_from_seed(&Seed::new([210; 32]));
-    //            let message = Protocol::sign_tx(NewTx::new(
-    //                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
-    //                                                      "login", "name", "url", "avatar_url"), 0, p, &s);
-    //            println!("pk = {}", ::hex::encode(p));
-    //            println!("new tx new struct = {}", message.to_hex_string());
-    //            println!("new tx bytearray = {:?}", message.into_parts().1.to_vec());
-    //            println!("new struct, inner = {}", ::hex::encode(NewTx::new(
-    //                &PublicKey::from_hex("41e8fde132ad670e534cd8b275d2cd7eec77733c66f8db48a1cada7fabfc4555").unwrap(),
-    //                "login", "name", "url", "avatar_url").into_bytes()));
-    //
-    //        }
-    //        panic!();
-    //    }
 }

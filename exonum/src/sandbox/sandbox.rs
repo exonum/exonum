@@ -477,7 +477,6 @@ impl Sandbox {
         self.process_events();
         let send = self.pop_sent();
         if let Some((real_addr, real_msg)) = send {
-            //assert_eq!(real_msg.into_parts().1.to_vec(), expected_msg.into_parts().1.to_vec());
             assert_eq!(expected_msg, real_msg, "Expected to send other message");
             assert_eq!(
                 addr, real_addr,
