@@ -19,7 +19,7 @@ use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 
 use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
-use messages::SignedMessage;
+use messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -56,11 +56,19 @@ impl Decoder for MessagesCodec {
 
         let buf = self.session.decrypt_msg(len, buf)?;
 
-        if buf.len() > NOISE_HEADER_LENGTH + self.max_message_len as usize {
+        if buf.len() > self.max_message_len as usize {
             bail!(
                 "Message too big received_len = {}, allowed_len = {}",
-                buf.len() - NOISE_HEADER_LENGTH,
+                buf.len(),
                 self.max_message_len
+            )
+        }
+
+        if buf.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
+            bail!(
+                "Received malicious message with wrong length received_len = {}, min_len = {}",
+                buf.len(),
+                EMPTY_SIGNED_MESSAGE_SIZE
             )
         }
 
@@ -78,8 +86,7 @@ impl Encoder for MessagesCodec {
     }
 }
 
-//#[cfg(test)]
-#[cfg(test2)]
+#[cfg(test)]
 mod test {
     use bytes::BytesMut;
     use failure;
@@ -88,44 +95,27 @@ mod test {
     use super::MessagesCodec;
     use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
     use events::noise::{HandshakeParams, NoiseWrapper};
+    use messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
     use node::state::SharedConnectList;
+
+    pub fn raw_message(val: Vec<u8>) -> SignedMessage {
+        SignedMessage::from_vec_unchecked(val)
+    }
 
     #[test]
     fn decode_message_valid_header_size() {
-        let data = vec![0_u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let data = vec![0; EMPTY_SIGNED_MESSAGE_SIZE + 1];
 
         match get_decoded_message(&data) {
-            Ok(Some(ref message)) if *message.as_ref() == data[..] => {}
+            Ok(Some(ref message)) if *message == &data[..] => {}
             _ => panic!("Wrong input"),
         };
     }
 
     #[test]
-    fn decode_message_small_size_in_header() {
-        let data = vec![0_u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-        assert!(get_decoded_message(&data).is_err());
-    }
-
-    #[test]
-    fn decode_message_zero_byte() {
-        let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
-
-        assert!(get_decoded_message(&data).is_err());
-    }
-
-    #[test]
-    #[should_panic(expected = "Received malicious message with wrong total_len")]
+    #[should_panic(expected = "Received malicious message with wrong length")]
     fn decode_message_small_length() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 11, 0, 0, 0, 0, 0];
-
-        get_decoded_message(&data).unwrap();
-    }
-
-    #[test]
-    #[should_panic(expected = "Received malicious message with wrong total_len")]
-    fn decode_message_big_length() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 11, 0, 0, 0];
+        let data = vec![0; EMPTY_SIGNED_MESSAGE_SIZE - 10];
 
         get_decoded_message(&data).unwrap();
     }
@@ -134,29 +124,29 @@ mod test {
     fn decode_message_eof() {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
 
-        let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
-        let raw = RawMessage::new(MessageBuffer::from_vec(data.clone()));
+        let data = vec![1u8; EMPTY_SIGNED_MESSAGE_SIZE + 10];
+        let raw = raw_message(data.clone());
 
         let mut bytes: BytesMut = BytesMut::new();
         initiator.encode(raw.clone(), &mut bytes).unwrap();
         initiator.encode(raw, &mut bytes).unwrap();
 
         match responder.decode_eof(&mut bytes.clone()) {
-            Ok(Some(ref message)) if *message.as_ref() == data[..] => {}
+            Ok(Some(ref message)) if *message == &data[..] => {}
             _ => panic!("Wrong input"),
         };
 
         // Emulate EOF behavior.
         bytes.truncate(1);
-        assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
+        assert!(responder.decode(&mut bytes).unwrap().is_none());
 
         bytes.clear();
         assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
     }
 
-    fn get_decoded_message(data: &[u8]) -> Result<Option<RawMessage>, failure::Error> {
+    fn get_decoded_message(data: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
-        let raw = RawMessage::new(MessageBuffer::from_vec(data.to_vec()));
+        let raw = raw_message(data.to_vec());
 
         let mut bytes: BytesMut = BytesMut::new();
         initiator.encode(raw, &mut bytes).unwrap();

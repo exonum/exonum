@@ -320,9 +320,9 @@ fn response_size_larger_than_max_message_len() {
     use messages::TRANSACTION_RESPONSE_EMPTY_SIZE;
     use storage::StorageValue;
 
+    const TX_HEADER: usize = 4; // service_id + message_id
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
-    const TX_HEADER: usize = 8 + 2;
     // Create 4 transactions.
     // The size of the fourth transactions is 1 more than size of the first three.
     let tx1 = gen_timestamping_tx();

@@ -226,7 +226,7 @@ impl ServiceContext {
     ///
     /// This method is necessary if you want to implement an alternative exonum node.
     /// For example, you can implement a special node without consensus for regression
-    /// testing of services business logic.`
+    /// testing of services business logic.
     pub fn new(
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
@@ -299,7 +299,7 @@ impl ServiceContext {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Signs and broadcast transaction to other nodes in the network.
+    /// Signs and broadcasts transaction to other nodes in the network.
     pub fn broadcast_transaction<T>(&self, tx: T)
     where
         T: Into<ServiceTransaction> + Transaction,
