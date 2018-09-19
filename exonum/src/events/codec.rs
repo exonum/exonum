@@ -58,7 +58,7 @@ impl Decoder for MessagesCodec {
 
         if buf.len() > self.max_message_len as usize {
             bail!(
-                "Message too big received_len = {}, allowed_len = {}",
+                "Received message is too long: received_len = {}, allowed_len = {}",
                 buf.len(),
                 self.max_message_len
             )
@@ -66,7 +66,7 @@ impl Decoder for MessagesCodec {
 
         if buf.len() <= EMPTY_SIGNED_MESSAGE_SIZE {
             bail!(
-                "Received malicious message with wrong length received_len = {}, min_len = {}",
+                "Received malicious message with wrong length: received_len = {}, min_len = {}",
                 buf.len(),
                 EMPTY_SIGNED_MESSAGE_SIZE
             )

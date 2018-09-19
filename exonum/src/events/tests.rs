@@ -195,7 +195,7 @@ pub fn connect_message(
     )
 }
 
-pub fn raw_message(_id: u16, len: usize) -> SignedMessage {
+pub fn raw_message(len: usize) -> SignedMessage {
     let buffer = vec![0u8; len];
     SignedMessage::from_vec_unchecked(buffer)
 }
@@ -280,8 +280,8 @@ fn test_network_big_message() {
     let first = "127.0.0.1:17200".parse().unwrap();
     let second = "127.0.0.1:17201".parse().unwrap();
 
-    let m1 = raw_message(15, 100000);
-    let m2 = raw_message(16, 400);
+    let m1 = raw_message(100000);
+    let m2 = raw_message(400);
 
     let mut connect_list = ConnectList::default();
 
@@ -336,8 +336,8 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let acceptable_message = raw_message(15, max_message_length);
-    let too_big_message = raw_message(16, max_message_length + 1000);
+    let acceptable_message = raw_message(max_message_length);
+    let too_big_message = raw_message(max_message_length + 1000);
     assert!(too_big_message.raw().len() > max_message_length);
     assert!(acceptable_message.raw().len() <= max_message_length);
     let mut connect_list = ConnectList::default();
@@ -372,7 +372,7 @@ fn test_network_reconnect() {
     let first = "127.0.0.1:19100".parse().unwrap();
     let second = "127.0.0.1:19101".parse().unwrap();
 
-    let msg = raw_message(11, 1000);
+    let msg = raw_message(1000);
 
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
@@ -489,7 +489,7 @@ fn test_send_first_not_connect() {
     let mut node = t1.spawn(node, connect_list.clone());
     let other_node = t2.spawn(other_node, connect_list.clone());
 
-    let message = raw_message(11, 1000);
+    let message = raw_message(1000);
     other_node.send_to(main, message.clone()); // should connect before send message
 
     assert_eq!(node.wait_for_connect(), t2.connect);
