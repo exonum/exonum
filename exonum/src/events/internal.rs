@@ -153,7 +153,8 @@ mod tests {
         let (pk, sk) = gen_keypair();
         let tx = SignedMessage::new(0, 0, vec![0; 200], pk, &sk);
 
-        let expected_event = InternalEvent::MessageVerified(Protocol::deserialize(tx.clone()).unwrap());
+        let expected_event =
+            InternalEvent::MessageVerified(Protocol::deserialize(tx.clone()).unwrap());
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }
@@ -161,8 +162,7 @@ mod tests {
     #[test]
     fn verify_incorrect_msg() {
         let (pk, _) = gen_keypair();
-        let tx =
-            SignedMessage::new_with_signature(0, 0, vec![0; 200], pk, Signature::zero());
+        let tx = SignedMessage::new_with_signature(0, 0, vec![0; 200], pk, Signature::zero());
 
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, None);
