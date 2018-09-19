@@ -1028,6 +1028,7 @@ impl Node {
             *self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
+            self.state().our_connect_message().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
