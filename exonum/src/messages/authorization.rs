@@ -46,6 +46,24 @@ impl SignedMessage {
         SignedMessage { raw: buffer }
     }
 
+    /// Creates `SignedMessage` from parts with specificic signature.
+    #[cfg(test)]
+    pub(crate) fn new_with_signature(
+        class: u8,
+        tag: u8,
+        value: Vec<u8>,
+        author: PublicKey,
+        signature: Signature,
+    ) -> SignedMessage {
+        let mut buffer = Vec::with_capacity(2 + value.len() + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH);
+        buffer.extend_from_slice(author.as_ref());
+        buffer.push(class);
+        buffer.push(tag);
+        buffer.extend_from_slice(value.as_ref());
+        buffer.extend_from_slice(signature.as_ref());
+        SignedMessage { raw: buffer }
+    }
+
     /// Creates `SignedMessage` wrapper from the raw buffer.
     /// Checks binary format and signature.
     pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Self, Error> {

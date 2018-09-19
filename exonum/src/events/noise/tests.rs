@@ -159,7 +159,7 @@ fn noise_encrypt_decrypt_bogus_message() {
 fn check_encrypt_decrypt_message(msg_size: usize) {
     let (mut initiator, mut responder) = create_noise_sessions();
     let mut buffer_msg = BytesMut::with_capacity(msg_size);
-    let message = raw_message(1, msg_size);
+    let message = raw_message(msg_size);
 
     initiator
         .encrypt_msg(message.raw(), &mut buffer_msg)

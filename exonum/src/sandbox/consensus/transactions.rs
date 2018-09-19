@@ -317,10 +317,9 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use messages::TRANSACTION_RESPONSE_EMPTY_SIZE;
+    use messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
     use storage::StorageValue;
 
-    const TX_HEADER: usize = 4; // service_id + message_id
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
     // Create 4 transactions.
@@ -341,9 +340,9 @@ fn response_size_larger_than_max_message_len() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
             + tx1.signed_message().raw().len()
-            + TX_HEADER
+            + RAW_TRANSACTION_HEADER
             + tx2.signed_message().raw().len()
-            + TX_HEADER) as u32;
+            + RAW_TRANSACTION_HEADER) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 

@@ -17,6 +17,7 @@ use blockchain::Schema;
 use messages::{
     BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest, Requests,
     TransactionsRequest, TransactionsResponse, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    RAW_TRANSACTION_HEADER,
 };
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
@@ -74,17 +75,16 @@ impl NodeHandler {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        const TX_HEADER: u32 = 4; // service_id + message_id
         let mut txs = Vec::new();
         let mut txs_size = 0;
         let unoccupied_message_size =
-            self.state.config().consensus.max_message_len - TRANSACTION_RESPONSE_EMPTY_SIZE as u32;
+            self.state.config().consensus.max_message_len as usize - TRANSACTION_RESPONSE_EMPTY_SIZE;
 
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
                 let raw = tx.signed_message().raw().to_vec();
-                if txs_size + raw.len() as u32 + TX_HEADER > unoccupied_message_size {
+                if txs_size + raw.len() + RAW_TRANSACTION_HEADER > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
                         &msg.author(),
                         mem::replace(&mut txs, vec![]),
@@ -93,7 +93,7 @@ impl NodeHandler {
                     self.send_to_peer(msg.author(), txs_response);
                     txs_size = 0;
                 }
-                txs_size += raw.len() as u32 + TX_HEADER;
+                txs_size += raw.len() + RAW_TRANSACTION_HEADER;
                 txs.push(raw);
             }
         }

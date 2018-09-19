@@ -69,7 +69,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
 
         let t1 = thread::spawn(move || {
             for _ in 0..times {
-                let msg = raw_message(0, len);
+                let msg = raw_message(len);
                 t1.send_to(second, msg);
                 t1.wait_for_message();
             }
@@ -78,7 +78,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
 
         let t2 = thread::spawn(move || {
             for _ in 0..times {
-                let msg = raw_message(1, len);
+                let msg = raw_message(len);
                 t2.send_to(first, msg);
                 t2.wait_for_message();
             }

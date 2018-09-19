@@ -56,6 +56,7 @@ mod tests;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
+pub(crate) const RAW_TRANSACTION_HEADER: usize = mem::size_of::<u16>() * 2;
 
 /// Transaction raw buffer.
 /// This struct is used to transfer transactions in network.
