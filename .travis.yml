@@ -1,5 +1,9 @@
 language: rust
 
+branches:
+  only:
+  - master
+
 addons:
   apt:
     sources:
