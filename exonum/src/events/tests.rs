@@ -17,7 +17,7 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    net::SocketAddr, thread, time::{self, Duration},
+    net::SocketAddr, thread, time::{self, Duration, SystemTime},
 };
 
 use blockchain::ConsensusConfig;
@@ -29,7 +29,6 @@ use events::{
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
-use std::time::SystemTime;
 
 #[derive(Debug)]
 pub struct TestHandler {

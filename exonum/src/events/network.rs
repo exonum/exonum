@@ -16,6 +16,7 @@ use failure;
 use futures::{
     future, future::{err, Either}, sync::mpsc, unsync, Future, IntoFuture, Sink, Stream,
 };
+use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
 use tokio_core::reactor::Handle;
 
@@ -23,7 +24,7 @@ use tokio_retry::{
     strategy::{jitter, FixedInterval}, Retry,
 };
 
-use std::{collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
 
 use super::{error::log_error, to_box};
 use events::{
@@ -31,8 +32,6 @@ use events::{
 };
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-use std::cell::RefCell;
-use tokio::net::{TcpListener, TcpStream};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 

@@ -63,7 +63,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   calculations in Exonum Java Bindings, but can be used for debug purposes
   as well. (#918)
 
-- Now peers requires only one connection to exchange messages between
+- Now peers require only one connection to exchange messages between
   them. (#945)
 
 ### Bug Fixes
