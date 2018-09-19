@@ -235,7 +235,7 @@ impl NetworkHandler {
                          connections limit reached.",
                         address
                     );
-                    return Either::A(future::ok(()));
+                    return Ok(());
                 }
 
                 let listener = handshake
@@ -247,14 +247,16 @@ impl NetworkHandler {
                     })
                     .and_then(move |(socket, message, receiver_rx)| {
                         let connection =
-                            Connection::new(handle.clone(), message.addr(), socket, receiver_rx);
+                            Connection::new(handle, message.addr(), socket, receiver_rx);
                         Self::handle_connection(connection, message, &network_tx)
                     })
                     .map(|_| {
                         drop(holder);
-                    });
+                    })
+                    .map_err(log_error);
 
-                Either::B(listener)
+                self.handle.spawn(listener);
+                Ok(())
             })
     }
 
