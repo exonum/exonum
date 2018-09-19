@@ -17,12 +17,11 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    net::SocketAddr, thread, time::{self, Duration},
+    net::SocketAddr, thread, time::{self, Duration, SystemTime},
 };
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, PublicKey, SecretKey};
-use env_logger;
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
@@ -208,6 +207,35 @@ pub struct ConnectionParams {
     handshake_params: HandshakeParams,
 }
 
+impl HandshakeParams {
+    // Helper method to create `HandshakeParams` with empty `ConnectList` and
+    // default `max_message_len`.
+    #[doc(hidden)]
+    pub fn with_default_params() -> Self {
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+        let address = "127.0.0.1:8000".parse().unwrap();
+
+        let connect = Connect::new(
+            &public_key,
+            address,
+            SystemTime::now().into(),
+            &user_agent::get(),
+            &secret_key,
+        );
+
+        let mut params = HandshakeParams::new(
+            public_key,
+            secret_key.clone(),
+            SharedConnectList::default(),
+            connect,
+            ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
+        );
+
+        params.set_remote_key(public_key);
+        params
+    }
+}
+
 impl ConnectionParams {
     pub fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
@@ -216,6 +244,7 @@ impl ConnectionParams {
             public_key,
             secret_key.clone(),
             SharedConnectList::default(),
+            connect.clone(),
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
         );
         let connect_info = ConnectInfo {
@@ -264,8 +293,6 @@ fn test_network_handshake() {
 
     e1.connect_with(second, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
-
-    e2.connect_with(first, t2.connect.clone());
     assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
     e1.disconnect_with(second);
@@ -302,9 +329,8 @@ fn test_network_big_message() {
     let mut e2 = t2.spawn(e2, connect_list);
 
     e1.connect_with(second, t1.connect.clone());
-    e2.wait_for_connect();
 
-    e2.connect_with(first, t2.connect.clone());
+    e2.wait_for_connect();
     e1.wait_for_connect();
 
     e1.send_to(second, m1.clone());
@@ -359,9 +385,8 @@ fn test_network_max_message_len() {
     let mut e2 = t2.spawn(e2, connect_list);
 
     e1.connect_with(second, t1.connect.clone());
-    e2.wait_for_connect();
 
-    e2.connect_with(first, t2.connect.clone());
+    e2.wait_for_connect();
     e1.wait_for_connect();
 
     e1.send_to(second, acceptable_message.clone());
@@ -399,6 +424,7 @@ fn test_network_reconnect() {
     // Handle first attempt.
     e1.connect_with(second, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
+    assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
     e1.send_to(second, msg.clone());
     assert_eq!(e2.wait_for_message(), msg);
@@ -413,6 +439,7 @@ fn test_network_reconnect() {
 
     e1.connect_with(second, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
+    assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
     e1.send_to(second, msg.clone());
     assert_eq!(e2.wait_for_message(), msg);
@@ -423,7 +450,6 @@ fn test_network_reconnect() {
 
 #[test]
 fn test_network_multiple_connect() {
-    env_logger::init();
     let main = "127.0.0.1:19600".parse().unwrap();
 
     let nodes = [

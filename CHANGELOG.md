@@ -70,6 +70,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   (`peer-address`) and listen address when generating config files. (#942)
 
 - Peer address is resolved on connect instead of resolving on node startup. (#942)
+- Now peers require only one connection to exchange messages between
+  them. (#945)
 
 ### Bug Fixes
 
