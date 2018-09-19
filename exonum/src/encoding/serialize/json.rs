@@ -488,33 +488,6 @@ impl ExonumJson for Decimal {
         Ok(serde_json::to_value(&self)?)
     }
 }
-/*
-impl ExonumJson for Vec<UncheckedBuffer> {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<dyn Error>> {
-        let bytes = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Vec<_> = Vec::new();
-        for el in bytes {
-            let string = el.as_str().ok_or("Can't cast json as string")?;
-            let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
-            vec.push(UncheckedBuffer::new(str_hex));
-        }
-        buffer.write(from, to, vec);
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
-        let vec = self.iter()
-            .map(|slice| Value::String(::encoding::serialize::encode_hex(slice.as_ref())))
-            .collect();
-        Ok(Value::Array(vec))
-    }
-}
-*/
 
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
