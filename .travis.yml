@@ -3,6 +3,7 @@ language: rust
 branches:
   only:
   - master
+  - /*release*/
 
 addons:
   apt:
