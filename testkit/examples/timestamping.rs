@@ -32,8 +32,6 @@ const SERVICE_ID: u16 = 512;
 
 transactions! {
     TimestampingServiceTransactions {
-        const SERVICE_ID = SERVICE_ID;
-
         struct TxTimestamp {
             from: &PublicKey,
             msg: &str,
@@ -44,10 +42,6 @@ transactions! {
 struct TimestampingService;
 
 impl Transaction for TxTimestamp {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
         Ok(())
     }

@@ -18,7 +18,7 @@ use serde_json;
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, CryptoHash, PublicKey, SecretKey}, helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Propose},
+    messages::{Message, Precommit, Propose, Protocol},
 };
 
 /// Emulated test network.
@@ -169,30 +169,40 @@ impl TestNode {
         height: Height,
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
-    ) -> Propose {
-        Propose::new(
-            self.validator_id
-                .expect("An attempt to create propose from a non-validator node."),
-            height,
-            Round::first(),
-            last_hash,
-            tx_hashes,
+    ) -> Message<Propose> {
+        Protocol::concrete(
+            Propose::new(
+                self.validator_id
+                    .expect("An attempt to create propose from a non-validator node."),
+                height,
+                Round::first(),
+                last_hash,
+                tx_hashes,
+            ),
+            self.consensus_public_key,
             &self.consensus_secret_key,
         )
     }
 
     /// Creates a `Precommit` message signed by this validator.
-    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> Precommit {
+    pub fn create_precommit(
+        &self,
+        propose: &Propose,
+        block_hash: &crypto::Hash,
+    ) -> Message<Precommit> {
         use std::time::SystemTime;
 
-        Precommit::new(
-            self.validator_id
-                .expect("An attempt to create propose from a non-validator node."),
-            propose.height(),
-            propose.round(),
-            &propose.hash(),
-            block_hash,
-            SystemTime::now().into(),
+        Protocol::concrete(
+            Precommit::new(
+                self.validator_id
+                    .expect("An attempt to create propose from a non-validator node."),
+                propose.height(),
+                propose.round(),
+                &propose.hash(),
+                block_hash,
+                SystemTime::now().into(),
+            ),
+            self.consensus_public_key,
             &self.consensus_secret_key,
         )
     }

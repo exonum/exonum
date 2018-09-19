@@ -16,9 +16,13 @@ extern crate serde;
 extern crate serde_json;
 
 use exonum::{
-    api, blockchain::{ExecutionResult, Schema as CoreSchema, Service, Transaction, TransactionSet},
+    api,
+    blockchain::{
+        ExecutionResult, Schema as CoreSchema, Service, Transaction, TransactionContext,
+        TransactionSet,
+    },
     crypto::{Hash, PublicKey}, encoding, helpers::Height, messages::{Message, RawTransaction},
-    node::TransactionSend, storage::{Fork, MapIndex, Snapshot},
+    storage::{Fork, MapIndex, Snapshot},
 };
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -87,7 +91,6 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 
 transactions! {
     pub(in inflating_cryptocurrency) CurrencyTransactions {
-        const SERVICE_ID = SERVICE_ID;
 
         /// Create a new wallet.
         struct TxCreateWallet {
@@ -108,14 +111,9 @@ transactions! {
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
 impl Transaction for TxCreateWallet {
-    /// Verify integrity of the transaction by checking the transaction
-    /// signature.
-    fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
-    }
-
     /// Apply logic to the storage when executing the transaction.
-    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let view = tc.fork();
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
         if schema.wallet(self.pub_key()).is_none() {
@@ -130,12 +128,13 @@ impl Transaction for TxTransfer {
     /// Check if the sender is not the receiver. Check correctness of the
     /// sender's signature.
     fn verify(&self) -> bool {
-        (*self.from() != *self.to()) && self.verify_signature(self.from())
+        (*self.from() != *self.to())
     }
 
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let view = tc.fork();
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
         let sender = schema.wallet(self.from());
