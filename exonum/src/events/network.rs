@@ -416,7 +416,7 @@ impl NetworkHandler {
                 NetworkRequest::SendMessage(address, message) => {
                     to_box(self.handle_send_message(&address, message))
                 }
-                NetworkRequest::DisconnectWithPeer(peer) => to_box(self.disconnect_with_peer(peer)),
+                NetworkRequest::DisconnectWithPeer(peer) => to_box(self.pool.disconnect_with_peer(&peer, &self.network_tx)),
                 NetworkRequest::Shutdown => to_box(
                     cancel_sender
                         .take()
@@ -480,18 +480,6 @@ impl NetworkHandler {
 
     fn can_create_connections(&self) -> bool {
         self.pool.len() <= self.network_config.max_outgoing_connections
-    }
-
-    fn disconnect_with_peer(
-        &self,
-        peer: SocketAddr,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        self.pool.remove(&peer);
-        self.network_tx
-            .clone()
-            .send(NetworkEvent::PeerDisconnected(peer))
-            .map_err(|_| format_err!("can't send disconnect"))
-            .map(drop)
     }
 
     fn send_unable_connect_event(
