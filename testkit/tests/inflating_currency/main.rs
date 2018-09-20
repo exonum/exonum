@@ -46,7 +46,7 @@ fn init_testkit() -> TestKit {
 fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = TxCreateWallet::new(&pubkey, name, &key);
+    let tx = TxCreateWallet::sign(name, &pubkey, &key);
 
     let tx_info: TransactionResponse = api.public(ApiKind::Service("cryptocurrency"))
         .query(&tx)
@@ -70,9 +70,9 @@ fn test_inflation() {
     let (tx, _) = create_wallet(&mut api, "Alice");
 
     testkit.create_block();
-    assert_eq!(get_balance(&mut api, tx.pub_key()), 1);
+    assert_eq!(get_balance(&mut api, tx.author()), 1);
     testkit.create_blocks_until(Height(10));
-    assert_eq!(get_balance(&mut api, tx.pub_key()), 10);
+    assert_eq!(get_balance(&mut api, tx.author()), 10);
 }
 
 #[test]
@@ -157,13 +157,13 @@ fn test_fuzz_transfers() {
     let keys_and_txs: Vec<_> = (0..USERS)
         .map(|i| {
             let (pubkey, key) = crypto::gen_keypair();
-            let tx = TxCreateWallet::new(&pubkey, &format!("User #{}", i), &key);
+            let tx = TxCreateWallet::sign(&format!("User #{}", i), &pubkey, &key);
             (key, tx)
         })
         .collect();
     let pubkeys: Vec<&_> = keys_and_txs
         .iter()
-        .map(|&(_, ref tx)| tx.pub_key())
+        .map(|&(_, ref tx)| tx.author())
         .collect();
 
     testkit.create_block_with_transactions(

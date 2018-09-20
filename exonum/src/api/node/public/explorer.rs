@@ -245,8 +245,8 @@ impl ExplorerApi {
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
-            .endpoint("v1/transaction", Self::transaction_info)
-            .endpoint_mut("v1/transaction", Self::add_transaction)
+            .endpoint("v1/transactions", Self::transaction_info)
+            .endpoint_mut("v1/transactions", Self::add_transaction)
     }
 }
 

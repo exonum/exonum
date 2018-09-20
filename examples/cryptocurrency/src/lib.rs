@@ -113,8 +113,10 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
-    use exonum::crypto::PublicKey;
-
+    use super::service::SERVICE_ID;
+    use exonum::{
+        crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
+    };
     transactions! {
         /// Transaction group.
         pub CurrencyTransactions {
@@ -123,8 +125,6 @@ pub mod transactions {
             /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
             /// `TxCreateWallet` transactions are processed.
             struct TxCreateWallet {
-                /// Public key of the wallet's owner.
-                pub_key: &PublicKey,
                 /// UTF-8 string with the owner's name.
                 name: &str,
             }
@@ -134,8 +134,6 @@ pub mod transactions {
             /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
             /// `TxTransfer` transactions are processed.
             struct TxTransfer {
-                /// Public key of the sender.
-                from: &PublicKey,
                 /// Public key of the receiver.
                 to: &PublicKey,
                 /// Number of tokens to transfer from sender's account to receiver's account.
@@ -145,6 +143,26 @@ pub mod transactions {
                 /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
                 seed: u64,
             }
+        }
+    }
+
+    impl TxCreateWallet {
+        #[doc(hidden)]
+        pub fn sign(name: &str, pk: &PublicKey, sc: &SecretKey) -> Message<RawTransaction> {
+            Protocol::sign_tx(TxCreateWallet::new(name), SERVICE_ID, *pk, sc)
+        }
+    }
+
+    impl TxTransfer {
+        #[doc(hidden)]
+        pub fn sign(
+            to: &PublicKey,
+            amount: u64,
+            seed: u64,
+            pk: &PublicKey,
+            sc: &SecretKey,
+        ) -> Message<RawTransaction> {
+            Protocol::sign_tx(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sc)
         }
     }
 }
@@ -184,6 +202,12 @@ pub mod errors {
         /// Can be emitted by `TxTransfer`.
         #[fail(display = "Insufficient currency amount")]
         InsufficientCurrencyAmount = 3,
+
+        /// Sender same as receiver.
+        ///
+        /// Can be emitted by `TxTransfer`.
+        #[fail(display = "Sender same as receiver")]
+        SenderSameAsReceiver = 4,
     }
 
     impl From<Error> for ExecutionError {
@@ -196,9 +220,7 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::{
-        blockchain::{ExecutionResult, Transaction, TransactionContext},
-    };
+    use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 
     use errors::Error;
     use schema::{CurrencySchema, Wallet};
@@ -212,12 +234,13 @@ pub mod contracts {
         /// with the specified public key and name, and an initial balance of 100.
         /// Otherwise, performs no op.
         fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+            let author = tc.author();
             let view = tc.fork();
             let mut schema = CurrencySchema::new(view);
-            if schema.wallet(self.pub_key()).is_none() {
-                let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
+            if schema.wallet(&author).is_none() {
+                let wallet = Wallet::new(&author, self.name(), INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
-                schema.wallets_mut().put(self.pub_key(), wallet);
+                schema.wallets_mut().put(&author, wallet);
                 Ok(())
             } else {
                 Err(Error::WalletAlreadyExists)?
@@ -226,11 +249,6 @@ pub mod contracts {
     }
 
     impl Transaction for TxTransfer {
-        /// Checks if the sender is not the receiver
-        fn verify(&self) -> bool {
-            (*self.from() != *self.to())
-        }
-
         /// Retrieves two wallets to apply the transfer; they should be previously registered
         /// with the help of [`TxCreateWallet`] transactions. Checks the sender's
         /// balance and applies changes to the balances of the wallets if the sender's balance
@@ -238,10 +256,16 @@ pub mod contracts {
         ///
         /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
         fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+            let author = tc.author();
             let view = tc.fork();
+
+            if &author == self.to() {
+                Err(Error::SenderSameAsReceiver)?
+            }
+
             let mut schema = CurrencySchema::new(view);
 
-            let sender = match schema.wallet(self.from()) {
+            let sender = match schema.wallet(&author) {
                 Some(val) => val,
                 None => Err(Error::SenderNotFound)?,
             };
@@ -257,7 +281,7 @@ pub mod contracts {
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
                 let mut wallets = schema.wallets_mut();
-                wallets.put(self.from(), sender);
+                wallets.put(&author, sender);
                 wallets.put(self.to(), receiver);
                 Ok(())
             } else {
@@ -270,8 +294,7 @@ pub mod contracts {
 /// REST API.
 pub mod api {
     use exonum::{
-        api::{self, ServiceApiBuilder, ServiceApiState},
-        crypto::{Hash, PublicKey},
+        api::{self, ServiceApiBuilder, ServiceApiState}, crypto::{Hash, PublicKey},
     };
 
     use schema::{CurrencySchema, Wallet};
@@ -312,18 +335,6 @@ pub mod api {
             let wallets = idx.values().collect();
             Ok(wallets)
         }
-/*
-        /// Common processing for transaction-accepting endpoints.
-        pub fn post_transaction(
-            state: &ServiceApiState,
-            query: CurrencyTransactions,
-        ) -> api::Result<TransactionResponse> {
-            let transaction: Box<dyn Transaction> = query.into();
-            let tx_hash = transaction.hash();
-            state.sender().send(transaction)?;
-            Ok(TransactionResponse { tx_hash })
-        }
-*/
 
         /// 'ServiceApiBuilder' facilitates conversion between transactions/read requests and REST
         /// endpoints; for example, it parses `POST`ed JSON into the binary transaction
@@ -334,8 +345,6 @@ pub mod api {
                 .public_scope()
                 .endpoint("v1/wallet", Self::get_wallet)
                 .endpoint("v1/wallets", Self::get_wallets);
-                //.endpoint_mut("v1/wallets", Self::post_transaction)
-                //.endpoint_mut("v1/wallets/transfer", Self::post_transaction);
         }
     }
 }
