@@ -300,7 +300,7 @@ impl Blockchain {
                 self.execute_transaction(*hash, height, index, &mut fork)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
-                    .expect("Transaction execute error.");
+                    .expect("Transaction execution error.");
             }
 
             // Invoke execute method for all services.
