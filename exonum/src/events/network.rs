@@ -14,7 +14,8 @@
 
 use failure;
 use futures::{
-    future, future::{err, Either}, sync::mpsc, unsync, Future, IntoFuture, Sink, Stream,
+    future, future::{err, Either}, stream::{SplitSink, SplitStream}, sync::mpsc, unsync, Future,
+    IntoFuture, Sink, Stream,
 };
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
@@ -119,6 +120,19 @@ impl ConnectionPool {
         let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
         self.add(&remote_address, sender_tx);
         receiver_rx
+    }
+
+    fn disconnect_with_peer(
+        &self,
+        peer: &SocketAddr,
+        network_tx: &mpsc::Sender<NetworkEvent>,
+    ) -> impl Future<Item = (), Error = failure::Error> {
+        self.remove(&peer);
+        network_tx
+            .clone()
+            .send(NetworkEvent::PeerDisconnected(*peer))
+            .map_err(|_| format_err!("can't send disconnect"))
+            .map(drop)
     }
 
     fn send_message(
@@ -243,12 +257,12 @@ impl NetworkHandler {
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
                         let receiver_rx = pool.add_incoming_address(&message.addr());
-                        Ok((socket, message, receiver_rx))
+                        Ok((pool, socket, message, receiver_rx))
                     })
-                    .and_then(move |(socket, message, receiver_rx)| {
+                    .and_then(move |(pool, socket, message, receiver_rx)| {
                         let connection =
                             Connection::new(handle, message.addr(), socket, receiver_rx);
-                        Self::handle_connection(connection, message, &network_tx)
+                        Self::handle_connection(connection, pool, message, &network_tx)
                     })
                     .map(|_| {
                         drop(holder);
@@ -280,6 +294,8 @@ impl NetworkHandler {
         let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
         self.pool.add(&address, sender_tx);
 
+        let pool = self.pool.clone();
+
         Retry::spawn(strategy, action)
             .map_err(into_failure)
             .and_then(move |socket| Self::configure_socket(socket, network_config))
@@ -289,39 +305,67 @@ impl NetworkHandler {
             .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
             .and_then(move |(socket, message)| {
                 let connection = Connection::new(handle.clone(), address, socket, receiver_rx);
-                Self::handle_connection(connection, message, &network_tx)
+                Self::handle_connection(connection, pool, message, &network_tx)
             })
             .map(drop)
     }
 
     fn process_messages(
+        pool: &ConnectionPool,
         handle: &Handle,
         connection: Connection,
-        network_tx: mpsc::Sender<NetworkEvent>,
+        network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> Result<(), failure::Error> {
-        let address = connection.address;
         let (sink, stream) = connection.socket.split();
 
-        let incoming_connection = network_tx
-            .sink_map_err(into_failure)
-            .send_all(stream.map(move |message| NetworkEvent::MessageReceived(address, message)))
-            .map_err(|e| {
-                error!("Connection terminated: {}: {}", e, e.find_root_cause());
-            })
-            .map(drop);
+        let incoming = Self::process_incoming_messages(
+            stream,
+            pool.clone(),
+            &connection.address,
+            network_tx.clone(),
+        );
 
-        let outgoing_connection = connection
-            .receiver_rx
+        let outgoing = Self::process_outgoing_messages(sink, connection.receiver_rx);
+
+        handle.spawn(incoming);
+        handle.spawn(outgoing);
+        Ok(())
+    }
+
+    fn process_outgoing_messages<S>(
+        sink: SplitSink<S>,
+        receiver_rx: mpsc::Receiver<RawMessage>,
+    ) -> impl Future<Item = (), Error = ()>
+    where
+        S: Sink<SinkItem = RawMessage, SinkError = failure::Error>,
+    {
+        receiver_rx
             .map_err(|_| format_err!("Receiver is gone."))
             .forward(sink)
             .map(drop)
             .map_err(|e| {
                 error!("Connection terminated: {}: {}", e, e.find_root_cause());
-            });
+            })
+    }
 
-        handle.spawn(incoming_connection);
-        handle.spawn(outgoing_connection);
-        Ok(())
+    fn process_incoming_messages<S>(
+        stream: SplitStream<S>,
+        pool: ConnectionPool,
+        address: &SocketAddr,
+        network_tx: mpsc::Sender<NetworkEvent>,
+    ) -> impl Future<Item = (), Error = ()>
+    where
+        S: Stream<Item = RawMessage, Error = failure::Error>,
+    {
+        let address = *address;
+        network_tx
+            .clone()
+            .sink_map_err(into_failure)
+            .send_all(stream.map(move |message| NetworkEvent::MessageReceived(address, message)))
+            .then(move |_| pool.disconnect_with_peer(&address, &network_tx))
+            .map_err(|e| {
+                error!("Connection terminated: {}: {}", e, e.find_root_cause());
+            })
     }
 
     fn configure_socket(
@@ -336,13 +380,15 @@ impl NetworkHandler {
 
     fn handle_connection(
         connection: Connection,
+        pool: ConnectionPool,
         message: Connect,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = failure::Error> {
         trace!("Established connection with peer={}", connection.address);
         let handle = connection.handle.clone();
-        Self::send_peer_connected_event(&connection.address, message, &network_tx)
-            .and_then(move |network_tx| Self::process_messages(&handle, connection, network_tx))
+        Self::send_peer_connected_event(&connection.address, message, &network_tx).and_then(
+            move |network_tx| Self::process_messages(&pool, &handle, connection, &network_tx),
+        )
     }
 
     fn parse_connect_msg(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
