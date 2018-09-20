@@ -18,10 +18,12 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext}, crypto::PublicKey,
+    blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext},
+    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
     storage::{Fork, Snapshot},
 };
 
+use super::SERVICE_ID;
 use schema::TimeSchema;
 
 /// Common errors emitted by transactions during execution.
@@ -52,16 +54,25 @@ transactions! {
         struct TxTime {
             /// Time of the validator.
             time: DateTime<Utc>,
-            /// Public key of the validator.
-            pub_key: &PublicKey,
         }
     }
 }
 
 impl TxTime {
-    fn check_signed_by_validator(&self, snapshot: &dyn Snapshot) -> ExecutionResult {
+    #[doc(hidden)]
+    pub fn sign(time: DateTime<Utc>, pk: &PublicKey, sc: &SecretKey) -> Message<RawTransaction> {
+        Protocol::sign_tx(TxTime::new(time), SERVICE_ID, *pk, sc)
+    }
+}
+
+impl TxTime {
+    fn check_signed_by_validator(
+        &self,
+        snapshot: &dyn Snapshot,
+        author: &PublicKey,
+    ) -> ExecutionResult {
         let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
-        let signed = keys.iter().any(|k| k.service_key == *self.pub_key());
+        let signed = keys.iter().any(|k| k.service_key == *author);
         if !signed {
             Err(Error::UnknownSender)?
         } else {
@@ -69,16 +80,14 @@ impl TxTime {
         }
     }
 
-    fn update_validator_time(&self, fork: &mut Fork) -> ExecutionResult {
+    fn update_validator_time(&self, fork: &mut Fork, author: &PublicKey) -> ExecutionResult {
         let mut schema = TimeSchema::new(fork);
-        match schema.validators_times().get(self.pub_key()) {
+        match schema.validators_times().get(author) {
             // The validator time in the storage should be less than in the transaction.
             Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsGreater)?,
             // Write the time for the validator.
             _ => {
-                schema
-                    .validators_times_mut()
-                    .put(self.pub_key(), self.time());
+                schema.validators_times_mut().put(author, self.time());
                 Ok(())
             }
         }
@@ -124,9 +133,10 @@ impl TxTime {
 
 impl Transaction for TxTime {
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let author = tc.author();
         let view = tc.fork();
-        self.check_signed_by_validator(view.as_ref())?;
-        self.update_validator_time(view)?;
+        self.check_signed_by_validator(view.as_ref(), &author)?;
+        self.update_validator_time(view, &author)?;
         Self::update_consolidated_time(view);
         Ok(())
     }

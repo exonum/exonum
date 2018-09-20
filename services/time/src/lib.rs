@@ -113,12 +113,7 @@ impl Service for TimeService {
         if context.validator_id().is_none() {
             return;
         }
-        let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
-        context
-            .broadcast_transaction(TxTime::new(
-                self.time.current_time(),
-                &pub_key,
-            ));
+        context.broadcast_transaction(TxTime::new(self.time.current_time()));
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
