@@ -300,7 +300,7 @@ impl Blockchain {
                 self.execute_transaction(*hash, height, index, &mut fork)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
-                    .expect("Transaction not found in the database.");
+                    .expect("Transaction execute error.");
             }
 
             // Invoke execute method for all services.
@@ -385,14 +385,21 @@ impl Blockchain {
         let (tx, service_name) = {
             let schema = Schema::new(&fork);
 
-            let tx = schema
-                .transactions()
-                .get(&tx_hash)
-                .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
+            let tx = schema.transactions().get(&tx_hash).ok_or_else(|| {
+                failure::err_msg(format!(
+                    "BUG: Cannot find transaction in database. tx: {:?}",
+                    tx_hash
+                ))
+            })?;
 
             let service_name = self.service_map
                 .get(tx.service_id() as usize)
-                .ok_or_else(|| failure::err_msg("Service not found."))?
+                .ok_or_else(|| {
+                    failure::err_msg(format!(
+                        "Service not found. Service id: {}",
+                        tx.service_id()
+                    ))
+                })?
                 .service_name();
 
             let tx = self.tx_from_raw(tx).or_else(|error| {
