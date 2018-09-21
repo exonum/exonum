@@ -16,6 +16,7 @@
 
 use actix::Arbiter;
 use actix_web::{http, ws};
+use chrono::{DateTime, Utc};
 use futures::IntoFuture;
 use serde_json;
 
@@ -24,12 +25,12 @@ use std::sync::{Arc, Mutex};
 
 use api::{
     backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websocket::{Server, Session}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
-    ServiceApiState,
+    websocket::{Server, Session},
+    Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
 use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
-use explorer::{BlockchainExplorer, TransactionInfo};
+use explorer::{self, BlockchainExplorer, TransactionInfo};
 use helpers::Height;
 use messages::Precommit;
 
@@ -46,6 +47,25 @@ pub struct BlocksRange {
     pub blocks: Vec<Block>,
 }
 
+/// Block header with the corresponding median time from the precommits.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct TimedBlock {
+    /// Block header as recorded in the blockchain.
+    pub block: Block,
+    /// Median time from the block precommits.
+    pub time: DateTime<Utc>,
+}
+
+/// Information on blocks and corresponding median time from the precommits coupled with the
+/// corresponding range in the blockchain.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct TimedBlocksRange {
+    /// Exclusive range of blocks.
+    pub range: Range<Height>,
+    /// Block headers with the corresponding median time from the precommits.
+    timed_blocks: Vec<TimedBlock>,
+}
+
 /// Information about a block in the blockchain.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BlockInfo {
@@ -55,6 +75,8 @@ pub struct BlockInfo {
     pub precommits: Vec<Precommit>,
     /// Hashes of transactions in the block.
     pub txs: Vec<Hash>,
+    /// Median time from the block precommits.
+    pub time: DateTime<Utc>,
 }
 
 /// Blocks in range parameters.
@@ -143,6 +165,51 @@ impl ExplorerApi {
         })
     }
 
+    /// Similar to the `blocks` method, but additionally returns median time from the precommits.
+    pub fn blocks_with_time(
+        state: &ServiceApiState,
+        query: BlocksQuery,
+    ) -> Result<TimedBlocksRange, ApiError> {
+        let explorer = BlockchainExplorer::new(state.blockchain());
+        if query.count > MAX_BLOCKS_PER_REQUEST {
+            return Err(ApiError::BadRequest(format!(
+                "Max block count per request exceeded ({})",
+                MAX_BLOCKS_PER_REQUEST
+            )));
+        }
+
+        let (upper, blocks_iter) = if let Some(upper) = query.latest {
+            (upper, explorer.blocks(..upper.next()))
+        } else {
+            (explorer.height(), explorer.blocks(..))
+        };
+
+        let timed_blocks: Vec<_> = blocks_iter
+            .rev()
+            .filter(|block| !query.skip_empty_blocks || !block.is_empty())
+            .take(query.count)
+            .map(|block| {
+                let time = median_precommits_time(&block.precommits());
+                TimedBlock {
+                    block: block.into_header(),
+                    time,
+                }
+            }).collect();
+
+        let height = if timed_blocks.len() < query.count {
+            Height(0)
+        } else {
+            timed_blocks
+                .last()
+                .map_or(Height(0), |tb| tb.block.height())
+        };
+
+        Ok(TimedBlocksRange {
+            range: height..upper.next(),
+            timed_blocks,
+        })
+    }
+
     /// Returns the content for a block at a specific height.
     pub fn block(
         state: &ServiceApiState,
@@ -211,17 +278,55 @@ impl ExplorerApi {
         );
         api_scope
             .endpoint("v1/blocks", Self::blocks)
+            .endpoint("v1/blocks_with_time", Self::blocks_with_time)
             .endpoint("v1/block", Self::block)
             .endpoint("v1/transactions", Self::transaction_info)
     }
+
+    //    fn blocks_range(state: &ServiceApiState, query: BlocksQuery) -> Result<(Range<Height>, Vec<explorer::BlockInfo>), ApiError> {
+    //        let explorer = BlockchainExplorer::new(state.blockchain());
+    //        if query.count > MAX_BLOCKS_PER_REQUEST {
+    //            return Err(ApiError::BadRequest(format!(
+    //                "Max block count per request exceeded ({})",
+    //                MAX_BLOCKS_PER_REQUEST
+    //            )));
+    //        }
+    //
+    //        let (upper, blocks_iter) = if let Some(upper) = query.latest {
+    //            (upper, explorer.blocks(..upper.next()))
+    //        } else {
+    //            (explorer.height(), explorer.blocks(..))
+    //        };
+    //
+    //        let blocks: Vec<_> = blocks_iter
+    //            .rev()
+    //            .filter(|block| !query.skip_empty_blocks || !block.is_empty())
+    //            .take(query.count)
+    //            .collect();
+    //
+    //        let height = if blocks.len() < query.count {
+    //            Height(0)
+    //        } else {
+    //            blocks.last().map_or(Height(0), |info| info.header().height())
+    //        };
+    //
+    //        Ok((height..upper.next(), blocks))
+    //    }
 }
 
-impl<'a> From<::explorer::BlockInfo<'a>> for BlockInfo {
-    fn from(inner: ::explorer::BlockInfo<'a>) -> Self {
+impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
+    fn from(inner: explorer::BlockInfo<'a>) -> Self {
         Self {
             block: inner.header().clone(),
             precommits: inner.precommits().to_vec(),
             txs: inner.transaction_hashes().to_vec(),
+            time: median_precommits_time(&inner.precommits()),
         }
     }
+}
+
+fn median_precommits_time(precommits: &[Precommit]) -> DateTime<Utc> {
+    let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
+    times.sort();
+    times[times.len() / 2]
 }
