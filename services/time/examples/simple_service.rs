@@ -89,7 +89,7 @@ impl TxMarker {
         pk: &PublicKey,
         sc: &SecretKey,
     ) -> Message<RawTransaction> {
-        Protocol::sign_tx(TxMarker::new(mark, time), SERVICE_ID, *pk, sc)
+        Protocol::sign_transaction(TxMarker::new(mark, time), SERVICE_ID, *pk, sc)
     }
 }
 

@@ -1158,7 +1158,7 @@ mod tests {
     impl TxAfterCommit {
         pub fn new_with_height(height: Height) -> Message<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            Protocol::sign_tx(
+            Protocol::sign_transaction(
                 TxAfterCommit::new(height),
                 SERVICE_ID,
                 keypair.0,

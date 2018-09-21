@@ -184,7 +184,7 @@ mod tests {
     impl TxTimestamp {
         fn for_str(s: &str) -> Message<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            Protocol::sign_tx(
+            Protocol::sign_transaction(
                 TxTimestamp::new(&pubkey, s),
                 TIMESTAMP_SERVICE_ID,
                 pubkey,

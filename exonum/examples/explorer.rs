@@ -38,7 +38,7 @@ pub fn mempool_transaction() -> Message<RawTransaction> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    Protocol::sign_tx(
+    Protocol::sign_transaction(
         CreateWallet::new(&pk_alex, "Alex"),
         SERVICE_ID,
         pk_alex,
@@ -59,19 +59,19 @@ pub fn sample_blockchain() -> Blockchain {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Protocol::sign_tx(
+    let tx_alice = Protocol::sign_transaction(
         CreateWallet::new(&pk_alice, "Alice"),
         SERVICE_ID,
         pk_alice,
         &key_alice,
     );
-    let tx_bob = Protocol::sign_tx(
+    let tx_bob = Protocol::sign_transaction(
         CreateWallet::new(&pk_bob, "Bob"),
         SERVICE_ID,
         pk_bob,
         &key_bob,
     );
-    let tx_transfer = Protocol::sign_tx(
+    let tx_transfer = Protocol::sign_transaction(
         Transfer::new(&pk_alice, &pk_bob, 100),
         SERVICE_ID,
         pk_alice,

@@ -41,16 +41,16 @@ impl NodeHandler {
         }
 
         match msg {
-            Requests::ProposeRequest(msg) => self.handle_request_propose(msg),
-            Requests::TransactionsRequest(msg) => self.handle_request_txs(msg),
-            Requests::PrevotesRequest(msg) => self.handle_request_prevotes(msg),
-            Requests::PeersRequest(msg) => self.handle_request_peers(msg),
-            Requests::BlockRequest(msg) => self.handle_request_block(msg),
+            Requests::ProposeRequest(ref msg) => self.handle_request_propose(msg),
+            Requests::TransactionsRequest(ref msg) => self.handle_request_txs(msg),
+            Requests::PrevotesRequest(ref msg) => self.handle_request_prevotes(msg),
+            Requests::PeersRequest(ref msg) => self.handle_request_peers(msg),
+            Requests::BlockRequest(ref msg) => self.handle_request_block(msg),
         }
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: Message<ProposeRequest>) {
+    pub fn handle_request_propose(&mut self, msg: &Message<ProposeRequest>) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -70,7 +70,7 @@ impl NodeHandler {
     }
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: Message<TransactionsRequest>) {
+    pub fn handle_request_txs(&mut self, msg: &Message<TransactionsRequest>) {
         use std::mem;
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
@@ -106,7 +106,7 @@ impl NodeHandler {
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: Message<PrevotesRequest>) {
+    pub fn handle_request_prevotes(&mut self, msg: & Message<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -117,7 +117,7 @@ impl NodeHandler {
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
             .filter(|p| !has_prevotes[p.validator().into()])
-            .map(|p| p.clone())
+            .cloned()
             .collect::<Vec<_>>();
 
         for prevote in prevotes {
@@ -126,7 +126,7 @@ impl NodeHandler {
     }
 
     /// Handles `BlockRequest` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: Message<BlockRequest>) {
+    pub fn handle_request_block(&mut self, msg: &Message<BlockRequest>) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),

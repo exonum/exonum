@@ -61,7 +61,7 @@ transactions! {
 impl TxTime {
     #[doc(hidden)]
     pub fn sign(time: DateTime<Utc>, pk: &PublicKey, sc: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_tx(TxTime::new(time), SERVICE_ID, *pk, sc)
+        Protocol::sign_transaction(TxTime::new(time), SERVICE_ID, *pk, sc)
     }
 }
 

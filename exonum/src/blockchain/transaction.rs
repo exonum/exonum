@@ -81,8 +81,9 @@ impl TransactionMessage {
         &self.message
     }
     /// Returns transaction smart contract.
-    pub fn transaction(&self) -> Option<&Box<dyn Transaction>> {
-        self.transaction.as_ref()
+    pub fn transaction(&self) -> Option<&dyn Transaction> {
+        use std::ops::Deref;
+        self.transaction.as_ref().map(Deref::deref)
     }
     /// Create new `TransactionMessage` from raw message.
     pub(crate) fn new(
@@ -219,15 +220,13 @@ pub struct TransactionContext<'a> {
 impl<'a> TransactionContext<'a> {
     pub(crate) fn new(
         fork: &'a mut Fork,
-        service_id: u16,
-        tx_hash: Hash,
-        author: PublicKey,
+        raw_message: &Message<RawTransaction>
     ) -> Self {
         TransactionContext {
             fork,
-            service_id,
-            tx_hash,
-            author,
+            service_id: raw_message.service_id(),
+            tx_hash: raw_message.hash(),
+            author: raw_message.author(),
         }
     }
     /// Returns fork of current blockchain state.
@@ -903,7 +902,7 @@ mod tests {
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
             let transaction =
-                Protocol::sign_tx(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
+                Protocol::sign_transaction(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();

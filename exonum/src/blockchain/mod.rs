@@ -50,7 +50,7 @@ use vec_map::VecMap;
 
 use std::{
     collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
-    ops::Deref, panic, sync::Arc,
+    panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -147,13 +147,13 @@ impl Blockchain {
     /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(
         &self,
-        raw: &Message<RawTransaction>,
+        raw: RawTransaction,
     ) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
             .ok_or_else(|| MessageError::from("Service not found."))?;
-        service.tx_from_raw(raw.deref().clone())
+        service.tx_from_raw(raw)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -401,7 +401,7 @@ impl Blockchain {
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
 
-            let tx = self.tx_from_raw(&raw).or_else(|error| {
+            let tx = self.tx_from_raw(raw.payload().clone()).or_else(|error| {
                 Err(failure::err_msg(format!(
                     "Service <{}>: {}, tx: {:?}",
                     service_name,
@@ -416,7 +416,7 @@ impl Blockchain {
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let context =
-                TransactionContext::new(&mut *fork, raw.service_id(), raw.hash(), raw.author());
+                TransactionContext::new(&mut *fork, &raw);
             tx.execute(context)
         }));
 
@@ -464,7 +464,7 @@ impl Blockchain {
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
-    pub fn commit<'a, I>(
+    pub fn commit<I>(
         &mut self,
         patch: &Patch,
         block_hash: Hash,

@@ -667,7 +667,7 @@ impl<'a> BlockchainExplorer<'a> {
         BlockchainExplorer {
             snapshot: blockchain.snapshot(),
             transaction_parser: Box::new(move |raw| {
-                let tx = blockchain.tx_from_raw(&raw)?;
+                let tx = blockchain.tx_from_raw(raw.payload().clone())?;
                 Ok(TransactionMessage::new(raw, tx))
             }),
         }

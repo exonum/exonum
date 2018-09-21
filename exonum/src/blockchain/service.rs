@@ -196,7 +196,7 @@ pub trait Service: Send + Sync + 'static {
     /// has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn after_commit<'a>(&self, context: &ServiceContext) {}
+    fn after_commit(&self, context: &ServiceContext) {}
 
     /// Extends API by handlers of this service. The request handlers are mounted on
     /// the `/api/services/{service_name}` path at the listen address of every
@@ -305,7 +305,7 @@ impl ServiceContext {
         T: Into<ServiceTransaction> + Transaction,
     {
         let tx_process = move || -> Result<(), ::failure::Error> {
-            let msg = Protocol::sign_tx(
+            let msg = Protocol::sign_transaction(
                 tx,
                 self.service_id,
                 self.service_keypair.0,
