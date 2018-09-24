@@ -136,27 +136,27 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+    after_success: |
+      cd $TRAVIS_BUILD_DIR  
+      wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+      tar xzf master.tar.gz &&
+      cd kcov-master &&
+      mkdir build &&
+      cd build &&
+      cmake .. &&
+      make &&
+      make install DESTDIR=../../kcov-build &&
+      cd ../.. &&
+      rm -rf kcov-master &&
+      for file in target/debug/*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+      bash <(curl -s https://codecov.io/bash) &&
+      echo "Uploaded code coverage"
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
     rust: nightly-2018-05-26
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
-
-after_success: |
-  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-  tar xzf master.tar.gz &&
-  cd kcov-master &&
-  mkdir build &&
-  cd build &&
-  cmake .. &&
-  make &&
-  make install DESTDIR=../../kcov-build &&
-  cd ../.. &&
-  rm -rf kcov-master &&
-  for file in target/debug/*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-  bash <(curl -s https://codecov.io/bash) &&
-  echo "Uploaded code coverage"
 
 notifications:
   slack:
