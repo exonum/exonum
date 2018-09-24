@@ -15,6 +15,7 @@ addons:
     - libiberty-dev
     - libsnappy-dev
     - librocksdb
+    - cmake
 
 rust:
   # Feel free to bump this version if you need features of newer Rust.
@@ -136,8 +137,20 @@ jobs:
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
 
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+after_success: |
+  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+  tar xzf master.tar.gz &&
+  cd kcov-master &&
+  mkdir build &&
+  cd build &&
+  cmake .. &&
+  make &&
+  make install DESTDIR=../../kcov-build &&
+  cd ../.. &&
+  rm -rf kcov-master &&
+  for file in target/debug/*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+  bash <(curl -s https://codecov.io/bash) &&
+  echo "Uploaded code coverage"
 
 notifications:
   slack:
