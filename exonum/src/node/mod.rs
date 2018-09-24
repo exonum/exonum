@@ -1119,7 +1119,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Protocol::sign_tx(
+        let tx = Protocol::sign_transaction(
             TxSimple::new(&p_key, "Hello, World!"),
             SERVICE_ID,
             p_key,

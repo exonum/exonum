@@ -82,14 +82,14 @@ impl NodeHandler {
         trace!("Handle message={:?}", msg);
 
         match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, msg),
+            ConsensusMessage::Propose(ref msg) => self.handle_propose(key, msg),
+            ConsensusMessage::Prevote(ref msg) => self.handle_prevote(key, msg),
+            ConsensusMessage::Precommit(ref msg) => self.handle_precommit(key, msg),
         }
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
-    pub fn handle_propose(&mut self, from: PublicKey, msg: Message<Propose>) {
+    pub fn handle_propose(&mut self, from: PublicKey, msg: &Message<Propose>) {
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.validator())
@@ -198,7 +198,7 @@ impl NodeHandler {
 
     /// Handles the `Block` message. For details see the message documentation.
     // TODO: Write helper function which returns Result. (ECR-123)
-    pub fn handle_block(&mut self, msg: Message<BlockResponse>) -> Result<(), failure::Error> {
+    pub fn handle_block(&mut self, msg: &Message<BlockResponse>) -> Result<(), failure::Error> {
         self.validate_block_response(&msg)?;
 
         let block = msg.block();
@@ -312,7 +312,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: Message<Prevote>) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: & Message<Prevote>) {
         trace!("Handle prevote");
 
         debug_assert_eq!(
@@ -434,7 +434,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
-    pub fn handle_precommit(&mut self, from: PublicKey, msg: Message<Precommit>) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Message<Precommit>) {
         trace!("Handle precommit");
 
         debug_assert_eq!(
@@ -569,7 +569,7 @@ impl NodeHandler {
     /// Handles raw transactions.
     pub fn handle_txs_batch(
         &mut self,
-        msg: Message<TransactionsResponse>,
+        msg: &Message<TransactionsResponse>,
     ) -> Result<(), failure::Error> {
         if msg.to() != self.state.consensus_public_key() {
             bail!(

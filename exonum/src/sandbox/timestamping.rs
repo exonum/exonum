@@ -76,7 +76,7 @@ impl Iterator for TimestampingTxGenerator {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
         let buf = TimestampTx::new(&data);
-        Some(Protocol::sign_tx(
+        Some(Protocol::sign_transaction(
             buf,
             TIMESTAMPING_SERVICE,
             self.public_key,

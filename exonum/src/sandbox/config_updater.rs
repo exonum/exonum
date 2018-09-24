@@ -42,7 +42,7 @@ impl TxConfig {
         actual_from: Height,
         signer: &SecretKey,
     ) -> Message<RawTransaction> {
-        Protocol::sign_tx(
+        Protocol::sign_transaction(
             TxConfig::new(from, config, actual_from),
             CONFIG_SERVICE,
             *from,
