@@ -156,7 +156,11 @@ impl ExplorerApi {
         Ok(BlocksRange {
             range: height..upper.next(),
             blocks,
-            times: if query.add_blocks_time { Some(times) } else { None },
+            times: if query.add_blocks_time {
+                Some(times)
+            } else {
+                None
+            },
         })
     }
 
