@@ -50,7 +50,10 @@ impl<'a> CounterSchema<&'a mut Fork> {
     }
 
     fn inc_count(&mut self, inc: u64) -> u64 {
-        let count = self.count().unwrap_or(0).checked_add(inc).expect("attempt to add with overflow");
+        let count = self.count()
+            .unwrap_or(0)
+            .checked_add(inc)
+            .expect("attempt to add with overflow");
         self.entry_mut().set(count);
         count
     }
