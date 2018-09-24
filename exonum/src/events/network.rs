@@ -33,13 +33,44 @@ use events::{
 };
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
+use crypto::PublicKey;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ConnectionType {
+    Incoming,
+    Outgoing,
+}
+
+#[derive(Debug)]
+pub struct Connection {
+    connection_type: ConnectionType,
+    message: Connect,
+}
+
+impl Connection {
+    pub fn address(&self) -> SocketAddr {
+        self.message.addr()
+    }
+
+    pub fn public_key(&self) -> &PublicKey {
+        self.message.pub_key()
+    }
+
+    pub fn connect(&self) -> &Connect {
+        &self.message
+    }
+
+    pub fn connection_type(&self) -> ConnectionType {
+        self.connection_type
+    }
+}
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(SocketAddr, Connect),
+    PeerConnected(SocketAddr, Connection),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -163,21 +194,21 @@ impl ConnectionPool {
     }
 }
 
-struct Connection {
+struct ConnectionParams {
     handle: Handle,
     address: SocketAddr,
     socket: Framed<TcpStream, MessagesCodec>,
     receiver_rx: mpsc::Receiver<RawMessage>,
 }
 
-impl Connection {
+impl ConnectionParams {
     fn new(
         handle: Handle,
         address: SocketAddr,
         socket: Framed<TcpStream, MessagesCodec>,
         receiver_rx: mpsc::Receiver<RawMessage>,
     ) -> Self {
-        Connection {
+        ConnectionParams {
             handle,
             address,
             socket,
@@ -260,9 +291,13 @@ impl NetworkHandler {
                         Ok((pool, socket, message, receiver_rx))
                     })
                     .and_then(move |(pool, socket, message, receiver_rx)| {
-                        let connection =
-                            Connection::new(handle, message.addr(), socket, receiver_rx);
-                        Self::handle_connection(connection, pool, message, &network_tx)
+                        let connection_params =
+                            ConnectionParams::new(handle, message.addr(), socket, receiver_rx);
+                        let connection = Connection {
+                            message: message,
+                            connection_type: ConnectionType::Incoming,
+                        };
+                        Self::handle_connection(connection_params, connection, pool, &network_tx)
                     })
                     .map(|_| {
                         drop(holder);
@@ -304,8 +339,13 @@ impl NetworkHandler {
             })
             .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
             .and_then(move |(socket, message)| {
-                let connection = Connection::new(handle.clone(), address, socket, receiver_rx);
-                Self::handle_connection(connection, pool, message, &network_tx)
+                let connection_params =
+                    ConnectionParams::new(handle.clone(), address, socket, receiver_rx);
+                let connection = Connection {
+                    message,
+                    connection_type: ConnectionType::Outgoing,
+                };
+                Self::handle_connection(connection_params, connection, pool, &network_tx)
             })
             .map(drop)
     }
@@ -313,7 +353,7 @@ impl NetworkHandler {
     fn process_messages(
         pool: &ConnectionPool,
         handle: &Handle,
-        connection: Connection,
+        connection: ConnectionParams,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> Result<(), failure::Error> {
         let (sink, stream) = connection.socket.split();
@@ -379,16 +419,20 @@ impl NetworkHandler {
     }
 
     fn handle_connection(
+        connection_params: ConnectionParams,
         connection: Connection,
         pool: ConnectionPool,
-        message: Connect,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = failure::Error> {
-        trace!("Established connection with peer={}", connection.address);
-        let handle = connection.handle.clone();
-        Self::send_peer_connected_event(&connection.address, message, &network_tx).and_then(
-            move |network_tx| Self::process_messages(&pool, &handle, connection, &network_tx),
-        )
+        trace!(
+            "Established connection with peer={}",
+            connection_params.address
+        );
+        let handle = connection_params.handle.clone();
+        Self::send_peer_connected_event(&connection_params.address, connection, &network_tx)
+            .and_then(move |network_tx| {
+                Self::process_messages(&pool, &handle, connection_params, &network_tx)
+            })
     }
 
     fn parse_connect_msg(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
@@ -416,7 +460,9 @@ impl NetworkHandler {
                 NetworkRequest::SendMessage(address, message) => {
                     to_box(self.handle_send_message(&address, message))
                 }
-                NetworkRequest::DisconnectWithPeer(peer) => to_box(self.pool.disconnect_with_peer(&peer, &self.network_tx)),
+                NetworkRequest::DisconnectWithPeer(peer) => {
+                    to_box(self.pool.disconnect_with_peer(&peer, &self.network_tx))
+                }
                 NetworkRequest::Shutdown => to_box(
                     cancel_sender
                         .take()
@@ -468,10 +514,10 @@ impl NetworkHandler {
 
     fn send_peer_connected_event(
         address: &SocketAddr,
-        message: Connect,
+        connection: Connection,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> {
-        let peer_connected = NetworkEvent::PeerConnected(*address, message);
+        let peer_connected = NetworkEvent::PeerConnected(*address, connection);
         network_tx
             .clone()
             .send(peer_connected)

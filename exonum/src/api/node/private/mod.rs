@@ -92,7 +92,7 @@ struct IncomingConnection {
 
 #[derive(Serialize, Deserialize)]
 struct PeersInfo {
-    incoming_connections: Vec<SocketAddr>,
+    incoming_connections: Vec<ConnectInfo>,
     outgoing_connections: HashMap<SocketAddr, IncomingConnection>,
 }
 
@@ -134,9 +134,20 @@ impl SystemApi {
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
-            for socket in self.shared_api_state.outgoing_connections() {
-                outgoing_connections.insert(socket, Default::default());
+            for connect_info in self.shared_api_state.outgoing_connections() {
+                outgoing_connections.insert(
+                    connect_info.address,
+                    IncomingConnection {
+                        public_key: Some(connect_info.public_key),
+                        state: Default::default(),
+                    },
+                );
             }
+
+            info!(
+                "shared_api_state.reconnects_timeout() {:?}",
+                self.shared_api_state.reconnects_timeout()
+            );
 
             for (s, delay) in self.shared_api_state.reconnects_timeout() {
                 outgoing_connections
@@ -144,13 +155,13 @@ impl SystemApi {
                     .or_insert_with(Default::default)
                     .state = IncomingConnectionState::Reconnect(ReconnectInfo { delay });
             }
-
-            for (s, p) in self.shared_api_state.peers_info() {
-                outgoing_connections
-                    .entry(s)
-                    .or_insert_with(Default::default)
-                    .public_key = Some(p);
-            }
+            //
+            //            for (s, p) in self.shared_api_state.peers_info() {
+            //                outgoing_connections
+            //                    .entry(s)
+            //                    .or_insert_with(Default::default)
+            //                    .public_key = Some(p);
+            //            }
 
             Ok(PeersInfo {
                 incoming_connections: self.shared_api_state.incoming_connections(),

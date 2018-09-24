@@ -796,7 +796,7 @@ where
 }
 
 /// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ConnectInfo {
     /// Peer address.
     #[serde(deserialize_with = "deserialize_socket_address")]
