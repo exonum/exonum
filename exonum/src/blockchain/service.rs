@@ -304,17 +304,14 @@ impl ServiceContext {
     where
         T: Into<ServiceTransaction> + Transaction,
     {
-        let tx_process = move || -> Result<(), ::failure::Error> {
-            let msg = Protocol::sign_transaction(
-                tx,
-                self.service_id,
-                self.service_keypair.0,
-                &self.service_keypair.1,
-            );
-            self.api_sender.broadcast_transaction(msg)
-        };
+        let msg = Protocol::sign_transaction(
+            tx,
+            self.service_id,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        );
 
-        if let Err(e) = tx_process() {
+        if let Err(e) = self.api_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }
     }
