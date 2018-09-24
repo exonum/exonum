@@ -155,13 +155,6 @@ impl SystemApi {
                     .or_insert_with(Default::default)
                     .state = IncomingConnectionState::Reconnect(ReconnectInfo { delay });
             }
-            //
-            //            for (s, p) in self.shared_api_state.peers_info() {
-            //                outgoing_connections
-            //                    .entry(s)
-            //                    .or_insert_with(Default::default)
-            //                    .public_key = Some(p);
-            //            }
 
             Ok(PeersInfo {
                 incoming_connections: self.shared_api_state.incoming_connections(),
