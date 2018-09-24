@@ -479,7 +479,7 @@ impl NetworkHandler {
     }
 
     fn can_create_connections(&self) -> bool {
-        self.pool.len() <= self.network_config.max_outgoing_connections
+        self.pool.len() < self.network_config.max_outgoing_connections
     }
 
     fn send_unable_connect_event(
