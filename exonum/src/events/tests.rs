@@ -89,7 +89,7 @@ impl TestHandler {
 
     pub fn wait_for_connect(&mut self) -> Connect {
         match self.wait_for_event() {
-            Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
+            Ok(NetworkEvent::PeerConnected(_addr, connection)) => connection.connect().clone(),
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
             Err(e) => panic!("An error during wait for connect occurred, {:?}", e),
         }

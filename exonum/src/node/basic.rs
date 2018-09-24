@@ -48,7 +48,6 @@ impl NodeHandler {
         // TODO: drop connection if checks have failed. (ECR-1837)
         info!("Received Connect message from peer: {:?}", peer_address);
         let message = connection.connect().clone();
-        let connection_type = connection.connection_type();
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
             trace!("Received Connect with same address as our external_address.");
@@ -131,9 +130,6 @@ impl NodeHandler {
         }
         self.blockchain.remove_peer_with_addr(&address);
     }
-
-    /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connection(&mut self, connection: Connection) {}
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.

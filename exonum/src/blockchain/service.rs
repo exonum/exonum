@@ -428,12 +428,10 @@ impl SharedNodeState {
             lock.peers_info.insert(c.addr(), *p);
         }
 
-        info!("state.connections {:?}", state.connections());
-
         for (address, c) in state.connections() {
             let connect_info = ConnectInfo {
                 address: *address,
-                public_key: *c.connect().pub_key(),
+                public_key: *c.public_key(),
             };
             match c.connection_type() {
                 ConnectionType::Incoming => lock.incoming_connections.insert(connect_info),

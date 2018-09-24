@@ -28,12 +28,12 @@ use tokio_retry::{
 use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
 
 use super::{error::log_error, to_box};
+use crypto::PublicKey;
 use events::{
     codec::MessagesCodec, error::into_failure, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-use crypto::PublicKey;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -294,7 +294,7 @@ impl NetworkHandler {
                         let connection_params =
                             ConnectionParams::new(handle, message.addr(), socket, receiver_rx);
                         let connection = Connection {
-                            message: message,
+                            message,
                             connection_type: ConnectionType::Incoming,
                         };
                         Self::handle_connection(connection_params, connection, pool, &network_tx)
