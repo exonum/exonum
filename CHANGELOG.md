@@ -63,6 +63,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   calculations in Exonum Java Bindings, but can be used for debug purposes
   as well. (#918)
 
+- Now peers require only one connection to exchange messages between
+  them. (#945)
+
 ### Bug Fixes
 
 #### exonum
@@ -113,6 +116,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - The `finalize` command now does not include the node itself as its own
   trusted peer in the generated configuration. (#892)
+
+- Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
 
 ## 0.9.1 - 2018-08-02
 

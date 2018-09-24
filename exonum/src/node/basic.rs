@@ -127,6 +127,7 @@ impl NodeHandler {
         self.blockchain.save_peer(&public_key, message);
         if need_connect {
             info!("Send Connect message to {}", address);
+            //TODO: remove responding connect [ECR-2385]
             self.connect(&address);
         }
     }
