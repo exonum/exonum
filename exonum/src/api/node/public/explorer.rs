@@ -76,6 +76,7 @@ pub struct BlocksQuery {
     pub skip_empty_blocks: bool,
     /// If true, then `BlocksRange`'s `times` field will contain median time from the
     /// corresponding blocks precommits.
+    #[serde(default)]
     pub add_blocks_time: bool,
 }
 
