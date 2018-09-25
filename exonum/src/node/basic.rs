@@ -32,7 +32,7 @@ impl NodeHandler {
             Ok(Any::Transaction(msg)) => self.handle_tx(&msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
             Ok(Any::Connect(_)) => {
-                //Connec messages now handled only with PeerConnected event.
+                //Connect messages now handled only with PeerConnected event.
             }
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
