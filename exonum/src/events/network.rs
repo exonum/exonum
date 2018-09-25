@@ -45,8 +45,8 @@ pub enum ConnectionType {
 
 #[derive(Debug)]
 pub struct Connection {
-    connection_type: ConnectionType,
-    message: Connect,
+    pub connection_type: ConnectionType,
+    pub message: Connect,
 }
 
 impl Connection {

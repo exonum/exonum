@@ -17,7 +17,7 @@ use rand::{self, Rng};
 use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, NodeRole, RequestData};
-use events::network::Connection;
+use events::network::{Connection, ConnectionType};
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
@@ -25,19 +25,29 @@ impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, raw: RawMessage) {
         match Any::from_raw(raw) {
+            Ok(Any::Connect(msg)) => self.handle_connect(msg),
             Ok(Any::Status(msg)) => self.handle_status(&msg),
             Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
             Ok(Any::Request(msg)) => self.handle_request(msg),
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(&msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
-            Ok(Any::Connect(_)) => {
-                //Connect messages now handled only with PeerConnected event.
-            }
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
             }
         }
+    }
+
+    /// Handles the `Connect` message and connects to a peer as result.
+    pub fn handle_connect(&mut self, message: Connect) {
+        let address = message.addr();
+        self.handle_connected(
+            &address,
+            Connection {
+                message,
+                connection_type: ConnectionType::Incoming,
+            },
+        )
     }
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
