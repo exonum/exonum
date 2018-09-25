@@ -139,13 +139,12 @@ impl ExplorerApi {
             .rev()
             .filter(|block| !query.skip_empty_blocks || !block.is_empty())
             .take(query.count)
-            .map(|block| {
+            .inspect(|block| {
                 if query.add_blocks_time {
                     times.push(median_precommits_time(&block.precommits()));
                 }
-
-                block.into_header()
             })
+            .map(|block| block.into_header())
             .collect();
 
         let height = if blocks.len() < query.count {
@@ -250,7 +249,7 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
 }
 
 fn median_precommits_time(precommits: &[Precommit]) -> DateTime<Utc> {
-    debug_assert!(precommits.is_empty(), "Precommits cannot be empty");
+    debug_assert!(!precommits.is_empty(), "Precommits cannot be empty");
     let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
     times.sort();
     times[times.len() / 2]
