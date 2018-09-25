@@ -387,7 +387,7 @@ fn test_network_max_message_len() {
     assert_eq!(e2.wait_for_message(), acceptable_message);
 
     e2.send_to(first, too_big_message.clone());
-    assert!(e1.wait_for_event().is_err());
+    assert_eq!(e1.wait_for_disconnect(), second);
 }
 
 #[test]
@@ -421,7 +421,6 @@ fn test_network_reconnect() {
     e1.send_to(second, msg.clone());
     assert_eq!(e2.wait_for_message(), msg);
 
-    e1.disconnect_with(second);
     drop(e2);
     assert_eq!(e1.wait_for_disconnect(), second);
 
