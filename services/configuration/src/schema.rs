@@ -57,10 +57,10 @@ lazy_static! {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "vote_for", rename_all = "lowercase")]
 pub enum VotingDecision {
-    /// `Vote` transaction variant.
-    Yea(Vote),
-    /// `VoteAgainst` transaction variant.
-    Nay(VoteAgainst),
+    /// `Vote` transaction `Hash` variant.
+    Yea(Hash),
+    /// `VoteAgainst` transaction `Hash` variant.
+    Nay(Hash),
 }
 
 impl CryptoHash for VotingDecision {

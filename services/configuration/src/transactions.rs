@@ -38,11 +38,6 @@ transactions! {
         ///
         /// [`ErrorCode`]: enum.ErrorCode.html
         struct Propose {
-            /// Sender of the transaction.
-            ///
-            /// Should be one of validators as per the active configuration.
-            from: &PublicKey,
-
             /// Configuration in JSON format.
             ///
             /// Should be convertible into `StoredConfiguration`.
@@ -62,11 +57,6 @@ transactions! {
         /// [`MaybeVote`]: struct.MaybeVote.html
         /// [`ErrorCode`]: enum.ErrorCode.html
         struct Vote {
-            /// Sender of the transaction.
-            ///
-            /// Should be one of validators as per the active configuration.
-            from: &PublicKey,
-
             /// Hash of the configuration that this vote is for.
             ///
             /// See [crate docs](index.html) for more details on how the hash is calculated.
@@ -86,11 +76,6 @@ transactions! {
         /// [`MaybeVote`]: struct.MaybeVote.html
         /// [`ErrorCode`]: enum.ErrorCode.html
         struct VoteAgainst {
-            /// Sender of the transaction.
-            ///
-            /// Should be one of validators as per the active configuration.
-            from: &PublicKey,
-
             /// Hash of the configuration that this vote is for.
             ///
             /// See [crate docs](index.html) for more details on how the hash is calculated.
@@ -260,32 +245,15 @@ impl Transaction for Propose {
     }
 }
 
-enum VotingDecisionRef<'a> {
-    Vote(&'a Vote),
-    VoteAgainst(&'a VoteAgainst),
+struct VotingDecisionContext {
+    decision: VotingDecision,
+    author: PublicKey,
+    cfg_hash: Hash,
+
+
 }
 
-impl<'a> VotingDecisionRef<'a> {
-    fn sender(&self) -> &PublicKey {
-        match *self {
-            VotingDecisionRef::Vote(vote) => vote.from(),
-            VotingDecisionRef::VoteAgainst(vote) => vote.from(),
-        }
-    }
-
-    fn cfg_hash(&self) -> &Hash {
-        match *self {
-            VotingDecisionRef::Vote(vote) => vote.cfg_hash(),
-            VotingDecisionRef::VoteAgainst(vote) => vote.cfg_hash(),
-        }
-    }
-
-    fn to_maybe_vote(&self) -> MaybeVote {
-        match *self {
-            VotingDecisionRef::Vote(vote) => MaybeVote::from(vote.clone()),
-            VotingDecisionRef::VoteAgainst(vote) => MaybeVote::from(vote.clone()),
-        }
-    }
+impl VotingDecisionRef {
 
     /// Checks context-dependent conditions for a `Vote`/`VoteAgainst` transaction.
     ///
