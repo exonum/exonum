@@ -392,7 +392,6 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// transactions! {
 ///     Transactions {
 ///         struct CreateWallet {
-///             public_key: &PublicKey,
 ///             name: &str,
 ///         }
 ///         // other transaction types...
@@ -403,18 +402,17 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # }
 ///
 /// # fn main() {
+/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
+///                     ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
+///                     46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
+///                     ac2800000005000000416c69636574556b9b7172b7072c\
+///                     75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
+///                     bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
+///                     e4e6ba44e284416f0f";
 /// let json = json!({
 ///     "content": {
-///         "protocol_version": 0,
-///         "service_id": 1000,
-///         "message_id": 0,
-///         "body": {
-///             "public_key": // ...
-/// #                         PublicKey::zero(),
-///             "name": "Alice"
-///         },
-///         "signature": // ...
-/// #                    Signature::zero()
+///         "message": //...
+///                     message,
 ///     },
 ///     "location": { "block_height": "1", "position_in_block": "0" },
 ///     "location_proof": // ...
@@ -422,10 +420,9 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///     "status": { "type": "success" }
 /// });
 ///
-/// let parsed: CommittedTransaction<CreateWallet> =
+/// let parsed: CommittedTransaction =
 ///     serde_json::from_value(json).unwrap();
 /// assert_eq!(parsed.location().block_height(), Height(1));
-/// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
@@ -573,25 +570,23 @@ impl CommittedTransaction {
 /// # }
 ///
 /// # fn main() {
+/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
+///                     ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
+///                     46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
+///                     ac2800000005000000416c69636574556b9b7172b7072c\
+///                     75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
+///                     bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
+///                     e4e6ba44e284416f0f";
 /// let json = json!({
 ///     "type": "in-pool",
 ///     "content": {
-///         "protocol_version": 0,
-///         "service_id": 1000,
-///         "message_id": 0,
-///         "body": {
-///             "public_key": // ...
-/// #                         PublicKey::zero(),
-///             "name": "Alice"
-///         },
-///         "signature": // ...
-/// #                    Signature::zero()
+///         "message": // ...
+/// #                   message
 ///     }
 /// });
 ///
-/// let parsed: TransactionInfo<CreateWallet> = serde_json::from_value(json).unwrap();
+/// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
 /// assert!(parsed.is_in_pool());
-/// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
