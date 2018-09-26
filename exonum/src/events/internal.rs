@@ -57,19 +57,6 @@ impl InternalPart {
             let event = future::ok(InternalEvent::MessageVerified(protocol));
             Self::send_event(event, internal_tx)
         })
-
-
-//        future::lazy(move || {
-//            let handler = move || -> Result<Protocol, failure::Error> {
-//                Protocol::deserialize(SignedMessage::from_raw_buffer(raw)?)
-//            };
-//            if let Ok(protocol) = handler() {
-//                let event = future::ok(InternalEvent::MessageVerified(protocol));
-//                Either::A(Self::send_event(event, internal_tx))
-//            } else {
-//                Either::B(future::ok(()))
-//            }
-//        })
     }
 
     /// Represents a task that processes Internal Requests and produces Internal Events.
