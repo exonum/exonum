@@ -22,6 +22,7 @@ use std::{
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use env_logger;
 use events::{
     error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
@@ -63,26 +64,26 @@ impl TestHandler {
         event.ok_or(())
     }
 
-    pub fn disconnect_with(&self, addr: SocketAddr) {
+    pub fn disconnect_with(&self, key: PublicKey) {
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::DisconnectWithPeer(addr))
+            .send(NetworkRequest::DisconnectWithPeer(key))
             .wait()
             .unwrap();
     }
 
-    pub fn connect_with(&self, addr: SocketAddr, connect: Connect) {
+    pub fn connect_with(&self, key: PublicKey, connect: Connect) {
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
+            .send(NetworkRequest::SendMessage(key, connect.raw().clone()))
             .wait()
             .unwrap();
     }
 
-    pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
+    pub fn send_to(&self, key: PublicKey, raw: RawMessage) {
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(addr, raw))
+            .send(NetworkRequest::SendMessage(key, raw))
             .wait()
             .unwrap();
     }
@@ -95,7 +96,7 @@ impl TestHandler {
         }
     }
 
-    pub fn wait_for_disconnect(&mut self) -> SocketAddr {
+    pub fn wait_for_disconnect(&mut self) -> PublicKey {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerDisconnected(addr)) => addr,
             Ok(other) => panic!("Unexpected disconnect received, {:?}", other),
@@ -105,7 +106,7 @@ impl TestHandler {
 
     pub fn wait_for_message(&mut self) -> RawMessage {
         match self.wait_for_event() {
-            Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
+            Ok(NetworkEvent::MessageReceived(msg)) => msg,
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
@@ -134,14 +135,16 @@ pub struct TestEvents {
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub events_config: EventsPoolCapacity,
+    pub connect_list: SharedConnectList,
 }
 
 impl TestEvents {
-    pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
+    pub fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> TestEvents {
         TestEvents {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
+            connect_list: connect_list.clone(),
         }
     }
 
@@ -170,6 +173,7 @@ impl TestEvents {
             max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
             network_requests: channel.network_requests,
             network_tx: network_tx.clone(),
+            connect_list: self.connect_list,
         };
 
         let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
@@ -213,7 +217,7 @@ impl HandshakeParams {
     #[doc(hidden)]
     pub fn with_default_params() -> Self {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-        let address = "127.0.0.1:8000".parse().unwrap();
+        let address = "127.0.0.1:8000";
 
         let connect = Connect::new(
             &public_key,
@@ -276,30 +280,30 @@ fn test_network_handshake() {
     let mut connect_list = ConnectList::default();
 
     let mut t1 = ConnectionParams::from_address(first);
+    let first_key = t1.connect_info.public_key;
     connect_list.add(t1.connect_info.clone());
 
     let mut t2 = ConnectionParams::from_address(second);
+    let second_key = t2.connect_info.public_key;
     connect_list.add(t2.connect_info.clone());
 
-    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
-    connect_list.resolve_and_cache_peer_address(&first.to_string());
-    connect_list.resolve_and_cache_peer_address(&second.to_string());
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
 
-    let e1 = TestEvents::with_addr(first);
-    let e2 = TestEvents::with_addr(second);
+    let e1 = TestEvents::with_addr(first, &connect_list);
+    let e2 = TestEvents::with_addr(second, &connect_list);
 
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
     assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
-    e1.disconnect_with(second);
-    assert_eq!(e1.wait_for_disconnect(), second);
+    e1.disconnect_with(second_key);
+    assert_eq!(e1.wait_for_disconnect(), second_key);
 
-    e2.disconnect_with(first);
-    assert_eq!(e2.wait_for_disconnect(), first);
+    e2.disconnect_with(first_key);
+    assert_eq!(e2.wait_for_disconnect(), first_key);
 }
 
 #[test]
@@ -313,53 +317,56 @@ fn test_network_big_message() {
     let mut connect_list = ConnectList::default();
 
     let mut t1 = ConnectionParams::from_address(first);
+    let first_key = t1.connect_info.public_key;
     connect_list.add(t1.connect_info.clone());
 
     let mut t2 = ConnectionParams::from_address(second);
+    let second_key = t2.connect_info.public_key;
     connect_list.add(t2.connect_info.clone());
 
     let mut connect_list = SharedConnectList::from_connect_list(connect_list);
     connect_list.resolve_and_cache_peer_address(&first.to_string());
     connect_list.resolve_and_cache_peer_address(&second.to_string());
 
-    let e1 = TestEvents::with_addr(first);
-    let e2 = TestEvents::with_addr(second);
+    let e1 = TestEvents::with_addr(first, &connect_list);
+    let e2 = TestEvents::with_addr(second, &connect_list);
 
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect.clone());
 
     e2.wait_for_connect();
     e1.wait_for_connect();
 
-    e1.send_to(second, m1.clone());
+    e1.send_to(second_key, m1.clone());
     assert_eq!(e2.wait_for_message(), m1);
 
-    e1.send_to(second, m2.clone());
+    e1.send_to(second_key, m2.clone());
     assert_eq!(e2.wait_for_message(), m2);
 
-    e1.send_to(second, m1.clone());
+    e1.send_to(second_key, m1.clone());
     assert_eq!(e2.wait_for_message(), m1);
 
-    e2.send_to(first, m2.clone());
+    e2.send_to(first_key, m2.clone());
     assert_eq!(e1.wait_for_message(), m2);
 
-    e2.send_to(first, m1.clone());
+    e2.send_to(first_key, m1.clone());
     assert_eq!(e1.wait_for_message(), m1);
 
-    e2.send_to(first, m2.clone());
+    e2.send_to(first_key, m2.clone());
     assert_eq!(e1.wait_for_message(), m2);
 
-    e1.disconnect_with(second);
-    assert_eq!(e1.wait_for_disconnect(), second);
+    e1.disconnect_with(second_key);
+    assert_eq!(e1.wait_for_disconnect(), second_key);
 
-    e2.disconnect_with(first);
-    assert_eq!(e2.wait_for_disconnect(), first);
+    e2.disconnect_with(first_key);
+    assert_eq!(e2.wait_for_disconnect(), first_key);
 }
 
 #[test]
 fn test_network_max_message_len() {
+    let _ = env_logger::try_init();
     let first = "127.0.0.1:17202".parse().unwrap();
     let second = "127.0.0.1:17303".parse().unwrap();
 
@@ -372,27 +379,31 @@ fn test_network_max_message_len() {
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info.clone());
+    let first_key = t1.connect_info.public_key;
+
     let mut t2 = ConnectionParams::from_address(second);
     connect_list.add(t2.connect_info.clone());
+    let second_key = t2.connect_info.public_key;
+
     let mut connect_list = SharedConnectList::from_connect_list(connect_list);
     connect_list.resolve_and_cache_peer_address(&first.to_string());
     connect_list.resolve_and_cache_peer_address(&second.to_string());
 
-    let e1 = TestEvents::with_addr(first);
-    let e2 = TestEvents::with_addr(second);
+    let e1 = TestEvents::with_addr(first, &connect_list);
+    let e2 = TestEvents::with_addr(second, &connect_list);
 
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect.clone());
 
     e2.wait_for_connect();
     e1.wait_for_connect();
 
-    e1.send_to(second, acceptable_message.clone());
+    e1.send_to(second_key, acceptable_message.clone());
     assert_eq!(e2.wait_for_message(), acceptable_message);
 
-    e2.send_to(first, too_big_message.clone());
+    e2.send_to(first_key, too_big_message.clone());
     assert!(e1.wait_for_event().is_err());
 }
 
@@ -408,13 +419,15 @@ fn test_network_reconnect() {
     connect_list.add(t1.connect_info.clone());
 
     let mut t2 = ConnectionParams::from_address(second);
+    let second_key = t2.connect_info.public_key;
     connect_list.add(t2.connect_info.clone());
+
     let mut connect_list = SharedConnectList::from_connect_list(connect_list);
     connect_list.resolve_and_cache_peer_address(&first.to_string());
     connect_list.resolve_and_cache_peer_address(&second.to_string());
 
-    let e1 = TestEvents::with_addr(first);
-    let e2 = TestEvents::with_addr(second);
+    let e1 = TestEvents::with_addr(first, &connect_list);
+    let e2 = TestEvents::with_addr(second, &connect_list);
 
     let mut e1 = t1.spawn(e1, connect_list.clone());
 
@@ -422,30 +435,30 @@ fn test_network_reconnect() {
     let mut e2 = t2.spawn(e2, connect_list.clone());
 
     // Handle first attempt.
-    e1.connect_with(second, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
     assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
-    e1.send_to(second, msg.clone());
+    e1.send_to(second_key, msg.clone());
     assert_eq!(e2.wait_for_message(), msg);
 
-    e1.disconnect_with(second);
+    e1.disconnect_with(second_key);
     drop(e2);
-    assert_eq!(e1.wait_for_disconnect(), second);
+    assert_eq!(e1.wait_for_disconnect(), second_key);
 
     // Handle second attempt.
-    let e2 = TestEvents::with_addr(second);
+    let e2 = TestEvents::with_addr(second, &connect_list);
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect.clone());
     assert_eq!(e2.wait_for_connect(), t1.connect.clone());
     assert_eq!(e1.wait_for_connect(), t2.connect.clone());
 
-    e1.send_to(second, msg.clone());
+    e1.send_to(second_key, msg.clone());
     assert_eq!(e2.wait_for_message(), msg);
 
-    e1.disconnect_with(second);
-    assert_eq!(e1.wait_for_disconnect(), second);
+    e1.disconnect_with(second_key);
+    assert_eq!(e1.wait_for_disconnect(), second_key);
 }
 
 #[test]
@@ -471,11 +484,13 @@ fn test_network_multiple_connect() {
     }
 
     let mut t1 = ConnectionParams::from_address(main);
-    let events = TestEvents::with_addr(t1.address);
+    let main_key = t1.connect_info.public_key;
 
     connect_list.add(t1.connect_info.clone());
 
     let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    let events = TestEvents::with_addr(t1.address, &connect_list);
+
     connect_list.resolve_and_cache_peer_address(&main.to_string());
     for a in &nodes {
         connect_list.resolve_and_cache_peer_address(&a.to_string());
@@ -486,22 +501,22 @@ fn test_network_multiple_connect() {
     let connectors: Vec<_> = connection_params
         .iter_mut()
         .map(|params| {
-            let events = TestEvents::with_addr(params.address);
+            let events = TestEvents::with_addr(params.address, &connect_list);
             params.spawn(events, connect_list.clone())
         })
         .collect();
 
-    connectors[0].connect_with(main, connection_params[0].connect.clone());
+    connectors[0].connect_with(main_key, connection_params[0].connect.clone());
     assert_eq!(
         node.wait_for_connect(),
         connection_params[0].connect.clone()
     );
-    connectors[1].connect_with(main, connection_params[1].connect.clone());
+    connectors[1].connect_with(main_key, connection_params[1].connect.clone());
     assert_eq!(
         node.wait_for_connect(),
         connection_params[1].connect.clone()
     );
-    connectors[2].connect_with(main, connection_params[2].connect.clone());
+    connectors[2].connect_with(main_key, connection_params[2].connect.clone());
     assert_eq!(
         node.wait_for_connect(),
         connection_params[2].connect.clone()
@@ -515,6 +530,7 @@ fn test_send_first_not_connect() {
 
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(main);
+    let main_key = t1.connect_info.public_key;
     connect_list.add(t1.connect_info.clone());
     let mut t2 = ConnectionParams::from_address(other);
     connect_list.add(t2.connect_info.clone());
@@ -522,14 +538,14 @@ fn test_send_first_not_connect() {
     connect_list.resolve_and_cache_peer_address(&main.to_string());
     connect_list.resolve_and_cache_peer_address(&other.to_string());
 
-    let node = TestEvents::with_addr(main);
-    let other_node = TestEvents::with_addr(other);
+    let node = TestEvents::with_addr(main, &connect_list);
+    let other_node = TestEvents::with_addr(other, &connect_list);
 
     let mut node = t1.spawn(node, connect_list.clone());
     let other_node = t2.spawn(other_node, connect_list.clone());
 
     let message = raw_message(11, 1000);
-    other_node.send_to(main, message.clone()); // should connect before send message
+    other_node.send_to(main_key, message.clone()); // should connect before send message
 
     assert_eq!(node.wait_for_connect(), t2.connect);
     assert_eq!(node.wait_for_message(), message);

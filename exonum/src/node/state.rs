@@ -25,11 +25,14 @@ use std::{
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use events::network::ConnectedPeerAddr;
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
 };
-use node::{connect_list::ConnectList, ConnectInfo};
+use node::{
+    connect_list::{ConnectList, PeerAddress}, ConnectInfo,
+};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -59,7 +62,7 @@ pub struct State {
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
-    connections: HashMap<SocketAddr, PublicKey>,
+    connections: HashMap<PublicKey, ConnectedPeerAddr>,
     height_start_time: SystemTime,
     height: Height,
 
@@ -400,9 +403,11 @@ impl SharedConnectList {
     }
 
     /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
+    pub fn find_key_by_address(&self, address: &str) -> Option<PublicKey> {
         let connect_list = self.inner.read().expect("ConnectList read lock");
-        connect_list.find_key_by_resolved_address(address).cloned()
+        connect_list
+            .find_key_by_unresolved_address(address)
+            .cloned()
     }
 
     /// Return `peers` from underlying `ConnectList`
@@ -417,6 +422,18 @@ impl SharedConnectList {
                 public_key: *pk,
             })
             .collect()
+    }
+
+    /// Update peer address in the connect list.
+    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+        let mut conn_list = self.inner.write().expect("ConnectList write lock");
+        conn_list.update_peer(public_key, address);
+    }
+
+    /// Get peer address using public key.
+    pub fn find_address_by_key(&self, public_key: &PublicKey) -> Option<PeerAddress> {
+        let connect_list = self.inner.read().expect("ConnectList read lock");
+        connect_list.find_address_by_pubkey(public_key).cloned()
     }
 
     /// Resolves peer network address and stores result.
@@ -578,25 +595,23 @@ impl State {
 
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        let mut addr = self.get_resolved_peer_address(msg.pub_addr());
-        if addr.is_none() {
-            addr = self.resolve_and_cache_peer_address(msg.pub_addr());
-        }
-        let addr = addr.expect("Fail to add peer with unknown address");
-        self.connections.insert(addr, pubkey);
         self.peers.insert(pubkey, msg).is_none()
+    }
+
+    /// Add connection to the connection list.
+    pub fn add_connection(&mut self, pubkey: PublicKey, address: ConnectedPeerAddr) {
+        self.connections.insert(pubkey, address);
     }
 
     /// Removes a peer by the socket address. Returns `Some` (connect message) of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<Connect> {
-        let pubkey = self.connections.remove(addr);
-        if let Some(ref pubkey) = pubkey {
-            if let Some(c) = self.peers.remove(pubkey) {
-                return Some(c);
-            }
+    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Connect> {
+        self.connections.remove(key);
+        if let Some(c) = self.peers.remove(key) {
+            Some(c)
+        } else {
+            None
         }
-        None
     }
 
     /// Checks if this node considers a peer to be a validator.
@@ -618,7 +633,7 @@ impl State {
     }
 
     /// Returns the addresses of known connections with public keys of its' validators.
-    pub fn connections(&self) -> &HashMap<SocketAddr, PublicKey> {
+    pub fn connections(&self) -> &HashMap<PublicKey, ConnectedPeerAddr> {
         &self.connections
     }
 

@@ -81,7 +81,7 @@ fn response_to_request_txs() {
     ));
 
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
@@ -218,7 +218,7 @@ fn duplicate_tx_in_pool() {
     sandbox.recv(&propose);
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -276,7 +276,7 @@ fn incorrect_tx_in_request() {
     // After `TRANSACTIONS_REQUEST_TIMEOUT` node send request with `tx0`.
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -365,7 +365,7 @@ fn response_size_larger_than_max_message_len() {
 
     // Receive response with `tx1` and `tx2`.
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
@@ -387,7 +387,7 @@ fn response_size_larger_than_max_message_len() {
 
     // Receive separate responses with `tx3` and `tx4`.
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
@@ -397,7 +397,7 @@ fn response_size_larger_than_max_message_len() {
     );
 
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &sandbox.create_transactions_response(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(1)),
@@ -476,7 +476,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             sandbox.s(ValidatorId(3)),
         ));
 
-        sandbox.send(sandbox.a(ValidatorId(3)), &propose);
+        sandbox.send(sandbox.p(ValidatorId(3)), &propose);
     }
 
     {
@@ -495,7 +495,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ));
 
         sandbox.send(
-            sandbox.a(ValidatorId(3)),
+            sandbox.p(ValidatorId(3)),
             &make_prevote_from_propose(&sandbox, &propose),
         );
     }
@@ -543,7 +543,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         ));
 
         sandbox.send(
-            sandbox.a(ValidatorId(1)),
+            sandbox.p(ValidatorId(1)),
             &sandbox.create_transactions_response(
                 &sandbox.p(ValidatorId(0)),
                 &sandbox.p(ValidatorId(1)),
@@ -665,7 +665,7 @@ fn request_txs_when_get_propose_or_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
 
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -688,7 +688,7 @@ fn request_txs_when_get_propose_or_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
 
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),

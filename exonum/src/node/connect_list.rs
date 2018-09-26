@@ -71,10 +71,20 @@ impl ConnectList {
         self.peers.values().any(|a| a.address == address)
     }
 
+    /// Get peer address with public key.
+    pub fn find_address_by_pubkey(&self, key: &PublicKey) -> Option<&PeerAddress> {
+        self.peers.get(key)
+    }
+
     /// Adds peer to the ConnectList.
     pub fn add(&mut self, peer: ConnectInfo) {
         self.peers
             .insert(peer.public_key, PeerAddress::new(peer.address));
+    }
+
+    /// Update peer address.
+    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+        self.peers.insert(*public_key, PeerAddress::new(address));
     }
 
     /// Get public key corresponding to validator with `address`.

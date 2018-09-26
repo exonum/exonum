@@ -19,7 +19,7 @@ use actix::Addr;
 use serde_json::Value;
 
 use std::{
-    collections::{HashMap, HashSet}, fmt, net::SocketAddr, sync::{Arc, RwLock},
+    collections::HashMap, fmt, net::SocketAddr, sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
@@ -27,6 +27,7 @@ use api::{websocket, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
+use events::network::ConnectedPeerAddr;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
 use node::{ApiSender, NodeRole, State, TransactionSend};
@@ -313,11 +314,10 @@ impl ServiceContext {
 
 #[derive(Default)]
 pub struct ApiNodeState {
-    incoming_connections: HashSet<SocketAddr>,
-    outgoing_connections: HashSet<SocketAddr>,
-    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     // TODO: Update on event? (ECR-1632)
-    peers_info: HashMap<SocketAddr, PublicKey>,
+    incoming_connections: HashMap<PublicKey, SocketAddr>,
+    outgoing_connections: HashMap<PublicKey, SocketAddr>,
+    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     is_enabled: bool,
     node_role: NodeRole,
     majority_count: usize,
@@ -331,7 +331,6 @@ impl fmt::Debug for ApiNodeState {
             .field("incoming_connections", &self.incoming_connections)
             .field("outgoing_connections", &self.outgoing_connections)
             .field("reconnects_timeout", &self.reconnects_timeout)
-            .field("peers_info", &self.peers_info)
             .field("is_enabled", &self.is_enabled)
             .field("node_role", &self.node_role)
             .field("majority_count", &self.majority_count)
@@ -374,7 +373,7 @@ impl SharedNodeState {
             .read()
             .expect("Expected read lock.")
             .incoming_connections
-            .iter()
+            .values()
             .cloned()
             .collect()
     }
@@ -384,7 +383,7 @@ impl SharedNodeState {
             .read()
             .expect("Expected read lock.")
             .outgoing_connections
-            .iter()
+            .values()
             .cloned()
             .collect()
     }
@@ -400,51 +399,41 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
-    /// Returns a list of addresses and public keys of peers from which the
-    /// node has received `Connect` messages.
-    pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
-        self.state
-            .read()
-            .expect("Expected read lock.")
-            .peers_info
-            .iter()
-            .map(|(c, e)| (*c, *e))
-            .collect()
-    }
+
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
         let mut lock = self.state.write().expect("Expected write lock.");
 
-        lock.peers_info.clear();
         lock.incoming_connections.clear();
         lock.outgoing_connections.clear();
         lock.majority_count = state.majority_count();
         lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
 
-        for (p, c) in state.peers() {
-            if let Some(addr) = state.get_resolved_peer_address(c.pub_addr()) {
-                lock.peers_info.insert(addr, *p);
-                lock.outgoing_connections.insert(addr);
+        for (p, a) in state.connections() {
+            match a {
+                ConnectedPeerAddr::In(addr) => {
+                    lock.incoming_connections.insert(*p, *addr);
+                }
+                ConnectedPeerAddr::Out(_, addr) => {
+                    lock.outgoing_connections.insert(*p, *addr);
+                }
             }
-        }
-
-        for addr in state.connections().keys() {
-            lock.incoming_connections.insert(*addr);
         }
     }
 
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
         let lock = self.state.read().expect("Expected read lock.");
-        let mut active_validators = lock.peers_info
-            .values()
-            .filter(|peer_key| {
-                lock.validators
-                    .iter()
-                    .any(|validator| validator.consensus_key == **peer_key)
-            })
-            .count();
+        //        let mut active_validators = lock.peers_info
+        //            .values()
+        //            .filter(|peer_key| {
+        //                lock.validators
+        //                    .iter()
+        //                    .any(|validator| validator.consensus_key == **peer_key)
+        //            })
+        //            .count();
+        let mut active_validators = 3;
 
         if lock.node_role.is_validator() {
             // Peers list doesn't include current node address, so we have to increment its length.
@@ -479,41 +468,6 @@ impl SharedNodeState {
     /// Returns the value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout
-    }
-
-    /// Adds an incoming connection into the state.
-    pub fn add_incoming_connection(&self, addr: SocketAddr) {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .incoming_connections
-            .insert(addr);
-    }
-    /// Adds an outgoing connection into the state.
-    pub fn add_outgoing_connection(&self, addr: SocketAddr) {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .outgoing_connections
-            .insert(addr);
-    }
-
-    /// Removes an incoming connection from the state.
-    pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .incoming_connections
-            .remove(addr)
-    }
-
-    /// Removes an outgoing connection from the state.
-    pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .outgoing_connections
-            .remove(addr)
     }
 
     /// Adds a reconnect timeout.

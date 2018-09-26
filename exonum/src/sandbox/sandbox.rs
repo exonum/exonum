@@ -76,7 +76,7 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 pub struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
-    pub sent: VecDeque<(SocketAddr, RawMessage)>,
+    pub sent: VecDeque<(PublicKey, RawMessage)>,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
@@ -145,7 +145,7 @@ pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,
     inner: RefCell<SandboxInner>,
-    addresses: Vec<SocketAddr>,
+    addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
     connect: Option<Connect>,
 }
@@ -165,6 +165,7 @@ impl Sandbox {
             self.s(ValidatorId(0)),
         );
 
+        self.inner.borrow_mut().sent.clear();
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
             self.recv(&self.create_connect(
@@ -174,7 +175,7 @@ impl Sandbox {
                 &user_agent::get(),
                 self.s(validator),
             ));
-            self.send(self.a(validator), &connect);
+            self.send(self.p(validator), &connect);
         }
 
         self.check_unexpected_message();
@@ -197,9 +198,9 @@ impl Sandbox {
         &self.validators_map[&p]
     }
 
-    pub fn a(&self, id: ValidatorId) -> SocketAddr {
+    pub fn a(&self, id: ValidatorId) -> String {
         let id: usize = id.into();
-        self.addresses[id]
+        self.addresses[id].address.clone()
     }
 
     /// Creates a `BlockRequest` message signed by this validator.
@@ -248,12 +249,12 @@ impl Sandbox {
     pub fn create_connect(
         &self,
         public_key: &PublicKey,
-        addr: SocketAddr,
+        addr: String,
         time: chrono::DateTime<::chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
     ) -> Connect {
-        Connect::new(public_key, &addr.to_string(), time, user_agent, secret_key)
+        Connect::new(public_key, &addr, time, user_agent, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -432,8 +433,7 @@ impl Sandbox {
 
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
-        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
-        let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
+        let event = NetworkEvent::MessageReceived(msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -448,26 +448,26 @@ impl Sandbox {
         self.inner.borrow_mut().process_events();
     }
 
-    pub fn pop_sent(&self) -> Option<(SocketAddr, RawMessage)> {
+    pub fn pop_sent(&self) -> Option<(PublicKey, RawMessage)> {
         self.inner.borrow_mut().sent.pop_front()
     }
 
-    pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
+    pub fn send<T: Message>(&self, key: PublicKey, msg: &T) {
         self.process_events();
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let send = self.pop_sent();
-        if let Some((real_addr, real_msg)) = send {
+        if let Some((real_key, real_msg)) = send {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
-            if real_addr != addr || any_real_msg != any_expected_msg {
+            if real_key != key || any_real_msg != any_expected_msg {
                 panic!(
                     "Expected to send the message {:?} to {} instead sending {:?} to {}",
-                    any_expected_msg, addr, any_real_msg, real_addr
+                    any_expected_msg, key, any_real_msg, real_key
                 )
             }
         } else {
             panic!(
                 "Expected to send the message {:?} to {} but nothing happened",
-                any_expected_msg, addr
+                any_expected_msg, key
             );
         }
     }
@@ -480,7 +480,7 @@ impl Sandbox {
             let peers_request =
                 PeersRequest::from_raw(msg).expect("Incorrect message. PeersRequest was expected");
 
-            let id = self.addresses.iter().position(|&a| a == addr);
+            let id = self.addresses.iter().position(|ref a| a.public_key == addr);
             if let Some(id) = id {
                 assert_eq!(&self.p(ValidatorId(id as u16)), peers_request.to());
             } else {
@@ -492,16 +492,16 @@ impl Sandbox {
     }
 
     pub fn broadcast<T: Message>(&self, msg: &T) {
-        self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
+        self.broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1));
     }
 
     pub fn try_broadcast<T: Message>(&self, msg: &T) -> Result<(), String> {
-        self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
+        self.try_broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1))
     }
 
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
     where
-        I: IntoIterator<Item = &'a SocketAddr>,
+        I: IntoIterator<Item = &'a PublicKey>,
     {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
@@ -512,7 +512,7 @@ impl Sandbox {
         addresses: I,
     ) -> Result<(), String>
     where
-        I: IntoIterator<Item = &'a SocketAddr>,
+        I: IntoIterator<Item = &'a PublicKey>,
     {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
 
@@ -803,7 +803,9 @@ impl Sandbox {
         let internal_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
 
-        let address = self.a(ValidatorId(0));
+        let address: SocketAddr = self.a(ValidatorId(0))
+            .parse()
+            .expect("Fail to parse socket address");
         let inner = self.inner.borrow();
 
         let blockchain = inner
@@ -1016,6 +1018,18 @@ fn sandbox_with_services_uninitialized(
         .map(gen_primitive_socket_addr)
         .collect::<Vec<_>>();
 
+    let str_addresses: Vec<String> = addresses.iter().map(|ref a| a.to_string()).collect();
+
+    let connect_infos: Vec<_> = validators
+        .iter()
+        .map(|(p, _)| p)
+        .zip(str_addresses.iter())
+        .map(|(p, a)| ConnectInfo {
+            address: a.clone(),
+            public_key: *p,
+        })
+        .collect();
+
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
     let mut blockchain = Blockchain::new(
@@ -1037,7 +1051,6 @@ fn sandbox_with_services_uninitialized(
             }),
     );
 
-    let str_addresses: Vec<String> = addresses.iter().map(|ref a| a.to_string()).collect();
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
@@ -1100,7 +1113,7 @@ fn sandbox_with_services_uninitialized(
         inner: RefCell::new(inner),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
-        addresses,
+        addresses: connect_infos,
         connect: None,
     };
 
@@ -1200,7 +1213,7 @@ mod tests {
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
-        let (public, secret) = gen_keypair();
+        let (public, _secret) = gen_keypair();
         let (service, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
@@ -1211,14 +1224,14 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
 
         s.recv(&s.create_connect(
-            &public,
+            &s.p(ValidatorId(2)),
             s.a(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
-            &secret,
+            &s.s(ValidatorId(2)),
         ));
         s.send(
-            s.a(ValidatorId(2)),
+            s.p(ValidatorId(2)),
             &s.create_connect(
                 &s.p(ValidatorId(0)),
                 s.a(ValidatorId(0)),
@@ -1244,7 +1257,7 @@ mod tests {
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
         s.send(
-            s.a(ValidatorId(1)),
+            s.p(ValidatorId(1)),
             &s.create_connect(
                 &s.p(ValidatorId(0)),
                 s.a(ValidatorId(0)),
@@ -1275,7 +1288,7 @@ mod tests {
             &secret,
         ));
         s.send(
-            s.a(ValidatorId(1)),
+            s.p(ValidatorId(1)),
             &s.create_connect(
                 &s.p(ValidatorId(0)),
                 s.a(ValidatorId(0)),

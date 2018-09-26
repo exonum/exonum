@@ -512,17 +512,22 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(|p| p.pub_addr().to_owned());
-            let it = it.chain(self.peer_discovery.iter().cloned());
-            let it = it.filter(|ref address| {
-                address.as_str() != self.state.our_connect_message().pub_addr()
-            });
+            let it = self.state.peers().values().map(|p| p.pub_key().to_owned());
+            let it = it.chain(
+                self.state()
+                    .connect_list()
+                    .peers()
+                    .into_iter()
+                    .map(|i| i.public_key),
+            );
+            let it =
+                it.filter(|ref address| address != &self.state.our_connect_message().pub_key());
             it.collect()
         };
 
-        for address in &peers {
-            self.connect(address);
-            info!("Trying to connect with peer {}", address);
+        for key in peers {
+            self.connect(key);
+            info!("Trying to connect with peer {}", key);
         }
 
         let snapshot = self.blockchain.snapshot();
@@ -563,38 +568,18 @@ impl NodeHandler {
 
     /// Sends the given message to a peer by its public key.
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
-        let address = {
-            if let Some(conn) = self.state.peers().get(&public_key) {
-                self.state
-                    .get_resolved_peer_address(conn.pub_addr())
-                    .expect("Sending message to peer with unresolved net address")
-            } else {
-                warn!(
-                    "Attempt to send message to peer with key {:?} without connection",
-                    public_key
-                );
-                return;
-            }
-        };
-
-        self.send_to_addr(&address, message);
-    }
-
-    /// Sends `RawMessage` to the specified address.
-    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        trace!("Send to address: {}", address);
-        let request = NetworkRequest::SendMessage(*address, message.clone());
+        let request = NetworkRequest::SendMessage(public_key, message.clone());
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &RawMessage) {
-        let peers: Vec<SocketAddr> = self.state
+        let peers: Vec<PublicKey> = self.state
             .peers()
             .iter()
-            .filter_map(|(pubkey, connection)| {
+            .filter_map(|(pubkey, _)| {
                 if self.state.connect_list().is_peer_allowed(pubkey) {
-                    self.state.get_resolved_peer_address(connection.pub_addr())
+                    Some(*pubkey)
                 } else {
                     None
                 }
@@ -602,20 +587,14 @@ impl NodeHandler {
             .collect();
 
         for address in peers {
-            self.send_to_addr(&address, message);
+            self.send_to_peer(address, message);
         }
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&mut self, address: &str) {
+    pub fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
-        let resolved = self.state.resolve_and_cache_peer_address(address);
-        if let Some(socket) = resolved {
-            self.send_to_addr(&socket, connect.raw());
-        } else {
-            info!("Failed to resolve hostname of peer: {}", address);
-            return;
-        }
+        self.send_to_peer(key, connect.raw());
     }
 
     /// Add timeout request.
@@ -1032,6 +1011,7 @@ impl Node {
 
     fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
+        let connect_list = self.state().connect_list().clone();
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
@@ -1041,6 +1021,7 @@ impl Node {
             network_tx,
             network_config: self.network_config,
             max_message_len: self.max_message_len,
+            connect_list,
         };
 
         let (internal_tx, internal_rx) = self.channel.internal_events;
