@@ -43,6 +43,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `MapProof::missing_keys_unchecked` method now return `impl Iterator` instead
   of `Vec`. (#918)
 
+- Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
+  of single IP-addresses.
+
 ### New Features
 
 #### exonum

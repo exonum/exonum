@@ -30,8 +30,7 @@ use encoding::Error as MessageError;
 use events::network::ConnectionType;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
-use node::ConnectInfo;
-use node::{ApiSender, NodeRole, State, TransactionSend};
+use node::{ApiSender, ConnectInfo, NodeRole, State, TransactionSend};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
