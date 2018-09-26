@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use futures::{
     future::{self, Either, Executor}, sync::mpsc, Future, Sink, Stream,
 };
@@ -49,17 +48,28 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(move || {
-            let handler = move || -> Result<Protocol, failure::Error> {
-                Protocol::deserialize(SignedMessage::from_raw_buffer(raw)?)
-            };
-            if let Ok(protocol) = handler() {
-                let event = future::ok(InternalEvent::MessageVerified(protocol));
-                Either::A(Self::send_event(event, internal_tx))
-            } else {
-                Either::B(future::ok(()))
-            }
+        future::lazy(||
+            SignedMessage::from_raw_buffer(raw)
+                            .and_then(Protocol::deserialize)
+        )
+        .map_err(drop)
+        .and_then(|protocol| {
+            let event = future::ok(InternalEvent::MessageVerified(protocol));
+            Self::send_event(event, internal_tx)
         })
+
+
+//        future::lazy(move || {
+//            let handler = move || -> Result<Protocol, failure::Error> {
+//                Protocol::deserialize(SignedMessage::from_raw_buffer(raw)?)
+//            };
+//            if let Ok(protocol) = handler() {
+//                let event = future::ok(InternalEvent::MessageVerified(protocol));
+//                Either::A(Self::send_event(event, internal_tx))
+//            } else {
+//                Either::B(future::ok(()))
+//            }
+//        })
     }
 
     /// Represents a task that processes Internal Requests and produces Internal Events.
@@ -151,7 +161,7 @@ mod tests {
     #[test]
     fn verify_msg() {
         let (pk, sk) = gen_keypair();
-        let tx = SignedMessage::new(0, 0, vec![0; 200], pk, &sk);
+        let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
 
         let expected_event =
             InternalEvent::MessageVerified(Protocol::deserialize(tx.clone()).unwrap());
@@ -162,7 +172,7 @@ mod tests {
     #[test]
     fn verify_incorrect_msg() {
         let (pk, _) = gen_keypair();
-        let tx = SignedMessage::new_with_signature(0, 0, vec![0; 200], pk, Signature::zero());
+        let tx = SignedMessage::new_with_signature(0, 0, &vec![0; 200], pk, Signature::zero());
 
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, None);

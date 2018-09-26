@@ -127,7 +127,7 @@
 //!
 //!     let info = explorer_api
 //!         .query(&TransactionQuery::new(tx1.hash()))
-//!         .get::<TransactionInfo<Value>>("v1/transactions")
+//!         .get::<TransactionInfo>("v1/transactions")
 //!         .unwrap();
 //! }
 //! ```
