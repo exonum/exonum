@@ -59,7 +59,7 @@ impl SignedMessage {
         buffer.extend_from_slice(author.as_ref());
         buffer.push(class);
         buffer.push(tag);
-        buffer.extend_from_slice(value);
+        buffer.extend_from_slicec(value);
         buffer.extend_from_slice(signature.as_ref());
         SignedMessage { raw: buffer }
     }

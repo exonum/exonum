@@ -733,7 +733,7 @@ impl<'a> BlockchainExplorer<'a> {
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
                 let raw_tx = schema.transactions().get(tx_hash).unwrap();
-                (&*self.transaction_parser)(raw_tx).unwrap()
+                (self.transaction_parser)(raw_tx).unwrap()
             }),
 
             location,

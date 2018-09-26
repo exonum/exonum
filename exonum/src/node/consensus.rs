@@ -312,7 +312,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: & Message<Prevote>) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Message<Prevote>) {
         trace!("Handle prevote");
 
         debug_assert_eq!(

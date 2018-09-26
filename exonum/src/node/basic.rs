@@ -26,7 +26,7 @@ impl NodeHandler {
     pub fn handle_message(&mut self, msg: Protocol) {
         match msg {
             Protocol::Consensus(msg) => self.handle_consensus(msg),
-            Protocol::Requests(msg) => self.handle_request(msg),
+            Protocol::Requests(ref msg) => self.handle_request(msg),
 
             Protocol::Service(Service::Connect(msg)) => self.handle_connect(msg),
             Protocol::Service(Service::Status(msg)) => self.handle_status(&msg),

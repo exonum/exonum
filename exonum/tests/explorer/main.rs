@@ -45,13 +45,15 @@ fn test_explorer_basics() {
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
     let payload_alice = CreateWallet::new(&pk_alice, "Alice");
-    let tx_alice = Protocol::sign_transaction(payload_alice.clone(), SERVICE_ID, pk_alice, &key_alice);
+    let tx_alice =
+        Protocol::sign_transaction(payload_alice.clone(), SERVICE_ID, pk_alice, &key_alice);
 
     let payload_bob = CreateWallet::new(&pk_bob, "Bob");
     let tx_bob = Protocol::sign_transaction(payload_bob.clone(), SERVICE_ID, pk_bob, &key_bob);
 
     let payload_transfer = Transfer::new(&pk_alice, &pk_bob, 2);
-    let tx_transfer = Protocol::sign_transaction(payload_transfer.clone(), SERVICE_ID, pk_alice, &key_alice);
+    let tx_transfer =
+        Protocol::sign_transaction(payload_transfer.clone(), SERVICE_ID, pk_alice, &key_alice);
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);

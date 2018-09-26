@@ -25,7 +25,7 @@ use messages::{
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_request(&mut self, msg: Requests) {
+    pub fn handle_request(&mut self, msg: &Requests) {
         // Request are sent to us
         if msg.to() != *self.state.consensus_public_key() {
             error!("Received message addressed to other peer = {:?}.", msg.to());
@@ -106,7 +106,7 @@ impl NodeHandler {
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: & Message<PrevotesRequest>) {
+    pub fn handle_request_prevotes(&mut self, msg: &Message<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
