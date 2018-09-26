@@ -285,7 +285,7 @@ impl Sandbox {
         propose_round: Round,
         propose_hash: &Hash,
         block_hash: &Hash,
-        system_time: chrono::DateTime<::chrono::Utc>,
+        system_time: chrono::DateTime<chrono::Utc>,
         secret_key: &SecretKey,
     ) -> Precommit {
         Precommit::new(

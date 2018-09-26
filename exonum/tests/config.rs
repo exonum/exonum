@@ -21,7 +21,8 @@ extern crate serde_derive;
 extern crate toml;
 
 use exonum::{
-    api::backends::actix::AllowOrigin, crypto::PublicKey,
+    api::backends::actix::AllowOrigin, crypto::{PublicKey, PUBLIC_KEY_LENGTH},
+    encoding::serialize::FromHex,
     helpers::{
         config::{ConfigFile, ConfigManager}, fabric::NodeBuilder,
     },
@@ -343,7 +344,7 @@ fn test_update_config() {
     // Test config update.
     let peer = ConnectInfo {
         address: "0.0.0.1:8080".to_owned(),
-        public_key: PublicKey::new([1; 32]),
+        public_key: PublicKey::new([1; PUBLIC_KEY_LENGTH]),
     };
 
     let connect_list = ConnectListConfig { peers: vec![peer] };

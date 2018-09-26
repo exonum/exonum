@@ -254,13 +254,13 @@ impl NetworkHandler {
                 let holder = incoming_connections_counter.clone();
                 // Check incoming connections count
                 let connections_count = Rc::strong_count(&incoming_connections_counter) - 1;
-                if connections_count > incoming_connections_limit {
+                if connections_count >= incoming_connections_limit {
                     warn!(
                         "Rejected incoming connection with peer={}, \
                          connections limit reached.",
                         address
                     );
-                    return Either::A(future::ok(()));
+                    return Ok(());
                 }
 
                 let listener = handshake
@@ -279,9 +279,11 @@ impl NetworkHandler {
                     })
                     .map(|_| {
                         drop(holder);
-                    });
+                    })
+                    .map_err(log_error);
 
-                Either::B(listener)
+                self.handle.spawn(listener);
+                Ok(())
             })
     }
 

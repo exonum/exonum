@@ -16,6 +16,7 @@
 
 use actix::Arbiter;
 use actix_web::{http, ws};
+use chrono::{DateTime, Utc};
 use futures::IntoFuture;
 use serde_json;
 
@@ -29,7 +30,7 @@ use api::{
 };
 use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
-use explorer::{BlockchainExplorer, TransactionInfo};
+use explorer::{self, BlockchainExplorer, TransactionInfo};
 use helpers::Height;
 use messages::Precommit;
 
@@ -44,6 +45,8 @@ pub struct BlocksRange {
     pub range: Range<Height>,
     /// Blocks in the range.
     pub blocks: Vec<Block>,
+    /// Optional median time from the corresponding blocks precommits.
+    pub times: Option<Vec<DateTime<Utc>>>,
 }
 
 /// Information about a block in the blockchain.
@@ -55,6 +58,8 @@ pub struct BlockInfo {
     pub precommits: Vec<Precommit>,
     /// Hashes of transactions in the block.
     pub txs: Vec<Hash>,
+    /// Median time from the block precommits.
+    pub time: DateTime<Utc>,
 }
 
 /// Blocks in range parameters.
@@ -69,6 +74,10 @@ pub struct BlocksQuery {
     /// If true, then only non-empty blocks are returned. The default value is false.
     #[serde(default)]
     pub skip_empty_blocks: bool,
+    /// If true, then `BlocksRange`'s `times` field will contain median time from the
+    /// corresponding blocks precommits.
+    #[serde(default)]
+    pub add_blocks_time: bool,
 }
 
 /// Block query parameters.
@@ -124,10 +133,17 @@ impl ExplorerApi {
             (explorer.height(), explorer.blocks(..))
         };
 
+        let mut times = Vec::new();
+
         let blocks: Vec<_> = blocks_iter
             .rev()
             .filter(|block| !query.skip_empty_blocks || !block.is_empty())
             .take(query.count)
+            .inspect(|block| {
+                if query.add_blocks_time {
+                    times.push(median_precommits_time(&block.precommits()));
+                }
+            })
             .map(|block| block.into_header())
             .collect();
 
@@ -140,6 +156,11 @@ impl ExplorerApi {
         Ok(BlocksRange {
             range: height..upper.next(),
             blocks,
+            times: if query.add_blocks_time {
+                Some(times)
+            } else {
+                None
+            },
         })
     }
 
@@ -216,12 +237,20 @@ impl ExplorerApi {
     }
 }
 
-impl<'a> From<::explorer::BlockInfo<'a>> for BlockInfo {
-    fn from(inner: ::explorer::BlockInfo<'a>) -> Self {
+impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
+    fn from(inner: explorer::BlockInfo<'a>) -> Self {
         Self {
             block: inner.header().clone(),
             precommits: inner.precommits().to_vec(),
             txs: inner.transaction_hashes().to_vec(),
+            time: median_precommits_time(&inner.precommits()),
         }
     }
+}
+
+fn median_precommits_time(precommits: &[Precommit]) -> DateTime<Utc> {
+    debug_assert!(!precommits.is_empty(), "Precommits cannot be empty");
+    let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
+    times.sort();
+    times[times.len() / 2]
 }
