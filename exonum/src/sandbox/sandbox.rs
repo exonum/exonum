@@ -165,7 +165,6 @@ impl Sandbox {
             self.s(ValidatorId(0)),
         );
 
-        self.inner.borrow_mut().sent.clear();
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
             self.recv(&self.create_connect(
@@ -986,6 +985,7 @@ impl SandboxBuilder {
             self.validators_count,
         );
 
+        sandbox.inner.borrow_mut().sent.clear(); // To clear initial connect messages.
         if self.initialize {
             let time = sandbox.time();
             sandbox.initialize(time, 1, self.validators_count as usize);
@@ -1213,25 +1213,27 @@ mod tests {
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
-        let (public, _secret) = gen_keypair();
+        let (public, secret) = gen_keypair();
         let (service, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
             service_key: service,
         };
+
+        let new_peer_addr = gen_primitive_socket_addr(2);
         // We also need to add public key from this keypair to the ConnectList.
         // Socket address doesn't matter in this case.
-        s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
+        s.add_peer_to_connect_list(new_peer_addr, validator_keys);
 
         s.recv(&s.create_connect(
-            &s.p(ValidatorId(2)),
-            s.a(ValidatorId(2)),
+            &public,
+            new_peer_addr.to_string(),
             s.time().into(),
             &user_agent::get(),
-            &s.s(ValidatorId(2)),
+            &secret,
         ));
         s.send(
-            s.p(ValidatorId(2)),
+            public,
             &s.create_connect(
                 &s.p(ValidatorId(0)),
                 s.a(ValidatorId(0)),
