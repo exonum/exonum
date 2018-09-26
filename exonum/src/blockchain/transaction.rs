@@ -218,10 +218,7 @@ pub struct TransactionContext<'a> {
 }
 
 impl<'a> TransactionContext<'a> {
-    pub(crate) fn new(
-        fork: &'a mut Fork,
-        raw_message: &Message<RawTransaction>
-    ) -> Self {
+    pub(crate) fn new(fork: &'a mut Fork, raw_message: &Message<RawTransaction>) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
@@ -901,8 +898,12 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction =
-                Protocol::sign_transaction(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
+            let transaction = Protocol::sign_transaction(
+                TxResult::new(index),
+                TX_RESULT_SERVICE_ID,
+                pk,
+                &sec_key,
+            );
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();

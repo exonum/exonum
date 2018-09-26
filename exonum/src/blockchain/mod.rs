@@ -145,10 +145,7 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(
-        &self,
-        raw: RawTransaction,
-    ) -> Result<Box<dyn Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -415,8 +412,7 @@ impl Blockchain {
         fork.checkpoint();
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let context =
-                TransactionContext::new(&mut *fork, &raw);
+            let context = TransactionContext::new(&mut *fork, &raw);
             tx.execute(context)
         }));
 
@@ -464,12 +460,7 @@ impl Blockchain {
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
-    pub fn commit<I>(
-        &mut self,
-        patch: &Patch,
-        block_hash: Hash,
-        precommits: I,
-    ) -> Result<(), Error>
+    pub fn commit<I>(&mut self, patch: &Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
     where
         I: Iterator<Item = Message<Precommit>>,
     {
