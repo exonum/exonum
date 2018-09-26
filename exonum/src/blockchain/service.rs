@@ -425,15 +425,11 @@ impl SharedNodeState {
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
         let lock = self.state.read().expect("Expected read lock.");
-        //        let mut active_validators = lock.peers_info
-        //            .values()
-        //            .filter(|peer_key| {
-        //                lock.validators
-        //                    .iter()
-        //                    .any(|validator| validator.consensus_key == **peer_key)
-        //            })
-        //            .count();
-        let mut active_validators = 3;
+        let mut active_validators = lock.incoming_connections
+            .keys()
+            .chain(lock.outgoing_connections.keys())
+            .filter(|pk| lock.validators.iter().any(|v| v.consensus_key == **pk))
+            .count();
 
         if lock.node_role.is_validator() {
             // Peers list doesn't include current node address, so we have to increment its length.
