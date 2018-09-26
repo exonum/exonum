@@ -17,12 +17,14 @@ extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet},
-    crypto::{gen_keypair, CryptoHash, Hash, PublicKey}, encoding,
-    messages::{Message, RawTransaction}, storage::{Fork, Snapshot},
+    blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding,
+    messages::{Message, Protocol, RawTransaction}, storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -33,16 +35,21 @@ const SERVICE_ID: u16 = 512;
 transactions! {
     TimestampingServiceTransactions {
         struct TxTimestamp {
-            from: &PublicKey,
             msg: &str,
         }
+    }
+}
+
+impl TxTimestamp {
+    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Message<RawTransaction> {
+        Protocol::sign_transaction(TxTimestamp::new(msg), SERVICE_ID, *author, key)
     }
 }
 
 struct TimestampingService;
 
 impl Transaction for TxTimestamp {
-    fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, _context: TransactionContext) -> ExecutionResult {
         Ok(())
     }
 }
@@ -74,9 +81,9 @@ fn main() {
         .create();
     // Create few transactions.
     let keypair = gen_keypair();
-    let tx1 = TxTimestamp::new(&keypair.0, "Down To Earth", &keypair.1);
-    let tx2 = TxTimestamp::new(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
-    let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
+    let tx1 = TxTimestamp::sign(&keypair.0, "Down To Earth", &keypair.1);
+    let tx2 = TxTimestamp::sign(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
+    let tx3 = TxTimestamp::sign(&keypair.0, "Dropping Like Flies", &keypair.1);
 
     // Commit them into blockchain.
     let block =

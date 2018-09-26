@@ -14,8 +14,10 @@
 
 //! Sample counter service.
 use exonum::{
-    api, blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionSet},
-    crypto::{Hash, PublicKey}, encoding, messages::{Message, RawTransaction},
+    api, blockchain::{ExecutionError, ExecutionResult, Service, Transaction,
+                      TransactionContext, TransactionSet},
+    crypto::{Hash, PublicKey, SecretKey}, encoding,
+    messages::{Protocol, Message, RawTransaction},
     storage::{Entry, Fork, Snapshot},
 };
 
@@ -66,13 +68,17 @@ transactions! {
     pub CounterTransactions {
 
         struct TxIncrement {
-            author: &PublicKey,
             by: u64,
         }
 
         struct TxReset {
-            author: &PublicKey,
         }
+    }
+}
+
+impl TxIncrement {
+    pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Message<RawTransaction> {
+        Protocol::sign_transaction(TxIncrement::new(by), SERVICE_ID, *author, key)
     }
 }
 
@@ -94,16 +100,12 @@ impl Transaction for TxIncrement {
 }
 
 impl TxReset {
-    pub fn verify_author(&self) -> bool {
-        use exonum::encoding::serialize::FromHex;
-        *self.author() == PublicKey::from_hex(ADMIN_KEY).unwrap()
+    pub fn sign(author: &PublicKey, key: &SecretKey) -> Message<RawTransaction> {
+       Protocol::sign_transaction(TxReset::new(), SERVICE_ID, *author, key)
     }
 }
 
 impl Transaction for TxReset {
-    fn verify(&self) -> bool {
-        self.verify_author()
-    }
 
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = CounterSchema::new(tc.fork());
@@ -125,13 +127,12 @@ struct CounterApi;
 impl CounterApi {
     fn increment(
         state: &api::ServiceApiState,
-        transaction: TxIncrement,
+        transaction: Message<RawTransaction>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
 
-        let transaction: Box<Transaction> = Box::new(transaction);
         let tx_hash = transaction.hash();
-        state.sender().send(transaction)?;
+        state.sender().broadcast_transaction(transaction)?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -143,13 +144,12 @@ impl CounterApi {
 
     fn reset(
         state: &api::ServiceApiState,
-        transaction: TxReset,
+        transaction: Message<RawTransaction>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
 
-        let transaction: Box<Transaction> = Box::new(transaction);
         let tx_hash = transaction.hash();
-        state.sender().send(transaction)?;
+        state.sender().broadcast_transaction(transaction)?;
         Ok(TransactionResponse { tx_hash })
     }
 

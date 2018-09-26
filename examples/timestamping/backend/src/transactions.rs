@@ -51,9 +51,6 @@ transactions! {
 
         /// A timestamp transaction.
         struct TxTimestamp {
-            /// Public key of transaction.
-            pub_key: &PublicKey,
-
             /// Timestamp content.
             content: Timestamp,
         }

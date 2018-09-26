@@ -216,15 +216,15 @@ impl CryptocurrencyApi {
     fn create_wallet(&self, name: &str) -> (CreateWallet, SecretKey) {
         let (pubkey, key) = crypto::gen_keypair();
         // Create a pre-signed transaction
-        let tx = CreateWallet::new(&pubkey, name, &key);
+        let tx = CreateWallet::sign(&pubkey, name, &key);
 
-        let tx_info: serde_json::Value = self.inner
-            .public(ApiKind::Service("cryptocurrency"))
-            .query(&tx)
-            .post("v1/wallets/transaction")
+        let data = hex::encode(tx.clone().serialize());
+        let tx_info: TransactionResponse = api
+            .public(ApiKind::Explorer)
+            .query(&json!({ "tx_body": data }))
+            .post("v1/transactions")
             .unwrap();
-        assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
-        (tx, key)
+        assert_eq!(tx_info.tx_hash, tx.hash());
     }
 
     fn get_wallet(&self, pub_key: PublicKey) -> Option<Wallet> {

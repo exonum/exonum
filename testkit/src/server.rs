@@ -153,18 +153,16 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
-
     use exonum::api;
     use exonum::blockchain::{
-        ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
+        ExecutionResult, Service, Transaction, TransactionContext,
     };
-    use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
-    use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
+    use exonum::crypto::{gen_keypair, Hash};
+    use exonum::encoding::{Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, Protocol, RawTransaction};
-    use exonum::storage::{Fork, Snapshot};
+    use exonum::storage::Snapshot;
 
     use super::*;
     use {TestKitApi, TestKitBuilder};
@@ -175,7 +173,6 @@ mod tests {
         Any {
 
             struct TxTimestamp {
-                from: &PublicKey,
                 msg: &str,
             }
         }
@@ -185,7 +182,7 @@ mod tests {
         fn for_str(s: &str) -> Message<RawTransaction> {
             let (pubkey, key) = gen_keypair();
             Protocol::sign_transaction(
-                TxTimestamp::new(&pubkey, s),
+                TxTimestamp::new(s),
                 TIMESTAMP_SERVICE_ID,
                 pubkey,
                 &key,
@@ -206,7 +203,7 @@ mod tests {
 
         impl Service for SampleService {
             fn service_id(&self) -> u16 {
-                1000
+                TIMESTAMP_SERVICE_ID
             }
 
             fn service_name(&self) -> &'static str {
@@ -262,7 +259,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(*block_info.transactions[0].content(), tx);
+        assert_eq!(block_info.transactions[0].content().message(), &tx);
 
         // Requests with a body that invoke `create_block`
         let bodies = vec![None, Some(CreateBlockQuery { tx_hashes: None })];
@@ -283,7 +280,7 @@ mod tests {
 
             assert_eq!(block_info.header.height(), Height(1));
             assert_eq!(block_info.transactions.len(), 1);
-            assert_eq!(*block_info.transactions[0].content(), tx);
+            assert_eq!(block_info.transactions[0].content().message(), &tx);
         }
     }
 
@@ -311,8 +308,8 @@ mod tests {
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
-            *block_info.transactions[0].content(),
-            tx_foo.serialize_field().unwrap()
+            block_info.transactions[0].content().message(),
+            &tx_foo
         );
 
         let body = CreateBlockQuery {
@@ -326,8 +323,8 @@ mod tests {
         assert_eq!(block_info.header.height(), Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
-            *block_info.transactions[0].content(),
-            tx_bar.serialize_field().unwrap()
+            block_info.transactions[0].content().message(),
+            &tx_bar
         );
     }
 

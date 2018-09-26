@@ -78,7 +78,7 @@ fn test_api_post_timestamp() {
 
     let info = Timestamp::new(&Hash::zero(), "metadata");
     let keypair = gen_keypair();
-    let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+    let tx = TxTimestamp::sign(&keypair.0, info, &keypair.1);
 
     let api = testkit.api();
     let tx_hash: Hash = api.public(ApiKind::Service("timestamping"))
@@ -97,7 +97,7 @@ fn test_api_get_timestamp_proof() {
 
     // Create timestamp
     let info = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+    let tx = TxTimestamp::sign(&keypair.0, info, &keypair.1);
     testkit.create_block_with_transactions(txvec![tx]);
 
     // get proof
@@ -118,7 +118,7 @@ fn test_api_get_timestamp_entry() {
 
     // Create timestamp
     let info = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = TxTimestamp::new(&keypair.0, info.clone(), &keypair.1);
+    let tx = TxTimestamp::sign(&keypair.0, info.clone(), &keypair.1);
     testkit.create_block_with_transactions(txvec![tx.clone()]);
 
     let api = testkit.api();
@@ -141,8 +141,8 @@ fn test_api_can_not_add_same_content_hash() {
     let content_hash = hash(&[1]);
     let timestamp1 = Timestamp::new(&content_hash, "metadata");
     let timestamp2 = Timestamp::new(&content_hash, "other metadata");
-    let tx_ok = TxTimestamp::new(&keypair.0, timestamp1.clone(), &keypair.1);
-    let tx_err = TxTimestamp::new(&keypair.0, timestamp2.clone(), &keypair.1);
+    let tx_ok = TxTimestamp::sign(&keypair.0, timestamp1.clone(), &keypair.1);
+    let tx_err = TxTimestamp::sign(&keypair.0, timestamp2.clone(), &keypair.1);
 
     testkit.create_block_with_transaction(tx_ok.clone());
     assert_status(&api, &tx_ok, &json!({ "type": "success" }));
