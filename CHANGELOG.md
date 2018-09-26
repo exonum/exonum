@@ -44,7 +44,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   of `Vec`. (#918)
 
 - Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
-  of single IP-addresses.
+  of single IP-addresses. (#959)
 
 ### New Features
 
