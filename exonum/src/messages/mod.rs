@@ -42,7 +42,9 @@ use encoding;
 use storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
-pub use self::{helpers::BinaryForm, protocol::*};
+pub use self::{
+    helpers::{to_hex_string, BinaryForm}, protocol::*,
+};
 
 #[macro_use]
 mod compatibility;
@@ -54,6 +56,7 @@ mod tests;
 
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
+pub(crate) const RAW_TRANSACTION_HEADER: usize = mem::size_of::<u16>() * 2;
 
 /// Transaction raw buffer.
 /// This struct is used to transfer transactions in network.
@@ -193,7 +196,7 @@ impl<T: ProtocolMessage> Message<T> {
     }
 
     /// Returns reference to the signed message.
-    pub(crate) fn signed_message(&self) -> &SignedMessage {
+    pub fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
 

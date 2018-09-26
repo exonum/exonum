@@ -13,19 +13,19 @@
 // limitations under the License.
 
 use blockchain::{
-    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionSet,
+    ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
+    TransactionSet,
 };
-use crypto::{Hash, PublicKey};
+use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::Height;
-use messages::{Message, RawTransaction};
-use storage::{Fork, Snapshot};
+use messages::{Message, Protocol, RawTransaction};
+use storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
 
 transactions! {
     ConfigUpdaterTransactions {
-        const SERVICE_ID = CONFIG_SERVICE;
 
         struct TxConfig {
             from: &PublicKey,
@@ -35,6 +35,21 @@ transactions! {
     }
 }
 
+impl TxConfig {
+    pub fn create_signed(
+        from: &PublicKey,
+        config: &[u8],
+        actual_from: Height,
+        signer: &SecretKey,
+    ) -> Message<RawTransaction> {
+        Protocol::sign_transaction(
+            TxConfig::new(from, config, actual_from),
+            CONFIG_SERVICE,
+            *from,
+            signer,
+        )
+    }
+}
 #[derive(Default)]
 pub struct ConfigUpdateService {}
 
@@ -45,12 +60,8 @@ impl ConfigUpdateService {
 }
 
 impl Transaction for TxConfig {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = Schema::new(fork);
+    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+        let mut schema = Schema::new(tc.fork());
         schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
         Ok(())
     }

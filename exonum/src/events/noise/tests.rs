@@ -36,7 +36,6 @@ use events::{
     },
     tests::raw_message,
 };
-use messages::RawMessage;
 use node::state::SharedConnectList;
 
 #[test]
@@ -160,10 +159,10 @@ fn noise_encrypt_decrypt_bogus_message() {
 fn check_encrypt_decrypt_message(msg_size: usize) {
     let (mut initiator, mut responder) = create_noise_sessions();
     let mut buffer_msg = BytesMut::with_capacity(msg_size);
-    let message = raw_message(1, msg_size);
+    let message = raw_message(msg_size);
 
     initiator
-        .encrypt_msg(message.as_ref(), &mut buffer_msg)
+        .encrypt_msg(message.raw(), &mut buffer_msg)
         .expect(format!("Unable to encrypt message with size {}", msg_size).as_str());
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
@@ -171,8 +170,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let res = responder
         .decrypt_msg(len, &mut buffer_msg)
         .expect(format!("Unable to decrypt message with size {}", msg_size).as_str());
-    let decrypted_message = RawMessage::from_vec(res.to_vec());
-    assert_eq!(message, decrypted_message);
+    assert_eq!(message.raw(), &res);
 }
 
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {

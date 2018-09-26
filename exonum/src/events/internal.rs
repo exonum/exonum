@@ -15,12 +15,13 @@
 use futures::{
     future::{self, Either, Executor}, sync::mpsc, Future, Sink, Stream,
 };
+
 use tokio_core::reactor::{Handle, Timeout};
 
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use blockchain::Transaction;
+use messages::{Protocol, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -43,18 +44,32 @@ impl InternalPart {
         })
     }
 
-    fn verify_transaction(
-        tx: Box<dyn Transaction>,
+    fn verify_message(
+        raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(move || {
-            if tx.verify() {
-                let event = future::ok(InternalEvent::TxVerified(tx.raw().clone()));
-                Either::A(Self::send_event(event, internal_tx))
-            } else {
-                Either::B(future::ok(()))
-            }
+        future::lazy(||
+            SignedMessage::from_raw_buffer(raw)
+                            .and_then(Protocol::deserialize)
+        )
+        .map_err(drop)
+        .and_then(|protocol| {
+            let event = future::ok(InternalEvent::MessageVerified(protocol));
+            Self::send_event(event, internal_tx)
         })
+
+
+//        future::lazy(move || {
+//            let handler = move || -> Result<Protocol, failure::Error> {
+//                Protocol::deserialize(SignedMessage::from_raw_buffer(raw)?)
+//            };
+//            if let Ok(protocol) = handler() {
+//                let event = future::ok(InternalEvent::MessageVerified(protocol));
+//                Either::A(Self::send_event(event, internal_tx))
+//            } else {
+//                Either::B(future::ok(()))
+//            }
+//        })
     }
 
     /// Represents a task that processes Internal Requests and produces Internal Events.
@@ -69,11 +84,11 @@ impl InternalPart {
         self.internal_requests_rx
             .map(move |request| {
                 let event = match request {
-                    InternalRequest::VerifyTx(tx) => {
-                        let fut = Self::verify_transaction(tx, internal_tx.clone());
+                    InternalRequest::VerifyMessage(tx) => {
+                        let fut = Self::verify_message(tx, internal_tx.clone());
                         verify_executor
                             .execute(Box::new(fut))
-                            .expect("cannot schedule transaction verification");
+                            .expect("cannot schedule message verification");
                         return;
                     }
 
@@ -114,33 +129,9 @@ mod tests {
     use std::thread;
 
     use super::*;
-    use blockchain::ExecutionResult;
-    use crypto::{gen_keypair, PublicKey, Signature};
-    use messages::Message;
-    use storage::Fork;
+    use crypto::{gen_keypair, Signature};
 
-    transactions! {
-        Transactions {
-            const SERVICE_ID = 255;
-
-            struct Tx {
-                sender: &PublicKey,
-                data: &str,
-            }
-        }
-    }
-
-    impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            self.verify_signature(self.sender())
-        }
-
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
-            Ok(())
-        }
-    }
-
-    fn verify_transaction<T: Transaction>(tx: T) -> Option<InternalEvent> {
+    fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);
         let (internal_requests_tx, internal_requests_rx) = mpsc::channel(16);
 
@@ -162,27 +153,28 @@ mod tests {
             core.run(task).unwrap()
         });
 
-        let request = InternalRequest::VerifyTx(tx.into());
+        let request = InternalRequest::VerifyMessage(msg);
         internal_requests_tx.wait().send(request).unwrap();
         thread.join().unwrap()
     }
 
     #[test]
-    fn verify_tx() {
+    fn verify_msg() {
         let (pk, sk) = gen_keypair();
-        let tx = Tx::new(&pk, "foo", &sk);
+        let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
 
-        let expected_event = InternalEvent::TxVerified(tx.raw().clone());
-        let event = verify_transaction(tx);
+        let expected_event =
+            InternalEvent::MessageVerified(Protocol::deserialize(tx.clone()).unwrap());
+        let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }
 
     #[test]
-    fn verify_incorrect_tx() {
+    fn verify_incorrect_msg() {
         let (pk, _) = gen_keypair();
-        let tx = Tx::new_with_signature(&pk, "foo", &Signature::zero());
+        let tx = SignedMessage::new_with_signature(0, 0, &vec![0; 200], pk, Signature::zero());
 
-        let event = verify_transaction(tx);
+        let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, None);
     }
 }

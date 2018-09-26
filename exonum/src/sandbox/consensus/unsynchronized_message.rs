@@ -19,7 +19,6 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::Message;
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 #[test]
@@ -57,7 +56,7 @@ fn test_queue_message_from_future_round() {
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
+#[should_panic(expected = "Send unexpected message Requests(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -95,7 +94,7 @@ fn test_queue_propose_message_from_next_height() {
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(0))
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let future_propose = sandbox.create_propose(
@@ -109,7 +108,7 @@ fn test_queue_propose_message_from_next_height() {
 
     sandbox.recv(&future_propose);
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
 
     info!(
         "last_block={:#?}, hash={:?}",

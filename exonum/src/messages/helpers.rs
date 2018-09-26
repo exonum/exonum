@@ -1,7 +1,7 @@
 use hex::{FromHex, ToHex};
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
 use encoding::Error;
 
@@ -40,4 +40,11 @@ impl HexStringRepresentation {
         let hex_string = <String as Deserialize>::deserialize(deserializer)?;
         FromHex::from_hex(&hex_string).map_err(de::Error::custom)
     }
+}
+
+/// Returns hexadecimal string representation of `message`.
+pub fn to_hex_string<T: ToHex>(message: &T) -> Result<String, fmt::Error> {
+    let mut hex_string = String::new();
+    message.write_hex(&mut hex_string)?;
+    Ok(hex_string)
 }

@@ -34,21 +34,21 @@ use events::{
     codec::MessagesCodec, error::into_failure, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use messages::{Any, Connect, Message, RawMessage};
+use messages::{Connect, Message, Protocol, Service, SignedMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(SocketAddr, Connect),
+    MessageReceived(SocketAddr, Vec<u8>),
+    PeerConnected(SocketAddr, Message<Connect>),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    SendMessage(SocketAddr, RawMessage),
+    SendMessage(SocketAddr, SignedMessage),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
@@ -79,7 +79,7 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
-    pub our_connect_message: Connect,
+    pub our_connect_message: Message<Connect>,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
@@ -89,7 +89,7 @@ pub struct NetworkPart {
 
 #[derive(Debug, Default, Clone)]
 struct ConnectionsPool {
-    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
+    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<SignedMessage>>>>,
 }
 
 impl ConnectionsPool {
@@ -97,18 +97,18 @@ impl ConnectionsPool {
         Self::default()
     }
 
-    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<RawMessage>) {
+    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<SignedMessage>) {
         self.inner.borrow_mut().insert(peer, sender.clone());
     }
 
-    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, failure::Error> {
+    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<SignedMessage>, failure::Error> {
         self.inner
             .borrow_mut()
             .remove(peer)
             .ok_or_else(|| format_err!("there is no sender in the connection pool"))
     }
 
-    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
+    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<SignedMessage>> {
         self.inner.borrow_mut().get(&peer).cloned()
     }
 
@@ -123,7 +123,7 @@ impl ConnectionsPool {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> mpsc::Sender<RawMessage> {
+    ) -> mpsc::Sender<SignedMessage> {
         // Register outgoing channel.
         let (conn_tx, conn_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
         self.insert(peer, &conn_tx);
@@ -199,7 +199,7 @@ impl ConnectionsPool {
     fn process_outgoing_messages(
         peer: SocketAddr,
         stream: Framed<TcpStream, MessagesCodec>,
-        conn_rx: mpsc::Receiver<RawMessage>,
+        conn_rx: mpsc::Receiver<SignedMessage>,
     ) -> impl Future<Item = (), Error = failure::Error> {
         trace!("Established connection with peer={}", peer);
         let (sink, stream) = stream.split();
@@ -265,7 +265,7 @@ impl NetworkPart {
 }
 
 struct RequestHandler {
-    connect_message: Connect,
+    connect_message: Message<Connect>,
     network_config: NetworkConfiguration,
     network_tx: mpsc::Sender<NetworkEvent>,
     handle: Handle,
@@ -275,7 +275,7 @@ struct RequestHandler {
 
 impl RequestHandler {
     fn from(
-        connect_message: Connect,
+        connect_message: Message<Connect>,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
@@ -320,7 +320,7 @@ impl RequestHandler {
     fn handle_send_message(
         &self,
         peer: SocketAddr,
-        message: RawMessage,
+        message: SignedMessage,
     ) -> impl Future<Item = (), Error = failure::Error> + 'static {
         let connection = if let Some(connection) = self.outgoing_connections.get(peer) {
             // We have a connection with the peer already
@@ -349,21 +349,21 @@ impl RequestHandler {
 
     fn send_connect_message(
         &self,
-        connection: mpsc::Sender<RawMessage>,
-        message: &RawMessage,
-    ) -> impl Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error> {
-        if message == self.connect_message.raw() {
+        connection: mpsc::Sender<SignedMessage>,
+        message: &SignedMessage,
+    ) -> impl Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error> {
+        if message == self.connect_message.signed_message() {
             Either::A(to_future(Ok(connection)))
         } else {
             Either::B(to_future(
                 connection
-                    .send(self.connect_message.raw().clone())
+                    .send(self.connect_message.clone().into())
                     .map_err(|_| format_err!("can't send message to a connection")),
             ))
         }
     }
 
-    fn connect_to_peer(&self, peer: SocketAddr) -> mpsc::Sender<RawMessage> {
+    fn connect_to_peer(&self, peer: SocketAddr) -> mpsc::Sender<SignedMessage> {
         self.outgoing_connections.clone().create_connection(
             self.network_config,
             peer,
@@ -375,10 +375,10 @@ impl RequestHandler {
 
     fn send_message<S>(
         connection: S,
-        message: RawMessage,
+        message: SignedMessage,
     ) -> impl Future<Item = (), Error = failure::Error>
     where
-        S: Future<Item = mpsc::Sender<RawMessage>, Error = failure::Error>,
+        S: Future<Item = mpsc::Sender<SignedMessage>, Error = failure::Error>,
     {
         connection
             .and_then(|sender| {
@@ -495,11 +495,11 @@ impl<'a> Listener<'a> {
             })
     }
 
-    fn parse_connect_message(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
+    fn parse_connect_message(raw: Option<Vec<u8>>) -> Result<Message<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
-        let message = Any::from_raw(raw).map_err(into_failure)?;
+        let message = Protocol::from_raw_buffer(raw)?;
         match message {
-            Any::Connect(connect) => Ok(connect),
+            Protocol::Service(Service::Connect(connect)) => Ok(connect),
             other => bail!(
                 "First message from a remote peer is not Connect, got={:?}",
                 other
@@ -510,11 +510,11 @@ impl<'a> Listener<'a> {
     fn process_incoming_messages<S>(
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
-        connect: Connect,
+        connect: Message<Connect>,
         address: SocketAddr,
     ) -> impl Future<Item = (), Error = failure::Error>
     where
-        S: Stream<Item = RawMessage, Error = failure::Error>,
+        S: Stream<Item = Vec<u8>, Error = failure::Error>,
     {
         let event = NetworkEvent::PeerConnected(address, connect);
         let stream = stream.map(move |raw| NetworkEvent::MessageReceived(address, raw));

@@ -503,7 +503,7 @@ macro_rules! impl_protocol {
     };
 }
 
-impl_protocol!{
+impl_protocol! {
     /// Composition of every exonum protocol messages.
     /// This messages used in network p2p communications.
     SignedMessage => Protocol {
@@ -576,7 +576,7 @@ impl Protocol {
     ) -> Message<T> {
         let value = message.encode().expect("Couldn't serialize data.");
         let (cls, typ) = T::message_type();
-        let signed = SignedMessage::new(cls, typ, value, author, secret_key);
+        let signed = SignedMessage::new(cls, typ, &value, author, secret_key);
         T::into_message_from_parts(message, signed)
     }
 
@@ -591,7 +591,7 @@ impl Protocol {
     /// # Panics
     ///
     /// This method can panic on serialization failure.
-    pub fn sign_tx<T>(
+    pub fn sign_transaction<T>(
         transaction: T,
         service_id: u16,
         public_key: PublicKey,

@@ -32,7 +32,7 @@ impl SignedMessage {
     pub(crate) fn new(
         class: u8,
         tag: u8,
-        value: Vec<u8>,
+        value: &[u8],
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> SignedMessage {
@@ -40,8 +40,26 @@ impl SignedMessage {
         buffer.extend_from_slice(author.as_ref());
         buffer.push(class);
         buffer.push(tag);
-        buffer.extend_from_slice(value.as_ref());
+        buffer.extend_from_slice(value);
         let signature = Self::sign(&buffer, secret_key).expect("Couldn't form signature");
+        buffer.extend_from_slice(signature.as_ref());
+        SignedMessage { raw: buffer }
+    }
+
+    /// Creates `SignedMessage` from parts with specificic signature.
+    #[cfg(test)]
+    pub(crate) fn new_with_signature(
+        class: u8,
+        tag: u8,
+        value: &[u8],
+        author: PublicKey,
+        signature: Signature,
+    ) -> SignedMessage {
+        let mut buffer = Vec::with_capacity(2 + value.len() + PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH);
+        buffer.extend_from_slice(author.as_ref());
+        buffer.push(class);
+        buffer.push(tag);
+        buffer.extend_from_slice(value);
         buffer.extend_from_slice(signature.as_ref());
         SignedMessage { raw: buffer }
     }
