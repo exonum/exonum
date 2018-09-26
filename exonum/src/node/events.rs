@@ -19,7 +19,7 @@ use events::{error::LogError, Event, EventHandler, InternalEvent, InternalReques
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
         match event {
-            Event::Network(network) => self.handle_network_event(network).log_error(),
+            Event::Network(network) => self.handle_network_event(network),
             Event::Api(api) => self.handle_api_event(api),
             Event::Internal(internal) => self.handle_internal_event(internal),
         }
