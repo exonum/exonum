@@ -22,7 +22,6 @@ extern crate toml;
 
 use exonum::{
     api::backends::actix::AllowOrigin, crypto::{PublicKey, PUBLIC_KEY_LENGTH},
-    encoding::serialize::FromHex,
     helpers::{
         config::{ConfigFile, ConfigManager}, fabric::NodeBuilder,
     },

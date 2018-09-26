@@ -14,7 +14,7 @@
 
 //! Mapping between peers public keys and IP-addresses.
 
-use std::{collections::BTreeMap, net::SocketAddr, net::ToSocketAddrs};
+use std::collections::BTreeMap;
 
 use crypto::PublicKey;
 use node::{ConnectInfo, ConnectListConfig};
@@ -24,20 +24,12 @@ use node::{ConnectInfo, ConnectListConfig};
 pub struct PeerAddress {
     /// External address of the peer hostname:port.
     pub address: String,
-    /// Currently used address resolution.
-    resolved: Option<SocketAddr>,
-    /// Backup address resolutions.
-    resolved_cache: Vec<SocketAddr>,
 }
 
 impl PeerAddress {
     /// New unresolved address.
     pub fn new(address: String) -> Self {
-        PeerAddress {
-            address,
-            resolved: None,
-            resolved_cache: Vec::new(),
-        }
+        PeerAddress { address }
     }
 }
 
@@ -86,56 +78,10 @@ impl ConnectList {
     pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
         self.peers.insert(*public_key, PeerAddress::new(address));
     }
-
-    /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_resolved_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
-        self.peers
-            .iter()
-            .find(|(_, a)| a.resolved.as_ref() == Some(address))
-            .map(|(p, _)| p)
-    }
-
-    /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_unresolved_address(&self, address: &str) -> Option<&PublicKey> {
-        self.peers
-            .iter()
-            .find(|(_, a)| a.address.as_str() == address)
-            .map(|(p, _)| p)
-    }
-
-    /// Resolves network address and stores it in the `ConnectList`.
-    pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
-        let key = *self.find_key_by_unresolved_address(address)?;
-        let entry = self.peers.get_mut(&key).unwrap();
-
-        let resolved_vec: Vec<SocketAddr> = entry
-            .address
-            .to_socket_addrs()
-            .map(|i| i.collect())
-            .unwrap_or_default();
-
-        entry.resolved_cache.retain(|a| resolved_vec.contains(a));
-
-        if entry.resolved_cache.is_empty() {
-            entry.resolved_cache = resolved_vec;
-        }
-
-        let resolved = entry.resolved_cache.pop();
-        entry.resolved = resolved;
-        resolved
-    }
-
-    /// Returns cached resolved network address of the peer.
-    pub fn get_resolved_peer_address(&self, address: &str) -> Option<SocketAddr> {
-        let key = self.find_key_by_unresolved_address(address)?;
-        self.peers[key].resolved
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
-
     use rand::{RngCore, SeedableRng, XorShiftRng};
 
     use super::*;
@@ -248,55 +194,4 @@ mod test {
         assert!(connect_list.is_address_allowed(&address));
     }
 
-    #[test]
-    fn test_network_address_resolve_trivial() {
-        let key = PublicKey::new([1; PUBLIC_KEY_LENGTH]);
-        let address = "127.0.0.1:80";
-        let resolved: SocketAddr = address.parse().unwrap();
-
-        let mut connect_list = ConnectList::default();
-        connect_list
-            .peers
-            .insert(key, PeerAddress::new(address.to_string()));
-
-        assert_eq!(connect_list.get_resolved_peer_address(address), None);
-        assert_eq!(
-            connect_list.find_key_by_unresolved_address(address),
-            Some(&key)
-        );
-
-        let test_address = connect_list.resolve_and_cache_peer_address(address);
-        assert_eq!(test_address, Some(resolved));
-        assert_eq!(
-            connect_list.get_resolved_peer_address(address),
-            Some(resolved)
-        );
-
-        assert_eq!(
-            connect_list.find_key_by_resolved_address(&resolved),
-            Some(&key)
-        );
-    }
-
-    #[test]
-    fn test_network_address_resolve_hostname() {
-        let key = PublicKey::new([1; PUBLIC_KEY_LENGTH]);
-        let address = "localhost:80";
-        let resolved: HashSet<SocketAddr> = address
-            .to_socket_addrs()
-            .map(|i| i.collect())
-            .unwrap_or_default();
-
-        let mut connect_list = ConnectList::default();
-        connect_list
-            .peers
-            .insert(key, PeerAddress::new(address.to_string()));
-
-        for _ in 0..resolved.len() {
-            let test_address = connect_list
-                .resolve_and_cache_peer_address(address)
-                .expect("Address should be resolved");
-            assert!(resolved.contains(&test_address));
-        }
-    }
 }

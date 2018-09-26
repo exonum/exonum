@@ -324,9 +324,7 @@ fn test_network_big_message() {
     let second_key = t2.connect_info.public_key;
     connect_list.add(t2.connect_info.clone());
 
-    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
-    connect_list.resolve_and_cache_peer_address(&first.to_string());
-    connect_list.resolve_and_cache_peer_address(&second.to_string());
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
 
     let e1 = TestEvents::with_addr(first, &connect_list);
     let e2 = TestEvents::with_addr(second, &connect_list);
@@ -385,9 +383,7 @@ fn test_network_max_message_len() {
     connect_list.add(t2.connect_info.clone());
     let second_key = t2.connect_info.public_key;
 
-    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
-    connect_list.resolve_and_cache_peer_address(&first.to_string());
-    connect_list.resolve_and_cache_peer_address(&second.to_string());
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
 
     let e1 = TestEvents::with_addr(first, &connect_list);
     let e2 = TestEvents::with_addr(second, &connect_list);
@@ -422,9 +418,7 @@ fn test_network_reconnect() {
     let second_key = t2.connect_info.public_key;
     connect_list.add(t2.connect_info.clone());
 
-    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
-    connect_list.resolve_and_cache_peer_address(&first.to_string());
-    connect_list.resolve_and_cache_peer_address(&second.to_string());
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
 
     let e1 = TestEvents::with_addr(first, &connect_list);
     let e2 = TestEvents::with_addr(second, &connect_list);
@@ -488,13 +482,8 @@ fn test_network_multiple_connect() {
 
     connect_list.add(t1.connect_info.clone());
 
-    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
     let events = TestEvents::with_addr(t1.address, &connect_list);
-
-    connect_list.resolve_and_cache_peer_address(&main.to_string());
-    for a in &nodes {
-        connect_list.resolve_and_cache_peer_address(&a.to_string());
-    }
 
     let mut node = t1.spawn(events, connect_list.clone());
 
@@ -534,9 +523,7 @@ fn test_send_first_not_connect() {
     connect_list.add(t1.connect_info.clone());
     let mut t2 = ConnectionParams::from_address(other);
     connect_list.add(t2.connect_info.clone());
-    let mut connect_list = SharedConnectList::from_connect_list(connect_list);
-    connect_list.resolve_and_cache_peer_address(&main.to_string());
-    connect_list.resolve_and_cache_peer_address(&other.to_string());
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
 
     let node = TestEvents::with_addr(main, &connect_list);
     let other_node = TestEvents::with_addr(other, &connect_list);

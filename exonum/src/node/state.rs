@@ -19,8 +19,8 @@ use failure;
 use serde_json::Value;
 
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
-    sync::{Arc, RwLock}, time::{Duration, SystemTime},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, sync::{Arc, RwLock},
+    time::{Duration, SystemTime},
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
@@ -402,14 +402,6 @@ impl SharedConnectList {
         connect_list.is_peer_allowed(public_key)
     }
 
-    /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_address(&self, address: &str) -> Option<PublicKey> {
-        let connect_list = self.inner.read().expect("ConnectList read lock");
-        connect_list
-            .find_key_by_unresolved_address(address)
-            .cloned()
-    }
-
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
         self.inner
@@ -434,14 +426,6 @@ impl SharedConnectList {
     pub fn find_address_by_key(&self, public_key: &PublicKey) -> Option<PeerAddress> {
         let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.find_address_by_pubkey(public_key).cloned()
-    }
-
-    /// Resolves peer network address and stores result.
-    pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
-        self.inner
-            .write()
-            .expect("ConnectList write lock")
-            .resolve_and_cache_peer_address(address)
     }
 }
 
@@ -1221,19 +1205,5 @@ impl State {
             .write()
             .expect("ConnectList write lock");
         list.add(peer);
-    }
-
-    /// Resolve network address of the peer and cache result.
-    pub fn resolve_and_cache_peer_address(&mut self, address: &str) -> Option<SocketAddr> {
-        self.connect_list.resolve_and_cache_peer_address(address)
-    }
-
-    /// Resolve network address of the peer.
-    pub fn get_resolved_peer_address(&self, address: &str) -> Option<SocketAddr> {
-        self.connect_list
-            .inner
-            .read()
-            .expect("Connect list read lock")
-            .get_resolved_peer_address(address)
     }
 }
