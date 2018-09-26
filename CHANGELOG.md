@@ -70,6 +70,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   (`peer-address`) and listen address when generating config files. (#942)
 
 - Peer address is resolved on connect instead of resolving on node startup. (#942)
+
 - Now peers require only one connection to exchange messages between
   them. (#945)
 
@@ -127,6 +128,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
 
 - `ConnectInfo` and `ConnectList` now stores unresolved addresses as strings. (#942)
+
+- Now `network` module uses `PublicKeys` to identify peers. (#942)
+
+- `system/v1/peers` endpoint now properly returns
+  incoming and outgoing connections of the node. (#942)
 
 ## 0.9.1 - 2018-08-02
 
