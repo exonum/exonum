@@ -15,15 +15,16 @@
 //! A special service which generates transactions on `after_commit` events.
 
 use exonum::{
-    blockchain::{ExecutionResult, Service, ServiceContext, Transaction, TransactionSet},
-    crypto::{Hash, Signature}, encoding, helpers::Height, messages::RawTransaction,
-    storage::{Fork, Snapshot},
+    blockchain::{ExecutionResult, Service, ServiceContext, Transaction,
+                 TransactionContext, TransactionSet},
+    crypto::Hash, encoding, helpers::Height, messages::RawTransaction,
+    storage::Snapshot,
 };
 
-const SERVICE_ID: u16 = 512;
+pub const SERVICE_ID: u16 = 512;
 
 transactions! {
-    HandleCommitTransactions {
+    pub HandleCommitTransactions {
 
         struct TxAfterCommit {
             height: Height,
@@ -32,7 +33,7 @@ transactions! {
 }
 
 impl Transaction for TxAfterCommit {
-    fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
+    fn execute(&self, _context: TransactionContext) -> ExecutionResult {
         Ok(())
     }
 }
@@ -58,7 +59,7 @@ impl Service for AfterCommitService {
     }
 
     fn after_commit(&self, context: &ServiceContext) {
-        let tx = TxAfterCommit::new_with_signature(context.height(), &Signature::zero());
-        context.transaction_sender().send(Box::new(tx)).unwrap();
+        let tx = TxAfterCommit::new(context.height());
+        context.broadcast_transaction(tx);
     }
 }

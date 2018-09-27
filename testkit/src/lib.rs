@@ -22,16 +22,18 @@
 //! #[macro_use]
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
+//! #[macro_use] extern crate serde_derive;
 //!
 //! use serde_json::Value;
 //!
 //! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
-//! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
-//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
+//! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionContext,
+//! TransactionSet, ExecutionResult};
+//! use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey, CryptoHash};
 //! use exonum::encoding;
 //! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
-//! use exonum::messages::{Message, RawTransaction};
+//! use exonum::messages::{Message, RawTransaction, Protocol};
 //! use exonum::storage::{Snapshot, Fork};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
@@ -42,16 +44,20 @@
 //! transactions! {
 //!     TimestampingTransactions {
 //!         struct TxTimestamp {
-//!             from: &PublicKey,
 //!             msg: &str,
 //!         }
 //!     }
+//! }
+//! impl TxTimestamp {
+//!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Message<RawTransaction> {
+//!        Protocol::sign_transaction(TxTimestamp::sign(msg), SERVICE_ID, *author, key)
+//!    }
 //! }
 //!
 //! struct TimestampingService;
 //!
 //! impl Transaction for TxTimestamp {
-//!     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
+//!     fn execute(&self, _context: TransactionContext) -> ExecutionResult {
 //!         Ok(())
 //!     }
 //! }
@@ -84,16 +90,16 @@
 //!
 //!     // Create few transactions.
 //!     let keypair = gen_keypair();
-//!     let tx1 = TxTimestamp::new(&keypair.0, "Down To Earth", &keypair.1);
-//!     let tx2 = TxTimestamp::new(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
-//!     let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
+//!     let tx1 = TxTimestamp::sign(&keypair.0, "Down To Earth", &keypair.1);
+//!     let tx2 = TxTimestamp::sign(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
+//!     let tx3 = TxTimestamp::sign(&keypair.0, "Dropping Like Flies", &keypair.1);
 //!     // Commit them into blockchain.
 //!     testkit.create_block_with_transactions(txvec![
 //!         tx1.clone(), tx2.clone(), tx3.clone()
 //!     ]);
 //!
 //!     // Add a single transaction.
-//!     let tx4 = TxTimestamp::new(&keypair.0, "Barking up the wrong tree", &keypair.1);
+//!     let tx4 = TxTimestamp::sign(&keypair.0, "Barking up the wrong tree", &keypair.1);
 //!     testkit.create_block_with_transaction(tx4.clone());
 //!
 //!     // Check results with schema.
@@ -121,7 +127,7 @@
 //!
 //!     let info = explorer_api
 //!         .query(&TransactionQuery::new(tx1.hash()))
-//!         .get::<TransactionInfo<Value>>("v1/transactions")
+//!         .get::<TransactionInfo>("v1/transactions")
 //!         .unwrap();
 //! }
 //! ```
@@ -483,7 +489,9 @@ impl TestKit {
     ///
     /// ```
     /// # #[macro_use] extern crate exonum;
+    /// # #[macro_use] extern crate serde_derive;
     /// # #[macro_use] extern crate exonum_testkit;
+    ///
     /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
     /// # use exonum::messages::RawTransaction;
     /// # use exonum::encoding;
@@ -516,7 +524,7 @@ impl TestKit {
     /// #     }
     /// # }
     /// # impl Transaction for MyTransaction {
-    /// #     fn execute(&self, _: &mut exonum::storage::Fork) -> ExecutionResult { Ok(()) }
+    /// #     fn execute(&self, _: exonum::blockchain::TransactionContext) -> ExecutionResult { Ok(()) }
     /// # }
     /// #
     /// # fn expensive_setup(_: &mut TestKit) {}
