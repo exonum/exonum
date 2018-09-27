@@ -263,18 +263,24 @@ impl NetworkHandler {
                     return Ok(());
                 }
 
+                let connect_list = self.connect_list.clone();
                 let listener = handshake
                     .listen(incoming_connection)
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
                         if pool.contains(message.pub_key()) {
                             Box::new(future::ok(()))
-                        } else {
+                        } else if connect_list.is_peer_allowed(message.pub_key()) {
                             let receiver_rx =
                                 pool.add_incoming_address(&message.pub_key(), &conn_addr);
                             let connection =
                                 Connection::new(handle.clone(), socket, receiver_rx, conn_addr);
                             to_box(Self::handle_connection(connection, message, &network_tx))
+                        } else {
+                            warn!( "Rejecting incoming connection with peer={} public_key={}, peer is not in the ConnectList",
+                                   address,message.pub_key()
+                            );
+                            Box::new(future::ok(()))
                         }
                     })
                     .map(|_| {
