@@ -27,7 +27,11 @@ struct BenchConfig {
     tcp_nodelay: bool,
 }
 
-fn test_events(cfg: &BenchConfig, listen_address: SocketAddr) -> TestEvents {
+fn test_events(
+    cfg: &BenchConfig,
+    listen_address: SocketAddr,
+    connect_list: SharedConnectList,
+) -> TestEvents {
     let network_config = NetworkConfiguration {
         tcp_nodelay: cfg.tcp_nodelay,
         ..Default::default()
@@ -36,6 +40,7 @@ fn test_events(cfg: &BenchConfig, listen_address: SocketAddr) -> TestEvents {
         listen_address,
         network_config,
         events_config: EventsPoolCapacity::default(),
+        connect_list,
     }
 }
 
@@ -50,27 +55,29 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
 
         let mut params1 = ConnectionParams::from_address(first);
         connect_list.add(params1.connect_info.clone());
+        let first_key = params1.connect_info.public_key;
 
         let mut params2 = ConnectionParams::from_address(second);
         connect_list.add(params2.connect_info.clone());
+        let second_key = params2.connect_info.public_key;
 
         let connect_list = SharedConnectList::from_connect_list(connect_list);
 
-        let e1 = test_events(cfg, first);
-        let e2 = test_events(cfg, second);
+        let e1 = test_events(cfg, first, connect_list.clone());
+        let e2 = test_events(cfg, second, connect_list.clone());
 
         let mut t1 = params1.spawn(e1, connect_list.clone());
         let mut t2 = params2.spawn(e2, connect_list);
 
-        t1.connect_with(second, params1.connect.clone());
-        t2.connect_with(first, params2.connect.clone());
+        t1.connect_with(second_key, params1.connect.clone());
+        t2.connect_with(first_key, params2.connect.clone());
         assert_eq!(t1.wait_for_connect(), params2.connect.clone());
         assert_eq!(t2.wait_for_connect(), params1.connect.clone());
 
         let t1 = thread::spawn(move || {
             for _ in 0..times {
                 let msg = raw_message(0, len);
-                t1.send_to(second, msg);
+                t1.send_to(second_key, msg);
                 t1.wait_for_message();
             }
             t1
@@ -79,7 +86,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
         let t2 = thread::spawn(move || {
             for _ in 0..times {
                 let msg = raw_message(1, len);
-                t2.send_to(first, msg);
+                t2.send_to(first_key, msg);
                 t2.wait_for_message();
             }
             t2
@@ -88,11 +95,11 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
         let mut t1 = t1.join().unwrap();
         let mut t2 = t2.join().unwrap();
 
-        t1.disconnect_with(second);
-        t2.disconnect_with(first);
+        t1.disconnect_with(second_key);
+        t2.disconnect_with(first_key);
 
-        assert_eq!(t1.wait_for_disconnect(), second);
-        assert_eq!(t2.wait_for_disconnect(), first);
+        assert_eq!(t1.wait_for_disconnect(), second_key);
+        assert_eq!(t2.wait_for_disconnect(), first_key);
 
         drop(t1);
         drop(t2);
