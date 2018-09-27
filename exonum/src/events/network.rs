@@ -327,12 +327,11 @@ impl NetworkHandler {
                     Box::new(future::ok(()))
                 } else {
                     let conn_addr = ConnectedPeerAddr::Out(
-                        unresolved_address.clone(),
+                        unresolved_address,
                         socket.get_ref().peer_addr().unwrap(),
                     );
                     pool.add(&key, conn_addr.clone(), sender_tx);
-                    let connection =
-                        Connection::new(handle.clone(), socket, receiver_rx, conn_addr.clone());
+                    let connection = Connection::new(handle, socket, receiver_rx, conn_addr);
                     to_box(Self::handle_connection(connection, message, &network_tx))
                 }
             })
