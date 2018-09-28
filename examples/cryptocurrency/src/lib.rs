@@ -148,8 +148,8 @@ pub mod transactions {
 
     impl TxCreateWallet {
         #[doc(hidden)]
-        pub fn sign(name: &str, pk: &PublicKey, sc: &SecretKey) -> Message<RawTransaction> {
-            Protocol::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sc)
+        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Message<RawTransaction> {
+            Protocol::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
         }
     }
 
@@ -160,9 +160,9 @@ pub mod transactions {
             amount: u64,
             seed: u64,
             pk: &PublicKey,
-            sc: &SecretKey,
+            sk: &SecretKey,
         ) -> Message<RawTransaction> {
-            Protocol::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sc)
+            Protocol::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sk)
         }
     }
 }
