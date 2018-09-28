@@ -50,7 +50,7 @@
 //! }
 //! impl TxTimestamp {
 //!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Message<RawTransaction> {
-//!        Protocol::sign_transaction(TxTimestamp::sign(msg), SERVICE_ID, *author, key)
+//!        Protocol::sign_transaction(TxTimestamp::new(msg), SERVICE_ID, *author, key)
 //!    }
 //! }
 //!
@@ -493,11 +493,13 @@ impl TestKit {
     /// # #[macro_use] extern crate exonum_testkit;
     ///
     /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
-    /// # use exonum::messages::RawTransaction;
+    /// # use exonum::messages::{Message, RawTransaction, Protocol};
     /// # use exonum::encoding;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
+    /// # use exonum::crypto::{PublicKey, SecretKey};
     /// #
     /// # type FromRawResult = Result<Box<Transaction>, encoding::Error>;
+    /// # const SERVICE_ID: u16 = 1;
     /// # pub struct MyService;
     /// # impl Service for MyService {
     /// #    fn service_name(&self) -> &str {
@@ -507,7 +509,7 @@ impl TestKit {
     /// #        Vec::new()
     /// #    }
     /// #    fn service_id(&self) -> u16 {
-    /// #        1
+    /// #        SERVICE_ID
     /// #    }
     /// #    fn tx_from_raw(&self, raw: RawTransaction) -> FromRawResult {
     /// #        let tx = MyServiceTransactions::tx_from_raw(raw)?;
@@ -518,10 +520,14 @@ impl TestKit {
     /// # transactions! {
     /// #     MyServiceTransactions {
     /// #         struct MyTransaction {
-    /// #             from: &exonum::crypto::PublicKey,
     /// #             msg: &str,
     /// #         }
     /// #     }
+    /// # }
+    /// # impl MyTransaction {
+    /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Message<RawTransaction> {
+    /// #        Protocol::sign_transaction(MyTransaction::new(msg), SERVICE_ID, *author, key)
+    /// #    }
     /// # }
     /// # impl Transaction for MyTransaction {
     /// #     fn execute(&self, _: exonum::blockchain::TransactionContext) -> ExecutionResult { Ok(()) }
@@ -536,8 +542,8 @@ impl TestKit {
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
-    /// let tx_a = MyTransaction::new(&pubkey, "foo", &key);
-    /// let tx_b = MyTransaction::new(&pubkey, "bar", &key);
+    /// let tx_a = MyTransaction::sign(&pubkey, "foo", &key);
+    /// let tx_b = MyTransaction::sign(&pubkey, "bar", &key);
     ///
     /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);

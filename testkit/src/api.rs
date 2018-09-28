@@ -96,7 +96,7 @@ impl TestKitApi {
     {
         self.api_sender
             .broadcast_transaction(transaction.into())
-            .expect("Cannot send transaction");
+            .expect("Cannot broadcast transaction");
     }
 
     /// Creates a requests builder for the public API scope.
