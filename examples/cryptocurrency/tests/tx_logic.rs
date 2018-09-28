@@ -25,7 +25,7 @@ extern crate exonum_testkit;
 extern crate rand;
 
 use exonum::{
-    blockchain::Transaction, crypto::{self, PublicKey, SecretKey},
+    crypto::{self, PublicKey, SecretKey}, messages::{Message, RawTransaction},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -46,8 +46,8 @@ fn test_create_wallet() {
     let (tx, _) = create_wallet(&mut testkit, ALICE_NAME);
 
     // Check that the user indeed is persisted by the service
-    let wallet = get_wallet(&testkit, tx.pub_key());
-    assert_eq!(wallet.pub_key(), tx.pub_key());
+    let wallet = get_wallet(&testkit, &tx.author());
+    assert_eq!(wallet.pub_key(), &tx.author());
     assert_eq!(wallet.name(), ALICE_NAME);
     assert_eq!(wallet.balance(), 100);
 }
@@ -58,13 +58,13 @@ fn test_transfer() {
     let (alice_pubkey, alice_key) = crypto::gen_keypair();
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
-        TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
-        TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
-        TxTransfer::new(
-            &alice_pubkey,
+        TxCreateWallet::sign(ALICE_NAME, &alice_pubkey, &alice_key),
+        TxCreateWallet::sign(BOB_NAME, &bob_pubkey, &bob_key),
+        TxTransfer::sign(
             &bob_pubkey,
             /* amount */ 10,
             /* seed */ 0,
+            &alice_pubkey,
             &alice_key
         ),
     ]);
@@ -82,12 +82,12 @@ fn test_transfer_from_nonexisting_wallet() {
     let (alice_pubkey, alice_key) = crypto::gen_keypair();
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
-        TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
-        TxTransfer::new(
-            &alice_pubkey,
+        TxCreateWallet::sign(BOB_NAME, &bob_pubkey, &bob_key),
+        TxTransfer::sign(
             &bob_pubkey,
             /* amount */ 10,
             /* seed */ 0,
+            &alice_pubkey,
             &alice_key
         ),
     ]);
@@ -104,16 +104,16 @@ fn test_transfer_to_nonexisting_wallet() {
     let (alice_pubkey, alice_key) = crypto::gen_keypair();
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
-        TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
-        TxTransfer::new(
-            &alice_pubkey,
+        TxCreateWallet::sign(ALICE_NAME, &alice_pubkey, &alice_key),
+        TxTransfer::sign(
             &bob_pubkey,
             /* amount */ 10,
             /* seed */ 0,
+            &alice_pubkey,
             &alice_key
         ),
         // Although Bob's wallet is created, this occurs after the transfer is executed.
-        TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
+        TxCreateWallet::sign(BOB_NAME, &bob_pubkey, &bob_key),
     ]);
 
     let alice_wallet = get_wallet(&testkit, &alice_pubkey);
@@ -129,13 +129,13 @@ fn test_transfer_overcharge() {
     let (alice_pubkey, alice_key) = crypto::gen_keypair();
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
-        TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
-        TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
-        TxTransfer::new(
-            &alice_pubkey,
+        TxCreateWallet::sign(ALICE_NAME, &alice_pubkey, &alice_key),
+        TxCreateWallet::sign(BOB_NAME, &bob_pubkey, &bob_key),
+        TxTransfer::sign(
             &bob_pubkey,
             /* amount */ 150,
             /* seed */ 0,
+            &alice_pubkey,
             &alice_key
         ),
     ]);
@@ -155,22 +155,22 @@ fn test_transfers_in_single_block() {
     let (alice_pubkey, alice_key) = crypto::gen_keypair();
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
-        TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
-        TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
+        TxCreateWallet::sign(ALICE_NAME, &alice_pubkey, &alice_key),
+        TxCreateWallet::sign(BOB_NAME, &bob_pubkey, &bob_key),
     ]);
 
-    let tx_a_to_b = TxTransfer::new(
-        &alice_pubkey,
+    let tx_a_to_b = TxTransfer::sign(
         &bob_pubkey,
         90, // amount
         0,  // seed
+        &alice_pubkey,
         &alice_key,
     );
-    let tx_b_to_a = TxTransfer::new(
-        &bob_pubkey,
+    let tx_b_to_a = TxTransfer::sign(
         &alice_pubkey,
         120, // amount
         0,   // seed
+        &bob_pubkey,
         &bob_key,
     );
 
@@ -214,18 +214,18 @@ fn test_fuzz_transfers() {
     let bob_keys = crypto::gen_keypair();
     let keys = &[alice_keys.clone(), bob_keys.clone()];
     testkit.create_block_with_transactions(txvec![
-        TxCreateWallet::new(&alice_keys.0, ALICE_NAME, &alice_keys.1),
-        TxCreateWallet::new(&bob_keys.0, BOB_NAME, &bob_keys.1),
+        TxCreateWallet::sign(ALICE_NAME, &alice_keys.0, &alice_keys.1),
+        TxCreateWallet::sign(BOB_NAME, &bob_keys.0, &bob_keys.1),
     ]);
 
     for _ in 0..BLOCKS {
         let n_txs = rng.gen_range(0, MAX_TRANSACTIONS); // number of transactions in the block
 
-        let txs: Vec<Box<Transaction>> = (0..n_txs)
+        let txs: Vec<Message<RawTransaction>> = (0..n_txs)
             .map(|_| {
                 let (sender, receiver) = (rng.choose(keys).unwrap(), rng.choose(keys).unwrap());
                 let amount = rng.gen_range(0, 250);
-                TxTransfer::new(&sender.0, &receiver.0, amount, rng.gen::<u64>(), &sender.1).into()
+                TxTransfer::sign(&receiver.0, amount, rng.gen::<u64>(), &sender.0, &sender.1)
             })
             .collect();
 
@@ -255,9 +255,9 @@ fn init_testkit() -> TestKit {
 }
 
 /// Creates a wallet with the given name and a random key.
-fn create_wallet(testkit: &mut TestKit, name: &str) -> (TxCreateWallet, SecretKey) {
+fn create_wallet(testkit: &mut TestKit, name: &str) -> (Message<RawTransaction>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
-    let tx = TxCreateWallet::new(&pubkey, name, &key);
+    let tx = TxCreateWallet::sign(name, &pubkey, &key);
     testkit.create_block_with_transaction(tx.clone());
     (tx, key)
 }
