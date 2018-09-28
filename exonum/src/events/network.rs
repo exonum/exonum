@@ -310,38 +310,46 @@ impl NetworkHandler {
 
         let unresolved_address = self.connect_list
             .find_address_by_key(&key)
-            .unwrap()
-            .address
-            .clone();
+            .map(|a| a.address.clone());
 
-        let action = {
-            let unresolved_address = unresolved_address.clone();
-            move || tokio_dns::TcpStream::connect(unresolved_address.as_str())
-        };
+        if let Some(unresolved_address) = unresolved_address {
+            let action = {
+                let unresolved_address = unresolved_address.clone();
+                move || tokio_dns::TcpStream::connect(unresolved_address.as_str())
+            };
 
-        let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
-        let pool = self.pool.clone();
-        Retry::spawn(strategy, action)
-            .map_err(into_failure)
-            .and_then(move |socket| Self::configure_socket(socket, network_config))
-            .and_then(move |outgoing_connection| {
-                Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
-            })
-            .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
-            .and_then(move |(socket, message)| {
-                if pool.contains(message.pub_key()) {
-                    Box::new(future::ok(()))
-                } else {
-                    let conn_addr = ConnectedPeerAddr::Out(
-                        unresolved_address,
-                        socket.get_ref().peer_addr().unwrap(),
-                    );
-                    pool.add(&key, conn_addr.clone(), sender_tx);
-                    let connection = Connection::new(handle, socket, receiver_rx, conn_addr);
-                    to_box(Self::handle_connection(connection, message, &network_tx))
-                }
-            })
-            .map(drop)
+            let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
+            let pool = self.pool.clone();
+            to_box(
+                Retry::spawn(strategy, action)
+                    .map_err(into_failure)
+                    .and_then(move |socket| Self::configure_socket(socket, network_config))
+                    .and_then(move |outgoing_connection| {
+                        Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
+                    })
+                    .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
+                    .and_then(move |(socket, message)| {
+                        if pool.contains(message.pub_key()) {
+                            Box::new(future::ok(()))
+                        } else {
+                            let conn_addr = ConnectedPeerAddr::Out(
+                                unresolved_address,
+                                socket.get_ref().peer_addr().unwrap(),
+                            );
+                            pool.add(&key, conn_addr.clone(), sender_tx);
+                            let connection =
+                                Connection::new(handle, socket, receiver_rx, conn_addr);
+                            to_box(Self::handle_connection(connection, message, &network_tx))
+                        }
+                    })
+                    .map(drop),
+            )
+        } else {
+            Box::new(err(format_err!(
+                "Trying to connect to peer not from ConnectList key={}",
+                key
+            )))
+        }
     }
 
     fn process_messages(

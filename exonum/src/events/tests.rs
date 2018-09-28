@@ -537,3 +537,57 @@ fn test_send_first_not_connect() {
     assert_eq!(node.wait_for_connect(), t2.connect);
     assert_eq!(node.wait_for_message(), message);
 }
+
+#[test]
+#[should_panic(expected = "An error during wait for connect occurred")]
+fn test_connect_list_ignore_when_connecting() {
+    let first = "127.0.0.1:20230".parse().unwrap();
+    let second = "127.0.0.1:20231".parse().unwrap();
+
+    let mut connect_list = ConnectList::default();
+
+    let mut t1 = ConnectionParams::from_address(first);
+    connect_list.add(t1.connect_info.clone());
+
+    let mut t2 = ConnectionParams::from_address(second);
+    let second_key = t2.connect_info.public_key;
+
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
+
+    let e1 = TestEvents::with_addr(first, &connect_list);
+    let e2 = TestEvents::with_addr(second, &connect_list);
+
+    let mut e1 = t1.spawn(e1, connect_list.clone());
+    let mut e2 = t2.spawn(e2, connect_list);
+
+    e1.connect_with(second_key, t1.connect.clone());
+    e2.wait_for_connect();
+    e1.wait_for_connect();
+}
+
+#[test]
+#[should_panic(expected = "An error during wait for connect occurred")]
+fn test_connect_list_ignore_when_listening() {
+    let first = "127.0.0.1:20230".parse().unwrap();
+    let second = "127.0.0.1:20231".parse().unwrap();
+
+    let mut connect_list = ConnectList::default();
+
+    let mut t1 = ConnectionParams::from_address(first);
+    let first_key = t1.connect_info.public_key;
+    connect_list.add(t1.connect_info.clone());
+
+    let mut t2 = ConnectionParams::from_address(second);
+
+    let connect_list = SharedConnectList::from_connect_list(connect_list);
+
+    let e1 = TestEvents::with_addr(first, &connect_list);
+    let e2 = TestEvents::with_addr(second, &connect_list);
+
+    let mut e1 = t1.spawn(e1, connect_list.clone());
+    let mut e2 = t2.spawn(e2, connect_list);
+
+    e2.connect_with(first_key, t1.connect.clone());
+    e1.wait_for_connect();
+    e2.wait_for_connect();
+}
