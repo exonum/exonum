@@ -25,6 +25,7 @@ use std::{
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use events::network::Connection;
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
@@ -59,7 +60,7 @@ pub struct State {
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
-    connections: HashMap<SocketAddr, PublicKey>,
+    connections: HashMap<SocketAddr, Connection>,
     height_start_time: SystemTime,
     height: Height,
 
@@ -569,19 +570,23 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        self.connections.insert(msg.addr(), pubkey);
-        self.peers.insert(pubkey, msg).is_none()
+    pub fn add_peer(&mut self, pubkey: PublicKey, connection: Connection) {
+        let connect = connection.connect().clone();
+        self.connections.insert(connection.address(), connection);
+        self.peers.insert(pubkey, connect);
     }
 
     /// Removes a peer by the socket address. Returns `Some` public key of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
-        let pubkey = self.connections.remove(addr);
-        if let Some(ref pubkey) = pubkey {
-            self.peers.remove(pubkey);
+    pub fn remove_peer_with_address(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
+        let connection = self.connections.remove(addr);
+        if let Some(ref connection) = connection {
+            let public_key = connection.public_key();
+            self.peers.remove(public_key);
+            Some(*public_key)
+        } else {
+            None
         }
-        pubkey
     }
 
     /// Checks if this node considers a peer to be a validator.
@@ -603,7 +608,7 @@ impl State {
     }
 
     /// Returns the addresses of known connections with public keys of its' validators.
-    pub fn connections(&self) -> &HashMap<SocketAddr, PublicKey> {
+    pub fn connections(&self) -> &HashMap<SocketAddr, Connection> {
         &self.connections
     }
 

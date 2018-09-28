@@ -27,9 +27,10 @@ use api::{websocket, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
+use events::network::ConnectionType;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
-use node::{ApiSender, NodeRole, State, TransactionSend};
+use node::{ApiSender, ConnectInfo, NodeRole, State, TransactionSend};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
@@ -313,8 +314,8 @@ impl ServiceContext {
 
 #[derive(Default)]
 pub struct ApiNodeState {
-    incoming_connections: HashSet<SocketAddr>,
-    outgoing_connections: HashSet<SocketAddr>,
+    incoming_connections: HashSet<ConnectInfo>,
+    outgoing_connections: HashSet<ConnectInfo>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
@@ -369,7 +370,7 @@ impl SharedNodeState {
         }
     }
     /// Returns a list of connected addresses of other nodes.
-    pub fn incoming_connections(&self) -> Vec<SocketAddr> {
+    pub fn incoming_connections(&self) -> Vec<ConnectInfo> {
         self.state
             .read()
             .expect("Expected read lock.")
@@ -379,7 +380,7 @@ impl SharedNodeState {
             .collect()
     }
     /// Returns a list of our connection sockets.
-    pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
+    pub fn outgoing_connections(&self) -> Vec<ConnectInfo> {
         self.state
             .read()
             .expect("Expected read lock.")
@@ -424,11 +425,17 @@ impl SharedNodeState {
 
         for (p, c) in state.peers() {
             lock.peers_info.insert(c.addr(), *p);
-            lock.outgoing_connections.insert(c.addr());
         }
 
-        for addr in state.connections().keys() {
-            lock.incoming_connections.insert(*addr);
+        for (address, c) in state.connections() {
+            let connect_info = ConnectInfo {
+                address: *address,
+                public_key: *c.public_key(),
+            };
+            match c.connection_type() {
+                ConnectionType::Incoming => lock.incoming_connections.insert(connect_info),
+                ConnectionType::Outgoing => lock.outgoing_connections.insert(connect_info),
+            };
         }
     }
 
@@ -477,41 +484,6 @@ impl SharedNodeState {
     /// Returns the value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout
-    }
-
-    /// Adds an incoming connection into the state.
-    pub fn add_incoming_connection(&self, addr: SocketAddr) {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .incoming_connections
-            .insert(addr);
-    }
-    /// Adds an outgoing connection into the state.
-    pub fn add_outgoing_connection(&self, addr: SocketAddr) {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .outgoing_connections
-            .insert(addr);
-    }
-
-    /// Removes an incoming connection from the state.
-    pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .incoming_connections
-            .remove(addr)
-    }
-
-    /// Removes an outgoing connection from the state.
-    pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
-        self.state
-            .write()
-            .expect("Expected write lock")
-            .outgoing_connections
-            .remove(addr)
     }
 
     /// Adds a reconnect timeout.
