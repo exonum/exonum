@@ -320,7 +320,7 @@ impl NetworkHandler {
 
             let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
             let pool = self.pool.clone();
-            to_box(
+            Either::A(
                 Retry::spawn(strategy, action)
                     .map_err(into_failure)
                     .and_then(move |socket| Self::configure_socket(socket, network_config))
@@ -345,7 +345,7 @@ impl NetworkHandler {
                     .map(drop),
             )
         } else {
-            Box::new(err(format_err!(
+            Either::B(err(format_err!(
                 "Trying to connect to peer not from ConnectList key={}",
                 key
             )))
