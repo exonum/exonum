@@ -46,6 +46,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Connect` message field `addr` with `SocketAddr` is removed, `pub_addr` with
    `str` of unresolved external address of the peer is used instead. (#942)
 
+- Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
+  of single IP-addresses. (#959)
+
 ### New Features
 
 #### exonum

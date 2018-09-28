@@ -19,7 +19,7 @@ use actix::Addr;
 use serde_json::Value;
 
 use std::{
-    collections::HashMap, fmt, net::SocketAddr, sync::{Arc, RwLock},
+    collections::{HashMap, HashSet}, fmt, net::SocketAddr, sync::{Arc, RwLock},
 };
 
 use super::transaction::Transaction;
@@ -30,7 +30,7 @@ use encoding::Error as MessageError;
 use events::network::ConnectedPeerAddr;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
-use node::{ApiSender, NodeRole, State, TransactionSend};
+use node::{ApiSender, ConnectInfo, NodeRole, State, TransactionSend};
 use storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
@@ -315,8 +315,8 @@ impl ServiceContext {
 #[derive(Default)]
 pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
-    incoming_connections: HashMap<PublicKey, SocketAddr>,
-    outgoing_connections: HashMap<PublicKey, SocketAddr>,
+    incoming_connections: HashSet<ConnectInfo>,
+    outgoing_connections: HashSet<ConnectInfo>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     is_enabled: bool,
     node_role: NodeRole,
@@ -368,22 +368,22 @@ impl SharedNodeState {
         }
     }
     /// Returns a list of connected addresses of other nodes.
-    pub fn incoming_connections(&self) -> Vec<SocketAddr> {
+    pub fn incoming_connections(&self) -> Vec<ConnectInfo> {
         self.state
             .read()
             .expect("Expected read lock.")
             .incoming_connections
-            .values()
+            .iter()
             .cloned()
             .collect()
     }
     /// Returns a list of our connection sockets.
-    pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
+    pub fn outgoing_connections(&self) -> Vec<ConnectInfo> {
         self.state
             .read()
             .expect("Expected read lock.")
             .outgoing_connections
-            .values()
+            .iter()
             .cloned()
             .collect()
     }
@@ -413,10 +413,18 @@ impl SharedNodeState {
         for (p, a) in state.connections() {
             match a {
                 ConnectedPeerAddr::In(addr) => {
-                    lock.incoming_connections.insert(*p, *addr);
+                    let conn_info = ConnectInfo {
+                        address: addr.to_string(),
+                        public_key: *p,
+                    };
+                    lock.incoming_connections.insert(conn_info);
                 }
                 ConnectedPeerAddr::Out(_, addr) => {
-                    lock.outgoing_connections.insert(*p, *addr);
+                    let conn_info = ConnectInfo {
+                        address: addr.to_string(),
+                        public_key: *p,
+                    };
+                    lock.outgoing_connections.insert(conn_info);
                 }
             }
         }
@@ -426,9 +434,13 @@ impl SharedNodeState {
     pub fn consensus_status(&self) -> bool {
         let lock = self.state.read().expect("Expected read lock.");
         let mut active_validators = lock.incoming_connections
-            .keys()
-            .chain(lock.outgoing_connections.keys())
-            .filter(|pk| lock.validators.iter().any(|v| v.consensus_key == **pk))
+            .iter()
+            .chain(lock.outgoing_connections.iter())
+            .filter(|ci| {
+                lock.validators
+                    .iter()
+                    .any(|v| v.consensus_key == ci.public_key)
+            })
             .count();
 
         if lock.node_role.is_validator() {

@@ -766,7 +766,7 @@ impl fmt::Debug for ApiSender {
 }
 
 /// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ConnectInfo {
     /// Peer address.
     pub address: String,
