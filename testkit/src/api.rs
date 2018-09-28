@@ -24,9 +24,9 @@ use serde_urlencoded;
 use std::fmt::{self, Display};
 
 use exonum::{
-    api::{self, ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
+    api::{self, ApiAggregator, ServiceApiState}, blockchain::SharedNodeState,
     encoding::serialize::reexport::{DeserializeOwned, Serialize},
-    node::{ApiSender, TransactionSend},
+    messages::{Message, RawTransaction}, node::ApiSender,
 };
 
 use TestKit;
@@ -92,11 +92,11 @@ impl TestKitApi {
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
-        T: Into<Box<dyn Transaction>>,
+        T: Into<Message<RawTransaction>>,
     {
         self.api_sender
-            .send(transaction.into())
-            .expect("Cannot send transaction");
+            .broadcast_transaction(transaction.into())
+            .expect("Cannot broadcast transaction");
     }
 
     /// Creates a requests builder for the public API scope.

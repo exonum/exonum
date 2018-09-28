@@ -14,8 +14,8 @@
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::{SharedNodeState, Transaction}, crypto::Hash,
-    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
+    blockchain::SharedNodeState, crypto::Hash, explorer::{BlockWithTransactions, BlockchainExplorer},
+    helpers::Height,
 };
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -58,7 +58,7 @@ impl TestkitServerApi {
     fn create_block(
         &self,
         tx_hashes: Option<Vec<Hash>>,
-    ) -> api::Result<BlockWithTransactions<Box<dyn Transaction>>> {
+    ) -> api::Result<BlockWithTransactions> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
@@ -79,10 +79,7 @@ impl TestkitServerApi {
         Ok(block_info)
     }
 
-    fn rollback(
-        &self,
-        height: Height,
-    ) -> api::Result<Option<BlockWithTransactions<Box<dyn Transaction>>>> {
+    fn rollback(&self, height: Height) -> api::Result<Option<BlockWithTransactions>> {
         if height == Height(0) {
             Err(api::Error::BadRequest(
                 "Cannot rollback past genesis block".into(),
@@ -156,46 +153,45 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
-
     use exonum::api;
-    use exonum::blockchain::{ExecutionResult, Service, Transaction};
-    use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
-    use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
+    use exonum::blockchain::{
+        ExecutionResult, Service, Transaction, TransactionContext,
+    };
+    use exonum::crypto::{gen_keypair, Hash};
+    use exonum::encoding::{Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
-    use exonum::messages::{Message, RawTransaction};
-    use exonum::storage::{Fork, Snapshot};
+    use exonum::messages::{Message, Protocol, RawTransaction};
+    use exonum::storage::Snapshot;
 
     use super::*;
     use {TestKitApi, TestKitBuilder};
 
-    type DeBlock = BlockWithTransactions<serde_json::Value>;
-
+    type DeBlock = BlockWithTransactions;
+    const TIMESTAMP_SERVICE_ID: u16 = 0;
     transactions! {
         Any {
-            const SERVICE_ID = 1000;
 
             struct TxTimestamp {
-                from: &PublicKey,
                 msg: &str,
             }
         }
     }
 
     impl TxTimestamp {
-        fn for_str(s: &str) -> Self {
+        fn for_str(s: &str) -> Message<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            TxTimestamp::new(&pubkey, s, &key)
+            Protocol::sign_transaction(
+                TxTimestamp::new(s),
+                TIMESTAMP_SERVICE_ID,
+                pubkey,
+                &key,
+            )
         }
     }
 
     impl Transaction for TxTimestamp {
-        fn verify(&self) -> bool {
-            self.verify_signature(self.from())
-        }
-
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -207,7 +203,7 @@ mod tests {
 
         impl Service for SampleService {
             fn service_id(&self) -> u16 {
-                1000
+                TIMESTAMP_SERVICE_ID
             }
 
             fn service_name(&self) -> &'static str {
@@ -263,10 +259,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(
-            *block_info.transactions[0].content(),
-            tx.serialize_field().unwrap()
-        );
+        assert_eq!(block_info.transactions[0].content().message(), &tx);
 
         // Requests with a body that invoke `create_block`
         let bodies = vec![None, Some(CreateBlockQuery { tx_hashes: None })];
@@ -287,10 +280,7 @@ mod tests {
 
             assert_eq!(block_info.header.height(), Height(1));
             assert_eq!(block_info.transactions.len(), 1);
-            assert_eq!(
-                *block_info.transactions[0].content(),
-                tx.serialize_field().unwrap()
-            );
+            assert_eq!(block_info.transactions[0].content().message(), &tx);
         }
     }
 
@@ -318,8 +308,8 @@ mod tests {
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
-            *block_info.transactions[0].content(),
-            tx_foo.serialize_field().unwrap()
+            block_info.transactions[0].content().message(),
+            &tx_foo
         );
 
         let body = CreateBlockQuery {
@@ -333,8 +323,8 @@ mod tests {
         assert_eq!(block_info.header.height(), Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
-            *block_info.transactions[0].content(),
-            tx_bar.serialize_field().unwrap()
+            block_info.transactions[0].content().message(),
+            &tx_bar
         );
     }
 
