@@ -37,16 +37,16 @@ fn node_config() -> NodeConfig {
         ..Default::default()
     };
 
-    let peer_address = "0.0.0.0:2000".parse().unwrap();
+    let peer_address = "0.0.0.0:2000";
 
     NodeConfig {
-        listen_address: peer_address,
+        listen_address: peer_address.parse().unwrap(),
         service_public_key,
         service_secret_key,
         consensus_public_key,
         consensus_secret_key,
         genesis,
-        external_address: peer_address,
+        external_address: peer_address.to_owned(),
         network: Default::default(),
         connect_list: Default::default(),
         api: api_cfg,

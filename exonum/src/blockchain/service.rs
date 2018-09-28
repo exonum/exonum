@@ -27,7 +27,7 @@ use api::{websocket, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
-use events::network::ConnectionType;
+use events::network::ConnectedPeerAddr;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::RawTransaction;
 use node::{ApiSender, ConnectInfo, NodeRole, State, TransactionSend};
@@ -314,11 +314,10 @@ impl ServiceContext {
 
 #[derive(Default)]
 pub struct ApiNodeState {
+    // TODO: Update on event? (ECR-1632)
     incoming_connections: HashSet<ConnectInfo>,
     outgoing_connections: HashSet<ConnectInfo>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
-    // TODO: Update on event? (ECR-1632)
-    peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
     node_role: NodeRole,
     majority_count: usize,
@@ -332,7 +331,6 @@ impl fmt::Debug for ApiNodeState {
             .field("incoming_connections", &self.incoming_connections)
             .field("outgoing_connections", &self.outgoing_connections)
             .field("reconnects_timeout", &self.reconnects_timeout)
-            .field("peers_info", &self.peers_info)
             .field("is_enabled", &self.is_enabled)
             .field("node_role", &self.node_role)
             .field("majority_count", &self.majority_count)
@@ -401,53 +399,47 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
-    /// Returns a list of addresses and public keys of peers from which the
-    /// node has received `Connect` messages.
-    pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
-        self.state
-            .read()
-            .expect("Expected read lock.")
-            .peers_info
-            .iter()
-            .map(|(c, e)| (*c, *e))
-            .collect()
-    }
+
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
         let mut lock = self.state.write().expect("Expected write lock.");
 
-        lock.peers_info.clear();
         lock.incoming_connections.clear();
         lock.outgoing_connections.clear();
         lock.majority_count = state.majority_count();
         lock.node_role = NodeRole::new(state.validator_id());
         lock.validators = state.validators().to_vec();
 
-        for (p, c) in state.peers() {
-            lock.peers_info.insert(c.addr(), *p);
-        }
-
-        for (address, c) in state.connections() {
-            let connect_info = ConnectInfo {
-                address: *address,
-                public_key: *c.public_key(),
-            };
-            match c.connection_type() {
-                ConnectionType::Incoming => lock.incoming_connections.insert(connect_info),
-                ConnectionType::Outgoing => lock.outgoing_connections.insert(connect_info),
-            };
+        for (p, a) in state.connections() {
+            match a {
+                ConnectedPeerAddr::In(addr) => {
+                    let conn_info = ConnectInfo {
+                        address: addr.to_string(),
+                        public_key: *p,
+                    };
+                    lock.incoming_connections.insert(conn_info);
+                }
+                ConnectedPeerAddr::Out(_, addr) => {
+                    let conn_info = ConnectInfo {
+                        address: addr.to_string(),
+                        public_key: *p,
+                    };
+                    lock.outgoing_connections.insert(conn_info);
+                }
+            }
         }
     }
 
     /// Returns a boolean value which indicates whether the consensus is achieved.
     pub fn consensus_status(&self) -> bool {
         let lock = self.state.read().expect("Expected read lock.");
-        let mut active_validators = lock.peers_info
-            .values()
-            .filter(|peer_key| {
+        let mut active_validators = lock.incoming_connections
+            .iter()
+            .chain(lock.outgoing_connections.iter())
+            .filter(|ci| {
                 lock.validators
                     .iter()
-                    .any(|validator| validator.consensus_key == **peer_key)
+                    .any(|v| v.consensus_key == ci.public_key)
             })
             .count();
 

@@ -136,7 +136,7 @@ impl SystemApi {
 
             for connect_info in self.shared_api_state.outgoing_connections() {
                 outgoing_connections.insert(
-                    connect_info.address,
+                    connect_info.address.parse().unwrap(),
                     IncomingConnection {
                         public_key: Some(connect_info.public_key),
                         state: Default::default(),

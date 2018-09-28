@@ -431,15 +431,15 @@ fn should_restore_peers_after_restart() {
 
     // receive a `Connect` message and the respond on it
     sandbox.recv(&connect_from_1);
-    sandbox.send(a1, &connect_from_0);
+    sandbox.send(p1, &connect_from_0);
 
     // restart the node
     let sandbox_restarted = sandbox.restart_uninitialized();
 
     // check that the node is connecting with the peer
-    sandbox_restarted.send(a1, &connect_from_0);
+    sandbox_restarted.send(p1, &connect_from_0);
 
     // check that the peer is restored
     sandbox_restarted.recv(&peers_request);
-    sandbox_restarted.send(a1, &connect_from_1);
+    sandbox_restarted.send(p1, &connect_from_1);
 }

@@ -14,10 +14,11 @@
 
 use rand::{self, Rng};
 
-use std::{error::Error, net::SocketAddr};
+use std::error::Error;
 
 use super::{NodeHandler, NodeRole, RequestData};
-use events::network::{Connection, ConnectionType};
+use crypto::PublicKey;
+use events::network::ConnectedPeerAddr;
 use helpers::Height;
 use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 
@@ -38,28 +39,48 @@ impl NodeHandler {
         }
     }
 
-    /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: Connect) {
-        let address = message.addr();
-        self.handle_connected(
-            &address,
-            Connection {
-                message,
-                connection_type: ConnectionType::Incoming,
-            },
-        )
-    }
-
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, peer_address: &SocketAddr, connection: Connection) {
+    pub fn handle_connected(&mut self, address: &ConnectedPeerAddr, connect: Connect) {
+        info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
+        self.state
+            .add_connection(*connect.pub_key(), address.clone());
+        self.handle_connect(connect);
+    }
+
+    /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
+    /// in the validators list.
+    pub fn handle_disconnected(&mut self, key: PublicKey) {
+        info!("Disconnected from: {}", key);
+        self.remove_peer_with_addr(key);
+    }
+
+    /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
+    /// if it was in the validators list.
+    pub fn handle_unable_to_connect(&mut self, key: PublicKey) {
+        info!("Could not connect to: {}", key);
+        self.remove_peer_with_addr(key);
+    }
+
+    /// Removes peer from the state and from the cache. Node will try to connect to that address
+    /// again if it was in the validators list.
+    fn remove_peer_with_addr(&mut self, key: PublicKey) {
+        self.state.remove_peer_with_pubkey(&key);
+        self.blockchain.remove_peer_with_pubkey(&key);
+        let is_validator = self.state.peer_is_validator(&key);
+        let in_connect_list = self.state.peer_in_connect_list(&key);
+        if is_validator && in_connect_list {
+            self.connect(key);
+        }
+    }
+
+    /// Handles the `Connect` message and connects to a peer as result.
+    pub fn handle_connect(&mut self, message: Connect) {
         // TODO Add spam protection. (ECR-170)
         // TODO: drop connection if checks have failed. (ECR-1837)
-        info!("Received Connect message from peer: {:?}", peer_address);
-        let message = connection.connect().clone();
-        let address = message.addr();
-        if address == self.state.our_connect_message().addr() {
+        let address = message.pub_addr().to_owned();
+        if address == self.state.our_connect_message().pub_addr() {
             trace!("Received Connect with same address as our external_address.");
             return;
         }
@@ -93,52 +114,35 @@ impl NodeHandler {
                 error!("Received outdated Connect message from {}", address);
                 return;
             } else if saved_message.time() < message.time() {
-                need_connect = saved_message.addr() != message.addr();
-            } else if saved_message.addr() == message.addr() {
+                need_connect = saved_message.pub_addr() != message.pub_addr();
+            } else if saved_message.pub_addr() == message.pub_addr() {
                 need_connect = false;
             } else {
                 error!("Received weird Connect message from {}", address);
                 return;
             }
+            if saved_message.pub_addr() != message.pub_addr() {
+                info!(
+                    "Updating connect list for peer: {} with new addr: {}",
+                    public_key,
+                    message.pub_addr()
+                );
+                self.state
+                    .connect_list()
+                    .update_peer(&public_key, message.pub_addr().to_string())
+            }
         }
-        self.state.add_peer(public_key, connection);
+        self.state.add_peer(public_key, message.clone());
         info!(
             "Received Connect message from {}, {}",
             address, need_connect,
         );
-        self.blockchain.save_peer(&public_key, message.clone());
+        self.blockchain.save_peer(&public_key, message);
         if need_connect {
             info!("Send Connect message to {}", address);
             //TODO: remove responding connect [ECR-2385]
-            self.connect(&address);
+            self.connect(public_key);
         }
-    }
-
-    /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
-    /// in the validators list.
-    pub fn handle_disconnected(&mut self, addr: SocketAddr) {
-        info!("Disconnected from: {}", addr);
-        self.remove_peer_with_address(addr);
-    }
-
-    /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
-    /// if it was in the validators list.
-    pub fn handle_unable_to_connect(&mut self, addr: SocketAddr) {
-        info!("Could not connect to: {}", addr);
-        self.remove_peer_with_address(addr);
-    }
-
-    /// Removes peer from the state and from the cache. Node will try to connect to that address
-    /// again if it was in the validators list.
-    fn remove_peer_with_address(&mut self, address: SocketAddr) {
-        if let Some(pubkey) = self.state.remove_peer_with_address(&address) {
-            let is_validator = self.state.peer_is_validator(&pubkey);
-            let in_connect_list = self.state.peer_in_connect_list(&pubkey);
-            if is_validator && in_connect_list {
-                self.connect(&address);
-            }
-        }
-        self.blockchain.remove_peer_with_addr(&address);
     }
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
@@ -225,7 +229,7 @@ impl NodeHandler {
                 peer.pub_key(),
                 self.state.consensus_secret_key(),
             );
-            trace!("Request peers from peer with addr {:?}", peer.addr());
+            trace!("Request peers from peer with addr {:?}", peer.pub_addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();

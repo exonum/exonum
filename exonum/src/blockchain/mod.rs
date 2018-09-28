@@ -49,8 +49,7 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
-    panic, sync::Arc,
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -526,16 +525,13 @@ impl Blockchain {
     }
 
     /// Removes from the cache the `Connect` message from a peer.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
         let mut fork = self.fork();
 
         {
             let mut schema = Schema::new(&mut fork);
             let mut peers = schema.peers_cache_mut();
-            let peer = peers.iter().find(|&(_, ref v)| v.addr() == *addr);
-            if let Some(pubkey) = peer.map(|(k, _)| k) {
-                peers.remove(&pubkey);
-            }
+            peers.remove(key);
         }
 
         self.merge(fork.into_patch())

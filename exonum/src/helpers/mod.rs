@@ -49,11 +49,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         }
     }));
     let peers = (0..validators.len())
-        .map(|x| {
-            format!("127.0.0.1:{}", start_port + x as u16)
-                .parse()
-                .unwrap()
-        })
+        .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
         .collect::<Vec<_>>();
 
     validators
@@ -61,8 +57,8 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         .zip(services.into_iter())
         .enumerate()
         .map(|(idx, (validator, service))| NodeConfig {
-            listen_address: peers[idx],
-            external_address: peers[idx],
+            listen_address: peers[idx].parse().unwrap(),
+            external_address: peers[idx].clone(),
             network: Default::default(),
             consensus_public_key: validator.0,
             consensus_secret_key: validator.1,
