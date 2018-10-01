@@ -24,12 +24,10 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-extern crate hex;
-
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{Message, RawTransaction},
+    messages::{self, Message, RawTransaction},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
@@ -221,7 +219,7 @@ impl CryptocurrencyApi {
         // Create a pre-signed transaction
         let tx = CreateWallet::sign(name, &pubkey, &key);
 
-        let data = hex::encode(tx.clone().serialize());
+        let data = messages::to_hex_string(&tx);
         let tx_info: TransactionResponse = self.inner
             .public(ApiKind::Explorer)
             .query(&json!({ "tx_body": data }))
@@ -249,7 +247,7 @@ impl CryptocurrencyApi {
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
     fn transfer(&self, tx: &Message<RawTransaction>) {
-        let data = hex::encode(tx.clone().serialize());
+        let data = messages::to_hex_string(&tx);
         let tx_info: TransactionResponse = self.inner
             .public(ApiKind::Explorer)
             .query(&json!({ "tx_body": data }))
