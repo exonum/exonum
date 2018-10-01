@@ -752,7 +752,7 @@ impl ApiSender {
 impl TransactionSend for ApiSender {
     fn send(&self, tx: Box<dyn Transaction>) -> Result<(), failure::Error> {
         if !tx.verify() {
-            bail!("Unable to verify transaction");
+            bail!("Invalid transaction");
         }
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
