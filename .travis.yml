@@ -24,6 +24,10 @@ addons:
     - libsnappy-dev
     - librocksdb
     - cmake
+    - zlib1g-dev
+    - build-essential
+    - pkg-config
+    - unzip
 
 rust:
   # Feel free to bump this version if you need features of newer Rust.
@@ -124,6 +128,11 @@ jobs:
         - libsnappy-dev
         - librocksdb
         - powershell
+        - cmake
+        - zlib1g-dev
+        - build-essential
+        - pkg-config
+
     install:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
