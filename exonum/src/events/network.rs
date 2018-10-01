@@ -175,12 +175,16 @@ impl ConnectionPool {
         key: &PublicKey,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = failure::Error> {
-        self.remove(key);
-        network_tx
-            .clone()
-            .send(NetworkEvent::PeerDisconnected(*key))
-            .map_err(|_| format_err!("can't send disconnect"))
-            .map(drop)
+        if self.remove(key).is_some() {
+            let send_disconnected = network_tx
+                .clone()
+                .send(NetworkEvent::PeerDisconnected(*key))
+                .map_err(|_| format_err!("can't send disconnect"))
+                .map(drop);
+            Either::A(send_disconnected)
+        } else {
+            Either::B(future::ok(()))
+        }
     }
 }
 
@@ -495,7 +499,9 @@ impl NetworkHandler {
                 NetworkRequest::SendMessage(key, message) => {
                     to_box(self.handle_send_message(&key, message))
                 }
-                NetworkRequest::DisconnectWithPeer(peer) => to_box(self.disconnect_with_peer(peer)),
+                NetworkRequest::DisconnectWithPeer(peer) => {
+                    to_box(self.pool.disconnect_with_peer(&peer, &self.network_tx))
+                }
                 NetworkRequest::Shutdown => to_box(
                     cancel_sender
                         .take()
@@ -558,27 +564,6 @@ impl NetworkHandler {
 
     fn can_create_connections(&self) -> bool {
         self.pool.len() < self.network_config.max_outgoing_connections
-    }
-
-    fn disconnect_with_peer(
-        &self,
-        peer: PublicKey,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        if self.pool.remove(&peer).is_some() {
-            to_box(
-                self.network_tx
-                    .clone()
-                    .send(NetworkEvent::PeerDisconnected(peer))
-                    .map_err(|_| format_err!("can't send disconnect"))
-                    .map(drop),
-            )
-        } else {
-            Box::new(err(format_err!(
-                "Attempt to connect to disconnect with peer with key {:?} which \
-                 is not in the connection pool",
-                peer
-            )))
-        }
     }
 
     fn send_unable_connect_event(
