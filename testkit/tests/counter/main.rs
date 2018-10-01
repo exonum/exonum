@@ -610,7 +610,7 @@ fn test_explorer_transaction_info() {
             "type": "in-pool",
             "content": {
                 "debug": TxIncrement::new(5),
-                "message": messages::to_hex_string(&tx).unwrap()
+                "message": messages::to_hex_string(&tx)
             },
         })
     );
