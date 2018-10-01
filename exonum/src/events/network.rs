@@ -14,7 +14,7 @@
 
 use failure;
 use futures::{
-    future, future::{err, Either}, stream::{SplitSink, SplitStream}, sync::mpsc, unsync, Future,
+    future::{self, err, Either}, stream::{SplitSink, SplitStream}, sync::mpsc, unsync, Future,
     IntoFuture, Sink, Stream,
 };
 use tokio::net::{TcpListener, TcpStream};
