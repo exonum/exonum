@@ -233,9 +233,9 @@ pub mod contracts {
         /// If a wallet with the specified public key is not registered, then creates a new wallet
         /// with the specified public key and name, and an initial balance of 100.
         /// Otherwise, performs no op.
-        fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-            let author = tc.author();
-            let view = tc.fork();
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let author = context.author();
+            let view = context.fork();
             let mut schema = CurrencySchema::new(view);
             if schema.wallet(&author).is_none() {
                 let wallet = Wallet::new(&author, self.name(), INIT_BALANCE);
@@ -255,9 +255,9 @@ pub mod contracts {
         /// is sufficient. Otherwise, performs no op.
         ///
         /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
-        fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-            let author = tc.author();
-            let view = tc.fork();
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let author = context.author();
+            let view = context.fork();
 
             if &author == self.to() {
                 Err(Error::SenderSameAsReceiver)?
