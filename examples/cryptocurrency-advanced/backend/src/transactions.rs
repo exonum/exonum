@@ -121,11 +121,11 @@ impl Transfer {
 }
 
 impl Transaction for Transfer {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        let ref from = tc.author();
-        let hash = tc.tx_hash();
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let ref from = context.author();
+        let hash = context.tx_hash();
 
-        let mut schema = Schema::new(tc.fork());
+        let mut schema = Schema::new(context.fork());
 
         let to = self.to();
         let amount = self.amount();
@@ -150,11 +150,11 @@ impl Transaction for Transfer {
 }
 
 impl Transaction for Issue {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        let ref pub_key = tc.author();
-        let hash = tc.tx_hash();
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let ref pub_key = context.author();
+        let hash = context.tx_hash();
 
-        let mut schema = Schema::new(tc.fork());
+        let mut schema = Schema::new(context.fork());
 
         if let Some(wallet) = schema.wallet(pub_key) {
             let amount = self.amount();
@@ -167,11 +167,11 @@ impl Transaction for Issue {
 }
 
 impl Transaction for CreateWallet {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        let ref pub_key = tc.author();
-        let hash = tc.tx_hash();
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let ref pub_key = context.author();
+        let hash = context.tx_hash();
 
-        let mut schema = Schema::new(tc.fork());
+        let mut schema = Schema::new(context.fork());
 
         if schema.wallet(pub_key).is_none() {
             let name = self.name();

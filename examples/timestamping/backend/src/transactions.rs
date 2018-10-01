@@ -58,8 +58,8 @@ transactions! {
 }
 
 impl Transaction for TxTimestamp {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        let time = TimeSchema::new(&tc.fork())
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let time = TimeSchema::new(&context.fork())
             .time()
             .get()
             .expect("Can't get the time");
@@ -67,7 +67,7 @@ impl Transaction for TxTimestamp {
         let content = self.content();
         let hash = content.content_hash();
 
-        let mut schema = Schema::new(tc.fork());
+        let mut schema = Schema::new(context.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
             Err(Error::HashAlreadyExists)?;
         }
