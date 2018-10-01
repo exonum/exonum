@@ -19,8 +19,9 @@
 #![allow(bare_trait_objects)]
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext}, crypto::{CryptoHash, PublicKey},
-    messages::Message, storage::Fork,
+    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
+    crypto::{CryptoHash, PublicKey, SecretKey},
+    messages::{Protocol, RawTransaction, Message}, storage::Fork,
 };
 
 use schema::Schema;
@@ -96,6 +97,26 @@ transactions! {
             /// Name of the new wallet.
             name:    &str,
         }
+    }
+}
+
+impl CreateWallet {
+    #[doc(hidden)]
+    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Message<RawTransaction> {
+        Protocol::sign_transaction(CreateWallet::new(name), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+    }
+}
+
+impl Transfer {
+    #[doc(hidden)]
+    pub fn sign(
+        pk: &PublicKey,
+        to: &PublicKey,
+        amount: u64,
+        seed: u64,
+        sk: &SecretKey,
+    ) -> Message<RawTransaction> {
+        Protocol::sign_transaction(Transfer::new(to, amount, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
     }
 }
 
