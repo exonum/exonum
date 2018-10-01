@@ -50,8 +50,8 @@ fn test_create_wallet() {
     api.assert_tx_status(tx.hash(), &json!({ "type": "success" }));
 
     // Check that the user indeed is persisted by the service.
-    let wallet = api.get_wallet(*tx.pub_key()).unwrap();
-    assert_eq!(wallet.pub_key(), tx.pub_key());
+    let wallet = api.get_wallet(*tx.author()).unwrap();
+    assert_eq!(wallet.pub_key(), tx.author());
     assert_eq!(wallet.name(), tx.name());
     assert_eq!(wallet.balance(), 100);
 }
@@ -198,7 +198,7 @@ fn test_unknown_wallet_request() {
     // Transaction is sent by API, but isn't committed.
     let (tx, _) = api.create_wallet(ALICE_NAME);
 
-    api.assert_no_wallet(*tx.pub_key());
+    api.assert_no_wallet(*tx.author());
 }
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
@@ -216,15 +216,15 @@ impl CryptocurrencyApi {
     fn create_wallet(&self, name: &str) -> (CreateWallet, SecretKey) {
         let (pubkey, key) = crypto::gen_keypair();
         // Create a pre-signed transaction
-        let tx = CreateWallet::new(&pubkey, name, &key);
+        let tx = CreateWallet::sign(&pubkey, name, &key);
 
-        let tx_info: serde_json::Value = self.inner
-            .public(ApiKind::Service("cryptocurrency"))
-            .query(&tx)
-            .post("v1/wallets/transaction")
+        let data = hex::encode(tx.clone().serialize());
+        let tx_info: TransactionResponse = api
+            .public(ApiKind::Explorer)
+            .query(&json!({ "tx_body": data }))
+            .post("v1/transactions")
             .unwrap();
-        assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
-        (tx, key)
+        assert_eq!(tx_info.tx_hash, tx.hash());
     }
 
     fn get_wallet(&self, pub_key: PublicKey) -> Option<Wallet> {

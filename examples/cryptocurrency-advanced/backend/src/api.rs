@@ -17,7 +17,8 @@
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof, Transaction, TransactionSet}, crypto::{Hash, PublicKey},
-    helpers::Height, node::TransactionSend, storage::{ListProof, MapProof},
+    helpers::Height, storage::{ListProof, MapProof},
+    messages::RawTransaction,
 };
 
 use transactions::WalletTransactions;
@@ -104,7 +105,10 @@ impl PublicApi {
             let transactions: Vec<WalletTransactions> = history
                 .iter()
                 .map(|record| general_schema.transactions().get(&record).unwrap())
-                .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
+                .map(|raw| {
+                    let raw: &RawTransaction = raw.as_ref();
+                    WalletTransactions::tx_from_raw(raw.clone()).unwrap()
+                })
                 .collect::<Vec<_>>();
 
             WalletHistory {
@@ -120,22 +124,10 @@ impl PublicApi {
         })
     }
 
-    /// Endpoint for handling cryptocurrency transactions.
-    pub fn post_transaction(
-        state: &ServiceApiState,
-        query: WalletTransactions,
-    ) -> api::Result<TransactionResponse> {
-        let transaction: Box<dyn Transaction> = query.into();
-        let tx_hash = transaction.hash();
-        state.sender().send(transaction)?;
-        Ok(TransactionResponse { tx_hash })
-    }
-
     /// Wires the above endpoint to public scope of the given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("v1/wallets/info", Self::wallet_info)
-            .endpoint_mut("v1/wallets/transaction", Self::post_transaction);
+            .endpoint("v1/wallets/info", Self::wallet_info);
     }
 }
