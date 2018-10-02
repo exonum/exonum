@@ -400,7 +400,7 @@ fn test_network_max_message_len() {
     assert_eq!(e2.wait_for_message(), acceptable_message);
 
     e2.send_to(first_key, too_big_message.clone());
-    assert!(e1.wait_for_event().is_err());
+    assert_eq!(e1.wait_for_disconnect(), second_key);
 }
 
 #[test]
