@@ -43,6 +43,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `MapProof::missing_keys_unchecked` method now return `impl Iterator` instead
   of `Vec`. (#918)
 
+- `Connect` message field `addr` with `SocketAddr` is removed, `pub_addr` with
+   `str` of unresolved external address of the peer is used instead. (#942)
+
+- Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
+  of single IP-addresses. (#959)
+
 ### New Features
 
 #### exonum
@@ -62,6 +68,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `MapProof::all_entries_unchecked` method. It is used for more efficient
   calculations in Exonum Java Bindings, but can be used for debug purposes
   as well. (#918)
+
+- Added `listen-address` command line argument to specify different external address
+  (`peer-address`) and listen address when generating config files. (#942)
+
+- Peer address is resolved on connect instead of resolving on node startup. (#942)
 
 - Now peers require only one connection to exchange messages between
   them. (#945)
@@ -118,6 +129,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   trusted peer in the generated configuration. (#892)
 
 - Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
+
+- `ConnectInfo` and `ConnectList` now stores unresolved addresses as strings. (#942)
+
+- Now `network` module uses `PublicKeys` to identify peers. (#942)
+
+- `system/v1/peers` endpoint now properly returns
+  incoming and outgoing connections of the node. (#942)
 
 ## 0.9.1 - 2018-08-02
 

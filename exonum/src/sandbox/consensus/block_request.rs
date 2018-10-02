@@ -80,7 +80,7 @@ fn handle_block_response_tx_in_pool() {
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -167,7 +167,7 @@ fn handle_block_response_with_unknown_tx() {
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -187,7 +187,7 @@ fn handle_block_response_with_unknown_tx() {
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -270,7 +270,7 @@ fn handle_block_response_with_invalid_txs_order() {
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -352,7 +352,7 @@ fn handle_block_response_with_invalid_precommits() {
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -437,7 +437,7 @@ fn handle_block_response_with_known_transaction() {
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -457,7 +457,7 @@ fn handle_block_response_with_known_transaction() {
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -544,7 +544,7 @@ fn handle_block_response_with_all_known_transactions() {
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -637,7 +637,7 @@ fn received_block_while_there_is_full_propose() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -660,7 +660,7 @@ fn received_block_while_there_is_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -670,7 +670,7 @@ fn received_block_while_there_is_full_propose() {
     );
 
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -757,7 +757,7 @@ fn received_block_while_there_is_pending_block() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -790,7 +790,7 @@ fn received_block_while_there_is_pending_block() {
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),
@@ -889,7 +889,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_block_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -909,7 +909,7 @@ fn transactions_request_to_multiple_nodes() {
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -920,7 +920,7 @@ fn transactions_request_to_multiple_nodes() {
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(3)),

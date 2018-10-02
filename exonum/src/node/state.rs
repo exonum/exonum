@@ -19,17 +19,20 @@ use failure;
 use serde_json::Value;
 
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, net::SocketAddr,
-    sync::{Arc, RwLock}, time::{Duration, SystemTime},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet}, sync::{Arc, RwLock},
+    time::{Duration, SystemTime},
 };
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use events::network::ConnectedPeerAddr;
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage,
 };
-use node::{connect_list::ConnectList, ConnectInfo};
+use node::{
+    connect_list::{ConnectList, PeerAddress}, ConnectInfo,
+};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -59,7 +62,7 @@ pub struct State {
     tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
-    connections: HashMap<SocketAddr, PublicKey>,
+    connections: HashMap<PublicKey, ConnectedPeerAddr>,
     height_start_time: SystemTime,
     height: Height,
 
@@ -382,41 +385,47 @@ impl IncompleteBlock {
 #[derive(Clone, Debug, Default)]
 /// Shared `ConnectList` representation to be used in network.
 pub struct SharedConnectList {
-    connect_list: Arc<RwLock<ConnectList>>,
+    inner: Arc<RwLock<ConnectList>>,
 }
 
 impl SharedConnectList {
     /// Creates `SharedConnectList` from `ConnectList`.
     pub fn from_connect_list(connect_list: ConnectList) -> Self {
         SharedConnectList {
-            connect_list: Arc::new(RwLock::new(connect_list)),
+            inner: Arc::new(RwLock::new(connect_list)),
         }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
     pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
-        let connect_list = self.connect_list.read().expect("ConnectList read lock");
+        let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.is_peer_allowed(public_key)
-    }
-
-    /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<PublicKey> {
-        let connect_list = self.connect_list.read().expect("ConnectList read lock");
-        connect_list.find_key_by_address(address).cloned()
     }
 
     /// Return `peers` from underlying `ConnectList`
     pub fn peers(&self) -> Vec<ConnectInfo> {
-        self.connect_list
+        self.inner
             .read()
             .expect("ConnectList read lock")
             .peers
             .iter()
             .map(|(pk, a)| ConnectInfo {
-                address: *a,
+                address: a.address.clone(),
                 public_key: *pk,
             })
             .collect()
+    }
+
+    /// Update peer address in the connect list.
+    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+        let mut conn_list = self.inner.write().expect("ConnectList write lock");
+        conn_list.update_peer(public_key, address);
+    }
+
+    /// Get peer address using public key.
+    pub fn find_address_by_key(&self, public_key: &PublicKey) -> Option<PeerAddress> {
+        let connect_list = self.inner.read().expect("ConnectList read lock");
+        connect_list.find_address_by_pubkey(public_key).cloned()
     }
 }
 
@@ -570,18 +579,23 @@ impl State {
 
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        self.connections.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
 
-    /// Removes a peer by the socket address. Returns `Some` public key of the peer if it was
+    /// Add connection to the connection list.
+    pub fn add_connection(&mut self, pubkey: PublicKey, address: ConnectedPeerAddr) {
+        self.connections.insert(pubkey, address);
+    }
+
+    /// Removes a peer by the socket address. Returns `Some` (connect message) of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> Option<PublicKey> {
-        let pubkey = self.connections.remove(addr);
-        if let Some(ref pubkey) = pubkey {
-            self.peers.remove(pubkey);
+    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Connect> {
+        self.connections.remove(key);
+        if let Some(c) = self.peers.remove(key) {
+            Some(c)
+        } else {
+            None
         }
-        pubkey
     }
 
     /// Checks if this node considers a peer to be a validator.
@@ -603,7 +617,7 @@ impl State {
     }
 
     /// Returns the addresses of known connections with public keys of its' validators.
-    pub fn connections(&self) -> &HashMap<SocketAddr, PublicKey> {
+    pub fn connections(&self) -> &HashMap<PublicKey, ConnectedPeerAddr> {
         &self.connections
     }
 
@@ -1187,7 +1201,7 @@ impl State {
     /// Add peer to node's `ConnectList`.
     pub fn add_peer_to_connect_list(&mut self, peer: ConnectInfo) {
         let mut list = self.connect_list
-            .connect_list
+            .inner
             .write()
             .expect("ConnectList write lock");
         list.add(peer);

@@ -28,8 +28,6 @@
 
 use chrono::{DateTime, Utc};
 
-use std::net::SocketAddr;
-
 use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};
@@ -85,8 +83,8 @@ messages! {
     struct Connect {
         /// The sender's public key.
         pub_key: &PublicKey,
-        /// The node's address.
-        addr: SocketAddr,
+        /// The node's external address.
+        pub_addr: &str,
         /// Time when the message was created.
         time: DateTime<Utc>,
         /// String containing information about this node including Exonum, Rust and OS versions.

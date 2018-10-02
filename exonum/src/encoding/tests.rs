@@ -20,7 +20,7 @@ use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use std::{net::SocketAddr, str::FromStr};
+use std::str::FromStr;
 
 use super::{CheckedOffset, Field, Offset};
 use blockchain::{Block, BlockProof};
@@ -368,23 +368,14 @@ fn test_segments_of_status_messages() {
 }
 
 fn test_connect(addr: &str) {
-    use std::str::FromStr;
-
-    let socket_address = SocketAddr::from_str(addr).unwrap();
     let time = Utc::now();
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let connect = Connect::new(
-        &public_key,
-        socket_address,
-        time,
-        &user_agent::get(),
-        &secret_key,
-    );
+    let connect = Connect::new(&public_key, &addr, time, &user_agent::get(), &secret_key);
     // read
     assert_eq!(connect.pub_key(), &public_key);
-    assert_eq!(connect.addr(), socket_address);
+    assert_eq!(connect.pub_addr(), addr);
     assert_eq!(connect.time(), time);
     assert!(connect.verify_signature(&public_key));
 }
