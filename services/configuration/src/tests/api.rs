@@ -21,8 +21,8 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use super::{
-    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
-    ConfigurationSchema, ConfigurationTestKit,
+    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
+    ConfigurationTestKit,
 };
 use api::{
     ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
@@ -93,6 +93,7 @@ impl ConfigurationApiTest for TestKitApi {
     }
 
     fn votes_for_propose(&self, hash: Hash) -> VotesInfo {
+        println!("Votes for propose");
         self.public(ApiKind::Service(SERVICE_NAME))
             .query(&HashQuery { hash })
             .get("v1/configs/votes")
@@ -272,7 +273,6 @@ fn test_votes_for_propose() {
         .validators()
         .iter()
         .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
-        .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
     let response = api.votes_for_propose(new_cfg.hash())
@@ -316,7 +316,6 @@ fn test_dissenting_votes_for_propose() {
         .validators()
         .iter()
         .map(|validator| new_tx_config_vote_against(validator, cfg_proposal_hash))
-        .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_dissenting_votes);
     let response = api.votes_for_propose(new_cfg.hash())
@@ -397,6 +396,7 @@ fn test_all_proposes() {
 
 #[test]
 fn test_all_committed() {
+    ::exonum::helpers::init_logger();
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();

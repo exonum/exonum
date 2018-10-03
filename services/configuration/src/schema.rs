@@ -15,14 +15,13 @@
 //! Storage schema for the configuration service.
 
 use exonum::{
-    crypto::{self, CryptoHash, Hash, PublicKey, Signature},
-    messages::{Protocol},
+    crypto::{self, CryptoHash, Hash, HASH_SIZE},
     storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 
 use std::{borrow::Cow, ops::Deref};
 
-use transactions::{Propose, Vote, VoteAgainst};
+use transactions::Propose;
 
 // Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -50,11 +49,11 @@ encoding_struct! {
 }
 
 lazy_static! {
-    static ref NO_VOTE_BYTES: Vec<u8> = vec![];
+    static ref NO_VOTE_BYTES: Vec<u8> = vec![0u8];
 }
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
 #[serde(tag = "vote_for", rename_all = "lowercase")]
 pub enum VotingDecision {
     /// `Vote` transaction `Hash` variant.
@@ -65,27 +64,33 @@ pub enum VotingDecision {
 
 impl CryptoHash for VotingDecision {
     fn hash(&self) -> Hash {
-        match *self {
-            VotingDecision::Yea(ref vote) => vote.hash(),
-            VotingDecision::Nay(ref vote_against) => vote_against.hash(),
-        }
+        let res = StorageValue::into_bytes(*self);
+        res.hash()
     }
 }
 
+const YEA_TAG: u8 = 1;
+const NAY_TAG: u8 = 2;
+
 impl StorageValue for VotingDecision {
     fn into_bytes(self) -> Vec<u8> {
-        match self {
-            VotingDecision::Yea(vote) => vote.into_bytes(),
-            VotingDecision::Nay(vote_against) => vote_against.into_bytes(),
-        }
+        let (tag, mut res) = match self {
+            VotingDecision::Yea(vote) => (YEA_TAG, vote.into_bytes()),
+            VotingDecision::Nay(vote_against) => (NAY_TAG, vote_against.into_bytes()),
+        };
+        res.push(tag);
+        res
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let raw_msg = Protocol::from_vec(bytes.to_vec());
-        if raw_msg.message_type() == <Vote as ServiceMessage>::MESSAGE_ID {
-            VotingDecision::Yea(Vote::from_bytes(bytes))
+        println!("MaybeVote::from_bytes");
+        assert_eq!(bytes.len(), HASH_SIZE + 1);
+        let tag = bytes[HASH_SIZE];
+        let raw_hash = Hash::from_slice(&bytes[0..HASH_SIZE]).unwrap();
+        if tag == YEA_TAG {
+            VotingDecision::Yea(raw_hash)
         } else {
-            VotingDecision::Nay(VoteAgainst::from_bytes(bytes))
+            VotingDecision::Nay(raw_hash)
         }
     }
 }
@@ -125,15 +130,9 @@ impl From<MaybeVote> for Option<VotingDecision> {
     }
 }
 
-impl From<Vote> for MaybeVote {
-    fn from(vote: Vote) -> MaybeVote {
-        MaybeVote::some(VotingDecision::Yea(vote))
-    }
-}
-
-impl From<VoteAgainst> for MaybeVote {
-    fn from(vote_against: VoteAgainst) -> MaybeVote {
-        MaybeVote::some(VotingDecision::Nay(vote_against))
+impl From<VotingDecision> for MaybeVote {
+    fn from(vote: VotingDecision) -> MaybeVote {
+        MaybeVote(Some(vote))
     }
 }
 
@@ -157,13 +156,13 @@ impl CryptoHash for MaybeVote {
 impl StorageValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
-            Some(VotingDecision::Yea(vote)) => vote.into_bytes(),
-            Some(VotingDecision::Nay(vote_against)) => vote_against.into_bytes(),
+            Some(v) => v.into_bytes(),
             None => NO_VOTE_BYTES.clone(),
         }
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        println!("MaybeVote::from_bytes");
         if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
@@ -254,89 +253,5 @@ impl<'a> Schema<&'a mut Fork> {
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, MaybeVote> {
         ProofListIndex::new_in_family(VOTES, config_hash, &mut self.view)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use exonum::crypto::HASH_SIZE;
-    use exonum::storage::{Database, MemoryDB};
-
-    lazy_static! {
-        static ref NO_VOTE: Vote =
-            Vote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero(),);
-    }
-
-    /// Check compatibility of old and new implementations of "absence of vote" signaling.
-    #[test]
-    fn test_serialization_of_maybe_vote() {
-        const VALIDATORS: usize = 5;
-
-        assert_eq!(NO_VOTE.hash(), MaybeVote::none().hash());
-        assert_eq!(NO_VOTE.clone().into_bytes(), MaybeVote::none().into_bytes());
-
-        let (pubkey, key) = crypto::gen_keypair();
-        let vote = Vote::new(&pubkey, &Hash::new([1; HASH_SIZE]), &key);
-        assert_eq!(
-            vote.clone().into_bytes(),
-            MaybeVote::from(vote.clone()).into_bytes()
-        );
-        assert_eq!(vote.hash(), MaybeVote::from(vote.clone()).hash());
-
-        let db = MemoryDB::new();
-        let mut fork = db.fork();
-        let merkle_root = {
-            let mut index: ProofListIndex<_, Vote> = ProofListIndex::new("index", &mut fork);
-            for _ in 0..VALIDATORS {
-                index.push(NO_VOTE.clone());
-            }
-            index.set(1, vote.clone());
-            index.merkle_root()
-        };
-        db.merge(fork.into_patch()).unwrap();
-
-        let snapshot = db.snapshot();
-        let index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &snapshot);
-        for (i, stored_vote) in index.iter().enumerate() {
-            assert_eq!(
-                stored_vote,
-                if i == 1 {
-                    MaybeVote::from(vote.clone())
-                } else {
-                    MaybeVote::none()
-                }
-            );
-        }
-
-        // Touch the index in order to recalculate its root hash
-        let new_merkle_root = {
-            let mut fork = db.fork();
-            let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
-            index.set(2, MaybeVote::from(vote.clone()));
-            index.set(2, MaybeVote::none());
-            index.merkle_root()
-        };
-        assert_eq!(merkle_root, new_merkle_root);
-    }
-
-    #[test]
-    fn test_serialization_of_voting_decision() {
-        let (pubkey, key) = crypto::gen_keypair();
-        let vote = Vote::new(&pubkey, &Hash::new([1; HASH_SIZE]), &key);
-        let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; HASH_SIZE]), &key);
-        assert_eq!(
-            vote.clone().into_bytes(),
-            VotingDecision::Yea(vote.clone()).into_bytes()
-        );
-        assert_eq!(vote.hash(), VotingDecision::Yea(vote.clone()).hash());
-        assert_eq!(
-            vote_against.clone().into_bytes(),
-            VotingDecision::Nay(vote_against.clone()).into_bytes()
-        );
-        assert_eq!(
-            vote_against.hash(),
-            VotingDecision::Nay(vote_against.clone()).hash()
-        );
     }
 }
