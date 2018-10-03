@@ -23,8 +23,9 @@ extern crate exonum_time;
 extern crate exonum_timestamping;
 
 use exonum::{
-    api::node::public::explorer::TransactionQuery, blockchain::Transaction,
-    crypto::{gen_keypair, hash, CryptoHash, Hash}, helpers::Height,
+    api::node::public::explorer::{TransactionQuery, TransactionResponse},
+    crypto::{gen_keypair, hash, Hash}, helpers::Height,
+    messages::{to_hex_string, Message, RawTransaction},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeService};
@@ -46,7 +47,11 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
 }
 
 /// Assert transaction status
-fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &serde_json::Value) {
+fn assert_status(
+    api: &TestKitApi,
+    tx: &Message<RawTransaction>,
+    expected_status: &serde_json::Value,
+) {
     let info: serde_json::Value = api.public(ApiKind::Explorer)
         .query(&TransactionQuery::new(tx.hash()))
         .get("v1/transactions")
@@ -81,12 +86,14 @@ fn test_api_post_timestamp() {
     let tx = TxTimestamp::sign(&keypair.0, info, &keypair.1);
 
     let api = testkit.api();
-    let tx_hash: Hash = api.public(ApiKind::Service("timestamping"))
-        .query(&tx)
-        .post("v1/timestamps")
+    let data = to_hex_string(&tx);
+
+    let tx_info: TransactionResponse = api.public(ApiKind::Explorer)
+        .query(&json!({ "tx_body": data }))
+        .post("v1/transactions")
         .unwrap();
 
-    assert_eq!(tx.hash(), tx_hash);
+    assert_eq!(tx.hash(), tx_info.tx_hash);
 }
 
 #[test]
@@ -98,7 +105,7 @@ fn test_api_get_timestamp_proof() {
     // Create timestamp
     let info = Timestamp::new(&Hash::zero(), "metadata");
     let tx = TxTimestamp::sign(&keypair.0, info, &keypair.1);
-    testkit.create_block_with_transactions(txvec![tx]);
+    testkit.create_block_with_transactions(txvec![tx.clone()]);
 
     // get proof
     let api = testkit.api();
