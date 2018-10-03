@@ -21,8 +21,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext}, crypto::{CryptoHash, PublicKey},
-    messages::Message, storage::Fork,
+    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
+    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
 };
 use exonum_time::schema::TimeSchema;
 
@@ -57,8 +57,25 @@ transactions! {
     }
 }
 
+impl TxTimestamp {
+    #[doc(hidden)]
+    pub fn sign(
+        author: &PublicKey,
+        content: Timestamp,
+        key: &SecretKey,
+    ) -> Message<RawTransaction> {
+        Protocol::sign_transaction(
+            TxTimestamp::new(content),
+            TIMESTAMPING_SERVICE,
+            *author,
+            key,
+        )
+    }
+}
+
 impl Transaction for TxTimestamp {
     fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let tx_hash = context.tx_hash();
         let time = TimeSchema::new(&context.fork())
             .time()
             .get()
@@ -73,7 +90,7 @@ impl Transaction for TxTimestamp {
         }
 
         trace!("Timestamp added: {:?}", self);
-        let entry = TimestampEntry::new(self.content(), &self.hash(), time);
+        let entry = TimestampEntry::new(self.content(), &tx_hash, time);
         schema.add_timestamp(entry);
         Ok(())
     }

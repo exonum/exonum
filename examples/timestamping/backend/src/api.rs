@@ -15,12 +15,11 @@
 //! REST API.
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof},
-    crypto::{CryptoHash, Hash}, storage::MapProof,
+    api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof}, crypto::Hash,
+    storage::MapProof,
 };
 
 use schema::{Schema, TimestampEntry};
-use transactions::TxTimestamp;
 use TIMESTAMPING_SERVICE;
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
@@ -53,7 +52,6 @@ pub struct TimestampProof {
 pub struct PublicApi;
 
 impl PublicApi {
-
     /// Endpoint for getting a single timestamp.
     pub fn handle_timestamp(
         state: &ServiceApiState,
