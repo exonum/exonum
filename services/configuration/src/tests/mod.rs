@@ -14,6 +14,8 @@
 
 use std::str;
 
+use serde_json;
+
 use config::ConfigurationServiceConfig;
 use exonum::{
     blockchain::{Schema, StoredConfiguration}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
@@ -730,4 +732,10 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
             Schema::new(&testkit.snapshot()).actual_configuration()
         );
     }
+}
+
+#[test]
+fn test_voting_decision_serialize() {
+    let vote = format!("{}", serde_json::to_value(&VotingDecision::Yea(Hash::default())).unwrap());
+    assert_eq!("{\"yea\":\"0000000000000000000000000000000000000000000000000000000000000000\"}", vote)
 }

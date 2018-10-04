@@ -93,7 +93,6 @@ impl ConfigurationApiTest for TestKitApi {
     }
 
     fn votes_for_propose(&self, hash: Hash) -> VotesInfo {
-        println!("Votes for propose");
         self.public(ApiKind::Service(SERVICE_NAME))
             .query(&HashQuery { hash })
             .get("v1/configs/votes")
@@ -282,7 +281,7 @@ fn test_votes_for_propose() {
         assert!(
             Schema::new(&testkit.snapshot())
                 .transactions()
-                .contains(&tx.hash(),),
+                .contains(&tx.tx_hash()),
             "Transaction is absent in blockchain: {:?}",
             tx
         );
@@ -396,7 +395,6 @@ fn test_all_proposes() {
 
 #[test]
 fn test_all_committed() {
-    ::exonum::helpers::init_logger();
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();

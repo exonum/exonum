@@ -23,6 +23,9 @@ use std::{borrow::Cow, ops::Deref};
 
 use transactions::Propose;
 
+const YEA_TAG: u8 = 1;
+const NAY_TAG: u8 = 2;
+
 // Defines `&str` constants with given name and value.
 macro_rules! define_names {
     ($($name:ident => $value:expr;)+) => (
@@ -54,7 +57,7 @@ lazy_static! {
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
-#[serde(tag = "vote_for", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum VotingDecision {
     /// `Vote` transaction `Hash` variant.
     Yea(Hash),
@@ -69,8 +72,15 @@ impl CryptoHash for VotingDecision {
     }
 }
 
-const YEA_TAG: u8 = 1;
-const NAY_TAG: u8 = 2;
+impl VotingDecision {
+    /// Returns internall transaction hash.
+    pub fn tx_hash(&self) -> Hash {
+        match *self {
+            VotingDecision::Yea(h) => h,
+            VotingDecision::Nay(h) => h,
+        }
+    }
+}
 
 impl StorageValue for VotingDecision {
     fn into_bytes(self) -> Vec<u8> {
@@ -83,7 +93,6 @@ impl StorageValue for VotingDecision {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        println!("MaybeVote::from_bytes");
         assert_eq!(bytes.len(), HASH_SIZE + 1);
         let tag = bytes[HASH_SIZE];
         let raw_hash = Hash::from_slice(&bytes[0..HASH_SIZE]).unwrap();
@@ -162,7 +171,6 @@ impl StorageValue for MaybeVote {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        println!("MaybeVote::from_bytes");
         if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
