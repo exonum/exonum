@@ -49,10 +49,6 @@ transactions! {
 }
 
 impl Transaction for Blank {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.author())
-    }
-
     fn execute(&self, _: &mut Fork) -> ExecutionResult {
         Ok(())
     }

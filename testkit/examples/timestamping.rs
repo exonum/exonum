@@ -22,7 +22,9 @@ extern crate serde_derive;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet},
+    blockchain::{
+        ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+    },
     crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding,
     messages::{Message, Protocol, RawTransaction}, storage::Snapshot,
 };

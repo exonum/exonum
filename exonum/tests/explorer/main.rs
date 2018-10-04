@@ -99,7 +99,7 @@ fn test_explorer_basics() {
             json!({
                 "content": {
                     "debug": payload_alice,
-                    "message": messages::to_hex_string(&tx_alice).unwrap()
+                    "message": messages::to_hex_string(&tx_alice)
                 },
                 "location": {
                     "block_height": "1",
@@ -129,7 +129,7 @@ fn test_explorer_basics() {
         json!({
             "content": {
                     "debug": payload_bob,
-                    "message": messages::to_hex_string(&tx_bob).unwrap()
+                    "message": messages::to_hex_string(&tx_bob)
             },
             "location": {
                 "block_height": "2",
@@ -153,7 +153,7 @@ fn test_explorer_basics() {
         json!({
             "content": {
                     "debug": payload_transfer,
-                    "message": messages::to_hex_string(&tx_transfer).unwrap()
+                    "message": messages::to_hex_string(&tx_transfer)
             },
             "location": {
                 "block_height": "2",

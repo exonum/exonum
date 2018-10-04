@@ -354,7 +354,7 @@ fn prepare_txs(blockchain: &mut Blockchain, transactions: &[BoxedTx]) -> Vec<Has
         transactions
             .iter()
             .map(|tx| {
-                schema.add_transaction_into_pool(tx.raw().clone());
+                schema.add_transaction_into_pool(tx.clone());
                 tx.hash()
             })
             .collect()

@@ -736,7 +736,10 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
 
 #[test]
 fn test_voting_decision_serialize() {
-    let vote = format!("{}", serde_json::to_value(&VotingDecision::Yea(Hash::default())).unwrap());
+    let vote = format!(
+        "{}",
+        serde_json::to_value(&VotingDecision::Yea(Hash::default())).unwrap()
+    );
     assert_eq!("{\"tx_hash\":\
     \"0000000000000000000000000000000000000000000000000000000000000000\",\"vote_type\":\"yea\"}", vote)
 }

@@ -1,9 +1,11 @@
 use hex::{FromHex, ToHex};
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 
-use std::fmt::{self, Display};
+use std::fmt::Display;
 
 use encoding::Error;
+
+use super::Message;
 
 /// Helper trait to define serialization format.
 pub trait BinaryForm: Sized {
@@ -43,8 +45,8 @@ impl HexStringRepresentation {
 }
 
 /// Returns hexadecimal string representation of `message`.
-pub fn to_hex_string<T: ToHex>(message: &T) -> Result<String, fmt::Error> {
+pub fn to_hex_string<T>(message: &Message<T>) -> String {
     let mut hex_string = String::new();
-    message.write_hex(&mut hex_string)?;
-    Ok(hex_string)
+    message.write_hex(&mut hex_string).unwrap();
+    hex_string
 }
