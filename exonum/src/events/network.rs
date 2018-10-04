@@ -374,8 +374,8 @@ impl NetworkHandler {
                     })
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
-                        let connection_limit = pool.count_outgoing() >= max_connections;
-                        if pool.contains(message.pub_key()) || connection_limit {
+                        let connection_limit_reached = pool.count_outgoing() >= max_connections;
+                        if pool.contains(message.pub_key()) || connection_limit_reached {
                             Box::new(future::ok(()))
                         } else {
                             let conn_addr = ConnectedPeerAddr::Out(
