@@ -5,6 +5,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.9.2 - 2018-09-10
 
+- Config parameter `external_address` is now a required value. (#826)
+
+### New features
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. In config file domain names can be used in `ConnectList`
+  configuration and addresses will be resolved once on startup. (#826)
+
 ### Internal Improvements
 
 #### exonum
