@@ -52,13 +52,6 @@ impl ConnectedPeerAddr {
             ConnectedPeerAddr::Out(_, _) => false,
         }
     }
-
-    pub fn is_outgoing(&self) -> bool {
-        match self {
-            ConnectedPeerAddr::In(_) => false,
-            ConnectedPeerAddr::Out(_, _) => true,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -133,7 +126,7 @@ impl ConnectionPool {
         let peers = self.peers.borrow();
         peers
             .iter()
-            .filter(|(_, e)| e.address.is_outgoing())
+            .filter(|(_, e)| !e.address.is_incoming())
             .count()
     }
 
