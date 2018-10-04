@@ -30,9 +30,8 @@ extern crate serde_json;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
-    blockchain::{TransactionErrorType as ErrorType},
-    crypto::{self, CryptoHash, PublicKey}, encoding::serialize::FromHex,
-    helpers::Height, messages::{self, Message, RawTransaction}
+    blockchain::TransactionErrorType as ErrorType, crypto::{self, CryptoHash, PublicKey},
+    encoding::serialize::FromHex, helpers::Height, messages::{self, Message, RawTransaction},
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
@@ -394,7 +393,9 @@ fn test_snapshot_comparison_panic() {
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| new == old + increment_by);
+        .assert("Counter has increased", |&old, &new| {
+            new == old + increment_by
+        });
 }
 
 #[test]
@@ -689,7 +690,7 @@ fn test_explorer_transaction_statuses() {
     let statuses: Vec<_> = [tx.hash(), error_tx.hash(), panicking_tx.hash()]
         .iter()
         .map(|hash| {
-            let info: TransactionInfo= api.public(ApiKind::Explorer)
+            let info: TransactionInfo = api.public(ApiKind::Explorer)
                 .query(&TransactionQuery::new(*hash))
                 .get("v1/transactions")
                 .unwrap();

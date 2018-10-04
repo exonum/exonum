@@ -20,15 +20,13 @@
 
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{CryptoHash, PublicKey, SecretKey},
-    messages::{Protocol, RawTransaction, Message}, storage::Fork,
+    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
 };
 
 use schema::Schema;
 use CRYPTOCURRENCY_SERVICE_ID;
 
 const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
-
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -116,13 +114,18 @@ impl Transfer {
         seed: u64,
         sk: &SecretKey,
     ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(Transfer::new(to, amount, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+        Protocol::sign_transaction(
+            Transfer::new(to, amount, seed),
+            CRYPTOCURRENCY_SERVICE_ID,
+            *pk,
+            sk,
+        )
     }
 }
 
 impl Transaction for Transfer {
     fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let ref from = context.author();
+        let from = &context.author();
         let hash = context.tx_hash();
 
         let mut schema = Schema::new(context.fork());
@@ -131,7 +134,7 @@ impl Transaction for Transfer {
         let amount = self.amount();
 
         if from == to {
-            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER))
+            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
         }
 
         let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
@@ -151,7 +154,7 @@ impl Transaction for Transfer {
 
 impl Transaction for Issue {
     fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let ref pub_key = context.author();
+        let pub_key = &context.author();
         let hash = context.tx_hash();
 
         let mut schema = Schema::new(context.fork());
@@ -168,7 +171,7 @@ impl Transaction for Issue {
 
 impl Transaction for CreateWallet {
     fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let ref pub_key = context.author();
+        let pub_key = &context.author();
         let hash = context.tx_hash();
 
         let mut schema = Schema::new(context.fork());

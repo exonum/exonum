@@ -48,15 +48,12 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(||
-            SignedMessage::from_raw_buffer(raw)
-                            .and_then(Protocol::deserialize)
-        )
-        .map_err(drop)
-        .and_then(|protocol| {
-            let event = future::ok(InternalEvent::MessageVerified(protocol));
-            Self::send_event(event, internal_tx)
-        })
+        future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Protocol::deserialize))
+            .map_err(drop)
+            .and_then(|protocol| {
+                let event = future::ok(InternalEvent::MessageVerified(protocol));
+                Self::send_event(event, internal_tx)
+            })
     }
 
     /// Represents a task that processes Internal Requests and produces Internal Events.

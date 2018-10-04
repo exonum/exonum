@@ -21,13 +21,9 @@ extern crate serde_json;
 extern crate serde_derive;
 
 // HACK: Silent "dead_code" warning.
-pub use hooks::{AfterCommitService, HandleCommitTransactions, SERVICE_ID, TxAfterCommit};
+pub use hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
 
-use exonum::{
-    helpers::Height,
-    blockchain::TransactionSet,
-    messages::Protocol,
-};
+use exonum::{blockchain::TransactionSet, helpers::Height, messages::Protocol};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
@@ -46,14 +42,15 @@ fn test_after_commit() {
             let HandleCommitTransactions::TxAfterCommit(message) =
                 HandleCommitTransactions::tx_from_raw(message).unwrap();
 
-            assert_eq!(message,
-                TxAfterCommit::new(Height(i - 1))
-            );
+            assert_eq!(message, TxAfterCommit::new(Height(i - 1)));
         }
 
-        let tx = Protocol::sign_transaction(TxAfterCommit::new(Height(i)), SERVICE_ID,
-                                            testkit.blockchain().service_keypair.0,
-                                    &testkit.blockchain().service_keypair.1);
+        let tx = Protocol::sign_transaction(
+            TxAfterCommit::new(Height(i)),
+            SERVICE_ID,
+            testkit.blockchain().service_keypair.0,
+            &testkit.blockchain().service_keypair.1,
+        );
         assert!(testkit.is_tx_in_pool(&tx.hash()));
     }
 
