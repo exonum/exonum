@@ -99,9 +99,9 @@ impl TxMarker {
 }
 
 impl Transaction for TxMarker {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        let author = tc.author();
-        let view = tc.fork();
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let author = context.author();
+        let view = context.fork();
         let time = TimeSchema::new(&view).time().get();
         match time {
             Some(current_time) if current_time <= self.time() => {
