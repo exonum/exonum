@@ -137,6 +137,30 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `system/v1/peers` endpoint now properly returns
   incoming and outgoing connections of the node. (#942)
 
+## 0.9.3 - 2018-10-04
+
+### Breaking Changes
+
+#### exonum
+
+- Config parameter `external_address` is now a required value. (#826)
+
+### New Features
+
+#### exonum
+
+- Added possibility to use domain names instead of IP addresses as a peer's
+  addresses. In config file domain names can be used in `ConnectList`
+  configuration and addresses will be resolved once on startup. (#826)
+
+## 0.9.2 - 2018-09-11
+
+### Internal Improvements
+
+#### exonum
+
+- Added a possibility to create `ServiceApiBuilder` with blockchain. (#929)
+
 ## 0.9.1 - 2018-08-02
 
 ### Bug Fixes
