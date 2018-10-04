@@ -13,7 +13,7 @@
 // limitations under the License.
 
 extern crate exonum;
-//extern crate exonum_configuration;
+extern crate exonum_configuration;
 extern crate exonum_time;
 
 extern crate exonum_timestamping;
@@ -23,7 +23,7 @@ use exonum::helpers::fabric::NodeBuilder;
 fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-//        .with_service(Box::new(exonum_configuration::ServiceFactory))
+        .with_service(Box::new(exonum_configuration::ServiceFactory))
         .with_service(Box::new(exonum_time::TimeServiceFactory))
         .with_service(Box::new(exonum_timestamping::ServiceFactory))
         .run();
