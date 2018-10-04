@@ -134,9 +134,9 @@ impl TxTime {
 }
 
 impl Transaction for TxTime {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        let author = tc.author();
-        let view = tc.fork();
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let author = context.author();
+        let view = context.fork();
         self.check_signed_by_validator(view.as_ref(), &author)?;
         self.update_validator_time(view, &author)?;
         Self::update_consolidated_time(view);
