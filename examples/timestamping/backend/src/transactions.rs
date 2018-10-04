@@ -21,8 +21,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
-    messages::Message, storage::Fork,
+    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
+    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
 };
 use exonum_time::schema::TimeSchema;
 
@@ -48,26 +48,35 @@ impl From<Error> for ExecutionError {
 transactions! {
     /// Transaction group.
     pub TimeTransactions {
-        const SERVICE_ID = TIMESTAMPING_SERVICE;
 
         /// A timestamp transaction.
         struct TxTimestamp {
-            /// Public key of transaction.
-            pub_key: &PublicKey,
-
             /// Timestamp content.
             content: Timestamp,
         }
     }
 }
 
-impl Transaction for TxTimestamp {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
+impl TxTimestamp {
+    #[doc(hidden)]
+    pub fn sign(
+        author: &PublicKey,
+        content: Timestamp,
+        key: &SecretKey,
+    ) -> Message<RawTransaction> {
+        Protocol::sign_transaction(
+            TxTimestamp::new(content),
+            TIMESTAMPING_SERVICE,
+            *author,
+            key,
+        )
     }
+}
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let time = TimeSchema::new(&fork)
+impl Transaction for TxTimestamp {
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let tx_hash = context.tx_hash();
+        let time = TimeSchema::new(&context.fork())
             .time()
             .get()
             .expect("Can't get the time");
@@ -75,13 +84,13 @@ impl Transaction for TxTimestamp {
         let content = self.content();
         let hash = content.content_hash();
 
-        let mut schema = Schema::new(fork);
+        let mut schema = Schema::new(context.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
             Err(Error::HashAlreadyExists)?;
         }
 
         trace!("Timestamp added: {:?}", self);
-        let entry = TimestampEntry::new(self.content(), &self.hash(), time);
+        let entry = TimestampEntry::new(self.content(), &tx_hash, time);
         schema.add_timestamp(entry);
         Ok(())
     }
