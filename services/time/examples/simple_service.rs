@@ -86,10 +86,15 @@ impl TxMarker {
     fn sign(
         mark: i32,
         time: DateTime<Utc>,
-        pk: &PublicKey,
-        sc: &SecretKey,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
     ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(TxMarker::new(mark, time), SERVICE_ID, *pk, sc)
+        Protocol::sign_transaction(
+            TxMarker::new(mark, time),
+            SERVICE_ID,
+            *public_key,
+            secret_key,
+        )
     }
 }
 

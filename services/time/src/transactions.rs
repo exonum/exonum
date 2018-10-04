@@ -60,12 +60,14 @@ transactions! {
 
 impl TxTime {
     #[doc(hidden)]
-    pub fn sign(time: DateTime<Utc>, pk: &PublicKey, sc: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(TxTime::new(time), SERVICE_ID, *pk, sc)
+    pub fn sign(
+        time: DateTime<Utc>,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> Message<RawTransaction> {
+        Protocol::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
     }
-}
 
-impl TxTime {
     fn check_signed_by_validator(
         &self,
         snapshot: &dyn Snapshot,
