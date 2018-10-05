@@ -25,6 +25,7 @@ use exonum::{
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     messages::{Message, Protocol, RawTransaction}, node::State, storage::{Fork, Snapshot},
 };
+
 use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 use SERVICE_ID;
 use SERVICE_NAME;

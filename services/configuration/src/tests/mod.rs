@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str;
-
-use serde_json;
-
-use config::ConfigurationServiceConfig;
 use exonum::{
     blockchain::{Schema, StoredConfiguration}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
     helpers::{Height, ValidatorId}, messages::{Message, RawTransaction}, storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
+use serde_json;
+
+use std::str;
+
+use config::ConfigurationServiceConfig;
 use SERVICE_NAME;
 use {
     ConfigurationTransactions, Propose, Schema as ConfigurationSchema,
@@ -29,6 +29,7 @@ use {
 };
 
 mod api;
+
 pub fn new_tx_config_propose(
     node: &TestNode,
     cfg_proposal: StoredConfiguration,
@@ -736,7 +737,10 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
 
 #[test]
 fn test_voting_decision_serialize() {
-    let vote = format!("{}", serde_json::to_value(&VotingDecision::Yea(Hash::default())).unwrap());
+    let vote = format!(
+        "{}",
+        serde_json::to_value(&VotingDecision::Yea(Hash::default())).unwrap()
+    );
     assert_eq!("{\"tx_hash\":\
     \"0000000000000000000000000000000000000000000000000000000000000000\",\"vote_type\":\"yea\"}", vote)
 }

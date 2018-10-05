@@ -73,7 +73,7 @@ impl CryptoHash for VotingDecision {
 }
 
 impl VotingDecision {
-    /// Returns internall transaction hash.
+    /// Returns internal transaction hash.
     pub fn tx_hash(&self) -> Hash {
         match *self {
             VotingDecision::Yea(h) => h,
@@ -96,10 +96,10 @@ impl StorageValue for VotingDecision {
         assert_eq!(bytes.len(), HASH_SIZE + 1);
         let tag = bytes[HASH_SIZE];
         let raw_hash = Hash::from_slice(&bytes[0..HASH_SIZE]).unwrap();
-        if tag == YEA_TAG {
-            VotingDecision::Yea(raw_hash)
-        } else {
-            VotingDecision::Nay(raw_hash)
+        match tag {
+            YEA_TAG => VotingDecision::Yea(raw_hash),
+            NAY_TAG => VotingDecision::Nay(raw_hash),
+            _ => panic!("invalid voting tag: {}", tag),
         }
     }
 }
