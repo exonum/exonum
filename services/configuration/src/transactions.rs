@@ -26,7 +26,6 @@ use exonum::{
 
 use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
-
 use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 use SERVICE_ID;
 use SERVICE_NAME;
