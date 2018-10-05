@@ -45,6 +45,15 @@ pub enum ConnectedPeerAddr {
     Out(String, SocketAddr),
 }
 
+impl ConnectedPeerAddr {
+    pub fn is_incoming(&self) -> bool {
+        match self {
+            ConnectedPeerAddr::In(_) => true,
+            ConnectedPeerAddr::Out(_, _) => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(RawMessage),
@@ -113,8 +122,12 @@ impl ConnectionPool {
         }
     }
 
-    fn len(&self) -> usize {
-        self.peers.borrow().len()
+    fn count_outgoing(&self) -> usize {
+        let peers = self.peers.borrow();
+        peers
+            .iter()
+            .filter(|(_, e)| !e.address.is_incoming())
+            .count()
     }
 
     fn add(&self, key: &PublicKey, address: ConnectedPeerAddr, sender: mpsc::Sender<RawMessage>) {
@@ -335,6 +348,7 @@ impl NetworkHandler {
         let network_config = self.network_config;
         let timeout = self.network_config.tcp_connect_retry_timeout;
         let max_tries = self.network_config.tcp_connect_max_retries as usize;
+        let max_connections = self.network_config.max_outgoing_connections;
         let strategy = FixedInterval::from_millis(timeout)
             .map(jitter)
             .take(max_tries);
@@ -360,7 +374,8 @@ impl NetworkHandler {
                     })
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
-                        if pool.contains(message.pub_key()) {
+                        let connection_limit_reached = pool.count_outgoing() >= max_connections;
+                        if pool.contains(message.pub_key()) || connection_limit_reached {
                             Box::new(future::ok(()))
                         } else {
                             let conn_addr = ConnectedPeerAddr::Out(
@@ -563,7 +578,7 @@ impl NetworkHandler {
     }
 
     fn can_create_connections(&self) -> bool {
-        self.pool.len() < self.network_config.max_outgoing_connections
+        self.pool.count_outgoing() < self.network_config.max_outgoing_connections
     }
 
     fn send_unable_connect_event(
