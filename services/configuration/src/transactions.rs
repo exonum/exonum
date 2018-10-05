@@ -16,8 +16,6 @@
 
 extern crate serde_json;
 
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
 use exonum::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
@@ -25,6 +23,9 @@ use exonum::{
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     messages::{Message, Protocol, RawTransaction}, node::State, storage::{Fork, Snapshot},
 };
+
+use config::ConfigurationServiceConfig;
+use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 use SERVICE_ID;
 use SERVICE_NAME;

@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str;
-
-use serde_json;
-
-use config::ConfigurationServiceConfig;
 use exonum::{
     blockchain::{Schema, StoredConfiguration}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
     helpers::{Height, ValidatorId}, messages::{Message, RawTransaction}, storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
+use serde_json;
+
+use std::str;
+
+use config::ConfigurationServiceConfig;
 use SERVICE_NAME;
 use {
     ConfigurationTransactions, Propose, Schema as ConfigurationSchema,
@@ -29,6 +29,7 @@ use {
 };
 
 mod api;
+
 pub fn new_tx_config_propose(
     node: &TestNode,
     cfg_proposal: StoredConfiguration,
