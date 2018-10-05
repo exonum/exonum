@@ -16,11 +16,9 @@ use failure;
 use toml::Value;
 
 use exonum::{
-    blockchain::{GenesisConfig, ValidatorKeys},
+    blockchain::{GenesisConfig, ValidatorKeys}, crypto::gen_keypair,
     helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
-    node::State,
-    crypto::gen_keypair,
-    node::{ConnectListConfig, NodeConfig},
+    node::State, node::{ConnectListConfig, NodeConfig},
 };
 
 use std::collections::BTreeMap;
