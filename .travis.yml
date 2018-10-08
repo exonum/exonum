@@ -85,7 +85,7 @@ jobs:
     - mkdir -p target/doc/exonum_configuration
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
     - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
-    - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.htm
+    - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
     - touch target/doc/exonum_configuration/enum.Option.html
     - cargo deadlinks --dir target/doc
 
