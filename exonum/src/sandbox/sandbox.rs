@@ -42,7 +42,7 @@ use events::{
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{
     BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, Protocol, ProtocolMessage, RawTransaction,
+    PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
     SignedMessage, Status, TransactionsRequest, TransactionsResponse,
 };
 use node::ConnectInfo;
@@ -76,7 +76,7 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 pub struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
-    pub sent: VecDeque<(SocketAddr, Protocol)>,
+    pub sent: VecDeque<(SocketAddr, Message)>,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
@@ -103,7 +103,7 @@ impl SandboxInner {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => {
                         let protocol_msg =
-                            Protocol::deserialize(msg).expect("Expected valid message.");
+                            Message::deserialize(msg).expect("Expected valid message.");
                         self.sent.push_back((peer, protocol_msg))
                     }
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
@@ -123,7 +123,7 @@ impl SandboxInner {
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
-                        let protocol = Protocol::deserialize(
+                        let protocol = Message::deserialize(
                             SignedMessage::from_raw_buffer(message).unwrap(),
                         ).unwrap();
                         self.handler
@@ -152,7 +152,7 @@ pub struct Sandbox {
     inner: RefCell<SandboxInner>,
     addresses: Vec<SocketAddr>,
     /// Connect message used during initialization.
-    connect: Option<Message<Connect>>,
+    connect: Option<Signed<Connect>>,
 }
 
 impl Sandbox {
@@ -213,8 +213,8 @@ impl Sandbox {
         to: &PublicKey,
         height: Height,
         secret_key: &SecretKey,
-    ) -> Message<BlockRequest> {
-        Protocol::concrete(BlockRequest::new(to, height), *author, secret_key)
+    ) -> Signed<BlockRequest> {
+        Message::concrete(BlockRequest::new(to, height), *author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
@@ -224,12 +224,12 @@ impl Sandbox {
         height: Height,
         last_hash: &Hash,
         secret_key: &SecretKey,
-    ) -> Message<Status> {
-        Protocol::concrete(Status::new(height, last_hash), *author, secret_key)
+    ) -> Signed<Status> {
+        Message::concrete(Status::new(height, last_hash), *author, secret_key)
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_block_response<I: IntoIterator<Item = Message<Precommit>>>(
+    pub fn create_block_response<I: IntoIterator<Item = Signed<Precommit>>>(
         &self,
         public_key: &PublicKey,
         to: &PublicKey,
@@ -237,8 +237,8 @@ impl Sandbox {
         precommits: I,
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
-    ) -> Message<BlockResponse> {
-        Protocol::concrete(
+    ) -> Signed<BlockResponse> {
+        Message::concrete(
             BlockResponse::new(
                 to,
                 block,
@@ -258,8 +258,8 @@ impl Sandbox {
         time: chrono::DateTime<::chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
-    ) -> Message<Connect> {
-        Protocol::concrete(
+    ) -> Signed<Connect> {
+        Message::concrete(
             Connect::new(addr, time, user_agent),
             *public_key,
             secret_key,
@@ -272,8 +272,8 @@ impl Sandbox {
         public_key: &PublicKey,
         to: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Message<PeersRequest> {
-        Protocol::concrete(PeersRequest::new(to), *public_key, secret_key)
+    ) -> Signed<PeersRequest> {
+        Message::concrete(PeersRequest::new(to), *public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -285,8 +285,8 @@ impl Sandbox {
         last_hash: &Hash,
         tx_hashes: &[Hash],
         secret_key: &SecretKey,
-    ) -> Message<Propose> {
-        Protocol::concrete(
+    ) -> Signed<Propose> {
+        Message::concrete(
             Propose::new(validator_id, height, round, last_hash, tx_hashes),
             self.p(validator_id),
             secret_key,
@@ -303,8 +303,8 @@ impl Sandbox {
         block_hash: &Hash,
         system_time: chrono::DateTime<::chrono::Utc>,
         secret_key: &SecretKey,
-    ) -> Message<Precommit> {
-        Protocol::concrete(
+    ) -> Signed<Precommit> {
+        Message::concrete(
             Precommit::new(
                 validator_id,
                 propose_height,
@@ -327,8 +327,8 @@ impl Sandbox {
         propose_hash: &Hash,
         locked_round: Round,
         secret_key: &SecretKey,
-    ) -> Message<Prevote> {
-        Protocol::concrete(
+    ) -> Signed<Prevote> {
+        Message::concrete(
             Prevote::new(
                 validator_id,
                 propose_height,
@@ -351,8 +351,8 @@ impl Sandbox {
         propose_hash: &Hash,
         validators: BitVec,
         secret_key: &SecretKey,
-    ) -> Message<PrevotesRequest> {
-        Protocol::concrete(
+    ) -> Signed<PrevotesRequest> {
+        Message::concrete(
             PrevotesRequest::new(to, height, round, propose_hash, validators),
             *from,
             secret_key,
@@ -367,8 +367,8 @@ impl Sandbox {
         height: Height,
         propose_hash: &Hash,
         secret_key: &SecretKey,
-    ) -> Message<ProposeRequest> {
-        Protocol::concrete(
+    ) -> Signed<ProposeRequest> {
+        Message::concrete(
             ProposeRequest::new(to, height, propose_hash),
             *author,
             secret_key,
@@ -382,8 +382,8 @@ impl Sandbox {
         to: &PublicKey,
         txs: &[Hash],
         secret_key: &SecretKey,
-    ) -> Message<TransactionsRequest> {
-        Protocol::concrete(TransactionsRequest::new(to, txs), *author, secret_key)
+    ) -> Signed<TransactionsRequest> {
+        Message::concrete(TransactionsRequest::new(to, txs), *author, secret_key)
     }
 
     /// Creates a `TransactionsResponse` message signed by this validator.
@@ -393,11 +393,11 @@ impl Sandbox {
         to: &PublicKey,
         txs: I,
         secret_key: &SecretKey,
-    ) -> Message<TransactionsResponse>
+    ) -> Signed<TransactionsResponse>
     where
-        I: IntoIterator<Item = Message<RawTransaction>>,
+        I: IntoIterator<Item = Signed<RawTransaction>>,
     {
-        Protocol::concrete(
+        Message::concrete(
             TransactionsResponse::new(to, txs.into_iter().map(|x| x.serialize()).collect()),
             *author,
             secret_key,
@@ -446,11 +446,11 @@ impl Sandbox {
     }
 
     /// Returns connect message used during initialization.
-    pub fn connect(&self) -> Option<&Message<Connect>> {
+    pub fn connect(&self) -> Option<&Signed<Connect>> {
         self.connect.as_ref()
     }
 
-    pub fn recv<T: ProtocolMessage>(&self, msg: &Message<T>) {
+    pub fn recv<T: ProtocolMessage>(&self, msg: &Signed<T>) {
         self.check_unexpected_message();
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.clone().serialize());
@@ -468,11 +468,11 @@ impl Sandbox {
         self.inner.borrow_mut().process_events();
     }
 
-    pub fn pop_sent(&self) -> Option<(SocketAddr, Protocol)> {
+    pub fn pop_sent(&self) -> Option<(SocketAddr, Message)> {
         self.inner.borrow_mut().sent.pop_front()
     }
 
-    pub fn send<T: ProtocolMessage>(&self, addr: SocketAddr, msg: &Message<T>) {
+    pub fn send<T: ProtocolMessage>(&self, addr: SocketAddr, msg: &Signed<T>) {
         let expected_msg = T::into_protocol(msg.clone());
         self.process_events();
         let send = self.pop_sent();
@@ -509,15 +509,15 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: ProtocolMessage>(&self, msg: &Message<T>) {
+    pub fn broadcast<T: ProtocolMessage>(&self, msg: &Signed<T>) {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
-    pub fn try_broadcast<T: ProtocolMessage>(&self, msg: &Message<T>) -> Result<(), String> {
+    pub fn try_broadcast<T: ProtocolMessage>(&self, msg: &Signed<T>) -> Result<(), String> {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
-    pub fn broadcast_to_addrs<'a, T: ProtocolMessage, I>(&self, msg: &Message<T>, addresses: I)
+    pub fn broadcast_to_addrs<'a, T: ProtocolMessage, I>(&self, msg: &Signed<T>, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
@@ -526,7 +526,7 @@ impl Sandbox {
 
     pub fn try_broadcast_to_addrs<'a, T: ProtocolMessage, I>(
         &self,
-        msg: &Message<T>,
+        msg: &Signed<T>,
         addresses: I,
     ) -> Result<(), String>
     where
@@ -621,9 +621,9 @@ impl Sandbox {
         *self.last_block().state_hash()
     }
 
-    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Message<RawTransaction>>
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<RawTransaction>>
     where
-        I: IntoIterator<Item = &'a Message<RawTransaction>>,
+        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain_ref().snapshot();
@@ -648,7 +648,7 @@ impl Sandbox {
     /// Extracts state_hash from the fake block.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
-        I: IntoIterator<Item = &'a Message<RawTransaction>>,
+        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
     {
         let height = self.current_height();
         let mut blockchain = self.blockchain_mut();
@@ -934,7 +934,7 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Message<Connect>>) -> Self {
+    pub fn from_peers(peers: &HashMap<PublicKey, Signed<Connect>>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> =
             peers.iter().map(|(p, c)| (*p, c.addr())).collect();
         ConnectList { peers }
@@ -1156,9 +1156,9 @@ mod tests {
     }
 
     impl TxAfterCommit {
-        pub fn new_with_height(height: Height) -> Message<RawTransaction> {
+        pub fn new_with_height(height: Height) -> Signed<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            Protocol::sign_transaction(
+            Message::sign_transaction(
                 TxAfterCommit::new(height),
                 SERVICE_ID,
                 keypair.0,

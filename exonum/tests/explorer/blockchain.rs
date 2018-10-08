@@ -23,7 +23,7 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::{Message, Protocol, RawTransaction}, node::ApiSender, storage::{MemoryDB, Snapshot},
+    messages::{Message, RawTransaction, Signed}, node::ApiSender, storage::{MemoryDB, Snapshot},
 };
 
 pub const SERVICE_ID: u16 = 0;
@@ -117,7 +117,7 @@ pub fn create_blockchain() -> Blockchain {
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
-pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTransaction>>) {
+pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTransaction>>) {
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
@@ -137,7 +137,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTr
     let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
-    let propose = Protocol::concrete(
+    let propose = Message::concrete(
         Propose::new(
             ValidatorId(0),
             height,
@@ -148,7 +148,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Message<RawTr
         consensus_public_key,
         &consensus_secret_key,
     );
-    let precommit = Protocol::concrete(
+    let precommit = Message::concrete(
         Precommit::new(
             ValidatorId(0),
             propose.height(),

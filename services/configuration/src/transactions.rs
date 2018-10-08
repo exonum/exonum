@@ -20,8 +20,8 @@ use exonum::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
     },
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-    messages::{Message, Protocol, RawTransaction}, node::State, storage::{Fork, Snapshot},
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
+    node::State, storage::{Fork, Snapshot},
 };
 
 use config::ConfigurationServiceConfig;
@@ -91,7 +91,7 @@ transactions! {
 impl ConfigurationTransactions {
     #[doc(hidden)]
     #[cfg(test)]
-    pub fn from_raw(message: Message<RawTransaction>) -> ConfigurationTransactions {
+    pub fn from_raw(message: Signed<RawTransaction>) -> ConfigurationTransactions {
         use exonum::blockchain::TransactionSet;
         use std::ops::Deref;
         ConfigurationTransactions::tx_from_raw(message.deref().clone()).unwrap()
@@ -99,23 +99,23 @@ impl ConfigurationTransactions {
 }
 
 impl VoteAgainst {
-    /// Create `Message` for `VoteAgainst` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(VoteAgainst::new(cfg_hash), SERVICE_ID, *author, key)
+    /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(VoteAgainst::new(cfg_hash), SERVICE_ID, *author, key)
     }
 }
 
 impl Vote {
-    /// Create `Message` for `Vote` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(Vote::new(cfg_hash), SERVICE_ID, *author, key)
+    /// Create `Signed` for `Vote` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Vote::new(cfg_hash), SERVICE_ID, *author, key)
     }
 }
 
 impl Propose {
-    /// Create `Message` for `Propose` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(Propose::new(cfg), SERVICE_ID, *author, key)
+    /// Create `Signed` for `Propose` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Propose::new(cfg), SERVICE_ID, *author, key)
     }
 }
 

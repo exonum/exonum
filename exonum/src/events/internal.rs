@@ -21,7 +21,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use messages::{Protocol, SignedMessage};
+use messages::{Message, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -48,7 +48,7 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Protocol::deserialize))
+        future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Message::deserialize))
             .map_err(drop)
             .and_then(|protocol| {
                 let event = future::ok(InternalEvent::MessageVerified(protocol));
@@ -148,7 +148,7 @@ mod tests {
         let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
 
         let expected_event =
-            InternalEvent::MessageVerified(Protocol::deserialize(tx.clone()).unwrap());
+            InternalEvent::MessageVerified(Message::deserialize(tx.clone()).unwrap());
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }

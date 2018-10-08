@@ -14,7 +14,7 @@
 
 use exonum::{
     blockchain::{Schema, StoredConfiguration}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
-    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction}, storage::StorageValue,
+    helpers::{Height, ValidatorId}, messages::{RawTransaction, Signed}, storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 use serde_json;
@@ -33,7 +33,7 @@ mod api;
 pub fn new_tx_config_propose(
     node: &TestNode,
     cfg_proposal: StoredConfiguration,
-) -> Message<RawTransaction> {
+) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
     Propose::sign(
         keypair.0,
@@ -42,7 +42,7 @@ pub fn new_tx_config_propose(
     )
 }
 
-pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Message<RawTransaction> {
+pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
     Vote::sign(keypair.0, &cfg_proposal_hash, keypair.1)
 }
@@ -50,7 +50,7 @@ pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Message<R
 pub fn new_tx_config_vote_against(
     node: &TestNode,
     cfg_proposal_hash: Hash,
-) -> Message<RawTransaction> {
+) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
     VoteAgainst::sign(keypair.0, &cfg_proposal_hash, keypair.1)
 }

@@ -20,9 +20,9 @@ use events::InternalRequest;
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Message, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawTransaction, SignedMessage, TransactionsRequest,
-    TransactionsResponse,
+    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
+    TransactionsRequest, TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;
@@ -89,7 +89,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
-    pub fn handle_propose(&mut self, from: PublicKey, msg: &Message<Propose>) {
+    pub fn handle_propose(&mut self, from: PublicKey, msg: &Signed<Propose>) {
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.validator())
@@ -145,7 +145,7 @@ impl NodeHandler {
         }
     }
 
-    fn validate_block_response(&self, msg: &Message<BlockResponse>) -> Result<(), failure::Error> {
+    fn validate_block_response(&self, msg: &Signed<BlockResponse>) -> Result<(), failure::Error> {
         if msg.to() != self.state.consensus_public_key() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
@@ -198,7 +198,7 @@ impl NodeHandler {
 
     /// Handles the `Block` message. For details see the message documentation.
     // TODO: Write helper function which returns Result. (ECR-123)
-    pub fn handle_block(&mut self, msg: &Message<BlockResponse>) -> Result<(), failure::Error> {
+    pub fn handle_block(&mut self, msg: &Signed<BlockResponse>) -> Result<(), failure::Error> {
         self.validate_block_response(&msg)?;
 
         let block = msg.block();
@@ -276,10 +276,7 @@ impl NodeHandler {
     /// # Panics
     ///
     /// Panics if the received block has incorrect `block_hash`.
-    pub fn handle_full_block(
-        &mut self,
-        msg: &Message<BlockResponse>,
-    ) -> Result<(), failure::Error> {
+    pub fn handle_full_block(&mut self, msg: &Signed<BlockResponse>) -> Result<(), failure::Error> {
         let block = msg.block();
         let block_hash = block.hash();
 
@@ -312,7 +309,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Message<Prevote>) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Signed<Prevote>) {
         trace!("Handle prevote");
 
         debug_assert_eq!(
@@ -434,7 +431,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
-    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Message<Precommit>) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Signed<Precommit>) {
         trace!("Handle precommit");
 
         debug_assert_eq!(
@@ -467,7 +464,7 @@ impl NodeHandler {
     }
 
     /// Commits block, so new height is achieved.
-    pub fn commit<I: Iterator<Item = Message<Precommit>>>(
+    pub fn commit<I: Iterator<Item = Signed<Precommit>>>(
         &mut self,
         block_hash: Hash,
         precommits: I,
@@ -529,7 +526,7 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
-    pub fn handle_tx(&mut self, msg: Message<RawTransaction>) -> Result<(), failure::Error> {
+    pub fn handle_tx(&mut self, msg: Signed<RawTransaction>) -> Result<(), failure::Error> {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -569,7 +566,7 @@ impl NodeHandler {
     /// Handles raw transactions.
     pub fn handle_txs_batch(
         &mut self,
-        msg: &Message<TransactionsResponse>,
+        msg: &Signed<TransactionsResponse>,
     ) -> Result<(), failure::Error> {
         if msg.to() != self.state.consensus_public_key() {
             bail!(
@@ -594,7 +591,7 @@ impl NodeHandler {
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-    pub fn handle_incoming_tx(&mut self, msg: Message<RawTransaction>) {
+    pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),
@@ -900,7 +897,7 @@ impl NodeHandler {
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.
     fn verify_precommits(
         &self,
-        precommits: &[Message<Precommit>],
+        precommits: &[Signed<Precommit>],
         block_hash: &Hash,
         block_height: Height,
     ) -> Result<(), failure::Error> {
@@ -930,7 +927,7 @@ impl NodeHandler {
         block_hash: &Hash,
         block_height: Height,
         precommit_round: Round,
-        precommit: &Message<Precommit>,
+        precommit: &Signed<Precommit>,
     ) -> Result<(), failure::Error> {
         if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator()) {
             if pub_key != precommit.author() {

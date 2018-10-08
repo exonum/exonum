@@ -31,7 +31,7 @@ extern crate serde_json;
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::TransactionErrorType as ErrorType, crypto::{self, CryptoHash, PublicKey},
-    encoding::serialize::FromHex, helpers::Height, messages::{self, Message, RawTransaction},
+    encoding::serialize::FromHex, helpers::Height, messages::{self, RawTransaction, Signed},
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
@@ -48,7 +48,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn inc_count(api: &TestKitApi, by: u64) -> Message<RawTransaction> {
+fn inc_count(api: &TestKitApi, by: u64) -> Signed<RawTransaction> {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxIncrement::sign(&pubkey, by, &key);

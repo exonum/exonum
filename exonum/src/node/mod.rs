@@ -53,7 +53,7 @@ use helpers::{
     config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
     Milliseconds, Round, ValidatorId,
 };
-use messages::{Connect, Message, Protocol, ProtocolMessage, RawTransaction, SignedMessage};
+use messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
@@ -69,7 +69,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Message<RawTransaction>),
+    Transaction(Signed<RawTransaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -408,7 +408,7 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Protocol::concrete(
+        let connect = Message::concrete(
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
@@ -458,8 +458,8 @@ impl NodeHandler {
         }
     }
 
-    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Message<T> {
-        Protocol::concrete(
+    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Signed<T> {
+        Message::concrete(
             message,
             *self.state.consensus_public_key(),
             self.state.consensus_secret_key(),
@@ -762,7 +762,7 @@ impl ApiSender {
             .map_err(into_failure)
     }
     /// Broadcast transaction to other node.
-    pub fn broadcast_transaction(&self, tx: Message<RawTransaction>) -> Result<(), Error> {
+    pub fn broadcast_transaction(&self, tx: Signed<RawTransaction>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
@@ -1119,7 +1119,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Protocol::sign_transaction(
+        let tx = Message::sign_transaction(
             TxSimple::new(&p_key, "Hello, World!"),
             SERVICE_ID,
             p_key,

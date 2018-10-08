@@ -30,7 +30,7 @@ use exonum::node::EventsPoolCapacity;
 use exonum::node::ExternalMessage;
 use exonum::{
     crypto, events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::{Protocol, RawTransaction, ServiceTransaction}, node::NodeChannel,
+    messages::{Message, RawTransaction, ServiceTransaction}, node::NodeChannel,
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -80,7 +80,7 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
-            let msg = Protocol::new(
+            let msg = Message::new(
                 RawTransaction::new(
                     0,
                     ServiceTransaction::from_raw_unchecked(0, vec![0; tx_size]),
@@ -202,7 +202,7 @@ fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
     b.iter(|| {
         for message in messages.clone() {
-            let _ = Protocol::from_raw_buffer(message).unwrap();
+            let _ = Message::from_raw_buffer(message).unwrap();
         }
     })
 }

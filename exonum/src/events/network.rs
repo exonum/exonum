@@ -34,14 +34,14 @@ use events::{
     codec::MessagesCodec, error::into_failure, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use messages::{Connect, Message, Protocol, Service, SignedMessage};
+use messages::{Connect, Message, Service, Signed, SignedMessage};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, Vec<u8>),
-    PeerConnected(SocketAddr, Message<Connect>),
+    PeerConnected(SocketAddr, Signed<Connect>),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
 }
@@ -79,7 +79,7 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
-    pub our_connect_message: Message<Connect>,
+    pub our_connect_message: Signed<Connect>,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
@@ -265,7 +265,7 @@ impl NetworkPart {
 }
 
 struct RequestHandler {
-    connect_message: Message<Connect>,
+    connect_message: Signed<Connect>,
     network_config: NetworkConfiguration,
     network_tx: mpsc::Sender<NetworkEvent>,
     handle: Handle,
@@ -275,7 +275,7 @@ struct RequestHandler {
 
 impl RequestHandler {
     fn from(
-        connect_message: Message<Connect>,
+        connect_message: Signed<Connect>,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
@@ -495,11 +495,11 @@ impl<'a> Listener<'a> {
             })
     }
 
-    fn parse_connect_message(raw: Option<Vec<u8>>) -> Result<Message<Connect>, failure::Error> {
+    fn parse_connect_message(raw: Option<Vec<u8>>) -> Result<Signed<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
-        let message = Protocol::from_raw_buffer(raw)?;
+        let message = Message::from_raw_buffer(raw)?;
         match message {
-            Protocol::Service(Service::Connect(connect)) => Ok(connect),
+            Message::Service(Service::Connect(connect)) => Ok(connect),
             other => bail!(
                 "First message from a remote peer is not Connect, got={:?}",
                 other
@@ -510,7 +510,7 @@ impl<'a> Listener<'a> {
     fn process_incoming_messages<S>(
         stream: SplitStream<S>,
         network_tx: mpsc::Sender<NetworkEvent>,
-        connect: Message<Connect>,
+        connect: Signed<Connect>,
         address: SocketAddr,
     ) -> impl Future<Item = (), Error = failure::Error>
     where

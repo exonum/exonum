@@ -29,7 +29,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
     crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding, helpers::Height,
-    messages::{Message, Protocol, RawTransaction}, storage::{Fork, ProofMapIndex, Snapshot},
+    messages::{Message, RawTransaction, Signed}, storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
@@ -88,8 +88,8 @@ impl TxMarker {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(
             TxMarker::new(mark, time),
             SERVICE_ID,
             *public_key,

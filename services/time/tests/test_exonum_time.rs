@@ -24,7 +24,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionResult},
     crypto::{gen_keypair, PublicKey}, helpers::{Height, ValidatorId},
-    messages::{Message, RawTransaction}, storage::Snapshot,
+    messages::{RawTransaction, Signed}, storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
@@ -57,7 +57,7 @@ fn assert_storage_times_eq<T: AsRef<Snapshot>>(
 
 fn assert_transaction_result<S: AsRef<Snapshot>>(
     snapshot: S,
-    transaction: &Message<RawTransaction>,
+    transaction: &Signed<RawTransaction>,
     expected_code: u8,
 ) -> Option<String> {
     let result = Schema::new(snapshot)

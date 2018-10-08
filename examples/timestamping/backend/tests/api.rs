@@ -25,7 +25,7 @@ extern crate exonum_timestamping;
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{gen_keypair, hash, Hash}, helpers::Height,
-    messages::{to_hex_string, Message, RawTransaction},
+    messages::{to_hex_string, RawTransaction, Signed},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeService};
@@ -49,7 +49,7 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
 /// Assert transaction status
 fn assert_status(
     api: &TestKitApi,
-    tx: &Message<RawTransaction>,
+    tx: &Signed<RawTransaction>,
     expected_status: &serde_json::Value,
 ) {
     let info: serde_json::Value = api.public(ApiKind::Explorer)

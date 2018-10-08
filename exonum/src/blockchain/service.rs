@@ -28,7 +28,7 @@ use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Milliseconds, ValidatorId};
-use messages::{Message, Protocol, RawTransaction, ServiceTransaction};
+use messages::{Message, RawTransaction, ServiceTransaction, Signed};
 use node::{ApiSender, NodeRole, State};
 use storage::{Fork, Snapshot};
 
@@ -50,7 +50,7 @@ use storage::{Fork, Snapshot};
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{Message, RawTransaction};
+/// # use exonum::messages::{Signed, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;
 ///
@@ -304,7 +304,7 @@ impl ServiceContext {
     where
         T: Into<ServiceTransaction> + Transaction,
     {
-        let msg = Protocol::sign_transaction(
+        let msg = Message::sign_transaction(
             tx,
             self.service_id,
             self.service_keypair.0,
@@ -318,7 +318,7 @@ impl ServiceContext {
 
     /// Broadcast transaction to other nodes in the network.
     /// This transaction should be signed externally.
-    pub fn broadcast_signed_transaction(&self, msg: Message<RawTransaction>) {
+    pub fn broadcast_signed_transaction(&self, msg: Signed<RawTransaction>) {
         if let Err(e) = self.api_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }

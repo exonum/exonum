@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use crypto::{gen_keypair, CryptoHash, Hash};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Message, RawTransaction};
+use messages::{RawTransaction, Signed};
 use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
@@ -47,7 +47,7 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
     sandbox
 }
 
-fn tx_hashes(transactions: &[Message<RawTransaction>]) -> Vec<Hash> {
+fn tx_hashes(transactions: &[Signed<RawTransaction>]) -> Vec<Hash> {
     let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
     hashes.sort();
     hashes
@@ -56,8 +56,8 @@ fn tx_hashes(transactions: &[Message<RawTransaction>]) -> Vec<Hash> {
 /// sends transactions into pool and returns this transactions in processing order
 fn send_txs_into_pool(
     sandbox: &Sandbox,
-    mut transactions: Vec<Message<RawTransaction>>,
-) -> Vec<Message<RawTransaction>> {
+    mut transactions: Vec<Signed<RawTransaction>>,
+) -> Vec<Signed<RawTransaction>> {
     for tx in &transactions {
         sandbox.recv(tx);
     }

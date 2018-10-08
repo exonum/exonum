@@ -115,7 +115,7 @@ pub mod schema {
 pub mod transactions {
     use super::service::SERVICE_ID;
     use exonum::{
-        crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
+        crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
     };
     transactions! {
         /// Transaction group.
@@ -148,8 +148,8 @@ pub mod transactions {
 
     impl TxCreateWallet {
         #[doc(hidden)]
-        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Message<RawTransaction> {
-            Protocol::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
+        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+            Message::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
         }
     }
 
@@ -161,8 +161,8 @@ pub mod transactions {
             seed: u64,
             pk: &PublicKey,
             sk: &SecretKey,
-        ) -> Message<RawTransaction> {
-            Protocol::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sk)
+        ) -> Signed<RawTransaction> {
+            Message::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sk)
         }
     }
 }

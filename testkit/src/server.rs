@@ -156,7 +156,7 @@ mod tests {
     use exonum::encoding::Error as EncodingError;
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
-    use exonum::messages::{Message, Protocol, RawTransaction};
+    use exonum::messages::{Message, RawTransaction, Signed};
     use exonum::storage::Snapshot;
 
     use super::*;
@@ -174,9 +174,9 @@ mod tests {
     }
 
     impl TxTimestamp {
-        fn for_str(s: &str) -> Message<RawTransaction> {
+        fn for_str(s: &str) -> Signed<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            Protocol::sign_transaction(TxTimestamp::new(s), TIMESTAMP_SERVICE_ID, pubkey, &key)
+            Message::sign_transaction(TxTimestamp::new(s), TIMESTAMP_SERVICE_ID, pubkey, &key)
         }
     }
 

@@ -18,7 +18,7 @@ use serde_json;
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, CryptoHash, PublicKey, SecretKey}, helpers::{Height, Round, ValidatorId},
-    messages::{Message, Precommit, Propose, Protocol},
+    messages::{Message, Precommit, Propose, Signed},
 };
 
 /// Emulated test network.
@@ -169,8 +169,8 @@ impl TestNode {
         height: Height,
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
-    ) -> Message<Propose> {
-        Protocol::concrete(
+    ) -> Signed<Propose> {
+        Message::concrete(
             Propose::new(
                 self.validator_id
                     .expect("An attempt to create propose from a non-validator node."),
@@ -189,10 +189,10 @@ impl TestNode {
         &self,
         propose: &Propose,
         block_hash: &crypto::Hash,
-    ) -> Message<Precommit> {
+    ) -> Signed<Precommit> {
         use std::time::SystemTime;
 
-        Protocol::concrete(
+        Message::concrete(
             Precommit::new(
                 self.validator_id
                     .expect("An attempt to create propose from a non-validator node."),
