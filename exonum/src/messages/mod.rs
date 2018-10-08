@@ -60,7 +60,7 @@ pub(crate) const RAW_TRANSACTION_HEADER: usize = mem::size_of::<u16>() * 2;
 
 /// Transaction raw buffer.
 /// This struct is used to transfer transactions in network.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct RawTransaction {
     service_id: u16,
     service_transaction: ServiceTransaction,
@@ -69,7 +69,7 @@ pub struct RawTransaction {
 /// Concrete raw transaction transaction inside `TransactionSet`.
 /// This type used inner inside `transactions!`
 /// to return raw transaction payload as part of service transaction set.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ServiceTransaction {
     transaction_id: u16,
     payload: Vec<u8>,
@@ -92,10 +92,8 @@ impl ServiceTransaction {
 
 impl RawTransaction {
     /// Creates a new instance of RawTransaction.
-    pub(in messages) fn new(
-        service_id: u16,
-        service_transaction: ServiceTransaction,
-    ) -> RawTransaction {
+    // `pub` because new used in benches.
+    pub fn new(service_id: u16, service_transaction: ServiceTransaction) -> RawTransaction {
         RawTransaction {
             service_id,
             service_transaction,

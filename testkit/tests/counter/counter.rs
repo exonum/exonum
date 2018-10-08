@@ -14,10 +14,11 @@
 
 //! Sample counter service.
 use exonum::{
-    api, blockchain::{ExecutionError, ExecutionResult, Service, Transaction,
-                      TransactionContext, TransactionSet},
-    crypto::{Hash, PublicKey, SecretKey}, encoding,
-    messages::{Protocol, Message, RawTransaction},
+    api,
+    blockchain::{
+        ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
+    },
+    crypto::{Hash, PublicKey, SecretKey}, encoding, messages::{Message, Protocol, RawTransaction},
     storage::{Entry, Fork, Snapshot},
 };
 
@@ -101,12 +102,11 @@ impl Transaction for TxIncrement {
 
 impl TxReset {
     pub fn sign(author: &PublicKey, key: &SecretKey) -> Message<RawTransaction> {
-       Protocol::sign_transaction(TxReset::new(), SERVICE_ID, *author, key)
+        Protocol::sign_transaction(TxReset::new(), SERVICE_ID, *author, key)
     }
 }
 
 impl Transaction for TxReset {
-
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = CounterSchema::new(tc.fork());
         schema.set_count(0);

@@ -40,7 +40,7 @@
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{Blockchain, Schema, Service, Transaction}, crypto::{Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId}, node::ApiSender,
+    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction}, node::ApiSender,
     storage::{Database, DbOptions, Patch, RocksDB},
 };
 use futures::sync::mpsc;
@@ -106,8 +106,9 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 mod timestamping {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
-        blockchain::{ExecutionResult, Service, Transaction}, crypto::{CryptoHash, Hash, PublicKey},
-        encoding::Error as EncodingError, messages::RawTransaction, storage::{Fork, Snapshot},
+        blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
+        crypto::{CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+        messages::{Message, Protocol, RawTransaction}, storage::Snapshot,
     };
     use rand::Rng;
 
@@ -136,17 +137,27 @@ mod timestamping {
 
     transactions! {
         TimestampingTransactions {
-            const SERVICE_ID = TIMESTAMPING_SERVICE_ID;
-
             struct Tx {
-                from: &PublicKey,
                 data: &Hash,
             }
 
             struct PanickingTx {
-                from: &PublicKey,
                 data: &Hash,
             }
+        }
+    }
+
+    impl Tx {
+        #[doc(hidden)]
+        pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Message<RawTransaction> {
+            Protocol::sign_transaction(Tx::new(data), TIMESTAMPING_SERVICE_ID, *pk, sk)
+        }
+    }
+
+    impl PanickingTx {
+        #[doc(hidden)]
+        pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Message<RawTransaction> {
+            Protocol::sign_transaction(PanickingTx::new(data), TIMESTAMPING_SERVICE_ID, *pk, sk)
         }
     }
 
@@ -157,7 +168,7 @@ mod timestamping {
             unimplemented!("never used in benchmark")
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
@@ -167,22 +178,24 @@ mod timestamping {
             unimplemented!("never used in benchmark")
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
             panic!("panic text");
         }
     }
 
-    pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+    pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = Message<RawTransaction>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            Tx::new(&pub_key, &i.hash(), &sec_key).into()
+            Tx::sign(&pub_key, &i.hash(), &sec_key)
         })
     }
 
-    pub fn panicking_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+    pub fn panicking_transactions(
+        mut rng: impl Rng,
+    ) -> impl Iterator<Item = Message<RawTransaction>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            PanickingTx::new(&pub_key, &i.hash(), &sec_key).into()
+            PanickingTx::sign(&pub_key, &i.hash(), &sec_key)
         })
     }
 }
@@ -190,9 +203,10 @@ mod timestamping {
 mod cryptocurrency {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
-        blockchain::{ExecutionError, ExecutionResult, Service, Transaction},
-        crypto::{Hash, PublicKey}, encoding::Error as EncodingError, messages::RawTransaction,
-        storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
+        blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
+        crypto::{Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
+        messages::{Message, Protocol, RawTransaction},
+        storage::{MapIndex, ProofMapIndex, Snapshot},
     };
     use rand::{seq::sample_slice_ref, Rng};
 
@@ -207,7 +221,7 @@ mod cryptocurrency {
 
     impl Service for Cryptocurrency {
         fn service_id(&self) -> u16 {
-            255
+            CRYPTOCURRENCY_SERVICE_ID
         }
 
         fn service_name(&self) -> &'static str {
@@ -226,28 +240,64 @@ mod cryptocurrency {
 
     transactions! {
         CryptocurrencyTransactions {
-            const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
-
             /// Transfers one unit of currency from `from` to `to`.
             struct Tx {
-                from: &PublicKey,
                 to: &PublicKey,
                 seed: u32,
             }
 
             /// Same as `Tx`, but without cryptographic proofs in `execute`.
             struct SimpleTx {
-                from: &PublicKey,
                 to: &PublicKey,
                 seed: u32,
             }
 
             /// Same as `SimpleTx`, but signals an error 50% of the time.
             struct RollbackTx {
-                from: &PublicKey,
                 to: &PublicKey,
                 seed: u32,
             }
+        }
+    }
+
+    impl Tx {
+        #[doc(hidden)]
+        pub fn sign(
+            pk: &PublicKey,
+            to: &PublicKey,
+            seed: u32,
+            sk: &SecretKey,
+        ) -> Message<RawTransaction> {
+            Protocol::sign_transaction(Tx::new(to, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+        }
+    }
+
+    impl SimpleTx {
+        #[doc(hidden)]
+        pub fn sign(
+            pk: &PublicKey,
+            to: &PublicKey,
+            seed: u32,
+            sk: &SecretKey,
+        ) -> Message<RawTransaction> {
+            Protocol::sign_transaction(SimpleTx::new(to, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+        }
+    }
+
+    impl RollbackTx {
+        #[doc(hidden)]
+        pub fn sign(
+            pk: &PublicKey,
+            to: &PublicKey,
+            seed: u32,
+            sk: &SecretKey,
+        ) -> Message<RawTransaction> {
+            Protocol::sign_transaction(
+                RollbackTx::new(to, seed),
+                CRYPTOCURRENCY_SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 
@@ -256,12 +306,13 @@ mod cryptocurrency {
             unimplemented!("never used in benchmark")
         }
 
-        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            let mut index = ProofMapIndex::new("provable_balances", fork);
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let from = context.author();
+            let mut index = ProofMapIndex::new("provable_balances", context.fork());
 
-            let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
+            let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
-            index.put(self.from(), from_balance - 1);
+            index.put(&from, from_balance - 1);
             index.put(self.to(), to_balance + 1);
 
             Ok(())
@@ -273,12 +324,14 @@ mod cryptocurrency {
             unimplemented!("never used in benchmark")
         }
 
-        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            let mut index = MapIndex::new("balances", fork);
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let from = context.author();
 
-            let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
+            let mut index = MapIndex::new("balances", context.fork());
+
+            let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
-            index.put(self.from(), from_balance - 1);
+            index.put(&from, from_balance - 1);
             index.put(self.to(), to_balance + 1);
 
             Ok(())
@@ -290,12 +343,14 @@ mod cryptocurrency {
             unimplemented!("never used in benchmark")
         }
 
-        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            let mut index = MapIndex::new("balances", fork);
+        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+            let from = context.author();
 
-            let from_balance = index.get(self.from()).unwrap_or(INITIAL_BALANCE);
+            let mut index = MapIndex::new("balances", context.fork());
+
+            let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
-            index.put(self.from(), from_balance - 1);
+            index.put(&from, from_balance - 1);
             index.put(self.to(), to_balance + 1);
 
             // We deliberately perform the check *after* reads/writes in order
@@ -308,42 +363,51 @@ mod cryptocurrency {
         }
     }
 
-    pub fn provable_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+    pub fn provable_transactions(
+        mut rng: impl Rng,
+    ) -> impl Iterator<Item = Message<RawTransaction>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
         (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => Tx::new(from, to, i, from_sk).into(),
+            [(ref from, ref from_sk), (ref to, ..)] => Tx::sign(from, to, i, from_sk).into(),
             _ => unreachable!(),
         })
     }
 
-    pub fn unprovable_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+    pub fn unprovable_transactions(
+        mut rng: impl Rng,
+    ) -> impl Iterator<Item = Message<RawTransaction>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
         (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::new(from, to, i, from_sk).into(),
+            [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::sign(from, to, i, from_sk),
             _ => unreachable!(),
         })
     }
 
-    pub fn rollback_transactions(mut rng: impl Rng) -> impl Iterator<Item = BoxedTx> {
+    pub fn rollback_transactions(
+        mut rng: impl Rng,
+    ) -> impl Iterator<Item = Message<RawTransaction>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
         (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::new(from, to, i, from_sk).into(),
+            [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::sign(from, to, i, from_sk),
             _ => unreachable!(),
         })
     }
 }
 
 /// Writes transactions to the pool and returns their hashes.
-fn prepare_txs(blockchain: &mut Blockchain, transactions: &[BoxedTx]) -> Vec<Hash> {
+fn prepare_txs(
+    blockchain: &mut Blockchain,
+    transactions: Vec<Message<RawTransaction>>,
+) -> Vec<Hash> {
     let mut fork = blockchain.fork();
 
     let tx_hashes = {
@@ -352,9 +416,9 @@ fn prepare_txs(blockchain: &mut Blockchain, transactions: &[BoxedTx]) -> Vec<Has
         // In the case of the block within `Bencher::iter()`, some transactions
         // may already be present in the pool. We don't particularly care about this.
         transactions
-            .iter()
+            .into_iter()
             .map(|tx| {
-                schema.add_transaction_into_pool(tx.raw().clone());
+                schema.add_transaction_into_pool(tx.clone());
                 tx.hash()
             })
             .collect()
@@ -383,7 +447,7 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
 
 fn prepare_blockchain(
     blockchain: &mut Blockchain,
-    generator: impl Iterator<Item = BoxedTx>,
+    generator: impl Iterator<Item = Message<RawTransaction>>,
     blockchain_height: usize,
     txs_in_block: usize,
 ) {
@@ -392,7 +456,7 @@ fn prepare_blockchain(
     for i in 0..blockchain_height {
         let start = txs_in_block * i;
         let end = txs_in_block * (i + 1);
-        let tx_hashes = prepare_txs(blockchain, &transactions[start..end]);
+        let tx_hashes = prepare_txs(blockchain, transactions[start..end].to_vec());
         assert_transactions_in_pool(blockchain, &tx_hashes);
 
         let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
@@ -408,7 +472,7 @@ fn execute_block_rocksdb(
     criterion: &mut Criterion,
     bench_name: &'static str,
     service: Box<dyn Service>,
-    mut tx_generator: impl Iterator<Item = BoxedTx>,
+    mut tx_generator: impl Iterator<Item = Message<RawTransaction>>,
 ) {
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);
@@ -428,7 +492,7 @@ fn execute_block_rocksdb(
         .take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1])
         .collect();
 
-    let tx_hashes = prepare_txs(&mut blockchain, &txs);
+    let tx_hashes = prepare_txs(&mut blockchain, txs.clone());
     assert_transactions_in_pool(&blockchain, &tx_hashes);
 
     // Because execute_block is not really "micro benchmark"

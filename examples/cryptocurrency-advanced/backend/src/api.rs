@@ -16,9 +16,8 @@
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, Transaction, TransactionSet}, crypto::{Hash, PublicKey},
-    helpers::Height, storage::{ListProof, MapProof},
-    messages::RawTransaction,
+    blockchain::{self, BlockProof, TransactionSet}, crypto::{Hash, PublicKey}, helpers::Height,
+    messages::RawTransaction, storage::{ListProof, MapProof},
 };
 
 use transactions::WalletTransactions;

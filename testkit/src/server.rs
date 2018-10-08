@@ -14,8 +14,8 @@
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::SharedNodeState, crypto::Hash, explorer::{BlockWithTransactions, BlockchainExplorer},
-    helpers::Height,
+    blockchain::SharedNodeState, crypto::Hash,
+    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
 };
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -55,10 +55,7 @@ impl TestkitServerApi {
         })
     }
 
-    fn create_block(
-        &self,
-        tx_hashes: Option<Vec<Hash>>,
-    ) -> api::Result<BlockWithTransactions> {
+    fn create_block(&self, tx_hashes: Option<Vec<Hash>>) -> api::Result<BlockWithTransactions> {
         let mut testkit = self.write();
         let block_info = if let Some(tx_hashes) = tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !testkit.is_tx_in_pool(h));
@@ -154,11 +151,9 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 #[cfg(test)]
 mod tests {
     use exonum::api;
-    use exonum::blockchain::{
-        ExecutionResult, Service, Transaction, TransactionContext,
-    };
+    use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
     use exonum::crypto::{gen_keypair, Hash};
-    use exonum::encoding::{Error as EncodingError};
+    use exonum::encoding::Error as EncodingError;
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, Protocol, RawTransaction};
@@ -181,12 +176,7 @@ mod tests {
     impl TxTimestamp {
         fn for_str(s: &str) -> Message<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            Protocol::sign_transaction(
-                TxTimestamp::new(s),
-                TIMESTAMP_SERVICE_ID,
-                pubkey,
-                &key,
-            )
+            Protocol::sign_transaction(TxTimestamp::new(s), TIMESTAMP_SERVICE_ID, pubkey, &key)
         }
     }
 
@@ -307,10 +297,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(
-            block_info.transactions[0].content().message(),
-            &tx_foo
-        );
+        assert_eq!(block_info.transactions[0].content().message(), &tx_foo);
 
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![tx_bar.hash()]),
@@ -322,10 +309,7 @@ mod tests {
 
         assert_eq!(block_info.header.height(), Height(2));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(
-            block_info.transactions[0].content().message(),
-            &tx_bar
-        );
+        assert_eq!(block_info.transactions[0].content().message(), &tx_bar);
     }
 
     #[test]

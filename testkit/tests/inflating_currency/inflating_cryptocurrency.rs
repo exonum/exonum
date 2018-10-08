@@ -18,13 +18,11 @@ extern crate serde_json;
 use exonum::{
     api,
     blockchain::{
-        ExecutionResult, ExecutionError, Schema as CoreSchema,
-        Service, Transaction, TransactionContext,
-        TransactionSet,
+        ExecutionError, ExecutionResult, Schema as CoreSchema, Service, Transaction,
+        TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey}, encoding, helpers::Height,
-    messages::{Message, RawTransaction, Protocol},
-    storage::{Fork, MapIndex, Snapshot},
+    messages::{Message, Protocol, RawTransaction}, storage::{Fork, MapIndex, Snapshot},
 };
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -197,9 +195,7 @@ impl CryptocurrencyApi {
     }
 
     fn wire(builder: &mut api::ServiceApiBuilder) {
-        builder
-            .public_scope()
-            .endpoint("v1/balance", Self::balance);
+        builder.public_scope().endpoint("v1/balance", Self::balance);
     }
 }
 

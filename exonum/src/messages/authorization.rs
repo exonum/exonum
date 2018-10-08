@@ -46,7 +46,7 @@ impl SignedMessage {
         SignedMessage { raw: buffer }
     }
 
-    /// Creates `SignedMessage` from parts with specificic signature.
+    /// Creates `SignedMessage` from parts with specific signature.
     #[cfg(test)]
     pub(crate) fn new_with_signature(
         class: u8,

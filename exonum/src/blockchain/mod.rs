@@ -79,7 +79,8 @@ pub const CORE_SERVICE: u16 = 0;
 pub struct Blockchain {
     db: Arc<dyn Database>,
     service_map: Arc<VecMap<Box<dyn Service>>>,
-    pub(crate) service_keypair: (PublicKey, SecretKey),
+    #[doc(hidden)]
+    pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
 }
 

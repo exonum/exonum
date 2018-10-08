@@ -22,11 +22,13 @@ extern crate test;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
-    use test::Bencher;
-    use tempdir::TempDir;
+    use exonum::storage::{
+        proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, MemoryDB,
+        ProofMapIndex, RocksDB,
+    };
     use rand::{Rng, RngCore, SeedableRng, XorShiftRng};
-    use exonum::storage::{Database, DbOptions, MemoryDB, ProofListIndex, ProofMapIndex, RocksDB,
-        proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE};
+    use tempdir::TempDir;
+    use test::Bencher;
 
     use std::collections::HashSet;
 
@@ -111,7 +113,7 @@ mod tests {
 
         for (i, proof) in proofs.into_iter().enumerate() {
             let checked_proof = proof.check().unwrap();
-            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+            assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
             assert_eq!(checked_proof.merkle_root(), table_merkle_root);
         }
     }
@@ -130,7 +132,7 @@ mod tests {
         b.iter(|| {
             for (i, proof) in proofs.iter().enumerate() {
                 let checked_proof = proof.clone().check().unwrap();
-                assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+                assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
                 assert_eq!(checked_proof.merkle_root(), table_merkle_root);
             }
         });
