@@ -81,6 +81,7 @@ jobs:
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
     - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
+    - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
     - mkdir -p target/doc/exonum_configuration
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
     - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
