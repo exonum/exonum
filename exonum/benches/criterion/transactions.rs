@@ -29,10 +29,8 @@ use exonum::events::InternalRequest;
 use exonum::node::EventsPoolCapacity;
 use exonum::node::ExternalMessage;
 use exonum::{
-    crypto,
-    events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::{RawTransaction, ServiceTransaction, Protocol},
-    node::NodeChannel,
+    crypto, events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
+    messages::{Protocol, RawTransaction, ServiceTransaction}, node::NodeChannel,
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -80,14 +78,19 @@ impl EventHandler for MessagesHandler {
 fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
     use exonum::storage::StorageValue;
     let (p, s) = crypto::gen_keypair();
-    (0..count).map(|_|{
-        let msg = Protocol::new(
-            RawTransaction::new(0,
-                                ServiceTransaction::from_raw_unchecked(0, vec![0;tx_size])),
-            p,
-            &s);
-        msg.into_bytes()
-    }).collect()
+    (0..count)
+        .map(|_| {
+            let msg = Protocol::new(
+                RawTransaction::new(
+                    0,
+                    ServiceTransaction::from_raw_unchecked(0, vec![0; tx_size]),
+                ),
+                p,
+                &s,
+            );
+            msg.into_bytes()
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -169,10 +172,7 @@ impl MessageVerifier {
         }
     }
 
-    fn send_all<'a>(
-        &self,
-        messages: Vec<Vec<u8>>,
-    ) -> impl Future<Item = (), Error = ()> + 'a {
+    fn send_all<'a>(&self, messages: Vec<Vec<u8>>) -> impl Future<Item = (), Error = ()> + 'a {
         let tx_sender = self.tx_sender.as_ref().unwrap().clone();
         let finish_signal = self.tx_handler.reset(messages.len());
 
@@ -233,11 +233,8 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
     );
     c.bench(
         "transactions/event_loop",
-        ParameterizedBenchmark::new(
-            "size",
-            bench_verify_messages_event_loop,
-            parameters.clone(),
-        ).throughput(|_| Throughput::Elements(MESSAGES_COUNT as u32))
+        ParameterizedBenchmark::new("size", bench_verify_messages_event_loop, parameters.clone())
+            .throughput(|_| Throughput::Elements(MESSAGES_COUNT as u32))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),
     );
