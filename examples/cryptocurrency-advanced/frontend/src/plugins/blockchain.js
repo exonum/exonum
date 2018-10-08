@@ -1,10 +1,8 @@
 import * as Exonum from 'exonum-client'
 import axios from 'axios'
 
-const TRANSACTION_URL = '/api/services/cryptocurrency/v1/wallets/transaction'
-const TRANSACTION_EXPLORER_URL = '/api/explorer/v1/transactions?hash='
+const TRANSACTION_URL = '/api/explorer/v1/transactions'
 const PER_PAGE = 10
-const PROTOCOL_VERSION = 0
 const SERVICE_ID = 128
 const TX_TRANSFER_ID = 0
 const TX_ISSUE_ID = 1
@@ -26,13 +24,12 @@ const TransactionMetaData = Exonum.newType({
   ]
 })
 
-function TransferTransaction () {
+function TransferTransaction (publicKey) {
   return Exonum.newMessage({
-    protocol_version: PROTOCOL_VERSION,
+    author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_TRANSFER_ID,
     fields: [
-      { name: 'from', type: Exonum.PublicKey },
       { name: 'to', type: Exonum.PublicKey },
       { name: 'amount', type: Exonum.Uint64 },
       { name: 'seed', type: Exonum.Uint64 }
@@ -40,54 +37,39 @@ function TransferTransaction () {
   })
 }
 
-function IssueTransaction () {
+function IssueTransaction (publicKey) {
   return Exonum.newMessage({
-    protocol_version: PROTOCOL_VERSION,
+    author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_ISSUE_ID,
     fields: [
-      { name: 'pub_key', type: Exonum.PublicKey },
       { name: 'amount', type: Exonum.Uint64 },
       { name: 'seed', type: Exonum.Uint64 }
     ]
   })
 }
 
-function CreateTransaction () {
+function CreateTransaction (publicKey) {
   return Exonum.newMessage({
-    protocol_version: PROTOCOL_VERSION,
+    author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_WALLET_ID,
     fields: [
-      { name: 'pub_key', type: Exonum.PublicKey },
       { name: 'name', type: Exonum.String }
     ]
   })
 }
 
-function getTransaction(id) {
-  switch (id) {
-    case TX_TRANSFER_ID:
-      return new TransferTransaction()
-    case TX_ISSUE_ID:
-      return new IssueTransaction()
-    case TX_WALLET_ID:
-      return new CreateTransaction()
+function getTransaction(key, publicKey) {
+  switch (key) {
+    case 'Transfer':
+      return new TransferTransaction(publicKey)
+    case 'Issue':
+      return new IssueTransaction(publicKey)
+    case 'CreateWallet':
+      return new CreateTransaction(publicKey)
     default:
-      throw new Error('Unknown transaction ID has been passed')
-  }
-}
-
-function getOwner(transaction) {
-  switch (transaction.message_id) {
-    case TX_TRANSFER_ID:
-      return transaction.body.from
-    case TX_ISSUE_ID:
-      return transaction.body.pub_key
-    case TX_WALLET_ID:
-      return transaction.body.pub_key
-    default:
-      throw new Error('Unknown transaction ID has been passed')
+      throw new Error('Unknown transaction name has been passed')
   }
 }
 
@@ -104,56 +86,44 @@ module.exports = {
 
       createWallet(keyPair, name) {
         // Describe transaction
-        const transaction = new CreateTransaction()
+        const transaction = new CreateTransaction(keyPair.publicKey)
 
         // Transaction data
         const data = {
-          pub_key: keyPair.publicKey,
           name: name
         }
 
-        // Sign transaction
-        const signature = transaction.sign(keyPair.secretKey, data)
-
         // Send transaction into blockchain
-        return transaction.send(TRANSACTION_URL, TRANSACTION_EXPLORER_URL, data, signature)
+        return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
       },
 
       addFunds(keyPair, amountToAdd, seed) {
         // Describe transaction
-        const transaction = new IssueTransaction()
+        const transaction = new IssueTransaction(keyPair.publicKey)
 
         // Transaction data
         const data = {
-          pub_key: keyPair.publicKey,
           amount: amountToAdd.toString(),
           seed: seed
         }
 
-        // Sign transaction
-        const signature = transaction.sign(keyPair.secretKey, data)
-
         // Send transaction into blockchain
-        return transaction.send(TRANSACTION_URL, TRANSACTION_EXPLORER_URL, data, signature)
+        return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
       },
 
       transfer(keyPair, receiver, amountToTransfer, seed) {
         // Describe transaction
-        const transaction = new TransferTransaction()
+        const transaction = new TransferTransaction(keyPair.publicKey)
 
         // Transaction data
         const data = {
-          from: keyPair.publicKey,
           to: receiver,
           amount: amountToTransfer,
           seed: seed
         }
 
-        // Sign transaction
-        const signature = transaction.sign(keyPair.secretKey, data)
-
         // Send transaction into blockchain
-        return transaction.send(TRANSACTION_URL, TRANSACTION_EXPLORER_URL, data, signature)
+        return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
       },
 
       getWallet(publicKey) {
@@ -200,32 +170,30 @@ module.exports = {
 
               // validate each transaction
               let transactions = []
-              for (let i in data.wallet_history.transactions) {
-                let transaction = data.wallet_history.transactions[i]
-
+              let index = 0
+              for (let transaction of data.wallet_history.transactions) {
                 // get transaction definition
-                let Transaction = getTransaction(transaction.message_id)
-
-                // get transaction owner
-                const owner = getOwner(transaction)
+                let Transaction = getTransaction(name, publicKey)
 
                 // add a signature to the transaction definition
                 Transaction.signature = transaction.signature
 
                 // validate transaction hash
-                if (Transaction.hash(transaction.body) !== transactionsMetaData[i]) {
+                if (Transaction.hash(transaction.body) !== transactionsMetaData[index]) {
                   throw new Error('Invalid transaction hash has been found')
                 }
 
                 // validate transaction signature
-                if (!Transaction.verifySignature(transaction.signature, owner, transaction.body)) {
+                if (!Transaction.verifySignature(transaction.signature, transaction.author, transaction.body)) {
                   throw new Error('Invalid transaction signature has been found')
                 }
 
                 // add transaction to the resulting array
                 transactions.push(Object.assign({
-                  hash: transactionsMetaData[i]
+                  hash: transactionsMetaData[index]
                 }, transaction))
+
+                index++
               }
 
               return {

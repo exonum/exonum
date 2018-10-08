@@ -1,44 +1,32 @@
 {
-  "hash":"0c234cbe082df2a60b554d8dcba74fb31c58f173e39f85184bab04c7f4771a1d",
-  "config":{
-    "previous_cfg_hash":"0000000000000000000000000000000000000000000000000000000000000000",
-    "actual_from":0,
-    "validator_keys":[
+  "hash": "5f7791d730bb681f2152ffa7d6b556b9628b245f36546a8889876e4699fe68d9",
+  "config": {
+    "previous_cfg_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actual_from": 0,
+    "validator_keys": [
       {
-        "consensus_key":"3af676455d2f6ae08c21c61d48523be3e293b4b2c062b1754ae1fe63b066687d",
-        "service_key":"c4669285d39a909c484f71e0c735b5e80c93626fcb1652fcc2989d5f827b6c24"
-      },
-      {
-        "consensus_key":"5831dfb1ed7546fd64ab33a53d78478722ee4a66bb8323fd45eaabe2c50703aa",
-        "service_key":"292faa44d018bb45e895a922d743274a89f72bd6df0aa881293adc26dc93403b"
-      },
-      {
-        "consensus_key":"8b2d61a718a75e432fa581cc9781e24c82073994549e7f7126cb0ac9d55d554a",
-        "service_key":"9cfa5e1e61657099f0ce8ff146c96704e6e69ee57590045438a8e6f3d2d8e7f9"
-      },
-      {
-        "consensus_key":"ccf74bf9423b0253e223a17ecfdc852d46665b74ab36b05d4f4fe9c651c57e6d",
-        "service_key":"ddbb9731237c54368126fc4b2f1557907ba36868474d8e50c801cfc6d0c2d98c"
+        "consensus_key": "77232252732e991de357869afe3323edaac215267ff1de4cd688e186de2a5f43",
+        "service_key": "ae1859cb5930ec6f5e74646630b56bc5ab7a282695cacd1770aca190fc71a86d"
       }
     ],
-    "consensus":{
-      "round_timeout":3000,
-      "status_timeout":5000,
-      "peers_timeout":10000,
-      "txs_block_limit":1000,
-      "max_message_len":1048576,
-      "min_propose_timeout":10,
-      "max_propose_timeout":200,
-      "propose_timeout_threshold":500
+    "consensus": {
+      "first_round_timeout": 3000,
+      "status_timeout": 5000,
+      "peers_timeout": 10000,
+      "txs_block_limit": 1000,
+      "max_message_len": 1048576,
+      "min_propose_timeout": 10,
+      "max_propose_timeout": 200,
+      "propose_timeout_threshold": 500
     },
-    "services":{
-      "configuration":{
+    "services": {
+      "configuration": {
         "majority_count": null
       },
-      "exonum_time":null,
-      "timestamping":null
+      "exonum_time": null,
+      "timestamping": null
     }
   },
-  "propose":null,
-  "votes":null
+  "propose": null,
+  "votes": null
 }
