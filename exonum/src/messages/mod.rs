@@ -92,7 +92,8 @@ impl ServiceTransaction {
 
 impl RawTransaction {
     /// Creates a new instance of RawTransaction.
-    pub(in messages) fn new(
+    // `pub` because new used in benches.
+    pub fn new(
         service_id: u16,
         service_transaction: ServiceTransaction,
     ) -> RawTransaction {

@@ -24,7 +24,7 @@ extern crate test;
 mod tests {
     use exonum::storage::{
         proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, MemoryDB,
-        ProofListIndex, ProofMapIndex, RocksDB,
+        ProofMapIndex, RocksDB,
     };
     use rand::{Rng, RngCore, SeedableRng, XorShiftRng};
     use tempdir::TempDir;
@@ -113,7 +113,7 @@ mod tests {
 
         for (i, proof) in proofs.into_iter().enumerate() {
             let checked_proof = proof.check().unwrap();
-            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+            assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
             assert_eq!(checked_proof.merkle_root(), table_merkle_root);
         }
     }
@@ -132,7 +132,7 @@ mod tests {
         b.iter(|| {
             for (i, proof) in proofs.iter().enumerate() {
                 let checked_proof = proof.clone().check().unwrap();
-                assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+                assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
                 assert_eq!(checked_proof.merkle_root(), table_merkle_root);
             }
         });
