@@ -161,13 +161,13 @@ fn main() {
     let tx2 = TxMarker::sign(
         2,
         mock_provider.time() + Duration::seconds(10),
-        &keypair1.0,
+        &keypair2.0,
         &keypair2.1,
     );
     let tx3 = TxMarker::sign(
         3,
         mock_provider.time() - Duration::seconds(5),
-        &keypair1.0,
+        &keypair3.0,
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
