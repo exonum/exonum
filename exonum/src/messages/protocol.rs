@@ -32,7 +32,7 @@ use failure;
 
 use std::{borrow::Cow, fmt::Debug, mem, net::SocketAddr};
 
-use super::{BinaryForm, Message, RawTransaction, ServiceTransaction, SignedMessage};
+use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
@@ -43,12 +43,12 @@ use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
     PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>() * 2;
 
-/// `Message<TransactionsResponse>` size without transactions inside.
+/// `Signed<TransactionsResponse>` size without transactions inside.
 #[doc(hidden)]
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
     EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u32>() * 2;
 
-/// `Message<RawTransaction>` size with empty transaction inside.
+/// `Signed<RawTransaction>` size with empty transaction inside.
 pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::size_of::<u16>() * 2;
 
 encoding_struct! {
@@ -356,11 +356,9 @@ impl BlockResponse {
 
 impl Precommit {
     /// Verify precommits signature and return it's safer wrapper
-    pub(crate) fn verify_precommit(
-        buffer: Vec<u8>,
-    ) -> Result<Message<Precommit>, ::failure::Error> {
+    pub(crate) fn verify_precommit(buffer: Vec<u8>) -> Result<Signed<Precommit>, ::failure::Error> {
         let signed = SignedMessage::from_raw_buffer(buffer)?;
-        let protocol = Protocol::deserialize(signed)?;
+        let protocol = Message::deserialize(signed)?;
         ProtocolMessage::try_from(protocol)
             .map_err(|_| format_err!("Couldn't verify precommit from message"))
     }
@@ -370,21 +368,21 @@ impl Precommit {
 #[doc(hidden)]
 pub trait ProtocolMessage: Debug + Clone + BinaryForm {
     fn message_type() -> (u8, u8);
-    ///Trying to convert `Protocol` to concrete message,
-    ///if ok returns message `Message<Self>` if fails, returns `Protocol` back.
-    fn try_from(p: Protocol) -> Result<Message<Self>, Protocol>;
+    ///Trying to convert `Message` to concrete message,
+    ///if ok returns message `Signed<Self>` if fails, returns `Message` back.
+    fn try_from(p: Message) -> Result<Signed<Self>, Message>;
 
-    fn into_protocol(this: Message<Self>) -> Protocol;
+    fn into_protocol(this: Signed<Self>) -> Message;
 
-    fn into_message_from_parts(self, sm: SignedMessage) -> Message<Self>;
+    fn into_message_from_parts(self, sm: SignedMessage) -> Signed<Self>;
 }
 
 /// Implement Exonum message protocol.
 ///
 /// Protocol should be described according to format:
 /// ```
-/// /// type of SignedMessage => new name of Protocol enum.
-/// SignedMessage => Protocol {
+/// /// type of SignedMessage => new name of Message enum.
+/// SignedMessage => Message {
 ///       // class ID => class name
 ///       0 => Service {
 ///            // message = message type ID
@@ -424,7 +422,7 @@ macro_rules! impl_protocol {
             pub enum $class {
             $(
                 $(#[$attr_type])+
-                $type(Message<$type>)
+                $type(Signed<$type>)
             ),+
             }
 
@@ -435,19 +433,19 @@ macro_rules! impl_protocol {
                     ($class_num, $type_num)
                 }
 
-                fn try_from(p: $protocol_name) -> Result<Message<Self>,Protocol> {
+                fn try_from(p: $protocol_name) -> Result<Signed<Self>, $protocol_name> {
                     match p {
                         $protocol_name::$class($class::$type(s)) => Ok(s),
                         p => Err(p)
                     }
                 }
 
-                fn into_protocol(this: Message<Self>) -> Protocol {
+                fn into_protocol(this: Signed<Self>) -> $protocol_name {
                     $protocol_name::$class($class::$type(this))
                 }
 
-                fn into_message_from_parts(self, sm: SignedMessage) -> Message<Self> {
-                    Message::new(self, sm)
+                fn into_message_from_parts(self, sm: SignedMessage) -> Signed<Self> {
+                    Signed::new(self, sm)
                 }
             }
             )+
@@ -463,9 +461,9 @@ macro_rules! impl_protocol {
         }
 
         impl $protocol_name {
-            /// Converts raw `SignedMessage` into concrete `Protocol` message.
+            /// Converts raw `SignedMessage` into concrete `Message` message.
             /// Returns error if fails.
-            pub fn deserialize(message: SignedMessage) -> Result<Protocol, failure::Error> {
+            pub fn deserialize(message: SignedMessage) -> Result<Self, failure::Error> {
             use $crate::events::error::into_failure;
                 match message.message_class() {
                     $($class_num =>
@@ -473,7 +471,7 @@ macro_rules! impl_protocol {
                             $($type_num =>{
                                 let payload = $type::decode(message.payload())
                                                 .map_err(into_failure)?;
-                                let message = Message::new(payload, message);
+                                let message = Signed::new(payload, message);
                                 Ok($protocol_name::$class($class::$type(message)))
                             }),+
                             _ => bail!("Not found message with this type {}", message.message_type())
@@ -506,7 +504,7 @@ macro_rules! impl_protocol {
 impl_protocol! {
     /// Composition of every exonum protocol messages.
     /// This messages used in network p2p communications.
-    SignedMessage => Protocol {
+    SignedMessage => Message {
         /// Exonum basic node messages.
         0 => Service {
             /// `RawTransaction` representation.
@@ -549,7 +547,7 @@ impl_protocol! {
     }
 }
 
-impl Protocol {
+impl Message {
     /// Creates new protocol message.
     ///
     /// # Panics
@@ -559,12 +557,12 @@ impl Protocol {
         message: T,
         author: PublicKey,
         secret_key: &SecretKey,
-    ) -> Protocol {
-        T::into_protocol(Protocol::concrete(message, author, secret_key))
+    ) -> Message {
+        T::into_protocol(Message::concrete(message, author, secret_key))
     }
 
     /// Creates new protocol message.
-    /// Return concrete `Message<T>`
+    /// Return concrete `Signed<T>`
     ///
     /// # Panics
     ///
@@ -573,15 +571,15 @@ impl Protocol {
         message: T,
         author: PublicKey,
         secret_key: &SecretKey,
-    ) -> Message<T> {
+    ) -> Signed<T> {
         let value = message.encode().expect("Couldn't serialize data.");
         let (cls, typ) = T::message_type();
         let signed = SignedMessage::new(cls, typ, &value, author, secret_key);
         T::into_message_from_parts(message, signed)
     }
 
-    /// Checks buffer and return instance of `Protocol`.
-    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Protocol, failure::Error> {
+    /// Checks buffer and return instance of `Message`.
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
         let signed = SignedMessage::from_raw_buffer(buffer)?;
         Self::deserialize(signed)
     }
@@ -596,7 +594,7 @@ impl Protocol {
         service_id: u16,
         public_key: PublicKey,
         secret_key: &SecretKey,
-    ) -> Message<RawTransaction>
+    ) -> Signed<RawTransaction>
     where
         T: Into<ServiceTransaction>,
     {
@@ -668,13 +666,13 @@ impl Consensus {
     }
 }
 
-impl<T: ProtocolMessage> From<Message<T>> for Protocol {
-    fn from(other: Message<T>) -> Self {
+impl<T: ProtocolMessage> From<Signed<T>> for Message {
+    fn from(other: Signed<T>) -> Self {
         ProtocolMessage::into_protocol(other)
     }
 }
 
-impl StorageValue for Protocol {
+impl StorageValue for Message {
     fn into_bytes(self) -> Vec<u8> {
         self.signed_message().raw().to_vec()
     }
@@ -682,11 +680,11 @@ impl StorageValue for Protocol {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let message = SignedMessage::from_vec_unchecked(value.into_owned());
         // TODO: Remove additional deserialization. [ECR-2315]
-        Protocol::deserialize(message).unwrap()
+        Message::deserialize(message).unwrap()
     }
 }
 
-impl CryptoHash for Protocol {
+impl CryptoHash for Message {
     fn hash(&self) -> Hash {
         self.signed_message().hash()
     }

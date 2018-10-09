@@ -2,9 +2,9 @@ use chrono::Utc;
 use hex::{self, FromHex};
 
 use super::{
-    BinaryForm, BlockResponse, Message, Precommit, Protocol, ProtocolMessage, RawTransaction,
-    ServiceTransaction, SignedMessage, Status, TransactionsResponse, RAW_TRANSACTION_EMPTY_SIZE,
-    TRANSACTION_RESPONSE_EMPTY_SIZE,
+    BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
+    ServiceTransaction, Signed, SignedMessage, Status, TransactionsResponse,
+    RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, PublicKey, SecretKey};
@@ -15,7 +15,7 @@ fn test_block_response_empty_size() {
     use crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let msg = TransactionsResponse::new(&public_key, vec![]);
-    let msg = Protocol::concrete(msg, public_key, &secret_key);
+    let msg = Message::concrete(msg, public_key, &secret_key);
     assert_eq!(
         TRANSACTION_RESPONSE_EMPTY_SIZE,
         msg.signed_message().raw().len()
@@ -46,7 +46,7 @@ fn test_known_transaction() {
 
     let set = ServiceTransaction::from_raw_unchecked(2, data.raw);
     let msg = RawTransaction::new(128, set);
-    let msg = Protocol::concrete(msg, pk, &sk);
+    let msg = Message::concrete(msg, pk, &sk);
     SignedMessage::from_raw_buffer(hex::decode(res).unwrap()).unwrap();
     assert_eq!(res, hex::encode(msg.signed_message().raw()));
 }
@@ -57,7 +57,7 @@ fn test_empty_tx_size() {
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let set = ServiceTransaction::from_raw_unchecked(0, vec![]);
     let msg = RawTransaction::new(0, set);
-    let msg = Protocol::concrete(msg, public_key, &secret_key);
+    let msg = Message::concrete(msg, public_key, &secret_key);
     assert_eq!(RAW_TRANSACTION_EMPTY_SIZE, msg.signed_message().raw().len())
 }
 
@@ -78,7 +78,7 @@ fn test_block() {
     );
 
     let precommits = vec![
-        Protocol::concrete(
+        Message::concrete(
             Precommit::new(
                 ValidatorId(123),
                 Height(15),
@@ -90,7 +90,7 @@ fn test_block() {
             pub_key,
             &secret_key,
         ),
-        Protocol::concrete(
+        Message::concrete(
             Precommit::new(
                 ValidatorId(13),
                 Height(25),
@@ -102,7 +102,7 @@ fn test_block() {
             pub_key,
             &secret_key,
         ),
-        Protocol::concrete(
+        Message::concrete(
             Precommit::new(
                 ValidatorId(323),
                 Height(15),
@@ -116,12 +116,12 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Protocol::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
-        Protocol::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
-        Protocol::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(2), &hash(&[])), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(4), &hash(&[2])), pub_key, &secret_key).hash(),
+        Message::concrete(Status::new(Height(7), &hash(&[3])), pub_key, &secret_key).hash(),
     ];
     let precommits_buf: Vec<_> = precommits.iter().map(|x| x.clone().serialize()).collect();
-    let block = Protocol::concrete(
+    let block = Message::concrete(
         BlockResponse::new(
             &pub_key,
             content.clone(),
@@ -138,8 +138,8 @@ fn test_block() {
     assert_eq!(block.precommits(), precommits_buf);
     assert_eq!(block.transactions().to_vec(), transactions);
 
-    let block2: Message<BlockResponse> = ProtocolMessage::try_from(
-        Protocol::deserialize(SignedMessage::from_raw_buffer(block.serialize()).unwrap()).unwrap(),
+    let block2: Signed<BlockResponse> = ProtocolMessage::try_from(
+        Message::deserialize(SignedMessage::from_raw_buffer(block.serialize()).unwrap()).unwrap(),
     ).unwrap();
 
     assert_eq!(block2.author(), pub_key);

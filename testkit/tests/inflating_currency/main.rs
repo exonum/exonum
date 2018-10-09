@@ -32,7 +32,7 @@ extern crate serde_json;
 
 use exonum::{
     api::node::public::explorer::TransactionResponse, crypto::{self, PublicKey, SecretKey},
-    helpers::Height, messages::{Message, RawTransaction},
+    helpers::Height, messages::{RawTransaction, Signed},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
@@ -48,7 +48,7 @@ fn init_testkit() -> TestKit {
         .create()
 }
 
-fn create_wallet(api: &TestKitApi, name: &str) -> (Message<RawTransaction>, SecretKey) {
+fn create_wallet(api: &TestKitApi, name: &str) -> (Signed<RawTransaction>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxCreateWallet::sign(name, &pubkey, &key);

@@ -28,7 +28,7 @@ use events::{
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, Protocol, SignedMessage};
+use messages::{Connect, Message, Signed, SignedMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
@@ -72,7 +72,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn connect_with(&self, addr: SocketAddr, connect: Message<Connect>) {
+    pub fn connect_with(&self, addr: SocketAddr, connect: Signed<Connect>) {
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(addr, connect.into()))
@@ -88,7 +88,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn wait_for_connect(&mut self) -> Message<Connect> {
+    pub fn wait_for_connect(&mut self) -> Signed<Connect> {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
@@ -149,7 +149,7 @@ impl TestEvents {
     pub fn spawn(
         self,
         handshake_params: &HandshakeParams,
-        connect: Message<Connect>,
+        connect: Signed<Connect>,
     ) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
@@ -162,7 +162,7 @@ impl TestEvents {
         handler_part
     }
 
-    fn into_reactor(self, connect: Message<Connect>) -> (TestHandler, NetworkPart) {
+    fn into_reactor(self, connect: Signed<Connect>) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
@@ -186,9 +186,9 @@ pub fn connect_message(
     addr: SocketAddr,
     public_key: &PublicKey,
     secret_key: &SecretKey,
-) -> Message<Connect> {
+) -> Signed<Connect> {
     let time = time::UNIX_EPOCH;
-    Protocol::concrete(
+    Message::concrete(
         Connect::new(addr, time.into(), &user_agent::get()),
         *public_key,
         secret_key,
@@ -202,7 +202,7 @@ pub fn raw_message(len: usize) -> SignedMessage {
 
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub connect: Message<Connect>,
+    pub connect: Signed<Connect>,
     pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,

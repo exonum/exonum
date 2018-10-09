@@ -14,7 +14,7 @@
 
 use crypto::Hash;
 use helpers::{Height, ValidatorId};
-use messages::{Message, Precommit};
+use messages::{Precommit, Signed};
 
 encoding_struct! {
     /// Exonum block header data structure.
@@ -54,7 +54,7 @@ pub struct BlockProof {
     /// in the block, etc.
     pub block: Block,
     /// List of `Precommit` messages for the block.
-    pub precommits: Vec<Message<Precommit>>,
+    pub precommits: Vec<Signed<Precommit>>,
 }
 
 #[cfg(test)]

@@ -56,7 +56,7 @@ use std::{
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Connect, Message, Precommit, Protocol, ProtocolMessage, RawTransaction};
+use messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use node::ApiSender;
 use storage::{self, Database, Error, Fork, Patch, Snapshot};
 
@@ -463,7 +463,7 @@ impl Blockchain {
     /// for each service in the increasing order of their identifiers.
     pub fn commit<I>(&mut self, patch: &Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
     where
-        I: Iterator<Item = Message<Precommit>>,
+        I: Iterator<Item = Signed<Precommit>>,
     {
         let patch = {
             let mut fork = {
@@ -507,7 +507,7 @@ impl Blockchain {
     }
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Message<Connect>) {
+    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Signed<Connect>) {
         let mut fork = self.fork();
 
         {
@@ -537,7 +537,7 @@ impl Blockchain {
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Message<Connect>> {
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
         let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
@@ -545,7 +545,7 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Message<T>) {
+    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Signed<T>) {
         self.save_messages(round, iter::once(raw.into()));
     }
 
@@ -553,7 +553,7 @@ impl Blockchain {
     /// `Fork` instance.
     pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
     where
-        I: IntoIterator<Item = Protocol>,
+        I: IntoIterator<Item = Message>,
     {
         let mut fork = self.fork();
 

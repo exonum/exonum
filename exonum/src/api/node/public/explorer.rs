@@ -31,7 +31,7 @@ use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
-use messages::{Message, Precommit, Protocol, RawTransaction, SignedMessage};
+use messages::{Message, Precommit, RawTransaction, Signed, SignedMessage};
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -52,7 +52,7 @@ pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
     pub block: Block,
     /// Precommits authorizing the block.
-    pub precommits: Vec<Message<Precommit>>,
+    pub precommits: Vec<Signed<Precommit>>,
     /// Hashes of transactions in the block.
     pub txs: Vec<Hash>,
 }
@@ -191,7 +191,7 @@ impl ExplorerApi {
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::from_raw_buffer(buf)?;
         let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(Protocol::deserialize(signed)?)
+        let signed = RawTransaction::try_from(Message::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
         let _ = state
             .sender()

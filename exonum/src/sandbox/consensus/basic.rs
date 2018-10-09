@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use blockchain::{Blockchain, Schema, CORE_SERVICE};
 use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Precommit};
+use messages::{Precommit, Signed};
 use sandbox::{
     sandbox::{self, timestamping_sandbox}, sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
@@ -229,7 +229,7 @@ fn test_retrieve_block_and_precommits() {
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
     let block = block_proof.block;
-    let precommits: Vec<Message<Precommit>> = block_proof.precommits;
+    let precommits: Vec<Signed<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
     let expected_block_hash = block.hash();
 

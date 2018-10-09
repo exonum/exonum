@@ -26,7 +26,7 @@ use exonum::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding,
-    messages::{Message, Protocol, RawTransaction}, storage::Snapshot,
+    messages::{Message, RawTransaction, Signed}, storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -43,8 +43,8 @@ transactions! {
 }
 
 impl TxTimestamp {
-    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(TxTimestamp::new(msg), SERVICE_ID, *author, key)
+    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(TxTimestamp::new(msg), SERVICE_ID, *author, key)
     }
 }
 

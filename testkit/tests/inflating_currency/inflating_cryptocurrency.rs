@@ -22,7 +22,7 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey}, encoding, helpers::Height,
-    messages::{Message, Protocol, RawTransaction}, storage::{Fork, MapIndex, Snapshot},
+    messages::{Message, RawTransaction, Signed}, storage::{Fork, MapIndex, Snapshot},
 };
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -108,8 +108,8 @@ transactions! {
 
 impl TxCreateWallet {
     #[doc(hidden)]
-    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
+    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
     }
 }
 
@@ -121,8 +121,8 @@ impl TxTransfer {
         seed: u64,
         pk: &PublicKey,
         sc: &SecretKey,
-    ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sc)
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sc)
     }
 }
 

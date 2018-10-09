@@ -19,7 +19,7 @@
 use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
+    crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
     storage::{Fork, Snapshot},
 };
 
@@ -64,8 +64,8 @@ impl TxTime {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
     }
 
     fn check_signed_by_validator(

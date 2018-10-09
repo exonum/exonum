@@ -29,7 +29,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
     crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding, helpers::Height,
-    messages::{Message, Protocol, RawTransaction}, storage::{Fork, ProofMapIndex, Snapshot},
+    messages::{Message, RawTransaction, Signed}, storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
@@ -88,8 +88,8 @@ impl TxMarker {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(
             TxMarker::new(mark, time),
             SERVICE_ID,
             *public_key,
@@ -161,13 +161,13 @@ fn main() {
     let tx2 = TxMarker::sign(
         2,
         mock_provider.time() + Duration::seconds(10),
-        &keypair1.0,
+        &keypair2.0,
         &keypair2.1,
     );
     let tx3 = TxMarker::sign(
         3,
         mock_provider.time() - Duration::seconds(5),
-        &keypair1.0,
+        &keypair3.0,
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);

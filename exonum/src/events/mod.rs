@@ -30,7 +30,7 @@ use futures::{
 use std::{cmp::Ordering, time::SystemTime};
 
 use helpers::{Height, Round};
-use messages::Protocol;
+use messages::Message;
 use node::{ExternalMessage, NodeTimeout};
 
 #[cfg(all(test, feature = "long_benchmarks"))]
@@ -51,7 +51,7 @@ pub enum InternalEvent {
     /// Shutdown the node.
     Shutdown,
     /// Message has been successfully verified.
-    MessageVerified(Protocol),
+    MessageVerified(Message),
 }
 
 #[derive(Debug)]

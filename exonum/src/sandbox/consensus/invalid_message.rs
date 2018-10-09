@@ -16,7 +16,7 @@
 //! incorrect messages.
 
 use helpers::{Height, Round, ValidatorId};
-use messages::{Propose, Protocol};
+use messages::{Message, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 /// HANDLE message
@@ -46,7 +46,7 @@ fn test_ignore_message_with_incorrect_validator_id() {
 
     let incorrect_validator_id = ValidatorId(64_999);
 
-    let propose = Protocol::concrete(
+    let propose = Message::concrete(
         Propose::new(
             incorrect_validator_id,
             Height(0),

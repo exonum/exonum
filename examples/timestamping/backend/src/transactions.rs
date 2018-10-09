@@ -22,7 +22,7 @@
 
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
+    crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
 };
 use exonum_time::schema::TimeSchema;
 
@@ -59,12 +59,8 @@ transactions! {
 
 impl TxTimestamp {
     #[doc(hidden)]
-    pub fn sign(
-        author: &PublicKey,
-        content: Timestamp,
-        key: &SecretKey,
-    ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(
+    pub fn sign(author: &PublicKey, content: Timestamp, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(
             TxTimestamp::new(content),
             TIMESTAMPING_SERVICE,
             *author,

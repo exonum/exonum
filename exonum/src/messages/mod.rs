@@ -18,13 +18,13 @@
 //!
 //!   * `Vec<u8>`: raw bytes as received from the network
 //!   * `SignedMessage`: integrity and signature of the message has been verified
-//!   * `Protocol`: the message has been completely parsed and has correct structure
+//!   * `Message`: the message has been completely parsed and has correct structure
 //!
 //! Graphical representation of the message processing flow:
 //!
 //! ```text
 //! +---------+             +---------------+                  +----------+
-//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Protocol |-->(handle)
+//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Message |-->(handle)
 //! +---------+     |       +---------------+        |         +----------+
 //!                 |                                |
 //!                 V                                V
@@ -162,9 +162,9 @@ impl BinaryForm for ServiceTransaction {
 /// serialize the `Payload` back, but Protobuf does not have a canonical form so the resulting
 /// payload may have different binary representation (thus invalidating the message signature).
 ///
-/// So we use `Message` to keep the original byte buffer around with the parsed `Payload`.
+/// So we use `Signed` to keep the original byte buffer around with the parsed `Payload`.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Message<T> {
+pub struct Signed<T> {
     // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
     //if our serialization format allows us (ECR-2315).
     payload: T,
@@ -172,10 +172,10 @@ pub struct Message<T> {
     message: SignedMessage,
 }
 
-impl<T: ProtocolMessage> Message<T> {
+impl<T: ProtocolMessage> Signed<T> {
     /// Creates a new instance of the message.
-    pub(in messages) fn new(payload: T, message: SignedMessage) -> Message<T> {
-        Message { payload, message }
+    pub(in messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
+        Signed { payload, message }
     }
 
     /// Returns hash of the full message.
@@ -213,7 +213,7 @@ impl fmt::Debug for ServiceTransaction {
     }
 }
 
-impl<T> ToHex for Message<T> {
+impl<T> ToHex for Signed<T> {
     fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
         self.message.raw().write_hex(w)
     }
@@ -223,43 +223,43 @@ impl<T> ToHex for Message<T> {
     }
 }
 
-impl<X: ProtocolMessage> FromHex for Message<X> {
+impl<X: ProtocolMessage> FromHex for Signed<X> {
     type Error = Error;
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = Protocol::deserialize(SignedMessage::from_raw_buffer(bytes)?)?;
+        let protocol = Message::deserialize(SignedMessage::from_raw_buffer(bytes)?)?;
         ProtocolMessage::try_from(protocol)
             .map_err(|_| format_err!("Couldn't deserialize message."))
     }
 }
 
-impl<T: ProtocolMessage> AsRef<SignedMessage> for Message<T> {
+impl<T: ProtocolMessage> AsRef<SignedMessage> for Signed<T> {
     fn as_ref(&self) -> &SignedMessage {
         &self.message
     }
 }
 
-impl<T: ProtocolMessage> AsRef<T> for Message<T> {
+impl<T: ProtocolMessage> AsRef<T> for Signed<T> {
     fn as_ref(&self) -> &T {
         &self.payload
     }
 }
 
-impl<T> From<Message<T>> for SignedMessage {
-    fn from(message: Message<T>) -> Self {
+impl<T> From<Signed<T>> for SignedMessage {
+    fn from(message: Signed<T>) -> Self {
         message.message
     }
 }
 
-impl<T: ProtocolMessage> Deref for Message<T> {
+impl<T: ProtocolMessage> Deref for Signed<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.payload
     }
 }
 
-impl<T: ProtocolMessage> StorageValue for Message<T> {
+impl<T: ProtocolMessage> StorageValue for Signed<T> {
     fn into_bytes(self) -> Vec<u8> {
         self.message.raw
     }
@@ -267,19 +267,19 @@ impl<T: ProtocolMessage> StorageValue for Message<T> {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let message = SignedMessage::from_vec_unchecked(value.into_owned());
         // TODO: Remove additional deserialization. [ECR-2315]
-        let msg = Protocol::deserialize(message).unwrap();
+        let msg = Message::deserialize(message).unwrap();
         T::try_from(msg).unwrap()
     }
 }
 
-impl<T: ProtocolMessage> CryptoHash for Message<T> {
+impl<T: ProtocolMessage> CryptoHash for Signed<T> {
     fn hash(&self) -> Hash {
         self.hash()
     }
 }
 
-impl PartialEq<Message<RawTransaction>> for SignedMessage {
-    fn eq(&self, other: &Message<RawTransaction>) -> bool {
+impl PartialEq<Signed<RawTransaction>> for SignedMessage {
+    fn eq(&self, other: &Signed<RawTransaction>) -> bool {
         self.eq(other.signed_message())
     }
 }

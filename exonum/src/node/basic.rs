@@ -19,23 +19,23 @@ use std::net::SocketAddr;
 use super::{NodeHandler, NodeRole, RequestData};
 use events::error::LogError;
 use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Protocol, Responses, Service, Status};
+use messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, msg: Protocol) {
+    pub fn handle_message(&mut self, msg: Message) {
         match msg {
-            Protocol::Consensus(msg) => self.handle_consensus(msg),
-            Protocol::Requests(ref msg) => self.handle_request(msg),
+            Message::Consensus(msg) => self.handle_consensus(msg),
+            Message::Requests(ref msg) => self.handle_request(msg),
 
-            Protocol::Service(Service::Connect(msg)) => self.handle_connect(msg),
-            Protocol::Service(Service::Status(msg)) => self.handle_status(&msg),
+            Message::Service(Service::Connect(msg)) => self.handle_connect(msg),
+            Message::Service(Service::Status(msg)) => self.handle_status(&msg),
             // ignore tx duplication error,
-            Protocol::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
-            Protocol::Responses(Responses::BlockResponse(msg)) => {
+            Message::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
+            Message::Responses(Responses::BlockResponse(msg)) => {
                 self.handle_block(&msg).log_error()
             }
-            Protocol::Responses(Responses::TransactionsResponse(msg)) => {
+            Message::Responses(Responses::TransactionsResponse(msg)) => {
                 self.handle_txs_batch(&msg).log_error()
             }
         }
@@ -43,7 +43,7 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, address: &SocketAddr, connect: Message<Connect>) {
+    pub fn handle_connected(&mut self, address: &SocketAddr, connect: Signed<Connect>) {
         info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
         self.handle_connect(connect);
@@ -77,7 +77,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: Message<Connect>) {
+    pub fn handle_connect(&mut self, message: Signed<Connect>) {
         // TODO Add spam protection (ECR-170)
         // TODO: drop connection if checks have failed. (ECR-1837)
         let address = message.addr();
@@ -130,7 +130,7 @@ impl NodeHandler {
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: &Message<Status>) {
+    pub fn handle_status(&mut self, msg: &Signed<Status>) {
         let height = self.state.height();
         trace!(
             "HANDLE STATUS: current height = {}, msg height = {}",
@@ -162,8 +162,8 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: &Message<PeersRequest>) {
-        let peers: Vec<Message<Connect>> =
+    pub fn handle_request_peers(&mut self, msg: &Signed<PeersRequest>) {
+        let peers: Vec<Signed<Connect>> =
             self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",

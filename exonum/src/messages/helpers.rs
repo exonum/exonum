@@ -5,7 +5,7 @@ use std::fmt::Display;
 
 use encoding::Error;
 
-use super::Message;
+use super::Signed;
 
 /// Helper trait to define serialization format.
 pub trait BinaryForm: Sized {
@@ -45,7 +45,7 @@ impl HexStringRepresentation {
 }
 
 /// Returns hexadecimal string representation of `message`.
-pub fn to_hex_string<T>(message: &Message<T>) -> String {
+pub fn to_hex_string<T>(message: &Signed<T>) -> String {
     let mut hex_string = String::new();
     message.write_hex(&mut hex_string).unwrap();
     hex_string

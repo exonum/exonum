@@ -20,7 +20,7 @@
 
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey}, messages::{Message, Protocol, RawTransaction},
+    crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
 };
 
 use schema::Schema;
@@ -100,8 +100,8 @@ transactions! {
 
 impl CreateWallet {
     #[doc(hidden)]
-    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Message<RawTransaction> {
-        Protocol::sign_transaction(CreateWallet::new(name), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(CreateWallet::new(name), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
     }
 }
 
@@ -113,8 +113,8 @@ impl Transfer {
         amount: u64,
         seed: u64,
         sk: &SecretKey,
-    ) -> Message<RawTransaction> {
-        Protocol::sign_transaction(
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(
             Transfer::new(to, amount, seed),
             CRYPTOCURRENCY_SERVICE_ID,
             *pk,

@@ -27,7 +27,7 @@ use blockchain::Block;
 use crypto::{gen_keypair, hash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Connect, Precommit, Prevote, Propose, Protocol, Status,
+    BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose, Status,
 };
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -362,7 +362,7 @@ fn test_connect(addr: &str) {
 
     // write
     let connect = Connect::new(socket_address, time, &user_agent::get());
-    let connect = Protocol::concrete(connect, public_key, &secret_key);
+    let connect = Message::concrete(connect, public_key, &secret_key);
     // read
     assert_eq!(connect.author(), public_key);
     assert_eq!(connect.addr(), socket_address);

@@ -27,8 +27,8 @@ use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
-    BlockResponse, Connect, Consensus as ConsensusMessage, Message, Precommit, Prevote, Propose,
-    RawTransaction,
+    BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
+    RawTransaction, Signed,
 };
 use node::{connect_list::ConnectList, ConnectInfo};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
@@ -48,7 +48,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: Message<Connect>,
+    our_connect_message: Signed<Connect>,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -59,7 +59,7 @@ pub struct State {
     connect_list: SharedConnectList,
     tx_pool_capacity: usize,
 
-    peers: HashMap<PublicKey, Message<Connect>>,
+    peers: HashMap<PublicKey, Signed<Connect>>,
     connections: HashMap<SocketAddr, PublicKey>,
     height_start_time: SystemTime,
     height: Height,
@@ -72,8 +72,8 @@ pub struct State {
     // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
-    prevotes: HashMap<(Round, Hash), Votes<Message<Prevote>>>,
-    precommits: HashMap<(Round, Hash), Votes<Message<Precommit>>>,
+    prevotes: HashMap<(Round, Hash), Votes<Signed<Prevote>>>,
+    precommits: HashMap<(Round, Hash), Votes<Signed<Precommit>>>,
 
     queued: Vec<ConsensusMessage>,
 
@@ -95,8 +95,8 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub struct ValidatorState {
     id: ValidatorId,
-    our_prevotes: HashMap<Round, Message<Prevote>>,
-    our_precommits: HashMap<Round, Message<Precommit>>,
+    our_prevotes: HashMap<Round, Signed<Prevote>>,
+    our_precommits: HashMap<Round, Signed<Precommit>>,
 }
 
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
@@ -127,7 +127,7 @@ struct RequestState {
 #[derive(Debug)]
 /// transactions.
 pub struct ProposeState {
-    propose: Message<Propose>,
+    propose: Signed<Propose>,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
     // Whether the message has been saved to the consensus messages' cache or not.
@@ -147,7 +147,7 @@ pub struct BlockState {
 /// Incomplete block.
 #[derive(Clone, Debug)]
 pub struct IncompleteBlock {
-    msg: Message<BlockResponse>,
+    msg: Signed<BlockResponse>,
     unknown_txs: HashSet<Hash>,
 }
 
@@ -157,13 +157,13 @@ pub trait VoteMessage: Clone {
     fn validator(&self) -> ValidatorId;
 }
 
-impl VoteMessage for Message<Precommit> {
+impl VoteMessage for Signed<Precommit> {
     fn validator(&self) -> ValidatorId {
         self.deref().validator()
     }
 }
 
-impl VoteMessage for Message<Prevote> {
+impl VoteMessage for Signed<Prevote> {
     fn validator(&self) -> ValidatorId {
         self.deref().validator()
     }
@@ -306,7 +306,7 @@ impl ProposeState {
     }
 
     /// Returns propose-message.
-    pub fn message(&self) -> &Message<Propose> {
+    pub fn message(&self) -> &Signed<Propose> {
         &self.propose
     }
 
@@ -365,7 +365,7 @@ impl BlockState {
 
 impl IncompleteBlock {
     /// Returns `BlockResponse` message.
-    pub fn message(&self) -> &Message<BlockResponse> {
+    pub fn message(&self) -> &Signed<BlockResponse> {
         &self.msg
     }
 
@@ -433,8 +433,8 @@ impl State {
         tx_pool_capacity: usize,
         connect_list: ConnectList,
         stored: StoredConfiguration,
-        connect: Message<Connect>,
-        peers: HashMap<PublicKey, Message<Connect>>,
+        connect: Signed<Connect>,
+        peers: HashMap<PublicKey, Signed<Connect>>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -570,7 +570,7 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Message<Connect>) -> bool {
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Signed<Connect>) -> bool {
         self.connections.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
@@ -599,7 +599,7 @@ impl State {
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
-    pub fn peers(&self) -> &HashMap<PublicKey, Message<Connect>> {
+    pub fn peers(&self) -> &HashMap<PublicKey, Signed<Connect>> {
         &self.peers
     }
 
@@ -855,14 +855,14 @@ impl State {
     }
 
     /// Returns pre-votes for the specified round and propose hash.
-    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Message<Prevote>] {
+    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Signed<Prevote>] {
         self.prevotes
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns pre-commits for the specified round and propose hash.
-    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Message<Precommit>] {
+    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Signed<Precommit>] {
         self.precommits
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
@@ -883,7 +883,7 @@ impl State {
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
     /// cannot contain unknown transactions. Returns hash of the propose.
-    pub fn add_self_propose(&mut self, msg: Message<Propose>) -> Hash {
+    pub fn add_self_propose(&mut self, msg: Signed<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
         self.proposes.insert(
@@ -905,8 +905,8 @@ impl State {
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose<S: AsRef<dyn Snapshot>>(
         &mut self,
-        msg: Message<Propose>,
-        transactions: &MapIndex<S, Hash, Message<RawTransaction>>,
+        msg: Signed<Propose>,
+        transactions: &MapIndex<S, Hash, Signed<RawTransaction>>,
         transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
@@ -973,8 +973,8 @@ impl State {
     /// - Received block has already committed transaction.
     pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
         &mut self,
-        msg: &Message<BlockResponse>,
-        txs: &MapIndex<S, Hash, Message<RawTransaction>>,
+        msg: &Signed<BlockResponse>,
+        txs: &MapIndex<S, Hash, Signed<RawTransaction>>,
         txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
@@ -1006,7 +1006,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Prevote` for the same round.
-    pub fn add_prevote(&mut self, msg: Message<Prevote>) -> bool {
+    pub fn add_prevote(&mut self, msg: Signed<Prevote>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1063,7 +1063,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Precommit` for the same round.
-    pub fn add_precommit(&mut self, msg: Message<Precommit>) -> bool {
+    pub fn add_precommit(&mut self, msg: Signed<Precommit>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1176,12 +1176,12 @@ impl State {
     }
 
     /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Message<Connect> {
+    pub fn our_connect_message(&self) -> &Signed<Connect> {
         &self.our_connect_message
     }
 
     /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Message<Connect>) {
+    pub fn set_our_connect_message(&mut self, msg: Signed<Connect>) {
         self.our_connect_message = msg;
     }
 

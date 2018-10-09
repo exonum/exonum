@@ -19,7 +19,7 @@ use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
 use hex::ToHex;
-use messages::{HexStringRepresentation, Message, RawTransaction, SignedMessage};
+use messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -49,7 +49,7 @@ pub struct TransactionMessage {
     transaction: Option<Box<dyn Transaction>>,
 
     #[serde(with = "HexStringRepresentation")]
-    message: Message<RawTransaction>,
+    message: Signed<RawTransaction>,
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
@@ -77,7 +77,7 @@ impl TransactionMessage {
         self.message.payload().clone()
     }
     /// Returns raw transaction message.
-    pub fn message(&self) -> &Message<RawTransaction> {
+    pub fn message(&self) -> &Signed<RawTransaction> {
         &self.message
     }
     /// Returns transaction smart contract.
@@ -87,7 +87,7 @@ impl TransactionMessage {
     }
     /// Create new `TransactionMessage` from raw message.
     pub(crate) fn new(
-        message: Message<RawTransaction>,
+        message: Signed<RawTransaction>,
         transaction: Box<dyn Transaction>,
     ) -> TransactionMessage {
         TransactionMessage {
@@ -106,7 +106,7 @@ impl ::serde::Serialize for dyn Transaction {
     }
 }
 
-/// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
+/// Transaction processing functionality for `Signed`s allowing to apply authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
 ///
 /// A transaction in Exonum is a group of sequential operations with the data.
@@ -135,7 +135,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// #
     /// use exonum::blockchain::{Transaction, TransactionContext};
     /// use exonum::crypto::PublicKey;
-    /// use exonum::messages::Message;
+    /// use exonum::messages::Signed;
     /// # use exonum::blockchain::ExecutionResult;
     ///
     /// transactions! {
@@ -218,7 +218,7 @@ pub struct TransactionContext<'a> {
 }
 
 impl<'a> TransactionContext<'a> {
-    pub(crate) fn new(fork: &'a mut Fork, raw_message: &Message<RawTransaction>) -> Self {
+    pub(crate) fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
@@ -481,7 +481,7 @@ pub trait TransactionSet:
 ///
 /// - `new` accepts as arguments all fields in the order of their declaration in
 ///   the macro. The constructor returns a transaction which contains
-///   the fields. This transaction could be converted into [`Message<RawTransaction>`]
+///   the fields. This transaction could be converted into [`Signed<RawTransaction>`]
 ///
 /// Each transaction also implements [`SegmentField`],
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
@@ -497,8 +497,8 @@ pub trait TransactionSet:
 /// [`SegmentField`]: ./encoding/trait.SegmentField.html
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
-/// [`Message`]: ./messages/struct.Message.html
-/// [`Message<RawTransaction>`]: ./messages/struct.Message.html
+/// [`Signed`]: ./messages/struct.Signed.html
+/// [`Signed<RawTransaction>`]: ./messages/struct.Signed.html
 /// [`Service`]: ./blockchain/trait.Service.html
 /// # Examples
 ///
@@ -766,7 +766,7 @@ mod tests {
     use crypto;
     use encoding;
     use helpers::{Height, ValidatorId};
-    use messages::Protocol;
+    use messages::Message;
     use node::ApiSender;
     use storage::{Database, Entry, MemoryDB, Snapshot};
 
@@ -898,12 +898,8 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction = Protocol::sign_transaction(
-                TxResult::new(index),
-                TX_RESULT_SERVICE_ID,
-                pk,
-                &sec_key,
-            );
+            let transaction =
+                Message::sign_transaction(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();

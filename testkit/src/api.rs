@@ -26,7 +26,7 @@ use std::fmt::{self, Display};
 use exonum::{
     api::{self, ApiAggregator, ServiceApiState}, blockchain::SharedNodeState,
     encoding::serialize::reexport::{DeserializeOwned, Serialize},
-    messages::{Message, RawTransaction}, node::ApiSender,
+    messages::{RawTransaction, Signed}, node::ApiSender,
 };
 
 use TestKit;
@@ -92,7 +92,7 @@ impl TestKitApi {
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
-        T: Into<Message<RawTransaction>>,
+        T: Into<Signed<RawTransaction>>,
     {
         self.api_sender
             .broadcast_transaction(transaction.into())
