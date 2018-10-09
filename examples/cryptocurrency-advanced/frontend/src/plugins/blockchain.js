@@ -25,7 +25,7 @@ const TransactionMetaData = Exonum.newType({
 })
 
 function TransferTransaction (publicKey) {
-  return Exonum.newMessage({
+  return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_TRANSFER_ID,
@@ -38,7 +38,7 @@ function TransferTransaction (publicKey) {
 }
 
 function IssueTransaction (publicKey) {
-  return Exonum.newMessage({
+  return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_ISSUE_ID,
@@ -50,7 +50,7 @@ function IssueTransaction (publicKey) {
 }
 
 function CreateTransaction (publicKey) {
-  return Exonum.newMessage({
+  return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_WALLET_ID,

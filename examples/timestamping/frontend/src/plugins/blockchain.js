@@ -34,7 +34,7 @@ module.exports = {
 
       createTimestamp: (keyPair, hash, metadata) => {
         // Describe transaction
-        const transaction = Exonum.newMessage({
+        const transaction = Exonum.newTransaction({
           author: keyPair.publicKey,
           service_id: SERVICE_ID,
           message_id: TX_ID,
