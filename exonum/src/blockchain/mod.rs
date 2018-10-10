@@ -49,8 +49,7 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, net::SocketAddr,
-    panic, sync::Arc,
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, panic, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -304,7 +303,7 @@ impl Blockchain {
                 self.execute_transaction(*hash, height, index, &mut fork)
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
-                    .expect("Transaction not found in the database.");
+                    .expect("Transaction execution error.");
             }
 
             // Invoke execute method for all services.
@@ -389,14 +388,21 @@ impl Blockchain {
         let (tx, raw, service_name) = {
             let schema = Schema::new(&fork);
 
-            let raw = schema
-                .transactions()
-                .get(&tx_hash)
-                .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
+            let raw = schema.transactions().get(&tx_hash).ok_or_else(|| {
+                failure::err_msg(format!(
+                    "BUG: Cannot find transaction in database. tx: {:?}",
+                    tx_hash
+                ))
+            })?;
 
             let service_name = self.service_map
                 .get(raw.service_id() as usize)
-                .ok_or_else(|| failure::err_msg("Service not found."))?
+                .ok_or_else(|| {
+                    failure::err_msg(format!(
+                        "Service not found. Service id: {}",
+                        raw.service_id()
+                    ))
+                })?
                 .service_name();
 
             let tx = self.tx_from_raw(raw.payload().clone()).or_else(|error| {
@@ -520,16 +526,13 @@ impl Blockchain {
     }
 
     /// Removes from the cache the `Connect` message from a peer.
-    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
         let mut fork = self.fork();
 
         {
             let mut schema = Schema::new(&mut fork);
             let mut peers = schema.peers_cache_mut();
-            let peer = peers.iter().find(|&(_, ref v)| v.addr() == *addr);
-            if let Some(pubkey) = peer.map(|(k, _)| k) {
-                peers.remove(&pubkey);
-            }
+            peers.remove(key);
         }
 
         self.merge(fork.into_patch())

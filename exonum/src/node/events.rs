@@ -44,7 +44,7 @@ impl NodeHandler {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
-            NetworkEvent::MessageReceived(_, raw) => {
+            NetworkEvent::MessageReceived(raw) => {
                 self.execute_later(InternalRequest::VerifyMessage(raw))
             }
         }
@@ -57,8 +57,8 @@ impl NodeHandler {
             }
             ExternalMessage::PeerAdd(info) => {
                 info!("Send Connect message to {}", info);
-                self.state.add_peer_to_connect_list(info);
-                self.connect(&info.address);
+                self.state.add_peer_to_connect_list(info.clone());
+                self.connect(info.public_key);
 
                 if self.config_manager.is_some() {
                     let connect_list_config =

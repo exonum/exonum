@@ -15,7 +15,7 @@
 #![allow(missing_debug_implementations)]
 
 //! This module implement all core commands.
-// spell-checker:ignore exts
+// spell-checker:ignore exts, rsplitn
 
 use crypto;
 use toml;
@@ -40,6 +40,7 @@ use storage::{Database, DbOptions, RocksDB};
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
+const LISTEN_ADDRESS: &str = "LISTEN_ADDRESS";
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
 const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
@@ -335,24 +336,52 @@ impl Command for GenerateCommonConfig {
 pub struct GenerateNodeConfig;
 
 impl GenerateNodeConfig {
-    fn addresses(context: &Context) -> (SocketAddr, SocketAddr) {
-        let address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+    fn addresses(context: &Context) -> (String, SocketAddr) {
+        let external_address_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+        let listen_address_str = &context.arg::<String>(LISTEN_ADDRESS).ok();
 
-        let external_address = address_str.parse::<SocketAddr>().unwrap_or_else(|_| {
-            let ip = address_str.parse::<IpAddr>().unwrap_or_else(|_| {
-                panic!(
-                    "Expected an ip address in {}: {:?}",
-                    PEER_ADDRESS, address_str
-                )
-            });
-            SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
+        // Try case where peer external address is socket address or ip address.
+        let external_address_socket = external_address_str.parse().or_else(|_| {
+            external_address_str
+                .parse()
+                .map(|ip| SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT))
         });
 
-        let listen_ip = match external_address {
-            SocketAddr::V4(_) => "0.0.0.0".parse().unwrap(),
-            SocketAddr::V6(_) => "::".parse().unwrap(),
+        let (external_address, external_port) = if let Ok(addr) = external_address_socket {
+            (addr.to_string(), addr.port())
+        } else {
+            let port = external_address_str
+                .rsplitn(2, ':')
+                .next()
+                .and_then(|p| p.parse::<u16>().ok());
+            if let Some(port) = port {
+                (external_address_str.clone(), port)
+            } else {
+                let port = DEFAULT_EXONUM_LISTEN_PORT;
+                (format!("{}:{}", external_address_str, port), port)
+            }
         };
-        let listen_address = SocketAddr::new(listen_ip, external_address.port());
+
+        let listen_address: SocketAddr = listen_address_str.as_ref().map_or_else(
+            || {
+                let listen_ip = match external_address_socket {
+                    Ok(addr) => match addr.ip() {
+                        IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),
+                        IpAddr::V6(_) => "::".parse().unwrap(),
+                    },
+                    Err(_) => "0.0.0.0".parse().unwrap(),
+                };
+                SocketAddr::new(listen_ip, external_port)
+            },
+            |a| {
+                a.parse().unwrap_or_else(|_| {
+                    panic!(
+                        "Correct socket address is expected for {}: {:?}",
+                        LISTEN_ADDRESS, a
+                    )
+                })
+            },
+        );
 
         (external_address, listen_address)
     }
@@ -370,6 +399,14 @@ impl Command for GenerateNodeConfig {
                 "Remote peer address",
                 "a",
                 "peer-address",
+                false,
+            ),
+            Argument::new_named(
+                LISTEN_ADDRESS,
+                false,
+                "Listen address",
+                "l",
+                "listen-address",
                 false,
             ),
         ]
@@ -423,7 +460,7 @@ impl Command for GenerateNodeConfig {
             service_key: service_public_key,
         };
         let node_pub_config = NodePublicConfig {
-            address: addresses.0,
+            address: addresses.0.clone(),
             validator_keys,
             services_public_configs,
         };
@@ -437,7 +474,7 @@ impl Command for GenerateNodeConfig {
 
         let private_config = NodePrivateConfig {
             listen_address: addresses.1,
-            external_address: addresses.0,
+            external_address: addresses.0.clone(),
             consensus_public_key,
             consensus_secret_key,
             service_public_key,
@@ -727,5 +764,99 @@ impl Command for GenerateTestnet {
         }
 
         Feedback::None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_generate_node_config_addresses() {
+        let mut ctx = Context::default();
+
+        let external = "127.0.0.1:1234";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (external.to_string(), "0.0.0.0:1234".parse().unwrap())
+        );
+
+        let external = "127.0.0.1";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (
+                SocketAddr::new(external.parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT).to_string(),
+                SocketAddr::new("0.0.0.0".parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT)
+            )
+        );
+
+        let external = "2001:db8::1";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (
+                SocketAddr::new(external.parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT).to_string(),
+                SocketAddr::new("::".parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT)
+            )
+        );
+
+        let external = "[2001:db8::1]:1234";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (external.to_string(), "[::]:1234".parse().unwrap())
+        );
+
+        let external = "localhost";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (
+                format!("{}:{}", external, DEFAULT_EXONUM_LISTEN_PORT),
+                SocketAddr::new("0.0.0.0".parse().unwrap(), DEFAULT_EXONUM_LISTEN_PORT)
+            )
+        );
+
+        let external = "localhost:1234";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (
+                external.to_string(),
+                SocketAddr::new("0.0.0.0".parse().unwrap(), 1234)
+            )
+        );
+
+        let external = "127.0.0.1:1234";
+        let listen = "1.2.3.4:5678";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        ctx.set_arg(LISTEN_ADDRESS, listen.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (external.to_string(), listen.parse().unwrap())
+        );
+
+        let external = "127.0.0.1:1234";
+        let listen = "1.2.3.4:5678";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        ctx.set_arg(LISTEN_ADDRESS, listen.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (external.to_string(), listen.parse().unwrap())
+        );
+
+        let external = "example.com";
+        let listen = "[2001:db8::1]:5678";
+        ctx.set_arg(PEER_ADDRESS, external.to_string());
+        ctx.set_arg(LISTEN_ADDRESS, listen.to_string());
+        assert_eq!(
+            GenerateNodeConfig::addresses(&ctx),
+            (
+                format!("{}:{}", external, DEFAULT_EXONUM_LISTEN_PORT),
+                listen.parse().unwrap()
+            )
+        );
     }
 }

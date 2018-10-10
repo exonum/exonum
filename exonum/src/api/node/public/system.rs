@@ -105,12 +105,14 @@ impl SystemApi {
     }
 
     fn get_connectivity_status(&self) -> ConnectivityStatus {
-        let peers_info = self.shared_api_state.peers_info();
-        if peers_info.is_empty() {
+        let in_conn = self.shared_api_state.incoming_connections().len();
+        let out_conn = self.shared_api_state.outgoing_connections().len();
+
+        if in_conn == 0 && out_conn == 0 {
             ConnectivityStatus::NotConnected
         } else {
             ConnectivityStatus::Connected(PeersAmount {
-                amount: peers_info.len(),
+                amount: in_conn + out_conn,
             })
         }
     }

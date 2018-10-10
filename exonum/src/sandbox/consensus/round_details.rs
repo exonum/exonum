@@ -89,7 +89,7 @@ fn request_propose_when_get_prevote() {
     ));
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_propose_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -116,7 +116,7 @@ fn request_prevotes_when_get_prevote_message() {
     ));
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_propose_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -130,7 +130,7 @@ fn request_prevotes_when_get_prevote_message() {
     validators.set(ValidatorId(2).into(), true);
 
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_prevote_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -608,11 +608,11 @@ fn handle_precommit_different_block_hash() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.recv(&propose);
@@ -671,11 +671,11 @@ fn handle_precommit_positive_scenario_commit() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -684,11 +684,11 @@ fn handle_precommit_positive_scenario_commit() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.recv(&propose);
@@ -757,11 +757,11 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.recv(&precommit_1);
         sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
         sandbox.send(
-            sandbox.a(ValidatorId(1)),
+            sandbox.p(ValidatorId(1)),
             &make_request_propose_from_precommit(&sandbox, &precommit_1),
         );
         sandbox.send(
-            sandbox.a(ValidatorId(1)),
+            sandbox.p(ValidatorId(1)),
             &make_request_prevote_from_precommit(&sandbox, &precommit_1),
         );
     }
@@ -774,11 +774,11 @@ fn lock_not_send_prevotes_after_commit() {
         // because this condition is checked at node/mod.rs->actual_round()
         sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
         sandbox.send(
-            sandbox.a(ValidatorId(2)),
+            sandbox.p(ValidatorId(2)),
             &make_request_propose_from_precommit(&sandbox, &precommit_2),
         );
         sandbox.send(
-            sandbox.a(ValidatorId(2)),
+            sandbox.p(ValidatorId(2)),
             &make_request_prevote_from_precommit(&sandbox, &precommit_2),
         );
     }
@@ -881,11 +881,11 @@ fn do_not_commit_if_propose_is_unknown() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -894,11 +894,11 @@ fn do_not_commit_if_propose_is_unknown() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     // !! if this propose would be received, commit would occur and last assert will
@@ -959,11 +959,11 @@ fn do_not_commit_if_tx_is_unknown() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -972,11 +972,11 @@ fn do_not_commit_if_tx_is_unknown() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1050,11 +1050,11 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1063,11 +1063,11 @@ fn commit_using_unknown_propose_with_precommits() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1075,11 +1075,11 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.recv(&precommit_3);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &make_request_propose_from_precommit(&sandbox, &precommit_3),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_3),
     );
 
@@ -1162,11 +1162,11 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1175,11 +1175,11 @@ fn handle_full_propose_wrong_state_hash() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1187,11 +1187,11 @@ fn handle_full_propose_wrong_state_hash() {
     sandbox.recv(&precommit_3);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &make_request_propose_from_precommit(&sandbox, &precommit_3),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(3)),
+        sandbox.p(ValidatorId(3)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_3),
     );
 
@@ -1360,11 +1360,11 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     //    sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1373,11 +1373,11 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1475,11 +1475,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(1)),
+        sandbox.p(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -1488,11 +1488,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
@@ -1545,7 +1545,7 @@ fn handle_tx_handle_full_propose() {
     sandbox.recv(&propose);
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.a(ValidatorId(2)),
+        sandbox.p(ValidatorId(2)),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(ValidatorId(2)),
@@ -1658,7 +1658,7 @@ fn handle_precommit_remove_propose_request() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.a(propose.validator()),
+        sandbox.p(propose.validator()),
         &sandbox.create_transactions_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(propose.validator()),
@@ -1671,7 +1671,7 @@ fn handle_precommit_remove_propose_request() {
     let prevoters = BitVec::from_elem(sandbox.n_validators(), false);
 
     sandbox.send(
-        sandbox.a(propose.validator()),
+        sandbox.p(propose.validator()),
         &sandbox.create_prevote_request(
             &sandbox.p(ValidatorId(0)),
             &sandbox.p(propose.validator()),
@@ -1743,7 +1743,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 
         if i == 1 {
             sandbox.send(
-                sandbox.a(propose.validator()),
+                sandbox.p(propose.validator()),
                 &sandbox.create_prevote_request(
                     &sandbox.p(ValidatorId(0)),
                     &sandbox.p(propose.validator()),

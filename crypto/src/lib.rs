@@ -200,7 +200,7 @@ pub trait CryptoHash {
 /// ```
 pub fn init() {
     if !crypto_impl::init() {
-        panic!("Cryptographic library hasn't initialized.");
+        panic!("Cryptographic library initialization failed.");
     }
 }
 
