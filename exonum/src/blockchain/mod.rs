@@ -51,7 +51,7 @@ use vec_map::VecMap;
 use std::{
     path::PathBuf, fs::File,
     panic, sync::Arc,
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, sync::Arc,
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
