@@ -49,7 +49,9 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, panic, sync::Arc,
+    path::PathBuf, fs::File,
+    panic, sync::Arc,
+    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -74,6 +76,8 @@ mod tests;
 /// into a single network.
 pub struct Blockchain {
     db: Arc<dyn Database>,
+    last_snapshot: Option<(Height, PathBuf)>,
+    snapshot_period_blocks: Option<u64>,
     service_map: Arc<VecMap<Box<dyn Service>>>,
     pub(crate) service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
@@ -102,6 +106,8 @@ impl Blockchain {
 
         Self {
             db: storage.into(),
+            last_snapshot: None,
+            snapshot_period_blocks: None,
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
@@ -133,6 +139,43 @@ impl Blockchain {
     /// via the `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
+    }
+
+    /// Returns last saved DB snapshot.
+    pub fn last_snapshot(&self) -> Option<(Height, PathBuf)> {
+        self.last_snapshot.clone()
+    }
+
+    /// Sets period in blocks of creation of DB snapshot (checkpoint).
+    /// Pass `None` to disable snapshot creation.
+    pub fn set_snapshot_period_blocks(&mut self, period: Option<u64>) {
+        self.snapshot_period_blocks = period;
+    }
+
+    /// Creates a new DB snapshot.
+    pub fn create_snapshot(&mut self) {
+        use std::path::Path;
+        use storage::image::helpers;
+
+        let height = self.last_block().height();
+
+        info!("Creating snapshot for height: {}", height);
+
+        let validator_pk = self.service_keypair.0;
+        let fname = &format!("snapshot_{}.bin", validator_pk.to_hex());
+        let fname = Path::new(&fname);
+        match File::create(fname) {
+            Ok(mut f) => {
+                helpers::export_db_to_image(&mut f, self.db.clone()).unwrap();
+                self.last_snapshot = Some((height, PathBuf::from(&fname)));
+            },
+
+            Err(e) => {
+                error!("Was unable to create snapshot: {:?}", e);
+            }
+        }
+
+        info!("Snapshot has been created");
     }
 
     /// Tries to create a `Transaction` object from the given raw message.
@@ -508,6 +551,20 @@ impl Blockchain {
         for service in self.service_map.values() {
             service.after_commit(&context);
         }
+
+        // Get current height
+        let height = {
+            let schema = Schema::new(self.snapshot());
+            schema.height()
+        };
+
+        // Create snapshot if passed snapshot (checkpoint) period
+        if let Some(period) = self.snapshot_period_blocks {
+            if (height.0 + 1) % period == 0 {
+                self.create_snapshot();
+            }
+        }
+
         Ok(())
     }
 
@@ -599,6 +656,8 @@ impl Clone for Blockchain {
     fn clone(&self) -> Self {
         Self {
             db: Arc::clone(&self.db),
+            last_snapshot: self.last_snapshot.clone(),
+            snapshot_period_blocks: self.snapshot_period_blocks.clone(),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),

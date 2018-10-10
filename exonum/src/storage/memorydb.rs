@@ -77,6 +77,13 @@ impl Database for MemoryDB {
     fn merge_sync(&self, patch: Patch) -> Result<()> {
         self.merge(patch)
     }
+
+    fn clear(&self) -> Result<()> {
+        let mut guard = self.map.write().unwrap();
+        guard.clear();
+
+        Ok(())
+    }
 }
 
 impl Snapshot for MemoryDB {
@@ -108,6 +115,11 @@ impl Snapshot for MemoryDB {
         };
 
         Box::new(MemoryDBIter { data, index: 0 })
+    }
+
+    fn tables(&self) -> Vec<String> {
+        let map_guard = self.map.read().unwrap();
+        map_guard.iter().map(|(k, _)| k.clone()).collect()
     }
 }
 

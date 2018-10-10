@@ -77,6 +77,8 @@ extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;
+extern crate flate2;
+extern crate csv;
 
 // Test dependencies.
 #[cfg(test)]

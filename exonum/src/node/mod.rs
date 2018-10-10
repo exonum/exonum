@@ -864,9 +864,10 @@ impl Node {
             services,
             node_cfg.service_public_key,
             node_cfg.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
+            ApiSender::new(channel.api_requests.0.clone())
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
+        blockchain.set_snapshot_period_blocks(node_cfg.database.snapshot_period_blocks);
 
         let peers = node_cfg.connect_list.addresses();
 

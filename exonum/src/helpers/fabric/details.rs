@@ -22,6 +22,7 @@ use toml;
 
 use std::{
     collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
+    fs::File, io::BufReader,
 };
 
 use super::{
@@ -31,13 +32,15 @@ use super::{
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
+
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
-use storage::{Database, DbOptions, RocksDB};
+use storage::{Database, DbOptions, RocksDB, image::helpers};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
+const DATABASE_IMAGE_PATH: &str = "DATABASE_IMAGE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
 const LISTEN_ADDRESS: &str = "LISTEN_ADDRESS";
@@ -55,7 +58,32 @@ impl Run {
     pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
-        Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
+
+        // Destroy database before applying the image (if any)
+        let has_db_image = ctx.arg::<String>(DATABASE_IMAGE_PATH).is_ok();
+        if has_db_image {
+            RocksDB::destroy(Path::new(&path), options)
+                .expect("Can't destroy existing database!");
+        }
+
+        let db = RocksDB::open(Path::new(&path), options)
+            .expect("Can't load database file");
+
+        // Load DB image from the given file (if any)
+        if let Ok(image_path) = ctx.arg::<String>(DATABASE_IMAGE_PATH) {
+            trace!("Loading DB image from {}", image_path);
+
+            let path = Path::new(&image_path);
+            let f = File::open(path)
+                .unwrap_or_else(|_| panic!("DB image not found in path {}", image_path));
+            let r = BufReader::new(f);
+
+            // Import DB image into storage
+            helpers::import_db_from_image(r, &db).expect("Failed to apply DB image");
+            info!("Applied DB image from file {}", image_path);
+        }
+
+        Box::new(db)
     }
 
     fn node_config_path(ctx: &Context) -> String {
@@ -93,6 +121,14 @@ impl Command for Run {
                 "Use database with the given path.",
                 "d",
                 "db-path",
+                false,
+            ),
+            Argument::new_named(
+                DATABASE_IMAGE_PATH,
+                false,
+                "Use database snapshot image file with the given path.",
+                "i",
+                "img-path",
                 false,
             ),
             Argument::new_named(

@@ -179,6 +179,27 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(IDX_NAME, &[4]), None);
 }
 
+fn clear<T: Database>(db: T) {
+    let mut fork = db.fork();
+
+    fork.put("cf1", vec![1], vec![1]);
+    fork.put("cf2", vec![2], vec![2]);
+    fork.put("cf3", vec![3], vec![3]);
+
+    assert_eq!(fork.get("cf1", &[1]), Some(vec![1]));
+    assert_eq!(fork.get("cf2", &[2]), Some(vec![2]));
+    assert_eq!(fork.get("cf3", &[3]), Some(vec![3]));
+
+    db.merge(fork.into_patch()).unwrap();
+
+    // Clear DB
+    assert!(db.clear().is_ok());
+
+    assert!(!db.snapshot().contains("cf1", &[1]));
+    assert!(!db.snapshot().contains("cf2", &[2]));
+    assert!(!db.snapshot().contains("cf3", &[3]));
+}
+
 mod memorydb_tests {
     use super::super::MemoryDB;
 
@@ -194,6 +215,11 @@ mod memorydb_tests {
     #[test]
     fn test_memory_changelog() {
         super::changelog(memorydb_database());
+    }
+
+    #[test]
+    fn test_memory_clear() {
+        super::clear(memorydb_database());
     }
 }
 
@@ -220,6 +246,13 @@ mod rocksdb_tests {
         let dir = TempDir::new("exonum_rocksdb2").unwrap();
         let path = dir.path();
         super::changelog(rocksdb_database(path));
+    }
+
+    #[test]
+    fn test_rocksdb_clear() {
+        let dir = TempDir::new("exonum_rocksdb3").unwrap();
+        let path = dir.path();
+        super::clear(rocksdb_database(path));
     }
 
     #[ignore]

@@ -284,6 +284,9 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
+
+    /// Removes anything from the database.
+    fn clear(&self) -> Result<()>;
 }
 
 /// A read-only snapshot of a storage backend.
@@ -309,6 +312,9 @@ pub trait Snapshot: 'static {
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
+
+    /// Returns a list of all tables (column families) in the snapshot.
+    fn tables(&self) -> Vec<String>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -358,6 +364,10 @@ impl Snapshot for Fork {
             snapshot: self.snapshot.iter(name, from),
             changes,
         })
+    }
+
+    fn tables(&self) -> Vec<String> {
+        self.patch.iter().map(|(k, _)| k.clone()).collect()
     }
 }
 
