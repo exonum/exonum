@@ -540,8 +540,8 @@ fn test_send_first_not_connect() {
 #[test]
 #[should_panic(expected = "An error during wait for connect occurred")]
 fn test_connect_list_ignore_when_connecting() {
-    let first = "127.0.0.1:20230".parse().unwrap();
-    let second = "127.0.0.1:20231".parse().unwrap();
+    let first = "127.0.0.1:27230".parse().unwrap();
+    let second = "127.0.0.1:27231".parse().unwrap();
 
     let mut connect_list = ConnectList::default();
 
