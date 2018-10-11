@@ -47,7 +47,7 @@ pub mod helpers {
             .has_headers(false)
             .from_reader(decoder);
 
-        let mut records_read = 0usize;
+        let mut records_read = 0_usize;
         let mut fork = db.fork();
 
         for record in rdr.byte_records() {
