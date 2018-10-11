@@ -14,10 +14,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
    parameter. `TransactionContext` provides the public key of transaction
    author, ID of current service, and transaction hash (#943)
 
-- Every transaction that contains the public key of the author was refactored to
-   author from `TransactionContext`. (#984 #980 #979 #975 #971)
+- Every transaction that contains the public key of the author was refactored
+   to use the author indicated in `TransactionContext`. (#984 #980 #979 #975 #971)
 
-- `/transactions/` endpoint can now transaction messages in hex format.
+- `/transactions/` endpoint can now handle transaction messages in hex format.
    Services that used custom endpoints were refactored to
    use `explorer/v1/transactions`. (#943 #984 #980 #979 #975 #971)
 
