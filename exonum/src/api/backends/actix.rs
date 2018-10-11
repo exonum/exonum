@@ -22,8 +22,8 @@ pub use actix_web::middleware::cors::Cors;
 use actix::{Addr, System};
 use actix_net::server::Server;
 use actix_web::{
-    self, error::ResponseError, server::{HttpServer, StopServer}, AsyncResponder,
-    FromRequest, HttpMessage, HttpResponse, Query,
+    self, error::ResponseError, server::{HttpServer, StopServer}, AsyncResponder, FromRequest,
+    HttpMessage, HttpResponse, Query,
 };
 use failure;
 use futures::{Future, IntoFuture};
