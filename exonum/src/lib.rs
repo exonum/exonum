@@ -16,12 +16,7 @@
 //!
 //! For more information see the project readme.
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 #![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
 #![cfg_attr(
