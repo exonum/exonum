@@ -343,6 +343,50 @@ impl ExonumJson for Vec<RawMessage> {
     }
 }
 
+impl<T> ExonumJsonDeserialize for Option<T>
+where
+    T: ExonumJsonDeserialize,
+    for<'a> Option<T>: Field<'a>,
+{
+    fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>> {
+        if value.is_null() {
+            Ok(None)
+        } else {
+            T::deserialize(value).map(Some)
+        }
+    }
+}
+
+impl<T> ExonumJson for Option<T>
+where
+    T: ExonumJsonDeserialize + ExonumJson,
+    for<'a> Option<T>: Field<'a>,
+{
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<dyn Error>> {
+        let value = if value.is_null() {
+            None
+        } else {
+            T::deserialize(value).map(Some)?
+        };
+        buffer.write(from, to, value);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
+        let result = if let Some(ref value) = self {
+            Ok(value.serialize_field()?)
+        } else {
+            Ok(Value::Null)
+        };
+        result
+    }
+}
+
 impl<T> ExonumJsonDeserialize for Vec<T>
 where
     T: ExonumJsonDeserialize,
