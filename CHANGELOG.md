@@ -7,29 +7,29 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking Changes
 
-- Message format was changed, that modify byte representation of
-   transaction and precommit. (#916)
+- Changed the message format, which, in turn, has led to changes in
+   the byte representation of transactions and precommit messages. (#916)
 
-- `Transaction::execute` now accept as second parameter `TransactionContext`
-   which provide public key of transaction author, id of current service,
-   and transaction hash. (#943)
+- `Transaction::execute` now accepts `TransactionContext` as the second
+   parameter. `TransactionContext` provides the public key of transaction
+   author, ID of current service, and transaction hash (#943)
 
-- Every transaction that contain public key of author was refactored to
+- Every transaction that contains the public key of the author was refactored to
    author from `TransactionContext`. (#984 #980 #979 #975 #971)
 
-- `/transactions/` endpoint now can handle transaction message in hex format.
-   Services that used custom endpoint was refactored to
-   use `explorer/v1/transactions` (#943 #984 #980 #979 #975 #971)
+- `/transactions/` endpoint can now transaction messages in hex format.
+   Services that used custom endpoints were refactored to
+   use `explorer/v1/transactions`. (#943 #984 #980 #979 #975 #971)
 
-- `majority_count` parameter has been removed from `StoredConfiguration` and
-   moved to `ConfigurationService` configuration. (#828)
+- `majority_count` parameter has been moved from `StoredConfiguration`
+   to `ConfigurationService` configuration. (#828)
 
-- Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
+- Removed obsolete `enable_blockchain_explorer` option from `NodeApiConfig`. (#891)
 
 #### exonum
 
 - Trait `TransactionSend` was removed.
-  `ApiSender` now contain `broadcast_transaction` method. (#943)
+  `ApiSender` now contains `broadcast_transaction` method. (#943)
 
 - `api::Error::InternalError` now contains `failure::Error` instead of
   `Box<::std::error::Error>`. (#879)
@@ -68,7 +68,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-configuration
 
-- The `Vote` and `VoteAgainst` now save transaction hash instead of
+- The `Vote` and `VoteAgainst` now save the transaction hash instead of
   full transaction message. (#984)
 
 ### New Features
