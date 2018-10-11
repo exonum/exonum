@@ -534,6 +534,11 @@ impl NodeHandler {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
+        if let Err(e) = self.blockchain.tx_from_raw(msg.payload().clone()) {
+            error!("Received invalid transaction {:?}, result: {}", msg, e);
+            bail!("Received malicious transaction.")
+        }
+
         let mut fork = self.blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
