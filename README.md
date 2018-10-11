@@ -5,6 +5,7 @@
 [![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum/master.svg?label=MacOS)](https://circleci.com/gh/exonum/exonum/tree/master)
 [![Appveyor Build Status](https://img.shields.io/appveyor/ci/exonum-org/exonum/master.svg?label=Windows)](https://ci.appveyor.com/project/exonum-org/exonum)
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
+[![codecov](https://codecov.io/gh/exonum/exonum/branch/master/graph/badge.svg)](https://codecov.io/gh/exonum/exonum)
 
 **Project info:**
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)

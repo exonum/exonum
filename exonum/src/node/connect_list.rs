@@ -14,26 +14,40 @@
 
 //! Mapping between peers public keys and IP-addresses.
 
-use std::{collections::BTreeMap, net::SocketAddr};
+use std::collections::BTreeMap;
 
 use crypto::PublicKey;
 use node::{ConnectInfo, ConnectListConfig};
+
+/// Network address of the peer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PeerAddress {
+    /// External address of the peer hostname:port.
+    pub address: String,
+}
+
+impl PeerAddress {
+    /// New unresolved address.
+    pub fn new(address: String) -> Self {
+        PeerAddress { address }
+    }
+}
 
 /// `ConnectList` stores mapping between IP-addresses and public keys.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConnectList {
     /// Peers to which we can connect.
     #[serde(default)]
-    pub peers: BTreeMap<PublicKey, SocketAddr>,
+    pub peers: BTreeMap<PublicKey, PeerAddress>,
 }
 
 impl ConnectList {
     /// Creates `ConnectList` from config.
     pub fn from_config(config: ConnectListConfig) -> Self {
-        let peers: BTreeMap<PublicKey, SocketAddr> = config
+        let peers: BTreeMap<PublicKey, PeerAddress> = config
             .peers
             .into_iter()
-            .map(|peer| (peer.public_key, peer.address))
+            .map(|peer| (peer.public_key, PeerAddress::new(peer.address)))
             .collect();
 
         ConnectList { peers }
@@ -45,21 +59,24 @@ impl ConnectList {
     }
 
     /// Check if we allow to connect to `address`.
-    pub fn is_address_allowed(&self, address: &SocketAddr) -> bool {
-        self.peers.values().any(|a| a == address)
+    pub fn is_address_allowed(&self, address: &str) -> bool {
+        self.peers.values().any(|a| a.address == address)
+    }
+
+    /// Get peer address with public key.
+    pub fn find_address_by_pubkey(&self, key: &PublicKey) -> Option<&PeerAddress> {
+        self.peers.get(key)
     }
 
     /// Adds peer to the ConnectList.
     pub fn add(&mut self, peer: ConnectInfo) {
-        self.peers.insert(peer.public_key, peer.address);
+        self.peers
+            .insert(peer.public_key, PeerAddress::new(peer.address));
     }
 
-    /// Get public key corresponding to validator with `address`.
-    pub fn find_key_by_address(&self, address: &SocketAddr) -> Option<&PublicKey> {
-        self.peers
-            .iter()
-            .find(|(_, a)| a == &address)
-            .map(|(p, _)| p)
+    /// Update peer address.
+    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+        self.peers.insert(*public_key, PeerAddress::new(address));
     }
 }
 
@@ -67,9 +84,7 @@ impl ConnectList {
 mod test {
     use rand::{RngCore, SeedableRng, XorShiftRng};
 
-    use std::net::SocketAddr;
-
-    use super::ConnectList;
+    use super::*;
     use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use node::ConnectInfo;
 
@@ -105,7 +120,7 @@ mod test {
     #[test]
     fn test_whitelist() {
         let regular = make_keys(REGULAR_PEERS, 4);
-        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
+        let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();
         check_in_connect_list(&connect_list, &regular, &[], &[0, 1, 2, 3]);
@@ -139,7 +154,7 @@ mod test {
     }
 
     fn add_to_connect_list(connect_list: &mut ConnectList, peers: &[PublicKey]) {
-        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
+        let address = "127.0.0.1:80".to_owned();
         for peer in peers {
             connect_list.add(ConnectInfo {
                 public_key: *peer,
@@ -167,7 +182,7 @@ mod test {
     #[test]
     fn test_address_allowed() {
         let (public_key, _) = gen_keypair();
-        let address: SocketAddr = "127.0.0.1:80".parse().unwrap();
+        let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();
         assert!(!connect_list.is_address_allowed(&address));

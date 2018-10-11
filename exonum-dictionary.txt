@@ -18,6 +18,7 @@ checkpointed
 chrono
 clippy
 clonned
+codecov
 compat
 concat
 Cors

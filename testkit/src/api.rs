@@ -225,8 +225,8 @@ where
 
         trace!("POST {}", url);
 
-        let mut builder = self.test_client.post(&url);
-        if let Some(ref query) = self.query.as_ref() {
+        let builder = self.test_client.post(&url);
+        let builder = if let Some(ref query) = self.query.as_ref() {
             trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
             builder.json(query)
         } else {
@@ -260,14 +260,14 @@ where
         }
 
         match response.status() {
-            StatusCode::Ok => Ok({
+            StatusCode::OK => Ok({
                 let body = response.text().expect("Unable to get response text");
                 trace!("Body: {}", body);
                 serde_json::from_str(&body).expect("Unable to deserialize body")
             }),
-            StatusCode::Forbidden => Err(api::Error::Unauthorized),
-            StatusCode::BadRequest => Err(api::Error::BadRequest(error(response))),
-            StatusCode::NotFound => Err(api::Error::NotFound(error(response))),
+            StatusCode::FORBIDDEN => Err(api::Error::Unauthorized),
+            StatusCode::BAD_REQUEST => Err(api::Error::BadRequest(error(response))),
+            StatusCode::NOT_FOUND => Err(api::Error::NotFound(error(response))),
             s if s.is_server_error() => Err(api::Error::InternalError(format_err!(
                 "{}",
                 error(response)

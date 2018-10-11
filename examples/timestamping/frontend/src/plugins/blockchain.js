@@ -5,12 +5,7 @@ const PER_PAGE = 10
 const PROTOCOL_VERSION = 0
 const SERVICE_ID = 130
 const TX_ID = 0
-const TableKey = Exonum.newType({
-  fields: [
-    { name: 'service_id', type: Exonum.Uint16 },
-    { name: 'table_index', type: Exonum.Uint16 }
-  ]
-})
+const TABLE_INDEX = 0
 const SystemTime = Exonum.newType({
   fields: [
     { name: 'secs', type: Exonum.Uint64 },
@@ -82,23 +77,12 @@ module.exports = {
                 throw new Error('Block can not be verified')
               }
 
-              // find root hash of table with all tables
-              const tableKey = TableKey.hash({
-                service_id: SERVICE_ID,
-                table_index: 0
-              })
-              const stateProof = new Exonum.MapProof(data.state_proof, Exonum.Hash, Exonum.Hash)
-              if (stateProof.merkleRoot !== data.block_info.block.state_hash) {
-                throw new Error('State proof is corrupted')
-              }
-              const timestampsHash = stateProof.entries.get(tableKey)
-              if (typeof timestampsHash === 'undefined') {
-                throw new Error('Timestamps table not found')
-              }
+              // verify table timestamps in the root tree
+              const tableRootHash = Exonum.verifyTable(data.state_proof, data.block_info.block.state_hash, SERVICE_ID, TABLE_INDEX)
 
               // find timestamp in the tree of all timestamps
               const timestampProof = new Exonum.MapProof(data.timestamp_proof, Exonum.Hash, TimestampEntry)
-              if (timestampProof.merkleRoot !== timestampsHash) {
+              if (timestampProof.merkleRoot !== tableRootHash) {
                 throw new Error('Timestamp proof is corrupted')
               }
               const timestamp = timestampProof.entries.get(hash)

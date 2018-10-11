@@ -109,7 +109,7 @@ exonum-cryptocurrency-advanced run --node-config example/node_4_cfg.toml --db-pa
 Install frontend dependencies:
 
 ```sh
-cd frontend
+cd ../frontend
 
 npm install
 ```

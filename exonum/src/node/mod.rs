@@ -18,7 +18,7 @@
 // spell-checker:ignore cors
 
 pub use self::{
-    connect_list::ConnectList, state::{RequestData, State, ValidatorState},
+    connect_list::{ConnectList, PeerAddress}, state::{RequestData, State, ValidatorState},
 };
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
@@ -26,13 +26,12 @@ pub mod state;
 
 use failure::{self, Error};
 use futures::{sync::mpsc, Future, Sink};
-use serde::de::{self, Deserialize, Deserializer};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, net::{SocketAddr, ToSocketAddrs}, sync::Arc, thread,
+    collections::{BTreeMap, HashSet}, fmt, net::SocketAddr, sync::Arc, thread,
     time::{Duration, SystemTime},
 };
 
@@ -121,7 +120,7 @@ pub struct NodeHandler {
     /// Blockchain.
     pub blockchain: Blockchain,
     /// Known peer addresses.
-    pub peer_discovery: Vec<SocketAddr>,
+    pub peer_discovery: Vec<String>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Node role.
@@ -238,8 +237,7 @@ pub struct NodeConfig {
     /// Network listening address.
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
-    #[serde(deserialize_with = "deserialize_socket_address")]
-    pub external_address: SocketAddr,
+    pub external_address: String,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Consensus public key.
@@ -276,7 +274,7 @@ pub struct Configuration {
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Known peer addresses.
-    pub peer_discovery: Vec<SocketAddr>,
+    pub peer_discovery: Vec<String>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
 }
@@ -347,7 +345,7 @@ impl ConnectListConfig {
             .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
-                address: config.address,
+                address: config.address.clone(),
             })
             .collect();
 
@@ -355,12 +353,12 @@ impl ConnectListConfig {
     }
 
     /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
-    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
+    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
         let peers = peers
             .iter()
             .zip(validators_keys.iter())
             .map(|(a, v)| ConnectInfo {
-                address: *a,
+                address: a.clone(),
                 public_key: v.consensus_key,
             })
             .collect();
@@ -376,8 +374,8 @@ impl ConnectListConfig {
     }
 
     /// `ConnectListConfig` peers addresses.
-    pub fn addresses(&self) -> Vec<SocketAddr> {
-        self.peers.iter().map(|p| p.address).collect()
+    pub fn addresses(&self) -> Vec<String> {
+        self.peers.iter().map(|p| p.address.clone()).collect()
     }
 }
 
@@ -385,7 +383,7 @@ impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
-        external_address: SocketAddr,
+        external_address: &str,
         sender: NodeSender,
         system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
@@ -523,15 +521,21 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(|s| s.addr());
-            let it = it.chain(self.peer_discovery.iter().cloned());
-            let it = it.filter(|&address| address != listen_address);
+            let it = self.state.peers().values().map(|p| p.author());
+            let it = it.chain(
+                self.state()
+                    .connect_list()
+                    .peers()
+                    .into_iter()
+                    .map(|i| i.public_key),
+            );
+            let it = it.filter(|address| address != &self.state.our_connect_message().author());
             it.collect()
         };
 
-        for address in &peers {
-            self.connect(address);
-            info!("Trying to connect with peer {}", address);
+        for key in peers {
+            self.connect(key);
+            info!("Trying to connect with peer {}", key);
         }
 
         let snapshot = self.blockchain.snapshot();
@@ -561,46 +565,20 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub(crate) fn send_to_peer<M: Into<SignedMessage>>(
-        &mut self,
-        public_key: PublicKey,
-        message: M,
-    ) {
-        let address = {
-            if let Some(conn) = self.state.peers().get(&public_key) {
-                conn.addr()
-            } else {
-                warn!(
-                    "Attempt to send message to peer with key {:?} without connection",
-                    public_key
-                );
-                return;
-            }
-        };
-
-        self.send_to_addr(&address, message);
-    }
-
-    /// Sends `SignedMessage` to the specified address.
-    pub(crate) fn send_to_addr<M: Into<SignedMessage>>(
-        &mut self,
-        address: &SocketAddr,
-        message: M,
-    ) {
-        trace!("Send to address: {}", address);
-        trace!("Send to address: {}", address);
-        let request = NetworkRequest::SendMessage(*address, message.into());
+    pub fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
+        let message = message.into();
+        let request = NetworkRequest::SendMessage(public_key, message);
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
     pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
-        let peers: Vec<SocketAddr> = self.state
+        let peers: Vec<PublicKey> = self.state
             .peers()
             .iter()
-            .filter_map(|(pubkey, connection)| {
+            .filter_map(|(pubkey, _)| {
                 if self.state.connect_list().is_peer_allowed(pubkey) {
-                    Some(connection.addr())
+                    Some(*pubkey)
                 } else {
                     None
                 }
@@ -608,14 +586,14 @@ impl NodeHandler {
             .collect();
         let message = message.into();
         for address in peers {
-            self.send_to_addr(&address, message.clone());
+            self.send_to_peer(address, message.clone());
         }
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&mut self, address: &SocketAddr) {
+    pub fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
-        self.send_to_addr(address, connect.clone());
+        self.send_to_peer(key, connect.clone());
     }
 
     /// Add timeout request.
@@ -774,29 +752,11 @@ impl fmt::Debug for ApiSender {
     }
 }
 
-fn deserialize_socket_address<'de, D>(value: D) -> Result<SocketAddr, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let address_str: String = Deserialize::deserialize(value)?;
-    address_str
-        .to_socket_addrs()
-        .map_err(de::Error::custom)?
-        .next()
-        .ok_or_else(|| {
-            de::Error::custom(&format!(
-                "no one ip belongs to the hostname: {}",
-                address_str
-            ))
-        })
-}
-
 /// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ConnectInfo {
     /// Peer address.
-    #[serde(deserialize_with = "deserialize_socket_address")]
-    pub address: SocketAddr,
+    pub address: String,
     /// Peer public key.
     pub public_key: PublicKey,
 }
@@ -918,7 +878,7 @@ impl Node {
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
-            node_cfg.external_address,
+            &node_cfg.external_address,
             channel.node_sender(),
             system_state,
             config,
@@ -1025,6 +985,7 @@ impl Node {
             *self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
             self.state().connect_list().clone(),
+            self.state().our_connect_message().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
@@ -1038,6 +999,7 @@ impl Node {
 
     fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
+        let connect_list = self.state().connect_list().clone();
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
@@ -1047,6 +1009,7 @@ impl Node {
             network_tx,
             network_config: self.network_config,
             max_message_len: self.max_message_len,
+            connect_list,
         };
 
         let (internal_tx, internal_rx) = self.channel.internal_events;

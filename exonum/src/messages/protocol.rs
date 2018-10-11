@@ -30,13 +30,14 @@ use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 use failure;
 
-use std::{borrow::Cow, fmt::Debug, mem, net::SocketAddr};
+use std::{borrow::Cow, fmt::Debug, mem};
 
 use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
-use storage::{Database, MemoryDB, ProofListIndex, StorageValue};
+use storage::proof_list_index as merkle;
+use storage::StorageValue;
 
 /// `SignedMessage` size with zero bytes payload.
 #[doc(hidden)]
@@ -67,7 +68,7 @@ encoding_struct! {
     /// message after receiving `node::Event::Connected`.
     struct Connect {
         /// The node's address.
-        addr: SocketAddr,
+        pub_addr: &str,
         /// Time when the message was created.
         time: DateTime<Utc>,
         /// String containing information about this node including Exonum, Rust and OS versions.
@@ -345,12 +346,7 @@ encoding_struct! {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
-        let db = MemoryDB::new();
-        let mut fork = db.fork();
-        let mut index = ProofListIndex::new("verify_tx_hash", &mut fork);
-        index.extend(self.transactions().iter().cloned());
-        let tx_hashes = index.merkle_root();
-        tx_hashes == *self.block().tx_hash()
+        *self.block().tx_hash() == merkle::root_hash(self.transactions())
     }
 }
 
