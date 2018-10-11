@@ -45,7 +45,7 @@ pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
 type HandshakeResult<S> =
-    Box<dyn Future<Item = (Framed<S, MessagesCodec>), Error = failure::Error>>;
+    Box<dyn Future<Item = (Framed<S, MessagesCodec>, Vec<u8>), Error = failure::Error>>;
 
 pub trait Handshake {
     fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;

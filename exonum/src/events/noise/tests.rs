@@ -36,7 +36,6 @@ use events::{
     },
     tests::raw_message,
 };
-use node::state::SharedConnectList;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -174,21 +173,17 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
 }
 
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-
-    let mut params =
-        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
-    params.set_remote_key(public_key);
+    let params = HandshakeParams::with_default_params();
 
     let mut initiator = NoiseWrapper::initiator(&params);
     let mut responder = NoiseWrapper::responder(&params);
 
-    let buffer_out = initiator.write_handshake_msg().unwrap();
+    let buffer_out = initiator.write_handshake_msg(&[]).unwrap();
     responder.read_handshake_msg(&buffer_out).unwrap();
 
-    let buffer_out = responder.write_handshake_msg().unwrap();
+    let buffer_out = responder.write_handshake_msg(&[]).unwrap();
     initiator.read_handshake_msg(&buffer_out).unwrap();
-    let buffer_out = initiator.write_handshake_msg().unwrap();
+    let buffer_out = initiator.write_handshake_msg(&[]).unwrap();
     responder.read_handshake_msg(&buffer_out).unwrap();
 
     (
@@ -237,19 +232,11 @@ const MAX_MESSAGE_LEN: usize = 128;
 const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
-pub fn default_test_params() -> HandshakeParams {
-    let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
-    let mut params =
-        HandshakeParams::new(public_key, secret_key, SharedConnectList::default(), 1024);
-    params.set_remote_key(public_key);
-    params
-}
-
 #[test]
 #[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
-    let params = default_test_params();
+    let params = HandshakeParams::with_default_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
@@ -263,7 +250,7 @@ fn test_noise_handshake_errors_ee_empty() {
 #[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
-    let params = default_test_params();
+    let params = HandshakeParams::with_default_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::StaticKeyExchange,
         EMPTY_MESSAGE,
@@ -277,7 +264,7 @@ fn test_noise_handshake_errors_es_empty() {
 #[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
-    let params = default_test_params();
+    let params = HandshakeParams::with_default_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
@@ -291,7 +278,7 @@ fn test_noise_handshake_errors_ee_standard() {
 #[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
-    let params = default_test_params();
+    let params = HandshakeParams::with_default_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::StaticKeyExchange,
         STANDARD_MESSAGE,
@@ -305,7 +292,7 @@ fn test_noise_handshake_errors_es_standard() {
 #[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
-    let params = default_test_params();
+    let params = HandshakeParams::with_default_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
@@ -319,7 +306,7 @@ fn test_noise_handshake_errors_ee_empty_listen() {
 #[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
-    let params = default_test_params();
+    let params = HandshakeParams::with_default_params();
     let bogus_message = Some(BogusMessage::new(
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
@@ -333,7 +320,7 @@ fn test_noise_handshake_errors_ee_standard_listen() {
 #[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
-    let mut params = default_test_params();
+    let mut params = HandshakeParams::with_default_params();
     let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
     params.set_remote_key(remote_key);
 
@@ -462,7 +449,7 @@ impl NoiseErrorHandshake {
 
         inner
             .read_handshake_msg(stream)
-            .map(move |(stream, inner)| {
+            .map(move |(stream, inner, _)| {
                 self.inner = Some(inner);
                 (stream, self)
             })
@@ -490,7 +477,7 @@ impl NoiseErrorHandshake {
 
             Either::B(
                 inner
-                    .write_handshake_msg(stream)
+                    .write_handshake_msg(stream, &[])
                     .map(move |(stream, inner)| {
                         self.inner = Some(inner);
                         self.current_step = self.current_step
@@ -511,7 +498,7 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.read_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, Vec::new()));
         Box::new(framed)
     }
 
@@ -522,7 +509,7 @@ impl Handshake for NoiseErrorHandshake {
         let framed = self.write_handshake_msg(stream)
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream, Vec::new()));
         Box::new(framed)
     }
 }

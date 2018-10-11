@@ -9,12 +9,7 @@ const SERVICE_ID = 128
 const TX_TRANSFER_ID = 0
 const TX_ISSUE_ID = 1
 const TX_WALLET_ID = 2
-const TableKey = Exonum.newType({
-  fields: [
-    { name: 'service_id', type: Exonum.Uint16 },
-    { name: 'table_index', type: Exonum.Uint16 }
-  ]
-})
+const TABLE_INDEX = 0
 const Wallet = Exonum.newType({
   fields: [
     { name: 'pub_key', type: Exonum.PublicKey },
@@ -175,23 +170,12 @@ module.exports = {
                 throw new Error('Block can not be verified')
               }
 
-              // find root hash of table with wallets in the tree of all tables
-              const tableKey = TableKey.hash({
-                service_id: SERVICE_ID,
-                table_index: 0
-              })
-              const tableProof = new Exonum.MapProof(data.wallet_proof.to_table, Exonum.Hash, Exonum.Hash)
-              if (tableProof.merkleRoot !== data.block_proof.block.state_hash) {
-                throw new Error('Wallets table proof is corrupted')
-              }
-              const walletsHash = tableProof.entries.get(tableKey)
-              if (typeof walletsHash === 'undefined') {
-                throw new Error('Wallets table not found')
-              }
+              // verify table timestamps in the root tree
+              const tableRootHash = Exonum.verifyTable(data.wallet_proof.to_table, data.block_proof.block.state_hash, SERVICE_ID, TABLE_INDEX)
 
               // find wallet in the tree of all wallets
               const walletProof = new Exonum.MapProof(data.wallet_proof.to_wallet, Exonum.PublicKey, Wallet)
-              if (walletProof.merkleRoot !== walletsHash) {
+              if (walletProof.merkleRoot !== tableRootHash) {
                 throw new Error('Wallet proof is corrupted')
               }
               const wallet = walletProof.entries.get(publicKey)
