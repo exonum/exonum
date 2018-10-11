@@ -1051,11 +1051,14 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, Schema, Transaction, TransactionContext};
+    use blockchain::{
+        ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+    };
     use crypto::gen_keypair;
+    use encoding::Error as MessageError;
     use events::EventHandler;
     use helpers;
-    use storage::{Database, MemoryDB};
+    use storage::{Database, MemoryDB, Snapshot};
     const SERVICE_ID: u16 = 0;
     transactions! {
         SimpleTransactions {
@@ -1072,12 +1075,32 @@ mod tests {
         }
     }
 
+    struct TestService;
+
+    impl Service for TestService {
+        fn service_id(&self) -> u16 {
+            SERVICE_ID
+        }
+
+        fn service_name(&self) -> &'static str {
+            "test service"
+        }
+
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
+            vec![]
+        }
+
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+            Ok(SimpleTransactions::tx_from_raw(raw)?.into())
+        }
+    }
+
     #[test]
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
         let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![];
+        let services = vec![Box::new(TestService) as Box<dyn Service>];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
         let mut node = Node::new(db, services, node_cfg, None);
@@ -1108,5 +1131,32 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 1);
+    }
+
+    #[test]
+    fn test_transaction_without_service() {
+        let (p_key, s_key) = gen_keypair();
+
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+
+        let mut node = Node::new(db, services, node_cfg, None);
+
+        let tx = Message::sign_transaction(
+            TxSimple::new(&p_key, "Hello, World!"),
+            SERVICE_ID,
+            p_key,
+            &s_key,
+        );
+
+        // Send transaction to node.
+        let event = ExternalMessage::Transaction(tx);
+        node.handler.handle_event(event.into());
+
+        // Service not found for transaction.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 0);
     }
 }
