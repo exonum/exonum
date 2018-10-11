@@ -7,17 +7,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking Changes
 
-- Message format was changed, that modify byte representation of 
-   transaction and precommit . (#916)
+- Message format was changed, that modify byte representation of
+   transaction and precommit. (#916)
 
 - `Transaction::execute` now accept as second parameter `TransactionContext`
    which provide public key of transaction author, id of current service,
    and transaction hash. (#943)
-   
-- Every transaction that contain public key of author was refactored to 
+
+- Every transaction that contain public key of author was refactored to
    author from `TransactionContext`. (#984 #980 #979 #975 #971)
 
-- `/transactions/` endpoint now can handle transaction message in hex format. 
+- `/transactions/` endpoint now can handle transaction message in hex format.
    Services that used custom endpoint was refactored to
    use `explorer/v1/transactions` (#943 #984 #980 #979 #975 #971)
 
@@ -27,7 +27,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
 
 #### exonum
-- Trait `TransactionSend` was removed. 
+
+- Trait `TransactionSend` was removed.
   `ApiSender` now contain `broadcast_transaction` method. (#943)
 
 - `api::Error::InternalError` now contains `failure::Error` instead of
@@ -65,8 +66,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
   of single IP-addresses. (#959)
 
-#### exonum-confiugration
-- The `Vote` and `VoteAgainst` now save transaction hash instead of full transaction message. (#984)
+#### exonum-configuration
+
+- The `Vote` and `VoteAgainst` now save transaction hash instead of
+  full transaction message. (#984)
 
 ### New Features
 
