@@ -650,24 +650,17 @@ fn test_correct_encoding_struct() {
 fn test_option_serialization_roundtrip() {
     use encoding::serialize::json::ExonumJson;
 
-    encoding_struct!(
-            struct Foo {
-                opt1: Option<u32>,
-                opt2: Option<Bar>,
-            }
-        );
+    encoding_struct!(struct Foo {
+        opt1: Option<u32>,
+        opt2: Option<Bar>,
+    });
 
-    encoding_struct!(
-            struct Bar {
-                name: &str,
-            }
-        );
+    encoding_struct!(struct Bar {
+        name: &str,
+    });
 
     let opts = vec![
-        (
-            Foo::new(None, None),
-            json!({"opt1": null, "opt2": null}),
-        ),
+        (Foo::new(None, None), json!({"opt1": null, "opt2": null})),
         (
             Foo::new(Some(0xFFFFFFFF), None),
             json!({"opt1": 4294967295_u32, "opt2": null}),
