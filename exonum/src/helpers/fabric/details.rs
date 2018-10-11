@@ -21,12 +21,17 @@ use crypto;
 use toml;
 
 use std::{
-    collections::{BTreeMap, HashMap}, fs, net::{IpAddr, SocketAddr}, path::{Path, PathBuf},
-    fs::File, io::BufReader,
+    collections::{BTreeMap, HashMap},
+    fs,
+    fs::File,
+    io::BufReader,
+    net::{IpAddr, SocketAddr},
+    path::{Path, PathBuf},
 };
 
 use super::{
-    internal::{CollectedCommand, Command, Feedback}, keys,
+    internal::{CollectedCommand, Command, Feedback},
+    keys,
     shared::{
         AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
     },
@@ -37,7 +42,7 @@ use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
-use storage::{Database, DbOptions, RocksDB, image::helpers};
+use storage::{image::helpers, Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const DATABASE_IMAGE_PATH: &str = "DATABASE_IMAGE_PATH";
@@ -56,18 +61,17 @@ pub struct Run;
 impl Run {
     /// Returns created database instance.
     pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
-        let path = ctx.arg::<String>(DATABASE_PATH)
+        let path = ctx
+            .arg::<String>(DATABASE_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
 
         // Destroy database before applying the image (if any)
         let has_db_image = ctx.arg::<String>(DATABASE_IMAGE_PATH).is_ok();
         if has_db_image {
-            RocksDB::destroy(Path::new(&path), options)
-                .expect("Can't destroy existing database!");
+            RocksDB::destroy(Path::new(&path), options).expect("Can't destroy existing database!");
         }
 
-        let db = RocksDB::open(Path::new(&path), options)
-            .expect("Can't load database file");
+        let db = RocksDB::open(Path::new(&path), options).expect("Can't load database file");
 
         // Load DB image from the given file (if any)
         if let Ok(image_path) = ctx.arg::<String>(DATABASE_IMAGE_PATH) {
@@ -196,7 +200,8 @@ pub struct RunDev;
 
 impl RunDev {
     fn artifacts_directory(ctx: &Context) -> PathBuf {
-        let directory = ctx.arg::<String>("ARTIFACTS_DIR")
+        let directory = ctx
+            .arg::<String>("ARTIFACTS_DIR")
             .unwrap_or_else(|_| ".exonum".into());
         PathBuf::from(&directory)
     }
@@ -256,7 +261,8 @@ impl RunDev {
     }
 
     fn cleanup(ctx: &Context) {
-        let database_dir_path = ctx.arg::<String>(DATABASE_PATH)
+        let database_dir_path = ctx
+            .arg::<String>(DATABASE_PATH)
             .expect("Expected DATABASE_PATH being set.");
         let database_dir = Path::new(&database_dir_path);
         if database_dir.exists() {
@@ -560,7 +566,8 @@ impl Finalize {
             if common != config.common {
                 panic!("Found config with different common part.");
             };
-            if map.insert(config.node.validator_keys.consensus_key, config.node)
+            if map
+                .insert(config.node.validator_keys.consensus_key, config.node)
                 .is_some()
             {
                 panic!("Found duplicate consensus keys in PUBLIC_CONFIGS");

@@ -82,7 +82,10 @@ impl RocksDB {
             }
         };
 
-        Ok(Self { db: Arc::new(db), path: path_str })
+        Ok(Self {
+            db: Arc::new(db),
+            path: path_str,
+        })
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
@@ -90,7 +93,8 @@ impl RocksDB {
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
-                None => self.db
+                None => self
+                    .db
                     .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
                     .unwrap(),
             };
@@ -163,7 +167,8 @@ impl Snapshot for RocksDBSnapshot {
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
         let iter = match self.db.cf_handle(name) {
-            Some(cf) => self.snapshot
+            Some(cf) => self
+                .snapshot
                 .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
                 .unwrap(),
             None => self.snapshot.iterator(IteratorMode::Start),
@@ -179,7 +184,8 @@ impl Snapshot for RocksDBSnapshot {
         let naive_tables = {
             use rocksdb::IteratorMode;
 
-            self.snapshot.iterator(IteratorMode::Start)
+            self.snapshot
+                .iterator(IteratorMode::Start)
                 .map(|(k, _)| String::from_utf8(k.into_vec()).unwrap())
                 .collect::<Vec<_>>()
         };

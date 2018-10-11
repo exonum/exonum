@@ -115,10 +115,20 @@ pub use self::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
         Snapshot,
     },
-    entry::Entry, error::Error, hash::UniqueHash, key_set_index::KeySetIndex, keys::StorageKey,
-    list_index::ListIndex, map_index::MapIndex, memorydb::MemoryDB, options::DbOptions,
-    proof_list_index::{ListProof, ProofListIndex}, rocksdb::RocksDB,
-    sparse_list_index::SparseListIndex, value_set_index::ValueSetIndex, values::StorageValue,
+    entry::Entry,
+    error::Error,
+    hash::UniqueHash,
+    key_set_index::KeySetIndex,
+    keys::StorageKey,
+    list_index::ListIndex,
+    map_index::MapIndex,
+    memorydb::MemoryDB,
+    options::DbOptions,
+    proof_list_index::{ListProof, ProofListIndex},
+    rocksdb::RocksDB,
+    sparse_list_index::SparseListIndex,
+    value_set_index::ValueSetIndex,
+    values::StorageValue,
 };
 
 /// A specialized `Result` type for I/O operations with storage.
@@ -136,6 +146,7 @@ mod options;
 mod rocksdb;
 mod values;
 
+pub mod image;
 pub mod key_set_index;
 pub mod list_index;
 pub mod map_index;
@@ -143,7 +154,6 @@ pub mod proof_list_index;
 pub mod proof_map_index;
 pub mod sparse_list_index;
 pub mod value_set_index;
-pub mod image;
 
 #[cfg(test)]
 mod tests;

@@ -25,10 +25,10 @@ pub struct DbImageRecord {
 
 /// Helper routines to import and export of a DB image.
 pub mod helpers {
-    use storage::{Database, Result};
-    use flate2::{Compression, write::GzEncoder, read::GzDecoder};
     use csv;
+    use flate2::{read::GzDecoder, write::GzEncoder, Compression};
     use std::{self, sync::Arc};
+    use storage::{Database, Result};
 
     /// Determines number of records to be inserted in patch during image export.
     /// This affects RAM usage during image import and may be tuned.
@@ -36,8 +36,10 @@ pub mod helpers {
 
     /// Reads records from the image and puts them into Database.
     pub fn import_db_from_image<R, D>(data: R, db: &D) -> Result<()>
-        where R: std::io::Read, D: Database + 'static {
-
+    where
+        R: std::io::Read,
+        D: Database + 'static,
+    {
         // Construct records iterator from compressed CSV
         let decoder = GzDecoder::new(data);
 
@@ -81,12 +83,15 @@ pub mod helpers {
     }
 
     /// Reads records from the DB and puts them into compressed image.
-    pub fn export_db_to_image<W: std::io::Write>(data: &mut W, db: Arc<dyn Database>) -> Result<()> {
+    pub fn export_db_to_image<W: std::io::Write>(
+        data: &mut W,
+        db: Arc<dyn Database>,
+    ) -> Result<()> {
         let snapshot = db.snapshot();
         let tables = snapshot.tables();
 
         let encoder = GzEncoder::new(data, Compression::best());
-        let mut writer  = csv::WriterBuilder::new()
+        let mut writer = csv::WriterBuilder::new()
             .has_headers(false)
             .from_writer(encoder);
 
@@ -104,7 +109,7 @@ pub mod helpers {
 
                     writer.write_byte_record(&record).unwrap();
                 } else {
-                    break
+                    break;
                 }
 
                 iter.next();
@@ -120,9 +125,9 @@ pub mod helpers {
 
 #[cfg(test)]
 mod tests {
-    use storage::Database;
     use super::helpers;
     use std::sync::Arc;
+    use storage::Database;
 
     mod memorydb_tests {
         use super::super::super::MemoryDB;
@@ -190,8 +195,13 @@ mod tests {
         let record_size = 2 + 3 + 3 + 4; // 2 for table name, 3 for key, 3 for value, 4 for delimiters
         let raw_bytes_size = num_records * record_size;
         let saving = 100.0f32 - (image_bytes.len() as f32 / raw_bytes_size as f32 * 100.0f32);
-        println!("Image size: {} bytes vs {} bytes uncompressed ({:.*}% compression)",
-                 image_bytes.len(), raw_bytes_size, 1, saving);
+        println!(
+            "Image size: {} bytes vs {} bytes uncompressed ({:.*}% compression)",
+            image_bytes.len(),
+            raw_bytes_size,
+            1,
+            saving
+        );
 
         db.clear().unwrap();
 

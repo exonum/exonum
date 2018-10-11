@@ -16,7 +16,12 @@
 //!
 //! For more information see the project readme.
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 #![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
 #![cfg_attr(
@@ -65,6 +70,8 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate csv;
+extern crate flate2;
 extern crate snow;
 extern crate tokio;
 extern crate tokio_codec;
@@ -77,8 +84,6 @@ extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;
-extern crate flate2;
-extern crate csv;
 
 // Test dependencies.
 #[cfg(test)]
