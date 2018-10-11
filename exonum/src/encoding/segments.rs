@@ -219,8 +219,8 @@ where
 
     fn extend_buffer(&self, mut buffer: &mut Vec<u8>) {
         let start = buffer.len() as Offset;
-        buffer.resize((start + self.count() * Self::item_size()) as usize, 0);
         if let Some(ref v) = self {
+            buffer.resize((start + Self::item_size()) as usize, 0);
             v.write(&mut buffer, start, start + Self::item_size());
         }
     }
@@ -231,7 +231,7 @@ where
         count: CheckedOffset,
         latest_segment: CheckedOffset,
     ) -> Result {
-        if count.unchecked_offset() > 0 {
+        if count.unchecked_offset() == 1 {
             T::check(buffer, from, (from + Self::item_size())?, latest_segment)
         } else {
             Ok(latest_segment)
