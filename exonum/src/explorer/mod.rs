@@ -636,7 +636,6 @@ impl TransactionInfo {
             _ => None,
         }
     }
-
 }
 
 /// Blockchain explorer.
