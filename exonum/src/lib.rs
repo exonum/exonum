@@ -41,6 +41,7 @@
 #[macro_use]
 extern crate pretty_assertions;
 extern crate actix;
+extern crate actix_net;
 extern crate actix_web;
 extern crate atty;
 extern crate bit_vec;
