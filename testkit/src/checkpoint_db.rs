@@ -61,6 +61,10 @@ impl<T: Database> Database for CheckpointDb<T> {
     fn merge_sync(&self, patch: Patch) -> StorageResult<()> {
         self.merge(patch)
     }
+
+    fn clear(&self) -> StorageResult<()> {
+        unimplemented!()
+    }
 }
 
 impl<T: Database> From<CheckpointDb<T>> for Arc<dyn Database> {

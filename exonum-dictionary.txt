@@ -156,3 +156,4 @@ validators
 websockets
 whitelisted
 writeln
+flate

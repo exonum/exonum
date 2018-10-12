@@ -136,6 +136,7 @@ mod options;
 mod rocksdb;
 mod values;
 
+pub mod image;
 pub mod key_set_index;
 pub mod list_index;
 pub mod map_index;

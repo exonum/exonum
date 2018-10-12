@@ -38,6 +38,7 @@ impl From<rocksdb::Error> for storage::Error {
 /// use different databases.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
+    path: String,
 }
 
 impl DbOptions {
@@ -53,6 +54,7 @@ impl DbOptions {
 pub struct RocksDBSnapshot {
     snapshot: rocksdb::Snapshot<'static>,
     db: Arc<rocksdb::DB>,
+    path: String,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -69,6 +71,8 @@ impl RocksDB {
     /// `create_if_missing` is switched on in `DbOptions`, a new database will
     /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<Self> {
+        let path_str = path.as_ref().to_string_lossy().to_string();
+
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
@@ -77,7 +81,11 @@ impl RocksDB {
                 rocksdb::DB::open(&options.to_rocksdb(), path)?
             }
         };
-        Ok(Self { db: Arc::new(db) })
+
+        Ok(Self {
+            db: Arc::new(db),
+            path: path_str,
+        })
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
@@ -98,6 +106,23 @@ impl RocksDB {
         }
         self.db.write_opt(batch, w_opts).map_err(Into::into)
     }
+
+    /// Drops specified column families.
+    #[allow(unused_must_use)] // ignore Result<> of drop_cf
+    fn drop_cfs(&self, cfs: Vec<String>) -> storage::Result<()> {
+        for cf in cfs {
+            self.db.drop_cf(&cf);
+        }
+
+        Ok(())
+    }
+
+    /// Destroys DB with given path and options.
+    pub fn destroy<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<()> {
+        rocksdb::DB::destroy(&options.to_rocksdb(), path)?;
+
+        Ok(())
+    }
 }
 
 impl Database for RocksDB {
@@ -105,6 +130,7 @@ impl Database for RocksDB {
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             db: Arc::clone(&self.db),
+            path: self.path.clone(),
         })
     }
 
@@ -117,6 +143,11 @@ impl Database for RocksDB {
         let mut w_opts = RocksDBWriteOptions::default();
         w_opts.set_sync(true);
         self.do_merge(patch, &w_opts)
+    }
+
+    fn clear(&self) -> storage::Result<()> {
+        let cfs = self.snapshot().tables();
+        self.drop_cfs(cfs)
     }
 }
 
@@ -145,6 +176,29 @@ impl Snapshot for RocksDBSnapshot {
             key: None,
             value: None,
         })
+    }
+
+    fn tables(&self) -> Vec<String> {
+        let naive_tables = {
+            use rocksdb::IteratorMode;
+
+            self.snapshot
+                .iterator(IteratorMode::Start)
+                .map(|(k, _)| String::from_utf8(k.into_vec()).unwrap())
+                .collect::<Vec<_>>()
+        };
+
+        if naive_tables.is_empty() {
+            let path = &self.path;
+
+            if let Ok(names) = get_cf_names(&path) {
+                names.iter().map(|name| name.clone()).collect::<Vec<_>>()
+            } else {
+                vec![]
+            }
+        } else {
+            naive_tables
+        }
     }
 }
 
