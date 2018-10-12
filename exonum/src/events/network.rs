@@ -34,7 +34,7 @@ use events::{
     codec::MessagesCodec, error::into_failure, noise::{Handshake, HandshakeParams, NoiseHandshake},
 };
 use helpers::Milliseconds;
-use messages::{Any, Connect, Message, RawMessage};
+use messages::{Connect, Message, Service, Signed, SignedMessage};
 use node::state::SharedConnectList;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
@@ -56,15 +56,15 @@ impl ConnectedPeerAddr {
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    MessageReceived(RawMessage),
-    PeerConnected(ConnectedPeerAddr, Connect),
+    MessageReceived(Vec<u8>),
+    PeerConnected(ConnectedPeerAddr, Signed<Connect>),
     PeerDisconnected(PublicKey),
     UnableConnectToPeer(PublicKey),
 }
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    SendMessage(PublicKey, RawMessage),
+    SendMessage(PublicKey, SignedMessage),
     DisconnectWithPeer(PublicKey),
     Shutdown,
 }
@@ -95,7 +95,7 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
-    pub our_connect_message: Connect,
+    pub our_connect_message: Signed<Connect>,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
@@ -106,7 +106,7 @@ pub struct NetworkPart {
 
 #[derive(Clone, Debug)]
 struct ConnectionPoolEntry {
-    sender: mpsc::Sender<RawMessage>,
+    sender: mpsc::Sender<SignedMessage>,
     address: ConnectedPeerAddr,
 }
 
@@ -130,7 +130,12 @@ impl ConnectionPool {
             .count()
     }
 
-    fn add(&self, key: &PublicKey, address: ConnectedPeerAddr, sender: mpsc::Sender<RawMessage>) {
+    fn add(
+        &self,
+        key: &PublicKey,
+        address: ConnectedPeerAddr,
+        sender: mpsc::Sender<SignedMessage>,
+    ) {
         let mut peers = self.peers.borrow_mut();
         peers.insert(*key, ConnectionPoolEntry { sender, address });
     }
@@ -149,8 +154,8 @@ impl ConnectionPool {
         &self,
         key: &PublicKey,
         address: &ConnectedPeerAddr,
-    ) -> mpsc::Receiver<RawMessage> {
-        let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
+    ) -> mpsc::Receiver<SignedMessage> {
+        let (sender_tx, receiver_rx) = mpsc::channel::<SignedMessage>(OUTGOING_CHANNEL_SIZE);
         self.add(key, address.clone(), sender_tx);
         receiver_rx
     }
@@ -158,7 +163,7 @@ impl ConnectionPool {
     fn send_message(
         &self,
         address: &PublicKey,
-        message: &RawMessage,
+        message: SignedMessage,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let address = *address;
         let sender_tx = self.peers.borrow();
@@ -169,7 +174,7 @@ impl ConnectionPool {
             Either::A(
                 sender
                     .clone()
-                    .send(message.clone())
+                    .send(message)
                     .map(drop)
                     .or_else(move |e| {
                         log_error(e);
@@ -204,7 +209,7 @@ impl ConnectionPool {
 struct Connection {
     handle: Handle,
     socket: Framed<TcpStream, MessagesCodec>,
-    receiver_rx: mpsc::Receiver<RawMessage>,
+    receiver_rx: mpsc::Receiver<SignedMessage>,
     address: ConnectedPeerAddr,
     key: PublicKey,
 }
@@ -213,7 +218,7 @@ impl Connection {
     fn new(
         handle: Handle,
         socket: Framed<TcpStream, MessagesCodec>,
-        receiver_rx: mpsc::Receiver<RawMessage>,
+        receiver_rx: mpsc::Receiver<SignedMessage>,
         address: ConnectedPeerAddr,
         key: PublicKey,
     ) -> Self {
@@ -302,17 +307,17 @@ impl NetworkHandler {
                     .listen(incoming_connection)
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
-                        if pool.contains(message.pub_key()) {
+                        if pool.contains(&message.author()) {
                             Box::new(future::ok(()))
-                        } else if connect_list.is_peer_allowed(message.pub_key()) {
+                        } else if connect_list.is_peer_allowed(&message.author()) {
                             let receiver_rx =
-                                pool.add_incoming_address(&message.pub_key(), &conn_addr);
+                                pool.add_incoming_address(&message.author(), &conn_addr);
                             let connection = Connection::new(
                                 handle.clone(),
                                 socket,
                                 receiver_rx,
                                 conn_addr,
-                                *message.pub_key(),
+                                message.author(),
                             );
                             to_box(Self::handle_connection(
                                 connection,
@@ -322,7 +327,7 @@ impl NetworkHandler {
                             ))
                         } else {
                             warn!( "Rejecting incoming connection with peer={} public_key={}, peer is not in the ConnectList",
-                                   address,message.pub_key()
+                                   address, message.author()
                             );
                             Box::new(future::ok(()))
                         }
@@ -363,7 +368,7 @@ impl NetworkHandler {
                 move || tokio_dns::TcpStream::connect(unresolved_address.as_str())
             };
 
-            let (sender_tx, receiver_rx) = mpsc::channel::<RawMessage>(OUTGOING_CHANNEL_SIZE);
+            let (sender_tx, receiver_rx) = mpsc::channel::<SignedMessage>(OUTGOING_CHANNEL_SIZE);
             let pool = self.pool.clone();
             Either::A(
                 Retry::spawn(strategy, action)
@@ -375,7 +380,7 @@ impl NetworkHandler {
                     .and_then(move |(socket, raw)| (Ok(socket), Self::parse_connect_msg(Some(raw))))
                     .and_then(move |(socket, message)| {
                         let connection_limit_reached = pool.count_outgoing() >= max_connections;
-                        if pool.contains(message.pub_key()) || connection_limit_reached {
+                        if pool.contains(&message.author()) || connection_limit_reached {
                             Box::new(future::ok(()))
                         } else {
                             let conn_addr = ConnectedPeerAddr::Out(
@@ -388,7 +393,7 @@ impl NetworkHandler {
                                 socket,
                                 receiver_rx,
                                 conn_addr,
-                                *message.pub_key(),
+                                message.author(),
                             );
                             to_box(Self::handle_connection(
                                 connection,
@@ -432,10 +437,10 @@ impl NetworkHandler {
 
     fn process_outgoing_messages<S>(
         sink: SplitSink<S>,
-        receiver_rx: mpsc::Receiver<RawMessage>,
+        receiver_rx: mpsc::Receiver<SignedMessage>,
     ) -> impl Future<Item = (), Error = ()>
     where
-        S: Sink<SinkItem = RawMessage, SinkError = failure::Error>,
+        S: Sink<SinkItem = SignedMessage, SinkError = failure::Error>,
     {
         receiver_rx
             .map_err(|_| format_err!("Receiver is gone."))
@@ -453,7 +458,7 @@ impl NetworkHandler {
         network_tx: mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = ()>
     where
-        S: Stream<Item = RawMessage, Error = failure::Error>,
+        S: Stream<Item = Vec<u8>, Error = failure::Error>,
     {
         let key = *key;
         network_tx
@@ -478,7 +483,7 @@ impl NetworkHandler {
 
     fn handle_connection(
         connection: Connection,
-        message: Connect,
+        message: Signed<Connect>,
         pool: ConnectionPool,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = failure::Error> {
@@ -489,11 +494,11 @@ impl NetworkHandler {
         )
     }
 
-    fn parse_connect_msg(raw: Option<RawMessage>) -> Result<Connect, failure::Error> {
+    fn parse_connect_msg(raw: Option<Vec<u8>>) -> Result<Signed<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
-        let message = Any::from_raw(raw).map_err(into_failure)?;
+        let message = Message::from_raw_buffer(raw)?;
         match message {
-            Any::Connect(connect) => Ok(connect),
+            Message::Service(Service::Connect(connect)) => Ok(connect),
             other => bail!(
                 "First message from a remote peer is not Connect, got={:?}",
                 other
@@ -535,12 +540,12 @@ impl NetworkHandler {
     fn handle_send_message(
         &self,
         address: &PublicKey,
-        message: RawMessage,
+        message: SignedMessage,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let pool = self.pool.clone();
 
         if pool.contains(address) {
-            to_box(pool.send_message(address, &message))
+            to_box(pool.send_message(address, message))
         } else if self.can_create_connections() {
             to_box(self.create_new_connection(*address, message))
         } else {
@@ -551,23 +556,23 @@ impl NetworkHandler {
     fn create_new_connection(
         &self,
         key: PublicKey,
-        message: RawMessage,
+        message: SignedMessage,
     ) -> impl Future<Item = (), Error = failure::Error> {
         let pool = self.pool.clone();
         let connect = self.handshake_params.connect.clone();
         self.connect(key, &self.handshake_params)
             .and_then(move |_| {
-                if &message == connect.raw() {
+                if &message == connect.signed_message() {
                     Either::A(future::ok(()))
                 } else {
-                    Either::B(pool.send_message(&key, &message))
+                    Either::B(pool.send_message(&key, message))
                 }
             })
     }
 
     fn send_peer_connected_event(
         address: &ConnectedPeerAddr,
-        message: Connect,
+        message: Signed<Connect>,
         network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> {
         let peer_connected = NetworkEvent::PeerConnected(address.clone(), message);
@@ -597,7 +602,7 @@ impl NetworkHandler {
         stream: TcpStream,
         key: PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, RawMessage), Error = failure::Error>
+    ) -> impl Future<Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>), Error = failure::Error>
     {
         let mut handshake_params = handshake_params.clone();
         handshake_params.set_remote_key(key);

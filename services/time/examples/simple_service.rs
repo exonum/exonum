@@ -22,12 +22,14 @@ extern crate exonum_testkit;
 extern crate exonum_time;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{ExecutionResult, Service, Transaction, TransactionSet},
-    crypto::{gen_keypair, Hash, PublicKey}, encoding, helpers::Height,
-    messages::{Message, RawTransaction}, storage::{Fork, ProofMapIndex, Snapshot},
+    blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding, helpers::Height,
+    messages::{Message, RawTransaction, Signed}, storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
@@ -71,28 +73,40 @@ impl<'a> MarkerSchema<&'a mut Fork> {
 
 transactions! {
     MarkerTransactions {
-        const SERVICE_ID = SERVICE_ID;
 
         /// Transaction, which must be executed no later than the specified time (field `time`).
         struct TxMarker {
-            from: &PublicKey,
             mark: i32,
             time: DateTime<Utc>,
         }
     }
 }
 
-impl Transaction for TxMarker {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
+impl TxMarker {
+    fn sign(
+        mark: i32,
+        time: DateTime<Utc>,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(
+            TxMarker::new(mark, time),
+            SERVICE_ID,
+            *public_key,
+            secret_key,
+        )
     }
+}
 
-    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+impl Transaction for TxMarker {
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let author = context.author();
+        let view = context.fork();
         let time = TimeSchema::new(&view).time().get();
         match time {
             Some(current_time) if current_time <= self.time() => {
                 let mut schema = MarkerSchema::new(view);
-                schema.marks_mut().put(self.from(), self.mark());
+                schema.marks_mut().put(&author, self.mark());
             }
             _ => {}
         }
@@ -143,17 +157,17 @@ fn main() {
     let keypair1 = gen_keypair();
     let keypair2 = gen_keypair();
     let keypair3 = gen_keypair();
-    let tx1 = TxMarker::new(&keypair1.0, 1, mock_provider.time(), &keypair1.1);
-    let tx2 = TxMarker::new(
-        &keypair2.0,
+    let tx1 = TxMarker::sign(1, mock_provider.time(), &keypair1.0, &keypair1.1);
+    let tx2 = TxMarker::sign(
         2,
         mock_provider.time() + Duration::seconds(10),
+        &keypair2.0,
         &keypair2.1,
     );
-    let tx3 = TxMarker::new(
-        &keypair3.0,
+    let tx3 = TxMarker::sign(
         3,
         mock_provider.time() - Duration::seconds(5),
+        &keypair3.0,
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
@@ -164,7 +178,7 @@ fn main() {
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
 
-    let tx4 = TxMarker::new(&keypair3.0, 4, Utc.timestamp(15, 0), &keypair3.1);
+    let tx4 = TxMarker::sign(4, Utc.timestamp(15, 0), &keypair3.0, &keypair3.1);
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();

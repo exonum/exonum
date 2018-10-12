@@ -26,47 +26,33 @@
 //!     * processing - how message is processed and result of the processing
 //!     * generation - in which cases message is generated
 
+use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
+use failure;
 
-use super::{BitVec, RawMessage, ServiceMessage};
+use std::{borrow::Cow, fmt::Debug, mem};
+
+use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
-use crypto::{Hash, PublicKey};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use helpers::{Height, Round, ValidatorId};
-use storage::proof_list_index::root_hash;
+use storage::proof_list_index as merkle;
+use storage::StorageValue;
 
-/// Consensus message type.
-pub const CONSENSUS: u16 = 0;
+/// `SignedMessage` size with zero bytes payload.
+#[doc(hidden)]
+pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
+    PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>() * 2;
 
-/// `Connect` message id.
-pub const CONNECT_MESSAGE_ID: u16 = Connect::MESSAGE_ID;
-/// `Status` message id.
-pub const STATUS_MESSAGE_ID: u16 = Status::MESSAGE_ID;
+/// `Signed<TransactionsResponse>` size without transactions inside.
+#[doc(hidden)]
+pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
+    EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u32>() * 2;
 
-/// `Propose` message id.
-pub const PROPOSE_MESSAGE_ID: u16 = Propose::MESSAGE_ID;
-/// `Prevote` message id.
-pub const PREVOTE_MESSAGE_ID: u16 = Prevote::MESSAGE_ID;
-/// `Precommit` message id.
-pub const PRECOMMIT_MESSAGE_ID: u16 = Precommit::MESSAGE_ID;
-/// `BlockResponse` message id.
-pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = BlockResponse::MESSAGE_ID;
-/// `TransactionsResponse` message id.
-pub const TRANSACTIONS_RESPONSE_MESSAGE_ID: u16 = TransactionsResponse::MESSAGE_ID;
+/// `Signed<RawTransaction>` size with empty transaction inside.
+pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::size_of::<u16>() * 2;
 
-/// `ProposeRequest` message id.
-pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = ProposeRequest::MESSAGE_ID;
-/// `TransactionsRequest` message id.
-pub const TRANSACTIONS_REQUEST_MESSAGE_ID: u16 = TransactionsRequest::MESSAGE_ID;
-/// `PrevotesRequest` message id.
-pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
-/// `PeersRequest` message id.
-pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
-/// `BlockRequest` message id.
-pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
-
-messages! {
-    const SERVICE_ID = CONSENSUS;
-
+encoding_struct! {
     /// Connect to a node.
     ///
     /// ### Validation
@@ -81,9 +67,7 @@ messages! {
     /// initialization. Additionally, the node responds by its own `Connect`
     /// message after receiving `node::Event::Connected`.
     struct Connect {
-        /// The sender's public key.
-        pub_key: &PublicKey,
-        /// The node's external address.
+        /// The node's address.
         pub_addr: &str,
         /// Time when the message was created.
         time: DateTime<Utc>,
@@ -91,7 +75,8 @@ messages! {
         user_agent: &str,
     }
 
-
+}
+encoding_struct! {
     /// Current node status.
     ///
     /// ### Validation
@@ -107,14 +92,13 @@ messages! {
     /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
     /// after accepting a new block.
     struct Status {
-        /// The sender's public key.
-        from: &PublicKey,
         /// The height to which the message is related.
         height: Height,
         /// Hash of the last committed block.
         last_hash: &Hash,
     }
-
+}
+encoding_struct! {
     /// Proposal for a new block.
     ///
     /// ### Validation
@@ -144,7 +128,8 @@ messages! {
         /// The list of transactions to include in the next block.
         transactions: &[Hash],
     }
-
+}
+encoding_struct! {
     /// Pre-vote for a new block.
     ///
     /// ### Validation
@@ -175,7 +160,8 @@ messages! {
         /// Locked round.
         locked_round: Round,
     }
-
+}
+encoding_struct! {
     /// Pre-commit for a proposal.
     ///
     /// ### Validation
@@ -208,7 +194,8 @@ messages! {
         /// Time of the `Precommit`.
         time: DateTime<Utc>,
     }
-
+}
+encoding_struct! {
     /// Information about a block.
     ///
     /// ### Validation
@@ -223,17 +210,17 @@ messages! {
     /// ### Generation
     /// The message is sent as response to `BlockRequest`.
     struct BlockResponse {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
         /// Block header.
         block: blockchain::Block,
         /// List of pre-commits.
-        precommits: Vec<Precommit>,
+        precommits: Vec<Vec<u8>>,
         /// List of the transaction hashes.
         transactions: &[Hash],
     }
+}
+encoding_struct! {
 
     /// Information about the transactions.
     ///
@@ -248,14 +235,14 @@ messages! {
     /// ### Generation
     /// The message is sent as response to `TransactionsRequest`.
     struct TransactionsResponse {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
         /// List of the transactions.
-        transactions: Vec<RawMessage>,
+        transactions: Vec<Vec<u8>>,
     }
 
+}
+encoding_struct! {
     /// Request for the `Propose`.
     ///
     /// ### Validation
@@ -269,8 +256,6 @@ messages! {
     /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
     /// handling.
     struct ProposeRequest {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
         /// The height to which the message is related.
@@ -278,7 +263,8 @@ messages! {
         /// Hash of the `Propose`.
         propose_hash: &Hash,
     }
-
+}
+encoding_struct! {
     /// Request for transactions by hash.
     ///
     /// ### Processing
@@ -288,14 +274,13 @@ messages! {
     /// This message can be sent during `Propose`, `Prevote` and `Precommit`
     /// handling.
     struct TransactionsRequest {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
         /// The list of the transaction hashes.
         txs: &[Hash],
     }
-
+}
+encoding_struct! {
     /// Request for pre-votes.
     ///
     /// ### Validation
@@ -308,8 +293,6 @@ messages! {
     /// ### Generation
     /// This message can be sent during `Prevote` and `Precommit` handling.
     struct PrevotesRequest {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
         /// The height to which the message is related.
@@ -321,7 +304,8 @@ messages! {
         /// The list of validators that send pre-votes.
         validators: BitVec,
     }
-
+}
+encoding_struct! {
     /// Request connected peers from a node.
     ///
     /// ### Validation
@@ -335,12 +319,11 @@ messages! {
     /// `PeersRequest` message is sent regularly with the timeout controlled by
     /// `blockchain::ConsensusConfig::peers_timeout`.
     struct PeersRequest {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
     }
-
+}
+encoding_struct! {
     /// Request for the block with the given `height`.
     ///
     /// ### Validation
@@ -351,11 +334,10 @@ messages! {
     ///
     /// ### Generation
     /// This message can be sent during `Status` processing.
+
     struct BlockRequest {
-        /// The sender's public key.
-        from: &PublicKey,
         /// Public key of the recipient.
-        to: &PublicKey,
+        to: & PublicKey,
         /// The height to which the message is related.
         height: Height,
     }
@@ -364,6 +346,342 @@ messages! {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
-        *self.block().tx_hash() == root_hash(self.transactions())
+        *self.block().tx_hash() == merkle::root_hash(self.transactions())
+    }
+}
+
+impl Precommit {
+    /// Verify precommits signature and return it's safer wrapper
+    pub(crate) fn verify_precommit(buffer: Vec<u8>) -> Result<Signed<Precommit>, ::failure::Error> {
+        let signed = SignedMessage::from_raw_buffer(buffer)?;
+        let protocol = Message::deserialize(signed)?;
+        ProtocolMessage::try_from(protocol)
+            .map_err(|_| format_err!("Couldn't verify precommit from message"))
+    }
+}
+
+/// Full message constraints list.
+#[doc(hidden)]
+pub trait ProtocolMessage: Debug + Clone + BinaryForm {
+    fn message_type() -> (u8, u8);
+    ///Trying to convert `Message` to concrete message,
+    ///if ok returns message `Signed<Self>` if fails, returns `Message` back.
+    fn try_from(p: Message) -> Result<Signed<Self>, Message>;
+
+    fn into_protocol(this: Signed<Self>) -> Message;
+
+    fn into_message_from_parts(self, sm: SignedMessage) -> Signed<Self>;
+}
+
+/// Implement Exonum message protocol.
+///
+/// Protocol should be described according to format:
+/// ```
+/// /// type of SignedMessage => new name of Message enum.
+/// SignedMessage => Message {
+///       // class ID => class name
+///       0 => Service {
+///            // message = message type ID
+///            RawTransaction = 0,
+///            Connect = 1,
+///            Status = 2,
+///            // ...
+///        },
+///        1 => Consensus {
+///            Precommit = 0,
+///            Propose = 1,
+///            Prevote = 2,
+///        },
+/// }
+/// ```
+///
+/// Each message should implement `Clone` and `Debug`.
+///
+macro_rules! impl_protocol {
+
+    (
+    $(#[$attr:meta])+
+    $signed_message:ident => $protocol_name:ident{
+        $($(#[$attr_class:meta])+
+        $class_num:expr => $class:ident{
+            $(
+                $(#[$attr_type:meta])+
+                $type:ident = $type_num:expr
+            ),+ $(,)*
+        } $(,)*)+
+    }
+    ) => {
+
+        $(
+            #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+            $(#[$attr_class])+
+            pub enum $class {
+            $(
+                $(#[$attr_type])+
+                $type(Signed<$type>)
+            ),+
+            }
+
+            $(
+
+            impl ProtocolMessage for $type {
+                fn message_type() -> (u8, u8) {
+                    ($class_num, $type_num)
+                }
+
+                fn try_from(p: $protocol_name) -> Result<Signed<Self>, $protocol_name> {
+                    match p {
+                        $protocol_name::$class($class::$type(s)) => Ok(s),
+                        p => Err(p)
+                    }
+                }
+
+                fn into_protocol(this: Signed<Self>) -> $protocol_name {
+                    $protocol_name::$class($class::$type(this))
+                }
+
+                fn into_message_from_parts(self, sm: SignedMessage) -> Signed<Self> {
+                    Signed::new(self, sm)
+                }
+            }
+            )+
+        )+
+
+        #[derive(PartialEq, Eq, Debug, Clone)]
+        $(#[$attr])+
+        pub enum $protocol_name {
+            $(
+             $(#[$attr_class])+
+                $class($class)
+            ),+
+        }
+
+        impl $protocol_name {
+            /// Converts raw `SignedMessage` into concrete `Message` message.
+            /// Returns error if fails.
+            pub fn deserialize(message: SignedMessage) -> Result<Self, failure::Error> {
+            use $crate::events::error::into_failure;
+                match message.message_class() {
+                    $($class_num =>
+                        match message.message_type() {
+                            $($type_num =>{
+                                let payload = $type::decode(message.payload())
+                                                .map_err(into_failure)?;
+                                let message = Signed::new(payload, message);
+                                Ok($protocol_name::$class($class::$type(message)))
+                            }),+
+                            _ => bail!("Not found message with this type {}", message.message_type())
+                        }
+                    ),+
+                    _ => bail!("Not found message with this class {}", message.message_class())
+                }
+            }
+
+            /// Returns reference to inner `SignedMessage`.
+            pub fn signed_message(&self) -> &SignedMessage {
+                match *self {
+                    $(
+                        $protocol_name::$class(ref c) => {
+                            match *c {
+                                $(
+                                    $class::$type(ref t) => {
+                                        t.signed_message()
+                                    }
+                                ),+
+                            }
+                        }
+                    ),+
+                }
+            }
+        }
+    };
+}
+
+impl_protocol! {
+    /// Composition of every exonum protocol messages.
+    /// This messages used in network p2p communications.
+    SignedMessage => Message {
+        /// Exonum basic node messages.
+        0 => Service {
+            /// `RawTransaction` representation.
+            RawTransaction = 0,
+            /// Handshake to other node.
+            Connect = 1,
+            /// `Status` information of other node.
+            Status = 2,
+        },
+        /// Exonum consensus specific node messages.
+        1 => Consensus {
+            /// Consensus `Precommit` message.
+            Precommit = 0,
+            /// Consensus `Propose` message.
+            Propose = 1,
+            /// Consensus `Prevote` message.
+            Prevote = 2,
+        },
+        /// Exonum node responses.
+        2 => Responses {
+            /// Information about transactions, that sent as response to `TransactionsRequest`.
+            TransactionsResponse = 0,
+            /// Information about block, that sent as response to `BlockRequest`.
+            BlockResponse = 1,
+        },
+        /// Exonum node requests.
+        3 => Requests {
+            /// Request of some propose which hash is known.
+            ProposeRequest = 0,
+            /// Request of unknown transactions.
+            TransactionsRequest = 1,
+            /// Request of prevotes for some propose.
+            PrevotesRequest = 2,
+            /// Request of peer exchange.
+            PeersRequest = 3,
+            /// Request of some future block.
+            BlockRequest = 4,
+        },
+
+    }
+}
+
+impl Message {
+    /// Creates new protocol message.
+    ///
+    /// # Panics
+    ///
+    /// This method can panic on serialization failure.
+    pub fn new<T: ProtocolMessage>(
+        message: T,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Message {
+        T::into_protocol(Message::concrete(message, author, secret_key))
+    }
+
+    /// Creates new protocol message.
+    /// Return concrete `Signed<T>`
+    ///
+    /// # Panics
+    ///
+    /// This method can panic on serialization failure.
+    pub fn concrete<T: ProtocolMessage>(
+        message: T,
+        author: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Signed<T> {
+        let value = message.encode().expect("Couldn't serialize data.");
+        let (cls, typ) = T::message_type();
+        let signed = SignedMessage::new(cls, typ, &value, author, secret_key);
+        T::into_message_from_parts(message, signed)
+    }
+
+    /// Checks buffer and return instance of `Message`.
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
+        let signed = SignedMessage::from_raw_buffer(buffer)?;
+        Self::deserialize(signed)
+    }
+
+    /// Creates a new raw transaction message.
+    ///
+    /// # Panics
+    ///
+    /// This method can panic on serialization failure.
+    pub fn sign_transaction<T>(
+        transaction: T,
+        service_id: u16,
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+    ) -> Signed<RawTransaction>
+    where
+        T: Into<ServiceTransaction>,
+    {
+        let set: ServiceTransaction = transaction.into();
+        let raw_tx = RawTransaction::new(service_id, set);
+        Self::concrete(raw_tx, public_key, secret_key)
+    }
+}
+
+impl Requests {
+    /// Returns public key of the message recipient.
+    pub fn to(&self) -> PublicKey {
+        *match *self {
+            Requests::ProposeRequest(ref msg) => msg.to(),
+            Requests::TransactionsRequest(ref msg) => msg.to(),
+            Requests::PrevotesRequest(ref msg) => msg.to(),
+            Requests::PeersRequest(ref msg) => msg.to(),
+            Requests::BlockRequest(ref msg) => msg.to(),
+        }
+    }
+
+    /// Returns author public key of the message sender.
+    pub fn author(&self) -> PublicKey {
+        match *self {
+            Requests::ProposeRequest(ref msg) => msg.author(),
+            Requests::TransactionsRequest(ref msg) => msg.author(),
+            Requests::PrevotesRequest(ref msg) => msg.author(),
+            Requests::PeersRequest(ref msg) => msg.author(),
+            Requests::BlockRequest(ref msg) => msg.author(),
+        }
+    }
+}
+
+impl Consensus {
+    /// Returns author public key of the message sender.
+    pub fn author(&self) -> PublicKey {
+        match *self {
+            Consensus::Propose(ref msg) => msg.author(),
+            Consensus::Prevote(ref msg) => msg.author(),
+            Consensus::Precommit(ref msg) => msg.author(),
+        }
+    }
+
+    /// Returns validator id of the message sender.
+    pub fn validator(&self) -> ValidatorId {
+        match *self {
+            Consensus::Propose(ref msg) => msg.validator(),
+            Consensus::Prevote(ref msg) => msg.validator(),
+            Consensus::Precommit(ref msg) => msg.validator(),
+        }
+    }
+
+    /// Returns height of the message.
+    pub fn height(&self) -> Height {
+        match *self {
+            Consensus::Propose(ref msg) => msg.height(),
+            Consensus::Prevote(ref msg) => msg.height(),
+            Consensus::Precommit(ref msg) => msg.height(),
+        }
+    }
+
+    /// Returns round of the message.
+    pub fn round(&self) -> Round {
+        match *self {
+            Consensus::Propose(ref msg) => msg.round(),
+            Consensus::Prevote(ref msg) => msg.round(),
+            Consensus::Precommit(ref msg) => msg.round(),
+        }
+    }
+}
+
+impl<T: ProtocolMessage> From<Signed<T>> for Message {
+    fn from(other: Signed<T>) -> Self {
+        ProtocolMessage::into_protocol(other)
+    }
+}
+
+impl StorageValue for Message {
+    fn into_bytes(self) -> Vec<u8> {
+        self.signed_message().raw().to_vec()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        let message = SignedMessage::from_vec_unchecked(value.into_owned());
+        // TODO: Remove additional deserialization. [ECR-2315]
+        Message::deserialize(message).unwrap()
+    }
+}
+
+impl CryptoHash for Message {
+    fn hash(&self) -> Hash {
+        self.signed_message().hash()
     }
 }

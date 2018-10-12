@@ -32,7 +32,7 @@ use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
 use explorer::{self, BlockchainExplorer, TransactionInfo};
 use helpers::Height;
-use messages::Precommit;
+use messages::{Message, Precommit, RawTransaction, Signed, SignedMessage};
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -55,7 +55,7 @@ pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
     pub block: Block,
     /// Precommits authorizing the block.
-    pub precommits: Vec<Precommit>,
+    pub precommits: Vec<Signed<Precommit>>,
     /// Hashes of transactions in the block.
     pub txs: Vec<Hash>,
     /// Median time from the block precommits.
@@ -92,6 +92,20 @@ impl BlockQuery {
     pub fn new(height: Height) -> Self {
         Self { height }
     }
+}
+
+/// Raw Transaction in hex representation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TransactionHex {
+    /// The hex value of the transaction to be broadcasted.
+    pub tx_body: String,
+}
+
+/// Transaction response.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct TransactionResponse {
+    /// The hex value of the transaction to be broadcasted.
+    pub tx_hash: Hash,
 }
 
 /// Transaction query parameters.
@@ -187,6 +201,25 @@ impl ExplorerApi {
                 ApiError::NotFound(description)
             })
     }
+    /// Adds transaction into unconfirmed tx pool, and broadcast transaction to other nodes.
+    pub fn add_transaction(
+        state: &ServiceApiState,
+        query: TransactionHex,
+    ) -> Result<TransactionResponse, ApiError> {
+        use events::error::into_failure;
+        use messages::ProtocolMessage;
+
+        let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
+        let signed = SignedMessage::from_raw_buffer(buf)?;
+        let tx_hash = signed.hash();
+        let signed = RawTransaction::try_from(Message::deserialize(signed)?)
+            .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
+        let _ = state
+            .sender()
+            .broadcast_transaction(signed)
+            .map_err(ApiError::from);
+        Ok(TransactionResponse { tx_hash })
+    }
 
     /// Subscribes to block commits events.
     pub fn handle_subscribe(
@@ -234,6 +267,7 @@ impl ExplorerApi {
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
             .endpoint("v1/transactions", Self::transaction_info)
+            .endpoint_mut("v1/transactions", Self::add_transaction)
     }
 }
 
@@ -248,7 +282,7 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
     }
 }
 
-fn median_precommits_time(precommits: &[Precommit]) -> DateTime<Utc> {
+fn median_precommits_time(precommits: &[Signed<Precommit>]) -> DateTime<Utc> {
     debug_assert!(!precommits.is_empty(), "Precommits cannot be empty");
     let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
     times.sort();

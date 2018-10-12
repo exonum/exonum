@@ -37,8 +37,8 @@ pub use self::{
     genesis::GenesisConfig, schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
-        ExecutionError, ExecutionResult, Transaction, TransactionError, TransactionErrorType,
-        TransactionResult, TransactionSet,
+        ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
+        TransactionErrorType, TransactionMessage, TransactionResult, TransactionSet,
     },
 };
 
@@ -55,7 +55,7 @@ use std::{
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
+use messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use node::ApiSender;
 use storage::{self, Database, Error, Fork, Patch, Snapshot};
 
@@ -68,6 +68,9 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+/// Id of core service table family.
+pub const CORE_SERVICE: u16 = 0;
+
 /// Exonum blockchain instance with a certain services set and data storage.
 ///
 /// Only nodes with an identical set of services and genesis block can be combined
@@ -75,7 +78,8 @@ mod tests;
 pub struct Blockchain {
     db: Arc<dyn Database>,
     service_map: Arc<VecMap<Box<dyn Service>>>,
-    pub(crate) service_keypair: (PublicKey, SecretKey),
+    #[doc(hidden)]
+    pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
 }
 
@@ -141,7 +145,7 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<dyn Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -381,10 +385,10 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let (tx, service_name) = {
+        let (tx, raw, service_name) = {
             let schema = Schema::new(&fork);
 
-            let tx = schema.transactions().get(&tx_hash).ok_or_else(|| {
+            let raw = schema.transactions().get(&tx_hash).ok_or_else(|| {
                 failure::err_msg(format!(
                     "BUG: Cannot find transaction in database. tx: {:?}",
                     tx_hash
@@ -392,16 +396,16 @@ impl Blockchain {
             })?;
 
             let service_name = self.service_map
-                .get(tx.service_id() as usize)
+                .get(raw.service_id() as usize)
                 .ok_or_else(|| {
                     failure::err_msg(format!(
                         "Service not found. Service id: {}",
-                        tx.service_id()
+                        raw.service_id()
                     ))
                 })?
                 .service_name();
 
-            let tx = self.tx_from_raw(tx).or_else(|error| {
+            let tx = self.tx_from_raw(raw.payload().clone()).or_else(|error| {
                 Err(failure::err_msg(format!(
                     "Service <{}>: {}, tx: {:?}",
                     service_name,
@@ -409,13 +413,15 @@ impl Blockchain {
                     tx_hash
                 )))
             })?;
-
-            (tx, service_name)
+            (tx, raw, service_name)
         };
 
         fork.checkpoint();
 
-        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
+        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            let context = TransactionContext::new(&mut *fork, &raw);
+            tx.execute(context)
+        }));
 
         let tx_result = TransactionResult(match catch_result {
             Ok(execution_result) => {
@@ -461,14 +467,9 @@ impl Blockchain {
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
-    pub fn commit<'a, I>(
-        &mut self,
-        patch: &Patch,
-        block_hash: Hash,
-        precommits: I,
-    ) -> Result<(), Error>
+    pub fn commit<I>(&mut self, patch: &Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
     where
-        I: Iterator<Item = &'a Precommit>,
+        I: Iterator<Item = Signed<Precommit>>,
     {
         let patch = {
             let mut fork = {
@@ -496,23 +497,23 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-        // Initializes the context after merge.
-        let context = ServiceContext::new(
-            self.service_keypair.0,
-            self.service_keypair.1.clone(),
-            self.api_sender.clone(),
-            self.fork(),
-        );
 
         // Invokes `after_commit` for each service in order of their identifiers
-        for service in self.service_map.values() {
+        for (service_id, service) in self.service_map.iter() {
+            let context = ServiceContext::new(
+                self.service_keypair.0,
+                self.service_keypair.1.clone(),
+                self.api_sender.clone(),
+                self.fork(),
+                service_id as u16,
+            );
             service.after_commit(&context);
         }
         Ok(())
     }
 
     /// Saves the `Connect` message from a peer to the cache.
-    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Signed<Connect>) {
         let mut fork = self.fork();
 
         {
@@ -539,7 +540,7 @@ impl Blockchain {
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
         let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
@@ -547,15 +548,15 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message(&mut self, round: Round, raw: &RawMessage) {
-        self.save_messages(round, iter::once(raw.clone()));
+    pub(crate) fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Signed<T>) {
+        self.save_messages(round, iter::once(raw.into()));
     }
 
-    /// Saves a collection of RawMessage to the consensus messages cache with single access to the
+    /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
     /// `Fork` instance.
     pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
     where
-        I: IntoIterator<Item = RawMessage>,
+        I: IntoIterator<Item = Message>,
     {
         let mut fork = self.fork();
 

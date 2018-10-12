@@ -33,7 +33,6 @@ use tokio_io::{
 };
 
 use events::{codec::MessagesCodec, error::into_failure};
-use messages::RawMessage;
 
 pub mod error;
 pub mod wrappers;
@@ -46,7 +45,7 @@ pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
 type HandshakeResult<S> =
-    Box<dyn Future<Item = (Framed<S, MessagesCodec>, RawMessage), Error = failure::Error>>;
+    Box<dyn Future<Item = (Framed<S, MessagesCodec>, Vec<u8>), Error = failure::Error>>;
 
 pub trait Handshake {
     fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;

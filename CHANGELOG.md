@@ -7,12 +7,29 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking Changes
 
-- `majority_count` parameter has been removed from `StoredConfiguration` and
-   moved to `ConfigurationService` configuration. (#828)
+- Changed the message format, which, in turn, has led to changes in
+   the byte representation of transactions and precommit messages. (#916)
 
-- Removed obsolete `enable_blockchain_explorer` option in `NodeApiConfig` (#891)
+- `Transaction::execute` now accepts `TransactionContext` as the second
+   parameter. `TransactionContext` provides the public key of transaction
+   author, ID of current service, and transaction hash (#943)
+
+- Every transaction that contains the public key of the author was refactored
+   to use the author indicated in `TransactionContext`. (#984 #980 #979 #975 #971)
+
+- `/transactions/` endpoint can now handle transaction messages in hex format.
+   Services that used custom endpoints were refactored to
+   use `explorer/v1/transactions`. (#943 #984 #980 #979 #975 #971)
+
+- `majority_count` parameter has been moved from `StoredConfiguration`
+   to `ConfigurationService` configuration. (#828)
+
+- Removed obsolete `enable_blockchain_explorer` option from `NodeApiConfig`. (#891)
 
 #### exonum
+
+- Trait `TransactionSend` was removed.
+  `ApiSender` now contains `broadcast_transaction` method. (#943)
 
 - `api::Error::InternalError` now contains `failure::Error` instead of
   `Box<::std::error::Error>`. (#879)
@@ -48,6 +65,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
   of single IP-addresses. (#959)
+
+#### exonum-configuration
+
+- The `Vote` and `VoteAgainst` now save the transaction hash instead of
+  full transaction message. (#984)
 
 ### New Features
 

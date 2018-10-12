@@ -35,11 +35,7 @@ impl NodeHandler {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
-            InternalEvent::TxVerified(tx) => {
-                // We don't care about result, because situation when transaction received twice
-                // is normal for internal messages (transaction may be received from 2+ nodes).
-                let _ = self.handle_verified_tx(tx);
-            }
+            InternalEvent::MessageVerified(msg) => self.handle_message(msg),
         }
     }
 
@@ -48,7 +44,9 @@ impl NodeHandler {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(&peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
-            NetworkEvent::MessageReceived(raw) => self.handle_message(raw),
+            NetworkEvent::MessageReceived(raw) => {
+                self.execute_later(InternalRequest::VerifyMessage(raw))
+            }
         }
     }
 
@@ -120,10 +118,12 @@ impl NodeHandler {
         let schema = Schema::new(snapshot);
         let pool = schema.transactions_pool();
         for tx_hash in pool.iter() {
-            self.broadcast(&schema
-                .transactions()
-                .get(&tx_hash)
-                .expect("Rebroadcast: invalid transaction hash"))
+            self.broadcast(
+                schema
+                    .transactions()
+                    .get(&tx_hash)
+                    .expect("Rebroadcast: invalid transaction hash"),
+            )
         }
     }
 }

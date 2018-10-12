@@ -24,7 +24,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use failure;
+use failure::{self, Error};
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
@@ -40,8 +40,7 @@ use api::{
     ApiAccess, ApiAggregator,
 };
 use blockchain::{
-    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, Transaction,
-    ValidatorKeys,
+    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
@@ -53,7 +52,7 @@ use helpers::{
     config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
     Milliseconds, Round, ValidatorId,
 };
-use messages::{Connect, Message, RawMessage};
+use messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
@@ -69,7 +68,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Box<dyn Transaction>),
+    Transaction(Signed<RawTransaction>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -407,11 +406,13 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Connect::new(
-            &config.listener.consensus_public_key,
-            external_address,
-            system_state.current_time().into(),
-            &user_agent::get(),
+        let connect = Message::concrete(
+            Connect::new(
+                external_address,
+                system_state.current_time().into(),
+                &user_agent::get(),
+            ),
+            config.listener.consensus_public_key,
             &config.listener.consensus_secret_key,
         );
 
@@ -453,6 +454,14 @@ impl NodeHandler {
             config_manager,
             allow_expedited_propose: true,
         }
+    }
+
+    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Signed<T> {
+        Message::concrete(
+            message,
+            *self.state.consensus_public_key(),
+            self.state.consensus_secret_key(),
+        )
     }
 
     /// Return internal `SharedNodeState`
@@ -512,7 +521,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(|p| p.pub_key().to_owned());
+            let it = self.state.peers().values().map(|p| p.author());
             let it = it.chain(
                 self.state()
                     .connect_list()
@@ -520,8 +529,7 @@ impl NodeHandler {
                     .into_iter()
                     .map(|i| i.public_key),
             );
-            let it =
-                it.filter(|ref address| address != &self.state.our_connect_message().pub_key());
+            let it = it.filter(|address| address != &self.state.our_connect_message().author());
             it.collect()
         };
 
@@ -556,24 +564,15 @@ impl NodeHandler {
         self.add_update_api_state_timeout();
     }
 
-    /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
-        if id as usize >= self.state.validators().len() {
-            error!("Invalid validator id: {}", id);
-        } else {
-            let public_key = self.state.validators()[id as usize].consensus_key;
-            self.send_to_peer(public_key, message);
-        }
-    }
-
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
-        let request = NetworkRequest::SendMessage(public_key, message.clone());
+    pub fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
+        let message = message.into();
+        let request = NetworkRequest::SendMessage(public_key, message);
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast(&mut self, message: &RawMessage) {
+    pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
         let peers: Vec<PublicKey> = self.state
             .peers()
             .iter()
@@ -585,16 +584,16 @@ impl NodeHandler {
                 }
             })
             .collect();
-
+        let message = message.into();
         for address in peers {
-            self.send_to_peer(address, message);
+            self.send_to_peer(address, message.clone());
         }
     }
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
-        self.send_to_peer(key, connect.raw());
+        self.send_to_peer(key, connect.clone());
     }
 
     /// Add timeout request.
@@ -719,13 +718,6 @@ impl fmt::Debug for NodeHandler {
     }
 }
 
-/// `TransactionSend` represents interface for sending transactions. For details see `ApiSender`
-/// implementation.
-pub trait TransactionSend: Send + Sync {
-    /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<dyn Transaction>) -> Result<(), failure::Error>;
-}
-
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
@@ -733,13 +725,13 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), failure::Error> {
+    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), Error> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
 
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), failure::Error> {
+    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
         self.0
             .clone()
             .send(message)
@@ -747,13 +739,8 @@ impl ApiSender {
             .map(drop)
             .map_err(into_failure)
     }
-}
-
-impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<dyn Transaction>) -> Result<(), failure::Error> {
-        if !tx.verify() {
-            bail!("Invalid transaction");
-        }
+    /// Broadcast transaction to other node.
+    pub fn broadcast_transaction(&self, tx: Signed<RawTransaction>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
@@ -910,7 +897,7 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), failure::Error> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
         let pool_size = self.thread_pool_size;
@@ -948,6 +935,7 @@ impl Node {
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> Result<(), failure::Error> {
+        trace!("Running node.");
         // Runs actix-web api.
         let actix_api_runtime = SystemRuntimeConfig {
             api_runtimes: {
@@ -1063,28 +1051,47 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, Schema, Transaction};
+    use blockchain::{
+        ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+    };
     use crypto::gen_keypair;
+    use encoding::Error as MessageError;
     use events::EventHandler;
     use helpers;
-    use storage::{Database, Fork, MemoryDB};
-
-    messages! {
-        const SERVICE_ID = 0;
-
-        struct TxSimple {
-            public_key: &PublicKey,
-            msg: &str,
+    use storage::{Database, MemoryDB, Snapshot};
+    const SERVICE_ID: u16 = 0;
+    transactions! {
+        SimpleTransactions {
+            struct TxSimple {
+                public_key: &PublicKey,
+                msg: &str,
+            }
         }
     }
 
     impl Transaction for TxSimple {
-        fn verify(&self) -> bool {
-            true
+        fn execute(&self, _: TransactionContext) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    struct TestService;
+
+    impl Service for TestService {
+        fn service_id(&self) -> u16 {
+            SERVICE_ID
         }
 
-        fn execute(&self, _view: &mut Fork) -> ExecutionResult {
-            Ok(())
+        fn service_name(&self) -> &'static str {
+            "test service"
+        }
+
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
+            vec![]
+        }
+
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+            Ok(SimpleTransactions::tx_from_raw(raw)?.into())
         }
     }
 
@@ -1093,15 +1100,20 @@ mod tests {
         let (p_key, s_key) = gen_keypair();
 
         let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![];
+        let services = vec![Box::new(TestService) as Box<dyn Service>];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+        let tx = Message::sign_transaction(
+            TxSimple::new(&p_key, "Hello, World!"),
+            SERVICE_ID,
+            p_key,
+            &s_key,
+        );
 
         // Create original transaction.
-        let tx_orig = Box::new(tx.clone());
+        let tx_orig = tx.clone();
         let event = ExternalMessage::Transaction(tx_orig);
         node.handler.handle_event(event.into());
 
@@ -1111,7 +1123,7 @@ mod tests {
         assert_eq!(schema.transactions_pool_len(), 1);
 
         // Create duplicated transaction.
-        let tx_copy = Box::new(tx.clone());
+        let tx_copy = tx.clone();
         let event = ExternalMessage::Transaction(tx_copy);
         node.handler.handle_event(event.into());
 
@@ -1119,5 +1131,32 @@ mod tests {
         let snapshot = node.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.transactions_pool_len(), 1);
+    }
+
+    #[test]
+    fn test_transaction_without_service() {
+        let (p_key, s_key) = gen_keypair();
+
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let services = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+
+        let mut node = Node::new(db, services, node_cfg, None);
+
+        let tx = Message::sign_transaction(
+            TxSimple::new(&p_key, "Hello, World!"),
+            SERVICE_ID,
+            p_key,
+            &s_key,
+        );
+
+        // Send transaction to node.
+        let event = ExternalMessage::Transaction(tx);
+        node.handler.handle_event(event.into());
+
+        // Service not found for transaction.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 0);
     }
 }
