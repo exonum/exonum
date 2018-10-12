@@ -636,6 +636,7 @@ impl TransactionInfo {
             _ => None,
         }
     }
+
 }
 
 /// Blockchain explorer.
@@ -672,22 +673,27 @@ impl<'a> BlockchainExplorer<'a> {
     /// Returns information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
         let schema = Schema::new(&self.snapshot);
-        let raw_tx = schema.transactions().get(tx_hash)?;
-
-        let content = match (*self.transaction_parser)(raw_tx) {
-            Err(e) => {
-                error!("Error while parsing transaction {:?}: {}", tx_hash, e);
-                return None;
-            }
-            Ok(v) => v,
-        };
-
+        let content = self.transaction_without_proof(tx_hash)?;
         if schema.transactions_pool().contains(tx_hash) {
             return Some(TransactionInfo::InPool { content });
         }
 
         let tx = self.committed_transaction(tx_hash, Some(content));
         Some(TransactionInfo::Committed(tx))
+    }
+
+    /// Returns transaction message without proof.
+    pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<TransactionMessage> {
+        let schema = Schema::new(&self.snapshot);
+        let raw_tx = schema.transactions().get(tx_hash)?;
+
+        match (*self.transaction_parser)(raw_tx) {
+            Err(e) => {
+                error!("Error while parsing transaction {:?}: {}", tx_hash, e);
+                None
+            }
+            Ok(v) => Some(v),
+        }
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
