@@ -63,7 +63,7 @@
       },
 
       handleBlock(event) {
-        console.log(event.data)
+        this.blocks.unshift(JSON.parse(event.data))
       }
     },
     mounted() {
