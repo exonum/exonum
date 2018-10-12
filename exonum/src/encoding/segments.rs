@@ -19,7 +19,6 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::{CheckedOffset, Error, Field, Offset, Result};
 use crypto::Hash;
-use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 /// Trait for fields, that has unknown `compile-time` size.
 /// Usually important for arrays,

@@ -15,18 +15,21 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
-use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
+use messages::{Message, Propose};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
+/// HANDLE message
+/// - verify signature
+/// - sandbox should panic on message verification
+
 #[test]
-fn test_ignore_message_with_incorrect_validator_id() {
+#[should_panic]
+fn test_ignore_message_with_incorrect_signature() {
     let sandbox = timestamping_sandbox();
 
-    let incorrect_validator_id = ValidatorId(64_999);
-
     let propose = sandbox.create_propose(
-        incorrect_validator_id,
+        ValidatorId(0),
         Height(0),
         Round(1),
         &sandbox.last_hash(),
@@ -38,15 +41,20 @@ fn test_ignore_message_with_incorrect_validator_id() {
 }
 
 #[test]
-fn test_ignore_message_with_incorrect_signature() {
+fn test_ignore_message_with_incorrect_validator_id() {
     let sandbox = timestamping_sandbox();
 
-    let propose = sandbox.create_propose(
-        ValidatorId(0),
-        Height(0),
-        Round(1),
-        &sandbox.last_hash(),
-        &[],
+    let incorrect_validator_id = ValidatorId(64_999);
+
+    let propose = Message::concrete(
+        Propose::new(
+            incorrect_validator_id,
+            Height(0),
+            Round(1),
+            &sandbox.last_hash(),
+            &[],
+        ),
+        sandbox.p(ValidatorId(1)),
         sandbox.s(ValidatorId(1)),
     );
 

@@ -21,8 +21,8 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use super::{
-    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, to_boxed,
-    ConfigurationSchema, ConfigurationTestKit,
+    new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
+    ConfigurationTestKit,
 };
 use api::{
     ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
@@ -272,7 +272,6 @@ fn test_votes_for_propose() {
         .validators()
         .iter()
         .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
-        .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
     let response = api.votes_for_propose(new_cfg.hash())
@@ -282,7 +281,7 @@ fn test_votes_for_propose() {
         assert!(
             Schema::new(&testkit.snapshot())
                 .transactions()
-                .contains(&tx.hash(),),
+                .contains(&tx.tx_hash()),
             "Transaction is absent in blockchain: {:?}",
             tx
         );
@@ -316,7 +315,6 @@ fn test_dissenting_votes_for_propose() {
         .validators()
         .iter()
         .map(|validator| new_tx_config_vote_against(validator, cfg_proposal_hash))
-        .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_dissenting_votes);
     let response = api.votes_for_propose(new_cfg.hash())

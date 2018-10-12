@@ -19,12 +19,14 @@
 #![allow(bare_trait_objects)]
 
 use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction}, crypto::{CryptoHash, PublicKey},
-    messages::Message, storage::Fork,
+    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
+    crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
 };
 
 use schema::Schema;
 use CRYPTOCURRENCY_SERVICE_ID;
+
+const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -65,12 +67,9 @@ impl From<Error> for ExecutionError {
 transactions! {
     /// Transaction group.
     pub WalletTransactions {
-        const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
 
         /// Transfer `amount` of the currency from one wallet to another.
         struct Transfer {
-            /// `PublicKey` of sender's wallet.
-            from:    &PublicKey,
             /// `PublicKey` of receiver's wallet.
             to:      &PublicKey,
             /// Amount of currency to transfer.
@@ -83,8 +82,6 @@ transactions! {
 
         /// Issue `amount` of the currency to the `wallet`.
         struct Issue {
-            /// `PublicKey` of the wallet.
-            pub_key:  &PublicKey,
             /// Issued amount of currency.
             amount:  u64,
             /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
@@ -95,26 +92,50 @@ transactions! {
 
         /// Create wallet with the given `name`.
         struct CreateWallet {
-            /// `PublicKey` of the new wallet.
-            pub_key: &PublicKey,
             /// Name of the new wallet.
             name:    &str,
         }
     }
 }
 
-impl Transaction for Transfer {
-    fn verify(&self) -> bool {
-        (self.from() != self.to()) && self.verify_signature(self.from())
+impl CreateWallet {
+    #[doc(hidden)]
+    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(CreateWallet::new(name), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
     }
+}
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = Schema::new(fork);
+impl Transfer {
+    #[doc(hidden)]
+    pub fn sign(
+        pk: &PublicKey,
+        to: &PublicKey,
+        amount: u64,
+        seed: u64,
+        sk: &SecretKey,
+    ) -> Signed<RawTransaction> {
+        Message::sign_transaction(
+            Transfer::new(to, amount, seed),
+            CRYPTOCURRENCY_SERVICE_ID,
+            *pk,
+            sk,
+        )
+    }
+}
 
-        let from = self.from();
+impl Transaction for Transfer {
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let from = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.fork());
+
         let to = self.to();
-        let hash = self.hash();
         let amount = self.amount();
+
+        if from == to {
+            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
+        }
 
         let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
 
@@ -132,14 +153,11 @@ impl Transaction for Transfer {
 }
 
 impl Transaction for Issue {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
-    }
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let pub_key = &context.author();
+        let hash = context.tx_hash();
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = Schema::new(fork);
-        let pub_key = self.pub_key();
-        let hash = self.hash();
+        let mut schema = Schema::new(context.fork());
 
         if let Some(wallet) = schema.wallet(pub_key) {
             let amount = self.amount();
@@ -152,14 +170,11 @@ impl Transaction for Issue {
 }
 
 impl Transaction for CreateWallet {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
-    }
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let pub_key = &context.author();
+        let hash = context.tx_hash();
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let mut schema = Schema::new(fork);
-        let pub_key = self.pub_key();
-        let hash = self.hash();
+        let mut schema = Schema::new(context.fork());
 
         if schema.wallet(pub_key).is_none() {
             let name = self.name();

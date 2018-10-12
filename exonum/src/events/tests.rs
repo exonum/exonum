@@ -28,7 +28,7 @@ use events::{
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
-use messages::{Connect, Message, MessageWriter, RawMessage};
+use messages::{Connect, Message, Signed, SignedMessage};
 use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
@@ -72,15 +72,15 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn connect_with(&self, key: PublicKey, connect: Connect) {
+    pub fn connect_with(&self, key: PublicKey, connect: Signed<Connect>) {
         self.network_requests_tx
             .clone()
-            .send(NetworkRequest::SendMessage(key, connect.raw().clone()))
+            .send(NetworkRequest::SendMessage(key, connect.into()))
             .wait()
             .unwrap();
     }
 
-    pub fn send_to(&self, key: PublicKey, raw: RawMessage) {
+    pub fn send_to(&self, key: PublicKey, raw: SignedMessage) {
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(key, raw))
@@ -88,7 +88,7 @@ impl TestHandler {
             .unwrap();
     }
 
-    pub fn wait_for_connect(&mut self) -> Connect {
+    pub fn wait_for_connect(&mut self) -> Signed<Connect> {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
@@ -104,9 +104,9 @@ impl TestHandler {
         }
     }
 
-    pub fn wait_for_message(&mut self) -> RawMessage {
+    pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
-            Ok(NetworkEvent::MessageReceived(msg)) => msg,
+            Ok(NetworkEvent::MessageReceived(msg)) => SignedMessage::from_vec_unchecked(msg),
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
@@ -148,7 +148,11 @@ impl TestEvents {
         }
     }
 
-    pub fn spawn(self, handshake_params: &HandshakeParams, connect: Connect) -> TestHandler {
+    pub fn spawn(
+        self,
+        handshake_params: &HandshakeParams,
+        connect: Signed<Connect>,
+    ) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
@@ -160,7 +164,7 @@ impl TestEvents {
         handler_part
     }
 
-    fn into_reactor(self, connect: Connect) -> (TestHandler, NetworkPart) {
+    fn into_reactor(self, connect: Signed<Connect>) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
@@ -185,25 +189,23 @@ pub fn connect_message(
     addr: SocketAddr,
     public_key: &PublicKey,
     secret_key: &SecretKey,
-) -> Connect {
+) -> Signed<Connect> {
     let time = time::UNIX_EPOCH;
-    Connect::new(
-        public_key,
-        &addr.to_string(),
-        time.into(),
-        &user_agent::get(),
+    Message::concrete(
+        Connect::new(&addr.to_string(), time.into(), &user_agent::get()),
+        *public_key,
         secret_key,
     )
 }
 
-pub fn raw_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, 0, id, len);
-    RawMessage::new(writer.sign(&gen_keypair().1))
+pub fn raw_message(len: usize) -> SignedMessage {
+    let buffer = vec![0u8; len];
+    SignedMessage::from_vec_unchecked(buffer)
 }
 
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub connect: Connect,
+    pub connect: Signed<Connect>,
     pub connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,
@@ -219,11 +221,9 @@ impl HandshakeParams {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
         let address = "127.0.0.1:8000";
 
-        let connect = Connect::new(
-            &public_key,
-            address,
-            SystemTime::now().into(),
-            &user_agent::get(),
+        let connect = Message::concrete(
+            Connect::new(address, SystemTime::now().into(), &user_agent::get()),
+            public_key,
             &secret_key,
         );
 
@@ -311,8 +311,8 @@ fn test_network_big_message() {
     let first = "127.0.0.1:17200".parse().unwrap();
     let second = "127.0.0.1:17201".parse().unwrap();
 
-    let m1 = raw_message(15, 100000);
-    let m2 = raw_message(16, 400);
+    let m1 = raw_message(100000);
+    let m2 = raw_message(400);
 
     let mut connect_list = ConnectList::default();
 
@@ -369,11 +369,10 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let max_payload_length =
-        max_message_length - ::messages::HEADER_LENGTH - ::crypto::SIGNATURE_LENGTH;
-    let acceptable_message = raw_message(15, max_payload_length);
-    let too_big_message = raw_message(16, max_payload_length + 1000);
-
+    let acceptable_message = raw_message(max_message_length);
+    let too_big_message = raw_message(max_message_length + 1000);
+    assert!(too_big_message.raw().len() > max_message_length);
+    assert!(acceptable_message.raw().len() <= max_message_length);
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info.clone());
@@ -408,7 +407,7 @@ fn test_network_reconnect() {
     let first = "127.0.0.1:19100".parse().unwrap();
     let second = "127.0.0.1:19101".parse().unwrap();
 
-    let msg = raw_message(11, 1000);
+    let msg = raw_message(1000);
 
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
@@ -531,7 +530,7 @@ fn test_send_first_not_connect() {
     let mut node = t1.spawn(node, connect_list.clone());
     let other_node = t2.spawn(other_node, connect_list.clone());
 
-    let message = raw_message(11, 1000);
+    let message = raw_message(1000);
     other_node.send_to(main_key, message.clone()); // should connect before send message
 
     assert_eq!(node.wait_for_connect(), t2.connect);
@@ -541,8 +540,8 @@ fn test_send_first_not_connect() {
 #[test]
 #[should_panic(expected = "An error during wait for connect occurred")]
 fn test_connect_list_ignore_when_connecting() {
-    let first = "127.0.0.1:20230".parse().unwrap();
-    let second = "127.0.0.1:20231".parse().unwrap();
+    let first = "127.0.0.1:27230".parse().unwrap();
+    let second = "127.0.0.1:27231".parse().unwrap();
 
     let mut connect_list = ConnectList::default();
 

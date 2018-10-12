@@ -16,21 +16,23 @@
 
 extern crate serde_json;
 
+use exonum::{
+    blockchain::{
+        ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
+    },
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
+    node::State, storage::{Fork, Snapshot},
+};
+
 use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
-use exonum::{
-    blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
-    crypto::{CryptoHash, Hash, PublicKey}, messages::Message, node::State,
-    storage::{Fork, Snapshot},
-};
-use schema::{MaybeVote, ProposeData, Schema};
+use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+use SERVICE_ID;
 use SERVICE_NAME;
 
 transactions! {
     /// Configuration Service transactions.
     pub ConfigurationTransactions {
-        const SERVICE_ID = super::SERVICE_ID;
-
         /// Propose a new configuration.
         ///
         /// # Notes
@@ -40,11 +42,6 @@ transactions! {
         ///
         /// [`ErrorCode`]: enum.ErrorCode.html
         struct Propose {
-            /// Sender of the transaction.
-            ///
-            /// Should be one of validators as per the active configuration.
-            from: &PublicKey,
-
             /// Configuration in JSON format.
             ///
             /// Should be convertible into `StoredConfiguration`.
@@ -64,11 +61,6 @@ transactions! {
         /// [`MaybeVote`]: struct.MaybeVote.html
         /// [`ErrorCode`]: enum.ErrorCode.html
         struct Vote {
-            /// Sender of the transaction.
-            ///
-            /// Should be one of validators as per the active configuration.
-            from: &PublicKey,
-
             /// Hash of the configuration that this vote is for.
             ///
             /// See [crate docs](index.html) for more details on how the hash is calculated.
@@ -88,16 +80,42 @@ transactions! {
         /// [`MaybeVote`]: struct.MaybeVote.html
         /// [`ErrorCode`]: enum.ErrorCode.html
         struct VoteAgainst {
-            /// Sender of the transaction.
-            ///
-            /// Should be one of validators as per the active configuration.
-            from: &PublicKey,
-
             /// Hash of the configuration that this vote is for.
             ///
             /// See [crate docs](index.html) for more details on how the hash is calculated.
             cfg_hash: &Hash,
         }
+    }
+}
+
+impl ConfigurationTransactions {
+    #[doc(hidden)]
+    #[cfg(test)]
+    pub fn from_raw(message: Signed<RawTransaction>) -> ConfigurationTransactions {
+        use exonum::blockchain::TransactionSet;
+        use std::ops::Deref;
+        ConfigurationTransactions::tx_from_raw(message.deref().clone()).unwrap()
+    }
+}
+
+impl VoteAgainst {
+    /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(VoteAgainst::new(cfg_hash), SERVICE_ID, *author, key)
+    }
+}
+
+impl Vote {
+    /// Create `Signed` for `Vote` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Vote::new(cfg_hash), SERVICE_ID, *author, key)
+    }
+}
+
+impl Propose {
+    /// Create `Signed` for `Propose` transaction, signed by provided keys.
+    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Propose::new(cfg), SERVICE_ID, *author, key)
     }
 }
 
@@ -148,6 +166,7 @@ impl Propose {
     fn precheck(
         &self,
         snapshot: &dyn Snapshot,
+        author: PublicKey,
     ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
         use exonum::storage::StorageValue;
@@ -156,7 +175,7 @@ impl Propose {
         if let Some(following) = following_config {
             return Err(AlreadyScheduled(following));
         }
-        if validator_index(snapshot, self.from()).is_none() {
+        if validator_index(snapshot, &author).is_none() {
             return Err(UnknownSender);
         }
 
@@ -249,12 +268,10 @@ impl Propose {
 }
 
 impl Transaction for Propose {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let (cfg, cfg_hash) = self.precheck(fork.as_ref()).map_err(|err| {
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let author = context.author();
+        let fork = context.fork();
+        let (cfg, cfg_hash) = self.precheck(fork.as_ref(), author).map_err(|err| {
             error!("Discarding propose {:?}: {}", self, err);
             err
         })?;
@@ -265,30 +282,19 @@ impl Transaction for Propose {
     }
 }
 
-enum VotingDecisionRef<'a> {
-    Vote(&'a Vote),
-    VoteAgainst(&'a VoteAgainst),
+struct VotingContext {
+    decision: VotingDecision,
+    author: PublicKey,
+    cfg_hash: Hash,
 }
 
-impl<'a> VotingDecisionRef<'a> {
-    fn sender(&self) -> &PublicKey {
-        match *self {
-            VotingDecisionRef::Vote(vote) => vote.from(),
-            VotingDecisionRef::VoteAgainst(vote) => vote.from(),
-        }
-    }
-
-    fn cfg_hash(&self) -> &Hash {
-        match *self {
-            VotingDecisionRef::Vote(vote) => vote.cfg_hash(),
-            VotingDecisionRef::VoteAgainst(vote) => vote.cfg_hash(),
-        }
-    }
-
-    fn to_maybe_vote(&self) -> MaybeVote {
-        match *self {
-            VotingDecisionRef::Vote(vote) => MaybeVote::from(vote.clone()),
-            VotingDecisionRef::VoteAgainst(vote) => MaybeVote::from(vote.clone()),
+impl VotingContext {
+    /// Creates new `VotingContext` from `VotingDecision` and author key.
+    fn new(decision: VotingDecision, author: PublicKey, cfg_hash: Hash) -> Self {
+        VotingContext {
+            author,
+            decision,
+            cfg_hash,
         }
     }
 
@@ -307,12 +313,12 @@ impl<'a> VotingDecisionRef<'a> {
 
         let schema = Schema::new(snapshot);
         let propose = schema
-            .propose(self.cfg_hash())
-            .ok_or_else(|| UnknownConfigRef(*self.cfg_hash()))?;
+            .propose(&self.cfg_hash)
+            .ok_or_else(|| UnknownConfigRef(self.cfg_hash))?;
 
-        if let Some(validator_id) = validator_index(snapshot, self.sender()) {
+        if let Some(validator_id) = validator_index(snapshot, &self.author) {
             let vote = schema
-                .votes_by_config_hash(self.cfg_hash())
+                .votes_by_config_hash(&self.cfg_hash)
                 .get(validator_id as u64)
                 .expect("Can't get vote for precheck");
 
@@ -331,10 +337,10 @@ impl<'a> VotingDecisionRef<'a> {
     fn save(&self, fork: &mut Fork) {
         use exonum::storage::StorageValue;
 
-        let cfg_hash = self.cfg_hash();
+        let cfg_hash = &self.cfg_hash;
         let propose_data: ProposeData = Schema::new(fork.as_ref())
             .propose_data_by_config_hash()
-            .get(self.cfg_hash())
+            .get(&self.cfg_hash)
             .unwrap();
 
         let propose = propose_data.tx_propose();
@@ -347,7 +353,7 @@ impl<'a> VotingDecisionRef<'a> {
         let validator_id = prev_cfg
             .validator_keys
             .iter()
-            .position(|pk| pk.service_key == *self.sender())
+            .position(|pk| pk.service_key == self.author)
             .unwrap();
 
         // Start writing to storage.
@@ -357,7 +363,7 @@ impl<'a> VotingDecisionRef<'a> {
 
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
-            votes.set(validator_id as u64, self.to_maybe_vote());
+            votes.set(validator_id as u64, self.decision.into());
             ProposeData::new(
                 propose_data.tx_propose(),
                 &votes.merkle_root(),
@@ -371,25 +377,14 @@ impl<'a> VotingDecisionRef<'a> {
     }
 }
 
-impl<'a> From<&'a Vote> for VotingDecisionRef<'a> {
-    fn from(vote: &Vote) -> VotingDecisionRef {
-        VotingDecisionRef::Vote(vote)
-    }
-}
-
-impl<'a> From<&'a VoteAgainst> for VotingDecisionRef<'a> {
-    fn from(vote_against: &VoteAgainst) -> VotingDecisionRef {
-        VotingDecisionRef::VoteAgainst(vote_against)
-    }
-}
-
 impl Transaction for Vote {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let author = context.author();
+        let tx_hash = context.tx_hash();
+        let fork = context.fork();
+        let decision = VotingDecision::Yea(tx_hash);
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let vote = VotingDecisionRef::from(self);
+        let vote = VotingContext::new(decision, author, *self.cfg_hash());
         let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote {:?}: {}", self, err);
             err
@@ -409,12 +404,13 @@ impl Transaction for Vote {
 }
 
 impl Transaction for VoteAgainst {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
+    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        let author = context.author();
+        let tx_hash = context.tx_hash();
+        let fork = context.fork();
+        let decision = VotingDecision::Nay(tx_hash);
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let vote_against = VotingDecisionRef::from(self);
+        let vote_against = VotingContext::new(decision, author, *self.cfg_hash());
         vote_against.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote against {:?}: {}", self, err);
             err
@@ -434,9 +430,10 @@ impl Transaction for VoteAgainst {
 mod tests {
     use exonum_testkit::{TestKit, TestKitBuilder};
 
-    use super::{Hash, VotingDecisionRef};
+    use super::{Hash, VotingContext};
     use config::ConfigurationServiceConfig;
     use errors::Error as ServiceError;
+    use schema::VotingDecision;
     use tests::{new_tx_config_vote, new_tx_config_vote_against};
     use Service as ConfigurationService;
 
@@ -452,12 +449,18 @@ mod tests {
         let hash = Hash::default();
 
         let illegal_vote = new_tx_config_vote(&testkit.network().validators()[3], hash);
-        let vote = VotingDecisionRef::from(&illegal_vote);
+
+        let decision = VotingDecision::Yea(illegal_vote.hash());
+        let author = illegal_vote.author();
+        let vote = VotingContext::new(decision, author, hash);
+
         let vote_result = vote.precheck(testkit.snapshot().as_ref());
 
         let illegal_vote_against =
             new_tx_config_vote_against(&testkit.network().validators()[3], hash);
-        let vote_against = VotingDecisionRef::from(&illegal_vote_against);
+        let decision = VotingDecision::Yea(illegal_vote_against.hash());
+        let author = illegal_vote_against.author();
+        let vote_against = VotingContext::new(decision, author, hash);
         let vote_against_result = vote_against.precheck(testkit.snapshot().as_ref());
 
         assert_matches!(vote_result, Err(ServiceError::UnknownConfigRef(_)));

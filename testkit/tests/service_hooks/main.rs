@@ -17,13 +17,13 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 
 // HACK: Silent "dead_code" warning.
-pub use hooks::{AfterCommitService, TxAfterCommit};
+pub use hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
 
-use exonum::{
-    crypto::{CryptoHash, Signature}, helpers::Height, messages::Message,
-};
+use exonum::{blockchain::TransactionSet, helpers::Height, messages::Message};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
@@ -38,13 +38,19 @@ fn test_after_commit() {
     for i in 1..5 {
         let block = testkit.create_block();
         if i > 1 {
-            assert_eq!(
-                block[0].content().raw(),
-                TxAfterCommit::new_with_signature(Height(i - 1), &Signature::zero()).raw()
-            );
+            let message = block[0].content().message().payload().clone();
+            let HandleCommitTransactions::TxAfterCommit(message) =
+                HandleCommitTransactions::tx_from_raw(message).unwrap();
+
+            assert_eq!(message, TxAfterCommit::new(Height(i - 1)));
         }
 
-        let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
+        let tx = Message::sign_transaction(
+            TxAfterCommit::new(Height(i)),
+            SERVICE_ID,
+            testkit.blockchain().service_keypair.0,
+            &testkit.blockchain().service_keypair.1,
+        );
         assert!(testkit.is_tx_in_pool(&tx.hash()));
     }
 

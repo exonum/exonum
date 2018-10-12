@@ -12,44 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{
+    blockchain::{Schema, StoredConfiguration}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
+    helpers::{Height, ValidatorId}, messages::{RawTransaction, Signed}, storage::StorageValue,
+};
+use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
+use serde_json;
+
 use std::str;
 
 use config::ConfigurationServiceConfig;
-use exonum::{
-    blockchain::{Schema, StoredConfiguration, Transaction},
-    crypto::{hash, CryptoHash, Hash, HASH_SIZE}, helpers::{Height, ValidatorId},
-    storage::StorageValue,
-};
-use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 use SERVICE_NAME;
 use {
-    Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
-    VotingDecision,
+    ConfigurationTransactions, Propose, Schema as ConfigurationSchema,
+    Service as ConfigurationService, Vote, VoteAgainst, VotingDecision,
 };
 
 mod api;
 
-pub fn to_boxed<T: Transaction>(tx: T) -> Box<dyn Transaction> {
-    Box::new(tx) as Box<dyn Transaction>
-}
-
-pub fn new_tx_config_propose(node: &TestNode, cfg_proposal: StoredConfiguration) -> Propose {
+pub fn new_tx_config_propose(
+    node: &TestNode,
+    cfg_proposal: StoredConfiguration,
+) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
-    Propose::new(
+    Propose::sign(
         keypair.0,
         str::from_utf8(cfg_proposal.into_bytes().as_slice()).unwrap(),
         keypair.1,
     )
 }
 
-pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Vote {
+pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
-    Vote::new(keypair.0, &cfg_proposal_hash, keypair.1)
+    Vote::sign(keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
-pub fn new_tx_config_vote_against(node: &TestNode, cfg_proposal_hash: Hash) -> VoteAgainst {
+pub fn new_tx_config_vote_against(
+    node: &TestNode,
+    cfg_proposal_hash: Hash,
+) -> Signed<RawTransaction> {
     let keypair = node.service_keypair();
-    VoteAgainst::new(keypair.0, &cfg_proposal_hash, keypair.1)
+    VoteAgainst::sign(keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
 pub trait ConfigurationTestKit {
@@ -86,7 +89,6 @@ impl ConfigurationTestKit for TestKit {
             .validators()
             .iter()
             .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
-            .map(to_boxed)
             .collect::<Vec<_>>();
         self.create_block_with_transactions(tx_votes);
         // Fast forward to cfg_change_height
@@ -261,7 +263,6 @@ fn test_apply_with_increased_majority() {
     let tx_votes = validators[0..5] // not enough validators
         .iter()
         .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
-        .map(to_boxed)
         .collect::<Vec<_>>();
 
     testkit.create_block_with_transactions(tx_votes);
@@ -348,6 +349,11 @@ fn test_discard_propose_for_same_cfg() {
     };
 
     testkit.create_block_with_transactions(txvec![propose_tx.clone(), duplicated_propose_tx]);
+    let propose_tx = ConfigurationTransactions::from_raw(propose_tx);
+    let propose_tx = match propose_tx {
+        ConfigurationTransactions::Propose(t) => t,
+        _ => panic!("Wrong tx found"),
+    };
     assert_eq!(Some(propose_tx), testkit.find_propose(new_cfg.hash()));
 }
 
@@ -377,8 +383,8 @@ fn test_discard_vote_for_absent_propose() {
     testkit.create_block_with_transactions(txvec![legal_vote.clone(), illegal_vote.clone()]);
 
     let votes = testkit.votes_for_propose(new_cfg.hash());
-    assert!(votes.contains(&Some(VotingDecision::Yea(legal_vote))));
-    assert!(!votes.contains(&Some(VotingDecision::Yea(illegal_vote))));
+    assert!(votes.contains(&Some(VotingDecision::Yea(legal_vote.hash()))));
+    assert!(!votes.contains(&Some(VotingDecision::Yea(illegal_vote.hash()))));
 }
 
 #[test]
@@ -400,8 +406,8 @@ fn test_vote_against_for_propose() {
     testkit.create_block_with_transactions(txvec![legal_vote.clone(), illegal_vote.clone()]);
 
     let votes = testkit.votes_for_propose(new_cfg.hash());
-    assert!(votes.contains(&Some(VotingDecision::Nay(legal_vote))));
-    assert!(!votes.contains(&Some(VotingDecision::Yea(illegal_vote))));
+    assert!(votes.contains(&Some(VotingDecision::Nay(legal_vote.hash()))));
+    assert!(!votes.contains(&Some(VotingDecision::Yea(illegal_vote.hash()))));
 }
 
 #[test]
@@ -449,7 +455,7 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
     assert!(!testkit
         .votes_for_propose(new_cfg.hash())
-        .contains(&Some(VotingDecision::Yea(illegal_vote))));
+        .contains(&Some(VotingDecision::Yea(illegal_vote.hash()))));
 }
 
 #[test]
@@ -461,7 +467,7 @@ fn test_discard_invalid_config_json() {
 
     let propose_tx = {
         let keypair = testkit.network().validators()[1].service_keypair();
-        Propose::new(&keypair.0, new_cfg, &keypair.1)
+        Propose::sign(&keypair.0, new_cfg, &keypair.1)
     };
     testkit.create_block_with_transactions(txvec![propose_tx]);
     assert_eq!(None, testkit.find_propose(hash(new_cfg.as_bytes())));
@@ -487,7 +493,6 @@ fn test_config_txs_discarded_when_following_config_present() {
         .validators()
         .iter()
         .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
-        .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
 
@@ -560,12 +565,11 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
         testkit.create_block_with_transactions(txvec![illegal_validator_vote.clone()]);
         assert!(!testkit
             .votes_for_propose(discarded_votes_cfg.hash())
-            .contains(&Some(VotingDecision::Yea(illegal_validator_vote))))
+            .contains(&Some(VotingDecision::Yea(illegal_validator_vote.hash()))))
     }
     {
         let votes = (0..3)
             .map(|id| new_tx_config_vote(&testkit.network().validators()[id], new_cfg.hash()))
-            .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(
@@ -598,11 +602,11 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
                 )
             })
             .collect::<Vec<_>>();
-        testkit.create_block_with_transactions(expected_votes.clone().into_iter().map(to_boxed));
+        testkit.create_block_with_transactions(expected_votes.clone().into_iter());
 
         let actual_votes = testkit.votes_for_propose(discarded_votes_cfg.hash());
         for expected_vote in expected_votes {
-            assert!(!actual_votes.contains(&Some(VotingDecision::Yea(expected_vote))));
+            assert!(!actual_votes.contains(&Some(VotingDecision::Yea(expected_vote.hash()))));
         }
     }
 }
@@ -633,7 +637,6 @@ fn test_regression_majority_votes_for_different_proposes() {
                 let validator = &testkit.network().validators()[1];
                 new_tx_config_propose(&validator, cfg.clone())
             })
-            .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(proposes);
     }
@@ -643,7 +646,6 @@ fn test_regression_majority_votes_for_different_proposes() {
                 let validator = &testkit.network().validators()[validator];
                 new_tx_config_vote(validator, new_cfg1.hash())
             })
-            .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(
@@ -698,7 +700,6 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
                 let validator = &testkit.network().validators()[validator];
                 new_tx_config_vote(validator, new_cfg1.hash())
             })
-            .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(
@@ -715,7 +716,6 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
                 let validator = &testkit.network().validators()[validator];
                 new_tx_config_vote(validator, new_cfg2.hash())
             })
-            .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(Height(4), testkit.height());
@@ -733,4 +733,14 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
             Schema::new(&testkit.snapshot()).actual_configuration()
         );
     }
+}
+
+#[test]
+fn test_voting_decision_serialize() {
+    let vote = format!(
+        "{}",
+        serde_json::to_value(&VotingDecision::Yea(Hash::default())).unwrap()
+    );
+    assert_eq!("{\"tx_hash\":\
+    \"0000000000000000000000000000000000000000000000000000000000000000\",\"vote_type\":\"yea\"}", vote)
 }

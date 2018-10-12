@@ -26,7 +26,6 @@ use super::WriteBufferWrapper;
 use crypto::{Hash, PublicKey, Signature};
 use encoding::{Field, Offset};
 use helpers::{Height, Round, ValidatorId};
-use messages::RawMessage;
 
 // TODO: Should we implement serialize for: `SecretKey`, `Seed`. (ECR-156)
 
