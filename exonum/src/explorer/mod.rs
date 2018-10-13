@@ -25,17 +25,17 @@ use std::{
 };
 
 use blockchain::{
-    Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+    Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
     TransactionResult, TxLocation,
 };
 use crypto::{CryptoHash, Hash};
 use encoding;
 use helpers::Height;
-use messages::{Precommit, RawMessage};
+use messages::{Precommit, RawTransaction, Signed};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<Box<dyn Transaction>, encoding::Error>;
+type ParseResult = Result<TransactionMessage, encoding::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -107,7 +107,7 @@ impl HeightRange {
 pub struct BlockInfo<'a> {
     header: Block,
     explorer: &'a BlockchainExplorer<'a>,
-    precommits: RefCell<Option<Vec<Precommit>>>,
+    precommits: RefCell<Option<Vec<Signed<Precommit>>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
 
@@ -162,7 +162,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Returns a list of precommits for this block.
-    pub fn precommits(&self) -> Ref<[Precommit]> {
+    pub fn precommits(&self) -> Ref<[Signed<Precommit>]> {
         if self.precommits.borrow().is_none() {
             let precommits = self.explorer.precommits(&self.header);
             *self.precommits.borrow_mut() = Some(precommits);
@@ -265,24 +265,20 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
     }
 }
 
+//TODO: impl Deserialize
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
-///
-/// The type parameter corresponds to some representation of `Box<Transaction>`.
-/// This generalization is needed to deserialize the type, e.g.,
-/// by using `BlockWithTransactions<serde_json::Value>`.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: SerializeContent"))]
-pub struct BlockWithTransactions<T = Box<dyn Transaction>> {
+pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
     pub header: Block,
     /// Precommits.
-    pub precommits: Vec<Precommit>,
+    pub precommits: Vec<Signed<Precommit>>,
     /// Transactions in the order they appear in the block.
-    pub transactions: Vec<CommittedTransaction<T>>,
+    pub transactions: Vec<CommittedTransaction>,
 }
 
-impl<T> BlockWithTransactions<T> {
+impl BlockWithTransactions {
     /// Returns the height of this block.
     ///
     /// This method is equivalent to calling `block.header.height()`.
@@ -301,7 +297,7 @@ impl<T> BlockWithTransactions<T> {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> EagerTransactions<T> {
+    pub fn iter(&self) -> EagerTransactions {
         self.transactions.iter()
     }
 }
@@ -309,12 +305,12 @@ impl<T> BlockWithTransactions<T> {
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactions<'a, T> = slice::Iter<'a, CommittedTransaction<T>>;
+pub type EagerTransactions<'a> = slice::Iter<'a, CommittedTransaction>;
 
-impl<T> Index<usize> for BlockWithTransactions<T> {
-    type Output = CommittedTransaction<T>;
+impl Index<usize> for BlockWithTransactions {
+    type Output = CommittedTransaction;
 
-    fn index(&self, index: usize) -> &CommittedTransaction<T> {
+    fn index(&self, index: usize) -> &CommittedTransaction {
         self.transactions.get(index).unwrap_or_else(|| {
             panic!(
                 "Index exceeds number of transactions in block {}",
@@ -324,11 +320,11 @@ impl<T> Index<usize> for BlockWithTransactions<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
-    type Item = &'a CommittedTransaction<T>;
-    type IntoIter = EagerTransactions<'a, T>;
+impl<'a> IntoIterator for &'a BlockWithTransactions {
+    type Item = &'a CommittedTransaction;
+    type IntoIter = EagerTransactions<'a>;
 
-    fn into_iter(self) -> EagerTransactions<'a, T> {
+    fn into_iter(self) -> EagerTransactions<'a> {
         self.iter()
     }
 }
@@ -388,40 +384,35 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// ```
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
-/// # use exonum::blockchain::{ExecutionResult, Transaction};
+/// # #[macro_use] extern crate serde_derive;
+/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
 /// # use exonum::helpers::Height;
-/// # use exonum::storage::Fork;
 /// transactions! {
 ///     Transactions {
-///         const SERVICE_ID = 1000;
-///
 ///         struct CreateWallet {
-///             public_key: &PublicKey,
 ///             name: &str,
 ///         }
 ///         // other transaction types...
 ///     }
 /// }
 /// # impl Transaction for CreateWallet {
-/// #     fn verify(&self) -> bool { true }
-/// #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 ///
 /// # fn main() {
+/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
+/// #                    ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
+/// #                    46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
+/// #                    ac2800000005000000416c69636574556b9b7172b7072c\
+/// #                    75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
+/// #                    bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
+/// #                    e4e6ba44e284416f0f";
 /// let json = json!({
 ///     "content": {
-///         "protocol_version": 0,
-///         "service_id": 1000,
-///         "message_id": 0,
-///         "body": {
-///             "public_key": // ...
-/// #                         PublicKey::zero(),
-///             "name": "Alice"
-///         },
-///         "signature": // ...
-/// #                    Signature::zero()
+///         "message": //...
+/// #                    message,
 ///     },
 ///     "location": { "block_height": "1", "position_in_block": "0" },
 ///     "location_proof": // ...
@@ -429,17 +420,14 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 ///     "status": { "type": "success" }
 /// });
 ///
-/// let parsed: CommittedTransaction<CreateWallet> =
+/// let parsed: CommittedTransaction =
 ///     serde_json::from_value(json).unwrap();
 /// assert_eq!(parsed.location().block_height(), Height(1));
-/// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: SerializeContent"))]
-pub struct CommittedTransaction<T = Box<dyn Transaction>> {
-    #[serde(serialize_with = "SerializeContent::serialize_content")]
-    content: T,
+pub struct CommittedTransaction {
+    content: TransactionMessage,
     location: TxLocation,
     location_proof: ListProof<Hash>,
     #[serde(with = "TxStatus")]
@@ -510,9 +498,9 @@ impl<'a> From<TxStatus<'a>> for TransactionResult {
     }
 }
 
-impl<T> CommittedTransaction<T> {
+impl CommittedTransaction {
     /// Returns the content of the transaction.
-    pub fn content(&self) -> &T {
+    pub fn content(&self) -> &TransactionMessage {
         &self.content
     }
 
@@ -564,14 +552,12 @@ impl<T> CommittedTransaction<T> {
 /// ```
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
-/// # use exonum::blockchain::{ExecutionResult, Transaction};
+/// # #[macro_use] extern crate serde_derive;
+/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{PublicKey, Signature};
 /// # use exonum::explorer::TransactionInfo;
-/// # use exonum::storage::Fork;
 /// transactions! {
 ///     Transactions {
-///         const SERVICE_ID = 1000;
-///
 ///         struct CreateWallet {
 ///             public_key: &PublicKey,
 ///             name: &str,
@@ -580,95 +566,46 @@ impl<T> CommittedTransaction<T> {
 ///     }
 /// }
 /// # impl Transaction for CreateWallet {
-/// #     fn verify(&self) -> bool { true }
-/// #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+/// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
 ///
 /// # fn main() {
+/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
+/// #                    ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
+/// #                    46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
+/// #                    ac2800000005000000416c69636574556b9b7172b7072c\
+/// #                    75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
+/// #                    bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
+/// #                    e4e6ba44e284416f0f";
+///
 /// let json = json!({
 ///     "type": "in-pool",
 ///     "content": {
-///         "protocol_version": 0,
-///         "service_id": 1000,
-///         "message_id": 0,
-///         "body": {
-///             "public_key": // ...
-/// #                         PublicKey::zero(),
-///             "name": "Alice"
-///         },
-///         "signature": // ...
-/// #                    Signature::zero()
+///         "message": // ...
+/// #                    message
 ///     }
 /// });
 ///
-/// let parsed: TransactionInfo<CreateWallet> = serde_json::from_value(json).unwrap();
+/// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
 /// assert!(parsed.is_in_pool());
-/// assert_eq!(parsed.content().name(), "Alice");
 /// # } // main
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: SerializeContent"))]
-pub enum TransactionInfo<T = Box<dyn Transaction>> {
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
-        #[serde(serialize_with = "SerializeContent::serialize_content")]
-        content: T,
+        content: TransactionMessage,
     },
 
     /// Transaction is already committed to the blockchain.
-    Committed(CommittedTransaction<T>),
+    Committed(CommittedTransaction),
 }
 
-/// A helper trait functionally equivalent to `serde`'s `Serialize`.
-///
-/// The trait is used to specify bounds on the `Serialize` implementation
-/// in transaction-related types in the `explorer` module, such as [`TransactionInfo`]
-/// and [`CommittedTransaction`].
-///
-/// # Why separate trait?
-///
-/// It is impossible to implement `Serialize` for `Box<Transaction>` (per Rust restrictions).
-/// Similarly, it is impossible to specify `Serialize` as a super-trait for `Transaction`,
-/// as it would render `Transaction` not object-safe. Thus, `SerializeContent` makes
-/// `Box<Transaction>` (as well as types containing transactions) serializable without
-/// needing a manual implementation of `Serialize`.
-///
-/// [`TransactionInfo`]: enum.TransactionInfo.html
-/// [`CommittedTransaction`]: struct.CommittedTransaction.html
-pub trait SerializeContent {
-    /// Serializes content of a transaction with the given serializer.
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer;
-}
-
-impl<T: Serialize> SerializeContent for T {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.serialize(serializer)
-    }
-}
-
-impl SerializeContent for Box<dyn Transaction> {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::Error;
-
-        let value = self.as_ref()
-            .serialize_field()
-            .map_err(|err| S::Error::custom(err.description()))?;
-        value.serialize(serializer)
-    }
-}
-
-impl<T> TransactionInfo<T> {
+impl TransactionInfo {
     /// Returns the content of this transaction.
-    pub fn content(&self) -> &T {
+    pub fn content(&self) -> &TransactionMessage {
         match *self {
             TransactionInfo::InPool { ref content } => content,
             TransactionInfo::Committed(ref tx) => tx.content(),
@@ -693,7 +630,7 @@ impl<T> TransactionInfo<T> {
 
     /// Returns a reference to the inner committed transaction if this transaction is committed.
     /// For transactions in pool, returns `None`.
-    pub fn as_committed(&self) -> Option<&CommittedTransaction<T>> {
+    pub fn as_committed(&self) -> Option<&CommittedTransaction> {
         match *self {
             TransactionInfo::Committed(ref tx) => Some(tx),
             _ => None,
@@ -711,7 +648,7 @@ impl<T> TransactionInfo<T> {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<dyn Snapshot>,
-    transaction_parser: Box<dyn Fn(RawMessage) -> ParseResult + 'a>,
+    transaction_parser: Box<dyn 'a + Fn(Signed<RawTransaction>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -725,7 +662,10 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn new(blockchain: &'a Blockchain) -> Self {
         BlockchainExplorer {
             snapshot: blockchain.snapshot(),
-            transaction_parser: Box::new(move |raw| blockchain.tx_from_raw(raw)),
+            transaction_parser: Box::new(move |raw| {
+                let tx = blockchain.tx_from_raw(raw.payload().clone())?;
+                Ok(TransactionMessage::new(raw, tx))
+            }),
         }
     }
 
@@ -734,12 +674,13 @@ impl<'a> BlockchainExplorer<'a> {
         let schema = Schema::new(&self.snapshot);
         let raw_tx = schema.transactions().get(tx_hash)?;
 
-        let content = (self.transaction_parser)(raw_tx.clone());
-        if let Err(e) = content {
-            error!("Error while parsing transaction {:?}: {}", raw_tx, e);
-            return None;
-        }
-        let content = content.unwrap();
+        let content = match (*self.transaction_parser)(raw_tx) {
+            Err(e) => {
+                error!("Error while parsing transaction {:?}: {}", tx_hash, e);
+                return None;
+            }
+            Ok(v) => v,
+        };
 
         if schema.transactions_pool().contains(tx_hash) {
             return Some(TransactionInfo::InPool { content });
@@ -750,7 +691,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn precommits(&self, block: &Block) -> Vec<Precommit> {
+    fn precommits(&self, block: &Block) -> Vec<Signed<Precommit>> {
         let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.hash());
         let precommits = precommits_table.iter().collect();
@@ -769,7 +710,7 @@ impl<'a> BlockchainExplorer<'a> {
     fn committed_transaction(
         &self,
         tx_hash: &Hash,
-        maybe_content: Option<Box<dyn Transaction>>,
+        maybe_content: Option<TransactionMessage>,
     ) -> CommittedTransaction {
         let schema = Schema::new(&self.snapshot);
 

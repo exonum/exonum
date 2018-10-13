@@ -29,9 +29,8 @@ use futures::{
 
 use std::{cmp::Ordering, time::SystemTime};
 
-use blockchain::Transaction;
 use helpers::{Height, Round};
-use messages::RawTransaction;
+use messages::Message;
 use node::{ExternalMessage, NodeTimeout};
 
 #[cfg(all(test, feature = "long_benchmarks"))]
@@ -51,8 +50,8 @@ pub enum InternalEvent {
     Timeout(NodeTimeout),
     /// Shutdown the node.
     Shutdown,
-    /// Transaction has been successfully verified.
-    TxVerified(RawTransaction),
+    /// Message has been successfully verified.
+    MessageVerified(Message),
 }
 
 #[derive(Debug)]
@@ -61,8 +60,8 @@ pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
     Shutdown,
-    /// Async request to verify a transaction in the thread pool.
-    VerifyTx(Box<dyn Transaction>),
+    /// Async request to verify a message in the thread pool.
+    VerifyMessage(Vec<u8>),
 }
 
 #[derive(Debug, PartialEq, Eq)]

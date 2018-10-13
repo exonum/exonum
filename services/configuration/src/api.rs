@@ -15,7 +15,7 @@
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{Schema as CoreSchema, StoredConfiguration}, crypto::{CryptoHash, Hash},
-    helpers::Height, node::TransactionSend, storage::StorageValue,
+    helpers::Height, storage::StorageValue,
 };
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};
@@ -231,32 +231,32 @@ impl PrivateApi {
         config.consensus.warn_if_nonoptimal();
 
         let cfg_hash = config.hash();
-        let propose = Propose::new(
+        let propose = Propose::sign(
             state.public_key(),
             ::std::str::from_utf8(config.into_bytes().as_slice()).unwrap(),
             state.secret_key(),
         );
         let tx_hash = propose.hash();
 
-        state.sender().send(propose.into())?;
+        state.sender().broadcast_transaction(propose)?;
 
         Ok(ProposeResponse { tx_hash, cfg_hash })
     }
 
     fn handle_vote(state: &ServiceApiState, query: HashQuery) -> api::Result<VoteResponse> {
-        let vote = Vote::new(state.public_key(), &query.hash, state.secret_key());
+        let vote = Vote::sign(state.public_key(), &query.hash, state.secret_key());
         let tx_hash = vote.hash();
 
-        state.sender().send(vote.into())?;
+        state.sender().broadcast_transaction(vote)?;
 
         Ok(VoteResponse { tx_hash })
     }
 
     fn handle_vote_against(state: &ServiceApiState, query: HashQuery) -> api::Result<VoteResponse> {
-        let vote_against = VoteAgainst::new(state.public_key(), &query.hash, state.secret_key());
+        let vote_against = VoteAgainst::sign(state.public_key(), &query.hash, state.secret_key());
         let tx_hash = vote_against.hash();
 
-        state.sender().send(vote_against.into())?;
+        state.sender().broadcast_transaction(vote_against)?;
 
         Ok(VoteResponse { tx_hash })
     }

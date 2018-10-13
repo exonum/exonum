@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const TRANSACTIONS_COUNT: usize = 1_000;
+const MESSAGES_COUNT: usize = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
 use criterion::{
@@ -29,57 +29,22 @@ use exonum::events::InternalRequest;
 use exonum::node::EventsPoolCapacity;
 use exonum::node::ExternalMessage;
 use exonum::{
-    blockchain::{ExecutionResult, Transaction}, crypto::{self, PublicKey},
-    events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::Message, node::NodeChannel, storage::Fork,
+    crypto, events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
+    messages::{Message, RawTransaction, ServiceTransaction}, node::NodeChannel,
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
-pub const SERVICE_ID: u16 = 1;
-
-transactions! {
-    pub Transactions {
-        const SERVICE_ID = SERVICE_ID;
-
-        struct Blank {
-            author: &PublicKey,
-            bytes: &[u8]
-        }
-    }
-}
-
-impl Transaction for Blank {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.author())
-    }
-
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
-        Ok(())
-    }
-}
-
-fn gen_transactions(count: usize, padding_len: usize) -> Vec<Box<Blank>> {
-    let padding = vec![0; padding_len];
-
-    (0..count)
-        .map(|_| {
-            let (p, s) = crypto::gen_keypair();
-            Box::new(Blank::new(&p, &padding, &s))
-        })
-        .collect()
-}
-
-struct TransactionsHandler {
+struct MessagesHandler {
     txs_count: usize,
     expected_count: usize,
     finish_signal: Option<oneshot::Sender<()>>,
 }
 
-impl TransactionsHandler {
+impl MessagesHandler {
     fn new(expected_count: usize) -> (Self, oneshot::Receiver<()>) {
         let channel = oneshot::channel();
 
-        let handler = TransactionsHandler {
+        let handler = MessagesHandler {
             txs_count: 0,
             expected_count,
             finish_signal: Some(channel.0),
@@ -92,10 +57,10 @@ impl TransactionsHandler {
     }
 }
 
-impl EventHandler for TransactionsHandler {
+impl EventHandler for MessagesHandler {
     fn handle_event(&mut self, event: Event) {
-        if let Event::Internal(InternalEvent::TxVerified(_)) = event {
-            assert!(!self.is_finished(), "unexpected `TxVerified`");
+        if let Event::Internal(InternalEvent::MessageVerified(_)) = event {
+            assert!(!self.is_finished(), "unexpected `MessageVerified`");
 
             self.txs_count += 1;
 
@@ -110,47 +75,65 @@ impl EventHandler for TransactionsHandler {
     }
 }
 
-#[derive(Clone)]
-struct TransactionsHandlerRef {
-    // We need to reset the handler from the main thread and then access it from the
-    // handler thread, hence the use of `Arc<RwLock<_>>`.
-    inner: Arc<RwLock<TransactionsHandler>>,
+fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
+    use exonum::storage::StorageValue;
+    let (p, s) = crypto::gen_keypair();
+    (0..count)
+        .map(|_| {
+            let msg = Message::new(
+                RawTransaction::new(
+                    0,
+                    ServiceTransaction::from_raw_unchecked(0, vec![0; tx_size]),
+                ),
+                p,
+                &s,
+            );
+            msg.into_bytes()
+        })
+        .collect()
 }
 
-impl TransactionsHandlerRef {
+#[derive(Clone)]
+struct MessagesHandlerRef {
+    // We need to reset the handler from the main thread and then access it from the
+    // handler thread, hence the use of `Arc<RwLock<_>>`.
+    inner: Arc<RwLock<MessagesHandler>>,
+}
+
+impl MessagesHandlerRef {
     fn new() -> Self {
-        let (handler, _) = TransactionsHandler::new(0);
-        TransactionsHandlerRef {
+        let (handler, _) = MessagesHandler::new(0);
+        MessagesHandlerRef {
             inner: Arc::new(RwLock::new(handler)),
         }
     }
 
     fn reset(&self, expected_count: usize) -> oneshot::Receiver<()> {
-        let (handler, finish_signal) = TransactionsHandler::new(expected_count);
+        let (handler, finish_signal) = MessagesHandler::new(expected_count);
         *self.inner.write().unwrap() = handler;
         finish_signal
     }
 }
 
-impl EventHandler for TransactionsHandlerRef {
+impl EventHandler for MessagesHandlerRef {
     fn handle_event(&mut self, event: Event) {
         self.inner.write().unwrap().handle_event(event);
     }
 }
 
-struct TransactionVerifier {
+struct MessageVerifier {
     tx_sender: Option<Sender<InternalRequest>>,
-    tx_handler: TransactionsHandlerRef,
+    tx_handler: MessagesHandlerRef,
     network_thread: JoinHandle<()>,
     handler_thread: JoinHandle<()>,
     api_sender: Option<Sender<ExternalMessage>>,
     network_sender: Option<Sender<NetworkEvent>>,
 }
 
-impl TransactionVerifier {
+impl MessageVerifier {
     fn new() -> Self {
         let channel = NodeChannel::new(&EventsPoolCapacity::default());
-        let handler = TransactionsHandlerRef::new();
+        let handler = MessagesHandlerRef::new();
 
         let handler_part = HandlerPart {
             handler: handler.clone(),
@@ -179,7 +162,7 @@ impl TransactionVerifier {
             core.run(internal_part.run(handle, verify_handle)).unwrap();
         });
 
-        TransactionVerifier {
+        MessageVerifier {
             handler_thread,
             network_thread,
             tx_sender: Some(channel.internal_requests.0.clone()),
@@ -189,19 +172,15 @@ impl TransactionVerifier {
         }
     }
 
-    fn send_all<'a>(
-        &self,
-        transactions: &'a [Box<Blank>],
-    ) -> impl Future<Item = (), Error = ()> + 'a {
+    fn send_all<'a>(&self, messages: Vec<Vec<u8>>) -> impl Future<Item = (), Error = ()> + 'a {
         let tx_sender = self.tx_sender.as_ref().unwrap().clone();
-        let finish_signal = self.tx_handler.reset(transactions.len());
+        let finish_signal = self.tx_handler.reset(messages.len());
 
         tx_sender
             .send_all(stream::iter_ok(
-                transactions
-                    .iter()
-                    .cloned()
-                    .map(|tx| InternalRequest::VerifyTx(tx as Box<dyn Transaction>)),
+                messages
+                    .into_iter()
+                    .map(|message| InternalRequest::VerifyMessage(message)),
             ))
             .map(drop)
             .map_err(drop)
@@ -219,23 +198,23 @@ impl TransactionVerifier {
     }
 }
 
-fn bench_verify_transactions_simple(b: &mut Bencher, &size: &usize) {
-    let transactions = gen_transactions(TRANSACTIONS_COUNT, size);
+fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
+    let messages = gen_messages(MESSAGES_COUNT, size);
     b.iter(|| {
-        for transaction in &transactions {
-            transaction.verify();
+        for message in messages.clone() {
+            let _ = Message::from_raw_buffer(message).unwrap();
         }
     })
 }
 
-fn bench_verify_transactions_event_loop(b: &mut Bencher, &size: &usize) {
-    let transactions = gen_transactions(TRANSACTIONS_COUNT, size);
+fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
+    let messages = gen_messages(MESSAGES_COUNT, size);
 
-    let verifier = TransactionVerifier::new();
+    let verifier = MessageVerifier::new();
     let mut core = Core::new().unwrap();
 
     b.iter(|| {
-        core.run(verifier.send_all(&transactions)).unwrap();
+        core.run(verifier.send_all(messages.clone())).unwrap();
     });
     verifier.join();
 }
@@ -247,18 +226,15 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
 
     c.bench(
         "transactions/simple",
-        ParameterizedBenchmark::new("size", bench_verify_transactions_simple, parameters.clone())
-            .throughput(|_| Throughput::Elements(TRANSACTIONS_COUNT as u32))
+        ParameterizedBenchmark::new("size", bench_verify_messages_simple, parameters.clone())
+            .throughput(|_| Throughput::Elements(MESSAGES_COUNT as u32))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),
     );
     c.bench(
         "transactions/event_loop",
-        ParameterizedBenchmark::new(
-            "size",
-            bench_verify_transactions_event_loop,
-            parameters.clone(),
-        ).throughput(|_| Throughput::Elements(TRANSACTIONS_COUNT as u32))
+        ParameterizedBenchmark::new("size", bench_verify_messages_event_loop, parameters.clone())
+            .throughput(|_| Throughput::Elements(MESSAGES_COUNT as u32))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),
     );

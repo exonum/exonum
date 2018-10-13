@@ -106,7 +106,7 @@ impl<V: Serialize> Serialize for ListProof<V> {
                 if let Some(ref hash) = *option_hash {
                     state = ser.serialize_struct("Left", 2)?;
                     state.serialize_field("left", left_proof)?;
-                    state.serialize_field("right", hash)?;
+                    state.serialize_field("right", &hash)?;
                 } else {
                     state = ser.serialize_struct("Left", 1)?;
                     state.serialize_field("left", left_proof)?;
@@ -114,7 +114,7 @@ impl<V: Serialize> Serialize for ListProof<V> {
             }
             Right(ref hash, ref right_proof) => {
                 state = ser.serialize_struct("Right", 2)?;
-                state.serialize_field("left", hash)?;
+                state.serialize_field("left", &hash)?;
                 state.serialize_field("right", right_proof)?;
             }
             Leaf(ref val) => {

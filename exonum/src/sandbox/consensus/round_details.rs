@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
-use messages::{Message, PrevotesRequest, TransactionsRequest};
+use messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest};
 use node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
@@ -428,7 +428,7 @@ fn lock_to_propose_and_send_prevote() {
         .build();
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     sandbox.recv(&propose);
@@ -637,7 +637,7 @@ fn handle_precommit_positive_scenario_commit() {
         .build();
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -1016,7 +1016,7 @@ fn commit_using_unknown_propose_with_precommits() {
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -1303,7 +1303,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let first_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(0))
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     // this propose will be used during second commit
@@ -1318,7 +1318,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_proposer_id(ValidatorId(3))
         .with_height(Height(2))
         .with_prev_hash(&first_block.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -1352,7 +1352,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(&precommit_1); //early precommit from future height
 
     sandbox.assert_state(Height(1), Round(1));
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
     sandbox.assert_state(Height(2), Round(1));
     assert_eq!(first_block.hash(), sandbox.last_hash());
 
@@ -1441,7 +1441,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     let block = BlockBuilder::new(&sandbox)
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
         .with_tx_hash(&tx.hash())
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(
@@ -1609,7 +1609,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     // option: with transaction
     let tx = gen_timestamping_tx();
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
     sandbox.assert_state(Height(2), Round(1));
 
     // add rounds & become leader
@@ -1733,7 +1733,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
         sandbox.process_events();
 
         let (_, msg) = sandbox.pop_sent().unwrap();
-        let msg = TransactionsRequest::from_raw(msg)
+        let msg = TransactionsRequest::try_from(msg)
             .expect("Incorrect message. TransactionsRequest was expected.");
 
         assert!(
@@ -1799,7 +1799,7 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
         sandbox.process_events();
 
         let (_, msg) = sandbox.pop_sent().unwrap();
-        let msg = TransactionsRequest::from_raw(msg)
+        let msg = TransactionsRequest::try_from(msg)
             .expect("Incorrect message. TransactionsRequest was expected.");
 
         assert!(
@@ -1808,7 +1808,7 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
         );
 
         let (_, msg) = sandbox.pop_sent().unwrap();
-        PrevotesRequest::from_raw(msg).expect("Incorrect message. PrevotesRequest was expected.");
+        PrevotesRequest::try_from(msg).expect("Incorrect message. PrevotesRequest was expected.");
     }
 
     assert!(

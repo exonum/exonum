@@ -15,17 +15,16 @@
 use failure;
 use toml::Value;
 
+use exonum::{
+    blockchain::{GenesisConfig, ValidatorKeys}, crypto::gen_keypair,
+    helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
+    node::State, node::{ConnectListConfig, NodeConfig},
+};
+
 use std::collections::BTreeMap;
 
-use blockchain::{GenesisConfig, ValidatorKeys};
 use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
-use exonum::crypto::gen_keypair;
-use exonum::node::{ConnectListConfig, NodeConfig};
-use exonum::{
-    helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
-    node::State,
-};
 
 pub struct GenerateCommonConfig;
 

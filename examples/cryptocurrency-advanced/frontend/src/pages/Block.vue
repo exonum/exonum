@@ -15,6 +15,44 @@
           </nav>
 
           <div class="card mt-5">
+            <div class="card-header">Block</div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3"><strong>Height:</strong></div>
+                  <div class="col-sm-9">
+                    <code>{{ block.height }}</code>
+                  </div>
+                </div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3"><strong>Previous block hash:</strong></div>
+                  <div class="col-sm-9">
+                    <code>{{ block.prev_hash }}</code>
+                  </div>
+                </div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3"><strong>Proposer ID:</strong></div>
+                  <div class="col-sm-9">
+                    <code>{{ block.proposer_id }}</code>
+                  </div>
+                </div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3"><strong>State hash:</strong></div>
+                  <div class="col-sm-9">
+                    <code>{{ block.state_hash }}</code>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card mt-5">
             <div class="card-header">Transactions</div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item font-weight-bold">

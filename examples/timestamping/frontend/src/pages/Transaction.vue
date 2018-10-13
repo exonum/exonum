@@ -5,7 +5,7 @@
         <div class="col-md-6 col-md-offset-3">
           <h1>Transaction</h1>
 
-          <div v-if="transaction" class="card mt-5">
+          <div v-if="location.block_height" class="card mt-5">
             <div class="card-header">Transaction</div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
@@ -40,37 +40,19 @@
                   </div>
                 </div>
               </li>
-              <li class="list-group-item">
+              <li v-if="content.message" class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>Protocol version:</strong></div>
-                  <div class="col-sm-9">{{ transaction.protocol_version }}</div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
-                  <div class="col-sm-3"><strong>Service ID:</strong></div>
-                  <div class="col-sm-9">{{ transaction.service_id }}</div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
-                  <div class="col-sm-3"><strong>Message ID:</strong></div>
-                  <div class="col-sm-9">{{ transaction.message_id }}</div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
-                  <div class="col-sm-3"><strong>Signature:</strong></div>
+                  <div class="col-sm-3"><strong>Serialized:</strong></div>
                   <div class="col-sm-9">
-                    <code>{{ transaction.signature }}</code>
+                    <code>{{ content.message }}</code>
                   </div>
                 </div>
               </li>
-              <li class="list-group-item">
+              <li v-if="content.debug" class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>Body:</strong></div>
+                  <div class="col-sm-3"><strong>Content:</strong></div>
                   <div class="col-sm-9">
-                    <pre><code>{{ JSON.stringify(transaction.body, null, 2) }}</code></pre>
+                    <pre><code>{{ JSON.stringify(content.debug, null, 2) }}</code></pre>
                   </div>
                 </div>
               </li>
@@ -96,7 +78,7 @@
     },
     data() {
       return {
-        transaction: null,
+        content: {},
         location: {},
         status: {},
         type: '',
@@ -109,7 +91,7 @@
 
         try {
           const data = await this.$blockchain.getTransaction(this.hash)
-          this.transaction = data.content
+          this.content = data.content
           this.location = data.location
           this.status = data.status
           this.type = data.type

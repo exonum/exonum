@@ -136,7 +136,6 @@ impl NoiseWrapper {
         const CHUNK_LENGTH: usize = MAX_MESSAGE_LENGTH - TAG_LENGTH;
         let len = encrypted_msg_len(msg.len());
         let mut encrypted_message = vec![0; len + HEADER_LENGTH];
-
         LittleEndian::write_u32(&mut encrypted_message[..HEADER_LENGTH], len as u32);
 
         let mut written = vec![0_u8; MAX_MESSAGE_LENGTH];
