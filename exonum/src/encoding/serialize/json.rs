@@ -350,12 +350,11 @@ where
     }
 
     fn serialize_field(&self) -> Result<Value, Box<dyn Error + Send + Sync>> {
-        let result = if let Some(ref value) = self {
+        if let Some(ref value) = self {
             Ok(value.serialize_field()?)
         } else {
             Ok(Value::Null)
-        };
-        result
+        }
     }
 }
 
