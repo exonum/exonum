@@ -44,15 +44,15 @@
                 <div class="row">
                   <div class="col-sm-12">
                     <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">
-                      <span v-if="transaction.message_id === 2">Wallet created</span>
-                      <span v-else-if="transaction.message_id === 1">
-                        <strong v-numeral="transaction.body.amount"/> funds added
+                      <span v-if="transaction.name">Wallet created</span>
+                      <span v-else-if="transaction.to && transaction.to === keyPair.publicKey">
+                        <strong v-numeral="transaction.amount"/> funds received
                       </span>
-                      <span v-else-if="transaction.message_id === 0 && transaction.body.from === keyPair.publicKey">
-                        <strong v-numeral="transaction.body.amount"/> funds sent
+                      <span v-else-if="transaction.to">
+                        <strong v-numeral="transaction.amount"/> funds sent
                       </span>
-                      <span v-else-if="transaction.message_id === 0 && transaction.body.to === keyPair.publicKey">
-                        <strong v-numeral="transaction.body.amount"/> funds received
+                      <span v-else>
+                        <strong v-numeral="transaction.amount"/> funds added
                       </span>
                     </router-link>
                   </div>
