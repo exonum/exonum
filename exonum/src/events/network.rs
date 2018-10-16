@@ -383,10 +383,17 @@ impl NetworkHandler {
                         if pool.contains(&message.author()) || connection_limit_reached {
                             Box::new(future::ok(()))
                         } else {
-                            let conn_addr = ConnectedPeerAddr::Out(
-                                unresolved_address,
-                                socket.get_ref().peer_addr().unwrap(),
-                            );
+                            let addr = match socket.get_ref().peer_addr() {
+                                Ok(addr) => addr,
+                                Err(e) => {
+                                    return Box::new(err(format_err!(
+                                        "Couldn't take peer addr from socket = {}",
+                                        e
+                                    )))
+                                        as Box<dyn Future<Error = failure::Error, Item = ()>>
+                                }
+                            };
+                            let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
                             pool.add(&key, conn_addr.clone(), sender_tx);
                             let connection = Connection::new(
                                 handle,
