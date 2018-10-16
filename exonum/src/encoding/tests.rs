@@ -510,3 +510,48 @@ fn test_correct_encoding_struct() {
     }
     drop(ThreeFields::new(0, 0, 0));
 }
+
+#[test]
+fn test_option_serialization_roundtrip() {
+    use encoding::serialize::json::ExonumJson;
+
+    encoding_struct!(struct Foo {
+        opt1: Option<u32>,
+        opt2: Option<Bar>,
+    });
+
+    encoding_struct!(struct Bar {
+        name: &str,
+    });
+
+    let opts = vec![
+        (Foo::new(None, None), json!({"opt1": null, "opt2": null})),
+        (
+            Foo::new(Some(0xFFFFFFFF), None),
+            json!({"opt1": 4294967295_u32, "opt2": null}),
+        ),
+        (
+            Foo::new(Some(0xFFFFFFFF), Some(Bar::new("Baz"))),
+            json!({"opt1": 4294967295_u32, "opt2": {"name": "Baz"}}),
+        ),
+        (
+            Foo::new(None, Some(Bar::new("Baz"))),
+            json!({"opt1": null, "opt2": {"name": "Baz"}}),
+        ),
+    ];
+
+    for (x, json_x) in opts.iter() {
+        let mut buffer = vec![0; Foo::field_size() as usize];
+        let from: Offset = 0;
+        let to: Offset = Foo::field_size();
+        let checked_from = CheckedOffset::new(from);
+        let checked_to = CheckedOffset::new(to);
+
+        let serialized = x.serialize_field().unwrap();
+        assert_eq!(*json_x, serialized);
+        Foo::deserialize_field(&serialized, &mut buffer, from, to).unwrap();
+        Foo::check(&buffer, checked_from, checked_to, checked_to).unwrap();
+        let foo = unsafe { Foo::read(&buffer, from, to) };
+        assert_eq!(*x, foo);
+    }
+}
