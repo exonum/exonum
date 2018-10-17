@@ -52,6 +52,8 @@
           const data = await this.$blockchain.getBlocks(latest)
           this.blocks = this.blocks.concat(data.blocks)
           this.isSpinnerVisible = false
+          this.webSocket = new WebSocket(`ws://${window.location.host}/api/explorer/v1/blocks/subscribe`)
+          this.webSocket.onmessage = this.handleNewBlock
         } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
@@ -60,12 +62,19 @@
 
       loadMore() {
         this.loadBlocks(this.blocks[this.blocks.length - 1].height - 1)
+      },
+
+      handleNewBlock(event) {
+        this.blocks.unshift(JSON.parse(event.data))
       }
     },
     mounted() {
       this.$nextTick(function() {
         this.loadBlocks()
       })
+    },
+    destroyed() {
+      this.webSocket.close()
     }
   }
 </script>
