@@ -24,7 +24,7 @@ const TransactionMetaData = Exonum.newType({
   ]
 })
 
-function TransferTransaction (publicKey) {
+function TransferTransaction(publicKey) {
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
@@ -37,7 +37,7 @@ function TransferTransaction (publicKey) {
   })
 }
 
-function IssueTransaction (publicKey) {
+function IssueTransaction(publicKey) {
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
@@ -49,7 +49,7 @@ function IssueTransaction (publicKey) {
   })
 }
 
-function CreateTransaction (publicKey) {
+function CreateTransaction(publicKey) {
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
@@ -60,17 +60,16 @@ function CreateTransaction (publicKey) {
   })
 }
 
-function getTransaction(key, publicKey) {
-  switch (key) {
-    case 'Transfer':
-      return new TransferTransaction(publicKey)
-    case 'Issue':
-      return new IssueTransaction(publicKey)
-    case 'CreateWallet':
-      return new CreateTransaction(publicKey)
-    default:
-      throw new Error('Unknown transaction name has been passed')
+function getTransaction(transaction, publicKey) {
+  if (transaction.name) {
+    return new CreateTransaction(publicKey)
   }
+
+  if (transaction.to) {
+    return new TransferTransaction(publicKey)
+  }
+
+  return new IssueTransaction(publicKey)
 }
 
 module.exports = {
@@ -169,31 +168,33 @@ module.exports = {
               }
 
               // validate each transaction
-              let transactions = []
+              const transactions = []
               let index = 0
               for (let transaction of data.wallet_history.transactions) {
-                // get transaction definition
-                let Transaction = getTransaction(name, publicKey)
+                const hash = transactionsMetaData[index++]
+                const buffer = Exonum.hexadecimalToUint8Array(transaction.message)
+                const bufferWithoutSignature = buffer.subarray(0, buffer.length - 64)
+                const author = Exonum.uint8ArrayToHexadecimal(buffer.subarray(0, 32))
+                const signature = Exonum.uint8ArrayToHexadecimal(buffer.subarray(buffer.length - 64, buffer.length));
 
-                // add a signature to the transaction definition
-                Transaction.signature = transaction.signature
+                const Transaction = getTransaction(transaction.debug, author)
 
-                // validate transaction hash
-                if (Transaction.hash(transaction.body) !== transactionsMetaData[index]) {
-                  throw new Error('Invalid transaction hash has been found')
+                if (Exonum.hash(buffer) !== hash) {
+                  throw new Error('Invalid transaction hash')
                 }
 
-                // validate transaction signature
-                if (!Transaction.verifySignature(transaction.signature, transaction.author, transaction.body)) {
-                  throw new Error('Invalid transaction signature has been found')
+                // serialize transaction and compare with message
+                if (!Transaction.serialize(transaction.debug).every(function (el, i) {
+                  return el === bufferWithoutSignature[i]
+                })) {
+                  throw new Error('Invalid transaction message')
                 }
 
-                // add transaction to the resulting array
-                transactions.push(Object.assign({
-                  hash: transactionsMetaData[index]
-                }, transaction))
+                if (!Transaction.verifySignature(signature, author, transaction.debug)) {
+                  throw new Error('Invalid transaction signature')
+                }
 
-                index++
+                transactions.push(Object.assign({ hash: hash }, transaction.debug))
               }
 
               return {

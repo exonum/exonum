@@ -1,64 +1,27 @@
 {
   "block_proof": {
     "block": {
-      "height": "1966",
-      "prev_hash": "5401485e3019dae35b445aa5d53c108e52cd6f60a1ea5c042461b13af65fcffa",
-      "proposer_id": 3,
-      "state_hash": "c4bfe8907e01dba164ba7086a2f2c1dedaa63d32772e8cf88cb6cfa7e60676ca",
-      "tx_count": 0,
-      "tx_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      "height": "56038",
+      "prev_hash": "0d0a93017cac1e75a7986a72f8046bcdd7eb4551b756db555a00b4268fac4a96",
+      "proposer_id": 0,
+      "state_hash": "766997171fbb8973280c5c6bd4cd48755c241464517a0e171728aedc98661505",
+      "tx_count": 1,
+      "tx_hash": "2a9c7c66ef597bae9c1758e75534c88c8fa9cf4a72977cda80d12f18feaf9020"
     },
     "precommits": [
       {
-        "body": {
-          "block_hash": "1d0b2f1a4fcaabf82650a56698ea2f1e3d36976e4936d35c677ce605ceece827",
-          "height": "1966",
-          "propose_hash": "3aba2042d38c57d5517bc47497df868924aa87e18bfdb311fddba776b641f0d7",
+        "payload": {
+          "block_hash": "7d87e35306760b29654c3b40ac580124d43ec766acb83c38995e9d7816221839",
+          "height": "56038",
+          "propose_hash": "9d06373063fd722bc6385dc548046107a89ac96917827b461bb8220afb778493",
           "round": 1,
           "time": {
-            "nanos": 940068000,
-            "secs": "1531164380"
-          },
-          "validator": 1
-        },
-        "message_id": 4,
-        "protocol_version": 0,
-        "service_id": 0,
-        "signature": "37f12cc1955f008cb6a3800c6bfef2f3b65495f99720d6d9e33c21197f4fdc58585440a213921f9fb47fe813a6e339877e0e2c31712bb2ed9417c6dd1c59a30a"
-      },
-      {
-        "body": {
-          "block_hash": "1d0b2f1a4fcaabf82650a56698ea2f1e3d36976e4936d35c677ce605ceece827",
-          "height": "1966",
-          "propose_hash": "3aba2042d38c57d5517bc47497df868924aa87e18bfdb311fddba776b641f0d7",
-          "round": 1,
-          "time": {
-            "nanos": 939410000,
-            "secs": "1531164380"
-          },
-          "validator": 2
-        },
-        "message_id": 4,
-        "protocol_version": 0,
-        "service_id": 0,
-        "signature": "7daf0961903c0a1d4793f7e13abc9a4b20ba14b7737891173bb1079c568f9045567fe4df1dc39ff41fc0abc196d0fdd0e068d8079a142e8c95362cb6cc31310b"
-      },
-      {
-        "body": {
-          "block_hash": "1d0b2f1a4fcaabf82650a56698ea2f1e3d36976e4936d35c677ce605ceece827",
-          "height": "1966",
-          "propose_hash": "3aba2042d38c57d5517bc47497df868924aa87e18bfdb311fddba776b641f0d7",
-          "round": 1,
-          "time": {
-            "nanos": 939512000,
-            "secs": "1531164380"
+            "nanos": 811229000,
+            "secs": "1539691874"
           },
           "validator": 0
         },
-        "message_id": 4,
-        "protocol_version": 0,
-        "service_id": 0,
-        "signature": "b898a81527dfe40c72ba40cb98eaca518b916dce5473c959553d71250cbd91b2e6e0944b12e074efb2ab04253937b2bce24d10a5122ad408b7e201d694719e00"
+        "message": "52b0e5b12eebfecfd39c79ff44a197542dabd958cb7e135a1e1354ec52c1237001000000e6da000000000000010000009d06373063fd722bc6385dc548046107a89ac96917827b461bb8220afb7784937d87e35306760b29654c3b40ac580124d43ec766acb83c38995e9d781622183962d5c55b00000000485f5a3011525e81d383c9e71d75ae31874e570b9707b81d0750c12990510d480c36ca81ce6f6886401822a860545661775196a06a365827f23f33747932f908ae84140d"
       }
     ]
   },
@@ -67,7 +30,7 @@
       "entries": [
         {
           "key": "50c8ba3a6170f0a2fb6736ece8a603576ef6309a35e810911599bc6211b554a9",
-          "value": "d254680aa08527c76c66bc330207aba007364615877f7ae68fadf15ec7d06003"
+          "value": "8b43e2041ef4af6253f34e3f76427664de49ac18d2efaa0664ffea4dfcceaeea"
         }
       ],
       "proof": [
@@ -77,45 +40,72 @@
         },
         {
           "path": "11",
-          "hash": "68adb3be1a114e85af9f8c96d761470c83ccad3d7f62fc8a3f9a7b7f640f631a"
+          "hash": "6a2b8b7b4b9341a0ea0fc353a5ebec913b8519888cc8e6c23a94bd47fcaec980"
         }
       ]
     },
     "to_wallet": {
       "entries": [
         {
-          "key": "ba78f4566a075958770ffd514cde99ed56bdb349fd95464a0b3ee1fb2459c600",
+          "key": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b",
           "value": {
-            "balance": "100",
-            "history_hash": "473fab385340f46b1e89f03124d05d849d7948ef11bc20ae569c96a15052704c",
-            "history_len": "1",
+            "balance": "145",
+            "history_hash": "8bb3dd4745085255a18e44dcaace6f27014524398e162985fdea10b4fd91a6c2",
+            "history_len": "3",
             "name": "John Doe",
-            "pub_key": "ba78f4566a075958770ffd514cde99ed56bdb349fd95464a0b3ee1fb2459c600"
+            "pub_key": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b"
           }
         }
       ],
       "proof": [
         {
-          "path": "1011011100001010011011001100100100100001110010001000010101001110011000010111101100000101000111000101011110110100100110000101000110000001100010001101110101101010011111100111001000001110011101110011000001000000010010001000111010000010111000100111111100000101",
-          "hash": "3b71f0f2655e0425bee267094be55f2327319498fecd9f039c0ba015b8ecd83c"
+          "path": "0111101100001000010110011101001100101011010101101010010000100000111100100000010100101111011110010111001101001010101101110001010110010111001010110100110101011101010000001010000100111111101101110110001010011000111011010000111011100011010100011001111100000110",
+          "hash": "23f07d1e37fe9d6b98da13e0d8f34600368583e8fa6d287ff46c1ca4c03fe78d"
+        },
+        {
+          "path": "11100",
+          "hash": "38b47bb15bdbe5f4ce5d4cbb6a4b9051d098935861556f9819a71fa60d23c54e"
         }
       ]
     }
   },
   "wallet_history": {
     "proof": {
-      "val": "473fab385340f46b1e89f03124d05d849d7948ef11bc20ae569c96a15052704c"
+      "left": {
+        "left": {
+          "val": "f7248195b3d0e2ca5c018a7cd26159d44c2c7e27a9e1f9150a1779d4f7f2420d"
+        },
+        "right": {
+          "val": "c8f0dbbfdf27f9118d4eb17eb0dbd0e4f3ecc5d62a69eb62d883e6f934750d7b"
+        }
+      },
+      "right": {
+        "left": {
+          "val": "2a9c7c66ef597bae9c1758e75534c88c8fa9cf4a72977cda80d12f18feaf9020"
+        }
+      }
     },
     "transactions": [
       {
-        "body": {
-          "name": "John Doe",
-          "pub_key": "ba78f4566a075958770ffd514cde99ed56bdb349fd95464a0b3ee1fb2459c600"
+        "debug": {
+          "name": "John Doe"
         },
-        "message_id": 2,
-        "protocol_version": 0,
-        "service_id": 128,
-        "signature": "c28cc03f7b2bb41cac2c83896be31a293594100e8fdced2d439165f7e9227b271b464408c694df887548971db70b2cf4f287f0781f1a0e9dfe9bfa0f0b80b70a"
+        "message": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b00008000020008000000080000004a6f686e20446f65470c0d186a70e22c1d7d62e92de644b8789172058a7dfff92655c050a8853d1000be72dfb2fe9f941ce705c61b9da2a476167e0ee2c7d91d265da28361132703"
+      },
+      {
+        "debug": {
+          "amount": "50",
+          "seed": "6684106035020060923"
+        },
+        "message": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800001003200000000000000fb586a6206b7c25c7dc31bf63c8476bccf7b43f2b3c7521db5b7c7f13300d011309b91055ec1c2e8fe4d82b3944f67918884dd51fdc43e7ce15f366625a85d30d72f3a27f74ccd01"
+      },
+      {
+        "debug": {
+          "amount": "5",
+          "seed": "16677062690994885376",
+          "to": "8740e2dbe13dfe028e4c4afe27bb3d732f1c45977fa523fcce0d3a90f7ca5c0a"
+        },
+        "message": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800000008740e2dbe13dfe028e4c4afe27bb3d732f1c45977fa523fcce0d3a90f7ca5c0a05000000000000000093ab9928d470e7f30500dfa46b886e42f1cdcfb18675c90213898c88da4ec05ed40bb170181c9c57b241abd45166f63858805ceda90827a3b1462718117b7150a6b39a9d9fd40c"
       }
     ]
   }

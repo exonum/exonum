@@ -16,11 +16,10 @@
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, TransactionSet}, crypto::{Hash, PublicKey}, helpers::Height,
-    messages::RawTransaction, storage::{ListProof, MapProof},
+    blockchain::{self, BlockProof, TransactionMessage}, crypto::{Hash, PublicKey},
+    explorer::BlockchainExplorer, helpers::Height, storage::{ListProof, MapProof},
 };
 
-use transactions::WalletTransactions;
 use wallet::Wallet;
 use {Schema, CRYPTOCURRENCY_SERVICE_ID};
 
@@ -53,7 +52,7 @@ pub struct WalletHistory {
     /// Proof of the list of transaction hashes.
     pub proof: ListProof<Hash>,
     /// List of above transactions.
-    pub transactions: Vec<WalletTransactions>,
+    pub transactions: Vec<TransactionMessage>,
 }
 
 /// Wallet information.
@@ -97,17 +96,15 @@ impl PublicApi {
 
         let wallet = currency_schema.wallet(&query.pub_key);
 
+        let explorer = BlockchainExplorer::new(state.blockchain());
+
         let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(&query.pub_key);
             let proof = history.get_range_proof(0, history.len());
 
-            let transactions: Vec<WalletTransactions> = history
+            let transactions = history
                 .iter()
-                .map(|record| general_schema.transactions().get(&record).unwrap())
-                .map(|raw| {
-                    let raw: &RawTransaction = raw.as_ref();
-                    WalletTransactions::tx_from_raw(raw.clone()).unwrap()
-                })
+                .map(|record| explorer.transaction_without_proof(&record).unwrap())
                 .collect::<Vec<_>>();
 
             WalletHistory {

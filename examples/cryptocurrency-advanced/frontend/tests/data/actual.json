@@ -1,28 +1,16 @@
 {
-  "hash": "ed4d3ded3c90e48ae288a41444c00a6bb2f71b1f158deed342c9e461ba4abe55",
+  "hash": "442e19ffcb701acccd22d41a6de555dcda57a6305f5a27a44aa14ff7208cda38",
   "config": {
     "previous_cfg_hash": "0000000000000000000000000000000000000000000000000000000000000000",
     "actual_from": 0,
     "validator_keys": [
       {
-        "consensus_key": "24e7bd3777610fe085336e09075d62ca1b4d758743667a6f7cdc30675902e3c3",
-        "service_key": "c6b0ae0f14114fe881d04fb7b3bda4909f88d6b77b380581860bbe968688b5fd"
-      },
-      {
-        "consensus_key": "26404261669b1e4489de1b4a21d612270db3a0817a50eedd21a4be54cf6bbbb7",
-        "service_key": "68606cec9201363713914b2006a3d2eba854f3bb6920a3f0e60fd0eaa530083a"
-      },
-      {
-        "consensus_key": "6ce9d5d1300449628146fe9a13122d78b86e8df3f09cba88254346f02671641b",
-        "service_key": "acc96bfe436cef131a101f90d95af4827dc4f25deffc69e1b270dfb996f49c18"
-      },
-      {
-        "consensus_key": "c39edb873bedd7195904f8ae833d1074d52076b893de396cdfe02989ead30afb",
-        "service_key": "5fc3409e9cbc8d934313040ff719706871db95360976c2d4c3bae317ed62a565"
+        "consensus_key": "52b0e5b12eebfecfd39c79ff44a197542dabd958cb7e135a1e1354ec52c12370",
+        "service_key": "5982e4e605e7fa56c1e86cfee9102ebdbb2b38f205f3194e1e4c3af5a9350b88"
       }
     ],
     "consensus": {
-      "round_timeout": 3000,
+      "first_round_timeout": 3000,
       "status_timeout": 5000,
       "peers_timeout": 10000,
       "txs_block_limit": 1000,
