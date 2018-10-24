@@ -383,7 +383,7 @@ fn test_domain_name_peer() {
                 ).unwrap(),
             },
             ConnectInfo {
-                address: "94.130.16.228:6333".parse().unwrap(),
+                address: "3.121.13.104:6333".parse().unwrap(),
                 public_key: PublicKey::from_hex(
                     "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e",
                 ).unwrap(),
