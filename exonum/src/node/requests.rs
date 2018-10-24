@@ -14,6 +14,7 @@
 
 use super::NodeHandler;
 use blockchain::Schema;
+use helpers::Height;
 use messages::{
     BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
     TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
@@ -46,6 +47,8 @@ impl NodeHandler {
             Requests::PrevotesRequest(ref msg) => self.handle_request_prevotes(msg),
             Requests::PeersRequest(ref msg) => self.handle_request_peers(msg),
             Requests::BlockRequest(ref msg) => self.handle_request_block(msg),
+            RequestMessage::Checkpoint(msg) => self.handle_request_checkpoint(&msg),
+            RequestMessage::File(msg) => self.handle_request_file(&msg),
         }
     }
 
@@ -157,5 +160,91 @@ impl NodeHandler {
             &transactions.iter().collect::<Vec<_>>(),
         ));
         self.send_to_peer(msg.author(), block_msg);
+    }
+
+    /// Handles `LastCheckpointRequest` message.
+    pub fn handle_request_checkpoint(&mut self, msg: &LastCheckpointRequest) {
+        if msg.height() > self.state.height() {
+            return;
+        }
+
+        let response = if let Some(ref checkpoints) = self.checkpoints {
+            if let Some((height, path, files_list)) = checkpoints.last_checkpoint() {
+                let checkpoint_name = path.to_string_lossy();
+                warn!(
+                    "[has checkpoint] Name: {}, files: {}",
+                    checkpoint_name, files_list
+                );
+
+                Some(LastCheckpointResponse::new(
+                    self.state.consensus_public_key(),
+                    msg.from(),
+                    true,
+                    height,
+                    &checkpoint_name,
+                    &files_list,
+                    self.state.consensus_secret_key(),
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if response.is_none() {
+            warn!(
+                "[no checkpoint] Has no checkpoint greater than {}",
+                msg.height()
+            );
+        }
+
+        let response = response.unwrap_or(LastCheckpointResponse::new(
+            self.state.consensus_public_key(),
+            msg.from(),
+            false,
+            Height(0),
+            "",
+            "",
+            self.state.consensus_secret_key(),
+        ));
+
+        self.send_to_peer(*msg.from(), response.raw());
+    }
+
+    /// Handles `FileRequest` message.
+    pub fn handle_request_file(&mut self, msg: &FileRequest) {
+        let response = if let Some(ref mut checkpoints) = self.checkpoints {
+            info!(
+                "[file] Requested file {} from {}",
+                msg.file_name(),
+                msg.checkpoint_name()
+            );
+
+            let bytes =
+                match checkpoints.read_checkpoint_file(msg.checkpoint_name(), msg.file_name()) {
+                    Err(e) => {
+                        error!("[file] Was unable to read file: {}", e);
+                        return;
+                    }
+
+                    Ok(bytes) => bytes,
+                };
+
+            Some(FileResponse::new(
+                self.state.consensus_public_key(),
+                msg.from(),
+                msg.checkpoint_name(),
+                msg.file_name(),
+                &bytes,
+                self.state.consensus_secret_key(),
+            ))
+        } else {
+            None
+        };
+
+        if let Some(response) = response {
+            self.send_to_peer(*msg.from(), response.raw());
+        }
     }
 }

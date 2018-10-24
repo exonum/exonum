@@ -865,6 +865,9 @@ impl Sandbox {
 
         let mut handler = NodeHandler::new(
             blockchain,
+            None,
+            None,
+            false,
             &address.to_string(),
             node_sender,
             Box::new(system_state),
@@ -1111,6 +1114,9 @@ fn sandbox_with_services_uninitialized(
 
     let mut handler = NodeHandler::new(
         blockchain.clone(),
+        None,
+        None,
+        false,
         &str_addresses[0],
         node_sender,
         Box::new(system_state),

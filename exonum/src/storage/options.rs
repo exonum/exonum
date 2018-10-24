@@ -38,6 +38,16 @@ pub struct DbOptions {
     ///
     /// Defaults to `true`.
     pub create_if_missing: bool,
+
+    /// A period of DB checkpoint creation in blocks.
+    ///
+    /// Defaults to `None`, meaning that checkpoint creation is disabled.
+    pub checkpoint_period_blocks: Option<u64>,
+
+    /// Maximum number of checkpoints per node.
+    ///
+    /// Defaults to `None` meaning that checkpoint number is unlimited.
+    pub max_checkpoints: Option<usize>,
 }
 
 impl Default for DbOptions {
@@ -45,6 +55,8 @@ impl Default for DbOptions {
         Self {
             max_open_files: None,
             create_if_missing: true,
+            checkpoint_period_blocks: None,
+            max_checkpoints: None,
         }
     }
 }

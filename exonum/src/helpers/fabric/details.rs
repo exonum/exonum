@@ -50,17 +50,23 @@ const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
 const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
 const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
+const CHECKPOINT_PATH: &str = "CHECKPOINT_PATH";
+const SYNC_MODE: &str = "SYNC_MODE";
 
 /// Run command.
 pub struct Run;
 
 impl Run {
     /// Returns created database instance.
-    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
+    pub fn db_helper(ctx: &Context, options: &DbOptions) -> (Box<dyn Database>, String) {
         let path = ctx
             .arg::<String>(DATABASE_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
-        Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
+
+        (
+            Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file")),
+            path,
+        )
     }
 
     fn node_config_path(ctx: &Context) -> String {
@@ -78,6 +84,11 @@ impl Run {
 
     fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
         ctx.arg(PRIVATE_API_ADDRESS).ok()
+    }
+
+    /// Checks whether node is started in sync mode.
+    pub fn is_sync_mode(ctx: &Context) -> bool {
+        ctx.arg::<String>(SYNC_MODE).is_ok()
     }
 }
 
@@ -114,6 +125,14 @@ impl Command for Run {
                 "Listen address for private api.",
                 None,
                 "private-api-address",
+                false,
+            ),
+            Argument::new_named(
+                SYNC_MODE,
+                false,
+                "Run node in DB sync over network mode.",
+                "s",
+                "sync-mode",
                 false,
             ),
         ]
@@ -770,6 +789,47 @@ impl Command for GenerateTestnet {
             let file_name = format!("{}.toml", idx);
             ConfigFile::save(&cfg, &dir.join(file_name)).unwrap();
         }
+
+        Feedback::None
+    }
+}
+
+/// Command for DB checkpoint creation.
+pub struct CreateCheckpoint;
+
+impl Command for CreateCheckpoint {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_positional(DATABASE_PATH, true, "Path to RocksDB directory."),
+            Argument::new_positional(CHECKPOINT_PATH, true, "Name of the checkpoint directory."),
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        "create-checkpoint"
+    }
+
+    fn about(&self) -> &str {
+        "Creates checkpoint of specific RocksDB instance. Node using that instance must be stopped."
+    }
+
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+        _exts: &dyn Fn(Context) -> Context,
+    ) -> Feedback {
+        let db_path = context
+            .arg::<String>(DATABASE_PATH)
+            .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
+        let checkpoint_path = context
+            .arg::<String>(CHECKPOINT_PATH)
+            .unwrap_or_else(|_| panic!("{} not found.", CHECKPOINT_PATH));
+
+        let options = DbOptions::default();
+        let db = RocksDB::open(&db_path, &options).expect("Can't load database file");
+
+        db.create_checkpoint(&checkpoint_path).unwrap();
 
         Feedback::None
     }

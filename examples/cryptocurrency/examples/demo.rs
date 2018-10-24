@@ -63,6 +63,8 @@ fn main() {
     println!("Creating in-memory database...");
     let node = Node::new(
         MemoryDB::new(),
+        None,
+        false,
         vec![Box::new(CurrencyService)],
         node_config(),
         None,

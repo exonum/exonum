@@ -19,7 +19,7 @@ use crypto::PublicKey;
 use events::error::LogError;
 use events::network::ConnectedPeerAddr;
 use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
+use messages::{Connect, FileResponse, LastCheckpointResponse,Message, PeersRequest, Responses, Service, Signed, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -37,7 +37,9 @@ impl NodeHandler {
             }
             Message::Responses(Responses::TransactionsResponse(msg)) => {
                 self.handle_txs_batch(&msg).log_error()
-            }
+            },
+            Ok(Any::LastCheckpoint(msg)) => self.handle_last_checkpoint(&msg),
+            Ok(Any::File(msg)) => self.handle_file(&msg),
         }
     }
 
@@ -167,8 +169,14 @@ impl NodeHandler {
                 self.state.set_node_height(peer, msg.height());
             }
 
-            // Request block
-            self.request(RequestData::Block(height), peer);
+            // Request checkpoint in sync mode if lagging for more than 100 blocks
+            if self.sync_mode && msg.height() > height && msg.height().0 - height.0 > 100 {
+                // Request checkpoint
+                self.request(RequestData::LastCheckpoint(height), peer);
+            } else {
+                // Request block
+                self.request(RequestData::Block(height), peer);
+            }
         }
     }
 
@@ -235,5 +243,59 @@ impl NodeHandler {
 
         let message = self.sign_message(status);
         self.broadcast(message);
+    }
+
+    /// Handles last checkpoint message.
+    pub fn handle_last_checkpoint(&mut self, msg: &LastCheckpointResponse) {
+        if !msg.has_checkpoint() {
+            return;
+        }
+
+        let req = if let Some(ref mut checkpoints) = self.checkpoints {
+            checkpoints.add_checkpoint(msg);
+
+            // Request files
+            if let Some(req) = checkpoints.next_checkpoint_file_request(msg.from()) {
+                Some(RequestData::File(req))
+            } else {
+                Some(RequestData::LastCheckpoint(msg.height()))
+            }
+        } else {
+            None
+        };
+
+        if let Some(req) = req {
+            self.request(req, *msg.from());
+        }
+    }
+
+    /// Handles file message.
+    pub fn handle_file(&mut self, msg: &FileResponse) {
+        let height = self.state.height();
+
+        let req = if let Some(ref mut checkpoints) = self.checkpoints {
+            if !checkpoints.save_checkpoint_file(msg) {
+                // Request another file
+                if let Some(req) = checkpoints.next_checkpoint_file_request(msg.from()) {
+                    Some(RequestData::File(req))
+                } else {
+                    Some(RequestData::LastCheckpoint(height))
+                }
+            } else {
+                if let Err(e) = checkpoints.apply_checkpoint(msg.checkpoint_name()) {
+                    error!("Was unable to apply checkpoint: {}", e);
+                    return;
+                }
+
+                // TODO: graceful shutdown
+                panic!("Successful sync");
+            }
+        } else {
+            None
+        };
+
+        if let Some(req) = req {
+            self.request(req, *msg.from());
+        }
     }
 }

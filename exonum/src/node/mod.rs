@@ -23,6 +23,7 @@ pub use self::{
 };
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
+mod checkpoints;
 pub mod state;
 
 use failure::{self, Error};
@@ -60,6 +61,7 @@ use helpers::{
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
 use messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
+use node::checkpoints::CheckpointManager;
 use node::state::SharedConnectList;
 use storage::{Database, DbOptions};
 
@@ -126,8 +128,15 @@ pub struct NodeHandler {
     pub channel: NodeSender,
     /// Blockchain.
     pub blockchain: Blockchain,
+    /// Path to DB.
+    pub db_path: Option<String>,
+    /// Node is in sync mode.
+    pub sync_mode: bool,
     /// Known peer addresses.
     pub peer_discovery: Vec<String>,
+    /// Checkpoint management state.
+    pub checkpoints: Option<CheckpointManager>,
+
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Node role.
@@ -389,6 +398,9 @@ impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
+        db_path: Option<String>,
+        checkpoints: Option<CheckpointManager>,
+        sync_mode: bool,
         external_address: &str,
         sender: NodeSender,
         system_state: Box<dyn SystemStateProvider>,
@@ -450,11 +462,14 @@ impl NodeHandler {
 
         Self {
             blockchain,
+            db_path,
+            sync_mode,
             api_state,
             system_state,
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
+            checkpoints,
             is_enabled,
             node_role,
             config_manager,
@@ -846,21 +861,34 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new<D: Into<Arc<dyn Database>>>(
         db: D,
+        db_path: Option<String>,
+        remote_sync_mode: bool,
         services: Vec<Box<dyn Service>>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
 
+        let db_arc = db.into();
+
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
-            db,
+            Arc::clone(&db_arc),
             services,
             node_cfg.service_public_key,
             node_cfg.service_secret_key.clone(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
+
+        use std::{fs::remove_dir_all, path::Path};
+        let path = Path::new("checkpoints")
+            .join("received")
+            .join(node_cfg.service_public_key.to_hex());
+
+        if path.exists() {
+            let _ = remove_dir_all(&path);
+        }
 
         let peers = node_cfg.connect_list.addresses();
 
@@ -880,11 +908,21 @@ impl Node {
             peer_discovery: peers,
         };
 
+        let checkpoints = CheckpointManager::new(
+            db_arc,
+            node_cfg.service_public_key,
+            node_cfg.database.checkpoint_period_blocks,
+            node_cfg.database.max_checkpoints,
+        );
+
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
+            db_path,
+            Some(checkpoints),
+            remote_sync_mode,
             &node_cfg.external_address,
             channel.node_sender(),
             system_state,
@@ -892,6 +930,7 @@ impl Node {
             api_state,
             config_file_path,
         );
+
         Self {
             api_options: node_cfg.api,
             handler,
@@ -1112,7 +1151,7 @@ mod tests {
         let services = vec![Box::new(TestService) as Box<dyn Service>];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(db, None, false, services, node_cfg, None);
 
         let tx = Message::sign_transaction(
             TxSimple::new(&p_key, "Hello, World!"),

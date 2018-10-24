@@ -18,9 +18,14 @@
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use rocksdb::{self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch};
+use rocksdb::{
+    self, checkpoint::Checkpoint, utils::get_cf_names, DBIterator, Options as RocksDbOptions,
+    WriteBatch,
+};
 
-use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
+use std::{
+    error::Error, fmt, iter::Peekable, mem, path::{Path, PathBuf}, sync::Arc,
+};
 
 use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
@@ -38,6 +43,7 @@ impl From<rocksdb::Error> for storage::Error {
 /// use different databases.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
+    db_path: PathBuf,
 }
 
 impl DbOptions {
@@ -69,6 +75,9 @@ impl RocksDB {
     /// `create_if_missing` is switched on in `DbOptions`, a new database will
     /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<Self> {
+        let mut path_buf = PathBuf::new();
+        path_buf.push(&path);
+
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
@@ -77,7 +86,11 @@ impl RocksDB {
                 rocksdb::DB::open(&options.to_rocksdb(), path)?
             }
         };
-        Ok(Self { db: Arc::new(db) })
+
+        Ok(Self {
+            db: Arc::new(db),
+            db_path: path_buf,
+        })
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> storage::Result<()> {
@@ -99,6 +112,40 @@ impl RocksDB {
         }
         self.db.write_opt(batch, w_opts).map_err(Into::into)
     }
+
+    /// Creates checkpoint of database on specific path.
+    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<(), ()> {
+        let checkpoint = Checkpoint::new(&*self.db).map_err(|_| ())?;
+
+        checkpoint.create_checkpoint(&path).map_err(|_| ())?;
+
+        Ok(())
+    }
+
+    /// Applies checkpoint by given path.
+    pub fn apply_cp(&self, cp_path: &str) -> Result<(), ()> {
+        use copy_dir::copy_dir;
+        use std::fs::remove_dir_all;
+        use std::path::Path;
+
+        let cp_path = Path::new(&cp_path);
+        if cp_path.exists() {
+            let db_path = &self.db_path;
+            if db_path.exists() {
+                if let Err(e) = remove_dir_all(&db_path) {
+                    error!("Unable to remove DB: {}", e);
+                    return Err(());
+                }
+            }
+
+            if let Err(e) = copy_dir(&cp_path, &db_path) {
+                error!("Unable to copy DB: {}", e);
+                return Err(());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Database for RocksDB {
@@ -118,6 +165,24 @@ impl Database for RocksDB {
         let mut w_opts = RocksDBWriteOptions::default();
         w_opts.set_sync(true);
         self.do_merge(patch, &w_opts)
+    }
+
+    /// Creates checkpoint based on the DB snapshot.
+    fn create_checkpoint(&self, path: &str) -> storage::Result<()> {
+        if (self as &RocksDB).create_checkpoint(&path).is_err() {
+            return Err(storage::Error::new("Failed to create checkpoint"));
+        }
+
+        Ok(())
+    }
+
+    /// Applies checkpoint from given path
+    fn apply_checkpoint(&self, path: &str) -> storage::Result<()> {
+        if (self as &RocksDB).apply_cp(path).is_err() {
+            return Err(storage::Error::new("Failed to apply checkpoint"));
+        }
+
+        Ok(())
     }
 }
 

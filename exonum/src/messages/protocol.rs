@@ -243,6 +243,58 @@ encoding_struct! {
 
 }
 encoding_struct! {
+    /// Information about the last checkpoint.
+    ///
+    /// ### Validation
+    /// The message is ignored if
+    ///     * its `to` field corresponds to a different node
+    ///
+    /// ### Processing
+    /// Returns information about the last checkpoint saved by node.
+    ///
+    /// ### Generation
+    /// The message is sent as response to `LastSnapshotRequest`.
+    struct LastCheckpointResponse {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+        /// Existence of the checkpoint.
+        has_checkpoint: bool,
+        /// Height of the checkpoint.
+        height: Height,
+        /// Name of the last checkpoint. Empty if `has_checkpoint` is false.
+        name: &str,
+        /// List of files associated with this checkpoint. Empty if `has_checkpoint` is false.
+        /// Format of the list is in JSON: `["file1", "file2", "etc."]`
+        files: &str,
+    }
+
+    /// Information about the last checkpoint.
+    ///
+    /// ### Validation
+    /// The message is ignored if
+    ///     * its `to` field corresponds to a different node
+    ///
+    /// ### Processing
+    /// Returns contents of the file requested and associated with specified checkpoint.
+    ///
+    /// ### Generation
+    /// The message is sent as response to `FileRequest`.
+    struct FileResponse {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+        /// Name of the checkpoint associated with the file.
+        checkpoint_name: &str,
+        /// Name of the file.
+        file_name: &str,
+        /// File's content
+        data: &[u8],
+    }
+}
+encoding_struct! {
     /// Request for the `Propose`.
     ///
     /// ### Validation
@@ -340,6 +392,46 @@ encoding_struct! {
         to: & PublicKey,
         /// The height to which the message is related.
         height: Height,
+    }
+
+    /// Request for the last checkpoint higher than the given `height`.
+    ///
+    /// ### Validation
+    /// The message is ignored if its `height` is bigger than the node's last checkpoint's.
+    ///
+    /// ### Processing
+    /// `LastCheckpointResponse` message is sent as the response.
+    ///
+    /// ### Generation
+    /// TBD
+    struct LastCheckpointRequest {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+        /// The height to which the message is related.
+        height: Height,
+    }
+
+    /// Request for the specific checkpoint's associated file data.
+    ///
+    /// ### Validation
+    /// The message is ignored if checkpoint or file doesn't exists.
+    ///
+    /// ### Processing
+    /// `FileResponse` message is sent as the response.
+    ///
+    /// ### Generation
+    /// Sent in response to `FileResponse`.
+    struct FileRequest {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
+        /// Name of the checkpoint to use.
+        checkpoint_name: &str,
+        /// Name of the file to retrieve.
+        file_name: &str,
     }
 }
 

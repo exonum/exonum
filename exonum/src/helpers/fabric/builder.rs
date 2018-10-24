@@ -21,7 +21,10 @@ use std::{
 
 use super::{
     clap_backend::ClapBackend,
-    details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
+    details::{
+        CreateCheckpoint, Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
+        RunDev,
+    },
     info::Info,
     internal::{CollectedCommand, Command, Feedback},
     keys,
@@ -77,13 +80,22 @@ impl NodeBuilder {
                 let config = ctx
                     .get(keys::NODE_CONFIG)
                     .expect("could not find node_config");
-                let db = Run::db_helper(ctx, &config.database);
+                let (db, db_path) = Run::db_helper(ctx, &config.database);
+                let sync_mode = Run::is_sync_mode(ctx);
                 let services: Vec<Box<dyn Service>> = self
                     .service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
                     .collect();
-                let node = Node::new(db, services, config, config_file_path);
+
+                let node = Node::new(
+                    db,
+                    Some(db_path),
+                    sync_mode,
+                    services,
+                    config,
+                    config_file_path,
+                );
                 Some(node)
             }
             _ => None,
@@ -133,6 +145,7 @@ impl NodeBuilder {
             Box::new(RunDev),
             Box::new(GenerateNodeConfig),
             Box::new(GenerateCommonConfig),
+            Box::new(CreateCheckpoint),
             Box::new(Finalize),
             Box::new(Maintenance),
         ].into_iter()

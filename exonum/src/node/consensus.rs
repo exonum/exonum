@@ -23,6 +23,7 @@ use messages::{
     BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
     PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
     TransactionsRequest, TransactionsResponse,
+    FileRequest, LastCheckpointRequest,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;
@@ -513,6 +514,17 @@ impl NodeHandler {
             block_hash.to_hex(),
         );
 
+        // Create checkpoint if needed
+        if let Some(ref mut checkpoints) = self.checkpoints {
+            if let Some(period) = checkpoints.checkpoint_period_blocks {
+                if (height.0 + 1) % period == 0 {
+                    if let Err(e) = checkpoints.create_checkpoint(&height) {
+                        error!("Unable to create checkpoint! {:?}", e);
+                    }
+                }
+            }
+        }
+
         self.broadcast_status();
         self.add_status_timeout();
 
@@ -771,6 +783,23 @@ impl NodeHandler {
                 RequestData::Block(height) => {
                     self.sign_message(BlockRequest::new(&peer, height)).into()
                 }
+                RequestData::LastCheckpoint(height) => {
+                    self.sign_message(LastCheckpointRequest::new(
+                        self.state.consensus_public_key(),
+                        &peer,
+                        height,
+                        self.state.consensus_secret_key(),
+                    )).into()
+                }
+                RequestData::File((ref checkpoint_name, ref file_name)) => {
+                    self.sign_message(FileRequest::new(
+                        self.state.consensus_public_key(),
+                        &peer,
+                        &checkpoint_name,
+                        &file_name,
+                        self.state.consensus_secret_key(),
+                    )).into()
+                },
             };
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, message);

@@ -515,6 +515,7 @@ impl Blockchain {
             );
             service.after_commit(&context);
         }
+
         Ok(())
     }
 

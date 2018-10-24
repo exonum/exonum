@@ -49,6 +49,10 @@ pub const TRANSACTIONS_REQUEST_TIMEOUT: Milliseconds = 100;
 pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `BlockRequest` message.
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
+/// Timeout value for the `LastCheckpointRequest` message.
+pub const CHECKPOINT_REQUEST_TIMEOUT: Milliseconds = 100;
+/// Timeout value for the `FileRequest` message.
+pub const FILE_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
@@ -119,6 +123,10 @@ pub enum RequestData {
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
     Block(Height),
+    /// Represents `LastCheckpointRequest` message.
+    LastCheckpoint(Height),
+    /// Represents `FileRequest` message.
+    File((String, String)),
 }
 
 #[derive(Debug)]
@@ -264,6 +272,8 @@ impl RequestData {
             }
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
+            RequestData::LastCheckpoint(..) => CHECKPOINT_REQUEST_TIMEOUT,
+            RequestData::File(..) => FILE_REQUEST_TIMEOUT,
         };
         Duration::from_millis(ms)
     }

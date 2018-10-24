@@ -285,6 +285,16 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
+
+    /// Creates checkpoint based on the DB snapshot.
+    fn create_checkpoint(&self, _path: &str) -> Result<()> {
+        Ok(())
+    }
+
+    /// Applies checkpoint from given path
+    fn apply_checkpoint(&self, _path: &str) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// A read-only snapshot of a storage backend.
