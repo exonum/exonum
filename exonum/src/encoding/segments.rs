@@ -198,8 +198,8 @@ impl<'a> SegmentField<'a> for RawMessage {
 }
 
 impl<'a, T> SegmentField<'a> for Option<T>
-    where
-        T: Field<'a>,
+where
+    T: Field<'a>,
 {
     fn item_size() -> Offset {
         T::field_size()

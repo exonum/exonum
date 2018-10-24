@@ -344,9 +344,9 @@ impl ExonumJson for Vec<RawMessage> {
 }
 
 impl<T> ExonumJsonDeserialize for Option<T>
-    where
-        T: ExonumJsonDeserialize,
-        for<'a> Option<T>: Field<'a>,
+where
+    T: ExonumJsonDeserialize,
+    for<'a> Option<T>: Field<'a>,
 {
     fn deserialize(value: &Value) -> Result<Self, Box<dyn Error>> {
         if value.is_null() {
@@ -358,9 +358,9 @@ impl<T> ExonumJsonDeserialize for Option<T>
 }
 
 impl<T> ExonumJson for Option<T>
-    where
-        T: ExonumJsonDeserialize + ExonumJson,
-        for<'a> Option<T>: Field<'a>,
+where
+    T: ExonumJsonDeserialize + ExonumJson,
+    for<'a> Option<T>: Field<'a>,
 {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
