@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## 0.9.4 - 2018-10-24
+
+### New features
+
+#### exonum
+
+- `SegmentField` implementation for `Option` has been added, allowing to
+  store optional values inside of transactions. (#1004)
+
 ## 0.9.3 - 2018-10-04
 
 ### Breaking Changes

@@ -197,6 +197,48 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 }
 
+impl<'a, T> SegmentField<'a> for Option<T>
+    where
+        T: Field<'a>,
+{
+    fn item_size() -> Offset {
+        T::field_size()
+    }
+
+    fn count(&self) -> Offset {
+        self.is_some() as usize as Offset
+    }
+
+    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
+        if count > 0 {
+            Some(T::read(buffer, from, from + Self::item_size()))
+        } else {
+            None
+        }
+    }
+
+    fn extend_buffer(&self, mut buffer: &mut Vec<u8>) {
+        let start = buffer.len() as Offset;
+        if let Some(ref v) = self {
+            buffer.resize((start + Self::item_size()) as usize, 0);
+            v.write(&mut buffer, start, start + Self::item_size());
+        }
+    }
+
+    fn check_data(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        count: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        if count.unchecked_offset() == 1 {
+            T::check(buffer, from, (from + Self::item_size())?, latest_segment)
+        } else {
+            Ok(latest_segment)
+        }
+    }
+}
+
 impl<'a, T> SegmentField<'a> for Vec<T>
 where
     T: Field<'a>,
