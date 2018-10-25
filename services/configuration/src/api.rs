@@ -115,7 +115,7 @@ impl PublicApi {
         }
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn proposed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ProposeHashInfo> {
         let schema = Schema::new(state.snapshot());
         let index = schema.config_hash_by_ordinal();
@@ -139,7 +139,7 @@ impl PublicApi {
         proposes
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn committed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ConfigHashInfo> {
         let core_schema = CoreSchema::new(state.snapshot());
         let actual_from = core_schema.configs_actual_from();

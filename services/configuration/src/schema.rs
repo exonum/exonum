@@ -230,7 +230,7 @@ where
     }
 
     /// Returns a list of votes for the proposal corresponding to the given configuration hash.
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<VotingDecision>> {
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
         let votes = votes_by_config_hash.iter().map(MaybeVote::into).collect();

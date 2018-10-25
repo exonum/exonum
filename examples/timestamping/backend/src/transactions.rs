@@ -18,7 +18,7 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 // Suppress a warning in `transactions!` macro call:
-#![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::redundant_field_names))]
 
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},

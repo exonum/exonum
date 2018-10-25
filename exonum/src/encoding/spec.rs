@@ -155,7 +155,7 @@ macro_rules! encoding_struct {
 
         // TODO: Extract some fields like hash and from_raw into trait. (ECR-156)
         impl $name {
-            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            #[cfg_attr(feature="cargo-clippy", allow(clippy::too_many_arguments))]
             #[allow(unused_imports, unused_mut)]
 
             /// Creates a new instance with given parameters.

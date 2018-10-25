@@ -434,7 +434,7 @@ impl SharedConnectList {
 
 impl State {
     /// Creates state with the given parameters.
-    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
         validator_id: Option<ValidatorId>,
         consensus_public_key: PublicKey,

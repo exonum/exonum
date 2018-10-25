@@ -98,9 +98,7 @@ impl StorageKey for () {
         // no-op
     }
 
-    fn read(_buffer: &[u8]) -> Self::Owned {
-        ()
-    }
+    fn read(_buffer: &[u8]) -> Self::Owned {}
 }
 
 impl StorageKey for u8 {

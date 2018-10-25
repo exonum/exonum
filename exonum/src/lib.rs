@@ -23,22 +23,22 @@
     bare_trait_objects
 )]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
-#![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
+#![cfg_attr(feature = "cargo-clippy", deny(clippy::clippy_pedantic))]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
           // Next `cast_*` lints don't give alternatives.
-          cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
+          clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
           // `filter(..).map(..)` often looks more shorter and readable.
-          filter_map,
+          clippy::filter_map,
           // Next lints produce too much noise/false positives.
-          stutter, similar_names,
+          clippy::stutter, clippy::similar_names,
           // Variant name ends with the enum name. Similar behavior to similar_names.
-          pub_enum_variant_names,
+          clippy::pub_enum_variant_names,
           // Next lints allowed due to false positive.
-          doc_markdown,
+          clippy::doc_markdown,
           // '... may panic' lints.
-          indexing_slicing,
+          clippy::indexing_slicing,
     )
 )]
 

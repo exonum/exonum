@@ -698,7 +698,7 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn precommits(&self, block: &Block) -> Vec<Signed<Precommit>> {
         let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.hash());
@@ -706,7 +706,7 @@ impl<'a> BlockchainExplorer<'a> {
         precommits
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
         let schema = Schema::new(&self.snapshot);
         let tx_hashes_table = schema.block_transactions(block.height());

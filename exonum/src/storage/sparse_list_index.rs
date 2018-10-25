@@ -18,7 +18,7 @@
 //! over the items of this index.
 
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
-#![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
+#![cfg_attr(feature="cargo-clippy", allow(clippy::doc_markdown))]
 
 use byteorder::{BigEndian, ByteOrder};
 
