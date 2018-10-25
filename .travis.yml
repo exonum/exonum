@@ -88,7 +88,7 @@ jobs:
     - ./node_modules/.bin/cspell --version
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cargo fmt --all -- --write-mode=check
+    - cargo fmt --all -- --check
     - npm run cspell
     - npm run md
     - cargo clean --doc
@@ -101,6 +101,8 @@ jobs:
     - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
     - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
     - touch target/doc/exonum_configuration/enum.Option.html
+    - touch target/std/string/struct.String.html
+    - touch target/std/primitive.usize.html
     - cargo deadlinks --dir target/doc
 
   # Clippy linting
