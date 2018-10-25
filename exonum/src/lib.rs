@@ -16,7 +16,12 @@
 //!
 //! For more information see the project readme.
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 #![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
 #![cfg_attr(
@@ -32,8 +37,8 @@
           pub_enum_variant_names,
           // Next lints allowed due to false positive.
           doc_markdown,
-          // Can be enabled when rust-lang-nursery/rust-clippy#2894 is fixed.
-          use_self,
+          // '... may panic' lints.
+          indexing_slicing,
     )
 )]
 

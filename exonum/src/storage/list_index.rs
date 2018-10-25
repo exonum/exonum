@@ -20,8 +20,9 @@
 use std::{cell::Cell, marker::PhantomData};
 
 use super::{
-    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
-    StorageKey, StorageValue,
+    base_index::{BaseIndex, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork, Snapshot, StorageKey, StorageValue,
 };
 
 /// A list of items where elements are added to the end of the list and are

@@ -15,7 +15,8 @@
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
 use std::{
-    fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+    fmt,
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
 use super::sodiumoxide::crypto::{

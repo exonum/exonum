@@ -23,7 +23,12 @@
 //! [docs]: https://exonum.com/doc/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 
 #[macro_use]
 extern crate exonum;
@@ -37,7 +42,8 @@ extern crate serde_json;
 /// Persistent data.
 pub mod schema {
     use exonum::{
-        crypto::PublicKey, storage::{Fork, MapIndex, Snapshot},
+        crypto::PublicKey,
+        storage::{Fork, MapIndex, Snapshot},
     };
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
@@ -115,7 +121,8 @@ pub mod schema {
 pub mod transactions {
     use super::service::SERVICE_ID;
     use exonum::{
-        crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
+        crypto::{PublicKey, SecretKey},
+        messages::{Message, RawTransaction, Signed},
     };
     transactions! {
         /// Transaction group.
@@ -294,7 +301,8 @@ pub mod contracts {
 /// REST API.
 pub mod api {
     use exonum::{
-        api::{self, ServiceApiBuilder, ServiceApiState}, crypto::{Hash, PublicKey},
+        api::{self, ServiceApiBuilder, ServiceApiState},
+        crypto::{Hash, PublicKey},
     };
 
     use schema::{CurrencySchema, Wallet};
@@ -352,8 +360,12 @@ pub mod api {
 /// Service declaration.
 pub mod service {
     use exonum::{
-        api::ServiceApiBuilder, blockchain::{Service, Transaction, TransactionSet}, crypto::Hash,
-        encoding, messages::RawTransaction, storage::Snapshot,
+        api::ServiceApiBuilder,
+        blockchain::{Service, Transaction, TransactionSet},
+        crypto::Hash,
+        encoding,
+        messages::RawTransaction,
+        storage::Snapshot,
     };
 
     use api::CryptocurrencyApi;

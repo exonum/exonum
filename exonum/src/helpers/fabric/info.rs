@@ -19,7 +19,8 @@ use serde_json;
 use std::collections::HashMap;
 
 use super::{
-    internal::{CollectedCommand, Command, Feedback}, Argument, CommandName, Context,
+    internal::{CollectedCommand, Command, Feedback},
+    Argument, CommandName, Context,
 };
 
 // Context entry for the type of the requested information.

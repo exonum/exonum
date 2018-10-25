@@ -20,9 +20,13 @@ use env_logger;
 use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    self, cell::{Ref, RefCell, RefMut},
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque}, iter::FromIterator,
-    net::{IpAddr, Ipv4Addr, SocketAddr}, ops::{AddAssign, Deref}, sync::{Arc, Mutex},
+    self,
+    cell::{Ref, RefCell, RefMut},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    iter::FromIterator,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::{AddAssign, Deref},
+    sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -119,13 +123,14 @@ impl SandboxInner {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
                     InternalRequest::Timeout(t) => self.timers.push(t),
-                    InternalRequest::JumpToRound(height, round) => self.handler
+                    InternalRequest::JumpToRound(height, round) => self
+                        .handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
-                        let protocol = Message::deserialize(
-                            SignedMessage::from_raw_buffer(message).unwrap(),
-                        ).unwrap();
+                        let protocol =
+                            Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
+                                .unwrap();
                         self.handler
                             .handle_event(InternalEvent::MessageVerified(protocol).into());
                     }
@@ -639,8 +644,7 @@ impl Sandbox {
                     return false;
                 }
                 true
-            })
-            .cloned()
+            }).cloned()
             .collect()
     }
 
@@ -724,7 +728,8 @@ impl Sandbox {
 
     pub fn round_timeout_increase(&self) -> Milliseconds {
         (self.cfg().consensus.first_round_timeout
-            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT)
+            / 100
     }
 
     pub fn current_round_timeout(&self) -> Milliseconds {
@@ -818,7 +823,8 @@ impl Sandbox {
         let internal_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
 
-        let address: SocketAddr = self.a(ValidatorId(0))
+        let address: SocketAddr = self
+            .a(ValidatorId(0))
             .parse()
             .expect("Fail to parse socket address");
         let inner = self.inner.borrow();
@@ -1043,8 +1049,7 @@ fn sandbox_with_services_uninitialized(
         .map(|(p, a)| ConnectInfo {
             address: a.clone(),
             public_key: *p,
-        })
-        .collect();
+        }).collect();
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
@@ -1396,8 +1401,7 @@ mod tests {
             .with_services(vec![
                 Box::new(AfterCommitService),
                 Box::new(TimestampingService::new()),
-            ])
-            .build();
+            ]).build();
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));

@@ -22,15 +22,18 @@ use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
 use tokio_core::reactor::Core;
 
 use std::{
-    sync::{Arc, RwLock}, thread::{self, JoinHandle},
+    sync::{Arc, RwLock},
+    thread::{self, JoinHandle},
 };
 
 use exonum::events::InternalRequest;
 use exonum::node::EventsPoolCapacity;
 use exonum::node::ExternalMessage;
 use exonum::{
-    crypto, events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::{Message, RawTransaction, ServiceTransaction}, node::NodeChannel,
+    crypto,
+    events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
+    messages::{Message, RawTransaction, ServiceTransaction},
+    node::NodeChannel,
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -89,8 +92,7 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
                 &s,
             );
             msg.into_bytes()
-        })
-        .collect()
+        }).collect()
 }
 
 #[derive(Clone)]
@@ -181,8 +183,7 @@ impl MessageVerifier {
                 messages
                     .into_iter()
                     .map(|message| InternalRequest::VerifyMessage(message)),
-            ))
-            .map(drop)
+            )).map(drop)
             .map_err(drop)
             .and_then(|()| finish_signal.map_err(drop))
     }

@@ -17,7 +17,8 @@
 use byteorder::{ByteOrder, LittleEndian};
 use rand::{thread_rng, RngCore};
 use snow::{
-    params::{CipherChoice, DHChoice, HashChoice}, resolvers::{CryptoResolver, DefaultResolver},
+    params::{CipherChoice, DHChoice, HashChoice},
+    resolvers::{CryptoResolver, DefaultResolver},
     types::{Cipher, Dh, Hash, Random},
 };
 
@@ -291,13 +292,13 @@ mod tests {
     fn test_curve25519() {
         // Values are cited from RFC-7748: 5.2.  Test Vectors.
         let mut keypair: SodiumDh25519 = Default::default();
-        let scalar = Vec::<u8>::from_hex(
-            "a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4",
-        ).unwrap();
+        let scalar =
+            Vec::<u8>::from_hex("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")
+                .unwrap();
         keypair.set(&scalar);
-        let public = Vec::<u8>::from_hex(
-            "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
-        ).unwrap();
+        let public =
+            Vec::<u8>::from_hex("e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c")
+                .unwrap();
         let mut output = [0_u8; 32];
         keypair.dh(&public, &mut output).unwrap();
 

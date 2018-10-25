@@ -113,7 +113,8 @@ pub use self::{error::Error, fields::Field, segments::SegmentField};
 pub mod serialize;
 
 use std::{
-    convert::From, ops::{Add, Div, Mul, Sub},
+    convert::From,
+    ops::{Add, Div, Mul, Sub},
 };
 
 mod error;

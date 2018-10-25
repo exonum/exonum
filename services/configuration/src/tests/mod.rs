@@ -13,8 +13,11 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{Schema, StoredConfiguration}, crypto::{hash, CryptoHash, Hash, HASH_SIZE},
-    helpers::{Height, ValidatorId}, messages::{RawTransaction, Signed}, storage::StorageValue,
+    blockchain::{Schema, StoredConfiguration},
+    crypto::{hash, CryptoHash, Hash, HASH_SIZE},
+    helpers::{Height, ValidatorId},
+    messages::{RawTransaction, Signed},
+    storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 use serde_json;
@@ -71,8 +74,7 @@ impl ConfigurationTestKit for TestKit {
             .with_validators(4)
             .with_service(ConfigurationService {
                 config: ConfigurationServiceConfig::default(),
-            })
-            .create()
+            }).create()
     }
 
     fn apply_configuration(&mut self, proposer: ValidatorId, cfg_proposal: StoredConfiguration) {
@@ -85,7 +87,8 @@ impl ConfigurationTestKit for TestKit {
         self.create_block_with_transactions(txvec![tx_propose]);
         // Push votes
         let cfg_proposal_hash = cfg_proposal.hash();
-        let tx_votes = self.network()
+        let tx_votes = self
+            .network()
             .validators()
             .iter()
             .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
@@ -119,8 +122,7 @@ fn test_full_node_to_validator() {
         .with_validators(3)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -140,8 +142,7 @@ fn test_add_validators_to_config() {
         .with_validators(3)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -161,8 +162,7 @@ fn test_exclude_sandbox_node_from_config() {
         .with_validators(4)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -182,8 +182,7 @@ fn test_apply_second_configuration() {
         .with_validators(3)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
     // First configuration.
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -214,8 +213,7 @@ fn test_apply_with_increased_majority() {
         .with_validators(6)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
 
     // Applying the first configuration with custom majority count.
     let cfg_change_height = Height(5);
@@ -280,8 +278,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
         .with_validators(4)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -308,8 +305,7 @@ fn test_discard_proposes_with_too_small_majority_count() {
         .with_validators(4)
         .with_service(ConfigurationService {
             config: ConfigurationServiceConfig::default(),
-        })
-        .create();
+        }).create();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
@@ -453,9 +449,11 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_blocks_until(Height(10));
     let illegal_vote = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
-    assert!(!testkit
-        .votes_for_propose(new_cfg.hash())
-        .contains(&Some(VotingDecision::Yea(illegal_vote.hash()))));
+    assert!(
+        !testkit
+            .votes_for_propose(new_cfg.hash())
+            .contains(&Some(VotingDecision::Yea(illegal_vote.hash())))
+    );
 }
 
 #[test]
@@ -563,9 +561,11 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
         let illegal_node = TestNode::new_auditor();
         let illegal_validator_vote = new_tx_config_vote(&illegal_node, discarded_votes_cfg.hash());
         testkit.create_block_with_transactions(txvec![illegal_validator_vote.clone()]);
-        assert!(!testkit
-            .votes_for_propose(discarded_votes_cfg.hash())
-            .contains(&Some(VotingDecision::Yea(illegal_validator_vote.hash()))))
+        assert!(
+            !testkit
+                .votes_for_propose(discarded_votes_cfg.hash())
+                .contains(&Some(VotingDecision::Yea(illegal_validator_vote.hash())))
+        )
     }
     {
         let votes = (0..3)
@@ -600,8 +600,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
                     &testkit.network().validators()[id],
                     discarded_votes_cfg.hash(),
                 )
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         testkit.create_block_with_transactions(expected_votes.clone().into_iter());
 
         let actual_votes = testkit.votes_for_propose(discarded_votes_cfg.hash());
@@ -636,8 +635,7 @@ fn test_regression_majority_votes_for_different_proposes() {
             .map(|cfg| {
                 let validator = &testkit.network().validators()[1];
                 new_tx_config_propose(&validator, cfg.clone())
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         testkit.create_block_with_transactions(proposes);
     }
     {
@@ -645,8 +643,7 @@ fn test_regression_majority_votes_for_different_proposes() {
             .map(|validator| {
                 let validator = &testkit.network().validators()[validator];
                 new_tx_config_vote(validator, new_cfg1.hash())
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(
             initial_cfg,
@@ -699,8 +696,7 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
             .map(|validator| {
                 let validator = &testkit.network().validators()[validator];
                 new_tx_config_vote(validator, new_cfg1.hash())
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(
             new_cfg1,
@@ -715,8 +711,7 @@ fn test_regression_new_vote_for_older_config_applies_old_config() {
             .map(|validator| {
                 let validator = &testkit.network().validators()[validator];
                 new_tx_config_vote(validator, new_cfg2.hash())
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);
         assert_eq!(Height(4), testkit.height());
         assert_eq!(

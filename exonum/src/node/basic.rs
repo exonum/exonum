@@ -204,7 +204,8 @@ impl NodeHandler {
                 rng.gen_range(0, to)
             };
 
-            let peer = self.state
+            let peer = self
+                .state
                 .peers()
                 .iter()
                 .map(|x| x.1.clone())

@@ -17,7 +17,8 @@ use std::{
     collections::{
         btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range},
         hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter},
-        Bound::{Included, Unbounded}, HashMap,
+        Bound::{Included, Unbounded},
+        HashMap,
     },
     iter::{Iterator as StdIterator, Peekable},
 };
@@ -414,7 +415,8 @@ impl Fork {
 
     /// Inserts a key-value pair into the fork.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        let changes = self.patch
+        let changes = self
+            .patch
             .changes_entry(name.to_string())
             .or_insert_with(Changes::new);
         if self.logged {
@@ -430,7 +432,8 @@ impl Fork {
 
     /// Removes a key from the fork.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        let changes = self.patch
+        let changes = self
+            .patch
             .changes_entry(name.to_string())
             .or_insert_with(Changes::new);
         if self.logged {
@@ -447,7 +450,8 @@ impl Fork {
     /// Removes all keys starting with the specified prefix from the column family
     /// with the given `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
-        let changes = self.patch
+        let changes = self
+            .patch
             .changes_entry(name.to_string())
             .or_insert_with(Changes::new);
         // Remove changes
@@ -465,7 +469,8 @@ impl Fork {
             changes.data.clear();
         }
         // Remove from storage
-        let mut iter = self.snapshot
+        let mut iter = self
+            .snapshot
             .iter(name, prefix.map_or(&[], |k| k.as_slice()));
         while let Some((k, ..)) = iter.next() {
             let change = changes.data.insert(k.to_vec(), Change::Delete);

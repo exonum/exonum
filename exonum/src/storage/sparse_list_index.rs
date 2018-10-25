@@ -25,8 +25,9 @@ use byteorder::{BigEndian, ByteOrder};
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
 use super::{
-    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
-    StorageKey, StorageValue,
+    base_index::{BaseIndex, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork, Snapshot, StorageKey, StorageValue,
 };
 use crypto::{hash, CryptoHash, Hash};
 

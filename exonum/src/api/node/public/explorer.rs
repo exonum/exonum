@@ -25,8 +25,8 @@ use std::sync::{Arc, Mutex};
 
 use api::{
     backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websocket::{Server, Session}, Error as ApiError, ServiceApiBackend, ServiceApiScope,
-    ServiceApiState,
+    websocket::{Server, Session},
+    Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
 use blockchain::{Block, SharedNodeState};
 use crypto::Hash;
@@ -157,8 +157,7 @@ impl ExplorerApi {
                 if query.add_blocks_time {
                     times.push(median_precommits_time(&block.precommits()));
                 }
-            })
-            .map(|block| block.into_header())
+            }).map(|block| block.into_header())
             .collect();
 
         let height = if blocks.len() < query.count {

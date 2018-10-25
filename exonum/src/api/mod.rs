@@ -14,7 +14,8 @@
 
 //! API and corresponding utilities.
 pub use self::{
-    error::Error, state::ServiceApiState,
+    error::Error,
+    state::ServiceApiState,
     with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
 };
 

@@ -25,8 +25,10 @@ use exonum::{
     blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding,
-    messages::{Message, RawTransaction, Signed}, storage::Snapshot,
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
+    encoding,
+    messages::{Message, RawTransaction, Signed},
+    storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -102,12 +104,12 @@ fn main() {
 
     // Check results with api.
     let api = testkit.api();
-    let blocks_range: BlocksRange = api.public(ApiKind::Explorer)
+    let blocks_range: BlocksRange = api
+        .public(ApiKind::Explorer)
         .query(&BlocksQuery {
             count: 10,
             ..Default::default()
-        })
-        .get("v1/blocks")
+        }).get("v1/blocks")
         .unwrap();
     assert_eq!(blocks_range.blocks.len(), 2);
 

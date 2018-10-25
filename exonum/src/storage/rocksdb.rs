@@ -85,7 +85,8 @@ impl RocksDB {
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
-                None => self.db
+                None => self
+                    .db
                     .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
                     .unwrap(),
             };
@@ -135,7 +136,8 @@ impl Snapshot for RocksDBSnapshot {
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         use rocksdb::{Direction, IteratorMode};
         let iter = match self.db.cf_handle(name) {
-            Some(cf) => self.snapshot
+            Some(cf) => self
+                .snapshot
                 .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
                 .unwrap(),
             None => self.snapshot.iterator(IteratorMode::Start),

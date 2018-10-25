@@ -865,7 +865,8 @@ mod tests {
                 255,
                 Some("(Not) really long error description".to_owned()),
             )),
-        ].iter()
+        ]
+            .iter()
             .map(|res| TransactionResult(res.to_owned()))
             .collect::<Vec<_>>();
 

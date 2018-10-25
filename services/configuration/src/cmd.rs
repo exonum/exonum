@@ -16,9 +16,11 @@ use failure;
 use toml::Value;
 
 use exonum::{
-    blockchain::{GenesisConfig, ValidatorKeys}, crypto::gen_keypair,
+    blockchain::{GenesisConfig, ValidatorKeys},
+    crypto::gen_keypair,
     helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
-    node::State, node::{ConnectListConfig, NodeConfig},
+    node::State,
+    node::{ConnectListConfig, NodeConfig},
 };
 
 use std::collections::BTreeMap;
@@ -167,12 +169,16 @@ pub fn generate_testnet_config(
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
-    let genesis = GenesisConfig::new(validators.iter().zip(services.iter()).map(|x| {
-        ValidatorKeys {
-            consensus_key: (x.0).0,
-            service_key: (x.1).0,
-        }
-    }));
+    let genesis =
+        GenesisConfig::new(
+            validators
+                .iter()
+                .zip(services.iter())
+                .map(|x| ValidatorKeys {
+                    consensus_key: (x.0).0,
+                    service_key: (x.1).0,
+                }),
+        );
 
     let mut service_config: BTreeMap<String, Value> = BTreeMap::new();
 
@@ -205,6 +211,5 @@ pub fn generate_testnet_config(
             services_configs: service_config.clone(),
             database: Default::default(),
             thread_pool_size: Default::default(),
-        })
-        .collect::<Vec<_>>()
+        }).collect::<Vec<_>>()
 }

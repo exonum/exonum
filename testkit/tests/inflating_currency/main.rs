@@ -31,8 +31,10 @@ extern crate hex;
 extern crate serde_json;
 
 use exonum::{
-    api::node::public::explorer::TransactionResponse, crypto::{self, PublicKey, SecretKey},
-    helpers::Height, messages::{RawTransaction, Signed},
+    api::node::public::explorer::TransactionResponse,
+    crypto::{self, PublicKey, SecretKey},
+    helpers::Height,
+    messages::{RawTransaction, Signed},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
@@ -54,7 +56,8 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (Signed<RawTransaction>, Secre
     let tx = TxCreateWallet::sign(name, &pubkey, &key);
 
     let data = hex::encode(tx.clone().serialize());
-    let tx_info: TransactionResponse = api.public(ApiKind::Explorer)
+    let tx_info: TransactionResponse = api
+        .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post("v1/transactions")
         .unwrap();
@@ -165,8 +168,7 @@ fn test_fuzz_transfers() {
             let (pubkey, key) = crypto::gen_keypair();
             let tx = TxCreateWallet::sign(&format!("User #{}", i), &pubkey, &key);
             (key, tx)
-        })
-        .collect();
+        }).collect();
     let pubkeys: Vec<_> = keys_and_txs
         .iter()
         .map(|&(_, ref tx)| tx.author())

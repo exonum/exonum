@@ -29,7 +29,8 @@ use byteorder::{ByteOrder, LittleEndian};
 use futures::future::Future;
 use tokio_codec::Framed;
 use tokio_io::{
-    io::{read_exact, write_all}, AsyncRead, AsyncWrite,
+    io::{read_exact, write_all},
+    AsyncRead, AsyncWrite,
 };
 
 use events::{codec::MessagesCodec, error::into_failure};
@@ -67,8 +68,7 @@ impl HandshakeRawMessage {
             .and_then(|(stream, msg)| {
                 let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
                 read_exact(stream, vec![0_u8; len as usize])
-            })
-            .map_err(into_failure)
+            }).map_err(into_failure)
             .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
     }
 

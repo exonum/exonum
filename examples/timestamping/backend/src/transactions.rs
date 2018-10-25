@@ -22,7 +22,8 @@
 
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
+    crypto::{PublicKey, SecretKey},
+    messages::{Message, RawTransaction, Signed},
 };
 use exonum_time::schema::TimeSchema;
 

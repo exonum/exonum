@@ -34,7 +34,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.27.0
+  - 1.29.0
 
 cache:
   directories:
@@ -49,7 +49,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.209
+  - CLIPPY_VERS=0.0.212
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
@@ -78,7 +78,7 @@ before_install:
 jobs:
   include:
   # Formatting & other lints that do not require compilation
-  - env: FEATURE=lints
+  - name: lints
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
@@ -105,15 +105,15 @@ jobs:
     - cargo deadlinks --dir target/doc
 
   # Clippy linting
-  - env: FEATURE=clippy
-    rust: nightly-2018-06-20
+  - name: clippy
+    rust: nightly-2018-07-07
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
     - cargo clippy --all -- -D warnings
 
   # Tests
-  - env: FEATURE=test
+  - name: test
     addons:
       apt:
         sources:
@@ -167,8 +167,8 @@ jobs:
       echo "Uploaded code coverage"
 
   # Benchmarks (compilation only)
-  - env: FEATURE=benchmarks
-    rust: nightly-2018-05-26
+  - name: benchmarks
+    rust: nightly-2018-07-07
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
 

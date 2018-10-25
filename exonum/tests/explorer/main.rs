@@ -27,8 +27,11 @@ extern crate serde_derive;
 extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation}, crypto::{self, Hash},
-    explorer::*, helpers::Height, messages::{self, Message, RawTransaction, Signed},
+    blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
+    crypto::{self, Hash},
+    explorer::*,
+    helpers::Height,
+    messages::{self, Message, RawTransaction, Signed},
 };
 
 use blockchain::{
@@ -398,8 +401,7 @@ fn test_transaction_iterator() {
             } else {
                 false
             }
-        })
-        .map(|tx| tx.location().position_in_block())
+        }).map(|tx| tx.location().position_in_block())
         .collect();
     assert_eq!(create_wallet_positions, vec![0, 1]);
 }

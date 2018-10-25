@@ -15,7 +15,9 @@
 //! REST API.
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof}, crypto::Hash,
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    blockchain::{self, BlockProof},
+    crypto::Hash,
     storage::MapProof,
 };
 

@@ -16,8 +16,11 @@
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, TransactionMessage}, crypto::{Hash, PublicKey},
-    explorer::BlockchainExplorer, helpers::Height, storage::{ListProof, MapProof},
+    blockchain::{self, BlockProof, TransactionMessage},
+    crypto::{Hash, PublicKey},
+    explorer::BlockchainExplorer,
+    helpers::Height,
+    storage::{ListProof, MapProof},
 };
 
 use wallet::Wallet;

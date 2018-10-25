@@ -30,7 +30,8 @@ use node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
 use sandbox::{
-    sandbox::{self, timestamping_sandbox}, sandbox_tests_helper::*,
+    sandbox::{self, timestamping_sandbox},
+    sandbox_tests_helper::*,
 };
 
 /// check scenario:

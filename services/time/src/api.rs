@@ -67,12 +67,12 @@ impl PrivateApi {
         let idx = schema.validators_times();
 
         // The times of all validators for which time is known.
-        let validators_times = idx.iter()
+        let validators_times = idx
+            .iter()
             .map(|(public_key, time)| ValidatorTime {
                 public_key,
                 time: Some(time),
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         Ok(validators_times)
     }
 
@@ -93,8 +93,7 @@ impl PrivateApi {
             .map(|validator| ValidatorTime {
                 public_key: validator.service_key,
                 time: idx.get(&validator.service_key),
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
         Ok(validators_times)
     }
 
