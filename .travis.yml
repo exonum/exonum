@@ -85,7 +85,7 @@ jobs:
     - rustfmt -V
     - nvm install 8 && nvm use 8
     - npm install
-    - ./node_modules/.bin/cspell --version.
+    - ./node_modules/.bin/cspell --version
     - ./node_modules/.bin/markdownlint --version
     script:
     - cargo fmt --all -- --write-mode=check
