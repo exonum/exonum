@@ -97,6 +97,7 @@ jobs:
     - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
     - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
     - mkdir -p target/doc/exonum_configuration
+    - mkdir -p target/std/string
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
     - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
     - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
