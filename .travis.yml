@@ -104,8 +104,9 @@ jobs:
 
   # Clippy linting.
   - name: clippy
+    rust: nightly-2018-10-23
     install:
-    - cargo clippy --version | rustup component add clippy-preview
+    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
     - cargo clippy --version
     script:
     - cargo clippy --all -- -D warnings
