@@ -613,7 +613,7 @@ fn not_request_txs_when_get_tx_and_propose() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -637,7 +637,7 @@ fn request_txs_when_get_propose_or_prevote() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);

@@ -35,7 +35,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real

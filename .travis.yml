@@ -7,8 +7,6 @@ branches:
   - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
   # Branch names endings with "-release" (for example "0.9.0-release").
   - /-release$/
-  # Separate message header branch
-  - message_header_refactor
 
 addons:
   apt:
@@ -32,9 +30,7 @@ addons:
     - unzip
 
 rust:
-  # Feel free to bump this version if you need features of newer Rust.
-  # Sync with badge in README.md
-  - 1.29.0
+  - 1.30.0
 
 cache:
   directories:
@@ -76,7 +72,7 @@ before_install:
 
 jobs:
   include:
-  # Formatting & other lints that do not require compilation
+  # Formatting & other lints that do not require compilation.
   - name: lints
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
@@ -106,16 +102,15 @@ jobs:
     - touch target/std/primitive.usize.html
     - cargo deadlinks --dir target/doc
 
-  # Clippy linting
+  # Clippy linting.
   - name: clippy
-    rust: nightly-2018-10-23
     install:
-    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
+    - cargo clippy --version | rustup component add clippy-preview
     - cargo clippy --version
     script:
     - cargo clippy --all -- -D warnings
 
-  # Tests
+  # Tests.
   - name: test
     addons:
       apt:
@@ -169,11 +164,17 @@ jobs:
       bash <(curl -s https://codecov.io/bash) &&
       echo "Uploaded code coverage"
 
-  # Benchmarks (compilation only)
+  # Benchmarks (compilation only).
   - name: benchmarks
     rust: nightly-2018-10-23
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Compatibility check with the older rust version. Should be synced with readme badges.
+  - name: rust_1_27_2_compatibility
+    rust: 1.27.2
+    script:
+    - cargo build
 
 notifications:
   slack:
