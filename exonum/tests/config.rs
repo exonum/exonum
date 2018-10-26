@@ -21,16 +21,23 @@ extern crate serde_derive;
 extern crate toml;
 
 use exonum::{
-    api::backends::actix::AllowOrigin, crypto::{PublicKey, PUBLIC_KEY_LENGTH},
+    api::backends::actix::AllowOrigin,
+    crypto::{PublicKey, PUBLIC_KEY_LENGTH},
     helpers::{
-        config::{ConfigFile, ConfigManager}, fabric::NodeBuilder,
+        config::{ConfigFile, ConfigManager},
+        fabric::NodeBuilder,
     },
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
 use toml::Value;
 
 use std::{
-    ffi::OsString, fs, fs::{File, OpenOptions}, io::{Read, Write}, panic, path::Path,
+    ffi::OsString,
+    fs,
+    fs::{File, OpenOptions},
+    io::{Read, Write},
+    panic,
+    path::Path,
 };
 
 const CONFIG_TMP_FOLDER: &str = "/tmp/";

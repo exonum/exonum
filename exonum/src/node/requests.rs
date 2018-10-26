@@ -113,7 +113,8 @@ impl NodeHandler {
         }
 
         let has_prevotes = msg.validators();
-        let prevotes = self.state
+        let prevotes = self
+            .state
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
             .filter(|p| !has_prevotes[p.validator().into()])

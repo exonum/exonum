@@ -187,7 +187,8 @@ impl NodeHandler {
         if !msg.verify_tx_hash() {
             bail!("Received block has invalid tx_hash, msg={:?}", msg);
         }
-        let precommits: Result<Vec<_>, _> = msg.precommits()
+        let precommits: Result<Vec<_>, _> = msg
+            .precommits()
             .into_iter()
             .map(Precommit::verify_precommit)
             .collect();
@@ -206,7 +207,8 @@ impl NodeHandler {
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(snapshot);
-            let has_unknown_txs = self.state
+            let has_unknown_txs = self
+                .state
                 .create_incomplete_block(&msg, &schema.transactions(), &schema.transactions_pool())
                 .has_unknown_txs();
 
@@ -223,7 +225,8 @@ impl NodeHandler {
                 self.handle_full_block(&msg)?;
             }
         } else {
-            let precommits: Result<Vec<_>, _> = msg.precommits()
+            let precommits: Result<Vec<_>, _> = msg
+                .precommits()
                 .into_iter()
                 .map(Precommit::verify_precommit)
                 .collect();
@@ -298,7 +301,8 @@ impl NodeHandler {
                 block.proposer_id(),
             );
         }
-        let precommits: Result<Vec<_>, _> = msg.precommits()
+        let precommits: Result<Vec<_>, _> = msg
+            .precommits()
             .into_iter()
             .map(Precommit::verify_precommit)
             .collect();
@@ -405,7 +409,8 @@ impl NodeHandler {
             if self.state.has_majority_prevotes(round, propose_hash) {
                 // Put consensus messages for current Propose and this round to the cache.
                 self.check_propose_saved(round, &propose_hash);
-                let raw_messages = self.state
+                let raw_messages = self
+                    .state
                     .prevotes(prevote_round, propose_hash)
                     .into_iter()
                     .map(|p| p.clone().into())
@@ -595,7 +600,10 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(clippy::needless_pass_by_value)
+    )]
     pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
@@ -723,45 +731,47 @@ impl NodeHandler {
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
-            let message: SignedMessage =
-                match *data {
-                    RequestData::Propose(ref propose_hash) => self.sign_message(
-                        ProposeRequest::new(&peer, self.state.height(), propose_hash),
-                    ).into(),
-                    RequestData::ProposeTransactions(ref propose_hash) => {
-                        let txs: Vec<_> = self.state
-                            .propose(propose_hash)
-                            .unwrap()
-                            .unknown_txs()
-                            .iter()
-                            .cloned()
-                            .collect();
-                        self.sign_message(TransactionsRequest::new(&peer, &txs))
-                            .into()
-                    }
-                    RequestData::BlockTransactions => {
-                        let txs: Vec<_> = match self.state.incomplete_block() {
-                            Some(incomplete_block) => {
-                                incomplete_block.unknown_txs().iter().cloned().collect()
-                            }
-                            None => return,
-                        };
-                        self.sign_message(TransactionsRequest::new(&peer, &txs))
-                            .into()
-                    }
-                    RequestData::Prevotes(round, ref propose_hash) => {
-                        self.sign_message(PrevotesRequest::new(
-                            &peer,
-                            self.state.height(),
-                            round,
-                            propose_hash,
-                            self.state.known_prevotes(round, propose_hash),
-                        )).into()
-                    }
-                    RequestData::Block(height) => {
-                        self.sign_message(BlockRequest::new(&peer, height)).into()
-                    }
-                };
+            let message: SignedMessage = match *data {
+                RequestData::Propose(ref propose_hash) => self
+                    .sign_message(ProposeRequest::new(
+                        &peer,
+                        self.state.height(),
+                        propose_hash,
+                    )).into(),
+                RequestData::ProposeTransactions(ref propose_hash) => {
+                    let txs: Vec<_> = self
+                        .state
+                        .propose(propose_hash)
+                        .unwrap()
+                        .unknown_txs()
+                        .iter()
+                        .cloned()
+                        .collect();
+                    self.sign_message(TransactionsRequest::new(&peer, &txs))
+                        .into()
+                }
+                RequestData::BlockTransactions => {
+                    let txs: Vec<_> = match self.state.incomplete_block() {
+                        Some(incomplete_block) => {
+                            incomplete_block.unknown_txs().iter().cloned().collect()
+                        }
+                        None => return,
+                    };
+                    self.sign_message(TransactionsRequest::new(&peer, &txs))
+                        .into()
+                }
+                RequestData::Prevotes(round, ref propose_hash) => self
+                    .sign_message(PrevotesRequest::new(
+                        &peer,
+                        self.state.height(),
+                        round,
+                        propose_hash,
+                        self.state.known_prevotes(round, propose_hash),
+                    )).into(),
+                RequestData::Block(height) => {
+                    self.sign_message(BlockRequest::new(&peer, height)).into()
+                }
+            };
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, message);
         }
@@ -830,7 +840,8 @@ impl NodeHandler {
     /// node tries to catch up with other nodes' height.
     pub fn request_next_block(&mut self) {
         // TODO: Randomize next peer. (ECR-171)
-        let heights: Vec<_> = self.state
+        let heights: Vec<_> = self
+            .state
             .nodes_with_bigger_height()
             .into_iter()
             .cloned()
@@ -854,7 +865,8 @@ impl NodeHandler {
 
     /// Broadcasts the `Prevote` message to all peers.
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state
+        let validator_id = self
+            .state
             .validator_id()
             .expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
@@ -879,7 +891,8 @@ impl NodeHandler {
 
     /// Broadcasts the `Precommit` message to all peers.
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state
+        let validator_id = self
+            .state
             .validator_id()
             .expect("called broadcast_precommit in Auditor node.");
         let precommit = self.sign_message(Precommit::new(

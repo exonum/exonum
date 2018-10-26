@@ -22,8 +22,11 @@ extern crate serde_json;
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{Blockchain, Schema, Transaction, TransactionError}, crypto, explorer::*,
-    helpers::{Height, ValidatorId}, messages::{Message, RawTransaction, Signed},
+    blockchain::{Blockchain, Schema, Transaction, TransactionError},
+    crypto,
+    explorer::*,
+    helpers::{Height, ValidatorId},
+    messages::{Message, RawTransaction, Signed},
 };
 
 use blockchain::{

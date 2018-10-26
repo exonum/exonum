@@ -21,8 +21,11 @@ use exonum::{
         ExecutionError, ExecutionResult, Schema as CoreSchema, Service, Transaction,
         TransactionContext, TransactionSet,
     },
-    crypto::{Hash, PublicKey, SecretKey}, encoding, helpers::Height,
-    messages::{Message, RawTransaction, Signed}, storage::{Fork, MapIndex, Snapshot},
+    crypto::{Hash, PublicKey, SecretKey},
+    encoding,
+    helpers::Height,
+    messages::{Message, RawTransaction, Signed},
+    storage::{Fork, MapIndex, Snapshot},
 };
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -190,8 +193,7 @@ impl CryptocurrencyApi {
             .map(|wallet| {
                 let height = CoreSchema::new(&snapshot).height();
                 wallet.actual_balance(height)
-            })
-            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
+            }).ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
     fn wire(builder: &mut api::ServiceApiBuilder) {

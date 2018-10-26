@@ -79,7 +79,7 @@ fn ignore_propose_from_non_leader() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_validator(ValidatorId(3))    //without this line Prevote would have been broadcast
+        .with_validator(ValidatorId(3)) //without this line Prevote would have been broadcast
         .build();
 
     sandbox.recv(&propose);

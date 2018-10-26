@@ -19,7 +19,12 @@
 //!
 //! [docs:time]: https://exonum.com/doc/advanced/time
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 
 extern crate chrono;
 #[macro_use]
@@ -41,9 +46,12 @@ pub mod time_provider;
 pub mod transactions;
 
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{Service, ServiceContext, Transaction, TransactionSet},
-    crypto::Hash, encoding::{self, serialize::json::reexport::Value},
-    helpers::fabric::{Context, ServiceFactory}, messages::RawTransaction,
+    api::ServiceApiBuilder,
+    blockchain::{Service, ServiceContext, Transaction, TransactionSet},
+    crypto::Hash,
+    encoding::{self, serialize::json::reexport::Value},
+    helpers::fabric::{Context, ServiceFactory},
+    messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
 use schema::TimeSchema;

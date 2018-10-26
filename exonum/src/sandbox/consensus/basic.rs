@@ -25,7 +25,8 @@ use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENG
 use helpers::{Height, Round, ValidatorId};
 use messages::{Precommit, Signed};
 use sandbox::{
-    sandbox::{self, timestamping_sandbox}, sandbox_tests_helper::*,
+    sandbox::{self, timestamping_sandbox},
+    sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
 };
 

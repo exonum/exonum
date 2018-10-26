@@ -14,7 +14,12 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 
 #[macro_use]
 extern crate exonum;
@@ -32,8 +37,12 @@ pub mod transactions;
 pub mod wallet;
 
 use exonum::{
-    api::ServiceApiBuilder, blockchain::{self, Transaction, TransactionSet}, crypto::Hash,
-    encoding::Error as EncodingError, helpers::fabric::{self, Context}, messages::RawTransaction,
+    api::ServiceApiBuilder,
+    blockchain::{self, Transaction, TransactionSet},
+    crypto::Hash,
+    encoding::Error as EncodingError,
+    helpers::fabric::{self, Context},
+    messages::RawTransaction,
     storage::Snapshot,
 };
 

@@ -191,7 +191,7 @@ impl ProofPath {
     pub fn new<K: ProofMapKey>(key: &K) -> Self {
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
-        key.write_key(&mut data[1..KEY_SIZE + 1]);
+        key.write_key(&mut data[1..=KEY_SIZE]);
         data[PROOF_PATH_LEN_POS] = 0;
         Self::from_raw(data)
     }
@@ -362,7 +362,7 @@ impl BitsRange for ProofPath {
     }
 
     fn raw_key(&self) -> &[u8] {
-        &self.bytes[1..KEY_SIZE + 1]
+        &self.bytes[1..=KEY_SIZE]
     }
 }
 

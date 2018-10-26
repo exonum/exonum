@@ -25,13 +25,15 @@ extern crate exonum_testkit;
 extern crate rand;
 
 use exonum::{
-    crypto::{self, PublicKey, SecretKey}, messages::{RawTransaction, Signed},
+    crypto::{self, PublicKey, SecretKey},
+    messages::{RawTransaction, Signed},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
 use cryptocurrency::{
-    schema::{CurrencySchema, Wallet}, service::CurrencyService,
+    schema::{CurrencySchema, Wallet},
+    service::CurrencyService,
     transactions::{TxCreateWallet, TxTransfer},
 };
 
@@ -226,8 +228,7 @@ fn test_fuzz_transfers() {
                 let (sender, receiver) = (rng.choose(keys).unwrap(), rng.choose(keys).unwrap());
                 let amount = rng.gen_range(0, 250);
                 TxTransfer::sign(&receiver.0, amount, rng.gen::<u64>(), &sender.0, &sender.1)
-            })
-            .collect();
+            }).collect();
 
         testkit.create_block_with_transactions(txs);
 

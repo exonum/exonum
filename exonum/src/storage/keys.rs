@@ -98,9 +98,7 @@ impl StorageKey for () {
         // no-op
     }
 
-    fn read(_buffer: &[u8]) -> Self::Owned {
-        ()
-    }
+    fn read(_buffer: &[u8]) -> Self::Owned {}
 }
 
 impl StorageKey for u8 {
@@ -354,7 +352,8 @@ mod tests {
                 // Fuzzed roundtrip
                 let mut buffer = [0_u8; $size];
                 let handpicked_vals = vec![$type::min_value(), $type::max_value()];
-                for x in rng.sample_iter(&Standard)
+                for x in rng
+                    .sample_iter(&Standard)
                     .take(FUZZ_SAMPLES)
                     .chain(handpicked_vals)
                 {
@@ -583,9 +582,11 @@ mod tests {
 
     #[test]
     fn hash_round_trip() {
-        let hashes = [Hash::from_hex(
-            "326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78",
-        ).unwrap()];
+        let hashes =
+            [
+                Hash::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78")
+                    .unwrap(),
+            ];
         assert_round_trip_eq(&hashes);
     }
 

@@ -133,8 +133,8 @@ fn test_ignore_message_from_far_height() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_height(Height(2))//without this line some Prevote will be sent
-                .build();
+        .with_height(Height(2)) //without this line some Prevote will be sent
+        .build();
 
     sandbox.recv(&propose);
 }
@@ -152,8 +152,8 @@ fn test_ignore_message_from_prev_height() {
     sandbox.assert_state(Height(2), Round(1));
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_height(Height(0))//without this line some Prevote will be sent
-                .build();
+        .with_height(Height(0)) //without this line some Prevote will be sent
+        .build();
 
     sandbox.recv(&propose);
 }

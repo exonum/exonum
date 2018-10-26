@@ -91,9 +91,7 @@ impl StorageValue for () {
         Vec::new()
     }
 
-    fn from_bytes(_value: Cow<[u8]>) -> Self {
-        ()
-    }
+    fn from_bytes(_value: Cow<[u8]>) -> Self {}
 }
 
 impl StorageValue for bool {

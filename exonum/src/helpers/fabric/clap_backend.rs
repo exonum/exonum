@@ -17,7 +17,8 @@ use clap;
 use std::{collections::HashMap, ffi::OsString};
 
 use super::{
-    internal::{CollectedCommand, Feedback}, ArgumentType, CommandName, Context,
+    internal::{CollectedCommand, Feedback},
+    ArgumentType, CommandName, Context,
 };
 
 pub struct ClapBackend;
@@ -98,8 +99,7 @@ impl ClapBackend {
                     }
                 };
                 clap_arg.help(arg.help).required(arg.required)
-            })
-            .collect();
+            }).collect();
 
         let mut subcommand = clap::SubCommand::with_name(command.name()).about(command.about());
 

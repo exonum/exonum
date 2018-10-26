@@ -22,8 +22,11 @@ use exonum::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
         TransactionContext, TransactionSet,
     },
-    crypto::{self, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-    messages::{Message, RawTransaction, Signed}, node::ApiSender, storage::{MemoryDB, Snapshot},
+    crypto::{self, Hash, PublicKey, SecretKey},
+    encoding::Error as EncodingError,
+    messages::{Message, RawTransaction, Signed},
+    node::ApiSender,
+    storage::{MemoryDB, Snapshot},
 };
 
 pub const SERVICE_ID: u16 = 0;

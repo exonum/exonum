@@ -20,9 +20,10 @@ use serde_json;
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
 use super::{
-    key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX}, node::BranchNode,
-    proof::MapProofBuilder, HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey,
-    ProofPath,
+    key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
+    node::BranchNode,
+    proof::MapProofBuilder,
+    HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
 use crypto::{hash, CryptoHash, Hash, HashStream};
 use encoding::serialize::reexport::{DeserializeOwned, Serialize};
@@ -1099,7 +1100,8 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
 
     let saved_hash = index1.merkle_root();
 
-    let mut keys_to_remove = data.iter()
+    let mut keys_to_remove = data
+        .iter()
         .take(50)
         .map(|item| item.0.clone())
         .collect::<Vec<_>>();

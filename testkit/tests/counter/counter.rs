@@ -18,7 +18,9 @@ use exonum::{
     blockchain::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{Hash, PublicKey, SecretKey}, encoding, messages::{Message, RawTransaction, Signed},
+    crypto::{Hash, PublicKey, SecretKey},
+    encoding,
+    messages::{Message, RawTransaction, Signed},
     storage::{Entry, Fork, Snapshot},
 };
 
@@ -53,7 +55,8 @@ impl<'a> CounterSchema<&'a mut Fork> {
     }
 
     fn inc_count(&mut self, inc: u64) -> u64 {
-        let count = self.count()
+        let count = self
+            .count()
             .unwrap_or(0)
             .checked_add(inc)
             .expect("attempt to add with overflow");

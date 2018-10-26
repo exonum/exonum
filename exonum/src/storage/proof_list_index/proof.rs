@@ -206,8 +206,9 @@ where
                     )));
                 }
                 if let Some(leaf_value) = map_key_value.get("val") {
-                    let val: V = from_value(leaf_value.clone())
-                        .map_err(|err| D::Error::custom(format_err_string("V", leaf_value, &err)))?;
+                    let val: V = from_value(leaf_value.clone()).map_err(|err| {
+                        D::Error::custom(format_err_string("V", leaf_value, &err))
+                    })?;
                     ListProof::Leaf(val)
                 } else {
                     // "left" is present

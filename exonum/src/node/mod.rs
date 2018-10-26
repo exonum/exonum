@@ -18,7 +18,8 @@
 // spell-checker:ignore cors
 
 pub use self::{
-    connect_list::{ConnectList, PeerAddress}, state::{RequestData, State, ValidatorState},
+    connect_list::{ConnectList, PeerAddress},
+    state::{RequestData, State, ValidatorState},
 };
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
@@ -31,7 +32,11 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet}, fmt, net::SocketAddr, sync::Arc, thread,
+    collections::{BTreeMap, HashSet},
+    fmt,
+    net::SocketAddr,
+    sync::Arc,
+    thread,
     time::{Duration, SystemTime},
 };
 
@@ -44,13 +49,15 @@ use blockchain::{
 };
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
-    error::{into_failure, LogError}, noise::HandshakeParams, HandlerPart, InternalEvent,
-    InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest,
-    SyncSender, TimeoutRequest,
+    error::{into_failure, LogError},
+    noise::HandshakeParams,
+    HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
+    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
 use helpers::{
-    config::ConfigManager, fabric::{NodePrivateConfig, NodePublicConfig}, user_agent, Height,
-    Milliseconds, Round, ValidatorId,
+    config::ConfigManager,
+    fabric::{NodePrivateConfig, NodePublicConfig},
+    user_agent, Height, Milliseconds, Round, ValidatorId,
 };
 use messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use node::state::SharedConnectList;
@@ -341,13 +348,13 @@ pub struct ConnectListConfig {
 impl ConnectListConfig {
     /// Creates `ConnectListConfig` from validators public configs.
     pub fn from_node_config(list: &[NodePublicConfig], node: &NodePrivateConfig) -> Self {
-        let peers = list.iter()
+        let peers = list
+            .iter()
             .filter(|config| config.validator_keys.consensus_key != node.consensus_public_key)
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
-            })
-            .collect();
+            }).collect();
 
         ConnectListConfig { peers }
     }
@@ -360,8 +367,7 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
                 public_key: v.consensus_key,
-            })
-            .collect();
+            }).collect();
 
         ConnectListConfig { peers }
     }
@@ -477,7 +483,8 @@ impl NodeHandler {
     /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
     pub fn round_timeout_increase(&self) -> Milliseconds {
         (self.state().consensus_config().first_round_timeout
-            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
+            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT)
+            / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
@@ -573,7 +580,8 @@ impl NodeHandler {
 
     /// Broadcasts given message to all peers.
     pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
-        let peers: Vec<PublicKey> = self.state
+        let peers: Vec<PublicKey> = self
+            .state
             .peers()
             .iter()
             .filter_map(|(pubkey, _)| {
@@ -582,8 +590,7 @@ impl NodeHandler {
                 } else {
                     None
                 }
-            })
-            .collect();
+            }).collect();
         let message = message.into();
         for address in peers {
             self.send_to_peer(address, message.clone());
@@ -947,28 +954,30 @@ impl Node {
                     Arc::new(app_config)
                 };
 
-                let public_api_handler = self.api_options
+                let public_api_handler = self
+                    .api_options
                     .public_api_address
                     .map(|listen_address| ApiRuntimeConfig {
                         listen_address,
                         access: ApiAccess::Public,
-                        app_config: self.api_options
+                        app_config: self
+                            .api_options
                             .public_allow_origin
                             .clone()
                             .map(into_app_config),
-                    })
-                    .into_iter();
-                let private_api_handler = self.api_options
+                    }).into_iter();
+                let private_api_handler = self
+                    .api_options
                     .private_api_address
                     .map(|listen_address| ApiRuntimeConfig {
                         listen_address,
                         access: ApiAccess::Private,
-                        app_config: self.api_options
+                        app_config: self
+                            .api_options
                             .private_allow_origin
                             .clone()
                             .map(into_app_config),
-                    })
-                    .into_iter();
+                    }).into_iter();
                 // Collects API handlers.
                 public_api_handler
                     .chain(private_api_handler)

@@ -15,7 +15,8 @@
 use std::time::Duration;
 
 use super::{
-    sandbox::timestamping_sandbox, sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
+    sandbox::timestamping_sandbox,
+    sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
 };
 use blockchain::Block;
 use crypto::{CryptoHash, Hash};

@@ -17,14 +17,18 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    net::SocketAddr, thread, time::{self, Duration, SystemTime},
+    net::SocketAddr,
+    thread,
+    time::{self, Duration, SystemTime},
 };
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use env_logger;
 use events::{
-    error::log_error, network::{NetworkConfiguration, NetworkPart}, noise::HandshakeParams,
+    error::log_error,
+    network::{NetworkConfiguration, NetworkPart},
+    noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
 };
 use helpers::user_agent;
@@ -55,7 +59,8 @@ impl TestHandler {
 
     pub fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
         let rx = self.network_events_rx.by_ref();
-        let future = rx.into_future()
+        let future = rx
+            .into_future()
             .timeout(Duration::from_secs(30))
             .map_err(drop);
 
@@ -491,8 +496,7 @@ fn test_network_multiple_connect() {
         .map(|params| {
             let events = TestEvents::with_addr(params.address, &connect_list);
             params.spawn(events, connect_list.clone())
-        })
-        .collect();
+        }).collect();
 
     connectors[0].connect_with(main_key, connection_params[0].connect.clone());
     assert_eq!(

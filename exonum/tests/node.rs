@@ -25,13 +25,19 @@ use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
-    sync::{Arc, Mutex}, thread::{self, JoinHandle}, time::Duration,
+    sync::{Arc, Mutex},
+    thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use exonum::{
-    blockchain::{Service, ServiceContext, Transaction}, crypto::Hash,
-    encoding::Error as EncodingError, helpers, messages::RawTransaction,
-    node::{ApiSender, ExternalMessage, Node}, storage::{Database, Fork, MemoryDB, Snapshot},
+    blockchain::{Service, ServiceContext, Transaction},
+    crypto::Hash,
+    encoding::Error as EncodingError,
+    helpers,
+    messages::RawTransaction,
+    node::{ApiSender, ExternalMessage, Node},
+    storage::{Database, Fork, MemoryDB, Snapshot},
 };
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);

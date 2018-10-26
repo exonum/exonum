@@ -39,8 +39,11 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
-    blockchain::{Blockchain, Schema, Service, Transaction}, crypto::{Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId}, messages::{RawTransaction, Signed}, node::ApiSender,
+    blockchain::{Blockchain, Schema, Service, Transaction},
+    crypto::{Hash, PublicKey, SecretKey},
+    helpers::{Height, ValidatorId},
+    messages::{RawTransaction, Signed},
+    node::ApiSender,
     storage::{Database, DbOptions, Patch, RocksDB},
 };
 use futures::sync::mpsc;
@@ -75,7 +78,8 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 
 fn create_blockchain(db: impl Database, services: Vec<Box<Service>>) -> Blockchain {
     use exonum::{
-        blockchain::{GenesisConfig, ValidatorKeys}, crypto,
+        blockchain::{GenesisConfig, ValidatorKeys},
+        crypto,
     };
     use std::sync::Arc;
 
@@ -107,8 +111,10 @@ mod timestamping {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
-        crypto::{CryptoHash, Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-        messages::{Message, RawTransaction, Signed}, storage::Snapshot,
+        crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+        encoding::Error as EncodingError,
+        messages::{Message, RawTransaction, Signed},
+        storage::Snapshot,
     };
     use rand::Rng;
 
@@ -204,8 +210,10 @@ mod cryptocurrency {
     use super::{gen_keypair_from_rng, BoxedTx};
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
-        crypto::{Hash, PublicKey, SecretKey}, encoding::Error as EncodingError,
-        messages::{Message, RawTransaction, Signed}, storage::{MapIndex, ProofMapIndex, Snapshot},
+        crypto::{Hash, PublicKey, SecretKey},
+        encoding::Error as EncodingError,
+        messages::{Message, RawTransaction, Signed},
+        storage::{MapIndex, ProofMapIndex, Snapshot},
     };
     use rand::{seq::sample_slice_ref, Rng};
 
@@ -419,8 +427,7 @@ fn prepare_txs(
             .map(|tx| {
                 schema.add_transaction_into_pool(tx.clone());
                 tx.hash()
-            })
-            .collect()
+            }).collect()
     };
 
     blockchain.merge(fork.into_patch()).unwrap();
@@ -510,7 +517,7 @@ fn execute_block_rocksdb(
             },
             TXS_IN_BLOCK,
         ).sample_size(50)
-            .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
+        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
     );
 }
 
