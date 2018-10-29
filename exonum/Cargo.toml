@@ -20,7 +20,7 @@ circle-ci = { repository = "exonum/exonum" }
 actix = "=0.7.5"
 actix-net = "=0.1.1"
 actix-web = "=0.7.13"
-log = "=0.4.5"
+log = "=0.4.6"
 byteorder = "1.2.3"
 hex = "=0.3.2"
 bit-vec = "=0.5.0"
