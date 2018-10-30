@@ -33,8 +33,10 @@
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 pub use self::{
-    block::{Block, BlockProof}, config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
-    genesis::GenesisConfig, schema::{Schema, TxLocation},
+    block::{Block, BlockProof},
+    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    genesis::GenesisConfig,
+    schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
@@ -49,7 +51,10 @@ use failure;
 use vec_map::VecMap;
 
 use std::{
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt, iter, mem, panic, sync::Arc,
+    collections::{BTreeMap, HashMap},
+    error::Error as StdError,
+    fmt, iter, mem, panic,
+    sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -147,7 +152,8 @@ impl Blockchain {
     /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
         let id = raw.service_id() as usize;
-        let service = self.service_map
+        let service = self
+            .service_map
             .get(id)
             .ok_or_else(|| MessageError::from("Service not found."))?;
         service.tx_from_raw(raw)
@@ -395,15 +401,15 @@ impl Blockchain {
                 ))
             })?;
 
-            let service_name = self.service_map
+            let service_name = self
+                .service_map
                 .get(raw.service_id() as usize)
                 .ok_or_else(|| {
                     failure::err_msg(format!(
                         "Service not found. Service id: {}",
                         raw.service_id()
                     ))
-                })?
-                .service_name();
+                })?.service_name();
 
             let tx = self.tx_from_raw(raw.payload().clone()).or_else(|error| {
                 Err(failure::err_msg(format!(

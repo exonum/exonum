@@ -20,7 +20,9 @@ use rust_decimal::Decimal;
 use uuid::{self, Uuid};
 
 use std::{
-    mem, net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr}, result::Result as StdResult,
+    mem,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    result::Result as StdResult,
 };
 
 use super::{CheckedOffset, Error, Offset, Result};

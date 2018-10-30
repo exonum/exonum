@@ -35,9 +35,9 @@ fn test_known_transaction() {
     00008000020057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d280000000b000000\
     746573745f77616c6c6574ff86a65814128dd86b2d267f7dd2de443c484139ae936e7c7405884c97619251f6a3d878d0ca140f026583a88777e074586d590388757159de3617f799959706";
 
-    let pk = PublicKey::from_hex(
-        "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",
-    ).unwrap();
+    let pk =
+        PublicKey::from_hex("57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d")
+            .unwrap();
     let sk = SecretKey::from_hex(
         "d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
          57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",

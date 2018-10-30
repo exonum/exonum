@@ -14,8 +14,10 @@
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiBuilder, ServiceApiScope, ServiceApiState},
-    blockchain::SharedNodeState, crypto::Hash,
-    explorer::{BlockWithTransactions, BlockchainExplorer}, helpers::Height,
+    blockchain::SharedNodeState,
+    crypto::Hash,
+    explorer::{BlockWithTransactions, BlockchainExplorer},
+    helpers::Height,
 };
 
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -242,7 +244,8 @@ mod tests {
         }
 
         // Test a bodiless request
-        let block_info: DeBlock = api.private("api/testkit")
+        let block_info: DeBlock = api
+            .private("api/testkit")
             .query(&CreateBlockQuery { tx_hashes: None })
             .post("v1/blocks/create")
             .unwrap();
@@ -263,7 +266,8 @@ mod tests {
                 testkit.poll_events();
             }
 
-            let block_info: DeBlock = api.private("api/testkit")
+            let block_info: DeBlock = api
+                .private("api/testkit")
                 .query(body)
                 .post("v1/blocks/create")
                 .unwrap();
@@ -290,7 +294,8 @@ mod tests {
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![tx_foo.hash()]),
         };
-        let block_info: DeBlock = api.private("api/testkit")
+        let block_info: DeBlock = api
+            .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
@@ -302,7 +307,8 @@ mod tests {
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![tx_bar.hash()]),
         };
-        let block_info: DeBlock = api.private("api/testkit")
+        let block_info: DeBlock = api
+            .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
@@ -319,7 +325,8 @@ mod tests {
         let body = CreateBlockQuery {
             tx_hashes: Some(vec![Hash::zero()]),
         };
-        let err = api.private("api/testkit")
+        let err = api
+            .private("api/testkit")
             .query(&body)
             .post::<DeBlock>("v1/blocks/create")
             .unwrap_err();
@@ -343,7 +350,8 @@ mod tests {
         assert_eq!(testkit.read().unwrap().height(), Height(4));
 
         // Test that requests with "overflowing" heights do nothing
-        let block_info: DeBlock = api.private("api/testkit")
+        let block_info: DeBlock = api
+            .private("api/testkit")
             .query(&Height(10))
             .post("v1/blocks/rollback")
             .unwrap();
@@ -351,7 +359,8 @@ mod tests {
 
         // Test idempotence of the rollback endpoint
         for _ in 0..2 {
-            let block_info: DeBlock = api.private("api/testkit")
+            let block_info: DeBlock = api
+                .private("api/testkit")
                 .query(&Height(4))
                 .post("v1/blocks/rollback")
                 .unwrap();
@@ -378,7 +387,8 @@ mod tests {
     fn test_rollback_past_genesis() {
         let (_, api) = init_handler(Height(4));
 
-        let err = api.private("api/testkit")
+        let err = api
+            .private("api/testkit")
             .query(&Height(0))
             .post::<DeBlock>("v1/blocks/rollback")
             .unwrap_err();

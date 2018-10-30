@@ -43,7 +43,8 @@ use storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
 pub use self::{
-    helpers::{to_hex_string, BinaryForm}, protocol::*,
+    helpers::{to_hex_string, BinaryForm},
+    protocol::*,
 };
 
 #[macro_use]

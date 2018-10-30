@@ -14,8 +14,10 @@
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{Schema as CoreSchema, StoredConfiguration}, crypto::{CryptoHash, Hash},
-    helpers::Height, storage::StorageValue,
+    blockchain::{Schema as CoreSchema, StoredConfiguration},
+    crypto::{CryptoHash, Hash},
+    helpers::Height,
+    storage::StorageValue,
 };
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};
@@ -113,7 +115,7 @@ impl PublicApi {
         }
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn proposed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ProposeHashInfo> {
         let schema = Schema::new(state.snapshot());
         let index = schema.config_hash_by_ordinal();
@@ -127,19 +129,17 @@ impl PublicApi {
                 });
 
                 (cfg_hash, propose_data)
-            })
-            .filter(|&(_, ref propose_data)| {
+            }).filter(|&(_, ref propose_data)| {
                 let cfg = <StoredConfiguration as StorageValue>::from_bytes(
                     propose_data.tx_propose().cfg().as_bytes().into(),
                 );
                 filter.matches(&cfg)
-            })
-            .map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
+            }).map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
             .collect();
         proposes
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn committed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ConfigHashInfo> {
         let core_schema = CoreSchema::new(state.snapshot());
         let actual_from = core_schema.configs_actual_from();
@@ -155,8 +155,7 @@ impl PublicApi {
                         config_hash
                     )
                 })
-            })
-            .filter(|config| filter.matches(config))
+            }).filter(|config| filter.matches(config))
             .map(|config| Self::config_with_proofs(state, config))
             .collect();
         committed_configs

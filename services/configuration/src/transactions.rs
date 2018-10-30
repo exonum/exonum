@@ -20,8 +20,10 @@ use exonum::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
     },
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey}, messages::{Message, RawTransaction, Signed},
-    node::State, storage::{Fork, Snapshot},
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+    messages::{Message, RawTransaction, Signed},
+    node::State,
+    storage::{Fork, Snapshot},
 };
 
 use config::ConfigurationServiceConfig;
@@ -443,8 +445,7 @@ mod tests {
             .with_validators(4)
             .with_service(ConfigurationService {
                 config: ConfigurationServiceConfig::default(),
-            })
-            .create();
+            }).create();
 
         let hash = Hash::default();
 

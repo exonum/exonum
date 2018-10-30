@@ -39,12 +39,15 @@ use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
 use serde::{
-    de::{self, Deserialize, Deserializer, Visitor}, Serialize, Serializer,
+    de::{self, Deserialize, Deserializer, Visitor},
+    Serialize, Serializer,
 };
 use uuid::Uuid;
 
 use std::{
-    default::Default, fmt, ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+    default::Default,
+    fmt,
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -604,7 +607,8 @@ impl CryptoHash for String {
 
 impl CryptoHash for SystemTime {
     fn hash(&self) -> Hash {
-        let duration = self.duration_since(UNIX_EPOCH)
+        let duration = self
+            .duration_since(UNIX_EPOCH)
             .expect("time value is later than 1970-01-01 00:00:00 UTC.");
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();

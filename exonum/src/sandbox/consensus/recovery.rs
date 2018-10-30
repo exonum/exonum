@@ -22,7 +22,8 @@ use helpers::{user_agent, Height, Round, ValidatorId};
 use node;
 
 use sandbox::{
-    sandbox::{timestamping_sandbox, SandboxBuilder}, sandbox_tests_helper::*,
+    sandbox::{timestamping_sandbox, SandboxBuilder},
+    sandbox_tests_helper::*,
 };
 
 #[test]

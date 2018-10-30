@@ -19,7 +19,12 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use toml;
 
 use std::{
-    fs::{self, File}, io::{Read, Write}, mem::drop, path::Path, sync::mpsc, thread,
+    fs::{self, File},
+    io::{Read, Write},
+    mem::drop,
+    path::Path,
+    sync::mpsc,
+    thread,
 };
 
 use node::{ConnectListConfig, NodeConfig};

@@ -20,7 +20,8 @@ use std::{borrow::Cow, error::Error, fmt};
 
 use crypto::{self, CryptoHash, Hash};
 use encoding::{
-    serialize::{json, WriteBufferWrapper}, CheckedOffset, Error as EncodingError, Field, Offset,
+    serialize::{json, WriteBufferWrapper},
+    CheckedOffset, Error as EncodingError, Field, Offset,
 };
 use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 

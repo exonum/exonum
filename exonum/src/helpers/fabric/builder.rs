@@ -13,13 +13,19 @@
 // limitations under the License.
 
 use std::{
-    collections::HashMap, ffi::OsString, fmt, panic::{self, PanicInfo},
+    collections::HashMap,
+    ffi::OsString,
+    fmt,
+    panic::{self, PanicInfo},
 };
 
 use super::{
     clap_backend::ClapBackend,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
-    info::Info, internal::{CollectedCommand, Command, Feedback}, keys, maintenance::Maintenance,
+    info::Info,
+    internal::{CollectedCommand, Command, Feedback},
+    keys,
+    maintenance::Maintenance,
     CommandName, ServiceFactory,
 };
 use blockchain::Service;
@@ -68,10 +74,12 @@ impl NodeBuilder {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
                 let config_file_path = ctx.get(keys::NODE_CONFIG_PATH).ok();
-                let config = ctx.get(keys::NODE_CONFIG)
+                let config = ctx
+                    .get(keys::NODE_CONFIG)
                     .expect("could not find node_config");
                 let db = Run::db_helper(ctx, &config.database);
-                let services: Vec<Box<dyn Service>> = self.service_factories
+                let services: Vec<Box<dyn Service>> = self
+                    .service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
                     .collect();
@@ -98,7 +106,8 @@ impl NodeBuilder {
     pub fn run(mut self) {
         // This should be moved into `commands` method, but services list can be obtained only here.
         {
-            let services: Vec<_> = self.service_factories
+            let services: Vec<_> = self
+                .service_factories
                 .iter()
                 .map(|f| f.service_name().to_owned())
                 .collect();
@@ -127,8 +136,8 @@ impl NodeBuilder {
             Box::new(Finalize),
             Box::new(Maintenance),
         ].into_iter()
-            .map(|c| (c.name(), CollectedCommand::new(c)))
-            .collect()
+        .map(|c| (c.name(), CollectedCommand::new(c)))
+        .collect()
     }
 }
 

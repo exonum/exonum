@@ -28,8 +28,11 @@ extern crate serde_derive;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey}, encoding, helpers::Height,
-    messages::{Message, RawTransaction, Signed}, storage::{Fork, ProofMapIndex, Snapshot},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
+    encoding,
+    helpers::Height,
+    messages::{Message, RawTransaction, Signed},
+    storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};

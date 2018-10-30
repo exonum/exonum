@@ -16,24 +16,29 @@
 //!
 //! For more information see the project readme.
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
-#![cfg_attr(feature = "cargo-clippy", deny(clippy_pedantic))]
+#![cfg_attr(feature = "cargo-clippy", deny(clippy::clippy_pedantic))]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
           // Next `cast_*` lints don't give alternatives.
-          cast_possible_wrap, cast_possible_truncation, cast_sign_loss,
+          clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
           // `filter(..).map(..)` often looks more shorter and readable.
-          filter_map,
+          clippy::filter_map,
           // Next lints produce too much noise/false positives.
-          stutter, similar_names,
+          clippy::stutter, clippy::similar_names,
           // Variant name ends with the enum name. Similar behavior to similar_names.
-          pub_enum_variant_names,
+          clippy::pub_enum_variant_names,
           // Next lints allowed due to false positive.
-          doc_markdown,
-          // Can be enabled when rust-lang-nursery/rust-clippy#2894 is fixed.
-          use_self,
+          clippy::doc_markdown,
+          // '... may panic' lints.
+          clippy::indexing_slicing,
     )
 )]
 

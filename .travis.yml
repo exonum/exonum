@@ -7,8 +7,6 @@ branches:
   - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
   # Branch names endings with "-release" (for example "0.9.0-release").
   - /-release$/
-  # Separate message header branch
-  - message_header_refactor
 
 addons:
   apt:
@@ -32,9 +30,7 @@ addons:
     - unzip
 
 rust:
-  # Feel free to bump this version if you need features of newer Rust.
-  # Sync with badge in README.md
-  - 1.27.0
+  - 1.30.0
 
 cache:
   directories:
@@ -49,7 +45,6 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.209
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
@@ -77,8 +72,8 @@ before_install:
 
 jobs:
   include:
-  # Formatting & other lints that do not require compilation
-  - env: FEATURE=lints
+  # Formatting & other lints that do not require compilation.
+  - name: lints
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
@@ -89,7 +84,7 @@ jobs:
     - ./node_modules/.bin/cspell --version
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cargo fmt --all -- --write-mode=check
+    - cargo fmt --all -- --check
     - npm run cspell
     - npm run md
     - cargo clean --doc
@@ -98,22 +93,26 @@ jobs:
     - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
     - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
     - mkdir -p target/doc/exonum_configuration
+    - mkdir -p target/std/string
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
     - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
     - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
     - touch target/doc/exonum_configuration/enum.Option.html
+    - touch target/std/string/struct.String.html
+    - touch target/std/primitive.usize.html
     - cargo deadlinks --dir target/doc
 
-  # Clippy linting
-  - env: FEATURE=clippy
-    rust: nightly-2018-06-20
+  # Clippy linting.
+  - name: clippy
+    rust: nightly-2018-10-23
     install:
-    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
+    - cargo clippy --version
     script:
     - cargo clippy --all -- -D warnings
 
-  # Tests
-  - env: FEATURE=test
+  # Tests.
+  - name: test
     addons:
       apt:
         sources:
@@ -166,11 +165,17 @@ jobs:
       bash <(curl -s https://codecov.io/bash) &&
       echo "Uploaded code coverage"
 
-  # Benchmarks (compilation only)
-  - env: FEATURE=benchmarks
-    rust: nightly-2018-05-26
+  # Benchmarks (compilation only).
+  - name: benchmarks
+    rust: nightly-2018-10-23
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Compatibility check with the older rust version. Should be synced with readme badges.
+  - name: rust_1_27_2_compatibility
+    rust: 1.27.2
+    script:
+    - cargo build
 
 notifications:
   slack:

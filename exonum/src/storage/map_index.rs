@@ -21,8 +21,9 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
-    StorageKey, StorageValue,
+    base_index::{BaseIndex, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork, Snapshot, StorageKey, StorageValue,
 };
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.

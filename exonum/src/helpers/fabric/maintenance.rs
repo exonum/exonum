@@ -17,7 +17,8 @@
 use std::{collections::HashMap, path::Path};
 
 use super::{
-    internal::{CollectedCommand, Command, Feedback}, Argument, CommandName, Context,
+    internal::{CollectedCommand, Command, Feedback},
+    Argument, CommandName, Context,
 };
 use blockchain::Schema;
 use helpers::config::ConfigFile;
@@ -39,13 +40,15 @@ pub struct Maintenance;
 
 impl Maintenance {
     fn node_config(ctx: &Context) -> NodeConfig {
-        let path = ctx.arg::<String>(NODE_CONFIG_PATH)
+        let path = ctx
+            .arg::<String>(NODE_CONFIG_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH));
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
     fn database(ctx: &Context, options: &DbOptions) -> Box<dyn Database> {
-        let path = ctx.arg::<String>(DATABASE_PATH)
+        let path = ctx
+            .arg::<String>(DATABASE_PATH)
             .unwrap_or_else(|_| panic!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }

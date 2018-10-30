@@ -25,7 +25,8 @@ use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use sandbox::{
     config_updater::TxConfig,
     sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
-    sandbox_tests_helper::*, timestamping::{TimestampingTxGenerator, DATA_SIZE},
+    sandbox_tests_helper::*,
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
@@ -38,8 +39,7 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
             config.max_propose_timeout = MAX_PROPOSE_TIMEOUT;
             config.min_propose_timeout = MIN_PROPOSE_TIMEOUT;
             config.propose_timeout_threshold = PROPOSE_THRESHOLD;
-        })
-        .build();
+        }).build();
 
     // Wait for us to become the leader.
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
@@ -613,7 +613,7 @@ fn not_request_txs_when_get_tx_and_propose() {
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -637,7 +637,7 @@ fn request_txs_when_get_propose_or_prevote() {
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
-                .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);

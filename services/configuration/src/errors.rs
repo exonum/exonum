@@ -17,8 +17,10 @@
 #![allow(bare_trait_objects)]
 
 use exonum::{
-    blockchain::{ExecutionError, StoredConfiguration}, crypto::Hash,
-    encoding::serialize::json::reexport::Error as JsonError, helpers::Height,
+    blockchain::{ExecutionError, StoredConfiguration},
+    crypto::Hash,
+    encoding::serialize::json::reexport::Error as JsonError,
+    helpers::Height,
 };
 
 use transactions::Propose;
@@ -71,7 +73,10 @@ pub enum ErrorCode {
 // Common error types for `Propose` and `Vote`.
 #[derive(Debug, Fail)]
 pub(crate) enum Error {
-    #[fail(display = "Next configuration is already scheduled: {:?}", _0)]
+    #[fail(
+        display = "Next configuration is already scheduled: {:?}",
+        _0
+    )]
     AlreadyScheduled(StoredConfiguration),
 
     #[fail(display = "Not authored by a validator")]
@@ -80,7 +85,10 @@ pub(crate) enum Error {
     #[fail(display = "Does not reference actual config {:?}", _0)]
     InvalidConfigRef(StoredConfiguration),
 
-    #[fail(display = "Current height {:?} greater or equal than `actual_from`", _0)]
+    #[fail(
+        display = "Current height {:?} greater or equal than `actual_from`",
+        _0
+    )]
     ActivationInPast(Height),
 
     #[fail(display = "Already proposed; old proposal: {:?}", _0)]
@@ -90,7 +98,10 @@ pub(crate) enum Error {
     InvalidConfig(#[cause] JsonError),
 
     #[fail(
-        display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min, max
+        display = "Invalid majority count: {}, it should be >= {} and <= {}",
+        proposed,
+        min,
+        max
     )]
     InvalidMajorityCount {
         min: usize,
@@ -98,7 +109,10 @@ pub(crate) enum Error {
         proposed: usize,
     },
 
-    #[fail(display = "Does not reference known config with hash {:?}", _0)]
+    #[fail(
+        display = "Does not reference known config with hash {:?}",
+        _0
+    )]
     UnknownConfigRef(Hash),
 
     #[fail(display = "Validator already voted for a referenced proposal")]

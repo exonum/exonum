@@ -20,8 +20,9 @@ use std::{cell::Cell, marker::PhantomData};
 
 use self::key::ProofListKey;
 use super::{
-    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
-    StorageKey, StorageValue,
+    base_index::{BaseIndex, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork, Snapshot, StorageKey, StorageValue,
 };
 use crypto::{hash, Hash, HashStream};
 
@@ -643,6 +644,5 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
             [first, second] => hash_pair(first, second),
             [single] => hash_one(single),
             _ => unreachable!(),
-        })
-        .collect()
+        }).collect()
 }

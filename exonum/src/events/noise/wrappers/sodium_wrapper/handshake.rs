@@ -21,10 +21,12 @@ use std::net::SocketAddr;
 
 use super::wrapper::NoiseWrapper;
 use crypto::{
-    x25519::{self, into_x25519_keypair, into_x25519_public_key}, PublicKey, SecretKey,
+    x25519::{self, into_x25519_keypair, into_x25519_public_key},
+    PublicKey, SecretKey,
 };
 use events::{
-    codec::MessagesCodec, noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+    codec::MessagesCodec,
+    noise::{Handshake, HandshakeRawMessage, HandshakeResult},
 };
 use messages::{Connect, Signed};
 use node::state::SharedConnectList;
@@ -127,7 +129,8 @@ impl NoiseHandshake {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
-            let rs = self.noise
+            let rs = self
+                .noise
                 .session
                 .get_remote_static()
                 .expect("Remote static key is not present!");
@@ -159,11 +162,11 @@ impl Handshake for NoiseHandshake {
     {
         let peer_address = self.peer_address;
         let connect = self.connect.clone();
-        let framed = self.read_handshake_msg(stream)
+        let framed = self
+            .read_handshake_msg(stream)
             .and_then(|(stream, handshake, _)| {
                 handshake.write_handshake_msg(stream, &connect.into_bytes())
-            })
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            }).and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake, message)| handshake.finalize(stream, message))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
@@ -178,15 +181,15 @@ impl Handshake for NoiseHandshake {
     {
         let peer_address = self.peer_address;
         let connect = self.connect.clone();
-        let framed = self.write_handshake_msg(stream, &[])
+        let framed = self
+            .write_handshake_msg(stream, &[])
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake, message)| {
                 (
                     handshake.write_handshake_msg(stream, &connect.into_bytes()),
                     Ok(message),
                 )
-            })
-            .and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
+            }).and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
                     .into()

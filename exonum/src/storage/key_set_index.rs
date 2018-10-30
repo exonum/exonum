@@ -21,7 +21,9 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot, StorageKey,
+    base_index::{BaseIndex, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork, Snapshot, StorageKey,
 };
 
 /// A set of key items.
@@ -201,7 +203,10 @@ where
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(clippy::needless_pass_by_value)
+    )]
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }

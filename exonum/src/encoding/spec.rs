@@ -155,7 +155,7 @@ macro_rules! encoding_struct {
 
         // TODO: Extract some fields like hash and from_raw into trait. (ECR-156)
         impl $name {
-            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            #[cfg_attr(feature="cargo-clippy", allow(clippy::too_many_arguments))]
             #[allow(unused_imports, unused_mut)]
 
             /// Creates a new instance with given parameters.
@@ -456,7 +456,8 @@ macro_rules! __ex_deserialize_field {
         $from:expr,
         $to:expr
     ) => {
-        let val = $obj.get(stringify!($field_name))
+        let val = $obj
+            .get(stringify!($field_name))
             .ok_or("Can't get object from json.")?;
         <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
     };

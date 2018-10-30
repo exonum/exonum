@@ -16,7 +16,8 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    crypto::Hash, storage::{Fork, ProofMapIndex, Snapshot},
+    crypto::Hash,
+    storage::{Fork, ProofMapIndex, Snapshot},
 };
 
 encoding_struct! {

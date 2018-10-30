@@ -22,12 +22,14 @@ pub use self::{
 use std::{fmt, marker::PhantomData};
 
 use self::{
-    key::{BitsRange, ChildKind, LEAF_KEY_PREFIX}, node::{BranchNode, Node},
+    key::{BitsRange, ChildKind, LEAF_KEY_PREFIX},
+    node::{BranchNode, Node},
     proof::{create_multiproof, create_proof},
 };
 use super::{
-    base_index::{BaseIndex, BaseIndexIter}, indexes_metadata::IndexType, Fork, Snapshot,
-    StorageKey, StorageValue,
+    base_index::{BaseIndex, BaseIndexIter},
+    indexes_metadata::IndexType,
+    Fork, Snapshot, StorageKey, StorageValue,
 };
 use crypto::{CryptoHash, Hash, HashStream};
 
@@ -856,12 +858,14 @@ where
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self.node {
-                    Node::Leaf(ref value) => f.debug_struct("Leaf")
+                    Node::Leaf(ref value) => f
+                        .debug_struct("Leaf")
                         .field("key", &self.path)
                         .field("hash", &self.hash)
                         .field("value", value)
                         .finish(),
-                    Node::Branch(ref branch) => f.debug_struct("Branch")
+                    Node::Branch(ref branch) => f
+                        .debug_struct("Branch")
                         .field("path", &self.path)
                         .field("hash", &self.hash)
                         .field("left", &self.child(branch, ChildKind::Left))
