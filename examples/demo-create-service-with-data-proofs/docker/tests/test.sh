@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Bash script for testing the docker container for exonum-cryptocurrency-advanced demo.
+# Bash script for testing the docker container for exonum-demo-create-service-with-data-proofs.
 #
 
 set -e
@@ -21,7 +21,7 @@ function kill-server {
     docker ps | grep serhiioryshych/exonum-cryptocurrency-advanced-example | gawk '{print $1}' | xargs docker stop || true
 }
 
-# Creates a wallet in the cryptocurrency-advanced demo.
+# Creates a wallet in the service with data proofs demo.
 #
 # Arguments:
 # - $1: filename with the transaction data.

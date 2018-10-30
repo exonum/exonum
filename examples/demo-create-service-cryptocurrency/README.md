@@ -1,4 +1,4 @@
-# Cryptocurrency Tutorial
+# Demo: Create Service (Cryptocurrency)
 
 [![Build status][travis-image]][travis-url]
 [![Gitter][gitter-image]][gitter-url]
@@ -28,7 +28,7 @@ To build and run a single node use:
 ```sh
 # clone the repository with blockchain node
 git clone git@github.com:exonum/exonum.git
-cd exonum/examples/cryptocurrency
+cd exonum/examples/demo-create-service-cryptocurrency
 
 # build and run a zero-configuration demo
 cargo run --example demo
@@ -52,7 +52,7 @@ handy way to do this).
 
 ## License
 
-Cryptocurrency is licensed under the Apache License (Version 2.0). See
+Cryptocurrency demo service is licensed under the Apache License (Version 2.0). See
 [LICENSE](LICENSE) for details.
 
 [the transaction endpoint]: http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets

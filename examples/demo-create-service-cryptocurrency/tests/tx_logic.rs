@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! These are tests concerning the business logic of transactions in the cryptocurrency service.
+//! These are tests concerning the business logic of transactions in the demo cryptocurrency service.
 //! See `api.rs` for tests focused on the API of the service.
 //!
 //! Note how business logic tests use `TestKit::create_block*` methods to send transactions,

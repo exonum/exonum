@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Cryptocurrency implementation example using [exonum](http://exonum.com/).
+//! A demo cryptocurrency implementation example using [Exonum](http://exonum.com/).
 
 #![deny(missing_debug_implementations, missing_docs, unsafe_code, bare_trait_objects)]
 

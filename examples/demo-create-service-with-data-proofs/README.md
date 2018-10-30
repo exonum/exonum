@@ -1,12 +1,15 @@
-# Cryptocurrency demo
+# Demo: Create Service (with Data Proofs)
 
-This project demonstrates how to bootstrap own cryptocurrency
-with [Exonum blockchain](https://github.com/exonum/exonum).
+This project demonstrates how to bootstrap a demo cryptocurrency service with
+data proofs based on the [Exonum blockchain](https://github.com/exonum/exonum).
 
-![Cryptocurrency demo](Screenshot.png)
+![Frontend example](Screenshot.png)
 
-Exonum blockchain keeps balances of users and handles secure
-transactions between them.
+In this demo service Exonum blockchain keeps balances of users and handles
+secure transactions between them.
+
+See [the documentation](https://exonum.com/doc/get-started/data-proofs)
+for a detailed step-by-step guide how to approach this example.
 
 It implements most basic operations:
 
@@ -20,8 +23,8 @@ It implements most basic operations:
 
 <!-- spell-checker:ignore serhiioryshych -->
 
-Simply run the following command to start the cryptocurrency service on 4 nodes
-on the local machine:
+Simply run the following command to start the demo cryptocurrency service on 4
+nodes on the local machine:
 
 ```bash
 docker run -p 8000-8008:8000-8008 serhiioryshych/exonum-cryptocurrency-advanced-example
@@ -47,13 +50,13 @@ Be sure you installed necessary packages:
 
 #### Install and run
 
-Below you will find a step-by-step guide to starting the cryptocurrency
+Below you will find a step-by-step guide to starting the demo cryptocurrency
 service on 4 nodes on the local machine.
 
 Build the project:
 
 ```sh
-cd examples/cryptocurrency-advanced/backend
+cd examples/demo-create-service-with-data-proofs/backend
 
 cargo install
 ```
@@ -135,7 +138,7 @@ Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 ## Tutorials
 
 - Read the
-  [frontend tutorial](https://github.com/exonum/exonum/blob/master/examples/cryptocurrency-advanced/tutorial/frontend.md)
+  [frontend tutorial](https://github.com/exonum/exonum/blob/master/examples/demo-create-service-with-data-proofs/tutorial/frontend.md)
   to get detailed information about the interaction of the client with Exonum blockchain.
 
 ## License

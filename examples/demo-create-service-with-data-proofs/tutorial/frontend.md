@@ -1,8 +1,8 @@
-# Cryptocurrency frontend tutorial
+# Service with data proofs frontend tutorial
 
 <!-- spell-checker:ignore uint -->
 
-Cryptocurrency demo application is built on [Vue.js](https://vuejs.org)
+The service with data proofs demo application is built on [Vue.js](https://vuejs.org)
 framework together with [Bootstrap](https://getbootstrap.com/).
 
 This tutorial covers the interaction of the client with Exonum blockchain:

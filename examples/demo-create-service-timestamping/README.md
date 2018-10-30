@@ -1,4 +1,4 @@
-# Timestamping demo
+# Demo: Create Service (Timestamping)
 
 This project demonstrates how to create simple timestamping service
 using [Exonum blockchain](https://github.com/exonum/exonum).
@@ -23,7 +23,7 @@ Clone the project and install Rust dependencies:
 ```sh
 git clone https://github.com/exonum/exonum
 
-cd exonum/examples/timestamping/backend
+cd exonum/examples/demo-create-service-timestamping/backend
 
 cargo install
 ```
