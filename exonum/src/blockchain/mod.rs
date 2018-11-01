@@ -125,9 +125,8 @@ impl Blockchain {
         }
     }
 
-    /// Returns the `VecMap` for all services. This is a map which
-    /// contains service identifiers and service interfaces. The VecMap
-    /// allows proceeding from the service identifier to the service itself.
+    /// Returns mapping from the service identifier (`u16`) to service (`Box<dyn Service>`) for
+    /// all services.
     pub fn service_map(&self) -> &Arc<HashMap<u16, Box<dyn Service>>> {
         &self.service_map
     }
