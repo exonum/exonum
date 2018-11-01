@@ -40,8 +40,9 @@ impl NodeHandler {
         }
 
         // Warning for messages from previous and future height (ignore when in sync mode)
-        if !self.sync_mode && (msg.height() < self.state.height().previous()
-            || msg.height() > self.state.height().next())
+        if !self.sync_mode
+            && (msg.height() < self.state.height().previous()
+                || msg.height() > self.state.height().next())
         {
             warn!(
                 "Received consensus message from other height: msg.height={}, self.height={}",
@@ -611,7 +612,10 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(clippy::needless_pass_by_value)
+    )]
     pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {

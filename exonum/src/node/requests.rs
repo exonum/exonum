@@ -17,9 +17,8 @@ use blockchain::Schema;
 use helpers::Height;
 use messages::{
     BlockRequest, BlockResponse, FileRequest, FileResponse, LastCheckpointRequest,
-    LastCheckpointResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
-    TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
-    TRANSACTION_RESPONSE_EMPTY_SIZE,
+    LastCheckpointResponse, PrevotesRequest, ProposeRequest, Requests, Signed, TransactionsRequest,
+    TransactionsResponse, RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
