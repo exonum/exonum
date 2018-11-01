@@ -17,7 +17,7 @@ use blockchain::Schema;
 use helpers::Height;
 use messages::{
     BlockRequest, BlockResponse, FileRequest, FileResponse, LastCheckpointRequest,
-    LastCheckpointResponse, PrevotesRequest, ProposeRequest, Requests, Responses, Signed,
+    LastCheckpointResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
     TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
