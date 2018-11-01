@@ -355,7 +355,7 @@ impl CheckpointManager {
         let mut checkpoints = checkpoints
             .map(|rd| rd.map(|i| i.path()).unwrap())
             .map(|pb| {
-                ((
+                (
                     pb.file_name()
                         .unwrap()
                         .to_str()
@@ -363,7 +363,7 @@ impl CheckpointManager {
                         .parse::<u64>()
                         .unwrap(),
                     pb,
-                ))
+                )
             }).map(|(h, pb)| {
                 let files_list = CheckpointManager::list_files_in_path(&pb);
 

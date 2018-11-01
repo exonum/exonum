@@ -611,7 +611,7 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
