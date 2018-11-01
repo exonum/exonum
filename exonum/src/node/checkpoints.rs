@@ -15,9 +15,13 @@
 //! Checkpoints management routines
 
 use std::{
-    collections::{BTreeMap, HashMap}, error::Error as StdError, fmt,
-    fs::{create_dir_all, remove_dir_all, remove_file, rename, File}, io::Write,
-    path::{Path, PathBuf}, sync::Arc,
+    collections::{BTreeMap, HashMap},
+    error::Error as StdError,
+    fmt,
+    fs::{create_dir_all, remove_dir_all, remove_file, rename, File},
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use crypto::PublicKey;
@@ -318,7 +322,8 @@ impl CheckpointManager {
     }
 
     fn list_files_in_path<P: AsRef<Path>>(path: P) -> String {
-        let files_list = path.as_ref()
+        let files_list = path
+            .as_ref()
             .read_dir()
             .map(|rd| {
                 rd.map(|i| {
@@ -329,8 +334,7 @@ impl CheckpointManager {
                             .unwrap_or("".to_string())
                     }).unwrap_or("".to_string())
                 }).collect::<Vec<_>>()
-            })
-            .unwrap_or(vec![]);
+            }).unwrap_or(vec![]);
 
         // Convert into JSON representation
         to_string(&files_list).unwrap_or("".to_string())
@@ -360,8 +364,7 @@ impl CheckpointManager {
                         .unwrap(),
                     pb,
                 ))
-            })
-            .map(|(h, pb)| {
+            }).map(|(h, pb)| {
                 let files_list = CheckpointManager::list_files_in_path(&pb);
 
                 // Strip prefix from path
@@ -370,8 +373,7 @@ impl CheckpointManager {
                 pb.push(h.to_string());
 
                 (Height(h), pb, files_list)
-            })
-            .collect::<Vec<_>>();
+            }).collect::<Vec<_>>();
 
         checkpoints.sort_unstable_by(|(h1, ..), (h2, ..)| h1.cmp(h2));
 
@@ -407,7 +409,8 @@ impl CheckpointManager {
             remove_dir_all(&path_temp)?;
         }
 
-        if self.db
+        if self
+            .db
             .create_checkpoint(&path_temp.to_str().unwrap())
             .is_ok()
         {

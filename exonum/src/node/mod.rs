@@ -1189,7 +1189,7 @@ mod tests {
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg, None);
+        let mut node = Node::new(db, None, false, services, node_cfg, None);
 
         let tx = Message::sign_transaction(
             TxSimple::new(&p_key, "Hello, World!"),

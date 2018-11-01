@@ -269,7 +269,8 @@ encoding_struct! {
         /// Format of the list is in JSON: `["file1", "file2", "etc."]`
         files: &str,
     }
-
+}
+encoding_struct! {
     /// Information about the last checkpoint.
     ///
     /// ### Validation
@@ -393,7 +394,8 @@ encoding_struct! {
         /// The height to which the message is related.
         height: Height,
     }
-
+}
+encoding_struct! {
     /// Request for the last checkpoint higher than the given `height`.
     ///
     /// ### Validation
@@ -412,7 +414,8 @@ encoding_struct! {
         /// The height to which the message is related.
         height: Height,
     }
-
+}
+encoding_struct! {
     /// Request for the specific checkpoint's associated file data.
     ///
     /// ### Validation
@@ -617,6 +620,10 @@ impl_protocol! {
             TransactionsResponse = 0,
             /// Information about block, that sent as response to `BlockRequest`.
             BlockResponse = 1,
+            /// Information about last checkpoint.
+            LastCheckpointResponse = 2,
+            /// Data of requested file.
+            FileResponse = 3,
         },
         /// Exonum node requests.
         3 => Requests {
@@ -630,6 +637,10 @@ impl_protocol! {
             PeersRequest = 3,
             /// Request of some future block.
             BlockRequest = 4,
+            /// Request of the last checkpoint.
+            LastCheckpointRequest = 5,
+            /// Request of the file.
+            FileRequest = 6,
         },
 
     }
@@ -701,6 +712,8 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.to(),
             Requests::PeersRequest(ref msg) => msg.to(),
             Requests::BlockRequest(ref msg) => msg.to(),
+            Requests::LastCheckpointRequest(ref msg) => msg.to(),
+            Requests::FileRequest(ref msg) => msg.to(),
         }
     }
 
@@ -712,6 +725,8 @@ impl Requests {
             Requests::PrevotesRequest(ref msg) => msg.author(),
             Requests::PeersRequest(ref msg) => msg.author(),
             Requests::BlockRequest(ref msg) => msg.author(),
+            Requests::LastCheckpointRequest(ref msg) => msg.author(),
+            Requests::FileRequest(ref msg) => msg.author(),
         }
     }
 }

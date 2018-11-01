@@ -19,7 +19,10 @@ use crypto::PublicKey;
 use events::error::LogError;
 use events::network::ConnectedPeerAddr;
 use helpers::Height;
-use messages::{Connect, FileResponse, LastCheckpointResponse,Message, PeersRequest, Responses, Service, Signed, Status};
+use messages::{
+    Connect, FileResponse, LastCheckpointResponse, Message, PeersRequest, Responses, Service,
+    Signed, Status,
+};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -37,9 +40,11 @@ impl NodeHandler {
             }
             Message::Responses(Responses::TransactionsResponse(msg)) => {
                 self.handle_txs_batch(&msg).log_error()
-            },
-            Ok(Any::LastCheckpoint(msg)) => self.handle_last_checkpoint(&msg),
-            Ok(Any::File(msg)) => self.handle_file(&msg),
+            }
+            Message::Responses(Responses::LastCheckpointResponse(msg)) => {
+                self.handle_last_checkpoint(&msg)
+            }
+            Message::Responses(Responses::FileResponse(msg)) => self.handle_file(&msg),
         }
     }
 
@@ -246,7 +251,7 @@ impl NodeHandler {
     }
 
     /// Handles last checkpoint message.
-    pub fn handle_last_checkpoint(&mut self, msg: &LastCheckpointResponse) {
+    pub fn handle_last_checkpoint(&mut self, msg: &Signed<LastCheckpointResponse>) {
         if !msg.has_checkpoint() {
             return;
         }
@@ -255,7 +260,7 @@ impl NodeHandler {
             checkpoints.add_checkpoint(msg);
 
             // Request files
-            if let Some(req) = checkpoints.next_checkpoint_file_request(msg.from()) {
+            if let Some(req) = checkpoints.next_checkpoint_file_request(&msg.author()) {
                 Some(RequestData::File(req))
             } else {
                 Some(RequestData::LastCheckpoint(msg.height()))
@@ -265,18 +270,18 @@ impl NodeHandler {
         };
 
         if let Some(req) = req {
-            self.request(req, *msg.from());
+            self.request(req, msg.author());
         }
     }
 
     /// Handles file message.
-    pub fn handle_file(&mut self, msg: &FileResponse) {
+    pub fn handle_file(&mut self, msg: &Signed<FileResponse>) {
         let height = self.state.height();
 
         let req = if let Some(ref mut checkpoints) = self.checkpoints {
             if !checkpoints.save_checkpoint_file(msg) {
                 // Request another file
-                if let Some(req) = checkpoints.next_checkpoint_file_request(msg.from()) {
+                if let Some(req) = checkpoints.next_checkpoint_file_request(&msg.author()) {
                     Some(RequestData::File(req))
                 } else {
                     Some(RequestData::LastCheckpoint(height))
@@ -295,7 +300,7 @@ impl NodeHandler {
         };
 
         if let Some(req) = req {
-            self.request(req, *msg.from());
+            self.request(req, msg.author());
         }
     }
 }

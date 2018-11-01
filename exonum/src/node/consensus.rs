@@ -20,10 +20,9 @@ use events::InternalRequest;
 use failure;
 use helpers::{Height, Round, ValidatorId};
 use messages::{
-    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
-    TransactionsRequest, TransactionsResponse,
-    FileRequest, LastCheckpointRequest,
+    BlockRequest, BlockResponse, Consensus as ConsensusMessage, FileRequest, LastCheckpointRequest,
+    Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed,
+    SignedMessage, TransactionsRequest, TransactionsResponse,
 };
 use node::{NodeHandler, RequestData};
 use storage::Patch;
@@ -612,10 +611,7 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::needless_pass_by_value)
-    )]
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
@@ -783,23 +779,19 @@ impl NodeHandler {
                 RequestData::Block(height) => {
                     self.sign_message(BlockRequest::new(&peer, height)).into()
                 }
-                RequestData::LastCheckpoint(height) => {
-                    self.sign_message(LastCheckpointRequest::new(
+                RequestData::LastCheckpoint(height) => self
+                    .sign_message(LastCheckpointRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
                         height,
-                        self.state.consensus_secret_key(),
-                    )).into()
-                }
-                RequestData::File((ref checkpoint_name, ref file_name)) => {
-                    self.sign_message(FileRequest::new(
+                    )).into(),
+                RequestData::File((ref checkpoint_name, ref file_name)) => self
+                    .sign_message(FileRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
                         &checkpoint_name,
                         &file_name,
-                        self.state.consensus_secret_key(),
-                    )).into()
-                },
+                    )).into(),
             };
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, message);

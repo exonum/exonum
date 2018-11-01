@@ -24,7 +24,12 @@ use rocksdb::{
 };
 
 use std::{
-    error::Error, fmt, iter::Peekable, mem, path::{Path, PathBuf}, sync::Arc,
+    error::Error,
+    fmt,
+    iter::Peekable,
+    mem,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};

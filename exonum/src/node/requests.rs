@@ -16,7 +16,8 @@ use super::NodeHandler;
 use blockchain::Schema;
 use helpers::Height;
 use messages::{
-    BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
+    BlockRequest, BlockResponse, FileRequest, FileResponse, LastCheckpointRequest,
+    LastCheckpointResponse, PrevotesRequest, ProposeRequest, Requests, Responses, Signed,
     TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
     TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
@@ -47,8 +48,8 @@ impl NodeHandler {
             Requests::PrevotesRequest(ref msg) => self.handle_request_prevotes(msg),
             Requests::PeersRequest(ref msg) => self.handle_request_peers(msg),
             Requests::BlockRequest(ref msg) => self.handle_request_block(msg),
-            RequestMessage::Checkpoint(msg) => self.handle_request_checkpoint(&msg),
-            RequestMessage::File(msg) => self.handle_request_file(&msg),
+            Requests::LastCheckpointRequest(msg) => self.handle_request_checkpoint(&msg),
+            Requests::FileRequest(msg) => self.handle_request_file(&msg),
         }
     }
 
@@ -183,7 +184,6 @@ impl NodeHandler {
                     height,
                     &checkpoint_name,
                     &files_list,
-                    self.state.consensus_secret_key(),
                 ))
             } else {
                 None
@@ -206,10 +206,10 @@ impl NodeHandler {
             Height(0),
             "",
             "",
-            self.state.consensus_secret_key(),
         ));
 
-        self.send_to_peer(*msg.from(), response.raw());
+        let response = self.sign_message(response);
+        self.send_to_peer(*msg.from(), response);
     }
 
     /// Handles `FileRequest` message.
@@ -237,14 +237,14 @@ impl NodeHandler {
                 msg.checkpoint_name(),
                 msg.file_name(),
                 &bytes,
-                self.state.consensus_secret_key(),
             ))
         } else {
             None
         };
 
         if let Some(response) = response {
-            self.send_to_peer(*msg.from(), response.raw());
+            let response = self.sign_message(response);
+            self.send_to_peer(*msg.from(), response);
         }
     }
 }
