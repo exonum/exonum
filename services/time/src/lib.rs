@@ -49,10 +49,10 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::{self, serialize::json::reexport::Value},
+    encoding,
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
-    storage::{Fork, Snapshot},
+    storage::Snapshot,
 };
 use schema::TimeSchema;
 
@@ -109,10 +109,6 @@ impl Service for TimeService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
-    }
-
-    fn initialize(&self, _fork: &mut Fork) -> Value {
-        Value::Null
     }
 
     /// Creates transaction after commit of the block.

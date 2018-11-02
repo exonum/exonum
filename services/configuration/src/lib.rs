@@ -89,7 +89,6 @@ pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use serde_json::to_value;
 
-use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
@@ -147,8 +146,8 @@ impl blockchain::Service for Service {
         api::PrivateApi::wire(builder);
     }
 
-    fn initialize(&self, _fork: &mut Fork) -> Value {
-        to_value(self.config.clone()).unwrap()
+    fn initialize(&self, _fork: &mut Fork) -> blockchain::InitResult {
+        blockchain::InitResult::Done(to_value(self.config.clone()).unwrap())
     }
 }
 

@@ -36,6 +36,18 @@ use messages::{Message, RawTransaction, ServiceTransaction, Signed};
 use node::{ApiSender, ConnectInfo, NodeRole, State};
 use storage::{Fork, Snapshot};
 
+/// Service initialization result.
+#[derive(Debug)]
+pub enum InitResult {
+    /// `Service::initialize(..)` will be called again with new instance of `Fork`.
+    ///
+    /// Previous instance of `Fork` will be merged into the database. The purpose of this option
+    /// is to allow incremental initialization with a lot of data (more than fit into RAM).
+    Continue,
+    /// Service has finished its initialization.
+    Done(Value),
+}
+
 /// A trait that describes the business logic of a certain service.
 ///
 /// Services are the main extension point for the Exonum framework. Initially,
@@ -181,8 +193,8 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [doc:global_cfg]: https://exonum.com/doc/architecture/services/#global-configuration.
     /// [`&mut Fork`]: https://exonum.com/doc/architecture/storage/#forks
-    fn initialize(&self, fork: &mut Fork) -> Value {
-        Value::Null
+    fn initialize(&self, fork: &mut Fork) -> InitResult {
+        InitResult::Done(Value::Null)
     }
 
     /// A service execution. This method is invoked for each service after execution

@@ -37,7 +37,7 @@ pub use self::{
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{Schema, TxLocation},
-    service::{Service, ServiceContext, SharedNodeState},
+    service::{InitResult, Service, ServiceContext, SharedNodeState},
     transaction::{
         ExecutionError, ExecutionResult, Transaction, TransactionContext, TransactionError,
         TransactionErrorType, TransactionMessage, TransactionResult, TransactionSet,
@@ -235,21 +235,29 @@ impl Blockchain {
             services: BTreeMap::new(),
         };
 
+        let service_keys: Vec<u16> = self.service_map.keys().cloned().collect();
+        for x in service_keys {
+            let name: String = self.service_map.get(&x).unwrap().service_name().into();
+            if config_propose.services.contains_key(&*name) {
+                panic!(
+                    "Services already contain service with '{}' name, please change it",
+                    name
+                );
+            }
+            let cfg = loop {
+                let mut fork = self.fork();
+                let result = self.service_map[&x].initialize(&mut fork);
+                self.merge(fork.into_patch())?;
+                if let InitResult::Done(cfg) = result {
+                    break cfg;
+                }
+            };
+            config_propose.services.insert(name, cfg);
+        }
+
+        // Commit actual configuration
         let patch = {
             let mut fork = self.fork();
-            // Update service tables
-            for (_, service) in self.service_map.iter() {
-                let cfg = service.initialize(&mut fork);
-                let name = service.service_name();
-                if config_propose.services.contains_key(name) {
-                    panic!(
-                        "Services already contain service with '{}' name, please change it",
-                        name
-                    );
-                }
-                config_propose.services.insert(name.into(), cfg);
-            }
-            // Commit actual configuration
             {
                 let mut schema = Schema::new(&mut fork);
                 if schema.block_hash_by_height(Height::zero()).is_some() {

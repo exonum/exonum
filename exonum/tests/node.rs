@@ -31,7 +31,7 @@ use std::{
 };
 
 use exonum::{
-    blockchain::{Service, ServiceContext, Transaction},
+    blockchain::{InitResult, Service, ServiceContext, Transaction},
     crypto::Hash,
     encoding::Error as EncodingError,
     helpers,
@@ -85,9 +85,9 @@ impl Service for InitializeCheckerService {
         unreachable!("An unknown transaction received");
     }
 
-    fn initialize(&self, _fork: &mut Fork) -> Value {
+    fn initialize(&self, _fork: &mut Fork) -> InitResult {
         *self.0.lock().unwrap() += 1;
-        Value::Null
+        InitResult::Done(Value::Null)
     }
 }
 
