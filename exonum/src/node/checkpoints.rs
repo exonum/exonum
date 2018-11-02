@@ -77,9 +77,9 @@ impl CheckpointManager {
 
         let last_checkpoint = checkpoints
             .list_checkpoints()
-            .unwrap_or(vec![])
+            .unwrap_or_else(|_| vec![])
             .last()
-            .map(|x| x.clone());
+            .cloned();
         checkpoints.last_checkpoint = last_checkpoint;
 
         if let Some(ref lc) = checkpoints.last_checkpoint {
@@ -109,7 +109,7 @@ impl CheckpointManager {
         }
 
         let mut downloaded_files = HashMap::new();
-        let files: Vec<String> = from_str(checkpoint.files()).unwrap_or(vec![]);
+        let files: Vec<String> = from_str(checkpoint.files()).unwrap_or_else(|_| vec![]);
         for file in files.iter() {
             downloaded_files.insert(file.clone(), false);
         }
@@ -250,7 +250,7 @@ impl CheckpointManager {
     /// Saves received file for checkpoint.
     /// Returns `true` if all files were downloaded and checkpoint is ready to be applied.
     pub fn save_checkpoint_file(&mut self, response: &FileResponse) -> bool {
-        let file_name = response.file_name().clone();
+        let file_name = response.file_name();
         let checkpoint_name = response.checkpoint_name();
         let mut all_downloaded = true;
 
@@ -331,13 +331,13 @@ impl CheckpointManager {
                         de.path()
                             .file_name()
                             .map(|oss| oss.to_str().unwrap_or("").to_string())
-                            .unwrap_or("".to_string())
-                    }).unwrap_or("".to_string())
+                            .unwrap_or_else(|| "".to_string())
+                    }).unwrap_or_else(|_| "".to_string())
                 }).collect::<Vec<_>>()
-            }).unwrap_or(vec![]);
+            }).unwrap_or_else(|_| vec![]);
 
         // Convert into JSON representation
-        to_string(&files_list).unwrap_or("".to_string())
+        to_string(&files_list).unwrap_or_else(|_| "".to_string())
     }
 
     /// Returns list of checkpoints created by node sorted by height ascending.
@@ -381,7 +381,7 @@ impl CheckpointManager {
     }
 
     /// Creates a new DB checkpoint.
-    pub fn create_checkpoint(&mut self, height: &Height) -> Result<(), Box<dyn StdError>> {
+    pub fn create_checkpoint(&mut self, height: Height) -> Result<(), Box<dyn StdError>> {
         // Remove some excess checkpoints prior checkpoint creation
         if let Err(e) = self.purge_checkpoints() {
             error!("Was unable to purge checkpoints: {}", e);
@@ -422,7 +422,7 @@ impl CheckpointManager {
             // Collect list of files in directory
             let files_list = CheckpointManager::list_files_in_path(&path_temp);
 
-            self.last_checkpoint = Some((*height, path, files_list));
+            self.last_checkpoint = Some((height, path, files_list));
         }
 
         if cp_path.exists() {

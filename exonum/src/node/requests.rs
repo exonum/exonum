@@ -198,7 +198,7 @@ impl NodeHandler {
             );
         }
 
-        let response = response.unwrap_or(LastCheckpointResponse::new(
+        let response = response.unwrap_or_else(|| LastCheckpointResponse::new(
             self.state.consensus_public_key(),
             msg.from(),
             false,

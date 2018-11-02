@@ -518,7 +518,7 @@ impl NodeHandler {
         if let Some(ref mut checkpoints) = self.checkpoints {
             if let Some(period) = checkpoints.checkpoint_period_blocks {
                 if (height.0 + 1) % period == 0 {
-                    if let Err(e) = checkpoints.create_checkpoint(&height) {
+                    if let Err(e) = checkpoints.create_checkpoint(height) {
                         error!("Unable to create checkpoint! {:?}", e);
                     }
                 }
