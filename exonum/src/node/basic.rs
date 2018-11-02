@@ -175,7 +175,7 @@ impl NodeHandler {
             }
 
             // Request checkpoint in sync mode if lagging for more than 100 blocks
-            if self.sync_mode && msg.height() > height && msg.height().0 - height.0 > 100 {
+            if self.sync_mode {
                 // Request checkpoint
                 self.request(RequestData::LastCheckpoint(height), peer);
             } else {
