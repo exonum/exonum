@@ -398,9 +398,6 @@ impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
-        db_path: Option<String>,
-        checkpoints: Option<CheckpointManager>,
-        sync_mode: bool,
         external_address: &str,
         sender: NodeSender,
         system_state: Box<dyn SystemStateProvider>,
@@ -462,14 +459,14 @@ impl NodeHandler {
 
         Self {
             blockchain,
-            db_path,
-            sync_mode,
+            db_path: None,
+            sync_mode: false,
             api_state,
             system_state,
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            checkpoints,
+            checkpoints: None,
             is_enabled,
             node_role,
             config_manager,
@@ -728,6 +725,21 @@ impl NodeHandler {
                 * self.round_timeout_increase();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
+
+    /// Sets checkpoint manager for handler.
+    pub fn set_checkpoint_manager(&mut self, checkpoints: Option<CheckpointManager>) {
+        self.checkpoints = checkpoints;
+    }
+
+    /// Sets path to DB for handler.
+    pub fn set_db_path(&mut self, db_path: Option<String>) {
+        self.db_path = db_path;
+    }
+
+    /// Enables or disables sync mode for handler.
+    pub fn set_sync_mode(&mut self, sync_mode: bool) {
+        self.sync_mode = sync_mode;
+    }
 }
 
 impl fmt::Debug for NodeHandler {
@@ -908,21 +920,11 @@ impl Node {
             peer_discovery: peers,
         };
 
-        let checkpoints = CheckpointManager::new(
-            db_arc,
-            node_cfg.service_public_key,
-            node_cfg.database.checkpoint_period_blocks,
-            node_cfg.database.max_checkpoints,
-        );
-
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
-        let handler = NodeHandler::new(
+        let mut handler = NodeHandler::new(
             blockchain,
-            db_path,
-            Some(checkpoints),
-            remote_sync_mode,
             &node_cfg.external_address,
             channel.node_sender(),
             system_state,
@@ -930,6 +932,17 @@ impl Node {
             api_state,
             config_file_path,
         );
+
+        handler.set_db_path(db_path);
+        handler.set_sync_mode(remote_sync_mode);
+
+        let checkpoints = CheckpointManager::new(
+            db_arc,
+            node_cfg.service_public_key,
+            node_cfg.database.checkpoint_period_blocks,
+            node_cfg.database.max_checkpoints,
+        );
+        handler.set_checkpoint_manager(Some(checkpoints));
 
         Self {
             api_options: node_cfg.api,
