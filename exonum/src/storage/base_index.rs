@@ -109,7 +109,7 @@ where
     where
         P: StorageKey,
         P: ?Sized,
-        S: AsRef<str>
+        S: AsRef<str>,
     {
         assert_valid_name(&family_name);
 
