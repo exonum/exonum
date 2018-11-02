@@ -178,15 +178,11 @@ where
     ///     &mut fork,
     ///  );
     /// ```
-    pub fn new_in_family<S, I>(
-        family_name: S,
-        index_id: &I,
-        view: T,
-    ) -> Self
-        where
-            I: StorageKey,
-            I: ?Sized,
-            S: AsRef<str>,
+    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
+    where
+        I: StorageKey,
+        I: ?Sized,
+        S: AsRef<str>,
     {
         Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofMap, view),
