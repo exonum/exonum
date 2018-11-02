@@ -14,8 +14,8 @@
 
 use super::super::crypto::Hash;
 use super::{
-    Database, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, Snapshot,
-    SparseListIndex, ValueSetIndex,
+    Database, Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
+    Snapshot, SparseListIndex, ValueSetIndex,
 };
 
 const IDX_NAME: &'static str = "idx_name";
@@ -269,6 +269,7 @@ mod rocksdb_tests {
 #[allow(unreachable_code, unused_variables)]
 fn should_compile() {
     let mut fork: Fork = unimplemented!();
+    let _: Entry<_, ()> = Entry::new_in_family("", "", &mut fork);
     let _: KeySetIndex<_, Hash> = KeySetIndex::new_in_family("", "", &mut fork);
     let _: ListIndex<_, ()> = ListIndex::new_in_family("", "", &mut fork);
     let _: MapIndex<_, Hash, ()> = MapIndex::new_in_family("", "", &mut fork);
