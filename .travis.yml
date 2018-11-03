@@ -102,54 +102,6 @@ jobs:
     - touch target/std/primitive.usize.html
     - cargo deadlinks --dir target/doc
 
-  # Clippy linting.
-  - name: clippy
-    rust: nightly-2018-10-23
-    install:
-    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
-    - cargo clippy --version
-    script:
-    - cargo clippy --all -- -D warnings
-
-  # Tests.
-  - name: test
-    addons:
-      apt:
-        sources:
-        - sourceline: 'ppa:giskou/librocksdb'
-        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
-          key_url: https://packages.microsoft.com/keys/microsoft.asc
-        packages:
-        - gcc
-        - g++
-        - libssl-dev
-        - libcurl4-openssl-dev
-        - libelf-dev
-        - libdw-dev
-        - binutils-dev
-        - libiberty-dev
-        - libsnappy-dev
-        - librocksdb
-        - powershell
-        - cmake
-        - zlib1g-dev
-        - build-essential
-        - pkg-config
-
-    install:
-    - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
-    script:
-    - cargo test --all
-    - cargo run -p exonum --example explorer
-    - cargo run -p exonum-testkit --example timestamping
-    - cargo run -p exonum-testkit --example configuration_change
-    - cargo run -p exonum-time --example simple_service
-# Update frontend integrity tests. [ECR-2481]
-#    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-#    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-#    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
-  
   # Run kcov.
   - name: kcov
     install:
@@ -166,12 +118,61 @@ jobs:
     - rm -rf kcov-36
     script:
     - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do 
-      mkdir -p "target/cov/$(basename $file)"
+    - ls -la
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do
+      echo ${file}
+      #mkdir -p "target/cov/$(basename $file)"
       ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
+  # Tests.
+  # name: test
+  # addons:
+  #   apt:
+  #     sources:
+  #     - sourceline: 'ppa:giskou/librocksdb'
+  #     - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+  #       key_url: https://packages.microsoft.com/keys/microsoft.asc
+  #     packages:
+  #     - gcc
+  #     - g++
+  #     - libssl-dev
+  #     - libcurl4-openssl-dev
+  #     - libelf-dev
+  #     - libdw-dev
+  #     - binutils-dev
+  #     - libiberty-dev
+  #     - libsnappy-dev
+  #     - librocksdb
+  #     - powershell
+  #     - cmake
+  #     - zlib1g-dev
+  #     - build-essential
+  #     - pkg-config
+
+  # install:
+  # - nvm install 8 && nvm use 8
+  # - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
+  # script:
+  # - cargo test --all
+  # - cargo run -p exonum --example explorer
+  # - cargo run -p exonum-testkit --example timestamping
+  # - cargo run -p exonum-testkit --example configuration_change
+  # - cargo run -p exonum-time --example simple_service
+# Update frontend integrity tests. [ECR-2481]
+#    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+#    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+#    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+ 
+ # Clippy linting.
+  - name: clippy
+    rust: nightly-2018-10-23
+    install:
+    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
+    - cargo clippy --version
+    script:
+    - cargo clippy --all -- -D warnings
 
   # Benchmarks (compilation only).
   - name: benchmarks
