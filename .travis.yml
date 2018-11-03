@@ -103,6 +103,7 @@ jobs:
     - cargo deadlinks --dir target/doc
 
   # Run kcov.
+  # Just adding this to push Travis
   - name: kcov
     install:
     - cd $TRAVIS_BUILD_DIR
