@@ -120,8 +120,8 @@ jobs:
     script:
     - cd $TRAVIS_BUILD_DIR
     - ls -la
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do
-      echo ${file}
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do \
+      echo ${file} \
       #mkdir -p "target/cov/$(basename $file)"
       ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - bash <(curl -s https://codecov.io/bash)
