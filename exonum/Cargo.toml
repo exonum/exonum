@@ -49,7 +49,7 @@ os_info = "1.0.1"
 chrono = { version = "=0.4.6", features = ["serde"] }
 uuid = { version = "=0.7.1", features = ["serde"] }
 snow = "=0.4.0"
-rust_decimal = "=0.10.1"
+rust_decimal = "=0.10.2"
 
 exonum-crypto = { version = "0.9.0", path = "../crypto" }
 exonum_rocksdb = "0.7.4"
