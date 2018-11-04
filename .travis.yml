@@ -125,33 +125,33 @@ jobs:
     - echo "Uploaded code coverage"
 
    # Tests.
-   name: test
-   addons:
-     apt:
-       sources:
-       - sourceline: 'ppa:giskou/librocksdb'
-       - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
-         key_url: https://packages.microsoft.com/keys/microsoft.asc
-       packages:
-       - gcc
-       - g++
-       - libssl-dev
-       - libcurl4-openssl-dev
-       - libelf-dev
-       - libdw-dev
-       - binutils-dev
-       - libiberty-dev
-       - libsnappy-dev
-       - librocksdb
-       - powershell
-       - cmake
-       - zlib1g-dev
-       - build-essential
-       - pkg-config
-   install:
+  - name: test
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - gcc
+        - g++
+        - libssl-dev
+        - libcurl4-openssl-dev
+        - libelf-dev
+        - libdw-dev
+        - binutils-dev
+        - libiberty-dev
+        - libsnappy-dev
+        - librocksdb
+        - powershell
+        - cmake
+        - zlib1g-dev
+        - build-essential
+        - pkg-config
+    install:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
-   script:
+    script:
     - cargo test --all
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
