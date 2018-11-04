@@ -119,9 +119,9 @@ jobs:
     - rm -rf kcov-36
     script:
     - cd $TRAVIS_BUILD_DIR
-    - ls -la
+    - ls -la target/debug/
     #- for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do echo "$file"
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do echo "$file"; done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
