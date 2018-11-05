@@ -20,7 +20,7 @@ mod blockchain;
 mod helpers;
 mod protocol;
 
-pub use self::blockchain::Block;
+pub use self::blockchain::{Block, ConfigReference, TxLocation};
 pub use self::helpers::{BitVec, Hash, PublicKey};
 pub use self::protocol::{
     BlockRequest, BlockResponse, Connect, PeersRequest, Precommit, Prevote, PrevotesRequest,
@@ -201,6 +201,16 @@ impl ProtobufValue for ValidatorId {
 
 impl ProtobufValue for u32 {
     type ProtoValue = u32;
+    fn to_pb_field(&self) -> Self::ProtoValue {
+        *self
+    }
+    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+        Ok(pb)
+    }
+}
+
+impl ProtobufValue for u64 {
+    type ProtoValue = u64;
     fn to_pb_field(&self) -> Self::ProtoValue {
         *self
     }

@@ -24,3 +24,13 @@ message Block {
   Hash tx_hash = 5;
   Hash state_hash = 6;
 }
+
+message ConfigReference {
+  uint64 actual_from = 1;
+  Hash cfg_hash = 2;
+}
+
+message TxLocation {
+  uint64 block_height = 1;
+  uint64 position_in_block = 2;
+}
