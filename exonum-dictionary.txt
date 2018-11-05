@@ -94,6 +94,8 @@ prevoters
 println
 proptest
 protobuf
+proto
+protoc
 pubkey
 pubkeys
 readonly

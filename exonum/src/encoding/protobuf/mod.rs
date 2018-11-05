@@ -130,17 +130,17 @@ impl ToProtobuf for bit_vec::BitVec {
     type ProtoStruct = BitVec;
 
     fn to_pb(&self) -> BitVec {
-        let mut bvec = BitVec::new();
-        bvec.set_data(self.to_bytes());
-        bvec.set_len(self.len() as u64);
-        bvec
+        let mut bit_vec = BitVec::new();
+        bit_vec.set_data(self.to_bytes());
+        bit_vec.set_len(self.len() as u64);
+        bit_vec
     }
 
     fn from_pb(pb: BitVec) -> Result<Self, ()> {
         let data = pb.get_data();
-        let mut bvec = bit_vec::BitVec::from_bytes(data);
-        bvec.truncate(pb.get_len() as usize);
-        Ok(bvec)
+        let mut bit_vec = bit_vec::BitVec::from_bytes(data);
+        bit_vec.truncate(pb.get_len() as usize);
+        Ok(bit_vec)
     }
 }
 
