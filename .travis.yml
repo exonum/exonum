@@ -12,6 +12,7 @@ addons:
   apt:
     sources:
     - sourceline: 'ppa:giskou/librocksdb'
+    - sourceline: 'ppa:maarten-fonville/protobuf'
     packages:
     - gcc
     - g++
@@ -28,6 +29,8 @@ addons:
     - build-essential
     - pkg-config
     - unzip
+    - protobuf-compiler
+    - libprotobuf-dev
 
 rust:
   - 1.30.0
