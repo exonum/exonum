@@ -51,7 +51,7 @@ pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
 /// `Signed<TransactionsResponse>` size without transactions inside.
 #[doc(hidden)]
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
-    EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u32>() * 2;
+    EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u8>() * 4;
 
 /// `Signed<RawTransaction>` size with empty transaction inside.
 pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::size_of::<u16>() * 2;
