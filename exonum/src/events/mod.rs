@@ -53,7 +53,7 @@ pub enum InternalEvent {
     /// Shutdown the node.
     Shutdown,
     /// Message has been successfully verified.
-    MessageVerified(Message),
+    MessageVerified(Box<Message>),
 }
 
 #[derive(Debug)]

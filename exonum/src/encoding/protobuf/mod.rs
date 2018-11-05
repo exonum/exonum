@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![allow(bare_trait_objects)]
+#![allow(renamed_and_removed_lints)]
 
 //! Protobuf generated structs
 //!
@@ -192,7 +193,7 @@ impl ProtobufValue for Round {
 impl ProtobufValue for ValidatorId {
     type ProtoValue = u32;
     fn to_pb_field(&self) -> Self::ProtoValue {
-        self.0 as u32
+        u32::from(self.0)
     }
     fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
         Ok(ValidatorId(pb as u16))
@@ -235,7 +236,7 @@ where
 {
     type ProtoValue = RepeatedField<T::ProtoValue>;
     fn to_pb_field(&self) -> Self::ProtoValue {
-        RepeatedField::from_vec(self.clone().into_iter().map(|v| v.to_pb_field()).collect())
+        RepeatedField::from_vec(self.into_iter().map(|v| v.to_pb_field()).collect())
     }
     fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
         let vec = pb
