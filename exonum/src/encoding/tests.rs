@@ -329,15 +329,15 @@ fn test_empty_segments() {
     assert_write_check_read(dat, 8);
 }
 
-#[test]
-fn test_segments_of_status_messages() {
-    let m1 = Status::new(Height(2), &hash(&[]));
-    let m2 = Status::new(Height(4), &hash(&[1]));
-    let m3 = Status::new(Height(5), &hash(&[3]));
-
-    let dat = vec![m1, m2, m3];
-    assert_write_check_read(dat, 8);
-}
+//#[test]
+//fn test_segments_of_status_messages() {
+//    let m1 = Status::new(Height(2), &hash(&[]));
+//    let m2 = Status::new(Height(4), &hash(&[1]));
+//    let m3 = Status::new(Height(5), &hash(&[3]));
+//
+//    let dat = vec![m1, m2, m3];
+//    assert_write_check_read(dat, 8);
+//}
 
 fn test_connect(addr: &str) {
     let time = Utc::now();

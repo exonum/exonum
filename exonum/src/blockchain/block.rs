@@ -12,33 +12,121 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::Hash;
+#![allow(missing_docs)] //TODO_PR_REMOVE
+
+use crypto::{self, CryptoHash, Hash};
+use encoding::protobuf::{self, ProtobufValue, ToProtobuf};
 use helpers::{Height, ValidatorId};
 use messages::{Precommit, Signed};
+use protobuf::Message;
+use std::borrow::Cow;
+use storage::StorageValue;
 
-encoding_struct! {
-    /// Exonum block header data structure.
-    ///
-    /// A block is essentially a list of transactions, which is
-    /// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
-    /// and is applied atomically to the blockchain state.
-    ///
-    /// The header only contains the amount of transactions and the transactions root hash as well as
-    /// other information, but not the transactions themselves.
-    struct Block {
-        /// Identifier of the leader node which has proposed the block.
+/// Exonum block header data structure.
+///
+/// A block is essentially a list of transactions, which is
+/// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
+/// and is applied atomically to the blockchain state.
+///
+/// The header only contains the amount of transactions and the transactions root hash as well as
+/// other information, but not the transactions themselves.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+pub struct Block {
+    /// Identifier of the leader node which has proposed the block.
+    pub proposer_id: ValidatorId,
+    /// Height of the block, which is also the number of this particular
+    /// block in the blockchain.
+    pub height: Height,
+    /// Number of transactions in this block.
+    pub tx_count: u32,
+    /// Hash link to the previous block in the blockchain.
+    pub prev_hash: Hash,
+    /// Root hash of the Merkle tree of transactions in this block.
+    pub tx_hash: Hash,
+    /// Hash of the blockchain state after applying transactions in the block.
+    pub state_hash: Hash,
+}
+
+impl Block {
+    pub fn new(
         proposer_id: ValidatorId,
-        /// Height of the block, which is also the number of this particular
-        /// block in the blockchain.
         height: Height,
-        /// Number of transactions in this block.
         tx_count: u32,
-        /// Hash link to the previous block in the blockchain.
         prev_hash: &Hash,
-        /// Root hash of the Merkle tree of transactions in this block.
         tx_hash: &Hash,
-        /// Hash of the blockchain state after applying transactions in the block.
         state_hash: &Hash,
+    ) -> Self {
+        Self {
+            proposer_id,
+            height,
+            tx_count,
+            prev_hash: *prev_hash,
+            tx_hash: *tx_hash,
+            state_hash: *state_hash,
+        }
+    }
+    pub fn proposer_id(&self) -> ValidatorId {
+        self.proposer_id
+    }
+    pub fn height(&self) -> Height {
+        self.height
+    }
+    pub fn tx_count(&self) -> u32 {
+        self.tx_count
+    }
+    pub fn prev_hash(&self) -> &Hash {
+        &self.prev_hash
+    }
+    pub fn tx_hash(&self) -> &Hash {
+        &self.tx_hash
+    }
+    pub fn state_hash(&self) -> &Hash {
+        &self.state_hash
+    }
+}
+
+impl ToProtobuf for Block {
+    type ProtoStruct = protobuf::Block;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut msg = Self::ProtoStruct::new();
+        msg.set_proposer_id(self.proposer_id.to_pb_field());
+        msg.set_height(self.height.to_pb_field());
+        msg.set_tx_count(self.tx_count.to_pb_field());
+        msg.set_prev_hash(self.prev_hash.to_pb_field());
+        msg.set_tx_hash(self.tx_hash.to_pb_field());
+        msg.set_state_hash(self.state_hash.to_pb_field());
+        msg
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
+        Ok(Self {
+            proposer_id: ProtobufValue::from_pb_field(pb.get_proposer_id())?,
+            height: ProtobufValue::from_pb_field(pb.get_height())?,
+            tx_count: ProtobufValue::from_pb_field(pb.get_tx_count())?,
+            prev_hash: ProtobufValue::from_pb_field(pb.take_prev_hash())?,
+            tx_hash: ProtobufValue::from_pb_field(pb.take_tx_hash())?,
+            state_hash: ProtobufValue::from_pb_field(pb.take_state_hash())?,
+        })
+    }
+}
+
+impl CryptoHash for Block {
+    fn hash(&self) -> Hash {
+        let v = self.to_pb().write_to_bytes().unwrap();
+        crypto::hash(&v)
+    }
+}
+
+impl StorageValue for Block {
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_pb().write_to_bytes().unwrap()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        let mut block = protobuf::Block::new();
+        block.merge_from_bytes(value.as_ref()).unwrap();
+        ToProtobuf::from_pb(block).unwrap()
     }
 }
 

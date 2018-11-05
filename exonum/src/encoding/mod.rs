@@ -111,6 +111,7 @@ pub use self::{error::Error, fields::Field, segments::SegmentField};
 
 #[macro_use]
 pub mod serialize;
+pub mod protobuf;
 
 use std::{
     convert::From,
