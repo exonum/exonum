@@ -162,6 +162,21 @@ jobs:
 #    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
 #    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
 #    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+    after_success: |
+      cd $TRAVIS_BUILD_DIR
+      wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz &&
+      tar xzf v36.tar.gz &&
+      cd kcov-36 &&
+      mkdir build &&
+      cd build &&
+      cmake .. &&
+      make &&
+      make install DESTDIR=../../kcov-build &&
+      cd ../.. &&
+      rm -rf kcov-36 &&
+      for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+      bash <(curl -s https://codecov.io/bash) &&
+      echo "Uploaded code coverage"
  
  # Clippy linting.
   - name: clippy
