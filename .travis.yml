@@ -87,9 +87,11 @@ jobs:
     - ./node_modules/.bin/cspell --version
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cargo fmt --all -- --check
     - npm run cspell
     - npm run md
+    # Force build.rs execution.
+    - cargo check -p exonum
+    - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
