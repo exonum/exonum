@@ -28,6 +28,7 @@ pub use self::protocol::{
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
+use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
 use crypto;
 use encoding::Error;

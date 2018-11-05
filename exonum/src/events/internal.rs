@@ -150,7 +150,7 @@ mod tests {
         let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
 
         let expected_event =
-            InternalEvent::MessageVerified(Message::deserialize(tx.clone()).unwrap());
+            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }
