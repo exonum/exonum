@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_docs)] //TODO_PR_REMOVE
-
 use crypto::{self, CryptoHash, Hash};
 use encoding::protobuf::{self, ProtobufValue, ToProtobuf};
 use helpers::{Height, ValidatorId};
@@ -48,6 +46,7 @@ pub struct Block {
 }
 
 impl Block {
+    /// Create new `Block`.
     pub fn new(
         proposer_id: ValidatorId,
         height: Height,
@@ -65,21 +64,28 @@ impl Block {
             state_hash: *state_hash,
         }
     }
+    /// Identifier of the leader node which has proposed the block.
     pub fn proposer_id(&self) -> ValidatorId {
         self.proposer_id
     }
+    /// Height of the block, which is also the number of this particular
+    /// block in the blockchain.
     pub fn height(&self) -> Height {
         self.height
     }
+    /// Number of transactions in this block.
     pub fn tx_count(&self) -> u32 {
         self.tx_count
     }
+    /// Hash link to the previous block in the blockchain.
     pub fn prev_hash(&self) -> &Hash {
         &self.prev_hash
     }
+    /// Root hash of the Merkle tree of transactions in this block.
     pub fn tx_hash(&self) -> &Hash {
         &self.tx_hash
     }
+    /// Hash of the blockchain state after applying transactions in the block.
     pub fn state_hash(&self) -> &Hash {
         &self.state_hash
     }

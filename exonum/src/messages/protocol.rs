@@ -26,8 +26,6 @@
 //!     * processing - how message is processed and result of the processing
 //!     * generation - in which cases message is generated
 
-#![allow(missing_docs)] //TODO_PR_REMOVE
-
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 use failure;
@@ -80,6 +78,7 @@ pub struct Connect {
 }
 
 impl Connect {
+    /// Create new `Connect` message.
     pub fn new(addr: &str, time: DateTime<Utc>, user_agent: &str) -> Self {
         Connect {
             pub_addr: addr.to_owned(),
@@ -88,14 +87,17 @@ impl Connect {
         }
     }
 
+    /// The node's address.
     pub fn pub_addr(&self) -> &str {
         &self.pub_addr
     }
 
+    /// Time when the message was created.
     pub fn time(&self) -> DateTime<Utc> {
         self.time
     }
 
+    /// String containing information about this node including Exonum, Rust and OS versions.
     pub fn user_agent(&self) -> &str {
         &self.user_agent
     }
@@ -143,6 +145,7 @@ pub struct Status {
 }
 
 impl Status {
+    /// Create new `Status` message.
     pub fn new(height: Height, last_hash: &Hash) -> Self {
         Self {
             height,
@@ -150,10 +153,12 @@ impl Status {
         }
     }
 
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
 
+    /// Hash of the last committed block.
     pub fn last_hash(&self) -> &Hash {
         &self.last_hash
     }
@@ -216,6 +221,7 @@ impl CryptoHash for Propose {
 }
 
 impl Propose {
+    /// Create new `Propose` message.
     pub fn new(
         validator: ValidatorId,
         height: Height,
@@ -232,18 +238,23 @@ impl Propose {
         }
     }
 
+    /// The validator id.
     pub fn validator(&self) -> ValidatorId {
         self.validator
     }
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
+    /// The round to which the message is related.
     pub fn round(&self) -> Round {
         self.round
     }
+    /// Hash of the previous block.
     pub fn prev_hash(&self) -> &Hash {
         &self.prev_hash
     }
+    /// The list of transactions to include in the next block.
     pub fn transactions(&self) -> &[Hash] {
         &self.transactions
     }
@@ -306,6 +317,7 @@ pub struct Prevote {
 }
 
 impl Prevote {
+    /// Create new `Prevote` message.
     pub fn new(
         validator: ValidatorId,
         height: Height,
@@ -322,19 +334,23 @@ impl Prevote {
         }
     }
 
+    /// The validator id.
     pub fn validator(&self) -> ValidatorId {
         self.validator
     }
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
+    /// The round to which the message is related.
     pub fn round(&self) -> Round {
         self.round
     }
+    /// Hash of the corresponding `Propose`.
     pub fn propose_hash(&self) -> &Hash {
         &self.propose_hash
     }
-
+    /// Locked round.
     pub fn locked_round(&self) -> Round {
         self.locked_round
     }
@@ -399,6 +415,7 @@ pub struct Precommit {
 }
 
 impl Precommit {
+    /// Create new `Precommit` message.
     pub fn new(
         validator: ValidatorId,
         height: Height,
@@ -416,21 +433,27 @@ impl Precommit {
             time,
         }
     }
+    /// The validator id.
     pub fn validator(&self) -> ValidatorId {
         self.validator
     }
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
+    /// The round to which the message is related.
     pub fn round(&self) -> Round {
         self.round
     }
+    /// Hash of the corresponding `Propose`.
     pub fn propose_hash(&self) -> &Hash {
         &self.propose_hash
     }
+    /// Hash of the new block.
     pub fn block_hash(&self) -> &Hash {
         &self.block_hash
     }
+    /// Time of the `Precommit`.
     pub fn time(&self) -> DateTime<Utc> {
         self.time
     }
@@ -488,6 +511,7 @@ pub struct BlockResponse {
 }
 
 impl BlockResponse {
+    /// Create new `BlockResponse` message.
     pub fn new(
         to: &PublicKey,
         block: blockchain::Block,
@@ -502,15 +526,19 @@ impl BlockResponse {
         }
     }
 
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
+    /// Block header.
     pub fn block(&self) -> blockchain::Block {
         self.block.clone()
     }
+    /// List of pre-commits.
     pub fn precommits(&self) -> Vec<Vec<u8>> {
         self.precommits.clone()
     }
+    /// List of the transaction hashes.
     pub fn transactions(&self) -> &[Hash] {
         &self.transactions
     }
@@ -559,6 +587,7 @@ pub struct TransactionsResponse {
 }
 
 impl TransactionsResponse {
+    /// Create new `TransactionsResponse` message.
     pub fn new(to: &PublicKey, transactions: Vec<Vec<u8>>) -> Self {
         Self {
             to: *to,
@@ -566,9 +595,11 @@ impl TransactionsResponse {
         }
     }
 
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
+    /// List of the transactions.
     pub fn transactions(&self) -> Vec<Vec<u8>> {
         self.transactions.clone()
     }
@@ -615,6 +646,7 @@ pub struct ProposeRequest {
 }
 
 impl ProposeRequest {
+    /// Create new `ProposeRequest`.
     pub fn new(to: &PublicKey, height: Height, propose_hash: &Hash) -> Self {
         Self {
             to: *to,
@@ -623,12 +655,15 @@ impl ProposeRequest {
         }
     }
 
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
+    /// Hash of the `Propose`.
     pub fn propose_hash(&self) -> &Hash {
         &self.propose_hash
     }
@@ -671,6 +706,7 @@ pub struct TransactionsRequest {
 }
 
 impl TransactionsRequest {
+    /// Create new `TransactionsRequest`.
     pub fn new(to: &PublicKey, txs: &[Hash]) -> Self {
         Self {
             to: *to,
@@ -678,10 +714,11 @@ impl TransactionsRequest {
         }
     }
 
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
-
+    /// The list of the transaction hashes.
     pub fn txs(&self) -> &[Hash] {
         &self.txs
     }
@@ -731,6 +768,7 @@ pub struct PrevotesRequest {
 }
 
 impl PrevotesRequest {
+    /// Create new `PrevotesRequest`.
     pub fn new(
         to: &PublicKey,
         height: Height,
@@ -747,22 +785,23 @@ impl PrevotesRequest {
         }
     }
 
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
-
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
-
+    /// The round to which the message is related.
     pub fn round(&self) -> Round {
         self.round
     }
-
+    /// Hash of the `Propose`.
     pub fn propose_hash(&self) -> &Hash {
         &self.propose_hash
     }
-
+    /// The list of validators that send pre-votes.
     pub fn validators(&self) -> BitVec {
         self.validators.clone()
     }
@@ -811,10 +850,11 @@ pub struct PeersRequest {
 }
 
 impl PeersRequest {
+    /// Create new `PeersRequest`.
     pub fn new(to: &PublicKey) -> Self {
         Self { to: *to }
     }
-
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
@@ -855,14 +895,15 @@ pub struct BlockRequest {
 }
 
 impl BlockRequest {
+    /// Create new `BlockRequest`.
     pub fn new(to: &PublicKey, height: Height) -> Self {
         Self { to: *to, height }
     }
-
+    /// Public key of the recipient.
     pub fn to(&self) -> &PublicKey {
         &self.to
     }
-
+    /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
     }
