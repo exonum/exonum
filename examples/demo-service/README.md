@@ -28,7 +28,7 @@ To build and run a single node use:
 ```sh
 # clone the repository with blockchain node
 git clone git@github.com:exonum/exonum.git
-cd exonum/examples/demo-create-service-cryptocurrency
+cd exonum/examples/demo-service
 
 # build and run a zero-configuration demo
 cargo run --example demo

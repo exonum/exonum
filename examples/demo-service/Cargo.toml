@@ -1,5 +1,5 @@
 [package]
-name = "exonum-cryptocurrency"
+name = "exonum-demo-service"
 publish = false
 version = "0.0.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]

@@ -1,5 +1,5 @@
 [package]
-name = "exonum-cryptocurrency-advanced"
+name = "exonum-demo-data-proofs"
 version = "0.9.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"

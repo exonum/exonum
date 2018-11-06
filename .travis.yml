@@ -146,8 +146,8 @@ jobs:
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
 # Update frontend integrity tests. [ECR-2481]
-#    - cd $TRAVIS_BUILD_DIR/examples/demo-create-service-cryptocurrency/examples && ./test.sh
-#    - cd $TRAVIS_BUILD_DIR/examples/demo-create-service-cryptocurrency/examples && ./test.ps1
+#    - cd $TRAVIS_BUILD_DIR/examples/demo-service/examples && ./test.sh
+#    - cd $TRAVIS_BUILD_DIR/examples/demo-service/examples && ./test.ps1
 #    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
     after_success: |
       cd $TRAVIS_BUILD_DIR

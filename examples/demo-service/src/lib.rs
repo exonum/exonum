@@ -21,7 +21,7 @@
 //!
 //! [exonum]: https://github.com/exonum/exonum
 //! [docs]: https://exonum.com/doc/get-started/create-service
-//! [readme]: https://github.com/exonum/demo-create-service-cryptocurrency#readme
+//! [readme]: https://github.com/exonum/demo-service#readme
 
 #![deny(
     missing_debug_implementations,

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Bash script for testing the docker container for exonum-demo-create-service-with-data-proofs.
+# Bash script for testing the docker container for exonum-demo-data-proofs.
 #
 
 set -e

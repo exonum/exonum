@@ -7,12 +7,12 @@
 # Cryptography:
 crypto/* @darkeld3r @aleksuss @pavel-mukhanov @vldm @slowli
 
-# Demo cryptocurrency service examples:
-examples/demo-create-service-cryptocurrency/* @darkeld3r @aleksuss @vitvakatu @ilammy
-examples/demo-create-service-with-data-proofs/* @darkeld3r @aleksuss @vitvakatu @ilammy
+# Demo service examples:
+examples/demo-service/* @darkeld3r @aleksuss @vitvakatu @ilammy
+examples/demo-data-proofs/* @darkeld3r @aleksuss @vitvakatu @ilammy
 
 # Timestamping demo:
-examples/demo-create-service-timestamping/* @darkeld3r @aleksuss @ozkriff @mvlabat @vitvakatu
+examples/demo-timestamping/* @darkeld3r @aleksuss @ozkriff @mvlabat @vitvakatu
 
 # Configuration service:
 services/configuration/* @darkeld3r @aleksuss @alekseysidorov @vldm @slowli

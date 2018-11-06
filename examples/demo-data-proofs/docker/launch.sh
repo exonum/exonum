@@ -3,7 +3,7 @@
 node_count=4
 start_peer_port=6331
 start_public_port=8000
-path_to_app=/root/.cargo/bin/exonum-cryptocurrency-advanced
+path_to_app=/root/.cargo/bin/exonum-demo-data-proofs
 
 cd backend && mkdir example && cd example
 $path_to_app generate-template common.toml --validators-count 4

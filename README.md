@@ -35,9 +35,9 @@ This is the main Exonum repository that includes
   * [Configuration service](services/configuration/README.md).
   * [Time service](services/time/README.md).
 * Examples
-  * [Demo cryptocurrency service](examples/demo-create-service-cryptocurrency/README.md).
-  * [Demo service with data proofs](examples/demo-create-service-with-data-proofs/README.md).
-  * [Demo timestamping service](examples/demo-create-service-timestamping/README.md).
+  * [Demo service](examples/demo-service/README.md).
+  * [Demo service with data proofs](examples/demo-data-proofs/README.md).
+  * [Demo timestamping service](examples/demo-timestamping/README.md).
 
 See individual projects readme for the details.
 

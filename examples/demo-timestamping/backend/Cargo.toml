@@ -1,5 +1,5 @@
 [package]
-name = "exonum-timestamping"
+name = "exonum-demo-timestamping"
 version = "0.0.0"
 publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]

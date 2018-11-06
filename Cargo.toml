@@ -6,8 +6,8 @@ members = [
     "testkit/server",
     "services/configuration",
     "services/time",
-    "examples/demo-create-service-cryptocurrency",
-    "examples/demo-create-service-with-data-proofs/backend",
-    "examples/demo-create-service-timestamping/backend",
+    "examples/demo-service",
+    "examples/demo-data-proofs/backend",
+    "examples/demo-timestamping/backend",
 ]
 exclude = [ "exonum/fuzz" ]

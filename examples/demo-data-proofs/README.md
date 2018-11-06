@@ -2,6 +2,8 @@
 
 This project demonstrates how to bootstrap a demo cryptocurrency service with
 data proofs based on the [Exonum blockchain](https://github.com/exonum/exonum).
+The current project is the extension of the
+[service creation demo](../demo-service/README.md).
 
 ![Frontend example](Screenshot.png)
 
@@ -56,7 +58,7 @@ service on 4 nodes on the local machine.
 Build the project:
 
 ```sh
-cd examples/demo-create-service-with-data-proofs/backend
+cd examples/demo-data-proofs/backend
 
 cargo install
 ```
@@ -68,43 +70,43 @@ Generate template:
 ```sh
 mkdir example
 
-exonum-cryptocurrency-advanced generate-template example/common.toml --validators-count 4
+exonum-demo-data-proofs generate-template example/common.toml --validators-count 4
 ```
 
 Generate public and secrets keys for each node:
 
 ```sh
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
+exonum-demo-data-proofs generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
+exonum-demo-data-proofs generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
+exonum-demo-data-proofs generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
+exonum-demo-data-proofs generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
 ```
 
 Finalize configs:
 
 ```sh
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-demo-data-proofs finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-demo-data-proofs finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-demo-data-proofs finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-demo-data-proofs finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 ```
 
 Run nodes:
 
 ```sh
-exonum-cryptocurrency-advanced run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
+exonum-demo-data-proofs run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
 
-exonum-cryptocurrency-advanced run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
+exonum-demo-data-proofs run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
 
-exonum-cryptocurrency-advanced run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
+exonum-demo-data-proofs run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
 
-exonum-cryptocurrency-advanced run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
+exonum-demo-data-proofs run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
 ```
 
 <!-- markdownlint-enable MD013 -->
@@ -138,7 +140,7 @@ Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 ## Tutorials
 
 - Read the
-  [frontend tutorial](https://github.com/exonum/exonum/blob/master/examples/demo-create-service-with-data-proofs/tutorial/frontend.md)
+  [frontend tutorial](https://github.com/exonum/exonum/blob/master/examples/demo-data-proofs/tutorial/frontend.md)
   to get detailed information about the interaction of the client with Exonum blockchain.
 
 ## License
