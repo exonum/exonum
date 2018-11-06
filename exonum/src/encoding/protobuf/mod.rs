@@ -15,8 +15,7 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-//! Protobuf generated structs
-//!
+//! Protobuf generated structs and traits for conversion.
 mod blockchain;
 mod helpers;
 mod protocol;
@@ -60,7 +59,7 @@ where
     fn decode(buffer: &[u8]) -> Result<Self, Error> {
         let mut pb = <Self as ToProtobuf>::ProtoStruct::new();
         pb.merge_from_bytes(buffer).unwrap();
-        Ok(Self::from_pb(pb).unwrap())
+        Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
     }
 }
 
@@ -221,16 +220,6 @@ impl ProtobufValue for u64 {
     }
 }
 
-impl ProtobufValue for Vec<u8> {
-    type ProtoValue = Vec<u8>;
-    fn to_pb_field(&self) -> Self::ProtoValue {
-        self.clone()
-    }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
-        Ok(pb)
-    }
-}
-
 impl<T> ProtobufValue for Vec<T>
 where
     T: ProtobufValue,
@@ -240,10 +229,18 @@ where
         RepeatedField::from_vec(self.into_iter().map(|v| v.to_pb_field()).collect())
     }
     fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
-        let vec = pb
-            .into_iter()
-            .map(|v| ProtobufValue::from_pb_field(v).unwrap())
-            .collect();
-        Ok(vec)
+        let vec: Result<Vec<_>, _> = pb.into_iter().map(ProtobufValue::from_pb_field).collect();
+        vec
+    }
+}
+
+/// Special case for protobuf bytes.
+impl ProtobufValue for Vec<u8> {
+    type ProtoValue = Vec<u8>;
+    fn to_pb_field(&self) -> Self::ProtoValue {
+        self.clone()
+    }
+    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+        Ok(pb)
     }
 }
