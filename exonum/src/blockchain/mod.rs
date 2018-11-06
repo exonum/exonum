@@ -48,7 +48,6 @@ pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
 use failure;
-use vec_map::VecMap;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -82,7 +81,7 @@ pub const CORE_SERVICE: u16 = 0;
 /// into a single network.
 pub struct Blockchain {
     db: Arc<dyn Database>,
-    service_map: Arc<VecMap<Box<dyn Service>>>,
+    service_map: Arc<HashMap<u16, Box<dyn Service>>>,
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
@@ -97,10 +96,10 @@ impl Blockchain {
         service_secret_key: SecretKey,
         api_sender: ApiSender,
     ) -> Self {
-        let mut service_map = VecMap::new();
+        let mut service_map = HashMap::new();
         for service in services {
-            let id = service.service_id() as usize;
-            if service_map.contains_key(id) {
+            let id = service.service_id();
+            if service_map.contains_key(&id) {
                 panic!(
                     "Services have already contain service with id={}, please change it.",
                     id
@@ -126,10 +125,9 @@ impl Blockchain {
         }
     }
 
-    /// Returns the `VecMap` for all services. This is a map which
-    /// contains service identifiers and service interfaces. The VecMap
-    /// allows proceeding from the service identifier to the service itself.
-    pub fn service_map(&self) -> &Arc<VecMap<Box<dyn Service>>> {
+    /// Returns mapping from the service identifier (`u16`) to service (`Box<dyn Service>`) for
+    /// all services.
+    pub fn service_map(&self) -> &Arc<HashMap<u16, Box<dyn Service>>> {
         &self.service_map
     }
 
@@ -151,10 +149,9 @@ impl Blockchain {
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
-        let id = raw.service_id() as usize;
         let service = self
             .service_map
-            .get(id)
+            .get(&raw.service_id())
             .ok_or_else(|| MessageError::from("Service not found."))?;
         service.tx_from_raw(raw)
     }
@@ -403,7 +400,7 @@ impl Blockchain {
 
             let service_name = self
                 .service_map
-                .get(raw.service_id() as usize)
+                .get(&raw.service_id())
                 .ok_or_else(|| {
                     failure::err_msg(format!(
                         "Service not found. Service id: {}",
@@ -511,7 +508,7 @@ impl Blockchain {
                 self.service_keypair.1.clone(),
                 self.api_sender.clone(),
                 self.fork(),
-                service_id as u16,
+                *service_id,
             );
             service.after_commit(&context);
         }
