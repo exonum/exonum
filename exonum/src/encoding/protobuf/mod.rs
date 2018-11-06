@@ -101,7 +101,7 @@ impl ToProtobuf for crypto::Hash {
 
     fn from_pb(pb: Hash) -> Result<Self, ()> {
         let data = pb.get_data();
-        if data.len() == crypto::PUBLIC_KEY_LENGTH {
+        if data.len() == crypto::HASH_SIZE {
             Ok(crypto::Hash::from_slice(data).unwrap())
         } else {
             Err(())
