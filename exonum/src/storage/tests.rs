@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::crypto::Hash;
 use super::{
     Database, Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
     Snapshot, SparseListIndex, ValueSetIndex,
 };
+use crypto::Hash;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -264,9 +264,8 @@ mod rocksdb_tests {
     }
 }
 
-#[test]
-#[ignore]
-#[allow(unreachable_code, unused_variables)]
+// This should compile to ensure ?Sized bound on `new_in_family` (see #1024).
+#[allow(dead_code, unreachable_code, unused_variables)]
 fn should_compile() {
     let mut fork: Fork = unimplemented!();
     let _: Entry<_, ()> = Entry::new_in_family("", "", &mut fork);
