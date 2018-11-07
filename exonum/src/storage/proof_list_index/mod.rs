@@ -133,11 +133,12 @@ where
     /// let mut mut_index : ProofListIndex<_, u8> =
     ///                                 ProofListIndex::new_in_family(name, &index_id, &mut fork);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
-        family_name: S,
-        index_id: &I,
-        view: T,
-    ) -> Self {
+    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
+    where
+        I: StorageKey,
+        I: ?Sized,
+        S: AsRef<str>,
+    {
         Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
             length: Cell::new(None),

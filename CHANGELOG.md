@@ -118,6 +118,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Bug with incorrect EOF handling while decoding network messages has been
   fixed. (#917)
 
+### API Improvements
+
+#### exonum
+
+- `new_in_family` index constructor introduced in #531 now accepts `&str` and `&[u8]`
+  as an `index_id` value.
+
 ### Internal Improvements
 
 #### exonum
