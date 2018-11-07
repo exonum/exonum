@@ -73,34 +73,34 @@ before_install:
 jobs:
   include:
   # Formatting & other lints that do not require compilation.
-#  - name: lints
-#    install:
-#    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-#    - cargo install --list
-#    - rustup component add rustfmt-preview
-#    - rustfmt -V
-#    - nvm install 8 && nvm use 8
-#    - npm install
-#    - ./node_modules/.bin/cspell --version
-#    - ./node_modules/.bin/markdownlint --version
-#    script:
-#    - cargo fmt --all -- --check
-#    - npm run cspell
-#    - npm run md
-#    - cargo clean --doc
-#    - cargo doc --no-deps
-#    # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
-#    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
-#    - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
-#    - mkdir -p target/doc/exonum_configuration
-#    - mkdir -p target/std/string
-#    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
-#    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
-#    - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
-#    - touch target/doc/exonum_configuration/enum.Option.html
-#    - touch target/std/string/struct.String.html
-#    - touch target/std/primitive.usize.html
-#    - cargo deadlinks --dir target/doc
+  - name: lints
+    install:
+    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    - cargo install --list
+    - rustup component add rustfmt-preview
+    - rustfmt -V
+    - nvm install 8 && nvm use 8
+    - npm install
+    - ./node_modules/.bin/cspell --version
+    - ./node_modules/.bin/markdownlint --version
+    script:
+    - cargo fmt --all -- --check
+    - npm run cspell
+    - npm run md
+    - cargo clean --doc
+    - cargo doc --no-deps
+    # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
+    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
+    - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
+    - mkdir -p target/doc/exonum_configuration
+    - mkdir -p target/std/string
+    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
+    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
+    - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
+    - touch target/doc/exonum_configuration/enum.Option.html
+    - touch target/std/string/struct.String.html
+    - touch target/std/primitive.usize.html
+    - cargo deadlinks --dir target/doc
 
   # Run kcov.
   - name: kcov
@@ -164,8 +164,6 @@ jobs:
 #    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
 #    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
 
-#      for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-
 #    after_success: |
 #      cd $TRAVIS_BUILD_DIR
 #      wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz &&
@@ -183,25 +181,25 @@ jobs:
 #      echo "Uploaded code coverage"
  
  # Clippy linting.
-#  - name: clippy
-#    rust: nightly-2018-10-23
-#    install:
-#    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
-#    - cargo clippy --version
-#    script:
-#    - cargo clippy --all -- -D warnings
+  - name: clippy
+    rust: nightly-2018-10-23
+    install:
+    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
+    - cargo clippy --version
+    script:
+    - cargo clippy --all -- -D warnings
 
   # Benchmarks (compilation only).
-#  - name: benchmarks
-#    rust: nightly-2018-10-23
-#    script:
-#    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+  - name: benchmarks
+    rust: nightly-2018-10-23
+    script:
+    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
 
   # Compatibility check with the older rust version. Should be synced with readme badges.
-#  - name: rust_1_27_2_compatibility
-#    rust: 1.27.2
-#    script:
-#    - cargo build
+  - name: rust_1_27_2_compatibility
+    rust: 1.27.2
+    script:
+    - cargo build
 
 notifications:
   slack:
