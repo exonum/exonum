@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{Database, Fork, Snapshot};
+use super::{
+    Database, Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
+    Snapshot, SparseListIndex, ValueSetIndex,
+};
+use crypto::Hash;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -258,4 +262,18 @@ mod rocksdb_tests {
         let iter = index.iter();
         assert_eq!(index.len() as usize, iter.count());
     }
+}
+
+// This should compile to ensure ?Sized bound on `new_in_family` (see #1024).
+#[allow(dead_code, unreachable_code, unused_variables)]
+fn should_compile() {
+    let mut fork: Fork = unimplemented!();
+    let _: Entry<_, ()> = Entry::new_in_family("", "", &mut fork);
+    let _: KeySetIndex<_, Hash> = KeySetIndex::new_in_family("", "", &mut fork);
+    let _: ListIndex<_, ()> = ListIndex::new_in_family("", "", &mut fork);
+    let _: MapIndex<_, Hash, ()> = MapIndex::new_in_family("", "", &mut fork);
+    let _: ProofListIndex<_, ()> = ProofListIndex::new_in_family("", "", &mut fork);
+    let _: ProofMapIndex<_, Hash, ()> = ProofMapIndex::new_in_family("", "", &mut fork);
+    let _: SparseListIndex<_, ()> = SparseListIndex::new_in_family("", "", &mut fork);
+    let _: ValueSetIndex<_, ()> = ValueSetIndex::new_in_family("", "", &mut fork);
 }
