@@ -657,7 +657,7 @@ impl<T: Database> From<T> for Box<dyn Database> {
     }
 }
 
-/// This type is a way to track changes applied within multiple forks.
+/// This type is a way to track keys affected by multiple forks.
 ///
 /// It's intended to be used during an incremental service initialization
 /// to rollback in case of panic.
@@ -683,7 +683,7 @@ impl Rollback {
         self.db.fork()
     }
 
-    /// Will merge patch and collect rollback actions required to revert it.
+    /// Will merge patch and collect keys affected by it.
     pub fn track_merge(&self, patch: Patch) -> Result<()> {
         for (index, changes) in patch.iter() {
             for (key, _) in changes.iter() {
@@ -729,7 +729,7 @@ impl Rollback {
 }
 
 impl Drop for Rollback {
-    /// Drop implementation will cleanup tracked changes. Rollback won't be performed.
+    /// Drop implementation will cleanup the list of affected keys. Rollback won't be performed.
     fn drop(&mut self) {
         let snapshot = self.db.snapshot();
         let mut affected_keys = snapshot.iter(&*self.index, b"");
