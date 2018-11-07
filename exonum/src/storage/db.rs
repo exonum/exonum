@@ -92,6 +92,15 @@ impl Patch {
         }
     }
 
+    /// Helper function that creates `Patch` instance with single change.
+    fn from_change(name: String, key: Vec<u8>, change: Change) -> Self {
+        let mut patch = Patch::new();
+        let mut changes = Changes::new();
+        changes.data.insert(key, change);
+        patch.insert_changes(name.into(), changes);
+        patch
+    }
+
     /// Returns changes for the given name.
     fn changes(&self, name: &str) -> Option<&Changes> {
         self.changes.get(name)
@@ -669,8 +678,13 @@ impl Rollback {
         }
     }
 
-    /// Will collect rollback actions required to revert provided `patch`.
-    pub fn track(&self, patch: &Patch) -> Result<()> {
+    /// Returns a new `Fork`.
+    pub fn fork(&self) -> Fork {
+        self.db.fork()
+    }
+
+    /// Will merge patch and collect rollback actions required to revert it.
+    pub fn track_merge(&self, patch: Patch) -> Result<()> {
         for (index, changes) in patch.iter() {
             for (key, _) in changes.iter() {
                 let action_key = [index.as_bytes(), &**key].join(&b'.');
@@ -687,7 +701,7 @@ impl Rollback {
                 }
             }
         }
-        Ok(())
+        self.db.merge(patch)
     }
 
     /// Will revert all tracked patches.
@@ -710,25 +724,17 @@ impl Rollback {
 
     /// Immediately puts key-value pair into specified index.
     fn put(&self, name: &str, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        eprintln!("put {} {:?} {:?}", name, key, value);
-        let mut fork = self.db.fork();
-        fork.put(name, key, value);
-        self.db.merge(fork.into_patch())
+        self.db.merge(Patch::from_change(name.into(), key, Change::Put(value)))
     }
 
     /// Returns value of `key` in specified index.
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        eprintln!("get {} {:?}", name, key);
-        let snapshot = self.db.snapshot();
-        snapshot.get(name, key)
+        self.db.snapshot().get(name, key)
     }
 
     /// Immediately removes `key` from specified index.
     fn remove(&self, name: &str, key: Vec<u8>) -> Result<()> {
-        eprintln!("remove {} {:?}", name, key);
-        let mut fork = self.db.fork();
-        fork.remove(name, key);
-        self.db.merge(fork.into_patch())
+        self.db.merge(Patch::from_change(name.into(), key, Change::Delete))
     }
 }
 

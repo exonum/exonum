@@ -225,8 +225,8 @@ impl Blockchain {
         }
     }
 
-    /// Creates and commits the genesis block with the given genesis configuration.
-    fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+    /// Initializes services for genesis block creation.
+    fn init_services(&mut self, cfg: GenesisConfig) -> Result<StoredConfiguration, Error> {
         let rollback = Rollback::new(self.db.clone());
 
         let mut config_propose = StoredConfiguration {
@@ -238,6 +238,7 @@ impl Blockchain {
         };
 
         let service_keys: Vec<u16> = self.service_map.keys().cloned().collect();
+
         for x in service_keys {
             let name: String = self.service_map.get(&x).unwrap().service_name().into();
             if config_propose.services.contains_key(&*name) {
@@ -248,33 +249,34 @@ impl Blockchain {
             }
 
             let cfg = loop {
-                let mut fork = self.fork();
+                let mut fork = rollback.fork();
+
                 let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
                     self.service_map[&x].initialize(&mut fork)
                 }));
-                match catch_result {
-                    Ok(result) => {
-                        let patch = fork.into_patch();
-                        rollback.track(&patch)?;
-                        self.merge(patch.clone())?;
-                        if let InitResult::Done(cfg) = result {
-                            break cfg;
-                        }
-                    },
-                    Err(error) => {
-                        if error.is::<Error>() {
-                            error!("Database error. Database may be in inconsistent state");
-                        } else {
-                            error!("Panic during service initialization. Reverting..");
-                            rollback.rollback().expect("Revert panics!");
-                        }
-                        panic::resume_unwind(error);
-                    }
+
+                let init_result = catch_result.unwrap_or_else(|error| {
+                    error!("Panic during service initialization. Reverting..");
+                    rollback.rollback().expect("Revert panics!");
+                    panic::resume_unwind(error);
+                });
+
+                rollback.track_merge(fork.into_patch())?;
+
+                if let InitResult::Done(cfg) = init_result {
+                    break cfg;
                 }
             };
 
             config_propose.services.insert(name, cfg);
         }
+
+        Ok(config_propose)
+    }
+
+    /// Creates and commits the genesis block with the given genesis configuration.
+    fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+        let config_propose = self.init_services(cfg)?;
 
         // Commit actual configuration
         let patch = {
