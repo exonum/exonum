@@ -663,7 +663,7 @@ impl<T: Database> From<T> for Box<dyn Database> {
 /// to rollback in case of panic.
 pub(crate) struct Rollback {
     db: Arc<dyn Database>,
-    actions: String,
+    index: String,
     snapshot: Box<dyn Snapshot>,
 }
 
@@ -672,7 +672,7 @@ impl Rollback {
     pub fn new(db: Arc<dyn Database>) -> Self {
         let id: usize = ::rand::random();
         Rollback {
-            actions: format!("__ROLLBACK__.{}.actions", id),
+            index: format!("__ROLLBACK__.{}", id),
             snapshot: db.snapshot(),
             db,
         }
@@ -687,17 +687,9 @@ impl Rollback {
     pub fn track_merge(&self, patch: Patch) -> Result<()> {
         for (index, changes) in patch.iter() {
             for (key, _) in changes.iter() {
-                let action_key = [index.as_bytes(), &**key].join(&b'.');
-                let old_val = self.snapshot.get(&*index, &**key);
-                let seen = self.get(&*self.actions, &*action_key).is_some();
-                if !seen {
-                    let action = match old_val {
-                        Some(old_val) => {
-                            RollbackAction::Put(index.clone(), key.clone(), old_val)
-                        },
-                        None => RollbackAction::Delete(index.clone(), key.clone()),
-                    };
-                    self.put(&*self.actions, action_key, action.serialize())?;
+                let affected_key = DbKey::new(index.clone(), key.clone()).serialize();
+                if self.get(&*self.index, &*affected_key).is_none() {
+                    self.put(&*self.index, affected_key, Vec::new())?;
                 }
             }
         }
@@ -707,16 +699,12 @@ impl Rollback {
     /// Will revert all tracked patches.
     pub fn rollback(&self) -> Result<()> {
         let snapshot = self.db.snapshot();
-        let mut actions = snapshot.iter(&*self.actions, b"");
-        while let Some((_, v)) = actions.next() {
-            eprintln!("Rollback {:?}", v);
-            match RollbackAction::deserialize(v) {
-                RollbackAction::Put(index, key, val) => {
-                    self.put(&*index, key, val)?
-                },
-                RollbackAction::Delete(index, key) => {
-                    self.remove(&*index, key)?
-                }
+        let mut affected_keys = snapshot.iter(&*self.index, b"");
+        while let Some((k, _)) = affected_keys.next() {
+            let affected_key = DbKey::deserialize(k);
+            match self.snapshot.get(&*affected_key.index, &*affected_key.key) {
+                Some(val) => self.put(&*affected_key.index, affected_key.key, val)?,
+                None => self.remove(&*affected_key.index, affected_key.key)?,
             }
         }
         Ok(())
@@ -724,7 +712,8 @@ impl Rollback {
 
     /// Immediately puts key-value pair into specified index.
     fn put(&self, name: &str, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-        self.db.merge(Patch::from_change(name.into(), key, Change::Put(value)))
+        self.db
+            .merge(Patch::from_change(name.into(), key, Change::Put(value)))
     }
 
     /// Returns value of `key` in specified index.
@@ -734,7 +723,8 @@ impl Rollback {
 
     /// Immediately removes `key` from specified index.
     fn remove(&self, name: &str, key: Vec<u8>) -> Result<()> {
-        self.db.merge(Patch::from_change(name.into(), key, Change::Delete))
+        self.db
+            .merge(Patch::from_change(name.into(), key, Change::Delete))
     }
 }
 
@@ -742,51 +732,37 @@ impl Drop for Rollback {
     /// Drop implementation will cleanup tracked changes. Rollback won't be performed.
     fn drop(&mut self) {
         let snapshot = self.db.snapshot();
-        let mut actions = snapshot.iter(&*self.actions, b"");
-        while let Some((key, _)) = actions.next() {
-            self.remove(&*self.actions, key.into()).unwrap();
+        let mut affected_keys = snapshot.iter(&*self.index, b"");
+        while let Some((key, _)) = affected_keys.next() {
+            self.remove(&*self.index, key.into()).unwrap();
         }
     }
 }
 
-/// Rollback action.
-enum RollbackAction {
-    /// Put(index, key, value)
-    Put(String, Vec<u8>, Vec<u8>),
-    /// Delete(index, key)
-    Delete(String, Vec<u8>),
+/// This structure is an identifier of a specific key in the database.
+struct DbKey {
+    index: String,
+    key: Vec<u8>,
 }
 
-impl RollbackAction {
-    /// Will serialize this action into `Vec<u8>`.
+impl DbKey {
+    fn new(index: String, key: Vec<u8>) -> Self {
+        DbKey { index, key }
+    }
+
     fn serialize(&self) -> Vec<u8> {
         fn serialize_slice<T: Write + WriteBytesExt>(mut write: T, slice: &[u8]) {
             write.write_u64::<LittleEndian>(slice.len() as u64).unwrap();
             write.write_all(slice).unwrap();
-
         }
 
         let mut out = Vec::new();
-
-        match self {
-            RollbackAction::Delete(index, key) => {
-                out.push(0);
-                serialize_slice(&mut out, index.as_bytes());
-                serialize_slice(&mut out, &*key);
-            },
-            RollbackAction::Put(index, key, val) => {
-                out.push(1);
-                serialize_slice(&mut out, index.as_bytes());
-                serialize_slice(&mut out, &*key);
-                serialize_slice(&mut out, &*val);
-            }
-        }
-
+        serialize_slice(&mut out, self.index.as_bytes());
+        serialize_slice(&mut out, &*self.key);
         out
     }
 
-    /// Will deserialize this action from `&[u8]`.
-    fn deserialize(mut val: &[u8]) -> Self {
+    fn deserialize(mut input: &[u8]) -> Self {
         fn deserialize_vec<T: Read + ReadBytesExt>(read: &mut T) -> Vec<u8> {
             let len = read.read_u64::<LittleEndian>().unwrap() as usize;
             let mut out = vec![0; len];
@@ -794,19 +770,12 @@ impl RollbackAction {
             out
         }
 
-        match val.read_u8().unwrap() {
-            0 => {
-                let index = deserialize_vec(&mut val);
-                let key = deserialize_vec(&mut val);
-                RollbackAction::Delete(String::from_utf8(index).unwrap(), key)
-            },
-            1 => {
-                let index = deserialize_vec(&mut val);
-                let key = deserialize_vec(&mut val);
-                let value = deserialize_vec(&mut val);
-                RollbackAction::Put(String::from_utf8(index).unwrap(), key, value)
-            },
-            _ => panic!("Unknown Rollback action"),
+        let index = deserialize_vec(&mut input);
+        let key = deserialize_vec(&mut input);
+
+        DbKey {
+            index: String::from_utf8(index).unwrap(),
+            key,
         }
     }
 }

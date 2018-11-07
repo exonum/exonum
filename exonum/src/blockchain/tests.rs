@@ -417,7 +417,9 @@ impl ServiceIncrementalInitialize {
 }
 
 impl Service for ServiceIncrementalInitialize {
-    fn service_id(&self) -> u16 { 1 }
+    fn service_id(&self) -> u16 {
+        1
+    }
 
     fn service_name(&self) -> &'static str {
         "some_service"
@@ -520,7 +522,9 @@ mod memorydb_tests {
     use node::ApiSender;
     use storage::{Database, Fork, MemoryDB};
 
-    use super::{ServiceIncrementalInitialize, ServiceGood, ServicePanic, ServicePanicStorageError};
+    use super::{
+        ServiceGood, ServiceIncrementalInitialize, ServicePanic, ServicePanicStorageError,
+    };
 
     fn create_database() -> Box<dyn Database> {
         Box::new(MemoryDB::new())
@@ -544,10 +548,10 @@ mod memorydb_tests {
 
     fn create_patched_blockchain_with_service<F>(
         service: Box<dyn Service>,
-        mut fun: F
+        mut fun: F,
     ) -> Blockchain
-        where
-            F: for<'a> FnMut(&'a mut Fork) -> (),
+    where
+        F: for<'a> FnMut(&'a mut Fork) -> (),
     {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
@@ -595,7 +599,9 @@ mod memorydb_tests {
     fn service_incremental_initialize() {
         let service = Box::new(ServiceIncrementalInitialize::default());
         let mut blockchain = create_blockchain_with_service(service);
-        blockchain.initialize(GenesisConfig::new(vec![].into_iter())).unwrap();
+        blockchain
+            .initialize(GenesisConfig::new(vec![].into_iter()))
+            .unwrap();
         super::assert_incremental_initialization(&blockchain);
     }
 
@@ -603,15 +609,12 @@ mod memorydb_tests {
     fn service_incremental_initialize_panic() {
         let service = ServiceIncrementalInitialize::panicking();
         let service = Box::new(service);
-        let mut blockchain = create_patched_blockchain_with_service(
-            service,
-            |fork| {
-                // Add keys to test initialization rollback
-                for x in 0..10_u8 {
-                    fork.put("foo", vec![x], vec![x, x + 1]);
-                }
-            },
-        );
+        let mut blockchain = create_patched_blockchain_with_service(service, |fork| {
+            // Add keys to test initialization rollback
+            for x in 0..10_u8 {
+                fork.put("foo", vec![x], vec![x, x + 1]);
+            }
+        });
         let result = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
             blockchain.initialize(GenesisConfig::new(vec![].into_iter()))
         }));
@@ -637,7 +640,9 @@ mod rocksdb_tests {
     use storage::{Database, DbOptions, Fork, RocksDB};
     use tempdir::TempDir;
 
-    use super::{ServiceGood, ServiceIncrementalInitialize, ServicePanic, ServicePanicStorageError};
+    use super::{
+        ServiceGood, ServiceIncrementalInitialize, ServicePanic, ServicePanicStorageError,
+    };
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
@@ -664,10 +669,10 @@ mod rocksdb_tests {
     fn create_patched_blockchain_with_service<F>(
         path: &Path,
         service: Box<dyn Service>,
-        mut fun: F
+        mut fun: F,
     ) -> Blockchain
-        where
-            F: for<'a> FnMut(&'a mut Fork) -> (),
+    where
+        F: for<'a> FnMut(&'a mut Fork) -> (),
     {
         let db = create_database(path);
         let service_keypair = gen_keypair();
@@ -726,7 +731,9 @@ mod rocksdb_tests {
         let dir = create_temp_dir();
         let service = Box::new(ServiceIncrementalInitialize::default());
         let mut blockchain = create_blockchain_with_service(dir.path(), service);
-        blockchain.initialize(GenesisConfig::new(vec![].into_iter())).unwrap();
+        blockchain
+            .initialize(GenesisConfig::new(vec![].into_iter()))
+            .unwrap();
         super::assert_incremental_initialization(&blockchain);
     }
 
@@ -735,16 +742,12 @@ mod rocksdb_tests {
         let dir = create_temp_dir();
         let service = ServiceIncrementalInitialize::panicking();
         let service = Box::new(service);
-        let mut blockchain = create_patched_blockchain_with_service(
-            dir.path(),
-            service,
-            |fork| {
-                // Add keys to test initialization rollback
-                for x in 0..10_u8 {
-                    fork.put("foo", vec![x], vec![x, x + 1]);
-                }
+        let mut blockchain = create_patched_blockchain_with_service(dir.path(), service, |fork| {
+            // Add keys to test initialization rollback
+            for x in 0..10_u8 {
+                fork.put("foo", vec![x], vec![x, x + 1]);
             }
-        );
+        });
         let result = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
             blockchain.initialize(GenesisConfig::new(vec![].into_iter()))
         }));
