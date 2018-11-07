@@ -25,6 +25,4 @@ npm-debug.log
 *.iml
 
 # protobuf generated
-exonum/src/encoding/protobuf/blockchain.rs
-exonum/src/encoding/protobuf/helpers.rs
-exonum/src/encoding/protobuf/protocol.rs
+exonum/src/encoding/protobuf/*.rs

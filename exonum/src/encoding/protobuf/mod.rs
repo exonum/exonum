@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Protobuf generated structs and traits for conversion.
+
+// For rust-protobuf generated files.
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-//! Protobuf generated structs and traits for conversion.
 mod blockchain;
 mod helpers;
 mod protocol;
@@ -100,11 +102,7 @@ impl ToProtobuf for crypto::Hash {
 
     fn from_pb(pb: Hash) -> Result<Self, ()> {
         let data = pb.get_data();
-        if data.len() == crypto::HASH_SIZE {
-            Ok(crypto::Hash::from_slice(data).unwrap())
-        } else {
-            Err(())
-        }
+        crypto::Hash::from_slice(data).ok_or(())
     }
 }
 
@@ -119,11 +117,7 @@ impl ToProtobuf for crypto::PublicKey {
 
     fn from_pb(pb: PublicKey) -> Result<Self, ()> {
         let data = pb.get_data();
-        if data.len() == crypto::PUBLIC_KEY_LENGTH {
-            Ok(crypto::PublicKey::from_slice(data).unwrap())
-        } else {
-            Err(())
-        }
+        crypto::PublicKey::from_slice(data).ok_or(())
     }
 }
 
@@ -196,7 +190,11 @@ impl ProtobufValue for ValidatorId {
         u32::from(self.0)
     }
     fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
-        Ok(ValidatorId(pb as u16))
+        if pb <= u32::from(u16::max_value()) {
+            Ok(ValidatorId(pb as u16))
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -229,8 +227,9 @@ where
         RepeatedField::from_vec(self.into_iter().map(|v| v.to_pb_field()).collect())
     }
     fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
-        let vec: Result<Vec<_>, _> = pb.into_iter().map(ProtobufValue::from_pb_field).collect();
-        vec
+        pb.into_iter()
+            .map(ProtobufValue::from_pb_field)
+            .collect::<Result<Vec<_>, _>>()
     }
 }
 
