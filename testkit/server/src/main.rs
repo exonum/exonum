@@ -13,7 +13,7 @@
 // limitations under the License.
 
 extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
+extern crate exonum_demo_service as cryptocurrency;
 extern crate exonum_testkit;
 
 use cryptocurrency::service::CurrencyService;
