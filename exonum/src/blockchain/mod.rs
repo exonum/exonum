@@ -61,7 +61,7 @@ use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use node::ApiSender;
-use storage::{self, Database, Error, Fork, Patch, Snapshot};
+use storage::{self, Database, Error, Fork, Patch, Rollback, Snapshot};
 
 mod block;
 mod genesis;
@@ -227,6 +227,8 @@ impl Blockchain {
 
     /// Creates and commits the genesis block with the given genesis configuration.
     fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+        let rollback = Rollback::new(self.db.clone());
+
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: Height::zero(),
@@ -240,18 +242,37 @@ impl Blockchain {
             let name: String = self.service_map.get(&x).unwrap().service_name().into();
             if config_propose.services.contains_key(&*name) {
                 panic!(
-                    "Services already contain service with '{}' name, please change it",
+                    "Services already contains service with '{}' name, please change it",
                     name
                 );
             }
+
             let cfg = loop {
                 let mut fork = self.fork();
-                let result = self.service_map[&x].initialize(&mut fork);
-                self.merge(fork.into_patch())?;
-                if let InitResult::Done(cfg) = result {
-                    break cfg;
+                let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                    self.service_map[&x].initialize(&mut fork)
+                }));
+                match catch_result {
+                    Ok(result) => {
+                        let patch = fork.into_patch();
+                        rollback.track(&patch)?;
+                        self.merge(patch.clone())?;
+                        if let InitResult::Done(cfg) = result {
+                            break cfg;
+                        }
+                    },
+                    Err(error) => {
+                        if error.is::<Error>() {
+                            error!("Database error. Database may be in inconsistent state");
+                        } else {
+                            error!("Panic during service initialization. Reverting..");
+                            rollback.rollback().expect("Revert panics!");
+                        }
+                        panic::resume_unwind(error);
+                    }
                 }
             };
+
             config_propose.services.insert(name, cfg);
         }
 

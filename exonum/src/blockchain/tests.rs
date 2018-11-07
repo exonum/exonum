@@ -19,7 +19,8 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json;
 
 use blockchain::{
-    Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
+    Blockchain, ExecutionResult, InitResult, Schema, Service, Transaction, TransactionContext,
+    TransactionSet,
 };
 use crypto::{gen_keypair, Hash};
 use encoding::Error as MessageError;
@@ -404,6 +405,51 @@ impl Service for ServicePanicStorageError {
     }
 }
 
+#[derive(Default)]
+struct ServiceIncrementalInitialize(::std::sync::atomic::AtomicUsize, bool);
+
+impl ServiceIncrementalInitialize {
+    fn panicking() -> Self {
+        let mut this = Self::default();
+        this.1 = true;
+        this
+    }
+}
+
+impl Service for ServiceIncrementalInitialize {
+    fn service_id(&self) -> u16 { 1 }
+
+    fn service_name(&self) -> &'static str {
+        "some_service"
+    }
+
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        unimplemented!()
+    }
+
+    fn initialize(&self, fork: &mut Fork) -> InitResult {
+        let a = self.0.fetch_add(1, ::std::sync::atomic::Ordering::SeqCst);
+
+        for x in 0..10 {
+            fork.put("foo", vec![x + 5 * a as u8], Vec::new());
+        }
+
+        if a < 5 {
+            InitResult::Continue
+        } else {
+            if self.1 {
+                panic!()
+            } else {
+                InitResult::Done(serde_json::Value::Null)
+            }
+        }
+    }
+}
+
 fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
@@ -421,14 +467,60 @@ fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<dyn Databa
     assert!(index.is_empty());
 }
 
+fn assert_incremental_initialization(blockchain: &Blockchain) {
+    // Assert that rollback data is deleted
+    let snapshot = blockchain.snapshot();
+    let mut iter = snapshot.iter("__ROLLBACK__.initialize.affected_idxs", b"");
+    while let Some(_) = iter.next() {
+        panic!("Should be empty");
+    }
+    let mut iter = snapshot.iter("__ROLLBACK__.initialize.foo.actions", b"");
+    while let Some(_) = iter.next() {
+        panic!("Should be empty");
+    }
+
+    // Assert that all steps of initialization are performed
+    let mut iter = snapshot.iter("foo", b"");
+    let mut i = 0;
+    while let Some((k, v)) = iter.next() {
+        assert_eq!(k, &[i as u8][..]);
+        assert_eq!(v, b"");
+        i += 1;
+    }
+    assert_eq!(i, 35);
+}
+
+fn assert_incremental_initialization_panic(blockchain: &Blockchain) {
+    // Assert that rollback data is deleted
+    let snapshot = blockchain.snapshot();
+    let mut iter = snapshot.iter("__ROLLBACK__.initialize.affected_idxs", b"");
+    while let Some(_) = iter.next() {
+        panic!("Should be empty");
+    }
+    let mut iter = snapshot.iter("__ROLLBACK__.initialize.foo.actions", b"");
+    while let Some(_) = iter.next() {
+        panic!("Should be empty");
+    }
+
+    // Assert that rollback is performed
+    let mut iter = snapshot.iter("foo", b"");
+    let mut i = 0;
+    while let Some((k, v)) = iter.next() {
+        assert_eq!(k, &[i as u8][..]);
+        assert_eq!(v, &[i as u8, (i as u8) + 1][..]);
+        i += 1;
+    }
+    assert_eq!(i, 10);
+}
+
 mod memorydb_tests {
-    use blockchain::{Blockchain, Service};
+    use blockchain::{Blockchain, GenesisConfig, Service};
     use crypto::gen_keypair;
     use futures::sync::mpsc;
     use node::ApiSender;
-    use storage::{Database, MemoryDB};
+    use storage::{Database, Fork, MemoryDB};
 
-    use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
+    use super::{ServiceIncrementalInitialize, ServiceGood, ServicePanic, ServicePanicStorageError};
 
     fn create_database() -> Box<dyn Database> {
         Box::new(MemoryDB::new())
@@ -447,10 +539,24 @@ mod memorydb_tests {
     }
 
     fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
+        create_patched_blockchain_with_service(service, |_| ())
+    }
+
+    fn create_patched_blockchain_with_service<F>(
+        service: Box<dyn Service>,
+        mut fun: F
+    ) -> Blockchain
+        where
+            F: for<'a> FnMut(&'a mut Fork) -> (),
+    {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        fun(&mut fork);
+        db.merge(fork.into_patch()).unwrap();
         Blockchain::new(
-            MemoryDB::new(),
+            db,
             vec![service],
             service_keypair.0,
             service_keypair.1,
@@ -486,6 +592,34 @@ mod memorydb_tests {
     }
 
     #[test]
+    fn service_incremental_initialize() {
+        let service = Box::new(ServiceIncrementalInitialize::default());
+        let mut blockchain = create_blockchain_with_service(service);
+        blockchain.initialize(GenesisConfig::new(vec![].into_iter())).unwrap();
+        super::assert_incremental_initialization(&blockchain);
+    }
+
+    #[test]
+    fn service_incremental_initialize_panic() {
+        let service = ServiceIncrementalInitialize::panicking();
+        let service = Box::new(service);
+        let mut blockchain = create_patched_blockchain_with_service(
+            service,
+            |fork| {
+                // Add keys to test initialization rollback
+                for x in 0..10_u8 {
+                    fork.put("foo", vec![x], vec![x, x + 1]);
+                }
+            },
+        );
+        let result = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+            blockchain.initialize(GenesisConfig::new(vec![].into_iter()))
+        }));
+        assert!(result.is_err());
+        super::assert_incremental_initialization_panic(&blockchain);
+    }
+
+    #[test]
     #[should_panic]
     fn service_execute_panic_storage_error() {
         let blockchain = create_blockchain_with_service(Box::new(ServicePanicStorageError));
@@ -495,15 +629,15 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
-    use blockchain::{Blockchain, Service};
+    use blockchain::{Blockchain, GenesisConfig, Service};
     use crypto::gen_keypair;
     use futures::sync::mpsc;
     use node::ApiSender;
     use std::path::Path;
-    use storage::{Database, DbOptions, RocksDB};
+    use storage::{Database, DbOptions, Fork, RocksDB};
     use tempdir::TempDir;
 
-    use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
+    use super::{ServiceGood, ServiceIncrementalInitialize, ServicePanic, ServicePanicStorageError};
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
@@ -524,9 +658,23 @@ mod rocksdb_tests {
     }
 
     fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
+        create_patched_blockchain_with_service(path, service, |_| ())
+    }
+
+    fn create_patched_blockchain_with_service<F>(
+        path: &Path,
+        service: Box<dyn Service>,
+        mut fun: F
+    ) -> Blockchain
+        where
+            F: for<'a> FnMut(&'a mut Fork) -> (),
+    {
         let db = create_database(path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
+        let mut fork = db.fork();
+        fun(&mut fork);
+        db.merge(fork.into_patch()).unwrap();
         Blockchain::new(
             db,
             vec![service],
@@ -571,6 +719,37 @@ mod rocksdb_tests {
         let dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute_panic(&blockchain, &mut db);
+    }
+
+    #[test]
+    fn service_incremental_initialize() {
+        let dir = create_temp_dir();
+        let service = Box::new(ServiceIncrementalInitialize::default());
+        let mut blockchain = create_blockchain_with_service(dir.path(), service);
+        blockchain.initialize(GenesisConfig::new(vec![].into_iter())).unwrap();
+        super::assert_incremental_initialization(&blockchain);
+    }
+
+    #[test]
+    fn service_incremental_initialize_panic() {
+        let dir = create_temp_dir();
+        let service = ServiceIncrementalInitialize::panicking();
+        let service = Box::new(service);
+        let mut blockchain = create_patched_blockchain_with_service(
+            dir.path(),
+            service,
+            |fork| {
+                // Add keys to test initialization rollback
+                for x in 0..10_u8 {
+                    fork.put("foo", vec![x], vec![x, x + 1]);
+                }
+            }
+        );
+        let result = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+            blockchain.initialize(GenesisConfig::new(vec![].into_iter()))
+        }));
+        assert!(result.is_err());
+        super::assert_incremental_initialization_panic(&blockchain);
     }
 
     #[test]

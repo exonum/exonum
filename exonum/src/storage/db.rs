@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+
 use std::{
     cmp::Ordering::{Equal, Greater, Less},
     collections::{
@@ -20,7 +22,9 @@ use std::{
         Bound::{Included, Unbounded},
         HashMap,
     },
+    io::{Read, Write},
     iter::{Iterator as StdIterator, Peekable},
+    sync::Arc,
 };
 
 use super::Result;
@@ -641,5 +645,162 @@ impl<'a> Iterator for ForkIter<'a> {
 impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
         Box::new(db) as Self
+    }
+}
+
+/// This type is a way to track changes applied within multiple forks.
+///
+/// It's intended to be used during an incremental service initialization
+/// to rollback in case of panic.
+pub(crate) struct Rollback {
+    db: Arc<dyn Database>,
+    actions: String,
+    snapshot: Box<dyn Snapshot>,
+}
+
+impl Rollback {
+    /// Creates a new `Rollback` for specified database.
+    pub fn new(db: Arc<dyn Database>) -> Self {
+        let id: usize = ::rand::random();
+        Rollback {
+            actions: format!("__ROLLBACK__.{}.actions", id),
+            snapshot: db.snapshot(),
+            db,
+        }
+    }
+
+    /// Will collect rollback actions required to revert provided `patch`.
+    pub fn track(&self, patch: &Patch) -> Result<()> {
+        for (index, changes) in patch.iter() {
+            for (key, _) in changes.iter() {
+                let action_key = [index.as_bytes(), &**key].join(&b'.');
+                let old_val = self.snapshot.get(&*index, &**key);
+                let seen = self.get(&*self.actions, &*action_key).is_some();
+                if !seen {
+                    let action = match old_val {
+                        Some(old_val) => {
+                            RollbackAction::Put(index.clone(), key.clone(), old_val)
+                        },
+                        None => RollbackAction::Delete(index.clone(), key.clone()),
+                    };
+                    self.put(&*self.actions, action_key, action.serialize())?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Will revert all tracked patches.
+    pub fn rollback(&self) -> Result<()> {
+        let snapshot = self.db.snapshot();
+        let mut actions = snapshot.iter(&*self.actions, b"");
+        while let Some((_, v)) = actions.next() {
+            eprintln!("Rollback {:?}", v);
+            match RollbackAction::deserialize(v) {
+                RollbackAction::Put(index, key, val) => {
+                    self.put(&*index, key, val)?
+                },
+                RollbackAction::Delete(index, key) => {
+                    self.remove(&*index, key)?
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Immediately puts key-value pair into specified index.
+    fn put(&self, name: &str, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+        eprintln!("put {} {:?} {:?}", name, key, value);
+        let mut fork = self.db.fork();
+        fork.put(name, key, value);
+        self.db.merge(fork.into_patch())
+    }
+
+    /// Returns value of `key` in specified index.
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        eprintln!("get {} {:?}", name, key);
+        let snapshot = self.db.snapshot();
+        snapshot.get(name, key)
+    }
+
+    /// Immediately removes `key` from specified index.
+    fn remove(&self, name: &str, key: Vec<u8>) -> Result<()> {
+        eprintln!("remove {} {:?}", name, key);
+        let mut fork = self.db.fork();
+        fork.remove(name, key);
+        self.db.merge(fork.into_patch())
+    }
+}
+
+impl Drop for Rollback {
+    /// Drop implementation will cleanup tracked changes. Rollback won't be performed.
+    fn drop(&mut self) {
+        let snapshot = self.db.snapshot();
+        let mut actions = snapshot.iter(&*self.actions, b"");
+        while let Some((key, _)) = actions.next() {
+            self.remove(&*self.actions, key.into()).unwrap();
+        }
+    }
+}
+
+/// Rollback action.
+enum RollbackAction {
+    /// Put(index, key, value)
+    Put(String, Vec<u8>, Vec<u8>),
+    /// Delete(index, key)
+    Delete(String, Vec<u8>),
+}
+
+impl RollbackAction {
+    /// Will serialize this action into `Vec<u8>`.
+    fn serialize(&self) -> Vec<u8> {
+        fn serialize_slice<T: Write + WriteBytesExt>(mut write: T, slice: &[u8]) {
+            write.write_u64::<LittleEndian>(slice.len() as u64).unwrap();
+            write.write_all(slice).unwrap();
+
+        }
+
+        let mut out = Vec::new();
+
+        match self {
+            RollbackAction::Delete(index, key) => {
+                out.push(0);
+                serialize_slice(&mut out, index.as_bytes());
+                serialize_slice(&mut out, &*key);
+            },
+            RollbackAction::Put(index, key, val) => {
+                out.push(1);
+                serialize_slice(&mut out, index.as_bytes());
+                serialize_slice(&mut out, &*key);
+                serialize_slice(&mut out, &*val);
+            }
+        }
+
+        out
+    }
+
+    /// Will deserialize this action from `&[u8]`.
+    fn deserialize(mut val: &[u8]) -> Self {
+        fn deserialize_vec<T: Read + ReadBytesExt>(read: &mut T) -> Vec<u8> {
+            let len = read.read_u64::<LittleEndian>().unwrap() as usize;
+            let mut out = vec![0; len];
+            read.read_exact(&mut out[..]).unwrap();
+            out
+        }
+
+        match val.read_u8().unwrap() {
+            0 => {
+                let index = deserialize_vec(&mut val);
+                let key = deserialize_vec(&mut val);
+                RollbackAction::Delete(String::from_utf8(index).unwrap(), key)
+            },
+            1 => {
+                let index = deserialize_vec(&mut val);
+                let key = deserialize_vec(&mut val);
+                let value = deserialize_vec(&mut val);
+                RollbackAction::Put(String::from_utf8(index).unwrap(), key, value)
+            },
+            _ => panic!("Unknown Rollback action"),
+        }
     }
 }
