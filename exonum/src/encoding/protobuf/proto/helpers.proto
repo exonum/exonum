@@ -15,14 +15,14 @@
 syntax = "proto3";
 
 message Hash {
-	bytes data = 1;
+  bytes data = 1;
 }
 
 message PublicKey {
-	bytes data = 1;
+  bytes data = 1;
 }
 
 message BitVec {
-	bytes data = 1;
+  bytes data = 1;
   uint64 len = 2;
 }
