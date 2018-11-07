@@ -30,6 +30,8 @@ cargo install
 
 Generate blockchain configuration:
 
+<!-- markdownlint-disable MD013 -->
+
 ```sh
 mkdir example
 
@@ -37,8 +39,6 @@ exonum-demo-timestamping generate-template example/common.toml --validators-coun
 ```
 
 Generate templates of nodes configurations:
-
-<!-- markdownlint-disable MD013 -->
 
 ```sh
 exonum-demo-timestamping generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
