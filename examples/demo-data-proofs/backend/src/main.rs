@@ -14,11 +14,11 @@
 
 extern crate exonum;
 extern crate exonum_configuration;
-extern crate exonum_cryptocurrency_advanced;
+extern crate exonum_demo_data_proofs;
 
 use exonum::helpers::{self, fabric::NodeBuilder};
 use exonum_configuration as configuration;
-use exonum_cryptocurrency_advanced as cryptocurrency;
+use exonum_demo_data_proofs as cryptocurrency;
 
 fn main() {
     exonum::crypto::init();

@@ -16,7 +16,7 @@ extern crate exonum;
 extern crate exonum_configuration;
 extern crate exonum_time;
 
-extern crate exonum_timestamping;
+extern crate exonum_demo_timestamping;
 
 use exonum::helpers::fabric::NodeBuilder;
 
@@ -25,6 +25,6 @@ fn main() {
     NodeBuilder::new()
         .with_service(Box::new(exonum_configuration::ServiceFactory))
         .with_service(Box::new(exonum_time::TimeServiceFactory))
-        .with_service(Box::new(exonum_timestamping::ServiceFactory))
+        .with_service(Box::new(exonum_demo_timestamping::ServiceFactory))
         .run();
 }

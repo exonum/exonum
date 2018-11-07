@@ -21,7 +21,7 @@
 #[macro_use]
 extern crate assert_matches;
 extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
+extern crate exonum_demo_service as cryptocurrency;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
