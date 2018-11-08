@@ -19,8 +19,8 @@ extern crate serde_json;
 extern crate exonum_testkit;
 
 extern crate exonum;
-extern crate exonum_time;
 extern crate exonum_demo_timestamping;
+extern crate exonum_time;
 
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
