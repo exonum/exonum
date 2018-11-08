@@ -20,7 +20,7 @@ extern crate exonum_testkit;
 
 extern crate exonum;
 extern crate exonum_time;
-extern crate exonum_timestamping;
+extern crate exonum_demo_timestamping;
 
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
@@ -33,7 +33,7 @@ use exonum_time::{time_provider::MockTimeProvider, TimeService};
 
 use std::time::SystemTime;
 
-use exonum_timestamping::{
+use exonum_demo_timestamping::{
     api::TimestampQuery,
     schema::{Timestamp, TimestampEntry},
     transactions::TxTimestamp,
