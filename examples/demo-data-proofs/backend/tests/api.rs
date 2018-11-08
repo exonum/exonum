@@ -19,7 +19,7 @@
 //! about the storage state.
 
 extern crate exonum;
-extern crate exonum_cryptocurrency_advanced as cryptocurrency;
+extern crate exonum_demo_data_proofs as cryptocurrency;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;

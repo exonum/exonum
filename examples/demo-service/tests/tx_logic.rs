@@ -19,7 +19,7 @@
 //! the service schema to make assertions about the storage state.
 
 extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
+extern crate exonum_demo_service as cryptocurrency;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate rand;
