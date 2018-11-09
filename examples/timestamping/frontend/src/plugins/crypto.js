@@ -8,16 +8,19 @@ export default {
           const reader = new FileReader;
           reader.onload = function() {
             try {
-              const hash = CryptoJS.algo.SHA256.create()
-              hash.update(CryptoJS.enc.Latin1.parse(reader.result))
+              const hash = CryptoJS.algo.SHA256.create();
+              hash.update(CryptoJS.enc.Latin1.parse(reader.result));
               resolve('' + hash.finalize())
             } catch (error) {
               reject(error)
             }
-          }
-
+          };
           reader.readAsBinaryString(file);
         })
+      },
+
+      fromHexString: hash => {
+        return Uint8Array.from(hash.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
       }
     }
   }
