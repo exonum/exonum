@@ -134,11 +134,12 @@ where
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
-        family_name: S,
-        index_id: &I,
-        view: T,
-    ) -> Self {
+    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
+    where
+        I: StorageKey,
+        I: ?Sized,
+        S: AsRef<str>,
+    {
         Self {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,
