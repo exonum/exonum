@@ -220,8 +220,6 @@ impl Default for EventsPoolCapacity {
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
-    /// Maximum number of uncommitted transactions.
-    pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
     pub events_pool_capacity: EventsPoolCapacity,
@@ -230,7 +228,6 @@ pub struct MemoryPoolConfig {
 impl Default for MemoryPoolConfig {
     fn default() -> Self {
         Self {
-            tx_pool_capacity: 100_000,
             events_pool_capacity: EventsPoolCapacity::default(),
         }
     }
@@ -429,7 +426,6 @@ impl NodeHandler {
             config.listener.consensus_secret_key,
             config.service.service_public_key,
             config.service.service_secret_key,
-            config.mempool.tx_pool_capacity,
             connect_list,
             stored,
             connect,
