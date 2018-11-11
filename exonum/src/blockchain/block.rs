@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crypto::{self, CryptoHash, Hash};
-use encoding::protobuf::{self, ProtobufValue, ToProtobuf};
+use encoding::protobuf::{self, ProtobufConvert};
 use helpers::{Height, ValidatorId};
 use messages::{Precommit, Signed};
 use protobuf::Message;
@@ -91,28 +91,28 @@ impl Block {
     }
 }
 
-impl ToProtobuf for Block {
+impl ProtobufConvert for Block {
     type ProtoStruct = protobuf::Block;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_proposer_id(self.proposer_id.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
-        msg.set_tx_count(self.tx_count.to_pb_field());
-        msg.set_prev_hash(self.prev_hash.to_pb_field());
-        msg.set_tx_hash(self.tx_hash.to_pb_field());
-        msg.set_state_hash(self.state_hash.to_pb_field());
+        msg.set_proposer_id(self.proposer_id.to_pb());
+        msg.set_height(self.height.to_pb());
+        msg.set_tx_count(self.tx_count.to_pb());
+        msg.set_prev_hash(self.prev_hash.to_pb());
+        msg.set_tx_hash(self.tx_hash.to_pb());
+        msg.set_state_hash(self.state_hash.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            proposer_id: ProtobufValue::from_pb_field(pb.get_proposer_id())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            tx_count: ProtobufValue::from_pb_field(pb.get_tx_count())?,
-            prev_hash: ProtobufValue::from_pb_field(pb.take_prev_hash())?,
-            tx_hash: ProtobufValue::from_pb_field(pb.take_tx_hash())?,
-            state_hash: ProtobufValue::from_pb_field(pb.take_state_hash())?,
+            proposer_id: ProtobufConvert::from_pb(pb.get_proposer_id())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            tx_count: ProtobufConvert::from_pb(pb.get_tx_count())?,
+            prev_hash: ProtobufConvert::from_pb(pb.take_prev_hash())?,
+            tx_hash: ProtobufConvert::from_pb(pb.take_tx_hash())?,
+            state_hash: ProtobufConvert::from_pb(pb.take_state_hash())?,
         })
     }
 }
@@ -132,7 +132,7 @@ impl StorageValue for Block {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let mut block = protobuf::Block::new();
         block.merge_from_bytes(value.as_ref()).unwrap();
-        ToProtobuf::from_pb(block).unwrap()
+        ProtobufConvert::from_pb(block).unwrap()
     }
 }
 

@@ -35,7 +35,7 @@ use std::{borrow::Cow, fmt::Debug, mem};
 use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use encoding::protobuf::{self, ProtobufValue, ToProtobuf};
+use encoding::protobuf::{self, ProtobufConvert};
 use helpers::{Height, Round, ValidatorId};
 use protobuf::Message as ProtobufMessage;
 use storage::proof_list_index as merkle;
@@ -103,22 +103,22 @@ impl Connect {
     }
 }
 
-impl ToProtobuf for Connect {
+impl ProtobufConvert for Connect {
     type ProtoStruct = protobuf::Connect;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_pub_addr(self.pub_addr.to_pb_field());
-        msg.set_time(self.time.to_pb_field());
-        msg.set_user_agent(self.user_agent.to_pb_field());
+        msg.set_pub_addr(self.pub_addr.to_pb());
+        msg.set_time(self.time.to_pb());
+        msg.set_user_agent(self.user_agent.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            pub_addr: ProtobufValue::from_pb_field(pb.take_pub_addr())?,
-            time: ProtobufValue::from_pb_field(pb.take_time())?,
-            user_agent: ProtobufValue::from_pb_field(pb.take_user_agent())?,
+            pub_addr: ProtobufConvert::from_pb(pb.take_pub_addr())?,
+            time: ProtobufConvert::from_pb(pb.take_time())?,
+            user_agent: ProtobufConvert::from_pb(pb.take_user_agent())?,
         })
     }
 }
@@ -164,20 +164,20 @@ impl Status {
     }
 }
 
-impl ToProtobuf for Status {
+impl ProtobufConvert for Status {
     type ProtoStruct = protobuf::Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_height(self.height.to_pb_field());
-        msg.set_last_hash(self.last_hash.to_pb_field());
+        msg.set_height(self.height.to_pb());
+        msg.set_last_hash(self.last_hash.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            last_hash: ProtobufValue::from_pb_field(pb.take_last_hash())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            last_hash: ProtobufConvert::from_pb(pb.take_last_hash())?,
         })
     }
 }
@@ -260,26 +260,26 @@ impl Propose {
     }
 }
 
-impl ToProtobuf for Propose {
+impl ProtobufConvert for Propose {
     type ProtoStruct = protobuf::Propose;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_validator(self.validator.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
-        msg.set_round(self.round.to_pb_field());
-        msg.set_prev_hash(self.prev_hash.to_pb_field());
-        msg.set_transactions(self.transactions.to_pb_field());
+        msg.set_validator(self.validator.to_pb());
+        msg.set_height(self.height.to_pb());
+        msg.set_round(self.round.to_pb());
+        msg.set_prev_hash(self.prev_hash.to_pb());
+        msg.set_transactions(self.transactions.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            validator: ProtobufValue::from_pb_field(pb.get_validator())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            round: ProtobufValue::from_pb_field(pb.get_round())?,
-            prev_hash: ProtobufValue::from_pb_field(pb.take_prev_hash())?,
-            transactions: ProtobufValue::from_pb_field(pb.take_transactions())?,
+            validator: ProtobufConvert::from_pb(pb.get_validator())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            round: ProtobufConvert::from_pb(pb.get_round())?,
+            prev_hash: ProtobufConvert::from_pb(pb.take_prev_hash())?,
+            transactions: ProtobufConvert::from_pb(pb.take_transactions())?,
         })
     }
 }
@@ -356,26 +356,26 @@ impl Prevote {
     }
 }
 
-impl ToProtobuf for Prevote {
+impl ProtobufConvert for Prevote {
     type ProtoStruct = protobuf::Prevote;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_validator(self.validator.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
-        msg.set_round(self.round.to_pb_field());
-        msg.set_propose_hash(self.propose_hash.to_pb_field());
-        msg.set_locked_round(self.locked_round.to_pb_field());
+        msg.set_validator(self.validator.to_pb());
+        msg.set_height(self.height.to_pb());
+        msg.set_round(self.round.to_pb());
+        msg.set_propose_hash(self.propose_hash.to_pb());
+        msg.set_locked_round(self.locked_round.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            validator: ProtobufValue::from_pb_field(pb.get_validator())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            round: ProtobufValue::from_pb_field(pb.get_round())?,
-            propose_hash: ProtobufValue::from_pb_field(pb.take_propose_hash())?,
-            locked_round: ProtobufValue::from_pb_field(pb.get_locked_round())?,
+            validator: ProtobufConvert::from_pb(pb.get_validator())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            round: ProtobufConvert::from_pb(pb.get_round())?,
+            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
+            locked_round: ProtobufConvert::from_pb(pb.get_locked_round())?,
         })
     }
 }
@@ -459,28 +459,28 @@ impl Precommit {
     }
 }
 
-impl ToProtobuf for Precommit {
+impl ProtobufConvert for Precommit {
     type ProtoStruct = protobuf::Precommit;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_validator(self.validator.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
-        msg.set_round(self.round.to_pb_field());
-        msg.set_propose_hash(self.propose_hash.to_pb_field());
-        msg.set_block_hash(self.block_hash.to_pb_field());
-        msg.set_time(self.time.to_pb_field());
+        msg.set_validator(self.validator.to_pb());
+        msg.set_height(self.height.to_pb());
+        msg.set_round(self.round.to_pb());
+        msg.set_propose_hash(self.propose_hash.to_pb());
+        msg.set_block_hash(self.block_hash.to_pb());
+        msg.set_time(self.time.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            validator: ProtobufValue::from_pb_field(pb.get_validator())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            round: ProtobufValue::from_pb_field(pb.get_round())?,
-            propose_hash: ProtobufValue::from_pb_field(pb.take_propose_hash())?,
-            block_hash: ProtobufValue::from_pb_field(pb.take_block_hash())?,
-            time: ProtobufValue::from_pb_field(pb.take_time())?,
+            validator: ProtobufConvert::from_pb(pb.get_validator())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            round: ProtobufConvert::from_pb(pb.get_round())?,
+            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
+            block_hash: ProtobufConvert::from_pb(pb.take_block_hash())?,
+            time: ProtobufConvert::from_pb(pb.take_time())?,
         })
     }
 }
@@ -544,24 +544,24 @@ impl BlockResponse {
     }
 }
 
-impl ToProtobuf for BlockResponse {
+impl ProtobufConvert for BlockResponse {
     type ProtoStruct = protobuf::BlockResponse;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
-        msg.set_block(self.block.to_pb_field());
-        msg.set_precommits(self.precommits.to_pb_field());
-        msg.set_transactions(self.transactions.to_pb_field());
+        msg.set_to(self.to.to_pb());
+        msg.set_block(self.block.to_pb());
+        msg.set_precommits(self.precommits.to_pb());
+        msg.set_transactions(self.transactions.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
-            block: ProtobufValue::from_pb_field(pb.take_block())?,
-            precommits: ProtobufValue::from_pb_field(pb.take_precommits())?,
-            transactions: ProtobufValue::from_pb_field(pb.take_transactions())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
+            block: ProtobufConvert::from_pb(pb.take_block())?,
+            precommits: ProtobufConvert::from_pb(pb.take_precommits())?,
+            transactions: ProtobufConvert::from_pb(pb.take_transactions())?,
         })
     }
 }
@@ -605,20 +605,20 @@ impl TransactionsResponse {
     }
 }
 
-impl ToProtobuf for TransactionsResponse {
+impl ProtobufConvert for TransactionsResponse {
     type ProtoStruct = protobuf::TransactionsResponse;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
-        msg.set_transactions(self.transactions.to_pb_field());
+        msg.set_to(self.to.to_pb());
+        msg.set_transactions(self.transactions.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
-            transactions: ProtobufValue::from_pb_field(pb.take_transactions())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
+            transactions: ProtobufConvert::from_pb(pb.take_transactions())?,
         })
     }
 }
@@ -669,22 +669,22 @@ impl ProposeRequest {
     }
 }
 
-impl ToProtobuf for ProposeRequest {
+impl ProtobufConvert for ProposeRequest {
     type ProtoStruct = protobuf::ProposeRequest;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
-        msg.set_propose_hash(self.propose_hash.to_pb_field());
+        msg.set_to(self.to.to_pb());
+        msg.set_height(self.height.to_pb());
+        msg.set_propose_hash(self.propose_hash.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            propose_hash: ProtobufValue::from_pb_field(pb.take_propose_hash())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
         })
     }
 }
@@ -724,20 +724,20 @@ impl TransactionsRequest {
     }
 }
 
-impl ToProtobuf for TransactionsRequest {
+impl ProtobufConvert for TransactionsRequest {
     type ProtoStruct = protobuf::TransactionsRequest;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
-        msg.set_txs(self.txs.to_pb_field());
+        msg.set_to(self.to.to_pb());
+        msg.set_txs(self.txs.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
-            txs: ProtobufValue::from_pb_field(pb.take_txs())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
+            txs: ProtobufConvert::from_pb(pb.take_txs())?,
         })
     }
 }
@@ -807,26 +807,26 @@ impl PrevotesRequest {
     }
 }
 
-impl ToProtobuf for PrevotesRequest {
+impl ProtobufConvert for PrevotesRequest {
     type ProtoStruct = protobuf::PrevotesRequest;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
-        msg.set_round(self.round.to_pb_field());
-        msg.set_propose_hash(self.propose_hash.to_pb_field());
-        msg.set_validators(self.validators.to_pb_field());
+        msg.set_to(self.to.to_pb());
+        msg.set_height(self.height.to_pb());
+        msg.set_round(self.round.to_pb());
+        msg.set_propose_hash(self.propose_hash.to_pb());
+        msg.set_validators(self.validators.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
-            round: ProtobufValue::from_pb_field(pb.get_round())?,
-            propose_hash: ProtobufValue::from_pb_field(pb.take_propose_hash())?,
-            validators: ProtobufValue::from_pb_field(pb.take_validators())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
+            round: ProtobufConvert::from_pb(pb.get_round())?,
+            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
+            validators: ProtobufConvert::from_pb(pb.take_validators())?,
         })
     }
 }
@@ -860,18 +860,18 @@ impl PeersRequest {
     }
 }
 
-impl ToProtobuf for PeersRequest {
+impl ProtobufConvert for PeersRequest {
     type ProtoStruct = protobuf::PeersRequest;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
+        msg.set_to(self.to.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
         })
     }
 }
@@ -909,20 +909,20 @@ impl BlockRequest {
     }
 }
 
-impl ToProtobuf for BlockRequest {
+impl ProtobufConvert for BlockRequest {
     type ProtoStruct = protobuf::BlockRequest;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb_field());
-        msg.set_height(self.height.to_pb_field());
+        msg.set_to(self.to.to_pb());
+        msg.set_height(self.height.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            to: ProtobufValue::from_pb_field(pb.take_to())?,
-            height: ProtobufValue::from_pb_field(pb.get_height())?,
+            to: ProtobufConvert::from_pb(pb.take_to())?,
+            height: ProtobufConvert::from_pb(pb.get_height())?,
         })
     }
 }

@@ -14,7 +14,7 @@
 
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{self, CryptoHash, Hash, PublicKey};
-use encoding::protobuf::{self, ProtobufValue, ToProtobuf};
+use encoding::protobuf::{self, ProtobufConvert};
 use helpers::{Height, Round};
 use messages::{Connect, Message, Precommit, RawTransaction, Signed};
 use protobuf::Message as ProtobufMessage;
@@ -83,20 +83,20 @@ impl ConfigReference {
     }
 }
 
-impl ToProtobuf for ConfigReference {
+impl ProtobufConvert for ConfigReference {
     type ProtoStruct = protobuf::ConfigReference;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_actual_from(self.actual_from.to_pb_field());
-        msg.set_cfg_hash(self.cfg_hash.to_pb_field());
+        msg.set_actual_from(self.actual_from.to_pb());
+        msg.set_cfg_hash(self.cfg_hash.to_pb());
         msg
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            actual_from: ProtobufValue::from_pb_field(pb.get_actual_from())?,
-            cfg_hash: ProtobufValue::from_pb_field(pb.take_cfg_hash())?,
+            actual_from: ProtobufConvert::from_pb(pb.get_actual_from())?,
+            cfg_hash: ProtobufConvert::from_pb(pb.take_cfg_hash())?,
         })
     }
 }
@@ -116,7 +116,7 @@ impl StorageValue for ConfigReference {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let mut config_ref = protobuf::ConfigReference::new();
         config_ref.merge_from_bytes(value.as_ref()).unwrap();
-        ToProtobuf::from_pb(config_ref).unwrap()
+        ProtobufConvert::from_pb(config_ref).unwrap()
     }
 }
 
@@ -150,20 +150,20 @@ impl TxLocation {
     }
 }
 
-impl ToProtobuf for TxLocation {
+impl ProtobufConvert for TxLocation {
     type ProtoStruct = protobuf::TxLocation;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut msg = Self::ProtoStruct::new();
-        msg.set_block_height(self.block_height.to_pb_field());
-        msg.set_position_in_block(self.position_in_block.to_pb_field());
+        msg.set_block_height(self.block_height.to_pb());
+        msg.set_position_in_block(self.position_in_block.to_pb());
         msg
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Self {
-            block_height: ProtobufValue::from_pb_field(pb.get_block_height())?,
-            position_in_block: ProtobufValue::from_pb_field(pb.get_position_in_block())?,
+            block_height: ProtobufConvert::from_pb(pb.get_block_height())?,
+            position_in_block: ProtobufConvert::from_pb(pb.get_position_in_block())?,
         })
     }
 }
@@ -183,7 +183,7 @@ impl StorageValue for TxLocation {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let mut tx_location = protobuf::TxLocation::new();
         tx_location.merge_from_bytes(value.as_ref()).unwrap();
-        ToProtobuf::from_pb(tx_location).unwrap()
+        ProtobufConvert::from_pb(tx_location).unwrap()
     }
 }
 

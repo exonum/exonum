@@ -39,9 +39,9 @@ use protobuf::{well_known_types, Message, RepeatedField};
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
-pub trait ToProtobuf: Sized {
+pub trait ProtobufConvert: Sized {
     /// Type of the protobuf clone of Self
-    type ProtoStruct: Message;
+    type ProtoStruct;
 
     /// Struct -> ProtoStruct
     fn to_pb(&self) -> Self::ProtoStruct;
@@ -52,46 +52,21 @@ pub trait ToProtobuf: Sized {
 
 impl<T> BinaryForm for T
 where
-    T: ToProtobuf,
+    T: ProtobufConvert,
+    <T as ProtobufConvert>::ProtoStruct: Message,
 {
     fn encode(&self) -> Result<Vec<u8>, Error> {
         Ok(self.to_pb().write_to_bytes().unwrap())
     }
 
     fn decode(buffer: &[u8]) -> Result<Self, Error> {
-        let mut pb = <Self as ToProtobuf>::ProtoStruct::new();
+        let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(buffer).unwrap();
         Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
     }
 }
 
-/// Used for establishing correspondence between rust struct field
-/// and protobuf value
-pub trait ProtobufValue: Sized {
-    /// Type of value that is returned with pb.take_field() method
-    type ProtoValue;
-    /// RustField -> ProtobufRustField
-    fn to_pb_field(&self) -> Self::ProtoValue;
-    /// ProtobufRustField -> RustField
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()>;
-}
-
-impl<T> ProtobufValue for T
-where
-    T: ToProtobuf,
-{
-    type ProtoValue = <Self as ToProtobuf>::ProtoStruct;
-
-    fn to_pb_field(&self) -> Self::ProtoValue {
-        self.to_pb()
-    }
-
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
-        Self::from_pb(pb)
-    }
-}
-
-impl ToProtobuf for crypto::Hash {
+impl ProtobufConvert for crypto::Hash {
     type ProtoStruct = Hash;
 
     fn to_pb(&self) -> Hash {
@@ -106,7 +81,7 @@ impl ToProtobuf for crypto::Hash {
     }
 }
 
-impl ToProtobuf for crypto::PublicKey {
+impl ProtobufConvert for crypto::PublicKey {
     type ProtoStruct = PublicKey;
 
     fn to_pb(&self) -> PublicKey {
@@ -121,7 +96,7 @@ impl ToProtobuf for crypto::PublicKey {
     }
 }
 
-impl ToProtobuf for bit_vec::BitVec {
+impl ProtobufConvert for bit_vec::BitVec {
     type ProtoStruct = BitVec;
 
     fn to_pb(&self) -> BitVec {
@@ -139,7 +114,7 @@ impl ToProtobuf for bit_vec::BitVec {
     }
 }
 
-impl ToProtobuf for DateTime<Utc> {
+impl ProtobufConvert for DateTime<Utc> {
     type ProtoStruct = well_known_types::Timestamp;
 
     fn to_pb(&self) -> well_known_types::Timestamp {
@@ -154,42 +129,42 @@ impl ToProtobuf for DateTime<Utc> {
     }
 }
 
-impl ProtobufValue for String {
-    type ProtoValue = Self;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for String {
+    type ProtoStruct = Self;
+    fn to_pb(&self) -> Self::ProtoStruct {
         self.clone()
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(pb)
     }
 }
 
-impl ProtobufValue for Height {
-    type ProtoValue = u64;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for Height {
+    type ProtoStruct = u64;
+    fn to_pb(&self) -> Self::ProtoStruct {
         self.0
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Height(pb))
     }
 }
 
-impl ProtobufValue for Round {
-    type ProtoValue = u32;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for Round {
+    type ProtoStruct = u32;
+    fn to_pb(&self) -> Self::ProtoStruct {
         self.0
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(Round(pb))
     }
 }
 
-impl ProtobufValue for ValidatorId {
-    type ProtoValue = u32;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for ValidatorId {
+    type ProtoStruct = u32;
+    fn to_pb(&self) -> Self::ProtoStruct {
         u32::from(self.0)
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         if pb <= u32::from(u16::max_value()) {
             Ok(ValidatorId(pb as u16))
         } else {
@@ -198,48 +173,48 @@ impl ProtobufValue for ValidatorId {
     }
 }
 
-impl ProtobufValue for u32 {
-    type ProtoValue = u32;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for u32 {
+    type ProtoStruct = u32;
+    fn to_pb(&self) -> Self::ProtoStruct {
         *self
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(pb)
     }
 }
 
-impl ProtobufValue for u64 {
-    type ProtoValue = u64;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for u64 {
+    type ProtoStruct = u64;
+    fn to_pb(&self) -> Self::ProtoStruct {
         *self
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(pb)
     }
 }
 
-impl<T> ProtobufValue for Vec<T>
+impl<T> ProtobufConvert for Vec<T>
 where
-    T: ProtobufValue,
+    T: ProtobufConvert,
 {
-    type ProtoValue = RepeatedField<T::ProtoValue>;
-    fn to_pb_field(&self) -> Self::ProtoValue {
-        RepeatedField::from_vec(self.into_iter().map(|v| v.to_pb_field()).collect())
+    type ProtoStruct = RepeatedField<T::ProtoStruct>;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        RepeatedField::from_vec(self.into_iter().map(|v| v.to_pb()).collect())
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         pb.into_iter()
-            .map(ProtobufValue::from_pb_field)
+            .map(ProtobufConvert::from_pb)
             .collect::<Result<Vec<_>, _>>()
     }
 }
 
 /// Special case for protobuf bytes.
-impl ProtobufValue for Vec<u8> {
-    type ProtoValue = Vec<u8>;
-    fn to_pb_field(&self) -> Self::ProtoValue {
+impl ProtobufConvert for Vec<u8> {
+    type ProtoStruct = Vec<u8>;
+    fn to_pb(&self) -> Self::ProtoStruct {
         self.clone()
     }
-    fn from_pb_field(pb: Self::ProtoValue) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         Ok(pb)
     }
 }
