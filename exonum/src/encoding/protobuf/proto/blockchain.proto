@@ -14,20 +14,22 @@
 
 syntax = "proto3";
 
+package exonum;
+
 import "helpers.proto";
 
 message Block {
   uint32 proposer_id = 1;
   uint64 height = 2;
   uint32 tx_count = 3;
-  Hash prev_hash = 4;
-  Hash tx_hash = 5;
-  Hash state_hash = 6;
+  exonum.Hash prev_hash = 4;
+  exonum.Hash tx_hash = 5;
+  exonum.Hash state_hash = 6;
 }
 
 message ConfigReference {
   uint64 actual_from = 1;
-  Hash cfg_hash = 2;
+  exonum.Hash cfg_hash = 2;
 }
 
 message TxLocation {

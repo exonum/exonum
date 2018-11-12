@@ -14,6 +14,8 @@
 
 syntax = "proto3";
 
+package exonum.consensus;
+
 import "helpers.proto";
 import "blockchain.proto";
 import "google/protobuf/timestamp.proto";
@@ -27,22 +29,22 @@ message Connect {
 
 message Status {
   uint64 height = 1;
-  Hash last_hash = 2;
+  exonum.Hash last_hash = 2;
 }
 
 message Propose {
   uint32 validator = 1;
   uint64 height = 2;
   uint32 round = 3;
-  Hash prev_hash = 4;
-  repeated Hash transactions = 5;
+  exonum.Hash prev_hash = 4;
+  repeated exonum.Hash transactions = 5;
 }
 
 message Prevote {
   uint32 validator = 1;
   uint64 height = 2;
   uint32 round = 3;
-  Hash propose_hash = 4;
+  exonum.Hash propose_hash = 4;
   uint32 locked_round = 5;
 }
 
@@ -50,48 +52,48 @@ message Precommit {
   uint32 validator = 1;
   uint64 height = 2;
   uint32 round = 3;
-  Hash propose_hash = 4;
-  Hash block_hash = 5;
+  exonum.Hash propose_hash = 4;
+  exonum.Hash block_hash = 5;
   google.protobuf.Timestamp time = 6;
 }
 
 message BlockResponse {
-  PublicKey to = 1;
-  Block block = 2;
+  exonum.PublicKey to = 1;
+  exonum.Block block = 2;
   repeated bytes precommits = 3;
-  repeated Hash transactions = 4;
+  repeated exonum.Hash transactions = 4;
 }
 
 message TransactionsResponse {
-  PublicKey to = 1;
+  exonum.PublicKey to = 1;
   repeated bytes transactions = 2;
 }
 
 message ProposeRequest {
-  PublicKey to = 1;
+  exonum.PublicKey to = 1;
   uint64 height = 2;
-  Hash propose_hash = 3;
+  exonum.Hash propose_hash = 3;
 }
 
 message TransactionsRequest {
-  PublicKey to = 1;
-  repeated Hash txs = 2;
+  exonum.PublicKey to = 1;
+  repeated exonum.Hash txs = 2;
 }
 
 message PrevotesRequest {
-  PublicKey to = 1;
+  exonum.PublicKey to = 1;
   uint64 height = 2;
   uint32 round = 3;
-  Hash propose_hash = 4;
-  BitVec validators = 5;
+  exonum.Hash propose_hash = 4;
+  exonum.BitVec validators = 5;
 }
 
 message PeersRequest {
-  PublicKey to = 1;
+  exonum.PublicKey to = 1;
 }
 
 message BlockRequest {
-  PublicKey to = 1;
+  exonum.PublicKey to = 1;
   uint64 height = 2;
 }
 
