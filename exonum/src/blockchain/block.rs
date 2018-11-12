@@ -31,18 +31,18 @@ use storage::StorageValue;
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
-    pub proposer_id: ValidatorId,
+    proposer_id: ValidatorId,
     /// Height of the block, which is also the number of this particular
     /// block in the blockchain.
-    pub height: Height,
+    height: Height,
     /// Number of transactions in this block.
-    pub tx_count: u32,
+    tx_count: u32,
     /// Hash link to the previous block in the blockchain.
-    pub prev_hash: Hash,
+    prev_hash: Hash,
     /// Root hash of the Merkle tree of transactions in this block.
-    pub tx_hash: Hash,
+    tx_hash: Hash,
     /// Hash of the blockchain state after applying transactions in the block.
-    pub state_hash: Hash,
+    state_hash: Hash,
 }
 
 impl Block {

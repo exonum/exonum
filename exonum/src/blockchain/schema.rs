@@ -58,9 +58,9 @@ define_names!(
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigReference {
     /// Height since which this configuration becomes actual.
-    pub actual_from: Height,
+    actual_from: Height,
     /// Hash of the configuration contents that serialized as raw bytes vec.
-    pub cfg_hash: Hash,
+    cfg_hash: Hash,
 }
 
 impl ConfigReference {
@@ -126,9 +126,9 @@ impl StorageValue for ConfigReference {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
-    pub block_height: Height,
+    block_height: Height,
     /// Zero-based position of this transaction in the block.
-    pub position_in_block: u64,
+    position_in_block: u64,
 }
 
 impl TxLocation {

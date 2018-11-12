@@ -70,11 +70,11 @@ pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::s
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct Connect {
     /// The node's address.
-    pub pub_addr: String,
+    pub_addr: String,
     /// Time when the message was created.
-    pub time: DateTime<Utc>,
+    time: DateTime<Utc>,
     /// String containing information about this node including Exonum, Rust and OS versions.
-    pub user_agent: String,
+    user_agent: String,
 }
 
 impl Connect {
@@ -139,9 +139,9 @@ impl ProtobufConvert for Connect {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct Status {
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
     /// Hash of the last committed block.
-    pub last_hash: Hash,
+    last_hash: Hash,
 }
 
 impl Status {
@@ -202,15 +202,15 @@ impl ProtobufConvert for Status {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct Propose {
     /// The validator id.
-    pub validator: ValidatorId,
+    validator: ValidatorId,
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
     /// The round to which the message is related.
-    pub round: Round,
+    round: Round,
     /// Hash of the previous block.
-    pub prev_hash: Hash,
+    prev_hash: Hash,
     /// The list of transactions to include in the next block.
-    pub transactions: Vec<Hash>,
+    transactions: Vec<Hash>,
 }
 
 impl CryptoHash for Propose {
@@ -305,15 +305,15 @@ impl ProtobufConvert for Propose {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct Prevote {
     /// The validator id.
-    pub validator: ValidatorId,
+    validator: ValidatorId,
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
     /// The round to which the message is related.
-    pub round: Round,
+    round: Round,
     /// Hash of the corresponding `Propose`.
-    pub propose_hash: Hash,
+    propose_hash: Hash,
     /// Locked round.
-    pub locked_round: Round,
+    locked_round: Round,
 }
 
 impl Prevote {
@@ -401,17 +401,17 @@ impl ProtobufConvert for Prevote {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct Precommit {
     /// The validator id.
-    pub validator: ValidatorId,
+    validator: ValidatorId,
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
     /// The round to which the message is related.
-    pub round: Round,
+    round: Round,
     /// Hash of the corresponding `Propose`.
-    pub propose_hash: Hash,
+    propose_hash: Hash,
     /// Hash of the new block.
-    pub block_hash: Hash,
+    block_hash: Hash,
     /// Time of the `Precommit`.
-    pub time: DateTime<Utc>,
+    time: DateTime<Utc>,
 }
 
 impl Precommit {
@@ -501,13 +501,13 @@ impl ProtobufConvert for Precommit {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct BlockResponse {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
     /// Block header.
-    pub block: blockchain::Block,
+    block: blockchain::Block,
     /// List of pre-commits.
-    pub precommits: Vec<Vec<u8>>,
+    precommits: Vec<Vec<u8>>,
     /// List of the transaction hashes.
-    pub transactions: Vec<Hash>,
+    transactions: Vec<Hash>,
 }
 
 impl BlockResponse {
@@ -581,9 +581,9 @@ impl ProtobufConvert for BlockResponse {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct TransactionsResponse {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
     /// List of the transactions.
-    pub transactions: Vec<Vec<u8>>,
+    transactions: Vec<Vec<u8>>,
 }
 
 impl TransactionsResponse {
@@ -638,11 +638,11 @@ impl ProtobufConvert for TransactionsResponse {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct ProposeRequest {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
     /// Hash of the `Propose`.
-    pub propose_hash: Hash,
+    propose_hash: Hash,
 }
 
 impl ProposeRequest {
@@ -700,9 +700,9 @@ impl ProtobufConvert for ProposeRequest {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
     /// The list of the transaction hashes.
-    pub txs: Vec<Hash>,
+    txs: Vec<Hash>,
 }
 
 impl TransactionsRequest {
@@ -756,15 +756,15 @@ impl ProtobufConvert for TransactionsRequest {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
     /// The round to which the message is related.
-    pub round: Round,
+    round: Round,
     /// Hash of the `Propose`.
-    pub propose_hash: Hash,
+    propose_hash: Hash,
     /// The list of validators that send pre-votes.
-    pub validators: BitVec,
+    validators: BitVec,
 }
 
 impl PrevotesRequest {
@@ -846,7 +846,7 @@ impl ProtobufConvert for PrevotesRequest {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct PeersRequest {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
 }
 
 impl PeersRequest {
@@ -889,9 +889,9 @@ impl ProtobufConvert for PeersRequest {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 pub struct BlockRequest {
     /// Public key of the recipient.
-    pub to: PublicKey,
+    to: PublicKey,
     /// The height to which the message is related.
-    pub height: Height,
+    height: Height,
 }
 
 impl BlockRequest {
