@@ -25,6 +25,8 @@ pub use self::protocol::{
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
+pub mod sandbox;
+
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
 use protobuf::{well_known_types, Message, RepeatedField};

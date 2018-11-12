@@ -12,30 +12,78 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use encoding::protobuf::sandbox::TimestampTx;
+
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use encoding::Error as MessageError;
-use messages::{Message, RawTransaction, Signed};
+use messages::{BinaryForm, Message, RawTransaction, ServiceTransaction, Signed};
+use protobuf::Message as PbMessage;
 use storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
 
-transactions! {
-    pub TimestampingTransactions {
-
-        struct TimestampTx {
-            data: &[u8],
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum TimestampingTransactions {
+    TimestampTx(TimestampTx),
 }
 
 impl Transaction for TimestampTx {
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
         Ok(())
+    }
+}
+
+impl TransactionSet for TimestampingTransactions {
+    fn tx_from_raw(raw: RawTransaction) -> Result<Self, MessageError> {
+        let (id, vec) = raw.service_transaction().into_raw_parts();
+        match id {
+            0 => {
+                let mut ts_tx = TimestampTx::new();
+                ts_tx.merge_from_bytes(&vec).unwrap();
+                Ok(TimestampingTransactions::TimestampTx(ts_tx))
+            }
+            num => Err(MessageError::Basic(
+                format!(
+                    "Tag {} not found for enum {}.",
+                    num, "TimestampingTransactions"
+                ).into(),
+            )),
+        }
+    }
+}
+
+impl Into<ServiceTransaction> for TimestampingTransactions {
+    fn into(self) -> ServiceTransaction {
+        let (id, vec) = match self {
+            TimestampingTransactions::TimestampTx(ref tx) => (0, tx.write_to_bytes().unwrap()),
+        };
+        ServiceTransaction::from_raw_unchecked(id, vec)
+    }
+}
+
+impl Into<TimestampingTransactions> for TimestampTx {
+    fn into(self) -> TimestampingTransactions {
+        TimestampingTransactions::TimestampTx(self)
+    }
+}
+
+impl Into<ServiceTransaction> for TimestampTx {
+    fn into(self) -> ServiceTransaction {
+        let set: TimestampingTransactions = self.into();
+        set.into()
+    }
+}
+
+impl Into<Box<dyn Transaction>> for TimestampingTransactions {
+    fn into(self) -> Box<dyn Transaction> {
+        match self {
+            TimestampingTransactions::TimestampTx(tx) => Box::new(tx),
+        }
     }
 }
 
@@ -76,7 +124,8 @@ impl Iterator for TimestampingTxGenerator {
     fn next(&mut self) -> Option<Signed<RawTransaction>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        let buf = TimestampTx::new(&data);
+        let mut buf = TimestampTx::new();
+        buf.set_data(data);
         Some(Message::sign_transaction(
             buf,
             TIMESTAMPING_SERVICE,
