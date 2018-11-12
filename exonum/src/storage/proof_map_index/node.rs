@@ -42,14 +42,12 @@ impl BranchNode {
         }
     }
 
-    pub fn child_hash(&self, kind: ChildKind) -> &Hash {
-        unsafe {
-            let from = match kind {
-                ChildKind::Right => HASH_SIZE,
-                ChildKind::Left => 0,
-            };
-            &*(&self.raw[from] as *const u8 as *const Hash)
-        }
+    pub fn child_hash(&self, kind: ChildKind) -> Hash {
+        let from = match kind {
+            ChildKind::Right => HASH_SIZE,
+            ChildKind::Left => 0,
+        };
+        Hash::read(&self.raw[from..from + HASH_SIZE])
     }
 
     pub fn child_path(&self, kind: ChildKind) -> ProofPath {
@@ -124,8 +122,8 @@ fn test_branch_node() {
     branch.set_child(ChildKind::Left, &ls, &lh);
     branch.set_child(ChildKind::Right, &rs, &rh);
 
-    assert_eq!(branch.child_hash(ChildKind::Left), &lh);
-    assert_eq!(branch.child_hash(ChildKind::Right), &rh);
+    assert_eq!(branch.child_hash(ChildKind::Left), lh);
+    assert_eq!(branch.child_hash(ChildKind::Right), rh);
     assert_eq!(branch.child_path(ChildKind::Left), ls);
     assert_eq!(branch.child_path(ChildKind::Right), rs);
 }

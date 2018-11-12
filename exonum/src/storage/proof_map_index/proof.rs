@@ -664,7 +664,7 @@ where
                 node_path = branch.child_path(next_bit);
 
                 let other_path_and_hash =
-                    (branch.child_path(!next_bit), *branch.child_hash(!next_bit));
+                    (branch.child_path(!next_bit), branch.child_hash(!next_bit));
                 match !next_bit {
                     ChildKind::Left => left_hashes.push(other_path_and_hash),
                     ChildKind::Right => right_hashes.push(other_path_and_hash),
@@ -687,7 +687,7 @@ where
                 } else {
                     // Both children of `branch` do not fit.
 
-                    let next_hash = *branch.child_hash(next_bit);
+                    let next_hash = branch.child_hash(next_bit);
                     match next_bit {
                         ChildKind::Left => left_hashes.push((node_path, next_hash)),
                         ChildKind::Right => right_hashes.push((node_path, next_hash)),
@@ -745,13 +745,13 @@ impl ContourNode {
             if !self.visited_left {
                 builder = builder.add_proof_entry(
                     self.branch.child_path(ChildKind::Left),
-                    *self.branch.child_hash(ChildKind::Left),
+                    self.branch.child_hash(ChildKind::Left),
                 );
             }
 
             builder = builder.add_proof_entry(
                 self.branch.child_path(ChildKind::Right),
-                *self.branch.child_hash(ChildKind::Right),
+                self.branch.child_hash(ChildKind::Right),
             );
         }
 
@@ -800,7 +800,7 @@ where
                         if !contour_tip.visited_left {
                             builder = builder.add_proof_entry(
                                 contour_tip.branch.child_path(ChildKind::Left),
-                                *contour_tip.branch.child_hash(ChildKind::Left),
+                                contour_tip.branch.child_hash(ChildKind::Left),
                             );
                         }
                         contour_tip.visited_right = true;
