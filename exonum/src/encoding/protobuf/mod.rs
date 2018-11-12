@@ -126,11 +126,9 @@ impl ProtobufConvert for DateTime<Utc> {
     }
 
     fn from_pb(pb: well_known_types::Timestamp) -> Result<Self, ()> {
-        if pb.get_nanos() >= 0 {
-            Ok(Utc.timestamp(pb.get_seconds(), pb.get_nanos() as u32))
-        } else {
-            Err(())
-        }
+        Utc.timestamp_opt(pb.get_seconds(), pb.get_nanos() as u32)
+            .single()
+            .ok_or(())
     }
 }
 
