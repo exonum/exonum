@@ -105,12 +105,12 @@ where
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new_in_family<S: AsRef<str>, P: StorageKey>(
-        family_name: S,
-        index_id: &P,
-        index_type: IndexType,
-        view: T,
-    ) -> Self {
+    pub fn new_in_family<S, P>(family_name: S, index_id: &P, index_type: IndexType, view: T) -> Self
+    where
+        P: StorageKey,
+        P: ?Sized,
+        S: AsRef<str>,
+    {
         assert_valid_name(&family_name);
 
         let is_family = true;
