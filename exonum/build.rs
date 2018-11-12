@@ -1,4 +1,4 @@
-// spell-checker:ignore rustc
+// spell-checker:ignore rustc, walkdir
 
 extern crate protoc_rust;
 extern crate walkdir;
