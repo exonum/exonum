@@ -80,3 +80,4 @@ sodiumoxide-crypto = ["exonum_sodiumoxide"]
 
 [build-dependencies]
 protoc-rust = "=2.1.4"
+walkdir = "2"
