@@ -23,10 +23,13 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate hex;
+extern crate openssl;
+extern crate pem;
 extern crate rust_decimal;
 extern crate serde;
 extern crate serde_json;
 extern crate uuid;
+
 
 #[doc(inline)]
 pub use self::crypto_impl::{
@@ -61,6 +64,7 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 mod macros;
 
 pub(crate) mod crypto_lib;
+pub(crate) mod utils;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
