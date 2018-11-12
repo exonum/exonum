@@ -78,7 +78,7 @@ impl ProtobufConvert for crypto::Hash {
 
     fn from_pb(pb: Hash) -> Result<Self, ()> {
         let data = pb.get_data();
-        if data.len() != crypto::HASH_SIZE {
+        if data.len() == crypto::HASH_SIZE {
             crypto::Hash::from_slice(data).ok_or(())
         } else {
             Err(())
@@ -97,7 +97,7 @@ impl ProtobufConvert for crypto::PublicKey {
 
     fn from_pb(pb: PublicKey) -> Result<Self, ()> {
         let data = pb.get_data();
-        if data.len() != crypto::PUBLIC_KEY_LENGTH {
+        if data.len() == crypto::PUBLIC_KEY_LENGTH {
             crypto::PublicKey::from_slice(data).ok_or(())
         } else {
             Err(())
