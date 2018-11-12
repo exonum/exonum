@@ -2,9 +2,9 @@
 
 extern crate protoc_rust;
 
-use std::{env, fs::File, io::Write, path::Path, process::Command};
-
 use protoc_rust::Customize;
+
+use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 static USER_AGENT_FILE_NAME: &str = "user_agent";
 

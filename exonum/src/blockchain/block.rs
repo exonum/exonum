@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use protobuf::Message;
+
+use std::borrow::Cow;
+
 use crypto::{self, CryptoHash, Hash};
 use encoding::protobuf::{self, ProtobufConvert};
 use helpers::{Height, ValidatorId};
 use messages::{Precommit, Signed};
-use protobuf::Message;
-use std::borrow::Cow;
 use storage::StorageValue;
 
 /// Exonum block header data structure.

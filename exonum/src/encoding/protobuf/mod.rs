@@ -18,10 +18,6 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-mod blockchain;
-mod helpers;
-mod protocol;
-
 pub use self::blockchain::{Block, ConfigReference, TxLocation};
 pub use self::helpers::{BitVec, Hash, PublicKey};
 pub use self::protocol::{
@@ -31,11 +27,16 @@ pub use self::protocol::{
 
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
+use protobuf::{well_known_types, Message, RepeatedField};
+
 use crypto;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 use messages::BinaryForm;
-use protobuf::{well_known_types, Message, RepeatedField};
+
+mod blockchain;
+mod helpers;
+mod protocol;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct

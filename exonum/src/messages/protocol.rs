@@ -29,6 +29,7 @@
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 use failure;
+use protobuf::Message as ProtobufMessage;
 
 use std::{borrow::Cow, fmt::Debug, mem};
 
@@ -37,9 +38,7 @@ use blockchain;
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use encoding::protobuf::{self, ProtobufConvert};
 use helpers::{Height, Round, ValidatorId};
-use protobuf::Message as ProtobufMessage;
-use storage::proof_list_index as merkle;
-use storage::StorageValue;
+use storage::{proof_list_index as merkle, StorageValue};
 
 /// `SignedMessage` size with zero bytes payload.
 #[doc(hidden)]
