@@ -18,9 +18,12 @@ use std::borrow::Cow;
 
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{self, CryptoHash, Hash, PublicKey};
-use encoding::protobuf::{self, ProtobufConvert};
+use encoding::{
+    self,
+    protobuf::{self, ProtobufConvert},
+};
 use helpers::{Height, Round};
-use messages::{Connect, Message, Precommit, RawTransaction, Signed};
+use messages::{BinaryForm, Connect, Message, Precommit, RawTransaction, Signed};
 use storage::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
     Snapshot, StorageValue,
@@ -56,7 +59,7 @@ define_names!(
 );
 
 /// Configuration index.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ProtobufConvert)]
 pub struct ConfigReference {
     /// Height since which this configuration becomes actual.
     actual_from: Height,
@@ -84,47 +87,10 @@ impl ConfigReference {
     }
 }
 
-impl ProtobufConvert for ConfigReference {
-    type ProtoStruct = protobuf::ConfigReference;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_actual_from(self.actual_from.to_pb());
-        msg.set_cfg_hash(self.cfg_hash.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            actual_from: ProtobufConvert::from_pb(pb.get_actual_from())?,
-            cfg_hash: ProtobufConvert::from_pb(pb.take_cfg_hash())?,
-        })
-    }
-}
-
-impl CryptoHash for ConfigReference {
-    fn hash(&self) -> Hash {
-        let v = self.to_pb().write_to_bytes().unwrap();
-        crypto::hash(&v)
-    }
-}
-
-impl StorageValue for ConfigReference {
-    fn into_bytes(self) -> Vec<u8> {
-        self.to_pb().write_to_bytes().unwrap()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        let mut config_ref = protobuf::ConfigReference::new();
-        config_ref.merge_from_bytes(value.as_ref()).unwrap();
-        ProtobufConvert::from_pb(config_ref).unwrap()
-    }
-}
-
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,
@@ -148,43 +114,6 @@ impl TxLocation {
     /// Zero-based position of this transaction in the block.
     pub fn position_in_block(&self) -> u64 {
         self.position_in_block
-    }
-}
-
-impl ProtobufConvert for TxLocation {
-    type ProtoStruct = protobuf::TxLocation;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_block_height(self.block_height.to_pb());
-        msg.set_position_in_block(self.position_in_block.to_pb());
-        msg
-    }
-
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            block_height: ProtobufConvert::from_pb(pb.get_block_height())?,
-            position_in_block: ProtobufConvert::from_pb(pb.get_position_in_block())?,
-        })
-    }
-}
-
-impl CryptoHash for TxLocation {
-    fn hash(&self) -> Hash {
-        let v = self.to_pb().write_to_bytes().unwrap();
-        crypto::hash(&v)
-    }
-}
-
-impl StorageValue for TxLocation {
-    fn into_bytes(self) -> Vec<u8> {
-        self.to_pb().write_to_bytes().unwrap()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        let mut tx_location = protobuf::TxLocation::new();
-        tx_location.merge_from_bytes(value.as_ref()).unwrap();
-        ProtobufConvert::from_pb(tx_location).unwrap()
     }
 }
 

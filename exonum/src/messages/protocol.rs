@@ -36,7 +36,10 @@ use std::{borrow::Cow, fmt::Debug, mem};
 use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use encoding::protobuf::{self, ProtobufConvert};
+use encoding::{
+    self,
+    protobuf::{self, ProtobufConvert},
+};
 use helpers::{Height, Round, ValidatorId};
 use storage::{proof_list_index as merkle, StorageValue};
 
@@ -66,7 +69,7 @@ pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::s
 /// A node sends `Connect` message to all known addresses during
 /// initialization. Additionally, the node responds by its own `Connect`
 /// message after receiving `node::Event::Connected`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct Connect {
     /// The node's address.
     pub_addr: String,
@@ -102,25 +105,6 @@ impl Connect {
     }
 }
 
-impl ProtobufConvert for Connect {
-    type ProtoStruct = protobuf::Connect;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_pub_addr(self.pub_addr.to_pb());
-        msg.set_time(self.time.to_pb());
-        msg.set_user_agent(self.user_agent.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            pub_addr: ProtobufConvert::from_pb(pb.take_pub_addr())?,
-            time: ProtobufConvert::from_pb(pb.take_time())?,
-            user_agent: ProtobufConvert::from_pb(pb.take_user_agent())?,
-        })
-    }
-}
 /// Current node status.
 ///
 /// ### Validation
@@ -135,7 +119,7 @@ impl ProtobufConvert for Connect {
 /// `Status` message is broadcast regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
 /// after accepting a new block.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct Status {
     /// The height to which the message is related.
     height: Height,
@@ -163,24 +147,6 @@ impl Status {
     }
 }
 
-impl ProtobufConvert for Status {
-    type ProtoStruct = protobuf::Status;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_height(self.height.to_pb());
-        msg.set_last_hash(self.last_hash.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            last_hash: ProtobufConvert::from_pb(pb.take_last_hash())?,
-        })
-    }
-}
-
 /// Proposal for a new block.
 ///
 /// ### Validation
@@ -198,7 +164,7 @@ impl ProtobufConvert for Status {
 /// A node broadcasts `Propose` if it is a leader and is not locked for a
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct Propose {
     /// The validator id.
     validator: ValidatorId,
@@ -210,13 +176,6 @@ pub struct Propose {
     prev_hash: Hash,
     /// The list of transactions to include in the next block.
     transactions: Vec<Hash>,
-}
-
-impl CryptoHash for Propose {
-    fn hash(&self) -> Hash {
-        let v = self.to_pb().write_to_bytes().unwrap();
-        crypto::hash(&v)
-    }
 }
 
 impl Propose {
@@ -259,30 +218,6 @@ impl Propose {
     }
 }
 
-impl ProtobufConvert for Propose {
-    type ProtoStruct = protobuf::Propose;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_validator(self.validator.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg.set_round(self.round.to_pb());
-        msg.set_prev_hash(self.prev_hash.to_pb());
-        msg.set_transactions(self.transactions.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            validator: ProtobufConvert::from_pb(pb.get_validator())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            round: ProtobufConvert::from_pb(pb.get_round())?,
-            prev_hash: ProtobufConvert::from_pb(pb.take_prev_hash())?,
-            transactions: ProtobufConvert::from_pb(pb.take_transactions())?,
-        })
-    }
-}
-
 /// Pre-vote for a new block.
 ///
 /// ### Validation
@@ -301,7 +236,7 @@ impl ProtobufConvert for Propose {
 /// ### Generation
 /// A node broadcasts `Prevote` in response to `Propose` when it has
 /// received all the transactions.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct Prevote {
     /// The validator id.
     validator: ValidatorId,
@@ -355,30 +290,6 @@ impl Prevote {
     }
 }
 
-impl ProtobufConvert for Prevote {
-    type ProtoStruct = protobuf::Prevote;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_validator(self.validator.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg.set_round(self.round.to_pb());
-        msg.set_propose_hash(self.propose_hash.to_pb());
-        msg.set_locked_round(self.locked_round.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            validator: ProtobufConvert::from_pb(pb.get_validator())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            round: ProtobufConvert::from_pb(pb.get_round())?,
-            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
-            locked_round: ProtobufConvert::from_pb(pb.get_locked_round())?,
-        })
-    }
-}
-
 /// Pre-commit for a proposal.
 ///
 /// ### Validation
@@ -397,7 +308,7 @@ impl ProtobufConvert for Prevote {
 /// ### Generation
 /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
 /// pre-votes and no unknown transactions.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
 pub struct Precommit {
     /// The validator id.
     validator: ValidatorId,
@@ -458,32 +369,6 @@ impl Precommit {
     }
 }
 
-impl ProtobufConvert for Precommit {
-    type ProtoStruct = protobuf::Precommit;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_validator(self.validator.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg.set_round(self.round.to_pb());
-        msg.set_propose_hash(self.propose_hash.to_pb());
-        msg.set_block_hash(self.block_hash.to_pb());
-        msg.set_time(self.time.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            validator: ProtobufConvert::from_pb(pb.get_validator())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            round: ProtobufConvert::from_pb(pb.get_round())?,
-            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
-            block_hash: ProtobufConvert::from_pb(pb.take_block_hash())?,
-            time: ProtobufConvert::from_pb(pb.take_time())?,
-        })
-    }
-}
-
 /// Information about a block.
 ///
 /// ### Validation
@@ -497,7 +382,7 @@ impl ProtobufConvert for Precommit {
 ///
 /// ### Generation
 /// The message is sent as response to `BlockRequest`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct BlockResponse {
     /// Public key of the recipient.
     to: PublicKey,
@@ -543,28 +428,6 @@ impl BlockResponse {
     }
 }
 
-impl ProtobufConvert for BlockResponse {
-    type ProtoStruct = protobuf::BlockResponse;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg.set_block(self.block.to_pb());
-        msg.set_precommits(self.precommits.to_pb());
-        msg.set_transactions(self.transactions.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-            block: ProtobufConvert::from_pb(pb.take_block())?,
-            precommits: ProtobufConvert::from_pb(pb.take_precommits())?,
-            transactions: ProtobufConvert::from_pb(pb.take_transactions())?,
-        })
-    }
-}
-
 /// Information about the transactions.
 ///
 /// ### Validation
@@ -577,7 +440,7 @@ impl ProtobufConvert for BlockResponse {
 ///
 /// ### Generation
 /// The message is sent as response to `TransactionsRequest`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct TransactionsResponse {
     /// Public key of the recipient.
     to: PublicKey,
@@ -604,24 +467,6 @@ impl TransactionsResponse {
     }
 }
 
-impl ProtobufConvert for TransactionsResponse {
-    type ProtoStruct = protobuf::TransactionsResponse;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg.set_transactions(self.transactions.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-            transactions: ProtobufConvert::from_pb(pb.take_transactions())?,
-        })
-    }
-}
-
 /// Request for the `Propose`.
 ///
 /// ### Validation
@@ -634,7 +479,7 @@ impl ProtobufConvert for TransactionsResponse {
 /// ### Generation
 /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
 /// handling.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct ProposeRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -668,26 +513,6 @@ impl ProposeRequest {
     }
 }
 
-impl ProtobufConvert for ProposeRequest {
-    type ProtoStruct = protobuf::ProposeRequest;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg.set_propose_hash(self.propose_hash.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
-        })
-    }
-}
-
 /// Request for transactions by hash.
 ///
 /// ### Processing
@@ -696,7 +521,7 @@ impl ProtobufConvert for ProposeRequest {
 /// ### Generation
 /// This message can be sent during `Propose`, `Prevote` and `Precommit`
 /// handling.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -723,24 +548,6 @@ impl TransactionsRequest {
     }
 }
 
-impl ProtobufConvert for TransactionsRequest {
-    type ProtoStruct = protobuf::TransactionsRequest;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg.set_txs(self.txs.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-            txs: ProtobufConvert::from_pb(pb.take_txs())?,
-        })
-    }
-}
-
 /// Request for pre-votes.
 ///
 /// ### Validation
@@ -752,7 +559,7 @@ impl ProtobufConvert for TransactionsRequest {
 ///
 /// ### Generation
 /// This message can be sent during `Prevote` and `Precommit` handling.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -806,30 +613,6 @@ impl PrevotesRequest {
     }
 }
 
-impl ProtobufConvert for PrevotesRequest {
-    type ProtoStruct = protobuf::PrevotesRequest;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg.set_round(self.round.to_pb());
-        msg.set_propose_hash(self.propose_hash.to_pb());
-        msg.set_validators(self.validators.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            round: ProtobufConvert::from_pb(pb.get_round())?,
-            propose_hash: ProtobufConvert::from_pb(pb.take_propose_hash())?,
-            validators: ProtobufConvert::from_pb(pb.take_validators())?,
-        })
-    }
-}
-
 /// Request connected peers from a node.
 ///
 /// ### Validation
@@ -842,7 +625,7 @@ impl ProtobufConvert for PrevotesRequest {
 /// ### Generation
 /// `PeersRequest` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct PeersRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -859,22 +642,6 @@ impl PeersRequest {
     }
 }
 
-impl ProtobufConvert for PeersRequest {
-    type ProtoStruct = protobuf::PeersRequest;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-        })
-    }
-}
-
 /// Request for the block with the given `height`.
 ///
 /// ### Validation
@@ -885,7 +652,7 @@ impl ProtobufConvert for PeersRequest {
 ///
 /// ### Generation
 /// This message can be sent during `Status` processing.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 pub struct BlockRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -905,24 +672,6 @@ impl BlockRequest {
     /// The height to which the message is related.
     pub fn height(&self) -> Height {
         self.height
-    }
-}
-
-impl ProtobufConvert for BlockRequest {
-    type ProtoStruct = protobuf::BlockRequest;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_to(self.to.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            to: ProtobufConvert::from_pb(pb.take_to())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-        })
     }
 }
 

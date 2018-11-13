@@ -1,0 +1,12 @@
+[package]
+name = "exonum_derive"
+version = "0.1.0"
+authors = ["Vitaly Drogan <vitaliy.drogan@gmail.com>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "0.15"
+quote = "0.6"
+proc-macro2 = "0.4"
