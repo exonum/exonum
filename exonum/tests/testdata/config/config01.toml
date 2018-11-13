@@ -22,7 +22,6 @@ max_propose_timeout = 200
 propose_timeout_threshold = 500
 
 [mempool]
-tx_pool_capacity = 100000
 
 [mempool.events_pool_capacity]
 api_requests_capacity = 1024
