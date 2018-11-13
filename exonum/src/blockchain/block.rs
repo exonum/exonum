@@ -17,9 +17,12 @@ use protobuf::Message;
 use std::borrow::Cow;
 
 use crypto::{self, CryptoHash, Hash};
-use encoding::protobuf::{self, ProtobufConvert};
+use encoding::{
+    self,
+    protobuf::{self, ProtobufConvert},
+};
 use helpers::{Height, ValidatorId};
-use messages::{Precommit, Signed};
+use messages::{BinaryForm, Precommit, Signed};
 use storage::StorageValue;
 
 /// Exonum block header data structure.
@@ -30,7 +33,7 @@ use storage::StorageValue;
 ///
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
     proposer_id: ValidatorId,
@@ -90,51 +93,6 @@ impl Block {
     /// Hash of the blockchain state after applying transactions in the block.
     pub fn state_hash(&self) -> &Hash {
         &self.state_hash
-    }
-}
-
-impl ProtobufConvert for Block {
-    type ProtoStruct = protobuf::Block;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut msg = Self::ProtoStruct::new();
-        msg.set_proposer_id(self.proposer_id.to_pb());
-        msg.set_height(self.height.to_pb());
-        msg.set_tx_count(self.tx_count.to_pb());
-        msg.set_prev_hash(self.prev_hash.to_pb());
-        msg.set_tx_hash(self.tx_hash.to_pb());
-        msg.set_state_hash(self.state_hash.to_pb());
-        msg
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(Self {
-            proposer_id: ProtobufConvert::from_pb(pb.get_proposer_id())?,
-            height: ProtobufConvert::from_pb(pb.get_height())?,
-            tx_count: ProtobufConvert::from_pb(pb.get_tx_count())?,
-            prev_hash: ProtobufConvert::from_pb(pb.take_prev_hash())?,
-            tx_hash: ProtobufConvert::from_pb(pb.take_tx_hash())?,
-            state_hash: ProtobufConvert::from_pb(pb.take_state_hash())?,
-        })
-    }
-}
-
-impl CryptoHash for Block {
-    fn hash(&self) -> Hash {
-        let v = self.to_pb().write_to_bytes().unwrap();
-        crypto::hash(&v)
-    }
-}
-
-impl StorageValue for Block {
-    fn into_bytes(self) -> Vec<u8> {
-        self.to_pb().write_to_bytes().unwrap()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        let mut block = protobuf::Block::new();
-        block.merge_from_bytes(value.as_ref()).unwrap();
-        ProtobufConvert::from_pb(block).unwrap()
     }
 }
 
