@@ -27,7 +27,7 @@ use storage::Snapshot;
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
 pub enum TimestampingTransactions {
     TimestampTx(TimestampTx),
 }
@@ -35,55 +35,6 @@ pub enum TimestampingTransactions {
 impl Transaction for TimestampTx {
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
         Ok(())
-    }
-}
-
-impl TransactionSet for TimestampingTransactions {
-    fn tx_from_raw(raw: RawTransaction) -> Result<Self, MessageError> {
-        let (id, vec) = raw.service_transaction().into_raw_parts();
-        match id {
-            0 => {
-                let mut ts_tx = TimestampTx::new();
-                ts_tx.merge_from_bytes(&vec).unwrap();
-                Ok(TimestampingTransactions::TimestampTx(ts_tx))
-            }
-            num => Err(MessageError::Basic(
-                format!(
-                    "Tag {} not found for enum {}.",
-                    num, "TimestampingTransactions"
-                ).into(),
-            )),
-        }
-    }
-}
-
-impl Into<ServiceTransaction> for TimestampingTransactions {
-    fn into(self) -> ServiceTransaction {
-        let (id, vec) = match self {
-            TimestampingTransactions::TimestampTx(ref tx) => (0, tx.write_to_bytes().unwrap()),
-        };
-        ServiceTransaction::from_raw_unchecked(id, vec)
-    }
-}
-
-impl Into<TimestampingTransactions> for TimestampTx {
-    fn into(self) -> TimestampingTransactions {
-        TimestampingTransactions::TimestampTx(self)
-    }
-}
-
-impl Into<ServiceTransaction> for TimestampTx {
-    fn into(self) -> ServiceTransaction {
-        let set: TimestampingTransactions = self.into();
-        set.into()
-    }
-}
-
-impl Into<Box<dyn Transaction>> for TimestampingTransactions {
-    fn into(self) -> Box<dyn Transaction> {
-        match self {
-            TimestampingTransactions::TimestampTx(tx) => Box::new(tx),
-        }
     }
 }
 
