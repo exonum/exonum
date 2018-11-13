@@ -131,8 +131,9 @@ impl SandboxInner {
                         let protocol =
                             Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
                                 .unwrap();
-                        self.handler
-                            .handle_event(InternalEvent::MessageVerified(protocol).into());
+                        self.handler.handle_event(
+                            InternalEvent::MessageVerified(Box::new(protocol)).into(),
+                        );
                     }
                 }
             }

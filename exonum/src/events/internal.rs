@@ -53,7 +53,7 @@ impl InternalPart {
         future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Message::deserialize))
             .map_err(drop)
             .and_then(|protocol| {
-                let event = future::ok(InternalEvent::MessageVerified(protocol));
+                let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
                 Self::send_event(event, internal_tx)
             })
     }
@@ -150,7 +150,7 @@ mod tests {
         let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
 
         let expected_event =
-            InternalEvent::MessageVerified(Message::deserialize(tx.clone()).unwrap());
+            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }

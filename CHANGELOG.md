@@ -26,6 +26,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Removed obsolete `enable_blockchain_explorer` option from `NodeApiConfig`. (#891)
 
+- Consensus messages and inner structs now serialized with protobuf. (#1028)
+
 - `tx_pool_capacity` parameter has been removed from `MemoryPoolConfig`. (#1036)
 
 #### exonum
