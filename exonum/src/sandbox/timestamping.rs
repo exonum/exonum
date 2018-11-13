@@ -24,13 +24,9 @@ use storage::Snapshot;
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
 
-transactions! {
-    pub TimestampingTransactions {
-
-        struct TimestampTx {
-            data: &[u8],
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum TimestampingTransactions {
+    TimestampTx(TimestampTx),
 }
 
 impl Transaction for TimestampTx {
