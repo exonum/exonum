@@ -468,11 +468,15 @@ impl Fork {
         } else {
             changes.data.clear();
         }
-        // Remove from storage
-        let mut iter = self
-            .snapshot
-            .iter(name, prefix.map_or(&[], |k| k.as_slice()));
+
+        // Remove keys from storage.
+        let prefix_as_slice = prefix.map_or(&[] as &[u8], |k| k.as_slice());
+        let mut iter = self.snapshot.iter(name, prefix_as_slice);
         while let Some((k, ..)) = iter.next() {
+            if !k.starts_with(prefix_as_slice) {
+                break;
+            }
+
             let change = changes.data.insert(k.to_vec(), Change::Delete);
             if self.logged {
                 self.changelog.push((name.to_string(), k.to_vec(), change));
