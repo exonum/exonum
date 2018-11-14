@@ -473,10 +473,10 @@ impl ProofPath {
         let bytes_len = ((bits_len + 7) / 8) as usize;
         let key = &self.raw_key()[0..bytes_len];
 
-        println!("Compress");
-        println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
-        println!("key: {:?}", key);
-        println!("raw: {:?}", self.bytes.as_ref());
+        // println!("Compress");
+        // println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
+        // println!("key: {:?}", key);
+        // println!("raw: {:?}", self.bytes.as_ref());
 
         let mut writer = Cursor::new(Vec::with_capacity(self.bytes.len()));
         leb128::write::unsigned(&mut writer, bits_len).unwrap();
@@ -498,8 +498,8 @@ impl ProofPath {
         let mut raw = [0u8; PROOF_PATH_SIZE];
         let bytes_len = reader.read(&mut raw[1..=KEY_SIZE]).unwrap();
 
-        println!("Decompress");
-        println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
+        // println!("Decompress");
+        // println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
 
         if bits_len == KEY_SIZE * 8 {
             raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
@@ -507,7 +507,7 @@ impl ProofPath {
             raw[PROOF_PATH_KIND_POS] = BRANCH_KEY_PREFIX;
             raw[PROOF_PATH_LEN_POS] = bits_len as u8;
         }
-        println!("raw: {:?}", raw.as_ref());
+        // println!("raw: {:?}", raw.as_ref());
         ProofPath::from_raw(raw)
     }
 }

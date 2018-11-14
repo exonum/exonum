@@ -20,7 +20,7 @@ use super::{
     super::{StorageKey, StorageValue},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
-use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE, HashStream};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -80,9 +80,20 @@ impl BranchNode {
     }
 }
 
+// impl CryptoHash for BranchNode {
+//     fn hash(&self) -> Hash {
+//         hash(&self.raw)
+//     }
+// }
+
 impl CryptoHash for BranchNode {
     fn hash(&self) -> Hash {
-        hash(&self.raw)
+        HashStream::new()
+            .update(self.child_hash(ChildKind::Left).as_ref())
+            .update(self.child_hash(ChildKind::Right).as_ref())
+            .update(self.child_path(ChildKind::Left).compress().as_ref())
+            .update(self.child_path(ChildKind::Right).compress().as_ref())
+            .hash()
     }
 }
 
