@@ -12,21 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf::Message as ProtobufMessage;
-
 use std::borrow::Cow;
 
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
-use crypto::{self, CryptoHash, Hash, PublicKey};
-use encoding::{
-    self,
-    protobuf::{self, ProtobufConvert},
-};
+use crypto::{CryptoHash, Hash, PublicKey};
+use encoding::protobuf;
 use helpers::{Height, Round};
-use messages::{BinaryForm, Connect, Message, Precommit, RawTransaction, Signed};
+use messages::{Connect, Message, Precommit, RawTransaction, Signed};
 use storage::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
-    Snapshot, StorageValue,
+    Snapshot,
 };
 
 /// Defines `&str` constants with given name and value.

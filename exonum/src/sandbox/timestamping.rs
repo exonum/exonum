@@ -20,8 +20,7 @@ use rand_xorshift::XorShiftRng;
 use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use encoding::Error as MessageError;
-use messages::{BinaryForm, Message, RawTransaction, ServiceTransaction, Signed};
-use protobuf::Message as PbMessage;
+use messages::{Message, RawTransaction, Signed};
 use storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
