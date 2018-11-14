@@ -17,6 +17,7 @@
 
 extern crate exonum;
 extern crate rand;
+extern crate rand_xorshift;
 extern crate tempdir;
 extern crate test;
 

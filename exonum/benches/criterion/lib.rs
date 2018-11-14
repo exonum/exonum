@@ -22,6 +22,7 @@ extern crate futures;
 extern crate log;
 extern crate num;
 extern crate rand;
+extern crate rand_xorshift;
 extern crate tempdir;
 extern crate tokio_core;
 extern crate tokio_threadpool;
