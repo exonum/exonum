@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{
-    self, distributions::Alphanumeric, seq::sample_iter, Rng, RngCore, SeedableRng,
-};
+use rand::{self, distributions::Alphanumeric, seq::IteratorRandom, Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use serde_json;
 
@@ -427,7 +425,7 @@ where
         (0..batch_size).collect()
     } else {
         let mut rng = XorShiftRng::from_seed(rand::random());
-        sample_iter(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS).unwrap()
+        (0..batch_size).choose_multiple(&mut rng, MAX_CHECKED_ELEMENTS)
     };
 
     for i in indexes {
@@ -464,13 +462,22 @@ fn check_multiproofs_for_data<K, V>(
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
         // Check the multiproof only for existing keys
-        let keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
+        let keys = data
+            .iter()
+            .map(|&(k, _)| k)
+            .choose_multiple(&mut rng, proof_size);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
 
         // Check the multiproof for the equal number of existing and non-existing keys
-        let mut keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
-        let non_keys = sample_iter(&mut rng, &nonexisting_keys, proof_size).unwrap();
+        let mut keys = data
+            .iter()
+            .map(|&(k, _)| k)
+            .choose_multiple(&mut rng, proof_size);
+        let non_keys = nonexisting_keys
+            .iter()
+            .cloned()
+            .choose_multiple(&mut rng, proof_size);
         keys.extend(non_keys);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
@@ -1054,11 +1061,10 @@ fn fuzz_delete_build_proofs(db: Box<dyn Database>) {
     }
 
     let (keys_to_remove, keys_to_remove_seq) = {
-        let mut keys = sample_iter(
-            &mut rng,
-            data.iter().map(|item| item.0.clone()),
-            SAMPLE_SIZE / 5,
-        ).unwrap();
+        let mut keys = data
+            .iter()
+            .map(|item| item.0.clone())
+            .choose_multiple(&mut rng, SAMPLE_SIZE / 5);
         rng.shuffle(&mut keys);
         let seq_keys = keys.split_off(SAMPLE_SIZE / 10);
         (keys, seq_keys)
