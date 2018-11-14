@@ -1162,30 +1162,24 @@ mod tests {
     use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
+    use encoding::protobuf::sandbox::TxAfterCommit;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::Snapshot;
 
     const SERVICE_ID: u16 = 1;
 
-    transactions! {
-        HandleCommitTransactions {
-
-            struct TxAfterCommit {
-                height: Height,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    enum HandleCommitTransactions {
+        TxAfterCommit(TxAfterCommit),
     }
 
     impl TxAfterCommit {
         pub fn new_with_height(height: Height) -> Signed<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            Message::sign_transaction(
-                TxAfterCommit::new(height),
-                SERVICE_ID,
-                keypair.0,
-                &keypair.1,
-            )
+            let mut payload_tx = TxAfterCommit::new();
+            payload_tx.set_height(height.0);
+            Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
         }
     }
 

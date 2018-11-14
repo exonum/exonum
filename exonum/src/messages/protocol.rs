@@ -29,17 +29,13 @@
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 use failure;
-use protobuf::Message as ProtobufMessage;
 
 use std::{borrow::Cow, fmt::Debug, mem};
 
 use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use encoding::{
-    self,
-    protobuf::{self, ProtobufConvert},
-};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use encoding::protobuf;
 use helpers::{Height, Round, ValidatorId};
 use storage::{proof_list_index as merkle, StorageValue};
 
