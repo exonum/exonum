@@ -65,6 +65,7 @@ extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate failure;
 extern crate futures;
 extern crate hex;
+extern crate leb128;
 #[macro_use]
 extern crate log;
 extern crate os_info;

@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use leb128;
+
 use std::cmp::{min, Ordering};
+use std::io::{Cursor, Read, Write};
 use std::ops;
 
 use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
@@ -29,6 +32,8 @@ pub const KEY_SIZE: usize = HASH_SIZE;
 pub const PROOF_PATH_SIZE: usize = KEY_SIZE + 2;
 /// Position of the byte with kind of the `ProofPath`.
 pub const PROOF_PATH_KIND_POS: usize = 0;
+/// Position of the beginning of the key.
+pub const PROOF_PATH_KEY_POS: usize = 1;
 /// Position of the byte with total length of the branch.
 pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
 
@@ -462,6 +467,51 @@ impl PartialOrd for ProofPath {
     }
 }
 
+impl ProofPath {
+    pub(crate) fn compress(&self) -> Vec<u8> {
+        let bits_len = self.end() as u64;
+        let bytes_len = ((bits_len + 7) / 8) as usize;
+        let key = &self.raw_key()[0..bytes_len];
+
+        println!("Compress");
+        println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
+        println!("key: {:?}", key);
+        println!("raw: {:?}", self.bytes.as_ref());
+
+        let mut writer = Cursor::new(Vec::with_capacity(self.bytes.len()));
+        leb128::write::unsigned(&mut writer, bits_len).unwrap();
+        writer.write(&key).unwrap();
+        let mut buf = writer.into_inner();
+        // Cuts of the bits that lie to the right of the end.
+        let last_bits_len = bits_len % 8;
+        if bytes_len > 0 && last_bits_len != 0 {
+            // *buf.last_mut().unwrap() &= !(255_u8 << (self.end() % 8));
+        }
+        buf
+    }
+
+    pub(crate) fn decompress(value: &[u8]) -> Self {
+        let mut reader = Cursor::new(value);
+        let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
+        debug_assert!(bits_len <= KEY_SIZE * 8);
+
+        let mut raw = [0u8; PROOF_PATH_SIZE];
+        let bytes_len = reader.read(&mut raw[1..=KEY_SIZE]).unwrap();
+
+        println!("Decompress");
+        println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
+
+        if bits_len == KEY_SIZE * 8 {
+            raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
+        } else {
+            raw[PROOF_PATH_KIND_POS] = BRANCH_KEY_PREFIX;
+            raw[PROOF_PATH_LEN_POS] = bits_len as u8;
+        }
+        println!("raw: {:?}", raw.as_ref());
+        ProofPath::from_raw(raw)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rand::{self, Rng};
@@ -508,6 +558,17 @@ mod tests {
             } else {
                 panic!("Incorrect ProofPath serialization, string expected");
             }
+        }
+    }
+
+    #[test]
+    fn test_fuzz_proof_path_compress() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let key = random_path(&mut rng);
+            let buf = key.compress();
+            let key2 = ProofPath::decompress(&buf);
+            assert_eq!(key2, key);
         }
     }
 
@@ -601,6 +662,26 @@ fn test_proof_path_storage_key_branch() {
     assert_eq!(buf[33], 11);
     assert_eq!(&buf[1..3], &[255, 7]);
     assert_eq!(&buf[3..33], &[0; 30]);
+    assert_eq!(key2, key);
+}
+
+#[test]
+fn test_proof_path_compress_leaf() {
+    let key = ProofPath::new(&[250; 32]);
+    let buf = key.compress();
+    let key2 = ProofPath::decompress(&buf);
+    assert_eq!(key2, key);
+}
+
+#[test]
+fn test_proof_path_compress_branch() {
+    let mut key = ProofPath::new(&[255_u8; 32]);
+    key = key.prefix(11);
+    key = key.suffix(5);
+
+    let buf = key.compress();
+    let mut key2 = ProofPath::decompress(&buf);
+    key2.start = 5;
     assert_eq!(key2, key);
 }
 
