@@ -9,15 +9,37 @@ extern crate quote;
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use syn::{Data, DeriveInput};
+use syn::{Data, DeriveInput, Lit, Meta, NestedMeta, Path};
 
 use std::env;
 
-#[proc_macro_derive(ProtobufConvert)]
+#[proc_macro_derive(ProtobufConvert, attributes(protobuf_convert))]
 pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let name = input.ident;
+    let proto_struct_name = {
+        input
+            .attrs
+            .iter()
+            .find_map(|attr| {
+                let meta = attr.parse_meta().ok()?;
+                if meta.name() != "protobuf_convert" {
+                    return None;
+                }
+                let list = match meta {
+                    Meta::List(x) => x,
+                    _ => panic!("protobuf_convert attribute expects one argument"),
+                };
+                let name: Path = match list.nested.iter().next().expect("h") {
+                    NestedMeta::Literal(Lit::Str(lit_str)) => lit_str
+                        .parse()
+                        .expect("protobuf_convert argument should be valid type path"),
+                    _ => panic!("protobuf_convert argument should be string"),
+                };
+                Some(name)
+            }).expect("protobuf_convert attribute not set")
+    };
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
     let data = match input.data {
         Data::Struct(x) => x,
@@ -78,7 +100,7 @@ pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
             use crypto::{self, CryptoHash, Hash};
 
             impl ProtobufConvert for #name {
-                type ProtoStruct = protobuf::#name;
+                type ProtoStruct = #proto_struct_name;
 
                 #to_pb_fn
 
