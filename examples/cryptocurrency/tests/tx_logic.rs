@@ -202,7 +202,7 @@ fn test_transfers_in_single_block() {
 /// [fuzz]: https://en.wikipedia.org/wiki/Fuzzing
 #[test]
 fn test_fuzz_transfers() {
-    use rand::{Rng, seq::SliceRandom};
+    use rand::{seq::SliceRandom, Rng};
     use std::collections::BTreeSet;
     use std::iter::FromIterator;
 
@@ -225,7 +225,10 @@ fn test_fuzz_transfers() {
 
         let txs: Vec<Signed<RawTransaction>> = (0..n_txs)
             .map(|_| {
-                let (sender, receiver) = (keys.choose(&mut rng).unwrap(), keys.choose(&mut rng).unwrap());
+                let (sender, receiver) = (
+                    keys.choose(&mut rng).unwrap(),
+                    keys.choose(&mut rng).unwrap(),
+                );
                 let amount = rng.gen_range(0, 250);
                 TxTransfer::sign(&receiver.0, amount, rng.gen::<u64>(), &sender.0, &sender.1)
             }).collect();
