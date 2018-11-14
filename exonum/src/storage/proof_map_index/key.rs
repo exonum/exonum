@@ -467,25 +467,49 @@ impl PartialOrd for ProofPath {
     }
 }
 
+pub(crate) struct CompressedProofPath {
+    raw: [u8; PROOF_PATH_SIZE],
+    len: usize,
+}
+
+impl std::default::Default for CompressedProofPath {
+    fn default() -> Self {
+        CompressedProofPath {
+            raw: [0u8; PROOF_PATH_SIZE],
+            len: 0,
+        }
+    }
+}
+
+impl AsRef<[u8]> for CompressedProofPath {
+    fn as_ref(&self) -> &[u8] {
+        &self.raw[0..self.len]
+    }
+}
+
+impl AsMut<[u8]> for CompressedProofPath {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.raw[0..self.len]
+    }
+}
+
 impl ProofPath {
-    pub(crate) fn compress(&self) -> Vec<u8> {
+    pub(crate) fn compress(&self) -> CompressedProofPath {
         let bits_len = self.end() as u64;
         let bytes_len = ((bits_len + 7) / 8) as usize;
         let key = &self.raw_key()[0..bytes_len];
 
-        // println!("Compress");
-        // println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
-        // println!("key: {:?}", key);
-        // println!("raw: {:?}", self.bytes.as_ref());
-
-        let mut writer = Cursor::new(Vec::with_capacity(self.bytes.len()));
-        leb128::write::unsigned(&mut writer, bits_len).unwrap();
-        writer.write(&key).unwrap();
-        let mut buf = writer.into_inner();
+        let mut buf = CompressedProofPath::default();
+        let bytes_written = {
+            let mut writer = Cursor::new(buf.raw.as_mut());
+            let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
+            bytes_written + writer.write(&key).unwrap()
+        };
+        buf.len = bytes_written;
         // Cuts of the bits that lie to the right of the end.
         let last_bits_len = bits_len % 8;
         if bytes_len > 0 && last_bits_len != 0 {
-            // *buf.last_mut().unwrap() &= !(255_u8 << (self.end() % 8));
+            *buf.as_mut().last_mut().unwrap() &= !(255_u8 << (self.end() % 8));
         }
         buf
     }
@@ -498,16 +522,12 @@ impl ProofPath {
         let mut raw = [0u8; PROOF_PATH_SIZE];
         let bytes_len = reader.read(&mut raw[1..=KEY_SIZE]).unwrap();
 
-        // println!("Decompress");
-        // println!("bits_len {}, bytes_len {}", bits_len, bytes_len);
-
         if bits_len == KEY_SIZE * 8 {
             raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
         } else {
             raw[PROOF_PATH_KIND_POS] = BRANCH_KEY_PREFIX;
             raw[PROOF_PATH_LEN_POS] = bits_len as u8;
         }
-        // println!("raw: {:?}", raw.as_ref());
         ProofPath::from_raw(raw)
     }
 }
@@ -567,7 +587,7 @@ mod tests {
         for _ in 0..1000 {
             let key = random_path(&mut rng);
             let buf = key.compress();
-            let key2 = ProofPath::decompress(&buf);
+            let key2 = ProofPath::decompress(buf.as_ref());
             assert_eq!(key2, key);
         }
     }
@@ -669,7 +689,7 @@ fn test_proof_path_storage_key_branch() {
 fn test_proof_path_compress_leaf() {
     let key = ProofPath::new(&[250; 32]);
     let buf = key.compress();
-    let key2 = ProofPath::decompress(&buf);
+    let key2 = ProofPath::decompress(buf.as_ref());
     assert_eq!(key2, key);
 }
 
@@ -680,7 +700,7 @@ fn test_proof_path_compress_branch() {
     key = key.suffix(5);
 
     let buf = key.compress();
-    let mut key2 = ProofPath::decompress(&buf);
+    let mut key2 = ProofPath::decompress(buf.as_ref());
     key2.start = 5;
     assert_eq!(key2, key);
 }
