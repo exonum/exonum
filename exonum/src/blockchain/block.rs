@@ -28,6 +28,7 @@ use messages::{Precommit, Signed};
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[protobuf_convert("protobuf::Block")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
     proposer_id: ValidatorId,
