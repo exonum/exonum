@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use rand::{
-    self, distributions::Alphanumeric, seq::sample_iter, Rng, RngCore, SeedableRng, XorShiftRng,
+    self, distributions::Alphanumeric, seq::sample_iter, Rng, RngCore, SeedableRng,
 };
+use rand_xorshift::XorShiftRng;
 use serde_json;
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};

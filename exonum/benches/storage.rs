@@ -26,7 +26,8 @@ mod tests {
         proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, MemoryDB,
         ProofMapIndex, RocksDB,
     };
-    use rand::{Rng, RngCore, SeedableRng, XorShiftRng};
+    use rand::{Rng, RngCore, SeedableRng};
+    use rand_xorshift::XorShiftRng;
     use tempdir::TempDir;
     use test::Bencher;
 

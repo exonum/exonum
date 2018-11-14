@@ -47,7 +47,8 @@ use exonum::{
     storage::{Database, DbOptions, Patch, RocksDB},
 };
 use futures::sync::mpsc;
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
 use tempdir::TempDir;
 
 use std::iter;
