@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use leb128;
+use smallvec::SmallVec;
 
 use std::cmp::{min, Ordering};
 use std::io::{Cursor, Read, Write};
@@ -467,45 +468,19 @@ impl PartialOrd for ProofPath {
     }
 }
 
-pub(crate) struct CompressedProofPath {
-    raw: [u8; PROOF_PATH_SIZE],
-    len: usize,
-}
-
-impl std::default::Default for CompressedProofPath {
-    fn default() -> Self {
-        CompressedProofPath {
-            raw: [0u8; PROOF_PATH_SIZE],
-            len: 0,
-        }
-    }
-}
-
-impl AsRef<[u8]> for CompressedProofPath {
-    fn as_ref(&self) -> &[u8] {
-        &self.raw[0..self.len]
-    }
-}
-
-impl AsMut<[u8]> for CompressedProofPath {
-    fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.raw[0..self.len]
-    }
-}
-
 impl ProofPath {
-    pub(crate) fn compress(&self) -> CompressedProofPath {
+    pub(crate) fn compress(&self) -> SmallVec<[u8; 64]> {
         let bits_len = self.end() as u64;
         let bytes_len = ((bits_len + 7) / 8) as usize;
         let key = &self.raw_key()[0..bytes_len];
 
-        let mut buf = CompressedProofPath::default();
+        let mut buf = smallvec![0u8; 64];
         let bytes_written = {
-            let mut writer = Cursor::new(buf.raw.as_mut());
+            let mut writer = Cursor::new(buf.as_mut());
             let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
             bytes_written + writer.write(&key).unwrap()
         };
-        buf.len = bytes_written;
+        buf.resize(bytes_written, 0);
         // Cuts of the bits that lie to the right of the end.
         let last_bits_len = bits_len % 8;
         if bytes_len > 0 && last_bits_len != 0 {
@@ -520,8 +495,6 @@ impl ProofPath {
         debug_assert!(bits_len <= KEY_SIZE * 8);
 
         let mut raw = [0u8; PROOF_PATH_SIZE];
-        let bytes_len = reader.read(&mut raw[1..=KEY_SIZE]).unwrap();
-
         if bits_len == KEY_SIZE * 8 {
             raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
         } else {
@@ -582,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fuzz_proof_path_compress() {
+    fn test_proof_path_compress_fuzz() {
         let mut rng = rand::thread_rng();
         for _ in 0..1000 {
             let key = random_path(&mut rng);
