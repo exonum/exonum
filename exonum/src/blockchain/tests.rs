@@ -15,7 +15,7 @@
 #![allow(dead_code, unsafe_code)]
 
 use chrono::{DateTime, TimeZone, Utc};
-use rand::{distributions::Alphanumeric, thread_rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json;
 
 use blockchain::{
