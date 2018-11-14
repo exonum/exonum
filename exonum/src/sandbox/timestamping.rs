@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use encoding::protobuf::tests::TimestampTx;
+
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
