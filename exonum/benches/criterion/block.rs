@@ -216,7 +216,7 @@ mod cryptocurrency {
         messages::{Message, RawTransaction, Signed},
         storage::{MapIndex, ProofMapIndex, Snapshot},
     };
-    use rand::{seq::sample_slice_ref, Rng};
+    use rand::{seq::SliceRandom, Rng};
 
     const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 
@@ -378,10 +378,12 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => Tx::sign(from, to, i, from_sk).into(),
-            _ => unreachable!(),
-        })
+        (0..).map(
+            move |i| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
+                [(ref from, ref from_sk), (ref to, ..)] => Tx::sign(from, to, i, from_sk).into(),
+                _ => unreachable!(),
+            },
+        )
     }
 
     pub fn unprovable_transactions(
@@ -391,10 +393,12 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::sign(from, to, i, from_sk),
-            _ => unreachable!(),
-        })
+        (0..).map(
+            move |i| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
+                [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::sign(from, to, i, from_sk),
+                _ => unreachable!(),
+            },
+        )
     }
 
     pub fn rollback_transactions(
@@ -404,10 +408,12 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::sign(from, to, i, from_sk),
-            _ => unreachable!(),
-        })
+        (0..).map(
+            move |i| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
+                [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::sign(from, to, i, from_sk),
+                _ => unreachable!(),
+            },
+        )
     }
 }
 
