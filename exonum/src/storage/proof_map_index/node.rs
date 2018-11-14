@@ -20,7 +20,7 @@ use super::{
     super::{StorageKey, StorageValue},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
-use crypto::{CryptoHash, Hash, HASH_SIZE, HashStream};
+use crypto::{CryptoHash, Hash, HashStream, HASH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -30,7 +30,7 @@ pub enum Node<T: StorageValue> {
     Branch(BranchNode),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct BranchNode {
     raw: Vec<u8>,
 }
@@ -115,20 +115,46 @@ impl ::std::fmt::Debug for BranchNode {
     }
 }
 
-#[test]
-fn test_branch_node() {
-    let mut branch = BranchNode::empty();
+#[cfg(test)]
+mod tests {
+    use crypto;
 
-    let lh = hash(&[1, 2]);
-    let rh = hash(&[3, 4]);
-    let ls = ProofPath::new(&[253; 32]);
-    let rs = ProofPath::new(&[244; 32]);
+    use super::*;
+    use storage::proof_map_index::key::BitsRange;
 
-    branch.set_child(ChildKind::Left, &ls, &lh);
-    branch.set_child(ChildKind::Right, &rs, &rh);
+    #[test]
+    fn test_branch_node_layout() {
+        let mut branch = BranchNode::empty();
 
-    assert_eq!(branch.child_hash(ChildKind::Left), lh);
-    assert_eq!(branch.child_hash(ChildKind::Right), rh);
-    assert_eq!(branch.child_path(ChildKind::Left), ls);
-    assert_eq!(branch.child_path(ChildKind::Right), rs);
+        let lh = crypto::hash(&[1, 2]);
+        let rh = crypto::hash(&[3, 4]);
+        let ls = ProofPath::new(&[253; 32]);
+        let rs = ProofPath::new(&[244; 32]);
+
+        branch.set_child(ChildKind::Left, &ls, &lh);
+        branch.set_child(ChildKind::Right, &rs, &rh);
+
+        assert_eq!(branch.child_hash(ChildKind::Left), lh);
+        assert_eq!(branch.child_hash(ChildKind::Right), rh);
+        assert_eq!(branch.child_path(ChildKind::Left), ls);
+        assert_eq!(branch.child_path(ChildKind::Right), rs);
+    }
+
+    #[test]
+    fn test_branch_node_storage_value() {
+        let mut branch = BranchNode::empty();
+
+        let lh = crypto::hash(&[1, 2]);
+        let rh = crypto::hash(&[3, 4]);
+        let ls = ProofPath::new(&[253; 32]).suffix(9).prefix(15);
+        let rs = ProofPath::new(&[244; 32]);
+
+        branch.set_child(ChildKind::Left, &ls, &lh);
+        branch.set_child(ChildKind::Right, &rs, &rh);
+
+        let buf = branch.clone().into_bytes();
+        let branch2 = BranchNode::from_bytes(buf.into());
+        assert_eq!(branch, branch2);
+        assert_eq!(branch.hash(), branch2.hash());
+    }
 }

@@ -495,6 +495,9 @@ impl ProofPath {
         debug_assert!(bits_len <= KEY_SIZE * 8);
 
         let mut raw = [0u8; PROOF_PATH_SIZE];
+        reader
+            .read(&mut raw[PROOF_PATH_KEY_POS..=KEY_SIZE])
+            .unwrap();
         if bits_len == KEY_SIZE * 8 {
             raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
         } else {
