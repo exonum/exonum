@@ -22,6 +22,7 @@ use blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crypto::{gen_keypair, Hash};
+use encoding::protobuf::tests::TestServiceTx;
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
 use messages::{Message, RawTransaction};
@@ -50,22 +51,31 @@ impl Service for TestService {
     }
 }
 
-transactions! {
-    TestServiceTxs {
-        struct Tx {
-            value: u64,
-        }
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[protobuf_convert("TestServiceTx")]
+struct Tx {
+    value: u64,
+}
+
+impl Tx {
+    fn new(value: u64) -> Self {
+        Self { value }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, TransactionSet, Debug)]
+enum TestServiceTxs {
+    Tx(Tx),
 }
 
 impl Transaction for Tx {
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        if self.value() == 42 {
+        if self.value == 42 {
             panic!(Error::new("42"))
         }
         let mut index = ListIndex::new(IDX_NAME, tc.fork());
-        index.push(self.value());
-        index.push(42 / self.value());
+        index.push(self.value);
+        index.push(42 / self.value);
         Ok(())
     }
 }
@@ -253,21 +263,47 @@ mod transactions_tests {
     use messages::Message;
     use serde_json;
 
-    transactions! {
-        MyTransactions {
-            struct A {
-                a: u32
-            }
+    use encoding::protobuf::tests::{BlockchainTestTxA, BlockchainTestTxB, BlockchainTestTxC};
 
-            struct B {
-                b: u32,
-                c: u8
-            }
-
-            struct C {
-                a: u32
-            }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("BlockchainTestTxA")]
+    struct A {
+        a: u64,
+    }
+    impl A {
+        fn new(a: u64) -> Self {
+            Self { a }
         }
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("BlockchainTestTxB")]
+    struct B {
+        b: u64,
+        c: u32,
+    }
+    impl B {
+        fn new(b: u64, c: u32) -> Self {
+            Self { b, c }
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("BlockchainTestTxC")]
+    struct C {
+        a: u64,
+    }
+    impl C {
+        fn new(a: u64) -> Self {
+            Self { a }
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    enum MyTransactions {
+        A(A),
+        B(B),
+        C(C),
     }
 
     impl Transaction for A {

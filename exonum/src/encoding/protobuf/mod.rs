@@ -25,7 +25,7 @@ pub use self::protocol::{
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
-pub mod sandbox;
+pub mod tests;
 
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};

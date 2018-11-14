@@ -92,6 +92,8 @@ pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
         mod #mod_name {
             use super::*;
 
+            use std::borrow::Cow;
+
             use #cr::messages::BinaryForm;
             use #cr::encoding::protobuf::ProtobufConvert;
             use #cr::storage::StorageValue;

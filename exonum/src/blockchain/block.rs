@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
-
 use crypto::Hash;
 use encoding::protobuf;
 use helpers::{Height, ValidatorId};

@@ -1162,7 +1162,7 @@ mod tests {
     use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
     use encoding;
-    use encoding::protobuf::sandbox::TxAfterCommit;
+    use encoding::protobuf::tests::TxAfterCommit;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::Snapshot;

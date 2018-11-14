@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use encoding::protobuf::sandbox::TxConfig;
+pub use encoding::protobuf::tests::TxConfig;
 
 use blockchain::{
     ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
