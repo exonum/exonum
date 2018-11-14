@@ -18,7 +18,7 @@ use actix::*;
 use actix_web::ws;
 use serde_json;
 
-use rand::{self, Rng, ThreadRng};
+use rand::{self, Rng, rngs::ThreadRng};
 
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
