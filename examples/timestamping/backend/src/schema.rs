@@ -14,34 +14,56 @@
 
 //! Timestamping database schema.
 
+use super::proto;
 use chrono::{DateTime, Utc};
 use exonum::{
     crypto::Hash,
     storage::{Fork, ProofMapIndex, Snapshot},
 };
 
-encoding_struct! {
-    /// Stores content's hash and some metadata about it.
-    struct Timestamp {
-        /// Hash of the content.
-        content_hash: &Hash,
+/// Stores content's hash and some metadata about it.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
+#[protobuf_convert("proto::Timestamp")]
+pub struct Timestamp {
+    /// Hash of the content.
+    pub content_hash: Hash,
 
-        /// Additional metadata.
-        metadata: &str,
+    /// Additional metadata.
+    pub metadata: String,
+}
+
+impl Timestamp {
+    /// Create new Timestamp.
+    pub fn new(content_hash: &Hash, metadata: &str) -> Self {
+        Self {
+            content_hash: *content_hash,
+            metadata: metadata.to_owned(),
+        }
     }
 }
 
-encoding_struct! {
-    /// Timestamp entry.
-    struct TimestampEntry {
-        /// Timestamp data.
-        timestamp: Timestamp,
+/// Timestamp entry.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[protobuf_convert("proto::TimestampEntry")]
+pub struct TimestampEntry {
+    /// Timestamp data.
+    pub timestamp: Timestamp,
 
-        /// Hash of transaction.
-        tx_hash: &Hash,
+    /// Hash of transaction.
+    pub tx_hash: Hash,
 
-        /// Timestamp time.
-        time: DateTime<Utc>,
+    /// Timestamp time.
+    pub time: DateTime<Utc>,
+}
+
+impl TimestampEntry {
+    /// New TimestampEntry.
+    pub fn new(timestamp: Timestamp, tx_hash: &Hash, time: DateTime<Utc>) -> Self {
+        Self {
+            timestamp,
+            tx_hash: *tx_hash,
+            time,
+        }
     }
 }
 
@@ -81,8 +103,8 @@ impl<'a> Schema<&'a mut Fork> {
 
     /// Adds the timestamp entry to the database.
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
-        let timestamp = timestamp_entry.timestamp();
-        let content_hash = timestamp.content_hash();
+        let timestamp = timestamp_entry.timestamp.clone();
+        let content_hash = &timestamp.content_hash;
 
         // Check that timestamp with given content_hash does not exist.
         if self.timestamps().contains(content_hash) {
