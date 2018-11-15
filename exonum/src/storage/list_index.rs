@@ -589,6 +589,10 @@ mod tests {
         );
     }
 
+    // Parameters for the `list_index_clear_in_family` test.
+    const FAMILY_CLEAR_PARAMS: &[(u32, u32, bool)] =
+        &[(0, 5, false), (5, 0, false), (1, 7, true), (7, 1, true)];
+
     mod memorydb_tests {
         use std::path::Path;
         use storage::{Database, ListIndex, MemoryDB};
@@ -642,14 +646,7 @@ mod tests {
 
         #[test]
         fn list_index_clear_in_family() {
-            const PARAMS: &[(u32, u32, bool)] = &[
-                (0_u32, 5_u32, false),
-                (5_u32, 0_u32, false),
-                (1_u32, 7_u32, true),
-                (7_u32, 1_u32, true),
-            ] as &[(u32, u32, bool)];
-
-            for &(x, y, merge_before_clear) in PARAMS {
+            for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
                 let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
                 let path = dir.path();
                 let db = create_database(path);
@@ -712,14 +709,7 @@ mod tests {
 
         #[test]
         fn list_index_clear_in_family() {
-            const PARAMS: &[(u32, u32, bool)] = &[
-                (0_u32, 5_u32, false),
-                (5_u32, 0_u32, false),
-                (1_u32, 7_u32, true),
-                (7_u32, 1_u32, true),
-            ] as &[(u32, u32, bool)];
-
-            for &(x, y, merge_before_clear) in PARAMS {
+            for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
                 let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
                 let path = dir.path();
                 let db = create_database(path);
