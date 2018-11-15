@@ -55,9 +55,9 @@ fn test_create_wallet() {
 
     // Check that the user indeed is persisted by the service.
     let wallet = api.get_wallet(tx.author()).unwrap();
-    assert_eq!(wallet.pub_key(), &tx.author());
-    assert_eq!(wallet.name(), ALICE_NAME);
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.pub_key, tx.author());
+    assert_eq!(wallet.name, ALICE_NAME);
+    assert_eq!(wallet.balance, 100);
 }
 
 /// Check that the transfer transaction works as intended.
@@ -73,9 +73,9 @@ fn test_transfer() {
 
     // Check that the initial Alice's and Bob's balances persisted by the service.
     let wallet = api.get_wallet(tx_alice.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 
     // Transfer funds by invoking the corresponding API method.
     let tx = Transfer::sign(
@@ -92,9 +92,9 @@ fn test_transfer() {
     // After the transfer transaction is included into a block, we may check new wallet
     // balances.
     let wallet = api.get_wallet(tx_alice.author()).unwrap();
-    assert_eq!(wallet.balance(), 90);
+    assert_eq!(wallet.balance, 90);
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
-    assert_eq!(wallet.balance(), 110);
+    assert_eq!(wallet.balance, 110);
 }
 
 /// Check that a transfer from a non-existing wallet fails as expected.
@@ -110,7 +110,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
     api.assert_no_wallet(tx_alice.author());
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 
     let tx = Transfer::sign(
         &tx_alice.author(),
@@ -128,7 +128,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
     // Check that Bob's balance doesn't change.
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 }
 
 /// Check that a transfer to a non-existing wallet fails as expected.
@@ -143,7 +143,7 @@ fn test_transfer_to_nonexisting_wallet() {
     testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
 
     let wallet = api.get_wallet(tx_alice.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
     api.assert_no_wallet(tx_bob.author());
 
     let tx = Transfer::sign(
@@ -162,7 +162,7 @@ fn test_transfer_to_nonexisting_wallet() {
 
     // Check that Alice's balance doesn't change.
     let wallet = api.get_wallet(tx_alice.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 }
 
 /// Check that an overcharge does not lead to changes in sender's and receiver's balances.
@@ -190,9 +190,9 @@ fn test_transfer_overcharge() {
     );
 
     let wallet = api.get_wallet(tx_alice.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 }
 
 #[test]
