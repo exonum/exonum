@@ -417,7 +417,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///         "message": //...
 /// #                    message,
 ///     },
-///     "location": { "block_height": "1", "position_in_block": "0" },
+///     "location": { "block_height": 1, "position_in_block": 0 },
 ///     "location_proof": // ...
 /// #                     { "val": Hash::zero() },
 ///     "status": { "type": "success" }

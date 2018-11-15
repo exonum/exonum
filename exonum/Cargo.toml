@@ -17,7 +17,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "=0.7.5"
+actix = "=0.7.6"
 actix-net = "=0.1.1"
 actix-web = "=0.7.13"
 atty = "=0.2.11"
@@ -26,7 +26,7 @@ byteorder = "1.2.3"
 bytes = "=0.4.10"
 chrono = { version = "=0.4.6", features = ["serde"] }
 clap = "2.31.2"
-env_logger = "=0.5.13"
+env_logger = "=0.6.0"
 erased-serde = "0.3"
 failure = "0.1.2"
 futures = "=0.1.25"
@@ -34,7 +34,10 @@ hex = "=0.3.2"
 leb128 = "=0.2.3"
 log = "=0.4.6"
 os_info = "1.0.1"
-rand = "=0.5.5"
+protobuf = "=2.1.4"
+rand = "=0.6.0"
+rand_xorshift = "=0.1.0"
+ring = "=0.13.2"
 rust_decimal = "=0.10.2"
 serde = "1.0.10"
 serde_derive = "1.0.64"
@@ -77,3 +80,7 @@ float_serialize = []
 long_benchmarks = []
 metrics-log = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
+
+[build-dependencies]
+protoc-rust = "=2.1.4"
+walkdir = "2.2.7"

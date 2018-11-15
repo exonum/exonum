@@ -12,6 +12,7 @@ addons:
   apt:
     sources:
     - sourceline: 'ppa:giskou/librocksdb'
+    - sourceline: 'ppa:maarten-fonville/protobuf'
     packages:
     - gcc
     - g++
@@ -28,6 +29,8 @@ addons:
     - build-essential
     - pkg-config
     - unzip
+    - protobuf-compiler
+    - libprotobuf-dev
 
 rust:
   - 1.30.0
@@ -84,9 +87,11 @@ jobs:
     - ./node_modules/.bin/cspell --version
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cargo fmt --all -- --check
     - npm run cspell
     - npm run md
+    # Force build.rs execution.
+    - cargo check -p exonum
+    - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
@@ -119,6 +124,7 @@ jobs:
         - sourceline: 'ppa:giskou/librocksdb'
         - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
           key_url: https://packages.microsoft.com/keys/microsoft.asc
+        - sourceline: 'ppa:maarten-fonville/protobuf'
         packages:
         - gcc
         - g++
@@ -135,6 +141,8 @@ jobs:
         - zlib1g-dev
         - build-essential
         - pkg-config
+        - protobuf-compiler
+        - libprotobuf-dev
 
     install:
     - nvm install 8 && nvm use 8

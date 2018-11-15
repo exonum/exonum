@@ -70,12 +70,14 @@ extern crate leb128;
 extern crate log;
 extern crate os_info;
 extern crate rand;
+extern crate rand_xorshift;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate protobuf;
 #[macro_use]
 extern crate smallvec;
 extern crate snow;
