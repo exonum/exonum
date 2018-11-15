@@ -449,7 +449,7 @@ impl Fork {
 
     /// Removes all keys starting with the specified prefix from the column family
     /// with the given `name`.
-    pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
+    pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&[u8]>) {
         let changes = self
             .patch
             .changes_entry(name.to_string())
@@ -458,7 +458,7 @@ impl Fork {
         if let Some(prefix) = prefix {
             let keys = changes
                 .data
-                .range::<Vec<u8>, _>((Included(prefix), Unbounded))
+                .range::<[u8], _>((Included(prefix), Unbounded))
                 .map(|(k, _)| k.to_vec())
                 .take_while(|k| k.starts_with(prefix))
                 .collect::<Vec<_>>();
@@ -470,10 +470,10 @@ impl Fork {
         }
 
         // Remove keys from storage.
-        let prefix_as_slice = prefix.map_or(&[] as &[u8], |k| k.as_slice());
-        let mut iter = self.snapshot.iter(name, prefix_as_slice);
+        let prefix_or_empty_slice = prefix.unwrap_or_default();
+        let mut iter = self.snapshot.iter(name, prefix_or_empty_slice);
         while let Some((k, ..)) = iter.next() {
-            if !k.starts_with(prefix_as_slice) {
+            if !k.starts_with(prefix_or_empty_slice) {
                 break;
             }
 
