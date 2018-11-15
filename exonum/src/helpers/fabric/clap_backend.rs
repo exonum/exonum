@@ -95,7 +95,9 @@ impl ClapBackend {
                         if let Some(short) = detail.short_name {
                             clap_arg = clap_arg.short(short);
                         }
-                        clap_arg.multiple(detail.multiple).takes_value(true)
+                        clap_arg
+                            .multiple(detail.multiple)
+                            .takes_value(arg.takes_value)
                     }
                 };
                 clap_arg.help(arg.help).required(arg.required)
