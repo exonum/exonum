@@ -27,6 +27,7 @@ use exonum::{
 };
 use exonum_time::schema::TimeSchema;
 
+use super::proto;
 use schema::{Schema, Timestamp, TimestampEntry};
 use TIMESTAMPING_SERVICE;
 
@@ -46,16 +47,26 @@ impl From<Error> for ExecutionError {
     }
 }
 
-transactions! {
-    /// Transaction group.
-    pub TimeTransactions {
+/// Timestamping transaction.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[protobuf_convert("proto::TxTimestamp")]
+pub struct TxTimestamp {
+    /// Timestamp content.
+    pub content: Timestamp,
+}
 
-        /// A timestamp transaction.
-        struct TxTimestamp {
-            /// Timestamp content.
-            content: Timestamp,
-        }
+impl TxTimestamp {
+    /// New TxTimestamp.
+    pub fn new(content: Timestamp) -> Self {
+        Self { content }
     }
+}
+
+/// Transaction group.
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum TimeTransactions {
+    /// A timestamp transaction.
+    TxTimestamp(TxTimestamp),
 }
 
 impl TxTimestamp {
@@ -78,8 +89,7 @@ impl Transaction for TxTimestamp {
             .get()
             .expect("Can't get the time");
 
-        let content = self.content();
-        let hash = content.content_hash();
+        let hash = &self.content.content_hash;
 
         let mut schema = Schema::new(context.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
@@ -87,7 +97,7 @@ impl Transaction for TxTimestamp {
         }
 
         trace!("Timestamp added: {:?}", self);
-        let entry = TimestampEntry::new(self.content(), &tx_hash, time);
+        let entry = TimestampEntry::new(self.content.clone(), &tx_hash, time);
         schema.add_timestamp(entry);
         Ok(())
     }

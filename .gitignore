@@ -26,3 +26,4 @@ npm-debug.log
 
 # protobuf generated
 exonum/src/encoding/protobuf/*.rs
+examples/timestamping/backend/src/proto/*.rs

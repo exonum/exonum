@@ -24,9 +24,11 @@
 )]
 
 extern crate chrono;
-#[macro_use]
 extern crate exonum;
 extern crate exonum_time;
+#[macro_use]
+extern crate exonum_derive;
+extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -34,9 +36,11 @@ extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate protobuf;
 extern crate serde_json;
 
 pub mod api;
+pub mod proto;
 pub mod schema;
 pub mod transactions;
 
