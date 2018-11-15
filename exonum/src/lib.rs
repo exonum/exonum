@@ -69,6 +69,7 @@ extern crate hex;
 extern crate log;
 extern crate os_info;
 extern crate rand;
+extern crate rand_xorshift;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]

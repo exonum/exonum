@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{RngCore, SeedableRng, XorShiftRng};
+use rand::{RngCore, SeedableRng};
+use rand_xorshift::XorShiftRng;
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
