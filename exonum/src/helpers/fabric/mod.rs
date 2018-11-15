@@ -79,9 +79,35 @@ pub struct Argument {
     pub required: bool,
     /// Help message.
     pub help: &'static str,
+    /// Used for named arguments: defines whether the argument is a flag or not (false for flags).
+    pub takes_value: bool,
 }
 
 impl Argument {
+    /// Creates a new falg with `long` and optionally `short` names.
+    pub fn new_flag<T>(
+        name: &'static str,
+        help: &'static str,
+        short_name: T,
+        long_name: &'static str,
+        multiple: bool,
+    ) -> Self
+    where
+        T: Into<Option<&'static str>>,
+    {
+        Self {
+            argument_type: ArgumentType::Named(NamedArgument {
+                short_name: short_name.into(),
+                long_name,
+                multiple,
+            }),
+            name,
+            help,
+            required: false,
+            takes_value: false,
+        }
+    }
+
     /// Creates a new argument with `long` and optionally `short` names.
     pub fn new_named<T>(
         name: &'static str,
@@ -103,6 +129,7 @@ impl Argument {
             name,
             help,
             required,
+            takes_value: true,
         }
     }
 
@@ -113,6 +140,7 @@ impl Argument {
             name,
             help,
             required,
+            takes_value: true,
         }
     }
 }
@@ -186,6 +214,7 @@ pub struct Context {
     args: BTreeMap<String, String>,
     multiple_args: BTreeMap<String, Vec<String>>,
     variables: BTreeMap<String, Value>,
+    flags: BTreeMap<String, u64>,
 }
 
 impl Context {
@@ -193,8 +222,9 @@ impl Context {
         let mut context = Self::default();
         for arg in args {
             // processing multiple value arguments make code ugly =(
+            // ^ well, don't be sad, this ain't the worst thing you can see in programming
             match arg.argument_type {
-                ArgumentType::Named(detail) if detail.multiple => {
+                ArgumentType::Named(detail) if detail.multiple && arg.takes_value => {
                     if let Some(values) = matches.values_of(&arg.name) {
                         let values: Vec<String> = values.map(|e| e.to_owned()).collect();
                         if context
@@ -204,6 +234,13 @@ impl Context {
                         {
                             panic!("Duplicated argument: {}", arg.name);
                         }
+                        continue;
+                    }
+                }
+                ArgumentType::Named(detail) if detail.multiple && !arg.takes_value => {
+                    let occurrences = matches.occurrences_of(&arg.name);
+                    if occurrences > 0 {
+                        context.flags.insert(arg.name.to_owned(), occurrences);
                         continue;
                     }
                 }
