@@ -469,7 +469,13 @@ impl PartialOrd for ProofPath {
 }
 
 impl ProofPath {
-    pub(crate) fn compress(&self) -> SmallVec<[u8; 64]> {
+    /// Creates a compressed binary representation of the given proof path.
+    ///
+    /// # Binary format
+    ///
+    /// - **bits_len** - total length in bits compressed by the leb128 algorithm.
+    /// - **bytes** - non-null bytes of the given ProofPath, i.e. the first `(bits_len + 7) / 8` bytes.
+    pub fn compress(&self) -> SmallVec<[u8; 64]> {
         let bits_len = self.end() as u64;
         let bytes_len = ((bits_len + 7) / 8) as usize;
         let key = &self.raw_key()[0..bytes_len];
@@ -489,7 +495,8 @@ impl ProofPath {
         buf
     }
 
-    pub(crate) fn decompress(value: &[u8]) -> Self {
+    /// Reads the proof path from the compressed binary representation.
+    pub fn decompress(value: &[u8]) -> Self {
         let mut reader = Cursor::new(value);
         let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
         debug_assert!(bits_len <= KEY_SIZE * 8);

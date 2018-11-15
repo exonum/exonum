@@ -7,6 +7,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking Changes
 
+- Changed the hash algorhitm of the intermidiate nodes in `ProofMapIndex`. (#???)
+
+  `ProofPath` now uses in hashing a compact binary representation instead of raw.
+
 - Changed the message format, which, in turn, has led to changes in
    the byte representation of transactions and precommit messages. (#916)
 
