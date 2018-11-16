@@ -24,16 +24,25 @@ use exonum::{
     messages::RawTransaction,
     storage::Snapshot,
 };
+use exonum_testkit::proto;
 
 pub const SERVICE_ID: u16 = 512;
 
-transactions! {
-    pub HandleCommitTransactions {
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq)]
+#[protobuf_convert("proto::TxAfterCommit")]
+pub struct TxAfterCommit {
+    pub height: Height,
+}
 
-        struct TxAfterCommit {
-            height: Height,
-        }
+impl TxAfterCommit {
+    pub fn new(height: Height) -> Self {
+        Self { height }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum HandleCommitTransactions {
+    TxAfterCommit(TxAfterCommit),
 }
 
 impl Transaction for TxAfterCommit {

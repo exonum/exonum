@@ -29,3 +29,4 @@ exonum/src/encoding/protobuf/*.rs
 examples/timestamping/backend/src/proto/*.rs
 examples/cryptocurrency-advanced/backend/src/proto/*.rs
 examples/cryptocurrency/src/proto/*.rs
+testkit/src/proto/*.rs
