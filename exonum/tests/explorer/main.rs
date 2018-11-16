@@ -105,8 +105,8 @@ fn test_explorer_basics() {
                     "message": messages::to_hex_string(&tx_alice)
                 },
                 "location": {
-                    "block_height": "1",
-                    "position_in_block": "0",
+                    "block_height": 1,
+                    "position_in_block": 0,
                 },
                 "location_proof": tx_info.location_proof(), // too complicated to check
                 "status": { "type": "success" },
@@ -135,8 +135,8 @@ fn test_explorer_basics() {
                     "message": messages::to_hex_string(&tx_bob)
             },
             "location": {
-                "block_height": "2",
-                "position_in_block": "0",
+                "block_height": 2,
+                "position_in_block": 0,
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
@@ -159,8 +159,8 @@ fn test_explorer_basics() {
                     "message": messages::to_hex_string(&tx_transfer)
             },
             "location": {
-                "block_height": "2",
-                "position_in_block": "1",
+                "block_height": 2,
+                "position_in_block": 1,
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {

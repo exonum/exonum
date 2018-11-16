@@ -5,6 +5,9 @@ environment:
   CL: "/wd5045"
 
 install:
+  - appveyor DownloadFile https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-win32.zip -FileName protoc.zip
+  - 7z x protoc.zip -o%USERPROFILE%\protoc\
+  - set PATH=%PATH%;%USERPROFILE%\protoc\bin
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain stable --default-host x86_64-pc-windows-msvc
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin

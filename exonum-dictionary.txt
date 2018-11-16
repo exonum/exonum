@@ -94,6 +94,8 @@ prevoters
 println
 proptest
 protobuf
+proto
+protoc
 pubkey
 pubkeys
 readonly
@@ -103,6 +105,7 @@ reimplemented
 repr
 reqwest
 RESTful
+rngs
 roadmap
 rocksdb
 roughtime
@@ -157,3 +160,4 @@ validators
 websockets
 whitelisted
 writeln
+xorshift
