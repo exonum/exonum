@@ -30,3 +30,5 @@ examples/timestamping/backend/src/proto/*.rs
 examples/cryptocurrency-advanced/backend/src/proto/*.rs
 examples/cryptocurrency/src/proto/*.rs
 testkit/src/proto/*.rs
+services/configuration/src/proto/*.rs
+services/time/src/proto/*.rs

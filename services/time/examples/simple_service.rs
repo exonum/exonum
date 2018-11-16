@@ -15,7 +15,6 @@
 //! Service, which uses the time oracle.
 
 extern crate chrono;
-#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
@@ -24,18 +23,21 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
+    crypto::{self, gen_keypair, Hash, PublicKey, SecretKey},
     encoding,
     helpers::Height,
     messages::{Message, RawTransaction, Signed},
     storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
-use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
+use exonum_time::{proto, schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
 
 /// Marker service id.
 const SERVICE_ID: u16 = 128;
@@ -74,15 +76,17 @@ impl<'a> MarkerSchema<&'a mut Fork> {
     }
 }
 
-transactions! {
-    MarkerTransactions {
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[protobuf_convert("proto::TxMarker")]
+/// Transaction, which must be executed no later than the specified time (field `time`).
+struct TxMarker {
+    mark: i32,
+    time: DateTime<Utc>,
+}
 
-        /// Transaction, which must be executed no later than the specified time (field `time`).
-        struct TxMarker {
-            mark: i32,
-            time: DateTime<Utc>,
-        }
-    }
+#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+enum MarkerTransactions {
+    TxMarker(TxMarker),
 }
 
 impl TxMarker {
@@ -92,12 +96,7 @@ impl TxMarker {
         public_key: &PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            TxMarker::new(mark, time),
-            SERVICE_ID,
-            *public_key,
-            secret_key,
-        )
+        Message::sign_transaction(TxMarker { mark, time }, SERVICE_ID, *public_key, secret_key)
     }
 }
 
