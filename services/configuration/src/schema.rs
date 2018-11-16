@@ -21,6 +21,7 @@ use exonum::{
 
 use std::{borrow::Cow, ops::Deref};
 
+use proto;
 use transactions::Propose;
 
 const YEA_TAG: u8 = 1;
@@ -39,15 +40,26 @@ define_names! {
     VOTES => "votes";
 }
 
-encoding_struct! {
-    /// Extended information about a proposal used for the storage.
-    struct ProposeData {
-        /// Proposal transaction.
-        tx_propose: Propose,
-        /// Merkle root of all votes for the proposal.
-        votes_history_hash: &Hash,
-        /// Number of eligible voting validators.
-        num_validators: u64,
+/// Extended information about a proposal used for the storage.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[protobuf_convert("proto::ProposeData")]
+pub struct ProposeData {
+    /// Proposal transaction.
+    pub tx_propose: Propose,
+    /// Merkle root of all votes for the proposal.
+    pub votes_history_hash: Hash,
+    /// Number of eligible voting validators.
+    pub num_validators: u64,
+}
+
+impl ProposeData {
+    /// New ProposeData.
+    pub fn new(tx_propose: Propose, votes_history_hash: &Hash, num_validators: u64) -> Self {
+        Self {
+            tx_propose,
+            votes_history_hash: *votes_history_hash,
+            num_validators,
+        }
     }
 }
 
@@ -225,7 +237,7 @@ where
     pub fn propose(&self, cfg_hash: &Hash) -> Option<Propose> {
         self.propose_data_by_config_hash()
             .get(cfg_hash)?
-            .tx_propose()
+            .tx_propose
             .into()
     }
 
