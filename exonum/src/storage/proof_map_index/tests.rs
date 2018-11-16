@@ -13,8 +13,12 @@
 // limitations under the License.
 
 use rand::{
-    self, distributions::Alphanumeric, seq::sample_iter, Rng, RngCore, SeedableRng, XorShiftRng,
+    self,
+    distributions::Alphanumeric,
+    seq::{IteratorRandom, SliceRandom},
+    Rng, RngCore, SeedableRng,
 };
+use rand_xorshift::XorShiftRng;
 use serde_json;
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
@@ -282,7 +286,7 @@ fn fuzz_insert(db1: Box<dyn Database>, db2: Box<dyn Database>) {
 
     let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(IDX_NAME, &mut storage2);
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, item.1.clone());
     }
@@ -298,11 +302,11 @@ fn fuzz_insert(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 
     // Test same keys
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index1.put(&item.0, vec![1]);
     }
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, vec![1]);
     }
@@ -426,7 +430,7 @@ where
         (0..batch_size).collect()
     } else {
         let mut rng = XorShiftRng::from_seed(rand::random());
-        sample_iter(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS).unwrap()
+        (0..batch_size).choose_multiple(&mut rng, MAX_CHECKED_ELEMENTS)
     };
 
     for i in indexes {
@@ -463,13 +467,22 @@ fn check_multiproofs_for_data<K, V>(
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
         // Check the multiproof only for existing keys
-        let keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
+        let keys = data
+            .iter()
+            .map(|&(k, _)| k)
+            .choose_multiple(&mut rng, proof_size);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
 
         // Check the multiproof for the equal number of existing and non-existing keys
-        let mut keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
-        let non_keys = sample_iter(&mut rng, &nonexisting_keys, proof_size).unwrap();
+        let mut keys = data
+            .iter()
+            .map(|&(k, _)| k)
+            .choose_multiple(&mut rng, proof_size);
+        let non_keys = nonexisting_keys
+            .iter()
+            .cloned()
+            .choose_multiple(&mut rng, proof_size);
         keys.extend(non_keys);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
@@ -1053,12 +1066,11 @@ fn fuzz_delete_build_proofs(db: Box<dyn Database>) {
     }
 
     let (keys_to_remove, keys_to_remove_seq) = {
-        let mut keys = sample_iter(
-            &mut rng,
-            data.iter().map(|item| item.0.clone()),
-            SAMPLE_SIZE / 5,
-        ).unwrap();
-        rng.shuffle(&mut keys);
+        let mut keys = data
+            .iter()
+            .map(|item| item.0.clone())
+            .choose_multiple(&mut rng, SAMPLE_SIZE / 5);
+        keys.shuffle(&mut rng);
         let seq_keys = keys.split_off(SAMPLE_SIZE / 10);
         (keys, seq_keys)
     };
@@ -1092,7 +1104,7 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
 
     let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(IDX_NAME, &mut storage2);
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
 
     for item in &data {
         index2.put(&item.0, item.1.clone());
@@ -1106,11 +1118,11 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
         .map(|item| item.0.clone())
         .collect::<Vec<_>>();
 
-    rng.shuffle(&mut keys_to_remove);
+    keys_to_remove.shuffle(&mut rng);
     for key in &keys_to_remove {
         index1.remove(key);
     }
-    rng.shuffle(&mut keys_to_remove);
+    keys_to_remove.shuffle(&mut rng);
     for key in &keys_to_remove {
         index2.remove(key);
     }
@@ -1126,7 +1138,7 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, item.1.clone());
     }

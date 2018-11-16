@@ -149,7 +149,7 @@ where
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
             let context = request.state();
-            let future = Query::from_request(&request, &())
+            let future = Query::from_request(&request, &Default::default())
                 .map(|query: Query<Q>| query.into_inner())
                 .and_then(|query| handler(context, query).map_err(From::from))
                 .and_then(|value| Ok(HttpResponse::Ok().json(value)))
@@ -205,7 +205,7 @@ where
         let index = move |request: HttpRequest| -> FutureResponse {
             let context = request.state().clone();
             let handler = handler.clone();
-            Query::from_request(&request, &())
+            Query::from_request(&request, &Default::default())
                 .map(move |query: Query<Q>| query.into_inner())
                 .into_future()
                 .and_then(move |query| handler(&context, query).map_err(From::from))

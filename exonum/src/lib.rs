@@ -69,12 +69,14 @@ extern crate hex;
 extern crate log;
 extern crate os_info;
 extern crate rand;
+extern crate rand_xorshift;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate protobuf;
 extern crate snow;
 extern crate tokio;
 extern crate tokio_codec;

@@ -12,6 +12,7 @@ addons:
   apt:
     sources:
     - sourceline: 'ppa:giskou/librocksdb'
+    - sourceline: 'ppa:maarten-fonville/protobuf'
     packages:
     - gcc
     - g++
@@ -28,6 +29,8 @@ addons:
     - build-essential
     - pkg-config
     - unzip
+    - protobuf-compiler
+    - libprotobuf-dev
 
 rust:
   - 1.30.0
@@ -84,9 +87,11 @@ jobs:
     - ./node_modules/.bin/cspell --version
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cargo fmt --all -- --check
     - npm run cspell
     - npm run md
+    # Force build.rs execution.
+    - cargo check -p exonum
+    - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
@@ -102,14 +107,25 @@ jobs:
     - touch target/std/primitive.usize.html
     - cargo deadlinks --dir target/doc
 
-  # Clippy linting.
-  - name: clippy
-    rust: nightly-2018-10-23
+  # Run kcov.
+  - name: kcov
     install:
-    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
-    - cargo clippy --version
+    - wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
+    - tar xzf v36.tar.gz
+    - cd kcov-36
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make
+    - make install DESTDIR=../../kcov-build
+    - cd ../..
+    - rm -rf kcov-36
     script:
-    - cargo clippy --all -- -D warnings
+    - cargo test --no-run
+    - cd $TRAVIS_BUILD_DIR
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
+    - bash <(curl -s https://codecov.io/bash)
+    - echo "Uploaded code coverage"
 
   # Tests.
   - name: test
@@ -119,6 +135,7 @@ jobs:
         - sourceline: 'ppa:giskou/librocksdb'
         - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
           key_url: https://packages.microsoft.com/keys/microsoft.asc
+        - sourceline: 'ppa:maarten-fonville/protobuf'
         packages:
         - gcc
         - g++
@@ -135,6 +152,8 @@ jobs:
         - zlib1g-dev
         - build-essential
         - pkg-config
+        - protobuf-compiler
+        - libprotobuf-dev
 
     install:
     - nvm install 8 && nvm use 8
@@ -149,21 +168,15 @@ jobs:
 #    - cd $TRAVIS_BUILD_DIR/examples/demo-service/examples && ./test.sh
 #    - cd $TRAVIS_BUILD_DIR/examples/demo-service/examples && ./test.ps1
 #    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
-    after_success: |
-      cd $TRAVIS_BUILD_DIR
-      wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz &&
-      tar xzf v36.tar.gz &&
-      cd kcov-36 &&
-      mkdir build &&
-      cd build &&
-      cmake .. &&
-      make &&
-      make install DESTDIR=../../kcov-build &&
-      cd ../.. &&
-      rm -rf kcov-36 &&
-      for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-      bash <(curl -s https://codecov.io/bash) &&
-      echo "Uploaded code coverage"
+ 
+ # Clippy linting.
+  - name: clippy
+    rust: nightly-2018-10-23
+    install:
+    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
+    - cargo clippy --version
+    script:
+    - cargo clippy --all -- -D warnings
 
   # Benchmarks (compilation only).
   - name: benchmarks
@@ -183,3 +196,5 @@ notifications:
   webhooks:
     urls:
     - https://webhooks.gitter.im/e/9599da7e3a500810190d
+
+    
