@@ -80,5 +80,5 @@ metrics-log = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
 
 [build-dependencies]
-protoc-rust = "=2.1.4"
+protoc-rust = "=2.2.0"
 walkdir = "2.2.7"
