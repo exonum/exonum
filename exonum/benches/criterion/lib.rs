@@ -14,13 +14,15 @@
 
 #[macro_use]
 extern crate criterion;
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate serde_derive;
 extern crate futures;
 extern crate log;
 extern crate num;
+extern crate protobuf;
 extern crate rand;
 extern crate rand_xorshift;
 extern crate tempdir;

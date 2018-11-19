@@ -113,7 +113,7 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-        encoding::Error as EncodingError,
+        encoding::{protobuf::tests, Error as EncodingError},
         messages::{Message, RawTransaction, Signed},
         storage::Snapshot,
     };
@@ -142,29 +142,43 @@ mod timestamping {
         }
     }
 
-    transactions! {
-        TimestampingTransactions {
-            struct Tx {
-                data: &Hash,
-            }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("tests::BenchTsTx")]
+    #[exonum_derive_outer]
+    struct Tx {
+        data: Hash,
+    }
 
-            struct PanickingTx {
-                data: &Hash,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("tests::BenchTsPanickingTx")]
+    #[exonum_derive_outer]
+    struct PanickingTx {
+        data: Hash,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum_derive_outer]
+    enum TimestampingTransactions {
+        Tx(Tx),
+        PanickingTx(PanickingTx),
     }
 
     impl Tx {
         #[doc(hidden)]
         pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
-            Message::sign_transaction(Tx::new(data), TIMESTAMPING_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(Tx { data: *data }, TIMESTAMPING_SERVICE_ID, *pk, sk)
         }
     }
 
     impl PanickingTx {
         #[doc(hidden)]
         pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
-            Message::sign_transaction(PanickingTx::new(data), TIMESTAMPING_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(
+                PanickingTx { data: *data },
+                TIMESTAMPING_SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 
@@ -212,7 +226,7 @@ mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{Hash, PublicKey, SecretKey},
-        encoding::Error as EncodingError,
+        encoding::{protobuf::tests, Error as EncodingError},
         messages::{Message, RawTransaction, Signed},
         storage::{MapIndex, ProofMapIndex, Snapshot},
     };
@@ -246,26 +260,39 @@ mod cryptocurrency {
         }
     }
 
-    transactions! {
-        CryptocurrencyTransactions {
-            /// Transfers one unit of currency from `from` to `to`.
-            struct Tx {
-                to: &PublicKey,
-                seed: u32,
-            }
+    /// Transfers one unit of currency from `from` to `to`.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("tests::BenchCrTx")]
+    #[exonum_derive_outer]
+    struct Tx {
+        to: PublicKey,
+        seed: u32,
+    }
 
-            /// Same as `Tx`, but without cryptographic proofs in `execute`.
-            struct SimpleTx {
-                to: &PublicKey,
-                seed: u32,
-            }
+    /// Same as `Tx`, but without cryptographic proofs in `execute`.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("tests::BenchCrSimpleTx")]
+    #[exonum_derive_outer]
+    struct SimpleTx {
+        to: PublicKey,
+        seed: u32,
+    }
 
-            /// Same as `SimpleTx`, but signals an error 50% of the time.
-            struct RollbackTx {
-                to: &PublicKey,
-                seed: u32,
-            }
-        }
+    /// Same as `SimpleTx`, but signals an error 50% of the time.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[protobuf_convert("tests::BenchCrRollbackTx")]
+    #[exonum_derive_outer]
+    struct RollbackTx {
+        to: PublicKey,
+        seed: u32,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum_derive_outer]
+    enum CryptocurrencyTransactions {
+        Tx(Tx),
+        SimpleTx(SimpleTx),
+        RollbackTx(RollbackTx),
     }
 
     impl Tx {
@@ -276,7 +303,7 @@ mod cryptocurrency {
             seed: u32,
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
-            Message::sign_transaction(Tx::new(to, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(Tx { to: *to, seed }, CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
         }
     }
 
@@ -288,7 +315,12 @@ mod cryptocurrency {
             seed: u32,
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
-            Message::sign_transaction(SimpleTx::new(to, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(
+                SimpleTx { to: *to, seed },
+                CRYPTOCURRENCY_SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 
@@ -301,7 +333,7 @@ mod cryptocurrency {
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
             Message::sign_transaction(
-                RollbackTx::new(to, seed),
+                RollbackTx { to: *to, seed },
                 CRYPTOCURRENCY_SERVICE_ID,
                 *pk,
                 sk,
@@ -319,9 +351,9 @@ mod cryptocurrency {
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
-            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(&self.to).unwrap_or(INITIAL_BALANCE);
             index.put(&from, from_balance - 1);
-            index.put(self.to(), to_balance + 1);
+            index.put(&self.to, to_balance + 1);
 
             Ok(())
         }
@@ -338,9 +370,9 @@ mod cryptocurrency {
             let mut index = MapIndex::new("balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
-            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(&self.to).unwrap_or(INITIAL_BALANCE);
             index.put(&from, from_balance - 1);
-            index.put(self.to(), to_balance + 1);
+            index.put(&self.to, to_balance + 1);
 
             Ok(())
         }
@@ -357,13 +389,13 @@ mod cryptocurrency {
             let mut index = MapIndex::new("balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
-            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(&self.to).unwrap_or(INITIAL_BALANCE);
             index.put(&from, from_balance - 1);
-            index.put(self.to(), to_balance + 1);
+            index.put(&self.to, to_balance + 1);
 
             // We deliberately perform the check *after* reads/writes in order
             // to check efficiency of rolling the changes back.
-            if self.seed() % 2 == 0 {
+            if self.seed % 2 == 0 {
                 Ok(())
             } else {
                 Err(ExecutionError::new(1))
