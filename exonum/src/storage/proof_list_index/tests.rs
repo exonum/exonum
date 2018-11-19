@@ -822,3 +822,35 @@ mod root_hash_tests {
         assert_root_hash_correct(&hash_list(&[]));
     }
 }
+
+mod ct_hash_tests {
+    use crypto::{self, Hash, hash};
+    use storage::{Database, MemoryDB, proof_list_index::{root_hash_ct, hash_value, NODE_TAG}};
+
+    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
+        bytes.iter().map(|chunk| crypto::hash(chunk)).collect()
+    }
+
+    #[test]
+    fn root_hash_certified_transparency() {
+        let root_hash = root_hash_ct(&hash_list(&[b"1", b"2"]));
+        println!("hash {:?}", root_hash);
+
+        println!("-------------------- manual check --------------------");
+
+        let hash1 = hash_value(hash(b"1").as_ref());
+        let hash2 = hash_value(hash(b"2").as_ref());
+
+        println!("hash1 {:?}", hash1);
+        println!("hash2 {:?}", hash2);
+
+        let mut value_to_hash = vec![NODE_TAG];
+        value_to_hash.extend_from_slice(&hash1.as_ref());
+        value_to_hash.extend_from_slice(&hash2.as_ref());
+
+        let root_hash = hash(&value_to_hash);
+
+        println!("root_hash {:?}", root_hash);
+    }
+
+}

@@ -16,7 +16,7 @@
 
 pub use self::proof::{ListProof, ListProofError};
 
-use std::{cell::Cell, marker::PhantomData};
+use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
 use self::key::ProofListKey;
 use super::{
@@ -59,12 +59,19 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
+const LEAF_TAG: u8 = 0x0;
+const NODE_TAG: u8 = 0x1;
+
 fn hash_one(h: &Hash) -> Hash {
-    hash(h.as_ref())
+    HashStream::new()
+        .update(&[NODE_TAG])
+        .update(h.as_ref())
+        .hash()
 }
 
 fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
     HashStream::new()
+        .update(&[NODE_TAG])
         .update(h1.as_ref())
         .update(h2.as_ref())
         .hash()
@@ -495,6 +502,28 @@ where
         }
     }
 
+    ///
+    pub fn push_ct(&mut self, value: V) {
+        let len = self.len();
+        self.set_len(len + 1);
+        let mut key = ProofListKey::new(1, len);
+        self.base.put(&key, value.hash());
+        self.base.put(&ProofListKey::leaf(len), value);
+
+        while key.height() < self.height() {
+            let hash = if key.is_left() {
+                hash_one(&self.get_branch_unchecked(key))
+            } else {
+                hash_pair(
+                    &self.get_branch_unchecked(key.as_left()),
+                    &self.get_branch_unchecked(key),
+                )
+            };
+            key = key.parent();
+            self.set_branch(key, hash);
+        }
+    }
+
     /// Extends the proof list with the contents of an iterator.
     ///
     /// # Examples
@@ -621,6 +650,12 @@ where
     }
 }
 
+fn hash_value(value_bytes: &[u8]) -> Hash {
+    let mut value_to_hash = vec![LEAF_TAG];
+    value_to_hash.extend_from_slice(&value_bytes);
+    hash(&value_to_hash)
+}
+
 /// Computes Merkle root hash for a given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
@@ -646,4 +681,36 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
             [single] => hash_one(single),
             _ => unreachable!(),
         }).collect()
+}
+
+///
+pub fn root_hash_ct(hashes: &[Hash]) -> Hash {
+    let len = hashes.len();
+
+    match len {
+        0 => Hash::zero(),
+        1 => {
+            let hash = hash_value(hashes[0].as_ref());
+
+            println!("hash value {:?}", hash);
+            hash
+        },
+        _ => {
+            let k = len.next_power_of_two() / 2;
+
+            println!("k {}", k);
+
+            let (left_hashes, right_hashes) = hashes.split_at(k);
+
+            println!("left hashes {:#?}, right hashes {:#?}", left_hashes, right_hashes);
+
+            let left_hash = root_hash_ct(left_hashes);
+            let right_hash = root_hash_ct(right_hashes);
+
+            let mut value_to_hash = vec![NODE_TAG];
+            value_to_hash.extend_from_slice(&left_hash.as_ref());
+            value_to_hash.extend_from_slice(&right_hash.as_ref());
+            hash(&value_to_hash)
+        }
+    }
 }

@@ -25,6 +25,7 @@ use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{
     Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed,
 };
+use storage::proof_list_index::root_hash;
 use storage::Database;
 
 pub type TimestampingSandbox = Sandbox;
@@ -207,7 +208,9 @@ pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
     let mut fork = MemoryDB::new().fork();
     let mut hashes = ProofListIndex::new("name", &mut fork);
     hashes.extend(txs.iter().cloned());
-    hashes.merkle_root()
+    hashes.merkle_root();
+
+    root_hash(txs)
 }
 
 pub fn add_round_with_transactions(
