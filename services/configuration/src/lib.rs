@@ -95,7 +95,7 @@ use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
-    crypto::{self, Hash},
+    crypto::Hash,
     encoding::Error as EncodingError,
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction,

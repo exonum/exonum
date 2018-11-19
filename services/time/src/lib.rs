@@ -52,7 +52,7 @@ pub mod transactions;
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
-    crypto::{self, Hash},
+    crypto::Hash,
     encoding::{self, serialize::json::reexport::Value},
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
