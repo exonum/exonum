@@ -216,6 +216,16 @@ impl ProtobufConvert for u64 {
     }
 }
 
+impl ProtobufConvert for i32 {
+    type ProtoStruct = i32;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        *self
+    }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+        Ok(pb)
+    }
+}
+
 impl<T> ProtobufConvert for Vec<T>
 where
     T: ProtobufConvert,

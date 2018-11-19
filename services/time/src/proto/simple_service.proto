@@ -19,6 +19,6 @@ package exonum.service.time.example;
 import "google/protobuf/timestamp.proto";
 
 message TxMarker {
-  uint32 mark = 1;
+  int32 mark = 1;
   google.protobuf.Timestamp time = 2;
 }

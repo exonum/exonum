@@ -30,7 +30,7 @@ extern crate protobuf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
-    crypto::{self, gen_keypair, Hash, PublicKey, SecretKey},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     encoding,
     helpers::Height,
     messages::{Message, RawTransaction, Signed},
@@ -106,9 +106,9 @@ impl Transaction for TxMarker {
         let view = context.fork();
         let time = TimeSchema::new(&view).time().get();
         match time {
-            Some(current_time) if current_time <= self.time() => {
+            Some(current_time) if current_time <= self.time => {
                 let mut schema = MarkerSchema::new(view);
-                schema.marks_mut().put(&author, self.mark());
+                schema.marks_mut().put(&author, self.mark);
             }
             _ => {}
         }
