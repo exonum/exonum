@@ -18,8 +18,8 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix = "=0.7.6"
-actix-net = "=0.1.1"
-actix-web = "=0.7.13"
+actix-net = "=0.2.2"
+actix-web = "=0.7.14"
 log = "=0.4.6"
 byteorder = "1.2.3"
 hex = "=0.3.2"
@@ -52,7 +52,6 @@ uuid = { version = "=0.7.1", features = ["serde"] }
 snow = "=0.4.0"
 rust_decimal = "=0.10.2"
 protobuf = "=2.1.4"
-ring = "=0.13.2"
 
 exonum-crypto = { version = "0.9.0", path = "../crypto" }
 exonum_rocksdb = "0.7.4"
