@@ -27,7 +27,10 @@ use syn::{Data, DeriveInput, Lit, Meta, NestedMeta, Path};
 
 use std::env;
 
-#[proc_macro_derive(ProtobufConvert, attributes(protobuf_convert))]
+#[proc_macro_derive(
+    ProtobufConvert,
+    attributes(protobuf_convert, exonum_derive_outer)
+)]
 pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
@@ -53,6 +56,21 @@ pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
                 };
                 Some(name)
             }).expect("protobuf_convert attribute not set")
+    };
+    let inside_crate = {
+        let derive_outer = input.attrs.iter().any(|attr| {
+            let meta = match attr.parse_meta() {
+                Ok(m) => m,
+                Err(_) => return false,
+            };
+            meta.name() == "exonum_derive_outer"
+        });
+
+        if derive_outer {
+            false
+        } else {
+            env::var("CARGO_PKG_NAME").unwrap() == "exonum"
+        }
     };
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
     let data = match input.data {
@@ -96,7 +114,7 @@ pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    let cr = if env::var("CARGO_PKG_NAME").unwrap() == "exonum" {
+    let cr = if inside_crate {
         quote!(crate)
     } else {
         quote!(exonum)
@@ -112,8 +130,8 @@ pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
             use #cr::encoding::protobuf::ProtobufConvert;
             use #cr::storage::StorageValue;
             use #cr::encoding;
-            use protobuf::Message;
-            use crypto::{self, CryptoHash, Hash};
+            use protobuf::Message as PbMessage;
+            use #cr::crypto::{self, CryptoHash, Hash};
 
             impl ProtobufConvert for #name {
                 type ProtoStruct = #proto_struct_name;
@@ -161,7 +179,7 @@ pub fn protobuf_convert_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-#[proc_macro_derive(TransactionSet)]
+#[proc_macro_derive(TransactionSet, attributes(exonum_derive_outer))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
@@ -191,6 +209,22 @@ pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
                 .expect("TransactionSet enum variant can't be empty");
             (n as u16, v.ident.clone(), field.ty.clone())
         }).collect::<Vec<_>>();
+
+    let inside_crate = {
+        let derive_outer = input.attrs.iter().any(|attr| {
+            let meta = match attr.parse_meta() {
+                Ok(m) => m,
+                Err(_) => return false,
+            };
+            meta.name() == "exonum_derive_outer"
+        });
+
+        if derive_outer {
+            false
+        } else {
+            env::var("CARGO_PKG_NAME").unwrap() == "exonum"
+        }
+    };
 
     let convert_1 = variants.iter().map(|(_, id, ty)| {
         quote! {
@@ -275,7 +309,7 @@ pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    let cr = if env::var("CARGO_PKG_NAME").unwrap() == "exonum" {
+    let cr = if inside_crate {
         quote!(crate)
     } else {
         quote!(exonum)
