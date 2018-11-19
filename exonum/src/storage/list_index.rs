@@ -468,8 +468,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Fork, ListIndex};
+    use super::{Fork, ListIndex, Snapshot};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
+    use storage::Database;
 
     fn gen_tempdir_name() -> String {
         thread_rng().sample_iter(&Alphanumeric).take(10).collect()
@@ -531,6 +532,67 @@ mod tests {
         );
     }
 
+    fn list_index_clear_in_family(db: Box<dyn Database>, x: u32, y: u32, merge_before_clear: bool) {
+        assert_ne!(x, y);
+        let mut fork = db.fork();
+
+        fn list<T>(index: u32, view: T) -> ListIndex<T, String>
+        where
+            T: AsRef<dyn Snapshot>,
+        {
+            ListIndex::new_in_family("family", &index, view)
+        }
+
+        // Write data to both indexes.
+        {
+            let mut index = list(x, &mut fork);
+            index.push("foo".to_owned());
+            index.push("bar".to_owned());
+        }
+        {
+            let mut index = list(y, &mut fork);
+            index.push("baz".to_owned());
+            index.push("qux".to_owned());
+        }
+
+        if merge_before_clear {
+            db.merge_sync(fork.into_patch()).expect("merge");
+            fork = db.fork();
+        }
+
+        // Clear the index with the lower family key.
+        {
+            let mut index = list(x, &mut fork);
+            index.clear();
+        }
+
+        // The other index should be unaffected.
+        {
+            let index = list(x, &fork);
+            assert!(index.is_empty());
+            let index = list(y, &fork);
+            assert_eq!(
+                index.iter().collect::<Vec<_>>(),
+                vec!["baz".to_owned(), "qux".to_owned()]
+            );
+        }
+
+        // ...even after fork merge.
+        db.merge_sync(fork.into_patch()).expect("merge");
+        let snapshot = db.snapshot();
+        let index = list(x, &snapshot);
+        assert!(index.is_empty());
+        let index = list(y, &snapshot);
+        assert_eq!(
+            index.iter().collect::<Vec<_>>(),
+            vec!["baz".to_owned(), "qux".to_owned()]
+        );
+    }
+
+    // Parameters for the `list_index_clear_in_family` test.
+    const FAMILY_CLEAR_PARAMS: &[(u32, u32, bool)] =
+        &[(0, 5, false), (5, 0, false), (1, 7, true), (7, 1, true)];
+
     mod memorydb_tests {
         use std::path::Path;
         use storage::{Database, ListIndex, MemoryDB};
@@ -580,6 +642,16 @@ mod tests {
             let mut fork = db.fork();
             let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
+        }
+
+        #[test]
+        fn list_index_clear_in_family() {
+            for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
+                let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+                let path = dir.path();
+                let db = create_database(path);
+                super::list_index_clear_in_family(db, x, y, merge_before_clear);
+            }
         }
     }
 
@@ -633,6 +705,16 @@ mod tests {
             let mut fork = db.fork();
             let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
+        }
+
+        #[test]
+        fn list_index_clear_in_family() {
+            for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
+                let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+                let path = dir.path();
+                let db = create_database(path);
+                super::list_index_clear_in_family(db, x, y, merge_before_clear);
+            }
         }
     }
 }
