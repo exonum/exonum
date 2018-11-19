@@ -23,7 +23,7 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    encoding::Error as EncodingError,
+    encoding::{protobuf::tests, Error as EncodingError},
     messages::{Message, RawTransaction, Signed},
     node::ApiSender,
     storage::{MemoryDB, Snapshot},
@@ -31,24 +31,52 @@ use exonum::{
 
 pub const SERVICE_ID: u16 = 0;
 
-transactions! {
-    pub ExplorerTransactions {
-        struct CreateWallet {
-            pubkey: &PublicKey,
-            name: &str,
-        }
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[protobuf_convert("tests::CreateWallet")]
+#[exonum_derive_outer]
+pub struct CreateWallet {
+    pub pubkey: PublicKey,
+    pub name: String,
+}
 
-        struct Transfer {
-            from: &PublicKey,
-            to: &PublicKey,
-            amount: u64,
+impl CreateWallet {
+    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
+        Self {
+            pubkey: *pubkey,
+            name: name.to_owned(),
         }
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[protobuf_convert("tests::Transfer")]
+#[exonum_derive_outer]
+pub struct Transfer {
+    pub from: PublicKey,
+    pub to: PublicKey,
+    pub amount: u64,
+}
+
+impl Transfer {
+    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
+        Self {
+            from: *from,
+            to: *to,
+            amount,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+#[exonum_derive_outer]
+pub enum ExplorerTransactions {
+    CreateWallet(CreateWallet),
+    Transfer(Transfer),
+}
+
 impl Transaction for CreateWallet {
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
-        if self.name().starts_with("Al") {
+        if self.name.starts_with("Al") {
             Ok(())
         } else {
             Err(ExecutionError::with_description(

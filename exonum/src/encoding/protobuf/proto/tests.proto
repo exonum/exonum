@@ -53,3 +53,38 @@ message BlockchainTestTxB {
 message BlockchainTestTxC {
   uint64 a = 1;
 }
+
+message CreateWallet {
+  exonum.PublicKey pubkey = 1;
+  string name = 2;
+}
+
+message Transfer {
+  exonum.PublicKey from = 1;
+  exonum.PublicKey to = 2;
+  uint64 amount =3;
+}
+
+
+message BenchTsTx {
+  exonum.Hash data = 1;
+}
+
+message BenchTsPanickingTx {
+  exonum.Hash data = 1;
+}
+
+message BenchCrTx {
+  exonum.PublicKey to = 1;
+  uint32 seed = 2;
+}
+
+message BenchCrSimpleTx {
+  exonum.PublicKey to = 1;
+  uint32 seed = 2;
+}
+
+message BenchCrRollbackTx {
+  exonum.PublicKey to = 1;
+  uint32 seed = 2;
+}
