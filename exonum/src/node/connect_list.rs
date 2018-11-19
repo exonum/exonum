@@ -82,7 +82,8 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
-    use rand::{RngCore, SeedableRng, XorShiftRng};
+    use rand::{RngCore, SeedableRng};
+    use rand_xorshift::XorShiftRng;
 
     use super::*;
     use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
