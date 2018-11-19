@@ -17,6 +17,7 @@ use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
 use crypto::Hash;
+use storage::proof_list_index::hash_value;
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]
@@ -42,7 +43,7 @@ pub enum ListProofError {
     UnmatchedRootHash,
 }
 
-impl<V: StorageValue> ListProof<V> {
+impl<V: StorageValue + Clone> ListProof<V> {
     fn collect<'a>(
         &'a self,
         key: ProofListKey,
@@ -68,7 +69,7 @@ impl<V: StorageValue> ListProof<V> {
                     return Err(ListProofError::UnexpectedLeaf);
                 }
                 vec.push((key.index(), value));
-                value.hash()
+                hash_value(value.clone())
             }
         };
         Ok(hash)

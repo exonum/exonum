@@ -61,12 +61,15 @@ pub struct ProofListIndexIter<'a, V> {
 
 const LEAF_TAG: u8 = 0x0;
 const NODE_TAG: u8 = 0x1;
+const LIST_TAG: u8 = 0x2;
+
+fn hash_value<V: StorageValue>(value: V) -> Hash {
+    let value_bytes = value.into_bytes();
+    hash_with_prefix(LEAF_TAG, &value_bytes)
+}
 
 fn hash_one(h: &Hash) -> Hash {
-    HashStream::new()
-        .update(&[NODE_TAG])
-        .update(h.as_ref())
-        .hash()
+    hash_with_prefix(NODE_TAG, h.as_ref())
 }
 
 fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
@@ -75,6 +78,18 @@ fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
         .update(h1.as_ref())
         .update(h2.as_ref())
         .hash()
+}
+
+fn hash_pair_with_prefix(prefix: u8, v1: &[u8], v2: &[u8]) -> Hash {
+    HashStream::new()
+        .update(&[prefix])
+        .update(&v1)
+        .update(&v2)
+        .hash()
+}
+
+fn hash_with_prefix(prefix: u8, value: &[u8]) -> Hash {
+    HashStream::new().update(&[prefix]).update(&value).hash()
 }
 
 impl<T, V> ProofListIndex<T, V>
@@ -337,6 +352,15 @@ where
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 
+    /// TBD
+    pub fn list_hash(&self) -> Hash {
+        HashStream::new()
+            .update(&[LIST_TAG])
+            .update(&[self.len() as u8])
+            .update(self.merkle_root().as_ref())
+            .hash()
+    }
+
     /// Returns the proof of existence for the list element at the specified position.
     ///
     /// # Panics
@@ -454,7 +478,7 @@ where
 
 impl<'a, V> ProofListIndex<&'a mut Fork, V>
 where
-    V: StorageValue,
+    V: StorageValue + Clone,
 {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
@@ -486,7 +510,12 @@ where
         let len = self.len();
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
-        self.base.put(&key, value.hash());
+
+        let hash = hash_value(value.clone());
+
+        println!("prooflist value hash {:?}", hash);
+
+        self.base.put(&key, hash);
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
@@ -498,28 +527,8 @@ where
                 )
             };
             key = key.parent();
-            self.set_branch(key, hash);
-        }
-    }
 
-    ///
-    pub fn push_ct(&mut self, value: V) {
-        let len = self.len();
-        self.set_len(len + 1);
-        let mut key = ProofListKey::new(1, len);
-        self.base.put(&key, value.hash());
-        self.base.put(&ProofListKey::leaf(len), value);
-
-        while key.height() < self.height() {
-            let hash = if key.is_left() {
-                hash_one(&self.get_branch_unchecked(key))
-            } else {
-                hash_pair(
-                    &self.get_branch_unchecked(key.as_left()),
-                    &self.get_branch_unchecked(key),
-                )
-            };
-            key = key.parent();
+            println!("prooflist mode hash {:?}", hash);
             self.set_branch(key, hash);
         }
     }
@@ -579,7 +588,7 @@ where
             );
         }
         let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, value.hash());
+        self.base.put(&key, hash_value(value.clone()));
         self.base.put(&ProofListKey::leaf(index), value);
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
@@ -650,24 +659,34 @@ where
     }
 }
 
-fn hash_value(value_bytes: &[u8]) -> Hash {
-    let mut value_to_hash = vec![LEAF_TAG];
-    value_to_hash.extend_from_slice(&value_bytes);
-    hash(&value_to_hash)
-}
-
 /// Computes Merkle root hash for a given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
 pub fn root_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
         0 => Hash::zero(),
-        1 => hashes[0],
+        1 => {
+            let hash = hash_value(hashes[0]);
+            println!("hash value {:?}", hash);
+            hash
+        }
         _ => {
-            let mut current_hashes = combine_hash_list(hashes);
+            let hashes: Vec<Hash> = hashes
+                .into_iter()
+                .map(|h| hash_with_prefix(LEAF_TAG, h.as_ref()))
+                .collect();
+
+            let mut current_hashes = combine_hash_list(&hashes);
+
+            println!("current_hashes {:#?}", current_hashes);
             while current_hashes.len() > 1 {
                 current_hashes = combine_hash_list(&current_hashes);
+
+                println!("current_hashes {:#?}", current_hashes);
             }
+            let node_hash = current_hashes[0];
+
+            println!("node_hash {:?}", node_hash);
             current_hashes[0]
         }
     }
@@ -690,11 +709,12 @@ pub fn root_hash_ct(hashes: &[Hash]) -> Hash {
     match len {
         0 => Hash::zero(),
         1 => {
-            let hash = hash_value(hashes[0].as_ref());
+            //            let hash = hash_value(hashes[0].as_ref());
 
-            println!("hash value {:?}", hash);
-            hash
-        },
+            //            println!("hash value {:?}", hash);
+            //            hash
+            unimplemented!()
+        }
         _ => {
             let k = len.next_power_of_two() / 2;
 
@@ -702,15 +722,19 @@ pub fn root_hash_ct(hashes: &[Hash]) -> Hash {
 
             let (left_hashes, right_hashes) = hashes.split_at(k);
 
-            println!("left hashes {:#?}, right hashes {:#?}", left_hashes, right_hashes);
+            println!(
+                "left hashes {:#?}, right hashes {:#?}",
+                left_hashes, right_hashes
+            );
 
             let left_hash = root_hash_ct(left_hashes);
             let right_hash = root_hash_ct(right_hashes);
 
-            let mut value_to_hash = vec![NODE_TAG];
-            value_to_hash.extend_from_slice(&left_hash.as_ref());
-            value_to_hash.extend_from_slice(&right_hash.as_ref());
-            hash(&value_to_hash)
+            HashStream::new()
+                .update(&[NODE_TAG])
+                .update(&left_hash.as_ref())
+                .update(&right_hash.as_ref())
+                .hash()
         }
     }
 }
