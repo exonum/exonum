@@ -499,7 +499,7 @@ impl ProofPath {
             bytes_written + writer.write(&key).unwrap()
         };
         assert_eq!(self.compressed_len(), bytes_written);
-        // Cuts of the bits that lie to the right of the end.
+        // Cut the bits that lie to the right of the end.
         let last_bits_len = bits_len % 8;
         if bytes_len > 0 && last_bits_len != 0 {
             *buffer.as_mut().last_mut().unwrap() &= !(255u8 << (self.end() % 8));
