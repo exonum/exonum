@@ -38,52 +38,121 @@ fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
         }).expect("protobuf_convert attribute is not set")
 }
 
+fn gen_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTokens {
+    let getters = field_names
+        .iter()
+        .map(|i| Ident::new(&format!("get_{}", i), Span::call_site()));
+    let our_struct_names = field_names.to_vec();
+
+    quote! {
+        fn from_pb(pb: Self::ProtoStruct) -> std::result::Result<Self, ()> {
+          Ok(Self {
+           #( #our_struct_names: ProtobufConvert::from_pb(pb.#getters().to_owned())?, )*
+          })
+        }
+    }
+}
+
+fn gen_protobuf_convert_to_pb(field_names: &[Ident]) -> impl quote::ToTokens {
+    let setters = field_names
+        .iter()
+        .map(|i| Ident::new(&format!("set_{}", i), Span::call_site()));
+    let our_struct_names = field_names.to_vec();
+
+    quote! {
+        fn to_pb(&self) -> Self::ProtoStruct {
+            let mut msg = Self::ProtoStruct::new();
+            #( msg.#setters(ProtobufConvert::to_pb(&self.#our_struct_names).into()); )*
+            msg
+        }
+    }
+}
+
+fn gen_to_protobuf_impl(
+    name: &Ident,
+    pb_name: &Path,
+    field_names: &[Ident],
+) -> impl quote::ToTokens {
+    let to_pb_fn = gen_protobuf_convert_to_pb(field_names);
+    let from_pb_fn = gen_protobuf_convert_from_pb(field_names);
+
+    quote! {
+        impl ProtobufConvert for #name {
+            type ProtoStruct = #pb_name;
+
+            #to_pb_fn
+
+            #from_pb_fn
+
+        }
+    }
+}
+
+fn gen_binary_form_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
+    quote! {
+        impl #cr::messages::BinaryForm for #name {
+
+            fn encode(&self) -> std::result::Result<Vec<u8>, _EncodingError> {
+                Ok(self.to_pb().write_to_bytes().unwrap())
+            }
+
+            fn decode(buffer: &[u8]) -> std::result::Result<Self, _EncodingError> {
+                let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
+                pb.merge_from_bytes(buffer).unwrap();
+                Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
+            }
+        }
+    }
+}
+
+fn gen_storage_traits_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
+    quote! {
+        impl #cr::crypto::CryptoHash for #name {
+            fn hash(&self) -> #cr::crypto::Hash {
+                let v = self.to_pb().write_to_bytes().unwrap();
+                #cr::crypto::hash(&v)
+            }
+        }
+
+        impl #cr::storage::StorageValue for #name {
+            fn into_bytes(self) -> Vec<u8> {
+                self.to_pb().write_to_bytes().unwrap()
+            }
+
+            fn from_bytes(value: std::borrow::Cow<[u8]>) -> Self {
+                let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
+                block.merge_from_bytes(value.as_ref()).unwrap();
+                ProtobufConvert::from_pb(block).unwrap()
+            }
+        }
+    }
+}
+
+fn get_field_names(input: &DeriveInput) -> Vec<Ident> {
+    let data = match &input.data {
+        Data::Struct(x) => x,
+        _ => panic!("Protobuf convert can be derived for structs only"),
+    };
+    data.fields
+        .iter()
+        .map(|f| f.ident.clone().unwrap())
+        .collect()
+}
+
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
-    let name = input.ident;
+    let name = input.ident.clone();
     let proto_struct_name = get_protobuf_struct_path(&input.attrs);
     let cr = super::get_exonum_types_prefix(&input.attrs);
 
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
-    let data = match input.data {
-        Data::Struct(x) => x,
-        _ => panic!("Protobuf convert can be derived for structs only"),
-    };
 
-    let field_names = data
-        .fields
-        .iter()
-        .map(|f| f.ident.clone().unwrap())
-        .collect::<Vec<_>>();
+    let field_names = get_field_names(&input);
+    let impl_protobuf_convert = gen_to_protobuf_impl(&name, &proto_struct_name, &field_names);
+    let impl_binary_form = gen_binary_form_impl(&name, &cr);
+    let impl_storage_traits = gen_storage_traits_impl(&name, &cr);
 
-    let to_pb_fn = {
-        let setters = field_names
-            .iter()
-            .map(|i| Ident::new(&format!("set_{}", i), Span::call_site()));
-        let our_struct_names = field_names.clone();
-        quote! {
-            fn to_pb(&self) -> Self::ProtoStruct {
-                let mut msg = Self::ProtoStruct::new();
-                #( msg.#setters(ProtobufConvert::to_pb(&self.#our_struct_names).into()); )*
-                msg
-            }
-        }
-    };
-
-    let from_pb_fn = {
-        let getters = field_names
-            .iter()
-            .map(|i| Ident::new(&format!("get_{}", i), Span::call_site()));
-        let our_struct_names = field_names.clone();
-        quote! {
-            fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-              Ok(Self {
-               #( #our_struct_names: ProtobufConvert::from_pb(pb.#getters().to_owned())?, )*
-              })
-            }
-        }
-    };
     let expanded = quote! {
         mod #mod_name {
             extern crate protobuf as _protobuf_crate;
@@ -94,46 +163,11 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
             use #cr::encoding::Error as _EncodingError;
             use self::_protobuf_crate::Message as _ProtobufMessage;
 
-            impl ProtobufConvert for #name {
-                type ProtoStruct = #proto_struct_name;
+            #impl_protobuf_convert
 
-                #to_pb_fn
+            #impl_binary_form
 
-                #from_pb_fn
-
-            }
-
-            impl #cr::messages::BinaryForm for #name
-            {
-                fn encode(&self) -> std::result::Result<Vec<u8>, _EncodingError> {
-                    Ok(self.to_pb().write_to_bytes().unwrap())
-                }
-
-                fn decode(buffer: &[u8]) -> std::result::Result<Self, _EncodingError> {
-                    let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-                    pb.merge_from_bytes(buffer).unwrap();
-                    Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
-                }
-            }
-
-            impl #cr::crypto::CryptoHash for #name {
-                fn hash(&self) -> #cr::crypto::Hash {
-                    let v = self.to_pb().write_to_bytes().unwrap();
-                    #cr::crypto::hash(&v)
-                }
-            }
-
-            impl #cr::storage::StorageValue for #name {
-                fn into_bytes(self) -> Vec<u8> {
-                    self.to_pb().write_to_bytes().unwrap()
-                }
-
-                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Self {
-                    let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
-                    block.merge_from_bytes(value.as_ref()).unwrap();
-                    ProtobufConvert::from_pb(block).unwrap()
-                }
-            }
+            #impl_storage_traits
         }
     };
 
