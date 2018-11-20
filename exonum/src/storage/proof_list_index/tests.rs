@@ -15,16 +15,12 @@
 use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
 
 use self::ListProof::*;
-use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
-use crypto::{hash, CryptoHash, Hash};
+use super::{hash_one, hash_pair, root_hash, hash_leaf, hash_with_prefix, LEAF_TAG, NODE_TAG, ListProof, ProofListIndex};
+use crypto::{hash, Hash};
 use encoding::serialize::{
     json::reexport::{from_str, to_string},
     reexport::Serialize,
 };
-use storage::proof_list_index::hash_value;
-use storage::proof_list_index::hash_with_prefix;
-use storage::proof_list_index::LEAF_TAG;
-use storage::proof_list_index::NODE_TAG;
 use storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";
@@ -125,9 +121,9 @@ fn list_index_proof(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
-    let h0 = hash_value(2u64);
-    let h1 = hash_value(4u64);
-    let h2 = hash_value(6u64);
+    let h0 = hash_leaf(2u64);
+    let h1 = hash_leaf(4u64);
+    let h2 = hash_leaf(6u64);
     let h01 = hash_pair(&h0, &h1);
     let h22 = hash_one(&h2);
     let h012 = hash_pair(&h01, &h22);
@@ -303,11 +299,11 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
     }
 }
 
-fn hash_leaf(value: &[u8]) -> Hash {
+fn hash_leaf_node(value: &[u8]) -> Hash {
     hash_with_prefix(LEAF_TAG, value)
 }
 
-fn hash_node(value: &[u8]) -> Hash {
+fn hash_branch_node(value: &[u8]) -> Hash {
     hash_with_prefix(NODE_TAG, value)
 }
 
@@ -316,37 +312,37 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.merkle_root(), Hash::zero());
 
-    let h1 = hash_leaf(&[1, 2]);
-    let h2 = hash_leaf(&[2, 3]);
-    let h3 = hash_leaf(&[3, 4]);
-    let h4 = hash_leaf(&[4, 5]);
-    let h5 = hash_leaf(&[5, 6]);
-    let h6 = hash_leaf(&[6, 7]);
-    let h7 = hash_leaf(&[7, 8]);
-    let h8 = hash_leaf(&[8, 9]);
+    let h1 = hash_leaf_node(&[1, 2]);
+    let h2 = hash_leaf_node(&[2, 3]);
+    let h3 = hash_leaf_node(&[3, 4]);
+    let h4 = hash_leaf_node(&[4, 5]);
+    let h5 = hash_leaf_node(&[5, 6]);
+    let h6 = hash_leaf_node(&[6, 7]);
+    let h7 = hash_leaf_node(&[7, 8]);
+    let h8 = hash_leaf_node(&[8, 9]);
 
-    let h12 = hash_node(&[h1.as_ref(), h2.as_ref()].concat());
-    let h3up = hash_node(h3.as_ref());
-    let h123 = hash_node(&[h12.as_ref(), h3up.as_ref()].concat());
+    let h12 = hash_branch_node(&[h1.as_ref(), h2.as_ref()].concat());
+    let h3up = hash_branch_node(h3.as_ref());
+    let h123 = hash_branch_node(&[h12.as_ref(), h3up.as_ref()].concat());
 
-    let h34 = hash_node(&[h3.as_ref(), h4.as_ref()].concat());
-    let h1234 = hash_node(&[h12.as_ref(), h34.as_ref()].concat());
+    let h34 = hash_branch_node(&[h3.as_ref(), h4.as_ref()].concat());
+    let h1234 = hash_branch_node(&[h12.as_ref(), h34.as_ref()].concat());
 
-    let h5up = hash_node(h5.as_ref());
-    let h5upup = hash_node(h5up.as_ref());
-    let h12345 = hash_node(&[h1234.as_ref(), h5upup.as_ref()].concat());
+    let h5up = hash_branch_node(h5.as_ref());
+    let h5upup = hash_branch_node(h5up.as_ref());
+    let h12345 = hash_branch_node(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-    let h56 = hash_node(&[h5.as_ref(), h6.as_ref()].concat());
-    let h56up = hash_node(h56.as_ref());
-    let h123456 = hash_node(&[h1234.as_ref(), h56up.as_ref()].concat());
+    let h56 = hash_branch_node(&[h5.as_ref(), h6.as_ref()].concat());
+    let h56up = hash_branch_node(h56.as_ref());
+    let h123456 = hash_branch_node(&[h1234.as_ref(), h56up.as_ref()].concat());
 
-    let h7up = hash_node(h7.as_ref());
-    let h567 = hash_node(&[h56.as_ref(), h7up.as_ref()].concat());
-    let h1234567 = hash_node(&[h1234.as_ref(), h567.as_ref()].concat());
+    let h7up = hash_branch_node(h7.as_ref());
+    let h567 = hash_branch_node(&[h56.as_ref(), h7up.as_ref()].concat());
+    let h1234567 = hash_branch_node(&[h1234.as_ref(), h567.as_ref()].concat());
 
-    let h78 = hash_node(&[h7.as_ref(), h8.as_ref()].concat());
-    let h5678 = hash_node(&[h56.as_ref(), h78.as_ref()].concat());
-    let h12345678 = hash_node(&[h1234.as_ref(), h5678.as_ref()].concat());
+    let h78 = hash_branch_node(&[h7.as_ref(), h8.as_ref()].concat());
+    let h5678 = hash_branch_node(&[h56.as_ref(), h78.as_ref()].concat());
+    let h12345678 = hash_branch_node(&[h1234.as_ref(), h5678.as_ref()].concat());
 
     let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![
         (vec![1, 2], h1, 0),
@@ -471,17 +467,17 @@ fn proof_structure(db: Box<dyn Database>) {
 
     // spell-checker:ignore upup
 
-    let h1 = hash_leaf(&vec![0, 1, 2]);
-    let h2 = hash_leaf(&vec![1, 2, 3]);
-    let h3 = hash_leaf(&vec![2, 3, 4]);
-    let h4 = hash_leaf(&vec![3, 4, 5]);
-    let h5 = hash_leaf(&vec![4, 5, 6]);
-    let h12 = hash_node(&[h1.as_ref(), h2.as_ref()].concat());
-    let h34 = hash_node(&[h3.as_ref(), h4.as_ref()].concat());
-    let h1234 = hash_node(&[h12.as_ref(), h34.as_ref()].concat());
-    let h5up = hash_node(h5.as_ref());
-    let h5upup = hash_node(h5up.as_ref());
-    let h12345 = hash_node(&[h1234.as_ref(), h5upup.as_ref()].concat());
+    let h1 = hash_leaf_node(&vec![0, 1, 2]);
+    let h2 = hash_leaf_node(&vec![1, 2, 3]);
+    let h3 = hash_leaf_node(&vec![2, 3, 4]);
+    let h4 = hash_leaf_node(&vec![3, 4, 5]);
+    let h5 = hash_leaf_node(&vec![4, 5, 6]);
+    let h12 = hash_branch_node(&[h1.as_ref(), h2.as_ref()].concat());
+    let h34 = hash_branch_node(&[h3.as_ref(), h4.as_ref()].concat());
+    let h1234 = hash_branch_node(&[h12.as_ref(), h34.as_ref()].concat());
+    let h5up = hash_branch_node(h5.as_ref());
+    let h5upup = hash_branch_node(h5up.as_ref());
+    let h12345 = hash_branch_node(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
     for i in 0_u8..5 {
         index.push(vec![i, i + 1, i + 2]);
@@ -835,37 +831,48 @@ mod root_hash_tests {
     }
 }
 
-mod ct_hash_tests {
-    use crypto::{self, hash, Hash};
-    use storage::{
-        proof_list_index::{hash_value, root_hash_ct, NODE_TAG},
-        Database, MemoryDB,
-    };
+mod list_hash_tests {
+    use byteorder::LittleEndian;
+    use bytes::ByteOrder;
+    use hex::FromHex;
 
-    fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {
-        bytes.iter().map(|chunk| crypto::hash(chunk)).collect()
-    }
+    use crypto::{Hash, hash};
+    use storage::{Database, MemoryDB, ProofListIndex, proof_list_index::LIST_TAG};
 
     #[test]
-    fn root_hash_certified_transparency() {
-        //        let root_hash = root_hash_ct(&hash_list(&[b"1", b"2"]));
-        //        println!("hash {:?}", root_hash);
+    fn proof_of_absence() {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        let mut index = ProofListIndex::new("absence", &mut fork);
 
-        println!("-------------------- manual check --------------------");
+        index.push(vec![1]);
+        index.push(vec![2]);
+        index.push(vec![3]);
+        index.push(vec![4]);
+        index.push(vec![5]);
 
-        //        let hash1 = hash_value(hash(b"1").as_ref());
-        //        let hash2 = hash_value(hash(b"2").as_ref());
-        //
-        //        println!("hash1 {:?}", hash1);
-        //        println!("hash2 {:?}", hash2);
-        //
-        //        let mut value_to_hash = vec![NODE_TAG];
-        //        value_to_hash.extend_from_slice(&hash1.as_ref());
-        //        value_to_hash.extend_from_slice(&hash2.as_ref());
-        //
-        //        let root_hash = hash(&value_to_hash);
-        //
-        //        println!("root_hash {:?}", root_hash);
+        let actual_list_hash = index.list_hash();
+
+        let existed_index = 5u64;
+        let root_hash = Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9").unwrap();
+
+        let hash = list_hash(existed_index, &root_hash.as_ref());
+        assert_eq!(hash, actual_list_hash);
+
+        let non_existed_index = 6u64;
+        let hash = list_hash(non_existed_index, &index.merkle_root().as_ref());
+        assert_ne!(hash, actual_list_hash);
     }
 
+    fn list_hash(index: u64, root_hash: &[u8]) -> Hash {
+        let mut len_bytes = vec![0; 8];
+        LittleEndian::write_u64(&mut len_bytes, index);
+
+        let mut hash_bytes = vec![];
+        hash_bytes.extend_from_slice(&[LIST_TAG]);
+        hash_bytes.extend_from_slice(&len_bytes);
+        hash_bytes.extend_from_slice(root_hash);
+
+       hash(&hash_bytes)
+    }
 }

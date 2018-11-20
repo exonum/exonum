@@ -16,7 +16,7 @@
 
 pub use self::proof::{ListProof, ListProofError};
 
-use std::{borrow::Cow, cell::Cell, marker::PhantomData};
+use std::{cell::Cell, marker::PhantomData};
 
 use self::key::ProofListKey;
 use super::{
@@ -24,12 +24,18 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::{hash, Hash, HashStream};
+use crypto::{Hash, HashStream};
+use byteorder::LittleEndian;
+use bytes::ByteOrder;
 
 mod key;
 mod proof;
 #[cfg(test)]
 mod tests;
+
+pub const LEAF_TAG: u8 = 0x0;
+const NODE_TAG: u8 = 0x1;
+const LIST_TAG: u8 = 0x2; // Subject of change in the future.
 
 // TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
@@ -59,11 +65,8 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-const LEAF_TAG: u8 = 0x0;
-const NODE_TAG: u8 = 0x1;
-const LIST_TAG: u8 = 0x2;
-
-fn hash_value<V: StorageValue>(value: V) -> Hash {
+/// TBD
+pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
     let value_bytes = value.into_bytes();
     hash_with_prefix(LEAF_TAG, &value_bytes)
 }
@@ -80,15 +83,7 @@ fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
         .hash()
 }
 
-fn hash_pair_with_prefix(prefix: u8, v1: &[u8], v2: &[u8]) -> Hash {
-    HashStream::new()
-        .update(&[prefix])
-        .update(&v1)
-        .update(&v2)
-        .hash()
-}
-
-fn hash_with_prefix(prefix: u8, value: &[u8]) -> Hash {
+pub fn hash_with_prefix(prefix: u8, value: &[u8]) -> Hash {
     HashStream::new().update(&[prefix]).update(&value).hash()
 }
 
@@ -354,9 +349,12 @@ where
 
     /// TBD
     pub fn list_hash(&self) -> Hash {
+        let mut length_bytes = vec![0; 8];
+        LittleEndian::write_u64(&mut length_bytes, self.len());
+
         HashStream::new()
             .update(&[LIST_TAG])
-            .update(&[self.len() as u8])
+            .update(&length_bytes)
             .update(self.merkle_root().as_ref())
             .hash()
     }
@@ -511,11 +509,7 @@ where
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
 
-        let hash = hash_value(value.clone());
-
-        println!("prooflist value hash {:?}", hash);
-
-        self.base.put(&key, hash);
+        self.base.put(&key, hash_leaf(value.clone()));
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
@@ -528,7 +522,6 @@ where
             };
             key = key.parent();
 
-            println!("prooflist mode hash {:?}", hash);
             self.set_branch(key, hash);
         }
     }
@@ -588,7 +581,7 @@ where
             );
         }
         let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, hash_value(value.clone()));
+        self.base.put(&key, hash_leaf(value.clone()));
         self.base.put(&ProofListKey::leaf(index), value);
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
@@ -666,27 +659,19 @@ pub fn root_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
         0 => Hash::zero(),
         1 => {
-            let hash = hash_value(hashes[0]);
-            println!("hash value {:?}", hash);
-            hash
+            hash_leaf(hashes[0])
         }
         _ => {
             let hashes: Vec<Hash> = hashes
                 .into_iter()
-                .map(|h| hash_with_prefix(LEAF_TAG, h.as_ref()))
+                .map(|h| hash_leaf(*h))
                 .collect();
 
             let mut current_hashes = combine_hash_list(&hashes);
 
-            println!("current_hashes {:#?}", current_hashes);
             while current_hashes.len() > 1 {
                 current_hashes = combine_hash_list(&current_hashes);
-
-                println!("current_hashes {:#?}", current_hashes);
             }
-            let node_hash = current_hashes[0];
-
-            println!("node_hash {:?}", node_hash);
             current_hashes[0]
         }
     }
@@ -700,41 +685,4 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
             [single] => hash_one(single),
             _ => unreachable!(),
         }).collect()
-}
-
-///
-pub fn root_hash_ct(hashes: &[Hash]) -> Hash {
-    let len = hashes.len();
-
-    match len {
-        0 => Hash::zero(),
-        1 => {
-            //            let hash = hash_value(hashes[0].as_ref());
-
-            //            println!("hash value {:?}", hash);
-            //            hash
-            unimplemented!()
-        }
-        _ => {
-            let k = len.next_power_of_two() / 2;
-
-            println!("k {}", k);
-
-            let (left_hashes, right_hashes) = hashes.split_at(k);
-
-            println!(
-                "left hashes {:#?}, right hashes {:#?}",
-                left_hashes, right_hashes
-            );
-
-            let left_hash = root_hash_ct(left_hashes);
-            let right_hash = root_hash_ct(right_hashes);
-
-            HashStream::new()
-                .update(&[NODE_TAG])
-                .update(&left_hash.as_ref())
-                .update(&right_hash.as_ref())
-                .hash()
-        }
-    }
 }

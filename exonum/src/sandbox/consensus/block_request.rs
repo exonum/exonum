@@ -20,6 +20,7 @@ use crypto::CryptoHash;
 use helpers::{Height, Round, ValidatorId};
 use node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
 use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use storage::proof_list_index::LEAF_TAG;
 
 /// HANDLE block response
 

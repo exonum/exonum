@@ -15,9 +15,8 @@
 use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
-use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
+use super::{super::StorageValue, hash_one, hash_pair, hash_leaf, key::ProofListKey};
 use crypto::Hash;
-use storage::proof_list_index::hash_value;
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]
@@ -69,7 +68,7 @@ impl<V: StorageValue + Clone> ListProof<V> {
                     return Err(ListProofError::UnexpectedLeaf);
                 }
                 vec.push((key.index(), value));
-                hash_value(value.clone())
+                hash_leaf(value.clone())
             }
         };
         Ok(hash)
