@@ -14,6 +14,7 @@ use std::{
 const DEFAULT_KEY_PATH: &str = "../private_key_file.pem";
 const IV: Option<&[u8]> = Some(b"\x00\x01\x02\x03\x04\x05\x06\x07\x00\x01\x02\x03\x04\x05\x06\x07");
 
+#[derive(Copy, Clone)]
 enum KeyOperation {
     ENCRYPT,
     DECRYPT,

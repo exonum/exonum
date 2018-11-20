@@ -130,6 +130,7 @@ subsec
 supermajority
 supervisorctl
 supervisord
+symm
 tempdir
 terminfo
 testdata

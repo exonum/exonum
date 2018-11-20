@@ -30,7 +30,6 @@ extern crate serde;
 extern crate serde_json;
 extern crate uuid;
 
-
 #[doc(inline)]
 pub use self::crypto_impl::{
     HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
