@@ -196,7 +196,7 @@ impl ProofPath {
     pub fn new<K: ProofMapKey>(key: &K) -> Self {
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
-        key.write_key(&mut data[1..=KEY_SIZE]);
+        key.write_key(&mut data[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS+KEY_SIZE]);
         data[PROOF_PATH_LEN_POS] = 0;
         Self::from_raw(data)
     }
@@ -367,7 +367,7 @@ impl BitsRange for ProofPath {
     }
 
     fn raw_key(&self) -> &[u8] {
-        &self.bytes[1..=KEY_SIZE]
+        &self.bytes[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS+KEY_SIZE]
     }
 }
 
@@ -499,7 +499,7 @@ impl ProofPath {
             bytes_written + writer.write(&key).unwrap()
         };
         assert_eq!(self.compressed_len(), bytes_written);
-        // Cuts of the bits that lie to the right of the end.
+        // Cut the bits that lie to the right of the end.
         let has_bits_in_last_byte = (bits_len % 8) != 0;
         if whole_bytes_len > 0 && has_bits_in_last_byte {
             let zero_bits_mask = !(255u8 << (self.end() % 8));
@@ -531,7 +531,7 @@ mod tests {
 
             let mut raw = [0u8; PROOF_PATH_SIZE];
             reader
-                .read(&mut raw[PROOF_PATH_KEY_POS..=KEY_SIZE])
+                .read(&mut raw[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS+KEY_SIZE])
                 .unwrap();
             if bits_len == KEY_SIZE * 8 {
                 raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
