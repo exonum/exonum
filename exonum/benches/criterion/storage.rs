@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const SAMPLE_SIZE: usize = 20;
+const SAMPLE_SIZE: usize = 10;
 
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
@@ -206,7 +206,7 @@ fn bench_proof_map_index_validate_proofs(b: &mut Bencher, len: &usize) {
 pub fn bench_storage(c: &mut Criterion) {
     ::exonum::crypto::init();
 
-    let item_counts = vec![100, 1_000, 10_000];
+    let item_counts = vec![1_000, 10_000, 100_000];
 
     c.bench(
         "storage/proof_list/append",

@@ -490,8 +490,8 @@ impl ProofPath {
         assert_eq!(self.compressed_len(), buffer.len());
 
         let bits_len = self.end() as u64;
-        let bytes_len = ((bits_len + 7) / 8) as usize;
-        let key = &self.raw_key()[0..bytes_len];
+        let whole_bytes_len = ((bits_len + 7) / 8) as usize;
+        let key = &self.raw_key()[0..whole_bytes_len];
 
         let bytes_written = {
             let mut writer = Cursor::new(buffer.as_mut());
@@ -500,29 +500,11 @@ impl ProofPath {
         };
         assert_eq!(self.compressed_len(), bytes_written);
         // Cuts of the bits that lie to the right of the end.
-        let last_bits_len = bits_len % 8;
-        if bytes_len > 0 && last_bits_len != 0 {
-            *buffer.as_mut().last_mut().unwrap() &= !(255u8 << (self.end() % 8));
+        let has_bits_in_last_byte = (bits_len % 8) != 0;
+        if whole_bytes_len > 0 && has_bits_in_last_byte {
+            let zero_bits_mask = !(255u8 << (self.end() % 8));
+            buffer[bytes_written - 1] &= zero_bits_mask;
         }
-    }
-
-    /// Reads the proof path from the compressed binary representation.
-    pub fn read_compressed(value: &[u8]) -> Self {
-        let mut reader = Cursor::new(value);
-        let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
-        debug_assert!(bits_len <= KEY_SIZE * 8);
-
-        let mut raw = [0u8; PROOF_PATH_SIZE];
-        reader
-            .read(&mut raw[PROOF_PATH_KEY_POS..=KEY_SIZE])
-            .unwrap();
-        if bits_len == KEY_SIZE * 8 {
-            raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
-        } else {
-            raw[PROOF_PATH_KIND_POS] = BRANCH_KEY_PREFIX;
-            raw[PROOF_PATH_LEN_POS] = bits_len as u8;
-        }
-        ProofPath::from_raw(raw)
     }
 }
 
@@ -540,6 +522,25 @@ mod tests {
             self.write_compressed(&mut buf);
             buf
         }
+
+        /// Reads the proof path from the compressed binary representation.
+        fn read_compressed(value: &[u8]) -> Self {
+            let mut reader = Cursor::new(value);
+            let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
+            debug_assert!(bits_len <= KEY_SIZE * 8);
+
+            let mut raw = [0u8; PROOF_PATH_SIZE];
+            reader
+                .read(&mut raw[PROOF_PATH_KEY_POS..=KEY_SIZE])
+                .unwrap();
+            if bits_len == KEY_SIZE * 8 {
+                raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
+            } else {
+                raw[PROOF_PATH_KIND_POS] = BRANCH_KEY_PREFIX;
+                raw[PROOF_PATH_LEN_POS] = bits_len as u8;
+            }
+            ProofPath::from_raw(raw)
+        }
     }
 
     /// Creates a random non-leaf, non-empty path.
@@ -552,7 +553,7 @@ mod tests {
     }
 
     #[test]
-    fn test_proof_path_serialization() {
+    fn test_proof_path_serialization_fuzz() {
         let path = ProofPath::new(&[1; 32]).prefix(3);
         assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
         let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
@@ -592,11 +593,19 @@ mod tests {
             let buf = key.compressed();
             let key2 = ProofPath::read_compressed(buf.as_ref());
             assert_eq!(key2, key);
+            // Trims insignificant bits in the last byte.
+            let trimmed_key = {
+                let mut buf = vec![0u8; PROOF_PATH_SIZE];
+                key.write(&mut buf);
+                ProofPath::read(&buf)
+            };
+            assert_eq!(key2, trimmed_key);
+            assert_eq!(key2.bytes.as_ref(), trimmed_key.bytes.as_ref());
         }
     }
 
     #[test]
-    fn test_proof_path_ordering() {
+    fn test_proof_path_ordering_fuzz() {
         assert!(ProofPath::new(&[1; 32]) > ProofPath::new(&[254; 32]));
         assert!(ProofPath::new(&[0b0001_0001; 32]) > ProofPath::new(&[0b0010_0001; 32]));
         assert!(ProofPath::new(&[1; 32]) == ProofPath::new(&[1; 32]));
@@ -613,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fuzz_match_len() {
+    fn test_match_len_fuzz() {
         let mut rng = rand::thread_rng();
         for _ in 0..10_000 {
             let (x, y) = (random_path(&mut rng), random_path(&mut rng));
@@ -705,6 +714,16 @@ mod tests {
         let mut key2 = ProofPath::read_compressed(buf.as_ref());
         key2.start = 5;
         assert_eq!(key2, key);
+        // Trims insignificant bits in the last byte.
+        let trimmed_key = {
+            let mut buf = vec![0u8; PROOF_PATH_SIZE];
+            key.write(&mut buf);
+            let mut key = ProofPath::read(&buf);
+            key.start = 5;
+            key
+        };
+        assert_eq!(key2, trimmed_key);
+        assert_eq!(key2.bytes.as_ref(), trimmed_key.bytes.as_ref());
     }
 
     #[test]
