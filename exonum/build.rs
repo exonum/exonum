@@ -43,6 +43,7 @@ fn main() {
             .collect::<Vec<_>>(),
         includes: &["src/encoding/protobuf/proto"],
         customize: Customize {
+            serde_derive: Some(true),
             ..Default::default()
         },
     }).expect("protoc");

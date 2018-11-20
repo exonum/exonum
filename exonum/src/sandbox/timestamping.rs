@@ -74,7 +74,8 @@ impl Iterator for TimestampingTxGenerator {
     fn next(&mut self) -> Option<Signed<RawTransaction>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        let buf = TimestampTx::new(&data);
+        let mut buf = TimestampTx::new();
+        buf.set_data(data);
         Some(Message::sign_transaction(
             buf,
             TIMESTAMPING_SERVICE,
