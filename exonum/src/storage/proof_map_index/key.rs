@@ -469,34 +469,46 @@ impl PartialOrd for ProofPath {
 }
 
 impl ProofPath {
+    /// Returns length in bytes of the compressed binary representation.
+    pub fn compressed_len(&self) -> usize {
+        let bits_len = self.end() as u64;
+        let mut bytes_len = {
+            let mut buf = [0u8; 4];
+            let mut writer = Cursor::new(buf.as_mut());
+            leb128::write::unsigned(&mut writer, bits_len).unwrap()
+        };
+        bytes_len += ((bits_len + 7) / 8) as usize;
+        bytes_len
+    }
+
     /// Creates a compressed binary representation of the given proof path.
     ///
     /// # Binary format
     ///
     /// - **bits_len** - total length in bits compressed by the leb128 algorithm.
     /// - **bytes** - non-null bytes of the given ProofPath, i.e. the first `(bits_len + 7) / 8` bytes.
-    pub fn compress(&self) -> SmallVec<[u8; 64]> {
+    pub fn write_compressed(&self, buffer: &mut [u8]) {
+        assert_eq!(self.compressed_len(), buffer.len());
+
         let bits_len = self.end() as u64;
         let bytes_len = ((bits_len + 7) / 8) as usize;
         let key = &self.raw_key()[0..bytes_len];
 
-        let mut buf = smallvec![0u8; 64];
         let bytes_written = {
-            let mut writer = Cursor::new(buf.as_mut());
+            let mut writer = Cursor::new(buffer.as_mut());
             let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
             bytes_written + writer.write(&key).unwrap()
         };
-        buf.resize(bytes_written, 0);
+        assert_eq!(self.compressed_len(), bytes_written);
         // Cuts of the bits that lie to the right of the end.
         let last_bits_len = bits_len % 8;
         if bytes_len > 0 && last_bits_len != 0 {
-            *buf.as_mut().last_mut().unwrap() &= !(255_u8 << (self.end() % 8));
+            *buffer.as_mut().last_mut().unwrap() &= !(255u8 << (self.end() % 8));
         }
-        buf
     }
 
     /// Reads the proof path from the compressed binary representation.
-    pub fn decompress(value: &[u8]) -> Self {
+    pub fn read_compressed(value: &[u8]) -> Self {
         let mut reader = Cursor::new(value);
         let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
         debug_assert!(bits_len <= KEY_SIZE * 8);
@@ -512,6 +524,12 @@ impl ProofPath {
             raw[PROOF_PATH_LEN_POS] = bits_len as u8;
         }
         ProofPath::from_raw(raw)
+    }
+
+    pub(crate) fn compressed(&self) -> SmallVec<[u8; 64]> {
+        let mut buf = smallvec![0u8; self.compressed_len()];
+        self.write_compressed(&mut buf);
+        buf
     }
 }
 
@@ -569,8 +587,8 @@ mod tests {
         let mut rng = rand::thread_rng();
         for _ in 0..1000 {
             let key = random_path(&mut rng);
-            let buf = key.compress();
-            let key2 = ProofPath::decompress(buf.as_ref());
+            let buf = key.compressed();
+            let key2 = ProofPath::read_compressed(buf.as_ref());
             assert_eq!(key2, key);
         }
     }
@@ -671,8 +689,8 @@ fn test_proof_path_storage_key_branch() {
 #[test]
 fn test_proof_path_compress_leaf() {
     let key = ProofPath::new(&[250; 32]);
-    let buf = key.compress();
-    let key2 = ProofPath::decompress(buf.as_ref());
+    let buf = key.compressed();
+    let key2 = ProofPath::read_compressed(buf.as_ref());
     assert_eq!(key2, key);
 }
 
@@ -682,8 +700,8 @@ fn test_proof_path_compress_branch() {
     key = key.prefix(11);
     key = key.suffix(5);
 
-    let buf = key.compress();
-    let mut key2 = ProofPath::decompress(buf.as_ref());
+    let buf = key.compressed();
+    let mut key2 = ProofPath::read_compressed(buf.as_ref());
     key2.start = 5;
     assert_eq!(key2, key);
 }

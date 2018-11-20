@@ -14,13 +14,15 @@
 
 #![allow(unsafe_code)]
 
+use smallvec::SmallVec;
+
 use std::borrow::Cow;
 
 use super::{
     super::{StorageKey, StorageValue},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
-use crypto::{CryptoHash, Hash, HashStream, HASH_SIZE};
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -82,12 +84,25 @@ impl BranchNode {
 
 impl CryptoHash for BranchNode {
     fn hash(&self) -> Hash {
-        HashStream::new()
-            .update(self.child_hash(ChildKind::Left).as_ref())
-            .update(self.child_hash(ChildKind::Right).as_ref())
-            .update(self.child_path(ChildKind::Left).compress().as_ref())
-            .update(self.child_path(ChildKind::Right).compress().as_ref())
-            .hash()
+        // It could be worth investigating whether implementing `smallvec::Array` for
+        // a `[u8; 132]` newtype could improve performance.
+        let mut bytes: SmallVec<[u8; 256]> = SmallVec::new();
+        let left_path = self.child_path(ChildKind::Left);
+        let right_path = self.child_path(ChildKind::Right);
+
+        let hashes_end = HASH_SIZE * 2;
+        let right_path_start = hashes_end + left_path.compressed_len();
+        let total_len = right_path_start + right_path.compressed_len();
+        // You can do without `unsafe` by initializing `bytes` to `smallvec![0; len]`;
+        // as far as I can tell, the decrease in performance is negligible.
+        unsafe {
+            bytes.set_len(total_len);
+        }
+        // Writes data to buffer.
+        bytes[..hashes_end].copy_from_slice(&self.raw[..hashes_end]);
+        left_path.write_compressed(&mut bytes[hashes_end..right_path_start]);
+        right_path.write_compressed(&mut bytes[right_path_start..]);
+        hash(bytes.as_ref())
     }
 }
 
