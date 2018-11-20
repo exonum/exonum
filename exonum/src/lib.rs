@@ -78,7 +78,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 extern crate protobuf;
-#[macro_use]
+#[cfg_attr(test, macro_use)]
 extern crate smallvec;
 extern crate snow;
 extern crate tokio;

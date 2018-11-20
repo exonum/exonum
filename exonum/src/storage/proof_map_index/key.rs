@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use leb128;
-use smallvec::SmallVec;
 
 use std::cmp::{min, Ordering};
 use std::io::{Cursor, Read, Write};
@@ -525,20 +524,23 @@ impl ProofPath {
         }
         ProofPath::from_raw(raw)
     }
-
-    pub(crate) fn compressed(&self) -> SmallVec<[u8; 64]> {
-        let mut buf = smallvec![0u8; self.compressed_len()];
-        self.write_compressed(&mut buf);
-        buf
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use rand::{self, Rng};
     use serde_json::{self, Value};
+    use smallvec::SmallVec;
 
     use super::*;
+
+    impl ProofPath {
+        fn compressed(&self) -> SmallVec<[u8; 64]> {
+            let mut buf = smallvec![0u8; self.compressed_len()];
+            self.write_compressed(&mut buf);
+            buf
+        }
+    }
 
     /// Creates a random non-leaf, non-empty path.
     fn random_path<T: Rng>(rng: &mut T) -> ProofPath {
@@ -653,226 +655,227 @@ mod tests {
             }
         }
     }
-}
 
-#[test]
-fn test_proof_path_storage_key_leaf() {
-    let key = ProofPath::new(&[250; 32]);
-    let mut buf = vec![0; PROOF_PATH_SIZE];
-    key.write(&mut buf);
-    let key2 = ProofPath::read(&buf);
+    #[test]
+    fn test_proof_path_storage_key_leaf() {
+        let key = ProofPath::new(&[250; 32]);
+        let mut buf = vec![0; PROOF_PATH_SIZE];
+        key.write(&mut buf);
+        let key2 = ProofPath::read(&buf);
 
-    assert_eq!(buf[0], LEAF_KEY_PREFIX);
-    assert_eq!(buf[33], 0);
-    assert_eq!(&buf[1..33], &[250; 32]);
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_proof_path_storage_key_branch() {
-    let mut key = ProofPath::new(&[255_u8; 32]);
-    key = key.prefix(11);
-    key = key.suffix(5);
-
-    let mut buf = vec![0; PROOF_PATH_SIZE];
-    key.write(&mut buf);
-    let mut key2 = ProofPath::read(&buf);
-    key2.start = 5;
-
-    assert_eq!(buf[0], BRANCH_KEY_PREFIX);
-    assert_eq!(buf[33], 11);
-    assert_eq!(&buf[1..3], &[255, 7]);
-    assert_eq!(&buf[3..33], &[0; 30]);
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_proof_path_compress_leaf() {
-    let key = ProofPath::new(&[250; 32]);
-    let buf = key.compressed();
-    let key2 = ProofPath::read_compressed(buf.as_ref());
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_proof_path_compress_branch() {
-    let mut key = ProofPath::new(&[255_u8; 32]);
-    key = key.prefix(11);
-    key = key.suffix(5);
-
-    let buf = key.compressed();
-    let mut key2 = ProofPath::read_compressed(buf.as_ref());
-    key2.start = 5;
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_proof_path_suffix() {
-    let b = ProofPath::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
-
-    assert_eq!(b.len(), 32);
-    assert_eq!(b.bit(0), ChildKind::Right);
-    assert_eq!(b.bit(7), ChildKind::Left);
-    assert_eq!(b.bit(8), ChildKind::Left);
-    assert_eq!(b.bit(9), ChildKind::Right);
-    assert_eq!(b.bit(15), ChildKind::Left);
-    assert_eq!(b.bit(16), ChildKind::Right);
-    assert_eq!(b.bit(20), ChildKind::Right);
-    assert_eq!(b.bit(23), ChildKind::Right);
-    assert_eq!(b.bit(26), ChildKind::Right);
-    assert_eq!(b.bit(27), ChildKind::Right);
-    assert_eq!(b.bit(31), ChildKind::Left);
-    let b2 = b.suffix(8);
-    assert_eq!(b2.len(), 24);
-    assert_eq!(b2.bit(0), ChildKind::Left);
-    assert_eq!(b2.bit(1), ChildKind::Right);
-    assert_eq!(b2.bit(7), ChildKind::Left);
-    assert_eq!(b2.bit(12), ChildKind::Right);
-    assert_eq!(b2.bit(15), ChildKind::Right);
-    let b3 = b2.suffix(24);
-    assert_eq!(b3.len(), 0);
-    let b4 = b.suffix(1);
-    assert_eq!(b4.bit(6), ChildKind::Left);
-    assert_eq!(b4.bit(7), ChildKind::Left);
-    assert_eq!(b4.bit(8), ChildKind::Right);
-}
-
-#[test]
-fn test_proof_path_prefix() {
-    // spell-checker:disable
-    let b = ProofPath::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
-    assert_eq!(b.len(), 8);
-    assert_eq!(b.prefix(1).bit(0), ChildKind::Right);
-    assert_eq!(b.prefix(1).len(), 1);
-}
-
-#[test]
-fn test_proof_path_len() {
-    let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    assert_eq!(b.len(), 256);
-}
-
-#[test]
-#[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_proof_path_at_overflow() {
-    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
-    b.bit(32);
-}
-
-#[test]
-#[should_panic(expected = "pos <= self.end()")]
-fn test_proof_path_suffix_overflow() {
-    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
-    b.suffix(255).suffix(2);
-}
-
-#[test]
-#[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_proof_path_suffix_bit_overflow() {
-    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    b.suffix(1).bit(255);
-}
-
-#[test]
-fn test_proof_path_common_prefix_len() {
-    let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
-    assert_eq!(b1.common_prefix_len(&b1), 256);
-    let c = b1.common_prefix_len(&b2);
-    assert_eq!(c, 17);
-    let c = b2.common_prefix_len(&b1);
-    assert_eq!(c, 17);
-    let b1 = b1.suffix(9);
-    let b2 = b2.suffix(9);
-    let c = b1.common_prefix_len(&b2);
-    assert_eq!(c, 8);
-    let b3 = ProofPath::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = ProofPath::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
-    assert_eq!(b3.common_prefix_len(&b4), 3);
-    assert_eq!(b4.common_prefix_len(&b3), 3);
-    assert_eq!(b3.common_prefix_len(&b3), 256);
-    let b3 = b3.suffix(30);
-    assert_eq!(b3.common_prefix_len(&b3), 226);
-    let b3 = b3.prefix(200);
-    assert_eq!(b3.common_prefix_len(&b3), 200);
-    let b5 = ProofPath::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
-    assert_eq!(b5.prefix(0).common_prefix_len(&b3), 0);
-}
-
-#[test]
-fn test_proof_path_match_len() {
-    let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
-
-    for start in 0..256 {
-        assert_eq!(b1.match_len(&b1, start), 256);
-    }
-    for start in 0..18 {
-        assert_eq!(b1.match_len(&b2, start), 17);
-        assert_eq!(b2.match_len(&b1, start), 17);
-    }
-    for start in 32..256 {
-        assert_eq!(b1.match_len(&b2, start), 256);
-        assert_eq!(b2.match_len(&b1, start), 256);
+        assert_eq!(buf[0], LEAF_KEY_PREFIX);
+        assert_eq!(buf[33], 0);
+        assert_eq!(&buf[1..33], &[250; 32]);
+        assert_eq!(key2, key);
     }
 
-    let b2 = ProofPath::from_raw(*b"\x01abce0000000000000000000000000000\x00");
-    for start in 0..25 {
-        assert_eq!(b1.match_len(&b2, start), 24);
-        assert_eq!(b2.match_len(&b1, start), 24);
+    #[test]
+    fn test_proof_path_storage_key_branch() {
+        let mut key = ProofPath::new(&[255_u8; 32]);
+        key = key.prefix(11);
+        key = key.suffix(5);
+
+        let mut buf = vec![0; PROOF_PATH_SIZE];
+        key.write(&mut buf);
+        let mut key2 = ProofPath::read(&buf);
+        key2.start = 5;
+
+        assert_eq!(buf[0], BRANCH_KEY_PREFIX);
+        assert_eq!(buf[33], 11);
+        assert_eq!(&buf[1..3], &[255, 7]);
+        assert_eq!(&buf[3..33], &[0; 30]);
+        assert_eq!(key2, key);
     }
 
-    let b1 = b1.prefix(19);
-    for start in 0..19 {
-        assert_eq!(b1.match_len(&b2, start), 19);
-        assert_eq!(b2.match_len(&b1, start), 19);
+    #[test]
+    fn test_proof_path_compress_leaf() {
+        let key = ProofPath::new(&[250; 32]);
+        let buf = key.compressed();
+        let key2 = ProofPath::read_compressed(buf.as_ref());
+        assert_eq!(key2, key);
     }
-}
 
-#[test]
-fn test_proof_path_is_leaf() {
-    let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    assert_eq!(b.len(), 256);
-    assert_eq!(b.suffix(4).is_leaf(), true);
-    assert_eq!(b.suffix(8).is_leaf(), true);
-    assert_eq!(b.suffix(250).is_leaf(), true);
-    assert_eq!(b.prefix(16).is_leaf(), false);
-}
+    #[test]
+    fn test_proof_path_compress_branch() {
+        let mut key = ProofPath::new(&[255_u8; 32]);
+        key = key.prefix(11);
+        key = key.suffix(5);
 
-#[test]
-fn test_proof_path_is_branch() {
-    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    assert_eq!(b.len(), 255);
-    assert_eq!(b.is_leaf(), false);
-}
+        let buf = key.compressed();
+        let mut key2 = ProofPath::read_compressed(buf.as_ref());
+        key2.start = 5;
+        assert_eq!(key2, key);
+    }
 
-#[test]
-fn test_proof_path_debug_leaf() {
-    use std::fmt::Write;
-    let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    let mut buf = String::new();
-    write!(&mut buf, "{:?}", b).unwrap();
-    assert_eq!(
+    #[test]
+    fn test_proof_path_suffix() {
+        let b = ProofPath::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
+
+        assert_eq!(b.len(), 32);
+        assert_eq!(b.bit(0), ChildKind::Right);
+        assert_eq!(b.bit(7), ChildKind::Left);
+        assert_eq!(b.bit(8), ChildKind::Left);
+        assert_eq!(b.bit(9), ChildKind::Right);
+        assert_eq!(b.bit(15), ChildKind::Left);
+        assert_eq!(b.bit(16), ChildKind::Right);
+        assert_eq!(b.bit(20), ChildKind::Right);
+        assert_eq!(b.bit(23), ChildKind::Right);
+        assert_eq!(b.bit(26), ChildKind::Right);
+        assert_eq!(b.bit(27), ChildKind::Right);
+        assert_eq!(b.bit(31), ChildKind::Left);
+        let b2 = b.suffix(8);
+        assert_eq!(b2.len(), 24);
+        assert_eq!(b2.bit(0), ChildKind::Left);
+        assert_eq!(b2.bit(1), ChildKind::Right);
+        assert_eq!(b2.bit(7), ChildKind::Left);
+        assert_eq!(b2.bit(12), ChildKind::Right);
+        assert_eq!(b2.bit(15), ChildKind::Right);
+        let b3 = b2.suffix(24);
+        assert_eq!(b3.len(), 0);
+        let b4 = b.suffix(1);
+        assert_eq!(b4.bit(6), ChildKind::Left);
+        assert_eq!(b4.bit(7), ChildKind::Left);
+        assert_eq!(b4.bit(8), ChildKind::Right);
+    }
+
+    #[test]
+    fn test_proof_path_prefix() {
+        // spell-checker:disable
+        let b = ProofPath::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
+        assert_eq!(b.len(), 8);
+        assert_eq!(b.prefix(1).bit(0), ChildKind::Right);
+        assert_eq!(b.prefix(1).len(), 1);
+    }
+
+    #[test]
+    fn test_proof_path_len() {
+        let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+        assert_eq!(b.len(), 256);
+    }
+
+    #[test]
+    #[should_panic(expected = "self.start() + idx < self.end()")]
+    fn test_proof_path_at_overflow() {
+        let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
+        b.bit(32);
+    }
+
+    #[test]
+    #[should_panic(expected = "pos <= self.end()")]
+    fn test_proof_path_suffix_overflow() {
+        let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+        assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
+        b.suffix(255).suffix(2);
+    }
+
+    #[test]
+    #[should_panic(expected = "self.start() + idx < self.end()")]
+    fn test_proof_path_suffix_bit_overflow() {
+        let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+        b.suffix(1).bit(255);
+    }
+
+    #[test]
+    fn test_proof_path_common_prefix_len() {
+        let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
+        let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
+        assert_eq!(b1.common_prefix_len(&b1), 256);
+        let c = b1.common_prefix_len(&b2);
+        assert_eq!(c, 17);
+        let c = b2.common_prefix_len(&b1);
+        assert_eq!(c, 17);
+        let b1 = b1.suffix(9);
+        let b2 = b2.suffix(9);
+        let c = b1.common_prefix_len(&b2);
+        assert_eq!(c, 8);
+        let b3 = ProofPath::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
+        let b4 = ProofPath::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
+        assert_eq!(b3.common_prefix_len(&b4), 3);
+        assert_eq!(b4.common_prefix_len(&b3), 3);
+        assert_eq!(b3.common_prefix_len(&b3), 256);
+        let b3 = b3.suffix(30);
+        assert_eq!(b3.common_prefix_len(&b3), 226);
+        let b3 = b3.prefix(200);
+        assert_eq!(b3.common_prefix_len(&b3), 200);
+        let b5 = ProofPath::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
+        assert_eq!(b5.prefix(0).common_prefix_len(&b3), 0);
+    }
+
+    #[test]
+    fn test_proof_path_match_len() {
+        let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
+        let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
+
+        for start in 0..256 {
+            assert_eq!(b1.match_len(&b1, start), 256);
+        }
+        for start in 0..18 {
+            assert_eq!(b1.match_len(&b2, start), 17);
+            assert_eq!(b2.match_len(&b1, start), 17);
+        }
+        for start in 32..256 {
+            assert_eq!(b1.match_len(&b2, start), 256);
+            assert_eq!(b2.match_len(&b1, start), 256);
+        }
+
+        let b2 = ProofPath::from_raw(*b"\x01abce0000000000000000000000000000\x00");
+        for start in 0..25 {
+            assert_eq!(b1.match_len(&b2, start), 24);
+            assert_eq!(b2.match_len(&b1, start), 24);
+        }
+
+        let b1 = b1.prefix(19);
+        for start in 0..19 {
+            assert_eq!(b1.match_len(&b2, start), 19);
+            assert_eq!(b2.match_len(&b1, start), 19);
+        }
+    }
+
+    #[test]
+    fn test_proof_path_is_leaf() {
+        let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+        assert_eq!(b.len(), 256);
+        assert_eq!(b.suffix(4).is_leaf(), true);
+        assert_eq!(b.suffix(8).is_leaf(), true);
+        assert_eq!(b.suffix(250).is_leaf(), true);
+        assert_eq!(b.prefix(16).is_leaf(), false);
+    }
+
+    #[test]
+    fn test_proof_path_is_branch() {
+        let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+        assert_eq!(b.len(), 255);
+        assert_eq!(b.is_leaf(), false);
+    }
+
+    #[test]
+    fn test_proof_path_debug_leaf() {
+        use std::fmt::Write;
+        let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+        let mut buf = String::new();
+        write!(&mut buf, "{:?}", b).unwrap();
+        assert_eq!(
         buf,
         "ProofPath { start: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|0111\
          1001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110\
          1000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110\
          1101|00110001|00110010|00110011|00110100|00110101|00110110|\" }"
     );
-}
+    }
 
-#[test]
-fn test_proof_path_debug_branch() {
-    use std::fmt::Write;
-    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xF0").suffix(12);
-    let mut buf = String::new();
-    write!(&mut buf, "{:?}", b).unwrap();
-    assert_eq!(
+    #[test]
+    fn test_proof_path_debug_branch() {
+        use std::fmt::Write;
+        let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xF0").suffix(12);
+        let mut buf = String::new();
+        write!(&mut buf, "{:?}", b).unwrap();
+        assert_eq!(
         buf,
         "ProofPath { start: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|011\
          11001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|011\
          01000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|011\
          01101|00110001|00110010|00110011|00110100|________|________|\" }"
     );
+    }
+
 }
