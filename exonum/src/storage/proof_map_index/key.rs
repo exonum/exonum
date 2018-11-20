@@ -475,27 +475,13 @@ impl PartialOrd for ProofPath {
 }
 
 impl ProofPath {
-    /// Returns length in bytes of the compressed binary representation.
-    pub fn compressed_len(&self) -> usize {
-        let bits_len = self.end() as u64;
-        let mut bytes_len = {
-            let mut buf = [0u8; 4];
-            let mut writer = Cursor::new(buf.as_mut());
-            leb128::write::unsigned(&mut writer, bits_len).unwrap()
-        };
-        bytes_len += div_ceil!(bits_len, 8) as usize;
-        bytes_len
-    }
-
     /// Creates a compressed binary representation of the given proof path.
     ///
     /// # Binary format
     ///
     /// - **bits_len** - total length in bits compressed by the leb128 algorithm.
     /// - **bytes** - non-null bytes of the given ProofPath, i.e. the first `(bits_len + 7) / 8` bytes.
-    pub fn write_compressed(&self, buffer: &mut [u8]) {
-        assert_eq!(self.compressed_len(), buffer.len());
-
+    pub fn write_compressed(&self, buffer: &mut [u8]) -> usize {
         let bits_len = self.end() as u64;
         let whole_bytes_len = div_ceil!(bits_len, 8) as usize;
         let key = &self.raw_key()[0..whole_bytes_len];
@@ -505,13 +491,13 @@ impl ProofPath {
             let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
             bytes_written + writer.write(&key).unwrap()
         };
-        debug_assert_eq!(self.compressed_len(), bytes_written);
         // Cut the bits that lie to the right of the end.
         let has_bits_in_last_byte = (bits_len % 8) != 0;
         if whole_bytes_len > 0 && has_bits_in_last_byte {
             let zero_bits_mask = !(255u8 << (self.end() % 8));
             buffer[bytes_written - 1] &= zero_bits_mask;
         }
+        bytes_written
     }
 }
 
@@ -527,8 +513,9 @@ mod tests {
 
     impl ProofPath {
         fn compressed(&self) -> SmallVec<[u8; 64]> {
-            let mut buf = smallvec![0u8; self.compressed_len()];
-            self.write_compressed(&mut buf);
+            let mut buf = smallvec![0u8; 64];
+            let bytes_written = self.write_compressed(&mut buf);
+            buf.resize(bytes_written, 0);
             buf
         }
 
