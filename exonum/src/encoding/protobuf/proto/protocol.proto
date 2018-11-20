@@ -26,7 +26,6 @@ message Connect {
   string user_agent = 3;
 }
 
-
 message Status {
   uint64 height = 1;
   exonum.Hash last_hash = 2;
@@ -88,12 +87,9 @@ message PrevotesRequest {
   exonum.BitVec validators = 5;
 }
 
-message PeersRequest {
-  exonum.PublicKey to = 1;
-}
+message PeersRequest { exonum.PublicKey to = 1; }
 
 message BlockRequest {
   exonum.PublicKey to = 1;
   uint64 height = 2;
 }
-

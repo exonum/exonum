@@ -16,13 +16,9 @@ syntax = "proto3";
 
 package exonum;
 
-message Hash {
-  bytes data = 1;
-}
+message Hash { bytes data = 1; }
 
-message PublicKey {
-  bytes data = 1;
-}
+message PublicKey { bytes data = 1; }
 
 message BitVec {
   bytes data = 1;
