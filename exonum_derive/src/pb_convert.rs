@@ -1,3 +1,17 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use syn::{Attribute, Data, DeriveInput, Lit, Meta, NestedMeta, Path};
@@ -17,11 +31,11 @@ fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
             let name: Path = match list.nested.iter().next().expect("h") {
                 NestedMeta::Literal(Lit::Str(lit_str)) => lit_str
                     .parse()
-                    .expect("protobuf_convert argument should be valid type path"),
-                _ => panic!("protobuf_convert argument should be string"),
+                    .expect("protobuf_convert argument should be a valid type path"),
+                _ => panic!("protobuf_convert argument should be a string"),
             };
             Some(name)
-        }).expect("protobuf_convert attribute not set")
+        }).expect("protobuf_convert attribute is not set")
 }
 
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
@@ -72,11 +86,13 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     };
     let expanded = quote! {
         mod #mod_name {
+            extern crate protobuf as _protobuf_crate;
+
             use super::*;
 
             use #cr::encoding::protobuf::ProtobufConvert;
             use #cr::encoding::Error as _EncodingError;
-            use protobuf::Message as _ProtobufMessage;
+            use self::_protobuf_crate::Message as _ProtobufMessage;
 
             impl ProtobufConvert for #name {
                 type ProtoStruct = #proto_struct_name;
@@ -89,11 +105,11 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 
             impl #cr::messages::BinaryForm for #name
             {
-                fn encode(&self) -> Result<Vec<u8>, _EncodingError> {
+                fn encode(&self) -> std::result::Result<Vec<u8>, _EncodingError> {
                     Ok(self.to_pb().write_to_bytes().unwrap())
                 }
 
-                fn decode(buffer: &[u8]) -> Result<Self, _EncodingError> {
+                fn decode(buffer: &[u8]) -> std::result::Result<Self, _EncodingError> {
                     let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
                     pb.merge_from_bytes(buffer).unwrap();
                     Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
