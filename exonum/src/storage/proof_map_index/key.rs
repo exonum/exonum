@@ -15,7 +15,7 @@
 use leb128;
 
 use std::cmp::{min, Ordering};
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Write};
 use std::ops;
 
 use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
@@ -36,6 +36,13 @@ pub const PROOF_PATH_KIND_POS: usize = 0;
 pub const PROOF_PATH_KEY_POS: usize = 1;
 /// Position of the byte with total length of the branch.
 pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
+
+/// Performs division, rounding the result up.
+macro_rules! div_ceil {
+    ($a:expr, $b:expr) => {
+        ($a + $b - 1) / $b
+    };
+}
 
 /// A trait that defines a subset of storage key types which are suitable for use with
 /// `ProofMapIndex`.
@@ -196,7 +203,7 @@ impl ProofPath {
     pub fn new<K: ProofMapKey>(key: &K) -> Self {
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
-        key.write_key(&mut data[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS+KEY_SIZE]);
+        key.write_key(&mut data[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]);
         data[PROOF_PATH_LEN_POS] = 0;
         Self::from_raw(data)
     }
@@ -299,7 +306,7 @@ pub(crate) trait BitsRange {
         debug_assert!(from >= self.start() && from <= self.end());
 
         let from = from / 8;
-        let to = min((self.end() + 7) / 8, (other.end() + 7) / 8);
+        let to = min(div_ceil!(self.end(), 8), div_ceil!(other.end(), 8));
         let max_len = min(self.len(), other.len());
 
         for i in from..to {
@@ -367,7 +374,7 @@ impl BitsRange for ProofPath {
     }
 
     fn raw_key(&self) -> &[u8] {
-        &self.bytes[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS+KEY_SIZE]
+        &self.bytes[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]
     }
 }
 
@@ -411,7 +418,7 @@ impl StorageKey for ProofPath {
         buffer.copy_from_slice(&self.bytes);
         // Cut of the bits that lie to the right of the end.
         if !self.is_leaf() {
-            let right = (self.end() as usize + 7) / 8;
+            let right = div_ceil!(self.end(), 8) as usize;
             if self.end() % 8 != 0 {
                 buffer[right] &= !(255_u8 << (self.end() % 8));
             }
@@ -439,7 +446,7 @@ impl PartialOrd for ProofPath {
         assert_eq!(self.start(), 0);
 
         let right_bit = min(self.end(), other.end());
-        let right = (right_bit as usize + 7) / 8;
+        let right = div_ceil!(right_bit, 8) as usize;
 
         for i in 0..right {
             let (mut self_byte, mut other_byte) = (self.raw_key()[i], other.raw_key()[i]);
@@ -476,7 +483,7 @@ impl ProofPath {
             let mut writer = Cursor::new(buf.as_mut());
             leb128::write::unsigned(&mut writer, bits_len).unwrap()
         };
-        bytes_len += ((bits_len + 7) / 8) as usize;
+        bytes_len += div_ceil!(bits_len, 8) as usize;
         bytes_len
     }
 
@@ -490,7 +497,7 @@ impl ProofPath {
         assert_eq!(self.compressed_len(), buffer.len());
 
         let bits_len = self.end() as u64;
-        let whole_bytes_len = ((bits_len + 7) / 8) as usize;
+        let whole_bytes_len = div_ceil!(bits_len, 8) as usize;
         let key = &self.raw_key()[0..whole_bytes_len];
 
         let bytes_written = {
@@ -498,7 +505,7 @@ impl ProofPath {
             let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
             bytes_written + writer.write(&key).unwrap()
         };
-        assert_eq!(self.compressed_len(), bytes_written);
+        debug_assert_eq!(self.compressed_len(), bytes_written);
         // Cut the bits that lie to the right of the end.
         let has_bits_in_last_byte = (bits_len % 8) != 0;
         if whole_bytes_len > 0 && has_bits_in_last_byte {
@@ -513,6 +520,8 @@ mod tests {
     use rand::{self, Rng};
     use serde_json::{self, Value};
     use smallvec::SmallVec;
+
+    use std::io::Read;
 
     use super::*;
 
@@ -531,7 +540,7 @@ mod tests {
 
             let mut raw = [0u8; PROOF_PATH_SIZE];
             reader
-                .read(&mut raw[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS+KEY_SIZE])
+                .read(&mut raw[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE])
                 .unwrap();
             if bits_len == KEY_SIZE * 8 {
                 raw[PROOF_PATH_KIND_POS] = LEAF_KEY_PREFIX;
