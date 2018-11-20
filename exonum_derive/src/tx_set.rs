@@ -66,7 +66,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
     });
 
     let into_service_tx = {
-        let tx_set_impls = variants.iter().map(|(n, id, _)| {
+        let tx_set_impl = variants.iter().map(|(n, id, _)| {
             quote! {
                 #name::#id( ref tx) => ( #n, tx.encode().unwrap()),
             }
@@ -76,7 +76,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
             impl Into<#cr::messages::ServiceTransaction> for #name {
                 fn into(self) -> #cr::messages::ServiceTransaction {
                     let (id, vec) = match self {
-                        #( #tx_set_impls )*
+                        #( #tx_set_impl )*
                     };
                     #cr::messages::ServiceTransaction::from_raw_unchecked(id, vec)
                 }
@@ -85,7 +85,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
     };
 
     let tx_set_impl = {
-        let tx_set_impls = variants.iter().map(|(n, id, ty)| {
+        let tx_set_impl = variants.iter().map(|(n, id, ty)| {
             quote! {
                 #n => {
                     Ok(#name::#id(#ty::decode(&vec)?))
@@ -98,7 +98,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
                 fn tx_from_raw(raw: #cr::messages::RawTransaction) -> std::result::Result<Self, _EncodingError> {
                     let (id, vec) = raw.service_transaction().into_raw_parts();
                     match id {
-                        #( #tx_set_impls )*
+                        #( #tx_set_impl )*
                         num => Err(_EncodingError::Basic(
                             format!(
                                 "Tag {} not found for enum {}.",
@@ -113,7 +113,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
     };
 
     let into_boxed_tx = {
-        let tx_set_impls = variants.iter().map(|(_, id, _)| {
+        let tx_set_impl = variants.iter().map(|(_, id, _)| {
             quote! {
                 #name::#id(tx) => Box::new(tx),
             }
@@ -123,7 +123,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
             impl Into<Box<dyn #cr::blockchain::Transaction>> for #name {
                 fn into(self) -> Box<dyn #cr::blockchain::Transaction> {
                     match self {
-                        #( #tx_set_impls )*
+                        #( #tx_set_impl )*
                     }
                 }
             }
