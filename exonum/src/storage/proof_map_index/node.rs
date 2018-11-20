@@ -163,6 +163,9 @@ mod tests {
         let branch2 = BranchNode::from_bytes(buf.into());
         assert_eq!(branch, branch2);
         assert_eq!(branch.hash(), branch2.hash());
-        assert_eq!(branch.hash().to_hex(), "828b8bfd6c1a67981f0bb8202a4d9b3cde30d092bbc2fcba03d64171f54a0676");
+        assert_eq!(
+            branch.hash().to_hex(),
+            "828b8bfd6c1a67981f0bb8202a4d9b3cde30d092bbc2fcba03d64171f54a0676"
+        );
     }
 }
