@@ -74,6 +74,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
   of single IP-addresses. (#959)
 
+- `Fork::remove_by_prefix()` method now specifies prefix as `Option<&[u8]>` instead
+  of `Option<&Vec<u8>>`. (#1042)
+
 #### exonum-configuration
 
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of
@@ -125,6 +128,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Bug with incorrect EOF handling while decoding network messages has been
   fixed. (#917)
+
+- Bug leading to deletion of excessive data when `clear`ing an index belonging
+  to an index family has been fixed. (#1042)
 
 ### API Improvements
 
