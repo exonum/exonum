@@ -94,8 +94,7 @@ impl CryptoHash for BranchNode {
         pos += self
             .child_path(ChildKind::Right)
             .write_compressed(&mut bytes[pos..]);
-        bytes.resize(pos, 0);
-        hash(bytes.as_ref())
+        hash(&bytes[0..pos])
     }
 }
 
