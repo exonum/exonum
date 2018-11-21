@@ -416,7 +416,7 @@ impl StorageKey for ProofPath {
 
     fn write(&self, buffer: &mut [u8]) {
         buffer.copy_from_slice(&self.bytes);
-        // Cut of the bits that lie to the right of the end.
+        // Trims insignificant bits in the last byte.
         if !self.is_leaf() {
             let right = div_ceil!(self.end(), 8) as usize;
             if self.end() % 8 != 0 {
@@ -486,15 +486,15 @@ impl ProofPath {
         let whole_bytes_len = div_ceil!(bits_len, 8) as usize;
         let key = &self.raw_key()[0..whole_bytes_len];
 
-        let (buffer, bytes_written) = {
-            let mut writer = Cursor::new(buffer);
+        let bytes_written = {
+            let mut writer = Cursor::new(&mut *buffer);
             let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
             bytes_written += writer.write(&key).unwrap();
-            (writer.into_inner(), bytes_written)
+            bytes_written
         };
-        // Cut the bits that lie to the right of the end.
-        let has_bits_in_last_byte = (bits_len % 8) != 0;
-        if whole_bytes_len > 0 && has_bits_in_last_byte {
+        // Trims insignificant bits in the last byte.
+        let bits_in_last_byte = bits_len % 8;
+        if whole_bytes_len > 0 && bits_in_last_byte != 0 {
             let zero_bits_mask = !(255u8 << (self.end() % 8));
             buffer[bytes_written - 1] &= zero_bits_mask;
         }
@@ -516,7 +516,7 @@ mod tests {
         fn compressed(&self) -> SmallVec<[u8; 64]> {
             let mut buf = smallvec![0u8; 64];
             let bytes_written = self.write_compressed(&mut buf);
-            buf.resize(bytes_written, 0);
+            buf.truncate(bytes_written);
             buf
         }
 
