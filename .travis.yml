@@ -189,7 +189,8 @@ jobs:
     install:
     - wget "https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-win32.zip" -t 5 -O "protoc.zip"
     - 7z x protoc.zip -o%USERPROFILE%\protoc\
-    - set PATH=%PATH%;%USERPROFILE%\protoc\bin
+    - export PATH=$LD_LIBRARY_PATH:$USERPROFILE/protoc/bin
+    # - set PATH=%PATH%;%USERPROFILE%\protoc\bin
     # - powershell Invoke-WebRequest -Uri "https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-win32.zip" -OutFile "protoc.zip"
     # - powershell Expand-Archive -Path protoc.zip -DestinationPath C:\Reference
     script:
