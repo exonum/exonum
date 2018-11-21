@@ -37,6 +37,7 @@ use transactions::bench_verify_transactions;
 
 mod block;
 mod crypto;
+mod proto;
 mod storage;
 mod transactions;
 

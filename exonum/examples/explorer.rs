@@ -35,7 +35,7 @@ use blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
 };
 
-#[path = "../tests/explorer/blockchain.rs"]
+#[path = "../tests/explorer/blockchain/mod.rs"]
 mod blockchain;
 
 /// Creates a transaction for the mempool.

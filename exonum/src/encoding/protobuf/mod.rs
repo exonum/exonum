@@ -25,6 +25,8 @@ pub use self::protocol::{
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
+pub mod helpers;
+#[cfg(test)]
 pub mod tests;
 
 use bit_vec;
@@ -37,7 +39,6 @@ use helpers::{Height, Round, ValidatorId};
 use messages::BinaryForm;
 
 mod blockchain;
-mod helpers;
 mod protocol;
 
 /// Used for establishing correspondence between rust struct

@@ -161,11 +161,8 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
             use #cr::messages::BinaryForm as _BinaryForm;
 
             #impl_conversions
-
             #into_service_tx
-
             #tx_set_impl
-
             #into_boxed_tx
         }
     };

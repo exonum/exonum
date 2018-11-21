@@ -23,6 +23,21 @@ fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<String> {
         }).collect()
 }
 
+fn protoc_generate(out_dir: &str, input_dir: &str, includes: &[&str]) {
+    protoc_rust::run(protoc_rust::Args {
+        out_dir,
+        input: &get_proto_files(input_dir)
+            .iter()
+            .map(|s| s.as_ref())
+            .collect::<Vec<_>>(),
+        includes,
+        customize: Customize {
+            serde_derive: Some(true),
+            ..Default::default()
+        },
+    }).expect("protoc");
+}
+
 fn main() {
     let package_name = option_env!("CARGO_PKG_NAME").unwrap_or("exonum");
     let package_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
@@ -35,18 +50,28 @@ fn main() {
     file.write_all(user_agent.as_bytes())
         .expect("Unable to data to file");
 
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: "src/encoding/protobuf",
-        input: &get_proto_files("src/encoding/protobuf/proto/")
-            .iter()
-            .map(|s| s.as_ref())
-            .collect::<Vec<_>>(),
-        includes: &["src/encoding/protobuf/proto"],
-        customize: Customize {
-            serde_derive: Some(true),
-            ..Default::default()
-        },
-    }).expect("protoc");
+    protoc_generate(
+        "src/encoding/protobuf",
+        "src/encoding/protobuf/proto/",
+        &["src/encoding/protobuf/proto"],
+    );
+
+    // Exonum external tests.
+    protoc_generate(
+        "tests/explorer/blockchain/proto",
+        "tests/explorer/blockchain/proto",
+        &[
+            "tests/explorer/blockchain/proto",
+            "src/encoding/protobuf/proto",
+        ],
+    );
+
+    // Exonum benchmarks.
+    protoc_generate(
+        "benches/criterion/proto",
+        "benches/criterion/proto",
+        &["benches/criterion", "src/encoding/protobuf/proto"],
+    );
 }
 
 fn rust_version() -> Option<String> {

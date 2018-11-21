@@ -110,10 +110,11 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 
 mod timestamping {
     use super::{gen_keypair_from_rng, BoxedTx};
+    use crate::proto;
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-        encoding::{protobuf::tests, Error as EncodingError},
+        encoding::Error as EncodingError,
         messages::{Message, RawTransaction, Signed},
         storage::Snapshot,
     };
@@ -144,7 +145,7 @@ mod timestamping {
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(
-        protobuf_convert = "tests::BenchTsTx",
+        protobuf_convert = "proto::TimestampTx",
         exonum_root_path = "exonum"
     )]
     struct Tx {
@@ -153,7 +154,7 @@ mod timestamping {
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(
-        protobuf_convert = "tests::BenchTsPanickingTx",
+        protobuf_convert = "proto::TimestampPanickingTx",
         exonum_root_path = "exonum"
     )]
     struct PanickingTx {
@@ -227,10 +228,11 @@ mod timestamping {
 
 mod cryptocurrency {
     use super::{gen_keypair_from_rng, BoxedTx};
+    use crate::proto;
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{Hash, PublicKey, SecretKey},
-        encoding::{protobuf::tests, Error as EncodingError},
+        encoding::Error as EncodingError,
         messages::{Message, RawTransaction, Signed},
         storage::{MapIndex, ProofMapIndex, Snapshot},
     };
@@ -267,7 +269,7 @@ mod cryptocurrency {
     /// Transfers one unit of currency from `from` to `to`.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(
-        protobuf_convert = "tests::BenchCrTx",
+        protobuf_convert = "proto::CurrencyTx",
         exonum_root_path = "exonum"
     )]
     struct Tx {
@@ -278,7 +280,7 @@ mod cryptocurrency {
     /// Same as `Tx`, but without cryptographic proofs in `execute`.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(
-        protobuf_convert = "tests::BenchCrSimpleTx",
+        protobuf_convert = "proto::CurrencySimpleTx",
         exonum_root_path = "exonum"
     )]
     struct SimpleTx {
@@ -289,7 +291,7 @@ mod cryptocurrency {
     /// Same as `SimpleTx`, but signals an error 50% of the time.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(
-        protobuf_convert = "tests::BenchCrRollbackTx",
+        protobuf_convert = "proto::CurrencyRollbackTx",
         exonum_root_path = "exonum"
     )]
     struct RollbackTx {

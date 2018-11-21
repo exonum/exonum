@@ -23,7 +23,7 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    encoding::{protobuf::tests, Error as EncodingError},
+    encoding::Error as EncodingError,
     messages::{Message, RawTransaction, Signed},
     node::ApiSender,
     storage::{MemoryDB, Snapshot},
@@ -31,9 +31,11 @@ use exonum::{
 
 pub const SERVICE_ID: u16 = 0;
 
+mod proto;
+
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(
-    protobuf_convert = "tests::CreateWallet",
+    protobuf_convert = "proto::CreateWallet",
     exonum_root_path = "exonum"
 )]
 pub struct CreateWallet {
@@ -52,7 +54,7 @@ impl CreateWallet {
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
 #[exonum(
-    protobuf_convert = "tests::Transfer",
+    protobuf_convert = "proto::Transfer",
     exonum_root_path = "exonum"
 )]
 pub struct Transfer {

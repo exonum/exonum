@@ -16,33 +16,7 @@ syntax = "proto3";
 
 import "helpers.proto";
 
-package exonum.tests;
-
-message TimestampTx { bytes data = 1; }
-
-message TxAfterCommit { uint64 height = 1; }
-
-message TxConfig {
-  exonum.PublicKey from = 1;
-  bytes config = 2;
-  uint64 actual_from = 3;
-}
-
-message TxSimple {
-  exonum.PublicKey public_key = 1;
-  string msg = 2;
-}
-
-message TestServiceTx { uint64 value = 1; }
-
-message BlockchainTestTxA { uint64 a = 1; }
-
-message BlockchainTestTxB {
-  uint64 b = 1;
-  uint32 c = 2;
-}
-
-message BlockchainTestTxC { uint64 a = 1; }
+package exonum.tests.explorer;
 
 message CreateWallet {
   exonum.PublicKey pubkey = 1;
