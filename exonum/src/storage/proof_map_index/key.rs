@@ -676,7 +676,7 @@ mod tests {
     }
 
     #[test]
-    fn test_proof_path_storage_key_branch() {
+    fn test_proof_path_storage_key_branch_regular() {
         let mut key = ProofPath::new(&[255_u8; 32]);
         key = key.prefix(11);
         key = key.suffix(5);
@@ -694,8 +694,26 @@ mod tests {
     }
 
     #[test]
-    fn test_proof_path_compress_leaf() {
+    fn test_proof_path_compress_leaf_regular() {
         let key = ProofPath::new(&[250; 32]);
+        let buf = key.compressed();
+        let key2 = ProofPath::read_compressed(buf.as_ref());
+        assert_eq!(key2, key);
+    }
+
+    #[test]
+    fn test_proof_path_compress_leaf_shortest() {
+        let mut key = ProofPath::new(&[250; 32]);
+        key = key.prefix(0);
+        let buf = key.compressed();
+        let key2 = ProofPath::read_compressed(buf.as_ref());
+        assert_eq!(key2, key);
+    }
+
+    #[test]
+    fn test_proof_path_compress_leaf_longest() {
+        let mut key = ProofPath::new(&[250; 32]);
+        key = key.prefix(255);
         let buf = key.compressed();
         let key2 = ProofPath::read_compressed(buf.as_ref());
         assert_eq!(key2, key);
