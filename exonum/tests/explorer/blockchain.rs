@@ -32,8 +32,10 @@ use exonum::{
 pub const SERVICE_ID: u16 = 0;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("tests::CreateWallet")]
-#[exonum_derive_outer]
+#[exonum(
+    protobuf_convert = "tests::CreateWallet",
+    exonum_root_path = "exonum"
+)]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
     pub name: String,
@@ -49,8 +51,10 @@ impl CreateWallet {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("tests::Transfer")]
-#[exonum_derive_outer]
+#[exonum(
+    protobuf_convert = "tests::Transfer",
+    exonum_root_path = "exonum"
+)]
 pub struct Transfer {
     pub from: PublicKey,
     pub to: PublicKey,
@@ -68,7 +72,7 @@ impl Transfer {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-#[exonum_derive_outer]
+#[exonum(exonum_root_path = "exonum")]
 pub enum ExplorerTransactions {
     CreateWallet(CreateWallet),
     Transfer(Transfer),

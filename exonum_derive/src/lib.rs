@@ -25,43 +25,99 @@ mod pb_convert;
 mod tx_set;
 
 use proc_macro::TokenStream;
-use syn::Attribute;
+use syn::{Attribute, Lit, Meta, MetaNameValue, NestedMeta, Path};
 
 use std::env;
 
-#[proc_macro_derive(
-    ProtobufConvert,
-    attributes(protobuf_convert, exonum_derive_outer)
-)]
+/// Derives `ProtobufConvert` trait.
+/// Attributes:
+/// `#[exonum( protobuf_convert = "path" )]`
+/// Required. `path` is name of the corresponding protobuf struct(generated from .proto file)
+/// `#[exonum( exonum_root_path = "path" )]`
+/// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
+#[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     pb_convert::generate_protobuf_convert(input)
 }
 
-#[proc_macro_derive(TransactionSet, attributes(exonum_derive_outer))]
+/// Derives `TransactionSet` trait for selected enum,
+/// enum should be set of variants with transactions inside.
+///
+/// Also implements:
+/// Conversion from Transaction types into this enum.
+/// Conversion from Transaction types, enum into `ServiceTransaction`.
+/// Conversion from enum into `Box<dyn Transaction>`.
+///
+/// Attributes:
+/// `#[exonum( exonum_root_path = "path" )]`
+/// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
+#[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
     tx_set::generate_transaction_set(input)
 }
 
+/// Exonum types should be imported with `crate::` prefix if inside crate
+/// or with `exonum::` when outside.
 fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
-    let inside_crate = {
-        let derive_outer = attrs.iter().any(|attr| {
-            let meta = match attr.parse_meta() {
-                Ok(m) => m,
-                Err(_) => return false,
-            };
-            meta.name() == "exonum_derive_outer"
-        });
-
-        if derive_outer {
-            false
+    let map_attrs = get_exonum_attributes(attrs);
+    let crate_path = map_attrs.into_iter().find_map(|nv| {
+        if nv.ident == "exonum_root_path" {
+            match nv.lit {
+                Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
+                _ => None,
+            }
         } else {
-            env::var("CARGO_PKG_NAME").unwrap() == "exonum"
+            None
         }
-    };
+    });
 
-    if inside_crate {
+    // If exonum_root_path attribute is defined we use its value
+    if let Some(path) = crate_path {
+        return quote!(#path);
+    }
+
+    // Check cargo env variable to see if we are building inside exonum crate.
+    let pkg_name = env::var("CARGO_PKG_NAME").expect(
+        "CARGO_PKG_NAME is not set, annotate struct wiht exonum( exonum_root_path = \"path\".",
+    );
+
+    if pkg_name == "exonum" {
         quote!(crate)
     } else {
         quote!(exonum)
     }
+}
+
+/// Extract attributes in the form of `#[exonum(name = "value")]`
+fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
+    let exonum_meta = attrs.iter().find_map(|attr| {
+        let meta = match attr.parse_meta() {
+            Ok(m) => m,
+            Err(_) => return None,
+        };
+        if meta.name() == "exonum" {
+            Some(meta)
+        } else {
+            None
+        }
+    });
+
+    let exonum_meta = if let Some(m) = exonum_meta {
+        m
+    } else {
+        return vec![];
+    };
+
+    let meta_list = match exonum_meta {
+        Meta::List(x) => x,
+        _ => panic!("exonum attribute should not be empty."),
+    };
+
+    meta_list
+        .nested
+        .into_iter()
+        .filter_map(|nested| match nested {
+            NestedMeta::Meta(Meta::NameValue(named)) => Some(named),
+            _ => None,
+        }).collect()
 }

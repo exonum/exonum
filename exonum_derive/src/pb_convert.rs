@@ -14,28 +14,22 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use syn::{Attribute, Data, DeriveInput, Lit, Meta, NestedMeta, Path};
+use syn::{Attribute, Data, DeriveInput, Lit, Path};
 
 fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
-    attrs
-        .iter()
-        .find_map(|attr| {
-            let meta = attr.parse_meta().ok()?;
-            if meta.name() != "protobuf_convert" {
-                return None;
+    let map_attrs = super::get_exonum_attributes(attrs);
+    let struct_path = map_attrs.into_iter().find_map(|nv| {
+        if nv.ident == "protobuf_convert" {
+            match nv.lit {
+                Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
+                _ => None,
             }
-            let list = match meta {
-                Meta::List(x) => x,
-                _ => panic!("protobuf_convert attribute expects one argument"),
-            };
-            let name: Path = match list.nested.iter().next().expect("h") {
-                NestedMeta::Literal(Lit::Str(lit_str)) => lit_str
-                    .parse()
-                    .expect("protobuf_convert argument should be a valid type path"),
-                _ => panic!("protobuf_convert argument should be a string"),
-            };
-            Some(name)
-        }).expect("protobuf_convert attribute is not set")
+        } else {
+            None
+        }
+    });
+
+    struct_path.expect("protobuf_convert attribute is not set properly.")
 }
 
 fn gen_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTokens {
@@ -99,7 +93,7 @@ fn gen_binary_form_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTok
             fn decode(buffer: &[u8]) -> std::result::Result<Self, _EncodingError> {
                 let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
                 pb.merge_from_bytes(buffer).unwrap();
-                Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
+                Self::from_pb(pb).map_err(|_| "Conversion from protobuf error.".into())
             }
         }
     }
@@ -131,7 +125,7 @@ fn gen_storage_traits_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::To
 fn get_field_names(input: &DeriveInput) -> Vec<Ident> {
     let data = match &input.data {
         Data::Struct(x) => x,
-        _ => panic!("Protobuf convert can be derived for structs only"),
+        _ => panic!("Protobuf convert can be derived for structs only."),
     };
     data.fields
         .iter()
@@ -164,9 +158,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
             use self::_protobuf_crate::Message as _ProtobufMessage;
 
             #impl_protobuf_convert
-
             #impl_binary_form
-
             #impl_storage_traits
         }
     };

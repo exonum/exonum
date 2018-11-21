@@ -143,21 +143,25 @@ mod timestamping {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("tests::BenchTsTx")]
-    #[exonum_derive_outer]
+    #[exonum(
+        protobuf_convert = "tests::BenchTsTx",
+        exonum_root_path = "exonum"
+    )]
     struct Tx {
         data: Hash,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("tests::BenchTsPanickingTx")]
-    #[exonum_derive_outer]
+    #[exonum(
+        protobuf_convert = "tests::BenchTsPanickingTx",
+        exonum_root_path = "exonum"
+    )]
     struct PanickingTx {
         data: Hash,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum_derive_outer]
+    #[exonum(exonum_root_path = "exonum")]
     enum TimestampingTransactions {
         Tx(Tx),
         PanickingTx(PanickingTx),
@@ -262,8 +266,10 @@ mod cryptocurrency {
 
     /// Transfers one unit of currency from `from` to `to`.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("tests::BenchCrTx")]
-    #[exonum_derive_outer]
+    #[exonum(
+        protobuf_convert = "tests::BenchCrTx",
+        exonum_root_path = "exonum"
+    )]
     struct Tx {
         to: PublicKey,
         seed: u32,
@@ -271,8 +277,10 @@ mod cryptocurrency {
 
     /// Same as `Tx`, but without cryptographic proofs in `execute`.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("tests::BenchCrSimpleTx")]
-    #[exonum_derive_outer]
+    #[exonum(
+        protobuf_convert = "tests::BenchCrSimpleTx",
+        exonum_root_path = "exonum"
+    )]
     struct SimpleTx {
         to: PublicKey,
         seed: u32,
@@ -280,15 +288,17 @@ mod cryptocurrency {
 
     /// Same as `SimpleTx`, but signals an error 50% of the time.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("tests::BenchCrRollbackTx")]
-    #[exonum_derive_outer]
+    #[exonum(
+        protobuf_convert = "tests::BenchCrRollbackTx",
+        exonum_root_path = "exonum"
+    )]
     struct RollbackTx {
         to: PublicKey,
         seed: u32,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum_derive_outer]
+    #[exonum(exonum_root_path = "exonum")]
     enum CryptocurrencyTransactions {
         Tx(Tx),
         SimpleTx(SimpleTx),

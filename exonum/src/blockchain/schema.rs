@@ -53,7 +53,7 @@ define_names!(
 
 /// Configuration index.
 #[derive(Debug, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert("protobuf::ConfigReference")]
+#[exonum(protobuf_convert = "protobuf::ConfigReference")]
 pub struct ConfigReference {
     /// Height since which this configuration becomes actual.
     actual_from: Height,
@@ -85,7 +85,7 @@ impl ConfigReference {
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
 #[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
-#[protobuf_convert("protobuf::TxLocation")]
+#[exonum(protobuf_convert = "protobuf::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,

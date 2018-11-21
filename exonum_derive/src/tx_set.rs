@@ -28,13 +28,13 @@ fn get_tx_variants(data: &DataEnum) -> Vec<TxSetVariant> {
         .enumerate()
         .map(|(n, v)| {
             if v.fields.iter().len() > 1 {
-                panic!("TransactionSet enum variant should have one field inside");
+                panic!("TransactionSet enum variant should have one field inside.");
             }
             let field = v
                 .fields
                 .iter()
                 .next()
-                .expect("TransactionSet enum variant can't be empty");
+                .expect("TransactionSet enum variant can't be empty.");
             TxSetVariant(n as u16, v.ident.clone(), field.ty.clone())
         }).collect()
 }
@@ -143,7 +143,7 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
     let mod_name = Ident::new(&format!("tx_set_impl_{}", name), Span::call_site());
     let data = match input.data {
         Data::Enum(x) => x,
-        _ => panic!("Only for enums"),
+        _ => panic!("Only for enums."),
     };
 
     let cr = super::get_exonum_types_prefix(&input.attrs);
