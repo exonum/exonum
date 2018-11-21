@@ -78,7 +78,7 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
 
     // Check cargo env variable to see if we are building inside exonum crate.
     let pkg_name = env::var("CARGO_PKG_NAME").expect(
-        "CARGO_PKG_NAME is not set, annotate struct with exonum( exonum_root_path = \"path\".",
+        "CARGO_PKG_NAME is not set, annotate struct with exonum( exonum_root_path = \"path\").",
     );
 
     if pkg_name == "exonum" {
