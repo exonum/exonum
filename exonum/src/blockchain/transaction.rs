@@ -221,7 +221,8 @@ pub struct TransactionContext<'a> {
 }
 
 impl<'a> TransactionContext<'a> {
-    pub(crate) fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
+    #[doc(hidden)]
+    pub fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
