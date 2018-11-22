@@ -481,7 +481,7 @@ impl ProofPath {
     ///
     /// - **bits_len** - total length of the given `ProofPath` in bits compressed
     ///   by the `leb128` algorithm
-    /// - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first 
+    /// - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
     ///   `(bits_len + 7) / 8` bytes.
     pub(crate) fn write_compressed(&self, buffer: &mut [u8]) -> usize {
         let bits_len = u64::from(self.end());
