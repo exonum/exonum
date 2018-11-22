@@ -479,9 +479,11 @@ impl ProofPath {
     ///
     /// # Binary format
     ///
-    /// - **bits_len** - total length in bits compressed by the leb128 algorithm.
-    /// - **bytes** - non-null bytes of the given ProofPath, i.e. the first `(bits_len + 7) / 8` bytes.
-    pub fn write_compressed(&self, buffer: &mut [u8]) -> usize {
+    /// - **bits_len** - total length of the given `ProofPath` in bits compressed
+    ///   by the `leb128` algorithm
+    /// - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first 
+    ///   `(bits_len + 7) / 8` bytes.
+    pub(crate) fn write_compressed(&self, buffer: &mut [u8]) -> usize {
         let bits_len = u64::from(self.end());
         let whole_bytes_len = div_ceil!(bits_len, 8) as usize;
         let key = &self.raw_key()[0..whole_bytes_len];
