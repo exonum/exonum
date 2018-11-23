@@ -16,8 +16,10 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
+use blockchain::{Schema, StoredConfiguration};
 use crypto::{CryptoHash, Hash, PublicKey};
 use encoding;
+use helpers::ValidatorId;
 use hex::ToHex;
 use messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
 use storage::{Fork, StorageValue};
@@ -226,22 +228,42 @@ impl<'a> TransactionContext<'a> {
             author: raw_message.author(),
         }
     }
+
     /// Returns fork of current blockchain state.
     pub fn fork(&mut self) -> &mut Fork {
         self.fork
     }
+
     /// Returns id of service that own this transaction.
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
+
     /// Returns transaction author public key
     pub fn author(&self) -> PublicKey {
         self.author
     }
+
     /// Returns current transaction message hash.
     /// This hash could be used to link some data in storage for external usage.
     pub fn tx_hash(&self) -> Hash {
         self.tx_hash
+    }
+
+    /// If the transaction author is a validator, returns its identifier,
+    /// otherwise returns `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.actual_configuration()
+            .validator_keys
+            .into_iter()
+            .position(|x| x.service_key == self.author)
+            .map(|x| ValidatorId(x as u16))
+    }
+
+    /// Returns the actual blockchain configuration.
+    pub fn actual_configuration(&self) -> StoredConfiguration {
+        let schema = Schema::new(&self.fork);
+        schema.actual_configuration()
     }
 }
 

@@ -21,7 +21,7 @@ use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
-    storage::{Fork, Snapshot},
+    storage::Fork,
 };
 
 use super::SERVICE_ID;
@@ -67,20 +67,6 @@ impl TxTime {
         secret_key: &SecretKey,
     ) -> Signed<RawTransaction> {
         Message::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
-    }
-
-    fn check_signed_by_validator(
-        &self,
-        snapshot: &dyn Snapshot,
-        author: &PublicKey,
-    ) -> ExecutionResult {
-        let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
-        let signed = keys.iter().any(|k| k.service_key == *author);
-        if !signed {
-            Err(Error::UnknownSender)?
-        } else {
-            Ok(())
-        }
     }
 
     fn update_validator_time(&self, fork: &mut Fork, author: &PublicKey) -> ExecutionResult {
@@ -136,11 +122,13 @@ impl TxTime {
 
 impl Transaction for TxTime {
     fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        // Checks that transaction was signed by the validator.
+        context.validator_id().ok_or_else(|| Error::UnknownSender)?;
+        // Executes transaction.
         let author = context.author();
-        let view = context.fork();
-        self.check_signed_by_validator(view.as_ref(), &author)?;
-        self.update_validator_time(view, &author)?;
-        Self::update_consolidated_time(view);
+        let fork = context.fork();
+        self.update_validator_time(fork, &author)?;
+        Self::update_consolidated_time(fork);
         Ok(())
     }
 }
