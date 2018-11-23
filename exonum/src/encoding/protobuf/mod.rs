@@ -59,7 +59,7 @@ where
     T: Message,
 {
     fn encode(&self) -> Result<Vec<u8>, Error> {
-        Ok(self.write_to_bytes().unwrap())
+        self.write_to_bytes().map_err(|e| Error::Other(Box::new(e)))
     }
 
     fn decode(buffer: &[u8]) -> Result<Self, Error> {

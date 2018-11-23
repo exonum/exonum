@@ -75,9 +75,7 @@ fn gen_to_protobuf_impl(
             type ProtoStruct = #pb_name;
 
             #to_pb_fn
-
             #from_pb_fn
-
         }
     }
 }
@@ -87,12 +85,12 @@ fn gen_binary_form_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTok
         impl #cr::messages::BinaryForm for #name {
 
             fn encode(&self) -> std::result::Result<Vec<u8>, _EncodingError> {
-                Ok(self.to_pb().write_to_bytes().unwrap())
+                self.to_pb().write_to_bytes().map_err(|e| _EncodingError::Other(Box::new(e)))
             }
 
             fn decode(buffer: &[u8]) -> std::result::Result<Self, _EncodingError> {
                 let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-                pb.merge_from_bytes(buffer).unwrap();
+                pb.merge_from_bytes(buffer).map_err(|e| _EncodingError::Other(Box::new(e)))?;
                 Self::from_pb(pb).map_err(|_| "Conversion from protobuf error.".into())
             }
         }
