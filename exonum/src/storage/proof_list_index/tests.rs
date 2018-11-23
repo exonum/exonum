@@ -15,13 +15,16 @@
 use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
 
 use self::ListProof::*;
-use super::{hash_one, hash_pair, root_hash, hash_leaf, hash_with_prefix, LEAF_TAG, NODE_TAG, ListProof, ProofListIndex};
+use super::{root_hash, ListProof, ProofListIndex};
 use crypto::{hash, Hash};
 use encoding::serialize::{
     json::reexport::{from_str, to_string},
     reexport::Serialize,
 };
-use storage::Database;
+use storage::{
+    hash::{hash_leaf, hash_one, hash_pair, hash_with_prefix, LEAF_TAG, NODE_TAG},
+    Database,
+};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -832,12 +835,10 @@ mod root_hash_tests {
 }
 
 mod list_hash_tests {
-    use byteorder::LittleEndian;
-    use bytes::ByteOrder;
     use hex::FromHex;
 
-    use crypto::{Hash, hash};
-    use storage::{Database, MemoryDB, ProofListIndex, proof_list_index::LIST_TAG};
+    use crypto::Hash;
+    use storage::{hash::list_hash, Database, MemoryDB, ProofListIndex};
 
     #[test]
     fn proof_of_absence() {
@@ -854,25 +855,15 @@ mod list_hash_tests {
         let actual_list_hash = index.list_hash();
 
         let existed_index = 5u64;
-        let root_hash = Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9").unwrap();
+        let root_hash =
+            Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9")
+                .unwrap();
 
-        let hash = list_hash(existed_index, &root_hash.as_ref());
+        let hash = list_hash(existed_index, root_hash);
         assert_eq!(hash, actual_list_hash);
 
         let non_existed_index = 6u64;
-        let hash = list_hash(non_existed_index, &index.merkle_root().as_ref());
+        let hash = list_hash(non_existed_index, index.merkle_root());
         assert_ne!(hash, actual_list_hash);
-    }
-
-    fn list_hash(index: u64, root_hash: &[u8]) -> Hash {
-        let mut len_bytes = vec![0; 8];
-        LittleEndian::write_u64(&mut len_bytes, index);
-
-        let mut hash_bytes = vec![];
-        hash_bytes.extend_from_slice(&[LIST_TAG]);
-        hash_bytes.extend_from_slice(&len_bytes);
-        hash_bytes.extend_from_slice(root_hash);
-
-       hash(&hash_bytes)
     }
 }

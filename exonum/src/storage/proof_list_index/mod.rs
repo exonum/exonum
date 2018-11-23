@@ -24,18 +24,13 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::{Hash, HashStream};
-use byteorder::LittleEndian;
-use bytes::ByteOrder;
+use crypto::Hash;
+use storage::hash::{self, hash_leaf, hash_one, hash_pair};
 
 mod key;
 mod proof;
 #[cfg(test)]
 mod tests;
-
-pub const LEAF_TAG: u8 = 0x0;
-const NODE_TAG: u8 = 0x1;
-const LIST_TAG: u8 = 0x2; // Subject of change in the future.
 
 // TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
@@ -63,28 +58,6 @@ pub struct ProofListIndex<T, V> {
 #[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
-}
-
-/// TBD
-pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
-    let value_bytes = value.into_bytes();
-    hash_with_prefix(LEAF_TAG, &value_bytes)
-}
-
-fn hash_one(h: &Hash) -> Hash {
-    hash_with_prefix(NODE_TAG, h.as_ref())
-}
-
-fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
-    HashStream::new()
-        .update(&[NODE_TAG])
-        .update(h1.as_ref())
-        .update(h2.as_ref())
-        .hash()
-}
-
-pub fn hash_with_prefix(prefix: u8, value: &[u8]) -> Hash {
-    HashStream::new().update(&[prefix]).update(&value).hash()
 }
 
 impl<T, V> ProofListIndex<T, V>
@@ -349,14 +322,7 @@ where
 
     /// TBD
     pub fn list_hash(&self) -> Hash {
-        let mut length_bytes = vec![0; 8];
-        LittleEndian::write_u64(&mut length_bytes, self.len());
-
-        HashStream::new()
-            .update(&[LIST_TAG])
-            .update(&length_bytes)
-            .update(self.merkle_root().as_ref())
-            .hash()
+        hash::list_hash(self.len(), self.merkle_root())
     }
 
     /// Returns the proof of existence for the list element at the specified position.
@@ -658,14 +624,9 @@ where
 pub fn root_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
         0 => Hash::zero(),
-        1 => {
-            hash_leaf(hashes[0])
-        }
+        1 => hash_leaf(hashes[0]),
         _ => {
-            let hashes: Vec<Hash> = hashes
-                .into_iter()
-                .map(|h| hash_leaf(*h))
-                .collect();
+            let hashes: Vec<Hash> = hashes.into_iter().map(|h| hash_leaf(*h)).collect();
 
             let mut current_hashes = combine_hash_list(&hashes);
 
