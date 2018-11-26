@@ -32,6 +32,7 @@ const NAME: &str = "name";
 const SAMPLE_SIZE: usize = 20;
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 16] = [100; 16];
+const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
 
 fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
     let mut rng = XorShiftRng::from_seed(SEED);
@@ -58,7 +59,7 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
     (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
-fn proof_list_append<T: Database>(b: &mut Bencher, db: &T, len: usize) {
+fn proof_list_append(b: &mut Bencher, db: &dyn Database, len: usize) {
     let mut rng = XorShiftRng::from_seed(SEED);
     let data = (0..len)
         .map(|_| {
@@ -79,7 +80,7 @@ fn proof_list_append<T: Database>(b: &mut Bencher, db: &T, len: usize) {
     );
 }
 
-fn proof_map_insert_without_merge<T: Database>(b: &mut Bencher, db: &T, len: usize) {
+fn proof_map_insert_without_merge(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || db.fork(),
@@ -93,7 +94,7 @@ fn proof_map_insert_without_merge<T: Database>(b: &mut Bencher, db: &T, len: usi
     );
 }
 
-fn proof_map_insert_with_merge<T: Database>(b: &mut Bencher, db: &T, len: usize) {
+fn proof_map_insert_with_merge(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || {
@@ -119,7 +120,7 @@ fn proof_map_insert_with_merge<T: Database>(b: &mut Bencher, db: &T, len: usize)
     );
 }
 
-fn proof_map_index_build_proofs<T: Database>(b: &mut Bencher, db: &T, len: usize) {
+fn proof_map_index_build_proofs(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(NAME, &mut storage);
@@ -142,7 +143,7 @@ fn proof_map_index_build_proofs<T: Database>(b: &mut Bencher, db: &T, len: usize
     }
 }
 
-fn proof_map_index_verify_proofs<T: Database>(b: &mut Bencher, db: &T, len: usize) {
+fn proof_map_index_verify_proofs(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(NAME, &mut storage);
@@ -162,90 +163,50 @@ fn proof_map_index_verify_proofs<T: Database>(b: &mut Bencher, db: &T, len: usiz
     });
 }
 
-fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
-    let options = DbOptions::default();
-    RocksDB::open(tempdir.path(), &options).unwrap()
-}
-
-fn bench_proof_list_append(b: &mut Bencher, len: &usize) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    proof_list_append(b, &db, *len);
-}
-
-fn bench_proof_map_insert_without_merge(b: &mut Bencher, len: &usize) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    proof_map_insert_without_merge(b, &db, *len);
-}
-
-fn bench_proof_map_insert_with_merge(b: &mut Bencher, len: &usize) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    proof_map_insert_with_merge(b, &db, *len);
-}
-
-fn bench_proof_map_index_build_proofs(b: &mut Bencher, len: &usize) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    proof_map_index_build_proofs(b, &db, *len);
-}
-
-fn bench_proof_map_index_validate_proofs(b: &mut Bencher, len: &usize) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    proof_map_index_verify_proofs(b, &db, *len);
+fn bench_fn_rocksdb<F>(c: &mut Criterion, name: &str, benchmark: F)
+where
+    F: Fn(&mut Bencher, &dyn Database, usize) + 'static,
+{
+    let item_counts = ITEM_COUNTS.iter().cloned();
+    c.bench(
+        name,
+        ParameterizedBenchmark::new(
+            "items",
+            move |b: &mut Bencher, &len: &usize| {
+                let tempdir = TempDir::new("exonum").unwrap();
+                let options = DbOptions::default();
+                let db = RocksDB::open(tempdir.path(), &options).unwrap();
+                benchmark(b, &db, len)
+            },
+            item_counts,
+        ).throughput(|s| Throughput::Elements(*s as u32))
+        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
+        .sample_size(SAMPLE_SIZE),
+    );
 }
 
 pub fn bench_storage(c: &mut Criterion) {
     ::exonum::crypto::init();
 
-    let item_counts = vec![1_000, 10_000, 100_000];
-    c.bench(
-        "storage/proof_list/append",
-        ParameterizedBenchmark::new("items", bench_proof_list_append, item_counts.clone())
-            .throughput(|s| Throughput::Elements(*s as u32))
-            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-            .sample_size(SAMPLE_SIZE),
-    );
-    c.bench(
+    bench_fn_rocksdb(c, "storage/proof_list/append", proof_list_append);
+    bench_fn_rocksdb(
+        c,
         "storage/proof_map/insert/no_merge",
-        ParameterizedBenchmark::new(
-            "items",
-            bench_proof_map_insert_without_merge,
-            item_counts.clone(),
-        ).throughput(|s| Throughput::Elements(*s as u32))
-        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-        .sample_size(SAMPLE_SIZE),
+        proof_map_insert_without_merge,
     );
-    c.bench(
+    bench_fn_rocksdb(
+        c,
         "storage/proof_map/insert/merge",
-        ParameterizedBenchmark::new(
-            "items",
-            bench_proof_map_insert_with_merge,
-            item_counts.clone(),
-        ).throughput(|s| Throughput::Elements(*s as u32))
-        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-        .sample_size(SAMPLE_SIZE),
+        proof_map_insert_with_merge,
     );
-    c.bench(
+    bench_fn_rocksdb(
+        c,
         "storage/proof_map/proofs/build",
-        ParameterizedBenchmark::new(
-            "items",
-            bench_proof_map_index_build_proofs,
-            item_counts.clone(),
-        ).throughput(|s| Throughput::Elements(*s as u32))
-        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-        .sample_size(SAMPLE_SIZE),
+        proof_map_index_build_proofs,
     );
-    c.bench(
+    bench_fn_rocksdb(
+        c,
         "storage/proof_map/proofs/validate",
-        ParameterizedBenchmark::new(
-            "items",
-            bench_proof_map_index_validate_proofs,
-            item_counts.clone(),
-        ).throughput(|s| Throughput::Elements(*s as u32))
-        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-        .sample_size(SAMPLE_SIZE),
+        proof_map_index_verify_proofs,
     );
 }
