@@ -25,9 +25,13 @@ mod pb_convert;
 mod tx_set;
 
 use proc_macro::TokenStream;
-use syn::{Attribute, Lit, Meta, MetaNameValue, NestedMeta, Path};
+use syn::{Attribute, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
 use std::env;
+
+/// Exonum derive attribute names, used as `#[exonum( ATTRIBUTE_NAME = .. )]`
+const ROOT_PATH_ATTRIBUTE: &str = "root";
+const PB_CONVERT_ATTRIBUTE: &str = "pb";
 
 /// Derives `ProtobufConvert` trait.
 /// Attributes:
@@ -37,7 +41,7 @@ use std::env;
 /// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
 #[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
-    pb_convert::generate_protobuf_convert(input)
+    pb_convert::implement_protobuf_convert(input)
 }
 
 /// Derives `TransactionSet` trait for selected enum,
@@ -53,22 +57,27 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
-    tx_set::generate_transaction_set(input)
+    tx_set::implement_transaction_set(input)
 }
 
 /// Exonum types should be imported with `crate::` prefix if inside crate
 /// or with `exonum::` when outside.
 fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
     let map_attrs = get_exonum_attributes(attrs);
-    let crate_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == "root" {
-            match nv.lit {
-                Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
-                _ => None,
-            }
-        } else {
-            None
+    let crate_path = map_attrs.into_iter().find_map(|nv| match &nv {
+        MetaNameValue {
+            lit: Lit::Str(path),
+            ident,
+            ..
         }
+            if ident == ROOT_PATH_ATTRIBUTE =>
+        {
+            Some(
+                path.parse::<Path>()
+                    .expect("failed to parse crate path in the attribute"),
+            )
+        }
+        _ => None,
     });
 
     // If exonum_root_path attribute is defined we use its value
@@ -90,34 +99,18 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
 
 /// Extract attributes in the form of `#[exonum(name = "value")]`
 fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
-    let exonum_meta = attrs.iter().find_map(|attr| {
-        let meta = match attr.parse_meta() {
-            Ok(m) => m,
-            Err(_) => return None,
-        };
-        if meta.name() == "exonum" {
-            Some(meta)
-        } else {
-            None
-        }
-    });
+    let exonum_meta = attrs
+        .iter()
+        .find_map(|attr| attr.parse_meta().ok().filter(|m| m.name() == "exonum"));
 
-    let exonum_meta = if let Some(m) = exonum_meta {
-        m
-    } else {
-        return vec![];
-    };
-
-    let meta_list = match exonum_meta {
-        Meta::List(x) => x,
-        _ => panic!("exonum attribute should not be empty."),
-    };
-
-    meta_list
-        .nested
-        .into_iter()
-        .filter_map(|nested| match nested {
-            NestedMeta::Meta(Meta::NameValue(named)) => Some(named),
-            _ => None,
-        }).collect()
+    match exonum_meta {
+        Some(Meta::List(MetaList { nested: list, .. })) => list
+            .into_iter()
+            .filter_map(|n| match n {
+                NestedMeta::Meta(Meta::NameValue(named)) => Some(named),
+                _ => None,
+            }).collect(),
+        Some(_) => panic!("`exonum` attribute should contain list of name value pairs"),
+        None => vec![],
+    }
 }

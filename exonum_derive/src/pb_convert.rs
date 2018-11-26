@@ -16,10 +16,12 @@ use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use syn::{Attribute, Data, DeriveInput, Lit, Path};
 
+use super::PB_CONVERT_ATTRIBUTE;
+
 fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
     let map_attrs = super::get_exonum_attributes(attrs);
     let struct_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == "pb" {
+        if nv.ident == PB_CONVERT_ATTRIBUTE {
             match nv.lit {
                 Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
                 _ => None,
@@ -29,10 +31,24 @@ fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
         }
     });
 
-    struct_path.expect("pb attribute is not set properly.")
+    struct_path.expect(&format!(
+        "{} attribute is not set properly.",
+        PB_CONVERT_ATTRIBUTE
+    ))
 }
 
-fn gen_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTokens {
+fn get_field_names(input: &DeriveInput) -> Vec<Ident> {
+    let data = match &input.data {
+        Data::Struct(x) => x,
+        _ => panic!("Protobuf convert can be derived for structs only."),
+    };
+    data.fields
+        .iter()
+        .map(|f| f.ident.clone().unwrap())
+        .collect()
+}
+
+fn implement_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTokens {
     let getters = field_names
         .iter()
         .map(|i| Ident::new(&format!("get_{}", i), Span::call_site()));
@@ -47,7 +63,7 @@ fn gen_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTokens {
     }
 }
 
-fn gen_protobuf_convert_to_pb(field_names: &[Ident]) -> impl quote::ToTokens {
+fn implement_protobuf_convert_to_pb(field_names: &[Ident]) -> impl quote::ToTokens {
     let setters = field_names
         .iter()
         .map(|i| Ident::new(&format!("set_{}", i), Span::call_site()));
@@ -62,13 +78,13 @@ fn gen_protobuf_convert_to_pb(field_names: &[Ident]) -> impl quote::ToTokens {
     }
 }
 
-fn gen_to_protobuf_impl(
+fn implement_protobuf_convert_trait(
     name: &Ident,
     pb_name: &Path,
     field_names: &[Ident],
 ) -> impl quote::ToTokens {
-    let to_pb_fn = gen_protobuf_convert_to_pb(field_names);
-    let from_pb_fn = gen_protobuf_convert_from_pb(field_names);
+    let to_pb_fn = implement_protobuf_convert_to_pb(field_names);
+    let from_pb_fn = implement_protobuf_convert_from_pb(field_names);
 
     quote! {
         impl ProtobufConvert for #name {
@@ -80,7 +96,7 @@ fn gen_to_protobuf_impl(
     }
 }
 
-fn gen_binary_form_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
+fn implement_binary_form(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
     quote! {
         impl #cr::messages::BinaryForm for #name {
 
@@ -97,7 +113,7 @@ fn gen_binary_form_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTok
     }
 }
 
-fn gen_storage_traits_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
+fn implement_storage_traits(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
     quote! {
         impl #cr::crypto::CryptoHash for #name {
             fn hash(&self) -> #cr::crypto::Hash {
@@ -106,32 +122,28 @@ fn gen_storage_traits_impl(name: &Ident, cr: &quote::ToTokens) -> impl quote::To
             }
         }
 
+        // This trait assumes that we work with trusted data so we can unwrap here.
         impl #cr::storage::StorageValue for #name {
             fn into_bytes(self) -> Vec<u8> {
-                self.to_pb().write_to_bytes().unwrap()
+                self.to_pb().write_to_bytes().expect(&format!(
+                    "Failed to serialize in StorageValue for {}",
+                    stringify!(#name)
+                ))
             }
 
             fn from_bytes(value: std::borrow::Cow<[u8]>) -> Self {
                 let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
                 block.merge_from_bytes(value.as_ref()).unwrap();
-                ProtobufConvert::from_pb(block).unwrap()
+                ProtobufConvert::from_pb(block).expect(&format!(
+                    "Failed to deserialize in StorageValue for {}",
+                    stringify!(#name)
+                ))
             }
         }
     }
 }
 
-fn get_field_names(input: &DeriveInput) -> Vec<Ident> {
-    let data = match &input.data {
-        Data::Struct(x) => x,
-        _ => panic!("Protobuf convert can be derived for structs only."),
-    };
-    data.fields
-        .iter()
-        .map(|f| f.ident.clone().unwrap())
-        .collect()
-}
-
-pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
+pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let name = input.ident.clone();
@@ -141,9 +153,10 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
 
     let field_names = get_field_names(&input);
-    let impl_protobuf_convert = gen_to_protobuf_impl(&name, &proto_struct_name, &field_names);
-    let impl_binary_form = gen_binary_form_impl(&name, &cr);
-    let impl_storage_traits = gen_storage_traits_impl(&name, &cr);
+    let protobuf_convert =
+        implement_protobuf_convert_trait(&name, &proto_struct_name, &field_names);
+    let binary_form = implement_binary_form(&name, &cr);
+    let storage_traits = implement_storage_traits(&name, &cr);
 
     let expanded = quote! {
         mod #mod_name {
@@ -155,9 +168,9 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
             use #cr::encoding::Error as _EncodingError;
             use self::_protobuf_crate::Message as _ProtobufMessage;
 
-            #impl_protobuf_convert
-            #impl_binary_form
-            #impl_storage_traits
+            #protobuf_convert
+            #binary_form
+            #storage_traits
         }
     };
 

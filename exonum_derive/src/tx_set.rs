@@ -14,9 +14,13 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use syn::{Data, DataEnum, DeriveInput, Type};
+use syn::{Data, DataEnum, DeriveInput, Fields, Type};
 
-struct TxSetVariant(u16, Ident, Type);
+struct TxSetVariant {
+    tx_id: u16,
+    tx_variant: Ident,
+    tx_type: Type,
+}
 
 fn get_tx_variants(data: &DataEnum) -> Vec<TxSetVariant> {
     if data.variants.is_empty() {
@@ -27,55 +31,71 @@ fn get_tx_variants(data: &DataEnum) -> Vec<TxSetVariant> {
         .iter()
         .enumerate()
         .map(|(n, v)| {
-            if v.fields.iter().len() > 1 {
+            let mut fields = match &v.fields {
+                Fields::Unnamed(f) => f.unnamed.iter(),
+                _ => panic!("Only unnamed fields are supported for TransactionSet enum"),
+            };
+            if fields.len() != 1 {
                 panic!("TransactionSet enum variant should have one field inside.");
             }
-            let field = v
-                .fields
-                .iter()
-                .next()
-                .expect("TransactionSet enum variant can't be empty.");
-            TxSetVariant(n as u16, v.ident.clone(), field.ty.clone())
+            let field = fields.next().unwrap();
+            TxSetVariant {
+                tx_id: n as u16,
+                tx_variant: v.ident.clone(),
+                tx_type: field.ty.clone(),
+            }
         }).collect()
 }
 
-fn gen_conversions_for_transactions(
+fn implement_conversions_for_transactions(
     name: &Ident,
     variants: &[TxSetVariant],
     cr: &quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let conversions = variants.iter().map(|TxSetVariant(_, id, ty)| {
-        quote! {
-          impl From<#ty> for #name {
-               fn from(tx: #ty) -> Self {
-                     #name::#id(tx)
-               }
-          }
-
-          impl Into<#cr::messages::ServiceTransaction> for #ty {
-              fn into(self) -> #cr::messages::ServiceTransaction {
-                  let set: #name = self.into();
-                  set.into()
+    let conversions = variants.iter().map(
+        |TxSetVariant {
+             tx_variant: var,
+             tx_type: ty,
+             ..
+         }| {
+            quote! {
+              impl From<#ty> for #name {
+                   fn from(tx: #ty) -> Self {
+                         #name::#var(tx)
+                   }
               }
-          }
-        }
-    });
+
+              impl Into<#cr::messages::ServiceTransaction> for #ty {
+                  fn into(self) -> #cr::messages::ServiceTransaction {
+                      let set: #name = self.into();
+                      set.into()
+                  }
+              }
+            }
+        },
+    );
 
     quote!{
         #(#conversions)*
     }
 }
 
-fn gen_into_service_tx(
+fn implement_into_service_tx(
     name: &Ident,
     variants: &[TxSetVariant],
     cr: &quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|TxSetVariant(n, id, _)| {
-        quote! {
-            #name::#id( ref tx) => ( #n, tx.encode().unwrap()),
-        }
-    });
+    let tx_set_impl = variants.iter().map(
+        |TxSetVariant {
+             tx_id: n,
+             tx_variant: var,
+             ..
+         }| {
+            quote! {
+                #name::#var( ref tx) => ( #n, tx.encode().unwrap()),
+            }
+        },
+    );
 
     quote! {
         impl Into<#cr::messages::ServiceTransaction> for #name {
@@ -89,41 +109,54 @@ fn gen_into_service_tx(
     }
 }
 
-fn gen_transaction_set_impl(
+fn implement_transaction_set_trait(
     name: &Ident,
     variants: &[TxSetVariant],
     cr: &quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|TxSetVariant(n, id, ty)| {
-        quote! {
-            #n => Ok(#name::#id(#ty::decode(&vec)?)),
-        }
-    });
+    let tx_set_impl = variants.iter().map(
+        |TxSetVariant {
+             tx_id: n,
+             tx_variant: var,
+             tx_type: ty,
+         }| {
+            quote! {
+                #n => Ok(#name::#var(#ty::decode(&vec)?)),
+            }
+        },
+    );
 
     quote! {
         impl #cr::blockchain::TransactionSet for #name {
-            fn tx_from_raw(raw: #cr::messages::RawTransaction) -> std::result::Result<Self, _EncodingError> {
+            fn tx_from_raw(
+                raw: #cr::messages::RawTransaction,
+            ) -> std::result::Result<Self, _EncodingError> {
                 let (id, vec) = raw.service_transaction().into_raw_parts();
                 match id {
                     #( #tx_set_impl )*
-                    num => Err(_EncodingError::Basic(format!("Tag {} not found for enum {}.",
-                                                             num, stringify!(#name)).into())),
+                    num => Err(_EncodingError::Basic(
+                        format!("Tag {} not found for enum {}.", num, stringify!(#name)).into(),
+                    )),
                 }
             }
         }
     }
 }
 
-fn gen_into_boxed_tx_impl(
+fn implement_into_boxed_tx(
     name: &Ident,
     variants: &[TxSetVariant],
     cr: &quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|TxSetVariant(_, id, _)| {
-        quote! {
-            #name::#id(tx) => Box::new(tx),
-        }
-    });
+    let tx_set_impl = variants.iter().map(
+        |TxSetVariant {
+             tx_variant: var, ..
+         }| {
+            quote! {
+                #name::#var(tx) => Box::new(tx),
+            }
+        },
+    );
 
     quote! {
         impl Into<Box<dyn #cr::blockchain::Transaction>> for #name {
@@ -136,7 +169,7 @@ fn gen_into_boxed_tx_impl(
     }
 }
 
-pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
+pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let name = input.ident;
@@ -149,10 +182,10 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
     let cr = super::get_exonum_types_prefix(&input.attrs);
     let vars = get_tx_variants(&data);
 
-    let impl_conversions = gen_conversions_for_transactions(&name, &vars, &cr);
-    let into_service_tx = gen_into_service_tx(&name, &vars, &cr);
-    let tx_set_impl = gen_transaction_set_impl(&name, &vars, &cr);
-    let into_boxed_tx = gen_into_boxed_tx_impl(&name, &vars, &cr);
+    let tx_set = implement_transaction_set_trait(&name, &vars, &cr);
+    let conversions = implement_conversions_for_transactions(&name, &vars, &cr);
+    let into_service_tx = implement_into_service_tx(&name, &vars, &cr);
+    let into_boxed_tx = implement_into_boxed_tx(&name, &vars, &cr);
 
     let expanded = quote! {
         mod #mod_name{
@@ -160,9 +193,9 @@ pub fn generate_transaction_set(input: TokenStream) -> TokenStream {
             use #cr::encoding::Error as _EncodingError;
             use #cr::messages::BinaryForm as _BinaryForm;
 
-            #impl_conversions
+            #conversions
+            #tx_set
             #into_service_tx
-            #tx_set_impl
             #into_boxed_tx
         }
     };
