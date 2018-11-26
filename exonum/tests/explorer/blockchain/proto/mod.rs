@@ -16,9 +16,9 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::transactions::{CreateWallet, Transfer};
+pub use self::tests_transactions::{CreateWallet, Transfer};
 
-pub mod transactions;
+include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
 
 pub mod helpers {
     pub use exonum::encoding::protobuf::helpers::*;

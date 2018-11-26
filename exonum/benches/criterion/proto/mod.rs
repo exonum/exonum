@@ -16,11 +16,11 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::transactions::{
+pub use self::bench_transactions::{
     CurrencyRollbackTx, CurrencySimpleTx, CurrencyTx, TimestampPanickingTx, TimestampTx,
 };
 
-mod transactions;
+include!(concat!(env!("OUT_DIR"), "/exonum_benches_proto_mod.rs"));
 
 pub mod helpers {
     pub use exonum::encoding::protobuf::helpers::*;

@@ -23,7 +23,3 @@ npm-debug.log
 .idea
 .vscode
 *.iml
-
-# protobuf generated
-exonum/src/encoding/protobuf/*.rs
-**/proto/*.rs

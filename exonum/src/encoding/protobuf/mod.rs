@@ -25,9 +25,7 @@ pub use self::protocol::{
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
-pub mod helpers;
-#[cfg(test)]
-pub mod tests;
+include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
 
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
@@ -37,9 +35,6 @@ use crypto;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 use messages::BinaryForm;
-
-mod blockchain;
-mod protocol;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
