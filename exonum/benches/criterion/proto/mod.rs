@@ -20,7 +20,7 @@ pub use self::transactions::{
     CurrencyRollbackTx, CurrencySimpleTx, CurrencyTx, TimestampPanickingTx, TimestampTx,
 };
 
-pub mod transactions;
+mod transactions;
 
 pub mod helpers {
     pub use exonum::encoding::protobuf::helpers::*;
