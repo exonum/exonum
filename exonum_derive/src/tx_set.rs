@@ -46,9 +46,9 @@ fn gen_conversions_for_transactions(
 ) -> impl quote::ToTokens {
     let conversions = variants.iter().map(|TxSetVariant(_, id, ty)| {
         quote! {
-          impl Into<#name> for #ty {
-               fn into(self) -> #name {
-                     #name::#id(self)
+          impl From<#ty> for #name {
+               fn from(tx: #ty) -> Self {
+                     #name::#id(tx)
                }
           }
 
