@@ -52,7 +52,7 @@ impl Service for TestService {
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(protobuf_convert = "TestServiceTx")]
+#[exonum(pb = "TestServiceTx")]
 struct Tx {
     value: u64,
 }
@@ -266,7 +266,7 @@ mod transactions_tests {
     use encoding::protobuf::tests::{BlockchainTestTxA, BlockchainTestTxB, BlockchainTestTxC};
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(protobuf_convert = "BlockchainTestTxA")]
+    #[exonum(pb = "BlockchainTestTxA")]
     struct A {
         a: u64,
     }
@@ -277,7 +277,7 @@ mod transactions_tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(protobuf_convert = "BlockchainTestTxB")]
+    #[exonum(pb = "BlockchainTestTxB")]
     struct B {
         b: u64,
         c: u32,
@@ -289,7 +289,7 @@ mod transactions_tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(protobuf_convert = "BlockchainTestTxC")]
+    #[exonum(pb = "BlockchainTestTxC")]
     struct C {
         a: u64,
     }

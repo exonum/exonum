@@ -19,7 +19,7 @@ use syn::{Attribute, Data, DeriveInput, Lit, Path};
 fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
     let map_attrs = super::get_exonum_attributes(attrs);
     let struct_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == "protobuf_convert" {
+        if nv.ident == "pb" {
             match nv.lit {
                 Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
                 _ => None,
@@ -29,7 +29,7 @@ fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
         }
     });
 
-    struct_path.expect("protobuf_convert attribute is not set properly.")
+    struct_path.expect("pb attribute is not set properly.")
 }
 
 fn gen_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTokens {

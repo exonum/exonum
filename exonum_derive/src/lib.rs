@@ -31,9 +31,9 @@ use std::env;
 
 /// Derives `ProtobufConvert` trait.
 /// Attributes:
-/// `#[exonum( protobuf_convert = "path" )]`
+/// `#[exonum( pb = "path" )]`
 /// Required. `path` is name of the corresponding protobuf struct(generated from .proto file)
-/// `#[exonum( exonum_root_path = "path" )]`
+/// `#[exonum( root = "path" )]`
 /// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
 #[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
@@ -49,7 +49,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// Conversion from enum into `Box<dyn Transaction>`.
 ///
 /// Attributes:
-/// `#[exonum( exonum_root_path = "path" )]`
+/// `#[exonum( root = "path" )]`
 /// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
@@ -61,7 +61,7 @@ pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
 fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
     let map_attrs = get_exonum_attributes(attrs);
     let crate_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.ident == "exonum_root_path" {
+        if nv.ident == "root" {
             match nv.lit {
                 Lit::Str(path) => Some(path.parse::<Path>().unwrap()),
                 _ => None,

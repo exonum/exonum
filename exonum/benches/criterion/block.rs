@@ -144,25 +144,19 @@ mod timestamping {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(
-        protobuf_convert = "proto::TimestampTx",
-        exonum_root_path = "exonum"
-    )]
+    #[exonum(pb = "proto::TimestampTx", root = "exonum")]
     struct Tx {
         data: Hash,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(
-        protobuf_convert = "proto::TimestampPanickingTx",
-        exonum_root_path = "exonum"
-    )]
+    #[exonum(pb = "proto::TimestampPanickingTx", root = "exonum")]
     struct PanickingTx {
         data: Hash,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(exonum_root_path = "exonum")]
+    #[exonum(root = "exonum")]
     enum TimestampingTransactions {
         Tx(Tx),
         PanickingTx(PanickingTx),
@@ -268,10 +262,7 @@ mod cryptocurrency {
 
     /// Transfers one unit of currency from `from` to `to`.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(
-        protobuf_convert = "proto::CurrencyTx",
-        exonum_root_path = "exonum"
-    )]
+    #[exonum(pb = "proto::CurrencyTx", root = "exonum")]
     struct Tx {
         to: PublicKey,
         seed: u32,
@@ -279,10 +270,7 @@ mod cryptocurrency {
 
     /// Same as `Tx`, but without cryptographic proofs in `execute`.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(
-        protobuf_convert = "proto::CurrencySimpleTx",
-        exonum_root_path = "exonum"
-    )]
+    #[exonum(pb = "proto::CurrencySimpleTx", root = "exonum")]
     struct SimpleTx {
         to: PublicKey,
         seed: u32,
@@ -290,17 +278,14 @@ mod cryptocurrency {
 
     /// Same as `SimpleTx`, but signals an error 50% of the time.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(
-        protobuf_convert = "proto::CurrencyRollbackTx",
-        exonum_root_path = "exonum"
-    )]
+    #[exonum(pb = "proto::CurrencyRollbackTx", root = "exonum")]
     struct RollbackTx {
         to: PublicKey,
         seed: u32,
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(exonum_root_path = "exonum")]
+    #[exonum(root = "exonum")]
     enum CryptocurrencyTransactions {
         Tx(Tx),
         SimpleTx(SimpleTx),
