@@ -31,10 +31,7 @@ fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
         }
     });
 
-    struct_path.expect(&format!(
-        "{} attribute is not set properly.",
-        PB_CONVERT_ATTRIBUTE
-    ))
+    struct_path.unwrap_or_else(|| panic!("{} attribute is not set properly.", PB_CONVERT_ATTRIBUTE))
 }
 
 fn get_field_names(input: &DeriveInput) -> Vec<Ident> {
