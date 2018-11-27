@@ -1,5 +1,6 @@
 use chrono::Utc;
 use hex::{self, FromHex};
+use serde_json;
 
 use super::{
     BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
@@ -151,9 +152,92 @@ fn test_block() {
         block: content.clone(),
         precommits: precommits.clone(),
     };
-    let json_str = ::serde_json::to_string(&block_proof).unwrap();
-    let block_proof_1: BlockProof = ::serde_json::from_str(&json_str).unwrap();
+    let json_str = serde_json::to_string(&block_proof).unwrap();
+    let block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap();
     assert_eq!(block_proof, block_proof_1);
+}
+
+#[test]
+fn test_precommit_serde_correct() {
+    let (pub_key, secret_key) = gen_keypair();
+    let ts = Utc::now();
+
+    let precommit = Message::concrete(
+        Precommit::new(
+            ValidatorId(123),
+            Height(15),
+            Round(25),
+            &hash(&[1, 2, 3]),
+            &hash(&[3, 2, 1]),
+            ts,
+        ),
+        pub_key,
+        &secret_key,
+    );
+
+    let precommit_json = serde_json::to_string(&precommit).unwrap();
+    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    assert_eq!(precommit2, precommit);
+}
+
+#[test]
+#[should_panic(expected = "Can\'t verify message.")]
+fn test_precommit_serde_wrong_signature() {
+    let (pub_key, secret_key) = gen_keypair();
+    let ts = Utc::now();
+
+    let mut precommit = Message::concrete(
+        Precommit::new(
+            ValidatorId(123),
+            Height(15),
+            Round(25),
+            &hash(&[1, 2, 3]),
+            &hash(&[3, 2, 1]),
+            ts,
+        ),
+        pub_key,
+        &secret_key,
+    );
+    // Break signature.
+    let raw_len = precommit.message.raw.len();
+    precommit.message.raw[raw_len - 2] /= 2 + 1;
+
+    let precommit_json = serde_json::to_string(&precommit).unwrap();
+    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    assert_eq!(precommit2, precommit);
+}
+
+#[test]
+#[should_panic(expected = "Payload does not correspond to the signed message")]
+fn test_precommit_serde_not_correspond_payload() {
+    let (pub_key, secret_key) = gen_keypair();
+    let ts = Utc::now();
+
+    let mut precommit = Message::concrete(
+        Precommit::new(
+            ValidatorId(123),
+            Height(15),
+            Round(25),
+            &hash(&[1, 2, 3]),
+            &hash(&[3, 2, 1]),
+            ts,
+        ),
+        pub_key,
+        &secret_key,
+    );
+    // Modify payload.
+    precommit.payload = Precommit::new(
+        ValidatorId(124),
+        Height(15),
+        Round(25),
+        &hash(&[1, 2, 3]),
+        &hash(&[3, 2, 1]),
+        ts,
+    );
+
+    let precommit_json = serde_json::to_string(&precommit).unwrap();
+    let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+    assert_eq!(precommit2, precommit);
 }
 
 #[test]

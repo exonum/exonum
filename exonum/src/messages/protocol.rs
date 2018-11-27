@@ -947,8 +947,8 @@ impl Precommit {
 #[doc(hidden)]
 pub trait ProtocolMessage: Debug + Clone + BinaryForm {
     fn message_type() -> (u8, u8);
-    ///Trying to convert `Message` to concrete message,
-    ///if ok returns message `Signed<Self>` if fails, returns `Message` back.
+    /// Trying to convert `Message` to concrete message,
+    /// if ok returns message `Signed<Self>` if fails, returns `Message` back.
     fn try_from(p: Message) -> Result<Signed<Self>, Message>;
 
     fn into_protocol(this: Signed<Self>) -> Message;
