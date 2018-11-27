@@ -35,6 +35,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 use hex::{FromHex, ToHex};
 use serde::de::{self, Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
@@ -165,12 +166,11 @@ impl BinaryForm for ServiceTransaction {
 /// payload may have different binary representation (thus invalidating the message signature).
 ///
 /// So we use `Signed` to keep the original byte buffer around with the parsed `Payload`.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Signed<T> {
     // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
     // if our serialization format allows us (ECR-2315).
     payload: T,
-    #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
 }
 
@@ -286,35 +286,30 @@ impl PartialEq<Signed<RawTransaction>> for SignedMessage {
     }
 }
 
+impl<T> Serialize for Signed<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        HexStringRepresentation::serialize(&self.message, serializer)
+    }
+}
+
 impl<'de, T> Deserialize<'de> for Signed<T>
 where
-    T: ProtocolMessage + Deserialize<'de>,
+    T: ProtocolMessage,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct SignedLayout<P> {
-            payload: P,
-            #[serde(with = "HexStringRepresentation")]
-            message: SignedMessage,
-        };
-
-        let inner: SignedLayout<T> = SignedLayout::deserialize(deserializer)?;
-        // Checks that signed message correspond to the payload.
-        let encoded_payload = inner
-            .payload
-            .encode()
-            .map_err(|e| de::Error::custom(format!("Unable to encode payload: {}", e)))?;
-        if encoded_payload != inner.message.payload() {
-            return Err(de::Error::custom(
-                "Payload does not correspond to the signed message",
-            ));
-        }
-        Ok(Signed {
-            payload: inner.payload,
-            message: inner.message,
-        })
+        let signed_message: SignedMessage = HexStringRepresentation::deserialize(deserializer)?;
+        Message::deserialize(signed_message)
+            .map_err(|e| de::Error::custom(format!("Unable to deserialize signed message: {}", e)))
+            .and_then(|msg| {
+                T::try_from(msg).map_err(|_| {
+                    de::Error::custom(format!("Unable to decode signed message into payload",))
+                })
+            })
     }
 }
