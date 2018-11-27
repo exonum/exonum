@@ -97,7 +97,7 @@ fn main() {
     protoc_generate(
         &out_dir,
         "benches/criterion/proto",
-        &["benches/criterion", "src/encoding/protobuf/proto"],
+        &["benches/criterion/proto", "src/encoding/protobuf/proto"],
         "exonum_benches_proto_mod.rs",
     );
 }
