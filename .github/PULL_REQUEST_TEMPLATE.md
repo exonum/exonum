@@ -13,6 +13,7 @@ See: https://jira.bf.local/browse/ECR-XYZW
 
 - [ ] There are no TODOs left in the merged code
 - [ ] Change is covered by automated tests
+- [ ] Benchmark results are attached (if applicable)
 - [ ] The [coding guidelines] are followed
 - [ ] Public API has proper documentation
 - [ ] Changelog is updated if needed (in case of notable or breaking changes)
