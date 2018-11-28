@@ -307,8 +307,11 @@ where
         Message::deserialize(signed_message)
             .map_err(|e| de::Error::custom(format!("Unable to deserialize signed message: {}", e)))
             .and_then(|msg| {
-                T::try_from(msg).map_err(|_| {
-                    de::Error::custom(format!("Unable to decode signed message into payload",))
+                T::try_from(msg).map_err(|e| {
+                    de::Error::custom(format!(
+                        "Unable to decode signed message into payload: {:?}",
+                        e
+                    ))
                 })
             })
     }
