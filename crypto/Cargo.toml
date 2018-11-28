@@ -15,14 +15,21 @@ description = "Cryptography related types, constants, traits and functions."
 byteorder = "1.2.3"
 chrono = "=0.4.6"
 hex = "=0.3.2"
-openssl = "0.10.15"
-pem = "=0.5.1"
+rand = "=0.6.1"
 rust_decimal = "=0.10.2"
 serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
+toml = "=0.4.9"
 uuid = "=0.7.1"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
+
+[dependencies.pwbox]
+git = "https://github.com/exonum/pwbox-rs"
+rev = "0858a4d7853312633128c6a953f50499920dd10a"
+
+[dev-dependencies]
+tempdir = "0.3.7"
 
 [features]
 default = ["sodiumoxide-crypto"]

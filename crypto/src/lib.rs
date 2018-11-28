@@ -23,11 +23,14 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate hex;
-extern crate openssl;
-extern crate pem;
+extern crate pwbox;
+extern crate rand;
 extern crate rust_decimal;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
+extern crate toml;
 extern crate uuid;
 
 #[doc(inline)]
