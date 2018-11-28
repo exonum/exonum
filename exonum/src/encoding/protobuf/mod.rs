@@ -210,7 +210,7 @@ where
 {
     type ProtoStruct = RepeatedField<T::ProtoStruct>;
     fn to_pb(&self) -> Self::ProtoStruct {
-        RepeatedField::from_vec(self.into_iter().map(|v| v.to_pb()).collect())
+        RepeatedField::from_vec(self.iter().map(|v| v.to_pb()).collect())
     }
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         pb.into_iter()

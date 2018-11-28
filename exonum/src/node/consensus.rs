@@ -412,7 +412,7 @@ impl NodeHandler {
                 let raw_messages = self
                     .state
                     .prevotes(prevote_round, propose_hash)
-                    .into_iter()
+                    .iter()
                     .map(|p| p.clone().into())
                     .collect::<Vec<_>>();
                 self.blockchain.save_messages(round, raw_messages);

@@ -16,14 +16,15 @@
 //!
 //! For more information see the project readme.
 
-#![deny(
+#![warn(
     missing_debug_implementations,
     missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
-#![cfg_attr(feature = "cargo-clippy", deny(clippy::clippy_pedantic))]
+// TODO This lints produces a lot of code style warnings [ERC2699]
+// #![cfg_attr(feature = "cargo-clippy", warn(clippy::pedantic))]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
