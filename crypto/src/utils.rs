@@ -62,11 +62,11 @@ pub fn read_keys_from_file<P: AsRef<Path>>(
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let pub_key = PublicKey::from_slice(
         &hex::decode(&keys.public_key).map_err(|e| Error::new(ErrorKind::Other, e))?,
-    ).ok_or(Error::new(
+    ).ok_or_else(|| Error::new(
         ErrorKind::Other,
         "Couldn't create PublicKey from slice",
     ))?;
-    let sec_key = SecretKey::from_slice(&decrypt(&keys, pass_phrase)?).ok_or(Error::new(
+    let sec_key = SecretKey::from_slice(&decrypt(&keys, pass_phrase)?).ok_or_else(|| Error::new(
         ErrorKind::Other,
         "Couldn't create SecretKey from slice",
     ))?;
