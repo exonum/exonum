@@ -7,7 +7,7 @@ See: https://jira.bf.local/browse/ECR-XYZW
 
 ### Definition of Done
 
-- [ ] There are no TODOs left in the code
+- [ ] There are no TODOs left in the merged code
 - [ ] Change is covered by automated tests
 - [ ] The [coding guidelines](https://github.com/exonum/exonum/blob/master/CONTRIBUTING.md#conventions) are followed
 - [ ] Public API has proper documentation
