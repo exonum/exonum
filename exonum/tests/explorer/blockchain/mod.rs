@@ -34,7 +34,7 @@ pub const SERVICE_ID: u16 = 0;
 mod proto;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::CreateWallet", root = "exonum")]
+#[exonum(pb = "proto::CreateWallet")]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
     pub name: String,
@@ -50,7 +50,7 @@ impl CreateWallet {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Transfer", root = "exonum")]
+#[exonum(pb = "proto::Transfer")]
 pub struct Transfer {
     pub from: PublicKey,
     pub to: PublicKey,
@@ -68,7 +68,6 @@ impl Transfer {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-#[exonum(root = "exonum")]
 pub enum ExplorerTransactions {
     CreateWallet(CreateWallet),
     Transfer(Transfer),

@@ -52,7 +52,7 @@ impl Service for TestService {
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "TestServiceTx")]
+#[exonum(pb = "TestServiceTx", crate = "crate")]
 struct Tx {
     value: u64,
 }
@@ -64,6 +64,7 @@ impl Tx {
 }
 
 #[derive(Serialize, Deserialize, Clone, TransactionSet, Debug)]
+#[exonum(crate = "crate")]
 enum TestServiceTxs {
     Tx(Tx),
 }
@@ -263,10 +264,10 @@ mod transactions_tests {
     use messages::Message;
     use serde_json;
 
-    use encoding::protobuf::tests::{BlockchainTestTxA, BlockchainTestTxB, BlockchainTestTxC};
+    use encoding::protobuf::tests::{BlockchainTestTxA, BlockchainTestTxB};
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "BlockchainTestTxA")]
+    #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
     struct A {
         a: u64,
     }
@@ -277,7 +278,7 @@ mod transactions_tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "BlockchainTestTxB")]
+    #[exonum(pb = "BlockchainTestTxB", crate = "crate")]
     struct B {
         b: u64,
         c: u32,
@@ -289,7 +290,7 @@ mod transactions_tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "BlockchainTestTxC")]
+    #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
     struct C {
         a: u64,
     }
@@ -300,6 +301,7 @@ mod transactions_tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
     enum MyTransactions {
         A(A),
         B(B),

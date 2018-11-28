@@ -1170,6 +1170,7 @@ mod tests {
     const SERVICE_ID: u16 = 1;
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
     enum HandleCommitTransactions {
         TxAfterCommit(TxAfterCommit),
     }

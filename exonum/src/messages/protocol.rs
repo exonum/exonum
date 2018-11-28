@@ -66,7 +66,7 @@ pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::s
 /// initialization. Additionally, the node responds by its own `Connect`
 /// message after receiving `node::Event::Connected`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Connect")]
+#[exonum(pb = "protobuf::Connect", crate = "crate")]
 pub struct Connect {
     /// The node's address.
     pub_addr: String,
@@ -117,7 +117,7 @@ impl Connect {
 /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
 /// after accepting a new block.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Status")]
+#[exonum(pb = "protobuf::Status", crate = "crate")]
 pub struct Status {
     /// The height to which the message is related.
     height: Height,
@@ -163,7 +163,7 @@ impl Status {
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Propose")]
+#[exonum(pb = "protobuf::Propose", crate = "crate")]
 pub struct Propose {
     /// The validator id.
     validator: ValidatorId,
@@ -236,7 +236,7 @@ impl Propose {
 /// A node broadcasts `Prevote` in response to `Propose` when it has
 /// received all the transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Prevote")]
+#[exonum(pb = "protobuf::Prevote", crate = "crate")]
 pub struct Prevote {
     /// The validator id.
     validator: ValidatorId,
@@ -309,7 +309,7 @@ impl Prevote {
 /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
 /// pre-votes and no unknown transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "protobuf::Precommit")]
+#[exonum(pb = "protobuf::Precommit", crate = "crate")]
 pub struct Precommit {
     /// The validator id.
     validator: ValidatorId,
@@ -384,7 +384,7 @@ impl Precommit {
 /// ### Generation
 /// The message is sent as response to `BlockRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::BlockResponse")]
+#[exonum(pb = "protobuf::BlockResponse", crate = "crate")]
 pub struct BlockResponse {
     /// Public key of the recipient.
     to: PublicKey,
@@ -443,7 +443,7 @@ impl BlockResponse {
 /// ### Generation
 /// The message is sent as response to `TransactionsRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::TransactionsResponse")]
+#[exonum(pb = "protobuf::TransactionsResponse", crate = "crate")]
 pub struct TransactionsResponse {
     /// Public key of the recipient.
     to: PublicKey,
@@ -483,7 +483,7 @@ impl TransactionsResponse {
 /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::ProposeRequest")]
+#[exonum(pb = "protobuf::ProposeRequest", crate = "crate")]
 pub struct ProposeRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -526,7 +526,7 @@ impl ProposeRequest {
 /// This message can be sent during `Propose`, `Prevote` and `Precommit`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::TransactionsRequest")]
+#[exonum(pb = "protobuf::TransactionsRequest", crate = "crate")]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -565,7 +565,7 @@ impl TransactionsRequest {
 /// ### Generation
 /// This message can be sent during `Prevote` and `Precommit` handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::PrevotesRequest")]
+#[exonum(pb = "protobuf::PrevotesRequest", crate = "crate")]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -632,7 +632,7 @@ impl PrevotesRequest {
 /// `PeersRequest` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::PeersRequest")]
+#[exonum(pb = "protobuf::PeersRequest", crate = "crate")]
 pub struct PeersRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -660,7 +660,7 @@ impl PeersRequest {
 /// ### Generation
 /// This message can be sent during `Status` processing.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::BlockRequest")]
+#[exonum(pb = "protobuf::BlockRequest", crate = "crate")]
 pub struct BlockRequest {
     /// Public key of the recipient.
     to: PublicKey,

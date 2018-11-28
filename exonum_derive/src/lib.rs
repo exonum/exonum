@@ -27,17 +27,15 @@ mod tx_set;
 use proc_macro::TokenStream;
 use syn::{Attribute, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
-use std::env;
-
 /// Exonum derive attribute names, used as `#[exonum( ATTRIBUTE_NAME = .. )]`
-const ROOT_PATH_ATTRIBUTE: &str = "root";
+const CRATE_PATH_ATTRIBUTE: &str = "crate";
 const PB_CONVERT_ATTRIBUTE: &str = "pb";
 
 /// Derives `ProtobufConvert` trait.
 /// Attributes:
 /// `#[exonum( pb = "path" )]`
 /// Required. `path` is name of the corresponding protobuf struct(generated from .proto file)
-/// `#[exonum( root = "path" )]`
+/// `#[exonum( crate = "path" )]`
 /// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
 #[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
@@ -53,7 +51,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// Conversion from enum into `Box<dyn Transaction>`.
 ///
 /// Attributes:
-/// `#[exonum( root = "path" )]`
+/// `#[exonum( crate = "path" )]`
 /// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
@@ -70,7 +68,7 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
             ident,
             ..
         }
-            if ident == ROOT_PATH_ATTRIBUTE =>
+            if ident == CRATE_PATH_ATTRIBUTE =>
         {
             Some(
                 path.parse::<Path>()
@@ -80,18 +78,8 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
         _ => None,
     });
 
-    // If exonum_root_path attribute is defined we use its value
     if let Some(path) = crate_path {
-        return quote!(#path);
-    }
-
-    // Check cargo env variable to see if we are building inside exonum crate.
-    let inside_exonum = env::var("CARGO_PKG_NAME")
-        .map(|pkg| pkg == "exonum")
-        .unwrap_or(false);
-
-    if inside_exonum {
-        quote!(crate)
+        quote!(#path)
     } else {
         quote!(exonum)
     }

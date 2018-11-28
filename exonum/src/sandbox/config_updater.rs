@@ -28,6 +28,7 @@ use storage::Snapshot;
 pub const CONFIG_SERVICE: u16 = 1;
 
 #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+#[exonum(crate = "crate")]
 enum ConfigUpdaterTransactions {
     TxConfig(TxConfig),
 }

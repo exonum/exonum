@@ -42,8 +42,6 @@ message BlockchainTestTxB {
   uint32 c = 2;
 }
 
-message BlockchainTestTxC { uint64 a = 1; }
-
 message CreateWallet {
   exonum.PublicKey pubkey = 1;
   string name = 2;

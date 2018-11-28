@@ -1068,6 +1068,7 @@ mod tests {
     const SERVICE_ID: u16 = 0;
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
     enum SimpleTransactions {
         TxSimple(TxSimple),
     }

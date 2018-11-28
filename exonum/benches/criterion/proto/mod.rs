@@ -16,9 +16,7 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::bench_transactions::{
-    CurrencyRollbackTx, CurrencySimpleTx, CurrencyTx, TimestampPanickingTx, TimestampTx,
-};
+pub use self::bench_transactions::{CurrencyTx, TimestampTx};
 
 include!(concat!(env!("OUT_DIR"), "/exonum_benches_proto_mod.rs"));
 

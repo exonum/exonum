@@ -20,19 +20,7 @@ package exonum.benchmarks;
 
 message TimestampTx { exonum.Hash data = 1; }
 
-message TimestampPanickingTx { exonum.Hash data = 1; }
-
 message CurrencyTx {
-  exonum.PublicKey to = 1;
-  uint32 seed = 2;
-}
-
-message CurrencySimpleTx {
-  exonum.PublicKey to = 1;
-  uint32 seed = 2;
-}
-
-message CurrencyRollbackTx {
   exonum.PublicKey to = 1;
   uint32 seed = 2;
 }

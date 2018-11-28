@@ -61,6 +61,8 @@ fn protoc_generate(out_dir: &str, input_dir: &str, includes: &[&str], mod_file: 
             ..Default::default()
         },
     }).expect("protoc");
+
+    println!("cargo:rerun-if-changed={}", input_dir);
 }
 
 fn main() {
