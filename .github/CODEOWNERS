@@ -1,39 +1,39 @@
 # Default owners for everything in the repository:
-* @darkeld3r @aleksuss
+* @aleksuss @alekseysidorov
 
 # Javascript specific changes:
-*.js @darkeld3r @boguslavsky
+*.js @aleksuss @boguslavsky
 
 # Cryptography:
-crypto/* @darkeld3r @aleksuss @pavel-mukhanov @vldm @slowli
+crypto/* @aleksuss @alekseysidorov @pavel-mukhanov @ilammy @slowli
 
 # Cryptocurrency examples:
-examples/cryptocurrency/* @darkeld3r @aleksuss @vitvakatu @ilammy
-examples/cryptocurrency-advanced/* @darkeld3r @aleksuss @vitvakatu @ilammy
+examples/cryptocurrency/* @aleksuss @alekseysidorov @vitvakatu @ilammy
+examples/cryptocurrency-advanced/* @aleksuss @alekseysidorov @vitvakatu @ilammy
 
 # Timestamping:
-examples/timestamping/* @darkeld3r @aleksuss @ozkriff @mvlabat @vitvakatu
+examples/timestamping/* @aleksuss @alekseysidorov @ozkriff @vitvakatu
 
 # Configuration service:
-services/configuration/* @darkeld3r @aleksuss @alekseysidorov @vldm @slowli
+services/configuration/* @aleksuss @alekseysidorov @ilammy @slowli
 
 # Time-oracle service:
-services/time/* @darkeld3r @aleksuss @alekseysidorov @slowli
+services/time/* @aleksuss @alekseysidorov @slowli
 
 # Testkit:
-testkit/* @darkeld3r @aleksuss @alekseysidorov @slowli
+testkit/* @aleksuss @alekseysidorov @slowli
 
 # Benchmarks:
-exonum/benches/* @darkeld3r @aleksuss @vldm @alekseysidorov @andreyluchin
+exonum/benches/* @aleksuss @alekseysidorov @ilammy @andreyluchin
 
 # Web api:
-exonum/src/api/* @darkeld3r @aleksuss @alekseysidorov @andreyluchin
+exonum/src/api/* @aleksuss @alekseysidorov @ilammy @andreyluchin
 
 # Encoding:
-exonum/src/encoding/* @darkeld3r @aleksuss @vldm
+exonum/src/encoding/* @aleksuss @alekseysidorov @dvush
 
 # Events:
-exonum/src/events/* @darkeld3r @aleksuss @alekseysidorov @andreyluchin @ilammy @pavel-mukhanov
+exonum/src/events/* @aleksuss @alekseysidorov @andreyluchin @ilammy @pavel-mukhanov
 
 # Node (consensus):
-exonum/src/node/* @darkeld3r @aleksuss @slowli
+exonum/src/node/* @aleksuss @alekseysidorov @slowli
