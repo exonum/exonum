@@ -49,7 +49,7 @@ pub fn read_keys_from_file<P: AsRef<Path>>(
 ) -> Result<(PublicKey, SecretKey), Error> {
     let mut key_file = File::open(path)?;
 
-    if cfg!(targe_os = "unix") {
+    if cfg!(unix) {
         let file_info = key_file.metadata()?;
         if (file_info.mode() & 0o600) != 0o600 {
             return Err(Error::new(ErrorKind::Other, "Wrong file's mode"));
@@ -160,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dectypt_from_file() {
+    fn test_decrypt_from_file() {
         let pass_phrase = b"passphrase";
         let file_content = r#"
 public_key = '4642dd43a3489ad0b252c79156ec4beac8e9d59a2d3561d56ce34ef7b363bd64'
@@ -182,7 +182,7 @@ iv = '30d22938dfdb63c3ce2f629b8cfafa35be695858456863fb'
 
         let encrypt_key: EncryptedKeys =
             toml::from_str(file_content).expect("Couldn't deserialize content");
-        let decrepted_secret_key = {
+        let decrypted_secret_key = {
             let sk_bytes = decrypt(&encrypt_key, pass_phrase).expect("Couldn't decrypt key");
             SecretKey::from_slice(&sk_bytes).unwrap()
         };
@@ -191,7 +191,7 @@ iv = '30d22938dfdb63c3ce2f629b8cfafa35be695858456863fb'
             encrypt_key.public_key,
             "4642dd43a3489ad0b252c79156ec4beac8e9d59a2d3561d56ce34ef7b363bd64"
         );
-        assert_eq!(decrepted_secret_key.to_hex(),
+        assert_eq!(decrypted_secret_key.to_hex(),
 "46803f1c86c4c7e0edba803488e10e95d83c83f8b7d95412af9e2f84956cd4b94642dd43a3489ad0b252c79156ec4beac8e9d59a2d3561d56ce34ef7b363bd64")
     }
 }

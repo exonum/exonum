@@ -16,6 +16,8 @@ bytearray
 byteorder
 checkpointed
 chrono
+cipherparams
+ciphertext
 clippy
 clonned
 codecov
@@ -50,6 +52,7 @@ hashable
 healthcheck
 idempotence
 interlayer
+kdfparams
 keepalive
 keypair
 keypairs
@@ -61,6 +64,7 @@ libsodium
 libssl
 maintainer's
 markdownlint
+memlimit
 memorydb
 mempool
 Merkelized
@@ -73,11 +77,13 @@ msgs
 multiproof
 multiproofs
 mutex
+nacl
 nanos
 nodelay
 nonoptimal
 oneshot
 openssl
+opslimit
 peekable
 permissioned
 postagainst
@@ -96,6 +102,7 @@ proptest
 protobuf
 pubkey
 pubkeys
+pwbox
 readonly
 rebasing
 reddit
@@ -112,6 +119,7 @@ runtimes
 rustfmt
 rustup
 scalarmult
+scrypt
 seedable
 serde
 serializable
@@ -158,3 +166,4 @@ validators
 websockets
 whitelisted
 writeln
+xsalsa
