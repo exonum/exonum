@@ -35,7 +35,7 @@ const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 /// failed. Errors consist of an error code and an optional description.
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
-/// framework) that can be obtained through `Schema` `transaction_statuses` method.
+/// framework) that can be obtained through `Schema::transaction_results` method.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TransactionResult(pub Result<(), TransactionError>);
 
