@@ -181,7 +181,7 @@ fn test_precommit_serde_correct() {
 }
 
 #[test]
-#[should_panic(expected = "Can not verify message.")]
+#[should_panic(expected = "Cannot verify message.")]
 fn test_precommit_serde_wrong_signature() {
     use crypto::SIGNATURE_LENGTH;
 

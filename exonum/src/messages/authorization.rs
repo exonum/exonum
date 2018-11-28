@@ -144,7 +144,7 @@ impl SignedMessage {
         public_key: &PublicKey,
     ) -> Result<(), Error> {
         if !crypto::verify(signature, &full_buffer, &public_key) {
-            bail!("Can not verify message.");
+            bail!("Cannot verify message.");
         }
         Ok(())
     }
