@@ -75,9 +75,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-crypto
 
-- Added `utils` module with functions `create_pem_file` for creating
-  and `read_key_from_pem` for reading encrypted files that contain a
-  secret key. (#1056)
+- Added `utils` module with functions `create_keys_file` for creating
+  and `read_keys_from_file` for reading files that contain a
+  public key and encrypted secret key. (#1056)
 
 #### exonum
 

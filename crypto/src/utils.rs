@@ -80,7 +80,11 @@ struct EncryptedKeys {
     secret_key: ErasedPwBox,
 }
 
-fn encrypt(public_key: String, secret_key: &[u8], pass_phrase: &[u8]) -> Result<EncryptedKeys, Error> {
+fn encrypt(
+    public_key: String,
+    secret_key: &[u8],
+    pass_phrase: &[u8],
+) -> Result<EncryptedKeys, Error> {
     let mut rng = thread_rng();
     let mut eraser = Eraser::new();
     eraser.add_suite::<Sodium>();
@@ -176,7 +180,8 @@ opslimit = 524288
 iv = '30d22938dfdb63c3ce2f629b8cfafa35be695858456863fb'
         "#;
 
-        let encrypt_key: EncryptedKeys = toml::from_str(file_content).expect("Couldn't deserialize content");
+        let encrypt_key: EncryptedKeys =
+            toml::from_str(file_content).expect("Couldn't deserialize content");
         let decrepted_secret_key = {
             let sk_bytes = decrypt(&encrypt_key, pass_phrase).expect("Couldn't decrypt key");
             SecretKey::from_slice(&sk_bytes).unwrap()
