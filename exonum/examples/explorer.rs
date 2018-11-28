@@ -153,8 +153,8 @@ fn main() {
             "content": serde_json::to_value(tx.content()).unwrap(),
             // Position in block
             "location": {
-                "block_height": "1",
-                "position_in_block": "0",
+                "block_height": 1,
+                "position_in_block": 0,
             },
             // `ListProof` of the transaction inclusion in block
             "location_proof": tx.location_proof(),
