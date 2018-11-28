@@ -33,7 +33,7 @@ exonum/src/api/* @aleksuss @alekseysidorov @ilammy @andreyluchin
 exonum/src/encoding/* @aleksuss @alekseysidorov @dvush
 
 # Events:
-exonum/src/events/* @aleksuss @alekseysidorov @andreyluchin @ilammy @pavel-mukhanov
+exonum/src/events/* @aleksuss @alekseysidorov @andreyluchin @ilammy @pavel-mukhanov @dvush
 
 # Node (consensus):
 exonum/src/node/* @aleksuss @alekseysidorov @slowli
