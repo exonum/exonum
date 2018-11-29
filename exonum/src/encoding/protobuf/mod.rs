@@ -25,18 +25,16 @@ pub use self::protocol::{
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
+include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
+
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
-use protobuf::{well_known_types, Message, RepeatedField};
+use protobuf::{well_known_types, Message};
 
 use crypto;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 use messages::BinaryForm;
-
-mod blockchain;
-mod helpers;
-mod protocol;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
@@ -53,17 +51,17 @@ pub trait ProtobufConvert: Sized {
 
 impl<T> BinaryForm for T
 where
-    T: ProtobufConvert,
-    <T as ProtobufConvert>::ProtoStruct: Message,
+    T: Message,
 {
     fn encode(&self) -> Result<Vec<u8>, Error> {
-        Ok(self.to_pb().write_to_bytes().unwrap())
+        self.write_to_bytes().map_err(|e| Error::Other(Box::new(e)))
     }
 
     fn decode(buffer: &[u8]) -> Result<Self, Error> {
-        let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-        pb.merge_from_bytes(buffer).unwrap();
-        Self::from_pb(pb).map_err(|_| "Conversion from protobuf error".into())
+        let mut pb = Self::new();
+        pb.merge_from_bytes(buffer)
+            .map_err(|_| "Conversion from protobuf error")?;
+        Ok(pb)
     }
 }
 
@@ -208,9 +206,9 @@ impl<T> ProtobufConvert for Vec<T>
 where
     T: ProtobufConvert,
 {
-    type ProtoStruct = RepeatedField<T::ProtoStruct>;
+    type ProtoStruct = Vec<T::ProtoStruct>;
     fn to_pb(&self) -> Self::ProtoStruct {
-        RepeatedField::from_vec(self.iter().map(|v| v.to_pb()).collect())
+        self.into_iter().map(|v| v.to_pb()).collect()
     }
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         pb.into_iter()

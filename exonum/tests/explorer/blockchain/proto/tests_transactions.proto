@@ -14,13 +14,17 @@
 
 syntax = "proto3";
 
-package exonum;
+import "helpers.proto";
 
-message Hash { bytes data = 1; }
+package exonum.tests.explorer;
 
-message PublicKey { bytes data = 1; }
+message CreateWallet {
+  exonum.PublicKey pubkey = 1;
+  string name = 2;
+}
 
-message BitVec {
-  bytes data = 1;
-  uint64 len = 2;
+message Transfer {
+  exonum.PublicKey from = 1;
+  exonum.PublicKey to = 2;
+  uint64 amount = 3;
 }

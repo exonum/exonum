@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use encoding::protobuf::tests::TimestampTx;
+
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
@@ -24,13 +26,10 @@ use storage::Snapshot;
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
 
-transactions! {
-    pub TimestampingTransactions {
-
-        struct TimestampTx {
-            data: &[u8],
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+#[exonum(crate = "crate")]
+pub enum TimestampingTransactions {
+    TimestampTx(TimestampTx),
 }
 
 impl Transaction for TimestampTx {
@@ -76,7 +75,8 @@ impl Iterator for TimestampingTxGenerator {
     fn next(&mut self) -> Option<Signed<RawTransaction>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        let buf = TimestampTx::new(&data);
+        let mut buf = TimestampTx::new();
+        buf.set_data(data);
         Some(Message::sign_transaction(
             buf,
             TIMESTAMPING_SERVICE,

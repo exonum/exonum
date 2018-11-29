@@ -14,13 +14,13 @@
 
 syntax = "proto3";
 
-package exonum;
+import "helpers.proto";
 
-message Hash { bytes data = 1; }
+package exonum.benchmarks;
 
-message PublicKey { bytes data = 1; }
+message TimestampTx { exonum.Hash data = 1; }
 
-message BitVec {
-  bytes data = 1;
-  uint64 len = 2;
+message CurrencyTx {
+  exonum.PublicKey to = 1;
+  uint32 seed = 2;
 }

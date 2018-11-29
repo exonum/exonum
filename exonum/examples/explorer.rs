@@ -14,12 +14,14 @@
 
 //! Examples of usage of a blockchain explorer.
 
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+extern crate protobuf;
 
 use exonum::{
     blockchain::{Blockchain, Schema, Transaction, TransactionError},
@@ -33,7 +35,7 @@ use blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
 };
 
-#[path = "../tests/explorer/blockchain.rs"]
+#[path = "../tests/explorer/blockchain/mod.rs"]
 mod blockchain;
 
 /// Creates a transaction for the mempool.

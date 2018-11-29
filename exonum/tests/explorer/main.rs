@@ -14,8 +14,9 @@
 
 //! Tests for the blockchain explorer functionality.
 
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate serde_json;
 
@@ -25,6 +26,7 @@ extern crate serde_derive;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate protobuf;
 
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
@@ -347,7 +349,7 @@ fn test_transaction_iterator() {
             let tx = ExplorerTransactions::tx_from_raw(raw_tx).unwrap();
             match tx {
                 ExplorerTransactions::CreateWallet(parsed_tx) => {
-                    assert_eq!(parsed_tx.name(), &format!("Alice #{}", i))
+                    assert_eq!(parsed_tx.name, format!("Alice #{}", i))
                 }
                 _ => panic!("Transaction couldn't be parsed."),
             }
