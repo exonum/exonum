@@ -61,10 +61,7 @@ pub fn read_keys_from_file<P: AsRef<Path>>(
     key_file.read_to_end(&mut file_content)?;
     let keys: EncryptedKeys =
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-    let pub_key = keys.public_key;
-    let sec_key = keys.decrypt(pass_phrase)?;
-
-    Ok((pub_key, sec_key))
+    keys.decrypt(pass_phrase)
 }
 
 struct PublicKeyHex;
@@ -110,7 +107,7 @@ impl EncryptedKeys {
         })
     }
 
-    fn decrypt(self, pass_phrase: &[u8]) -> Result<SecretKey, Error> {
+    fn decrypt(self, pass_phrase: &[u8]) -> Result<(PublicKey, SecretKey), Error> {
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
         let restored = match eraser.restore(&self.secret_key) {
@@ -131,7 +128,7 @@ impl EncryptedKeys {
             .ok_or_else(|| Error::new(ErrorKind::Other, "Couldn't create seed from slice"))?;
         let (public_key, secret_key) = gen_keypair_from_seed(&seed);
         assert_eq!(self.public_key, public_key);
-        Ok(secret_key)
+        Ok((public_key, secret_key))
     }
 }
 
@@ -165,7 +162,7 @@ mod tests {
         let encrypt_key =
             EncryptedKeys::encrypt(pk, &sk, pass_phrase).expect("Couldn't encrypt keys");
 
-        let decrypted_key = encrypt_key
+        let (_, decrypted_key) = encrypt_key
             .decrypt(pass_phrase)
             .expect("Couldn't decrypt key");
 
@@ -195,14 +192,9 @@ iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
 
         let encrypt_key: EncryptedKeys =
             toml::from_str(file_content).expect("Couldn't deserialize content");
-        let (public_key, decrypted_secret_key) = {
-            let public_key = encrypt_key.public_key.clone();
-            let secret_key = encrypt_key
+        let (public_key, decrypted_secret_key) = encrypt_key
                 .decrypt(pass_phrase)
                 .expect("Couldn't decrypt key");
-            (public_key, secret_key)
-        };
-
         assert_eq!(
             public_key.to_hex(),
             "2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8"
