@@ -36,3 +36,8 @@ message TxLocation {
   uint64 block_height = 1;
   uint64 position_in_block = 2;
 }
+
+message TransactionResult {
+  uint32 status = 1;
+  string description = 2;
+}

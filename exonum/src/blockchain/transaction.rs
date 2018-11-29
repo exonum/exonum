@@ -13,11 +13,14 @@
 // limitations under the License.
 
 //! `Transaction` related types.
+
+use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
+
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crypto::{CryptoHash, Hash, PublicKey};
-use encoding;
+use encoding::{self, protobuf::ProtobufConvert};
 use hex::ToHex;
 use messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
 use storage::{Fork, StorageValue};
@@ -413,34 +416,48 @@ impl From<ExecutionError> for TransactionError {
     }
 }
 
-// `TransactionResult` is stored as `u16` plus `bool` (`true` means that optional part is present)
-// with optional string part needed only for string error description.
-impl StorageValue for TransactionResult {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut res = u16::into_bytes(status_as_u16(&self));
-        if let Some(description) = self.0.err().and_then(|e| e.description) {
-            res.extend(bool::into_bytes(true));
-            res.extend(String::into_bytes(description));
-        } else {
-            res.extend(bool::into_bytes(false));
+impl ProtobufConvert for TransactionResult {
+    type ProtoStruct = encoding::protobuf::TransactionResult;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut proto = <Self as ProtobufConvert>::ProtoStruct::new();
+        proto.set_status(status_as_u16(self).to_pb());
+        if let Some(description) = self.0.as_ref().err().and_then(|e| e.description.clone()) {
+            proto.set_description(description);
         }
-        res
+        proto
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let main_part = <u16 as StorageValue>::from_bytes(Cow::Borrowed(&bytes));
-        let description = if bool::from_bytes(Cow::Borrowed(&bytes[2..3])) {
-            Some(String::from_bytes(Cow::Borrowed(&bytes[3..])))
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
+        let status_code: u16 = ProtobufConvert::from_pb(pb.get_status())?;
+        let description = if pb.get_description() != "" {
+            Some(pb.take_description())
         } else {
             None
         };
 
-        TransactionResult(match main_part {
+        Ok(TransactionResult(match status_code {
             value @ 0...MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::panic(description)),
             value => panic!("Invalid TransactionResult value: {}", value),
-        })
+        }))
+    }
+}
+
+impl StorageValue for TransactionResult {
+    fn into_bytes(self) -> Vec<u8> {
+        self.to_pb()
+            .write_to_bytes()
+            .expect("Failed to serialize TransactionResult to protobuf.")
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
+        block
+            .merge_from_bytes(bytes.as_ref())
+            .expect("Failed to parse TransactionResult from protobuf.");
+        ProtobufConvert::from_pb(block).expect("Failed to convert TransactionResult from protobuf.")
     }
 }
 
@@ -845,7 +862,6 @@ mod tests {
         let results = [
             Ok(()),
             Err(TransactionError::panic(None)),
-            Err(TransactionError::panic(Some("".to_owned()))),
             Err(TransactionError::panic(Some(
                 "Panic error description".to_owned(),
             ))),
@@ -855,7 +871,6 @@ mod tests {
                 Some("Some error description".to_owned()),
             )),
             Err(TransactionError::code(1, None)),
-            Err(TransactionError::code(1, Some("".to_owned()))),
             Err(TransactionError::code(100, None)),
             Err(TransactionError::code(100, Some("just error".to_owned()))),
             Err(TransactionError::code(254, None)),
