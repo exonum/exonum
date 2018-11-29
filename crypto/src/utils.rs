@@ -193,8 +193,8 @@ iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
         let encrypt_key: EncryptedKeys =
             toml::from_str(file_content).expect("Couldn't deserialize content");
         let (public_key, decrypted_secret_key) = encrypt_key
-                .decrypt(pass_phrase)
-                .expect("Couldn't decrypt key");
+            .decrypt(pass_phrase)
+            .expect("Couldn't decrypt key");
         assert_eq!(
             public_key.to_hex(),
             "2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8"
