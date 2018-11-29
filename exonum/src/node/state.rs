@@ -63,7 +63,6 @@ pub struct State {
 
     config: StoredConfiguration,
     connect_list: SharedConnectList,
-    tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Signed<Connect>>,
     connections: HashMap<PublicKey, ConnectedPeerAddr>,
@@ -441,7 +440,6 @@ impl State {
         consensus_secret_key: SecretKey,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
-        tx_pool_capacity: usize,
         connect_list: ConnectList,
         stored: StoredConfiguration,
         connect: Signed<Connect>,
@@ -456,7 +454,6 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity,
             connect_list: SharedConnectList::from_connect_list(connect_list),
             peers,
             connections: HashMap::new(),
