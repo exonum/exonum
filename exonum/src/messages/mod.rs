@@ -34,6 +34,8 @@
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 use hex::{FromHex, ToHex};
+use serde::de::{self, Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
@@ -164,12 +166,11 @@ impl BinaryForm for ServiceTransaction {
 /// payload may have different binary representation (thus invalidating the message signature).
 ///
 /// So we use `Signed` to keep the original byte buffer around with the parsed `Payload`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Signed<T> {
     // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    //if our serialization format allows us (ECR-2315).
+    // if our serialization format allows us (ECR-2315).
     payload: T,
-    #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
 }
 
@@ -282,5 +283,36 @@ impl<T: ProtocolMessage> CryptoHash for Signed<T> {
 impl PartialEq<Signed<RawTransaction>> for SignedMessage {
     fn eq(&self, other: &Signed<RawTransaction>) -> bool {
         self.eq(other.signed_message())
+    }
+}
+
+impl<T> Serialize for Signed<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        HexStringRepresentation::serialize(&self.message, serializer)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for Signed<T>
+where
+    T: ProtocolMessage,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let signed_message: SignedMessage = HexStringRepresentation::deserialize(deserializer)?;
+        Message::deserialize(signed_message)
+            .map_err(|e| de::Error::custom(format!("Unable to deserialize signed message: {}", e)))
+            .and_then(|msg| {
+                T::try_from(msg).map_err(|e| {
+                    de::Error::custom(format!(
+                        "Unable to decode signed message into payload: {:?}",
+                        e
+                    ))
+                })
+            })
     }
 }

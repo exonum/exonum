@@ -1060,24 +1060,30 @@ mod tests {
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     };
     use crypto::gen_keypair;
+    use encoding::protobuf::{tests::TxSimple, ProtobufConvert};
     use encoding::Error as MessageError;
     use events::EventHandler;
     use helpers;
     use storage::{Database, MemoryDB, Snapshot};
     const SERVICE_ID: u16 = 0;
-    transactions! {
-        SimpleTransactions {
-            struct TxSimple {
-                public_key: &PublicKey,
-                msg: &str,
-            }
-        }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
+    enum SimpleTransactions {
+        TxSimple(TxSimple),
     }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
+    }
+
+    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<RawTransaction> {
+        let mut msg = TxSimple::new();
+        msg.set_public_key(p_key.to_pb());
+        msg.set_msg("Hello, World!".to_owned());
+        Message::sign_transaction(msg, SERVICE_ID, p_key, s_key)
     }
 
     struct TestService;
@@ -1110,12 +1116,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Message::sign_transaction(
-            TxSimple::new(&p_key, "Hello, World!"),
-            SERVICE_ID,
-            p_key,
-            &s_key,
-        );
+        let tx = create_simple_tx(p_key, &s_key);
 
         // Create original transaction.
         let tx_orig = tx.clone();
@@ -1148,12 +1149,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Message::sign_transaction(
-            TxSimple::new(&p_key, "Hello, World!"),
-            SERVICE_ID,
-            p_key,
-            &s_key,
-        );
+        let tx = create_simple_tx(p_key, &s_key);
 
         // Send transaction to node.
         let event = ExternalMessage::Transaction(tx);

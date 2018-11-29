@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use encoding::protobuf::tests::TxConfig;
+
 use blockchain::{
     ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
     TransactionSet,
 };
 use crypto::{Hash, PublicKey, SecretKey};
+use encoding::protobuf::ProtobufConvert;
 use encoding::Error as MessageError;
 use helpers::Height;
 use messages::{Message, RawTransaction, Signed};
@@ -24,15 +27,10 @@ use storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
 
-transactions! {
-    ConfigUpdaterTransactions {
-
-        struct TxConfig {
-            from: &PublicKey,
-            config: &[u8],
-            actual_from: Height,
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+#[exonum(crate = "crate")]
+enum ConfigUpdaterTransactions {
+    TxConfig(TxConfig),
 }
 
 impl TxConfig {
@@ -42,12 +40,12 @@ impl TxConfig {
         actual_from: Height,
         signer: &SecretKey,
     ) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            TxConfig::new(from, config, actual_from),
-            CONFIG_SERVICE,
-            *from,
-            signer,
-        )
+        let mut msg = TxConfig::new();
+        msg.set_from(from.to_pb());
+        msg.set_config(config.to_vec());
+        msg.set_actual_from(actual_from.0);
+
+        Message::sign_transaction(msg, CONFIG_SERVICE, *from, signer)
     }
 }
 #[derive(Default)]
@@ -62,7 +60,8 @@ impl ConfigUpdateService {
 impl Transaction for TxConfig {
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = Schema::new(tc.fork());
-        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
+        schema
+            .commit_configuration(StoredConfiguration::try_deserialize(self.get_config()).unwrap());
         Ok(())
     }
 }

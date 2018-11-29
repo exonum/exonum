@@ -31,24 +31,51 @@ use exonum::{
 
 pub const SERVICE_ID: u16 = 0;
 
-transactions! {
-    pub ExplorerTransactions {
-        struct CreateWallet {
-            pubkey: &PublicKey,
-            name: &str,
-        }
+mod proto;
 
-        struct Transfer {
-            from: &PublicKey,
-            to: &PublicKey,
-            amount: u64,
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::CreateWallet")]
+pub struct CreateWallet {
+    pub pubkey: PublicKey,
+    pub name: String,
+}
+
+impl CreateWallet {
+    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
+        Self {
+            pubkey: *pubkey,
+            name: name.to_owned(),
         }
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Transfer")]
+pub struct Transfer {
+    pub from: PublicKey,
+    pub to: PublicKey,
+    pub amount: u64,
+}
+
+impl Transfer {
+    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
+        Self {
+            from: *from,
+            to: *to,
+            amount,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum ExplorerTransactions {
+    CreateWallet(CreateWallet),
+    Transfer(Transfer),
+}
+
 impl Transaction for CreateWallet {
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
-        if self.name().starts_with("Al") {
+        if self.name.starts_with("Al") {
             Ok(())
         } else {
             Err(ExecutionError::with_description(
