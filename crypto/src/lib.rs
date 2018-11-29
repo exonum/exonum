@@ -23,6 +23,7 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate hex;
+extern crate hex_buffer_serde;
 extern crate pwbox;
 extern crate rand;
 extern crate rust_decimal;

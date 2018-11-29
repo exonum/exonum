@@ -15,6 +15,7 @@ description = "Cryptography related types, constants, traits and functions."
 byteorder = "1.2.3"
 chrono = "=0.4.6"
 hex = "=0.3.2"
+hex-buffer-serde = "=0.1.0"
 rand = "=0.6.1"
 rust_decimal = "=0.10.2"
 serde = "1.0.10"
@@ -26,7 +27,7 @@ exonum_sodiumoxide = { version = "0.0.20", optional = true }
 
 [dependencies.pwbox]
 git = "https://github.com/exonum/pwbox-rs"
-rev = "0858a4d7853312633128c6a953f50499920dd10a"
+rev = "e7557c7c08f9a1f9018816ae0913084b4df70a4a"
 
 [dev-dependencies]
 tempdir = "0.3.7"

@@ -13,9 +13,11 @@
 // limitations under the License.
 
 #![allow(dead_code)] // TODO Remove after complete ECR-2518 and  ECR-2519
-use super::{gen_keypair, PublicKey, SecretKey};
+use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
 use rand::thread_rng;
+use std::borrow::Cow;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::{
@@ -28,8 +30,7 @@ use toml;
 /// Creates a TOML file that contains encrypted `SecretKey` and returns `PublicKey` for the secret key.
 pub fn create_keys_file<P: AsRef<Path>>(path: P, pass_phrase: &[u8]) -> Result<PublicKey, Error> {
     let (pk, sk) = gen_keypair();
-    let sk_bytes = hex::decode(sk.to_hex()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-    let keys = encrypt(pk.to_hex(), &sk_bytes, pass_phrase)?;
+    let keys = EncryptedKeys::encrypt(pk, &sk, pass_phrase)?;
     let file_content =
         toml::to_string_pretty(&keys).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let mut open_options = OpenOptions::new();
@@ -60,63 +61,78 @@ pub fn read_keys_from_file<P: AsRef<Path>>(
     key_file.read_to_end(&mut file_content)?;
     let keys: EncryptedKeys =
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
-    let pub_key = PublicKey::from_slice(
-        &hex::decode(&keys.public_key).map_err(|e| Error::new(ErrorKind::Other, e))?,
-    ).ok_or_else(|| Error::new(
-        ErrorKind::Other,
-        "Couldn't create PublicKey from slice",
-    ))?;
-    let sec_key = SecretKey::from_slice(&decrypt(&keys, pass_phrase)?).ok_or_else(|| Error::new(
-        ErrorKind::Other,
-        "Couldn't create SecretKey from slice",
-    ))?;
+    let pub_key = keys.public_key;
+    let sec_key = keys.decrypt(pass_phrase)?;
 
     Ok((pub_key, sec_key))
 }
 
+struct PublicKeyHex;
+
+impl Hex<PublicKey> for PublicKeyHex {
+    fn create_bytes(value: &PublicKey) -> Cow<[u8]> {
+        Cow::Borrowed(&*value.as_ref())
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<PublicKey, String> {
+        PublicKey::from_slice(bytes)
+            .ok_or_else(|| "Couldn't create PublicKey from slice".to_owned())
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct EncryptedKeys {
-    public_key: String,
+    #[serde(with = "PublicKeyHex")]
+    public_key: PublicKey,
     secret_key: ErasedPwBox,
 }
 
-fn encrypt(
-    public_key: String,
-    secret_key: &[u8],
-    pass_phrase: &[u8],
-) -> Result<EncryptedKeys, Error> {
-    let mut rng = thread_rng();
-    let mut eraser = Eraser::new();
-    eraser.add_suite::<Sodium>();
-    let pwbox = Sodium::build_box(&mut rng)
-        .seal(pass_phrase, secret_key)
-        .map_err(|_| Error::new(ErrorKind::Other, "Couldn't create a pw box"))?;
-    let encrypted_key = eraser
-        .erase(pwbox)
-        .map_err(|_| Error::new(ErrorKind::Other, "Couldn't convert a pw box"))?;
+impl EncryptedKeys {
+    fn encrypt(
+        public_key: PublicKey,
+        secret_key: &SecretKey,
+        pass_phrase: &[u8],
+    ) -> Result<EncryptedKeys, Error> {
+        let mut rng = thread_rng();
+        let mut eraser = Eraser::new();
+        let seed = &secret_key[..SEED_LENGTH];
+        eraser.add_suite::<Sodium>();
+        let pwbox = Sodium::build_box(&mut rng)
+            .seal(pass_phrase, &seed)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't create a pw box"))?;
+        let encrypted_key = eraser
+            .erase(&pwbox)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't convert a pw box"))?;
 
-    Ok(EncryptedKeys {
-        public_key,
-        secret_key: encrypted_key,
-    })
-}
+        Ok(EncryptedKeys {
+            public_key,
+            secret_key: encrypted_key,
+        })
+    }
 
-fn decrypt(keys: &EncryptedKeys, pass_phrase: &[u8]) -> Result<Vec<u8>, Error> {
-    let mut eraser = Eraser::new();
-    eraser.add_suite::<Sodium>();
-    let restored = match eraser.restore(&keys.secret_key) {
-        Ok(restored) => restored,
-        Err(_) => {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "Couldn't restore a secret key",
-            ))
-        }
-    };
-    Ok(restored
-        .open(pass_phrase)
-        .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?
-        .to_vec())
+    fn decrypt(self, pass_phrase: &[u8]) -> Result<SecretKey, Error> {
+        let mut eraser = Eraser::new();
+        eraser.add_suite::<Sodium>();
+        let restored = match eraser.restore(&self.secret_key) {
+            Ok(restored) => restored,
+            Err(_) => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    "Couldn't restore a secret key",
+                ))
+            }
+        };
+        assert_eq!(restored.len(), SEED_LENGTH);
+        let seed_bytes = restored
+            .open(pass_phrase)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?
+            .to_vec();
+        let seed = Seed::from_slice(&seed_bytes[..])
+            .ok_or_else(|| Error::new(ErrorKind::Other, "Couldn't create seed from slice"))?;
+        let (public_key, secret_key) = gen_keypair_from_seed(&seed);
+        assert_eq!(self.public_key, public_key);
+        Ok(secret_key)
+    }
 }
 
 #[cfg(test)]
@@ -146,15 +162,12 @@ mod tests {
         let pass_phrase = b"passphrase";
         let (pk, sk) = gen_keypair();
 
-        let encrypt_key = {
-            let sk_bytes = hex::decode(sk.to_hex()).expect("Couldn't decode secret key");
-            encrypt(pk.to_hex(), &sk_bytes, pass_phrase).expect("Couldn't encrypt keys")
-        };
+        let encrypt_key =
+            EncryptedKeys::encrypt(pk, &sk, pass_phrase).expect("Couldn't encrypt keys");
 
-        let decrypted_key = {
-            let sk_bytes = decrypt(&encrypt_key, pass_phrase).expect("Couldn't decrypt key");
-            SecretKey::from_slice(&sk_bytes).unwrap()
-        };
+        let decrypted_key = encrypt_key
+            .decrypt(pass_phrase)
+            .expect("Couldn't decrypt key");
 
         assert_eq!(sk, decrypted_key);
     }
@@ -163,35 +176,38 @@ mod tests {
     fn test_decrypt_from_file() {
         let pass_phrase = b"passphrase";
         let file_content = r#"
-public_key = '4642dd43a3489ad0b252c79156ec4beac8e9d59a2d3561d56ce34ef7b363bd64'
+public_key = '2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8'
 
 [secret_key]
-ciphertext = '581a2e85801ccd6f2e019ec78c3c68cfa51dd7ddc08b66b749844ba3582443d564a0e6cfaf098233e3858f4554ed7f7f920f1715a91062d450db9c5e773001c3'
-mac = 'f909940a0d45eea96462ce6f20336503'
+ciphertext = '7fbb51090742482da42816b2c908ff61c470a19ca1b984014c7ac37dd46ef1ef'
+mac = '862f27c67b07f9665628b6f9a72a1c20'
 kdf = 'scrypt-nacl'
 cipher = 'xsalsa20-poly1305'
 
 [secret_key.kdfparams]
-salt = '748dd73abf954c2796d241ca162f28033a36af80801e4a6045c3d1a9a26170a3'
+salt = '2ee70102a15aff032523a5df91e435172ef003ad9898a3a5eb2f5af447d28b63'
 memlimit = 16777216
 opslimit = 524288
 
 [secret_key.cipherparams]
-iv = '30d22938dfdb63c3ce2f629b8cfafa35be695858456863fb'
+iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
         "#;
 
         let encrypt_key: EncryptedKeys =
             toml::from_str(file_content).expect("Couldn't deserialize content");
-        let decrypted_secret_key = {
-            let sk_bytes = decrypt(&encrypt_key, pass_phrase).expect("Couldn't decrypt key");
-            SecretKey::from_slice(&sk_bytes).unwrap()
+        let (public_key, decrypted_secret_key) = {
+            let public_key = encrypt_key.public_key.clone();
+            let secret_key = encrypt_key
+                .decrypt(pass_phrase)
+                .expect("Couldn't decrypt key");
+            (public_key, secret_key)
         };
 
         assert_eq!(
-            encrypt_key.public_key,
-            "4642dd43a3489ad0b252c79156ec4beac8e9d59a2d3561d56ce34ef7b363bd64"
+            public_key.to_hex(),
+            "2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8"
         );
         assert_eq!(decrypted_secret_key.to_hex(),
-"46803f1c86c4c7e0edba803488e10e95d83c83f8b7d95412af9e2f84956cd4b94642dd43a3489ad0b252c79156ec4beac8e9d59a2d3561d56ce34ef7b363bd64")
+"47782139daefd1c1764d9ed0faa3e8e591c89a9c4e786758d196ed5041ca9e572e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8")
     }
 }
