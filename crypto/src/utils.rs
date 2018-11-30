@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore cipherparams ciphertext
+
 #![allow(dead_code)] // TODO Remove after complete ECR-2518 and  ECR-2519
 use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use hex_buffer_serde::Hex;
@@ -43,25 +45,30 @@ pub fn create_keys_file<P: AsRef<Path>>(path: P, pass_phrase: &[u8]) -> Result<P
     Ok(pk)
 }
 
-/// Reads `PublicKey` and `SecretKey` from encrypted file located by path and returns its.
+/// Reads and returns `PublicKey` and `SecretKey` from encrypted file located by path and returns its.
 pub fn read_keys_from_file<P: AsRef<Path>>(
     path: P,
     pass_phrase: &[u8],
 ) -> Result<(PublicKey, SecretKey), Error> {
     let mut key_file = File::open(path)?;
 
-    if cfg!(unix) {
-        let file_info = key_file.metadata()?;
-        if (file_info.mode() & 0o600) != 0o600 {
-            return Err(Error::new(ErrorKind::Other, "Wrong file's mode"));
-        }
-    }
+    #[cfg(unix)]
+    validate_file_mode(key_file.metadata()?.mode())?;
 
     let mut file_content = vec![];
     key_file.read_to_end(&mut file_content)?;
     let keys: EncryptedKeys =
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
     keys.decrypt(pass_phrase)
+}
+
+#[cfg(unix)]
+fn validate_file_mode(mode: u32) -> Result<(), Error> {
+    if (mode & 0o077) == 0 {
+        Ok(())
+    } else {
+        Err(Error::new(ErrorKind::Other, "Wrong file's mode"))
+    }
 }
 
 struct PublicKeyHex;
@@ -110,25 +117,22 @@ impl EncryptedKeys {
     fn decrypt(self, pass_phrase: &[u8]) -> Result<(PublicKey, SecretKey), Error> {
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
-        let restored = match eraser.restore(&self.secret_key) {
-            Ok(restored) => restored,
-            Err(_) => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "Couldn't restore a secret key",
-                ))
-            }
-        };
+        let restored = eraser
+            .restore(&self.secret_key)
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't restore a secret key"))?;
         assert_eq!(restored.len(), SEED_LENGTH);
         let seed_bytes = restored
             .open(pass_phrase)
-            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?
-            .to_vec();
+            .map_err(|_| Error::new(ErrorKind::Other, "Couldn't open an encrypted key"))?;
         let seed = Seed::from_slice(&seed_bytes[..])
             .ok_or_else(|| Error::new(ErrorKind::Other, "Couldn't create seed from slice"))?;
         let (public_key, secret_key) = gen_keypair_from_seed(&seed);
-        assert_eq!(self.public_key, public_key);
-        Ok((public_key, secret_key))
+
+        if self.public_key == public_key {
+            Ok((public_key, secret_key))
+        } else {
+            Err(Error::new(ErrorKind::Other, "Different public keys"))
+        }
     }
 }
 
@@ -145,12 +149,8 @@ mod tests {
         let dir = TempDir::new("test_utils").expect("Couldn't create TempDir");
         let file_path = dir.path().join("private_key.toml");
         let pass_phrase = b"passphrase";
-        let result = create_keys_file(file_path.as_path(), pass_phrase);
-        assert!(result.is_ok());
-        let pk1 = result.unwrap();
-        let result = read_keys_from_file(file_path.as_path(), pass_phrase);
-        assert!(result.is_ok());
-        let (pk2, _) = result.unwrap();
+        let pk1 = create_keys_file(file_path.as_path(), pass_phrase).unwrap();
+        let (pk2, _) = read_keys_from_file(file_path.as_path(), pass_phrase).unwrap();
         assert_eq!(pk1, pk2);
     }
 
@@ -158,15 +158,9 @@ mod tests {
     fn test_encrypt_decrypt() {
         let pass_phrase = b"passphrase";
         let (pk, sk) = gen_keypair();
-
-        let encrypt_key =
-            EncryptedKeys::encrypt(pk, &sk, pass_phrase).expect("Couldn't encrypt keys");
-
-        let (_, decrypted_key) = encrypt_key
-            .decrypt(pass_phrase)
-            .expect("Couldn't decrypt key");
-
-        assert_eq!(sk, decrypted_key);
+        let keys = EncryptedKeys::encrypt(pk, &sk, pass_phrase).expect("Couldn't encrypt keys");
+        let (_, decrypted_sk) = keys.decrypt(pass_phrase).expect("Couldn't decrypt key");
+        assert_eq!(sk, decrypted_sk);
     }
 
     #[test]
@@ -190,16 +184,28 @@ opslimit = 524288
 iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
         "#;
 
-        let encrypt_key: EncryptedKeys =
+        let keys: EncryptedKeys =
             toml::from_str(file_content).expect("Couldn't deserialize content");
-        let (public_key, decrypted_secret_key) = encrypt_key
-            .decrypt(pass_phrase)
-            .expect("Couldn't decrypt key");
+        let (public_key, secret_key) = keys.decrypt(pass_phrase).expect("Couldn't decrypt key");
         assert_eq!(
             public_key.to_hex(),
             "2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8"
         );
-        assert_eq!(decrypted_secret_key.to_hex(),
+        assert_eq!(secret_key.to_hex(),
 "47782139daefd1c1764d9ed0faa3e8e591c89a9c4e786758d196ed5041ca9e572e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8")
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_validate_file_mode() {
+        assert!(validate_file_mode(0o100600).is_ok());
+        assert!(validate_file_mode(0o600).is_ok());
+        assert!(validate_file_mode(0o111111).is_err());
+        assert!(validate_file_mode(0o100644).is_err());
+        assert!(validate_file_mode(0o100666).is_err());
+        assert!(validate_file_mode(0o100777).is_err());
+        assert!(validate_file_mode(0o100755).is_err());
+        assert!(validate_file_mode(0o644).is_err());
+        assert!(validate_file_mode(0o666).is_err());
     }
 }
