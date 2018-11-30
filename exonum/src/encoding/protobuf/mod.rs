@@ -222,7 +222,7 @@ where
 {
     type ProtoStruct = Vec<T::ProtoStruct>;
     fn to_pb(&self) -> Self::ProtoStruct {
-        self.into_iter().map(|v| v.to_pb()).collect()
+        self.iter().map(|v| v.to_pb()).collect()
     }
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         pb.into_iter()

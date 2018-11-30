@@ -1,24 +1,26 @@
-os: Visual Studio 2017
+os: Visual Studio 2015
 
 environment:
   # Workaround for the issue https://github.com/briansmith/ring/issues/648
   CL: "/wd5045"
+  # Stable 64-bit MSVC
+  target: rust-ms
+  # Print full backtrace
+  RUST_BACKTRACE: full
 
 install:
-  - appveyor DownloadFile https://github.com/protocolbuffers/protobuf/releases/download/v3.6.1/protoc-3.6.1-win32.zip -FileName protoc.zip
-  - 7z x protoc.zip -o%USERPROFILE%\protoc\
-  - set PATH=%PATH%;%USERPROFILE%\protoc\bin
-  - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
-  - rustup-init -yv --default-toolchain stable --default-host x86_64-pc-windows-msvc
-  - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
-  - set RUST_BACKTRACE=1
+  - choco install -y %target%
+  - choco install -y protoc
+  - refreshenv
   - rustc -vV
   - cargo -vV
 
 build: false
 
 test_script:
-  - cargo test --all
+  - cargo test --tests --all
+  # Doc tests are disabled due to appveyor total timeout. 
+  # - cargo test --doc
 
 cache:
   - '%USERPROFILE%\.cargo -> Cargo.toml'
