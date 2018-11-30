@@ -63,6 +63,7 @@ pub fn read_keys_from_file<P: AsRef<Path>>(
 }
 
 #[cfg(unix)]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::verbose_bit_mask))]
 fn validate_file_mode(mode: u32) -> Result<(), Error> {
     if (mode & 0o077) == 0 {
         Ok(())
