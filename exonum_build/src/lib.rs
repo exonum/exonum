@@ -22,16 +22,21 @@ extern crate walkdir;
 use protoc_rust::Customize;
 use walkdir::WalkDir;
 
-use std::{env, fs::File, io::Write, path::Path};
+use std::{
+    env,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
-/// Find all .proto files in `path` and subfolders.
-fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<String> {
+/// Finds all .proto files in `path` and subfolders and returns a vector of their paths.
+fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
     WalkDir::new(path)
         .into_iter()
         .filter_map(|e| {
             let e = e.ok()?;
             if e.path().extension()?.to_str() == Some("proto") {
-                Some(e.path().to_str()?.to_owned())
+                Some(e.path().into())
             } else {
                 None
             }
@@ -43,16 +48,16 @@ fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<String> {
 /// so we generate piece of `mod.rs` which includes generated files as public submodules.
 ///
 /// tests.proto .rs file will be included with `#[cfg(test)]`.
-fn generate_mod_rs(out_dir: &str, proto_files: &[String], mod_file: &str) {
+fn generate_mod_rs(out_dir: &str, proto_files: &[PathBuf], mod_file: &str) {
     let mod_file_content = {
         proto_files
             .iter()
             .map(|f| {
-                let mod_name = Path::new(f)
+                let mod_name = f
                     .file_stem()
                     .unwrap()
                     .to_str()
-                    .expect("proto file name is not &str");
+                    .expect(".proto file name is not convertible to &str");
                 if mod_name == "tests" {
                     format!("#[cfg(test)]\npub mod {};\n", mod_name)
                 } else {
@@ -66,7 +71,7 @@ fn generate_mod_rs(out_dir: &str, proto_files: &[String], mod_file: &str) {
         .expect("Unable to write data to file");
 }
 
-/// Generate .rs files from .proto files.
+/// Generates .rs files from .proto files.
 ///
 /// `protoc` executable from protobuf should be in `$PATH`
 ///
@@ -105,7 +110,10 @@ pub fn protobuf_generate(input_dir: &str, includes: &[&str], mod_file: &str) {
 
     protoc_rust::run(protoc_rust::Args {
         out_dir,
-        input: &proto_files.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+        input: &proto_files
+            .iter()
+            .map(|s| s.to_str().unwrap())
+            .collect::<Vec<_>>(),
         includes,
         customize: Customize {
             serde_derive: Some(true),
