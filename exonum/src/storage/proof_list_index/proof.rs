@@ -29,6 +29,8 @@ pub enum ListProof<V> {
     Right(Hash, Box<ListProof<V>>),
     /// A leaf of proof with requested element.
     Leaf(V),
+    /// TBD
+    Absent(u64, Hash)
 }
 
 /// An error that is returned when the list proof is invalid.
@@ -69,6 +71,9 @@ impl<V: StorageValue + Clone> ListProof<V> {
                 }
                 vec.push((key.index(), value));
                 hash_leaf(value.clone())
+            }
+            ListProof::Absent(_, _) => {
+                unreachable!()
             }
         };
         Ok(hash)
@@ -120,6 +125,11 @@ impl<V: Serialize> Serialize for ListProof<V> {
             Leaf(ref val) => {
                 state = ser.serialize_struct("Leaf", 1)?;
                 state.serialize_field("val", val)?;
+            }
+            ListProof::Absent(ref index, ref hash) => {
+                state = ser.serialize_struct("Absent", 2)?;
+                state.serialize_field("index", index)?;
+                state.serialize_field("hash", &hash)?;
             }
         }
         state.end()

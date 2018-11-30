@@ -183,6 +183,10 @@ where
         }
     }
 
+    fn list_hash(&self) -> Hash {
+        hash::list_hash(self.len(), self.merkle_root())
+    }
+
     /// Returns the element at the indicated position or `None` if the indicated position
     /// is out of bounds.
     ///
@@ -320,11 +324,6 @@ where
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 
-    /// TBD
-    pub fn list_hash(&self) -> Hash {
-        hash::list_hash(self.len(), self.merkle_root())
-    }
-
     /// Returns the proof of existence for the list element at the specified position.
     ///
     /// # Panics
@@ -347,12 +346,9 @@ where
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
-            panic!(
-                "Index out of bounds: the len is {} but the index is {}",
-                self.len(),
-                index
-            );
+            return ListProof::Absent(index, self.list_hash());
         }
+
         self.construct_proof(self.root_key(), index, index + 1)
     }
 
@@ -377,13 +373,6 @@ where
     /// let list_proof = index.get_range_proof(1, 3);
     /// ```
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
-        if to > self.len() {
-            panic!(
-                "Illegal range boundaries: the len is {:?}, but the range end is {:?}",
-                self.len(),
-                to
-            )
-        }
         if to <= from {
             panic!(
                 "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
@@ -391,7 +380,11 @@ where
             )
         }
 
-        self.construct_proof(self.root_key(), from, to)
+        if to > self.len() {
+            ListProof::Absent(index, self.list_hash())
+        } else {
+            self.construct_proof(self.root_key(), from, to)
+        }
     }
 
     /// Returns an iterator over the list. The iterator element type is V.

@@ -632,7 +632,6 @@ mod memorydb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_bound_empty() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -745,7 +744,6 @@ mod rocksdb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_bound_empty() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -839,31 +837,43 @@ mod list_hash_tests {
 
     use crypto::Hash;
     use storage::{hash::list_hash, Database, MemoryDB, ProofListIndex};
+    use storage::ListProof;
 
     #[test]
-    fn proof_of_absence() {
+    fn proof_of_absence_single() {
         let db = MemoryDB::new();
         let mut fork = db.fork();
-        let mut index = ProofListIndex::new("absence", &mut fork);
+        let mut list = ProofListIndex::new("absence", &mut fork);
 
-        index.push(vec![1]);
-        index.push(vec![2]);
-        index.push(vec![3]);
-        index.push(vec![4]);
-        index.push(vec![5]);
+        list.push(vec![1]);
+        list.push(vec![2]);
+        list.push(vec![3]);
+        list.push(vec![4]);
+        list.push(vec![5]);
 
-        let actual_list_hash = index.list_hash();
-
-        let existed_index = 5u64;
         let root_hash =
             Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9")
                 .unwrap();
 
-        let hash = list_hash(existed_index, root_hash);
-        assert_eq!(hash, actual_list_hash);
-
         let non_existed_index = 6u64;
-        let hash = list_hash(non_existed_index, index.merkle_root());
-        assert_ne!(hash, actual_list_hash);
+        let proof = list.get_proof(non_existed_index);
+
+        match proof {
+            ListProof::Absent(index, actual_list_hash) => {
+                assert_eq!(index, non_existed_index);
+
+                let expected_hash = list_hash(list.len(), root_hash);
+                assert_eq!(expected_hash, actual_list_hash);
+                assert!(index >= list.len());
+            }
+            _ => {
+                panic!("Unexpected proof {:?}", proof);
+            }
+        }
+    }
+
+    #[test]
+    fn proof_of_absence_range() {
+        //TBD
     }
 }
