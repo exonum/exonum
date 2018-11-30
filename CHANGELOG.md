@@ -76,6 +76,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `exonum_derive` crate has been added with custom derives for `ProtobufConvert`
   and `TransactionSet`. (#1055)
 
+- `TransactionResult` is now serialized using protobuf. Empty description
+  of the result is now the equivalent of there being no description
+  of the result. (#1075)
+
 #### exonum-configuration
 
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of
