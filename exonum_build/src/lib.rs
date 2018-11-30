@@ -72,8 +72,8 @@ fn generate_mod_rs(out_dir: &str, proto_files: &[String], mod_file: &str) {
 ///
 /// # Examples
 ///
+/// In `build.rs`
 /// ```no_run
-/// // In build.rs
 /// extern crate exonum_build;
 ///
 /// use exonum_build::protobuf_generate;
@@ -87,8 +87,8 @@ fn generate_mod_rs(out_dir: &str, proto_files: &[String], mod_file: &str) {
 ///
 /// To use generated protobuf structs.
 ///
+/// In `src/proto/mod.rs`
 /// ```ignore
-/// // In src/proto/mod.rs
 /// extern crate exonum;
 ///
 /// include!(concat!(env!("OUT_DIR"), "/example_mod.rs"));
