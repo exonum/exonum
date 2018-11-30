@@ -381,7 +381,7 @@ where
         }
 
         if to > self.len() {
-            ListProof::Absent(index, self.list_hash())
+            ListProof::Absent(to, self.list_hash())
         } else {
             self.construct_proof(self.root_key(), from, to)
         }

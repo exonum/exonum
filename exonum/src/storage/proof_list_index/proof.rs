@@ -29,7 +29,7 @@ pub enum ListProof<V> {
     Right(Hash, Box<ListProof<V>>),
     /// A leaf of proof with requested element.
     Leaf(V),
-    /// TBD
+    /// Proof of absence of element with specified index.
     Absent(u64, Hash)
 }
 
