@@ -30,7 +30,7 @@ use std::{
 };
 
 /// Finds all .proto files in `path` and subfolders and returns a vector of their paths.
-fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
+fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
     WalkDir::new(path)
         .into_iter()
         .filter_map(|e| {
@@ -48,7 +48,11 @@ fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
 /// so we generate piece of `mod.rs` which includes generated files as public submodules.
 ///
 /// tests.proto .rs file will be included with `#[cfg(test)]`.
-fn generate_mod_rs(out_dir: &str, proto_files: &[PathBuf], mod_file: &str) {
+fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
+    out_dir: &P,
+    proto_files: &[PathBuf],
+    mod_file: &Q,
+) {
     let mod_file_content = {
         proto_files
             .iter()
@@ -65,7 +69,7 @@ fn generate_mod_rs(out_dir: &str, proto_files: &[PathBuf], mod_file: &str) {
                 }
             }).collect::<String>()
     };
-    let dest_path = Path::new(&out_dir).join(mod_file);
+    let dest_path = out_dir.as_ref().join(mod_file);
     let mut file = File::create(dest_path).expect("Unable to create output file");
     file.write_all(mod_file_content.as_bytes())
         .expect("Unable to write data to file");
@@ -101,20 +105,37 @@ fn generate_mod_rs(out_dir: &str, proto_files: &[PathBuf], mod_file: &str) {
 /// // If you use types from exonum .proto files.
 /// use exonum::encoding::protobuf::*;
 /// ```
-pub fn protobuf_generate(input_dir: &str, includes: &[&str], mod_file: &str) {
-    let out_dir = &env::var("OUT_DIR").expect("Unable to get OUT_DIR");
+pub fn protobuf_generate<P, Q, R, I>(input_dir: P, includes: I, mod_file_name: Q)
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+    R: AsRef<Path>,
+    I: IntoIterator<Item = R>,
+{
+    let out_dir: PathBuf = env::var("OUT_DIR")
+        .map(|i| i.into())
+        .expect("Unable to get OUT_DIR");
 
-    let proto_files = get_proto_files(input_dir);
+    let proto_files = get_proto_files(&input_dir);
+    generate_mod_rs(&out_dir, &proto_files, &mod_file_name);
 
-    generate_mod_rs(out_dir, &proto_files, mod_file);
+    let includes = includes.into_iter().collect::<Vec<_>>();
 
     protoc_rust::run(protoc_rust::Args {
-        out_dir,
+        out_dir: out_dir
+            .to_str()
+            .expect("Out dir name is not convertible to &str"),
         input: &proto_files
             .iter()
-            .map(|s| s.to_str().unwrap())
+            .map(|s| s.to_str().expect("File name is not convertible to &str"))
             .collect::<Vec<_>>(),
-        includes,
+        includes: &includes
+            .iter()
+            .map(|s| {
+                s.as_ref()
+                    .to_str()
+                    .expect("Include dir name is not convertible to &str")
+            }).collect::<Vec<_>>(),
         customize: Customize {
             serde_derive: Some(true),
             ..Default::default()
@@ -122,5 +143,11 @@ pub fn protobuf_generate(input_dir: &str, includes: &[&str], mod_file: &str) {
     }).expect("protoc");
 
     // rerun build.rs if .proto files changed.
-    println!("cargo:rerun-if-changed={}", input_dir);
+    println!(
+        "cargo:rerun-if-changed={}",
+        input_dir
+            .as_ref()
+            .to_str()
+            .expect("Input dir name is not convertible to &str")
+    );
 }
