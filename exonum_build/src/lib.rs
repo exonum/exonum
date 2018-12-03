@@ -105,19 +105,19 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 /// // If you use types from exonum .proto files.
 /// use exonum::encoding::protobuf::*;
 /// ```
-pub fn protobuf_generate<P, Q, R, I>(input_dir: P, includes: I, mod_file_name: Q)
+pub fn protobuf_generate<P, R, I, T>(input_dir: P, includes: I, mod_file_name: T)
 where
     P: AsRef<Path>,
-    Q: AsRef<Path>,
     R: AsRef<Path>,
     I: IntoIterator<Item = R>,
+    T: AsRef<str>,
 {
-    let out_dir: PathBuf = env::var("OUT_DIR")
-        .map(|i| i.into())
+    let out_dir = env::var("OUT_DIR")
+        .map(PathBuf::from)
         .expect("Unable to get OUT_DIR");
 
     let proto_files = get_proto_files(&input_dir);
-    generate_mod_rs(&out_dir, &proto_files, &mod_file_name);
+    generate_mod_rs(&out_dir, &proto_files, &mod_file_name.as_ref());
 
     let includes = includes.into_iter().collect::<Vec<_>>();
 
