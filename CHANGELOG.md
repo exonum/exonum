@@ -80,6 +80,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   of the result is now the equivalent of there being no description
   of the result. (#1075)
 
+- `exonum_build` crate has been added to simplify writing `build.rs` files
+  for services that use protobuf code generation. (#1076)
+
 #### exonum-configuration
 
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of
