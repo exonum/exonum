@@ -18,17 +18,11 @@ package exonum.testkit;
 
 import "helpers.proto";
 
-message TxTimestamp {
-  string message = 1;
-}
+message TxTimestamp { string message = 1; }
 
-message TxAfterCommit {
-  uint64 height = 1;
-}
+message TxAfterCommit { uint64 height = 1; }
 
-message TxCreateWallet {
-  string name = 1;
-}
+message TxCreateWallet { string name = 1; }
 
 message TxTransfer {
   exonum.PublicKey to = 1;
@@ -43,9 +37,6 @@ message Wallet {
   uint64 last_update_height = 4;
 }
 
-message TxIncrement {
-  uint64 by = 1;
-}
+message TxIncrement { uint64 by = 1; }
 
-message TxReset {
-}
+message TxReset {}

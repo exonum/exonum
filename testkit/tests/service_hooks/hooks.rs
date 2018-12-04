@@ -29,7 +29,7 @@ use exonum_testkit::proto;
 pub const SERVICE_ID: u16 = 512;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq)]
-#[protobuf_convert("proto::TxAfterCommit")]
+#[exonum(pb = "proto::TxAfterCommit")]
 pub struct TxAfterCommit {
     pub height: Height,
 }

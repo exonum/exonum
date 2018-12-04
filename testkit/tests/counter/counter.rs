@@ -74,11 +74,11 @@ impl<'a> CounterSchema<&'a mut Fork> {
 // // // // Transactions // // // //
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TxReset")]
+#[exonum(pb = "proto::TxReset")]
 pub struct TxReset {}
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TxIncrement")]
+#[exonum(pb = "proto::TxIncrement")]
 pub struct TxIncrement {
     by: u64,
 }

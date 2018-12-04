@@ -39,7 +39,7 @@ use exonum_testkit::{proto, ApiKind, TestKitBuilder};
 const SERVICE_ID: u16 = 512;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TxTimestamp")]
+#[exonum(pb = "proto::TxTimestamp")]
 struct TxTimestamp {
     message: String,
 }

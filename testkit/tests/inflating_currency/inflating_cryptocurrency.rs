@@ -40,7 +40,7 @@ pub const INIT_BALANCE: u64 = 0;
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::Wallet")]
+#[exonum(pb = "proto::Wallet")]
 pub struct Wallet {
     pub pub_key: PublicKey,
     pub name: String,
@@ -105,14 +105,14 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 
 /// Create a new wallet.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TxCreateWallet")]
+#[exonum(pb = "proto::TxCreateWallet")]
 pub struct TxCreateWallet {
     name: String,
 }
 
 /// Transfer coins between the wallets.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TxTransfer")]
+#[exonum(pb = "proto::TxTransfer")]
 pub struct TxTransfer {
     to: PublicKey,
     amount: u64,

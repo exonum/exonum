@@ -17,12 +17,10 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-mod testkit;
-
 pub use self::testkit::{
     TxAfterCommit, TxCreateWallet, TxIncrement, TxReset, TxTimestamp, TxTransfer, Wallet,
 };
 
-mod helpers {
-    pub use exonum::encoding::protobuf::PublicKey;
-}
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+
+use exonum::encoding::protobuf::*;
