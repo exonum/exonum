@@ -74,9 +74,9 @@ impl<V: StorageValue + Clone> ListProof<V> {
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(value.clone())
             }
-            ListProof::Absent(_, _) => {
+            ListProof::Absent(_, hash) => {
                 //TODO: modify to use in validate method
-                unreachable!()
+                hash
             },
         };
         Ok(hash)

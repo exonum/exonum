@@ -183,8 +183,8 @@ where
         }
     }
 
-    fn list_hash(&self) -> Hash {
-        HashTag::list_hash(self.len(), self.merkle_root())
+    fn merkle_root(&self) -> Hash {
+        self.get_branch(self.root_key()).unwrap_or_default()
     }
 
     /// Returns the element at the indicated position or `None` if the indicated position
@@ -320,8 +320,8 @@ where
     /// let hash = index.merkle_root();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn merkle_root(&self) -> Hash {
-        self.get_branch(self.root_key()).unwrap_or_default()
+    pub fn list_hash(&self) -> Hash {
+        HashTag::list_hash(self.len(), self.merkle_root())
     }
 
     /// Returns the proof of existence for the list element at the specified position.

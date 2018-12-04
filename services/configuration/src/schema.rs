@@ -241,7 +241,7 @@ where
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
             self.propose_data_by_config_hash().merkle_root(),
-            self.config_hash_by_ordinal().merkle_root(),
+            self.config_hash_by_ordinal().list_hash(),
         ]
     }
 }

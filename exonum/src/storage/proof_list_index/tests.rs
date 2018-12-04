@@ -128,27 +128,27 @@ fn list_index_proof(db: Box<dyn Database>) {
     let h22 = HashTag::hash_single_node(&h2);
     let h012 = HashTag::hash_node(&h01, &h22);
 
-    assert_eq!(index.merkle_root(), Hash::default());
+    assert_eq!(index.list_hash(), Hash::default());
 
     index.push(2u64);
 
-    assert_eq!(index.merkle_root(), h0);
+    assert_eq!(index.list_hash(), h0);
     assert_eq!(index.get_proof(0), Leaf(2));
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2)]
     );
 
     index.push(4u64);
-    assert_eq!(index.merkle_root(), h01);
+    assert_eq!(index.list_hash(), h01);
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2)]
     );
@@ -156,7 +156,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_proof(1)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(1, &4)]
     );
@@ -168,13 +168,13 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_range_proof(0, 2)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
 
     index.push(6u64);
-    assert_eq!(index.merkle_root(), h012);
+    assert_eq!(index.list_hash(), h012);
     assert_eq!(
         index.get_proof(0),
         Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
@@ -182,7 +182,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2)]
     );
@@ -193,7 +193,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_proof(1)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(1, &4)]
     );
@@ -204,7 +204,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_proof(2)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(2, &6)]
     );
@@ -219,7 +219,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_range_proof(0, 2)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
@@ -234,7 +234,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_range_proof(1, 3)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(1, &4), (2, &6)]
     );
@@ -249,7 +249,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     assert_eq!(
         index
             .get_range_proof(0, 3)
-            .validate(index.merkle_root(), index.len())
+            .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4), (2, &6)]
     );
@@ -265,7 +265,7 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
         index.push(value.clone());
     }
     index.get(0);
-    let table_merkle_root = index.merkle_root();
+    let table_merkle_root = index.list_hash();
 
     for _ in 0..50 {
         let start_range = rng.gen_range(0, num_values);
@@ -463,7 +463,7 @@ fn proof_illegal_range(db: Box<dyn Database>) {
 fn proof_structure(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.merkle_root(), Hash::zero());
+    assert_eq!(index.list_hash(), Hash::zero());
 
     // spell-checker:ignore upup
 
@@ -483,7 +483,7 @@ fn proof_structure(db: Box<dyn Database>) {
         index.push(vec![i, i + 1, i + 2]);
     }
 
-    assert_eq!(index.merkle_root(), h12345);
+    assert_eq!(index.list_hash(), h12345);
     let range_proof = index.get_range_proof(4, 5);
 
     assert_eq!(
@@ -522,10 +522,10 @@ fn simple_merkle_root(db: Box<dyn Database>) {
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.get(0), None);
     index.push(vec![1]);
-    assert_eq!(index.merkle_root(), h1);
+    assert_eq!(index.list_hash(), h1);
 
     index.set(0, vec![2]);
-    assert_eq!(index.merkle_root(), h2);
+    assert_eq!(index.list_hash(), h2);
 }
 
 fn same_merkle_root(db1: Box<dyn Database>, db2: Box<dyn Database>) {
@@ -550,7 +550,7 @@ fn same_merkle_root(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     i2.push(vec![5]);
     i2.push(vec![1]);
 
-    assert_eq!(i1.merkle_root(), i2.merkle_root());
+    assert_eq!(i1.list_hash(), i2.list_hash());
 }
 
 #[derive(Serialize)]
@@ -799,7 +799,7 @@ mod root_hash_tests {
         let mut fork = db.fork();
         let mut index = ProofListIndex::new("merkle_root", &mut fork);
         index.extend(hashes.iter().cloned());
-        index.merkle_root()
+        index.list_hash()
     }
 
     fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {

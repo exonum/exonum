@@ -352,7 +352,7 @@ impl Blockchain {
                     sum_table.merkle_root()
                 };
 
-                let tx_hash = schema.block_transactions(height).merkle_root();
+                let tx_hash = schema.block_transactions(height).list_hash();
 
                 (tx_hash, state_hash)
             };

@@ -208,7 +208,7 @@ pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
     let mut fork = MemoryDB::new().fork();
     let mut hashes = ProofListIndex::new("name", &mut fork);
     hashes.extend(txs.iter().cloned());
-    hashes.merkle_root();
+    hashes.list_hash();
 
     root_hash(txs)
 }
