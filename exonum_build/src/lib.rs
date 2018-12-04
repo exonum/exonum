@@ -152,6 +152,24 @@ where
     );
 }
 
+/// Get path where exonum protobuf files are located.
+///
+/// Needed for code generation of .proto files which include exonum provided .proto files.
+///
+/// # Examples
+///
+/// ```no_run
+/// extern crate exonum_build;
+///
+/// use exonum_build::{protobuf_generate, get_exonum_protobuf_files_path};
+///
+/// let exonum_protos = get_exonum_protobuf_files_path();
+/// protobuf_generate(
+///    "src/proto",
+///    &["src/proto", &exonum_protos],
+///    "protobuf_mod.rs",
+/// );
+/// ```
 pub fn get_exonum_protobuf_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_PROTOS").expect("Failed to get exonum protobuf path")
 }
