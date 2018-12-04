@@ -113,6 +113,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Now peers require only one connection to exchange messages between
   them. (#945)
 
+#### exonum_build
+
+- `exonum_build` crate has been added to simplify writing `build.rs` files
+  for services that use protobuf code generation. (#1076)
+
 ### Bug Fixes
 
 #### exonum
