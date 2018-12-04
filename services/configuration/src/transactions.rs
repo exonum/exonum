@@ -42,7 +42,7 @@ use SERVICE_NAME;
 ///
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[protobuf_convert("proto::Propose")]
+#[exonum(pb = "proto::Propose")]
 pub struct Propose {
     /// Configuration in JSON format.
     ///
@@ -63,7 +63,7 @@ pub struct Propose {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[protobuf_convert("proto::Vote")]
+#[exonum(pb = "proto::Vote")]
 pub struct Vote {
     /// Hash of the configuration that this vote is for.
     ///
@@ -84,7 +84,7 @@ pub struct Vote {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[protobuf_convert("proto::VoteAgainst")]
+#[exonum(pb = "proto::VoteAgainst")]
 pub struct VoteAgainst {
     /// Hash of the configuration that this vote is for.
     ///
@@ -115,29 +115,15 @@ impl ConfigurationTransactions {
 
 impl VoteAgainst {
     /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            VoteAgainst {
-                cfg_hash: *cfg_hash,
-            },
-            SERVICE_ID,
-            *author,
-            key,
-        )
+    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
     }
 }
 
 impl Vote {
     /// Create `Signed` for `Vote` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            Vote {
-                cfg_hash: *cfg_hash,
-            },
-            SERVICE_ID,
-            *author,
-            key,
-        )
+    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
     }
 }
 
@@ -145,7 +131,7 @@ impl Propose {
     /// Create `Signed` for `Propose` transaction, signed by provided keys.
     pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<RawTransaction> {
         Message::sign_transaction(
-            Propose {
+            Self {
                 cfg: cfg.to_owned(),
             },
             SERVICE_ID,

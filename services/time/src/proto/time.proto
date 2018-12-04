@@ -18,7 +18,8 @@ package exonum.service.time;
 
 import "google/protobuf/timestamp.proto";
 
+// Transaction that is sent by the validator after the commit of the block.
 message TxTime {
+  // Time of the validator.
   google.protobuf.Timestamp time = 1;
 }
-

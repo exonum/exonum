@@ -17,8 +17,6 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-mod simple_service;
-mod time;
-
-pub use self::simple_service::TxMarker;
 pub use self::time::TxTime;
+
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));

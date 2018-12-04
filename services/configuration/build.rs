@@ -1,15 +1,12 @@
-extern crate protoc_rust;
+extern crate exonum_build;
 
-use protoc_rust::Customize;
+use exonum_build::{get_exonum_protobuf_files_path, protobuf_generate};
 
 fn main() {
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: "src/proto",
-        input: &["src/proto/configuration.proto"],
-        includes: &["src/proto", "../../exonum/src/encoding/protobuf/proto"],
-        customize: Customize {
-            serde_derive: Some(true),
-            ..Default::default()
-        },
-    }).expect("protoc");
+    let exonum_protos = get_exonum_protobuf_files_path();
+    protobuf_generate(
+        "src/proto",
+        &["src/proto", &exonum_protos],
+        "protobuf_mod.rs",
+    );
 }

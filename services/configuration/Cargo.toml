@@ -36,4 +36,4 @@ pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
 
 [build-dependencies]
-protoc-rust = "=2.2.0"
+exonum_build = { version = "0.9.0", path = "../../exonum_build" }

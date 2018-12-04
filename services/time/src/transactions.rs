@@ -49,7 +49,7 @@ impl From<Error> for ExecutionError {
 
 /// Transaction that is sent by the validator after the commit of the block.
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[protobuf_convert("proto::TxTime")]
+#[exonum(pb = "proto::TxTime")]
 pub struct TxTime {
     /// Time of the validator.
     pub time: DateTime<Utc>,

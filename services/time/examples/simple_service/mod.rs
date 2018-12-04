@@ -37,7 +37,7 @@ use exonum::{
     storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
-use exonum_time::{proto, schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
+use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
 
 /// Marker service id.
 const SERVICE_ID: u16 = 128;
@@ -77,7 +77,7 @@ impl<'a> MarkerSchema<&'a mut Fork> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[protobuf_convert("proto::TxMarker")]
+#[exonum(pb = "proto::TxMarker")]
 /// Transaction, which must be executed no later than the specified time (field `time`).
 struct TxMarker {
     mark: i32,

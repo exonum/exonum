@@ -42,7 +42,7 @@ define_names! {
 
 /// Extended information about a proposal used for the storage.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[protobuf_convert("proto::ProposeData")]
+#[exonum(pb = "proto::ProposeData")]
 pub struct ProposeData {
     /// Proposal transaction.
     pub tx_propose: Propose,

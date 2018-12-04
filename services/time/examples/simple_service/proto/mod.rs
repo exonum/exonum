@@ -17,8 +17,6 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::configuration::{Propose, ProposeData, Vote, VoteAgainst};
+pub use self::simple_service::TxMarker;
 
-include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
-
-use exonum::encoding::protobuf::*;
+include!(concat!(env!("OUT_DIR"), "/simple_service_protobuf_mod.rs"));

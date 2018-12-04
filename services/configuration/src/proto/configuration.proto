@@ -18,21 +18,32 @@ package exonum.service.configuration;
 
 import "helpers.proto";
 
+// Propose a new configuration.
 message Propose {
+  // Configuration in JSON format.
   string cfg = 1;
 }
 
+// Vote for the new configuration.
 message Vote {
+  // Hash of the configuration that this vote is for.
+  // See crate docs for more details on how the hash is calculated.
   exonum.Hash cfg_hash = 1;
 }
 
+// VoteAgainst for the new configuration.
 message VoteAgainst {
+  // Hash of the configuration that this vote is for.
+  // See crate docs for more details on how the hash is calculated.
   exonum.Hash cfg_hash = 1;
 }
 
-
+// Extended information about a proposal used for the storage.
 message ProposeData {
+  // Proposal transaction.
   Propose tx_propose = 1;
+  // Merkle root of all votes for the proposal.
   exonum.Hash votes_history_hash = 2;
+  // Number of eligible voting validators.
   uint64 num_validators = 3;
 }
