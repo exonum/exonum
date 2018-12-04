@@ -44,6 +44,7 @@ use rand::Rng;
 use inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
 
 mod inflating_cryptocurrency;
+mod proto;
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()

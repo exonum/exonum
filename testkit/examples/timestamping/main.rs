@@ -27,12 +27,14 @@ use exonum::{
     blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{self, gen_keypair, Hash, PublicKey, SecretKey},
+    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     encoding,
     messages::{Message, RawTransaction, Signed},
     storage::Snapshot,
 };
-use exonum_testkit::{proto, ApiKind, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKitBuilder};
+
+mod proto;
 
 // Simple service implementation.
 
@@ -52,7 +54,7 @@ enum TimestampingServiceTransactions {
 impl TxTimestamp {
     fn sign(author: &PublicKey, message: &str, key: &SecretKey) -> Signed<RawTransaction> {
         Message::sign_transaction(
-            TxTimestamp {
+            Self {
                 message: message.to_owned(),
             },
             SERVICE_ID,

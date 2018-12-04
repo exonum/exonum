@@ -25,10 +25,11 @@ extern crate protobuf;
 // HACK: Silent "dead_code" warning.
 pub use hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
 
-use exonum::{blockchain::TransactionSet, crypto, helpers::Height, messages::Message};
+use exonum::{blockchain::TransactionSet, helpers::Height, messages::Message};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
+mod proto;
 
 #[test]
 fn test_after_commit() {

@@ -28,7 +28,7 @@ use exonum::{
     storage::{Fork, MapIndex, Snapshot},
 };
 
-use exonum_testkit::proto;
+use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -49,9 +49,9 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new(pub_key: &PublicKey, name: &str, balance: u64, last_update_height: u64) -> Self {
+    pub fn new(&pub_key: &PublicKey, name: &str, balance: u64, last_update_height: u64) -> Self {
         Self {
-            pub_key: *pub_key,
+            pub_key,
             name: name.to_owned(),
             balance,
             last_update_height,
@@ -129,7 +129,7 @@ impl TxCreateWallet {
     #[doc(hidden)]
     pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
         Message::sign_transaction(
-            TxCreateWallet {
+            Self {
                 name: name.to_owned(),
             },
             SERVICE_ID,
@@ -142,22 +142,13 @@ impl TxCreateWallet {
 impl TxTransfer {
     #[doc(hidden)]
     pub fn sign(
-        to: &PublicKey,
+        &to: &PublicKey,
         amount: u64,
         seed: u64,
         pk: &PublicKey,
         sc: &SecretKey,
     ) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            TxTransfer {
-                to: *to,
-                amount,
-                seed,
-            },
-            SERVICE_ID,
-            *pk,
-            sc,
-        )
+        Message::sign_transaction(Self { to, amount, seed }, SERVICE_ID, *pk, sc)
     }
 }
 

@@ -151,3 +151,7 @@ where
             .expect("Input dir name is not convertible to &str")
     );
 }
+
+pub fn get_exonum_protobuf_files_path() -> String {
+    env::var("DEP_EXONUM_PROTOBUF_PROTOS").expect("Failed to get exonum protobuf path")
+}

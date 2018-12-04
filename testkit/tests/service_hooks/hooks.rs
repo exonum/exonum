@@ -14,6 +14,7 @@
 
 //! A special service which generates transactions on `after_commit` events.
 
+use super::proto;
 use exonum::{
     blockchain::{
         ExecutionResult, Service, ServiceContext, Transaction, TransactionContext, TransactionSet,
@@ -24,7 +25,6 @@ use exonum::{
     messages::RawTransaction,
     storage::Snapshot,
 };
-use exonum_testkit::proto;
 
 pub const SERVICE_ID: u16 = 512;
 

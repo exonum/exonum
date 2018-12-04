@@ -14,7 +14,15 @@
 
 //! Module of the rust-protobuf generated files.
 
+// For protobuf generated files.
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-include!(concat!(env!("OUT_DIR"), "/testkit_protobuf_mod.rs"));
+pub use self::inflating_cryptocurrency::{TxCreateWallet, TxTransfer, Wallet};
+
+include!(concat!(
+    env!("OUT_DIR"),
+    "/currency_example_protobuf_mod.rs"
+));
+
+use exonum::encoding::protobuf::*;

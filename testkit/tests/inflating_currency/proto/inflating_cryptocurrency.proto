@@ -12,9 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module of the rust-protobuf generated files.
+syntax = "proto3";
 
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+package exonum.testkit;
 
-include!(concat!(env!("OUT_DIR"), "/testkit_protobuf_mod.rs"));
+import "helpers.proto";
+
+message TxCreateWallet { string name = 1; }
+
+message TxTransfer {
+  exonum.PublicKey to = 1;
+  uint64 amount = 2;
+  uint64 seed = 3;
+}
+
+message Wallet {
+  exonum.PublicKey pub_key = 1;
+  string name = 2;
+  uint64 balance = 3;
+  uint64 last_update_height = 4;
+}

@@ -46,6 +46,7 @@ use counter::{
 };
 
 mod counter;
+mod proto;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let testkit = TestKit::for_service(CounterService);

@@ -24,7 +24,7 @@ use exonum::{
     storage::{Entry, Fork, Snapshot},
 };
 
-use exonum_testkit::proto;
+use super::proto;
 
 pub const SERVICE_ID: u16 = 1;
 
@@ -95,7 +95,7 @@ impl TxIncrement {
     }
 
     pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxIncrement::new(by), SERVICE_ID, *author, key)
+        Message::sign_transaction(Self::new(by), SERVICE_ID, *author, key)
     }
 }
 
@@ -118,7 +118,7 @@ impl Transaction for TxIncrement {
 
 impl TxReset {
     pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxReset {}, SERVICE_ID, *author, key)
+        Message::sign_transaction(Self {}, SERVICE_ID, *author, key)
     }
 }
 

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module of the rust-protobuf generated files.
+syntax = "proto3";
 
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+package exonum.testkit;
 
-include!(concat!(env!("OUT_DIR"), "/testkit_protobuf_mod.rs"));
+message TxAfterCommit { uint64 height = 1; }

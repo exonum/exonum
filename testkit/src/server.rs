@@ -168,17 +168,9 @@ mod tests {
     const TIMESTAMP_SERVICE_ID: u16 = 0;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::TxTimestamp")]
+    #[exonum(pb = "proto::tests::TxTimestamp")]
     struct TxTimestamp {
         message: String,
-    }
-
-    impl TxTimestamp {
-        fn new(message: &str) -> Self {
-            Self {
-                message: message.to_owned(),
-            }
-        }
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
@@ -189,7 +181,14 @@ mod tests {
     impl TxTimestamp {
         fn for_str(s: &str) -> Signed<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            Message::sign_transaction(TxTimestamp::new(s), TIMESTAMP_SERVICE_ID, pubkey, &key)
+            Message::sign_transaction(
+                Self {
+                    message: s.to_owned(),
+                },
+                TIMESTAMP_SERVICE_ID,
+                pubkey,
+                &key,
+            )
         }
     }
 

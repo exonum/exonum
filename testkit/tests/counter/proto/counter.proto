@@ -16,27 +16,6 @@ syntax = "proto3";
 
 package exonum.testkit;
 
-import "helpers.proto";
-
-message TxTimestamp { string message = 1; }
-
-message TxAfterCommit { uint64 height = 1; }
-
-message TxCreateWallet { string name = 1; }
-
-message TxTransfer {
-  exonum.PublicKey to = 1;
-  uint64 amount = 2;
-  uint64 seed = 3;
-}
-
-message Wallet {
-  exonum.PublicKey pub_key = 1;
-  string name = 2;
-  uint64 balance = 3;
-  uint64 last_update_height = 4;
-}
-
 message TxIncrement { uint64 by = 1; }
 
 message TxReset {}
