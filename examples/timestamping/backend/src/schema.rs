@@ -23,7 +23,7 @@ use exonum::{
 
 /// Stores content's hash and some metadata about it.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
-#[protobuf_convert("proto::Timestamp")]
+#[exonum(pb = "proto::Timestamp")]
 pub struct Timestamp {
     /// Hash of the content.
     pub content_hash: Hash,
@@ -34,9 +34,9 @@ pub struct Timestamp {
 
 impl Timestamp {
     /// Create new Timestamp.
-    pub fn new(content_hash: &Hash, metadata: &str) -> Self {
+    pub fn new(&content_hash: &Hash, metadata: &str) -> Self {
         Self {
-            content_hash: *content_hash,
+            content_hash,
             metadata: metadata.to_owned(),
         }
     }
@@ -44,7 +44,7 @@ impl Timestamp {
 
 /// Timestamp entry.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TimestampEntry")]
+#[exonum(pb = "proto::TimestampEntry")]
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,
@@ -58,10 +58,10 @@ pub struct TimestampEntry {
 
 impl TimestampEntry {
     /// New TimestampEntry.
-    pub fn new(timestamp: Timestamp, tx_hash: &Hash, time: DateTime<Utc>) -> Self {
+    pub fn new(timestamp: Timestamp, &tx_hash: &Hash, time: DateTime<Utc>) -> Self {
         Self {
             timestamp,
-            tx_hash: *tx_hash,
+            tx_hash,
             time,
         }
     }

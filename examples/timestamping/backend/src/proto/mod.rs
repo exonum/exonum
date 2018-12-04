@@ -17,10 +17,8 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-mod timestamping;
-
 pub use self::timestamping::{Timestamp, TimestampEntry, TxTimestamp};
 
-mod helpers {
-    pub use exonum::encoding::protobuf::Hash;
-}
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+
+use exonum::encoding::protobuf::*;

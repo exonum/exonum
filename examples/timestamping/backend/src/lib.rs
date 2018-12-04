@@ -28,7 +28,6 @@ extern crate exonum;
 extern crate exonum_time;
 #[macro_use]
 extern crate exonum_derive;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate failure;
 #[macro_use]

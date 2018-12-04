@@ -19,17 +19,20 @@ package exonum.examples.timestamping;
 import "helpers.proto";
 import "google/protobuf/timestamp.proto";
 
+// Stores content's hash and some metadata about it.
 message Timestamp {
   exonum.Hash content_hash = 1;
   string metadata = 2;
 }
 
 message TimestampEntry {
+  // Timestamp data.
   Timestamp timestamp = 1;
+  // Hash of transaction.
   exonum.Hash tx_hash = 2;
+  // Timestamp time.
   google.protobuf.Timestamp time = 3;
 }
 
-message TxTimestamp {
-  Timestamp content = 1;
-}
+/// Timestamping transaction.
+message TxTimestamp { Timestamp content = 1; }

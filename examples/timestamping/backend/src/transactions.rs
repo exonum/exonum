@@ -49,7 +49,7 @@ impl From<Error> for ExecutionError {
 
 /// Timestamping transaction.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::TxTimestamp")]
+#[exonum(pb = "proto::TxTimestamp")]
 pub struct TxTimestamp {
     /// Timestamp content.
     pub content: Timestamp,
