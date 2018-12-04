@@ -8,7 +8,17 @@ use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 static USER_AGENT_FILE_NAME: &str = "user_agent";
 
-fn main() {
+fn create_path_to_protobuf_schema_env() {
+    // Workaround for https://github.com/rust-lang/cargo/issues/3544
+    // We "link" exonum with exonum_protobuf library
+    // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
+    let path = env::current_dir()
+        .expect("Failed to get current dir.")
+        .join("src/encoding/protobuf/proto");
+    println!("cargo:protos={}", path.to_str().unwrap());
+}
+
+fn write_user_agent_file() {
     let package_name = option_env!("CARGO_PKG_NAME").unwrap_or("exonum");
     let package_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
     let rust_version = rust_version().unwrap_or("rust ?".to_string());
@@ -19,6 +29,12 @@ fn main() {
     let mut file = File::create(dest_path).expect("Unable to create output file");
     file.write_all(user_agent.as_bytes())
         .expect("Unable to write data to file");
+}
+
+fn main() {
+    write_user_agent_file();
+
+    create_path_to_protobuf_schema_env();
 
     protobuf_generate(
         "src/encoding/protobuf/proto/",
