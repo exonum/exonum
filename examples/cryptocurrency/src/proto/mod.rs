@@ -14,13 +14,12 @@
 
 //! Module of the rust-protobuf generated files.
 
+// For protobuf generated files.
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-mod cryptocurrency;
-
 pub use self::cryptocurrency::{TxCreateWallet, TxTransfer, Wallet};
 
-mod helpers {
-    pub use exonum::encoding::protobuf::PublicKey;
-}
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+
+use exonum::encoding::protobuf::*;

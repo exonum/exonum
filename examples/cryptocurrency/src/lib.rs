@@ -31,7 +31,6 @@
 )]
 
 extern crate exonum;
-extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
@@ -59,7 +58,7 @@ pub mod schema {
     // [1]: https://exonum.com/doc/architecture/serialization
     /// Wallet struct used to persist data within the service.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("proto::Wallet")]
+    #[exonum(pb = "proto::Wallet")]
     pub struct Wallet {
         /// Public key of the wallet owner.
         pub pub_key: PublicKey,
@@ -72,9 +71,9 @@ pub mod schema {
     /// Additional methods for managing balance of the wallet in an immutable fashion.
     impl Wallet {
         /// Create new Wallet.
-        pub fn new(pub_key: &PublicKey, name: &str, balance: u64) -> Self {
+        pub fn new(&pub_key: &PublicKey, name: &str, balance: u64) -> Self {
             Self {
-                pub_key: *pub_key,
+                pub_key,
                 name: name.to_owned(),
                 balance,
             }
@@ -145,7 +144,7 @@ pub mod transactions {
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("proto::TxCreateWallet")]
+    #[exonum(pb = "proto::TxCreateWallet")]
     pub struct TxCreateWallet {
         /// UTF-8 string with the owner's name.
         pub name: String,
@@ -156,7 +155,7 @@ pub mod transactions {
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[protobuf_convert("proto::TxTransfer")]
+    #[exonum(pb = "proto::TxTransfer")]
     pub struct TxTransfer {
         /// Public key of the receiver.
         pub to: PublicKey,
