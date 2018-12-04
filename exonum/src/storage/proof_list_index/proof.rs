@@ -54,23 +54,25 @@ impl<V: StorageValue + Clone> ListProof<V> {
             return Err(ListProofError::UnexpectedBranch);
         }
         let hash = match *self {
-            ListProof::Full(ref left, ref right) => hash_pair(
+            ListProof::Full(ref left, ref right) => HashTag::hash_node(
                 &left.collect(key.left(), vec)?,
                 &right.collect(key.right(), vec)?,
             ),
             ListProof::Left(ref left, Some(ref right)) => {
-                hash_pair(&left.collect(key.left(), vec)?, right)
+                HashTag::hash_node(&left.collect(key.left(), vec)?, right)
             }
-            ListProof::Left(ref left, None) => hash_one(&left.collect(key.left(), vec)?),
+            ListProof::Left(ref left, None) => {
+                HashTag::hash_single_node(&left.collect(key.left(), vec)?)
+            }
             ListProof::Right(ref left, ref right) => {
-                hash_pair(left, &right.collect(key.right(), vec)?)
+                HashTag::hash_node(left, &right.collect(key.right(), vec)?)
             }
             ListProof::Leaf(ref value) => {
                 if key.height() > 1 {
                     return Err(ListProofError::UnexpectedLeaf);
                 }
                 vec.push((key.index(), value));
-                hash_leaf(value.clone())
+                HashTag::hash_leaf(value.clone())
             }
             ListProof::Absent(_, _) => {
                 //TODO: modify to use in validate method

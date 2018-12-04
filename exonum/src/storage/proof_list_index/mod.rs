@@ -25,7 +25,7 @@ use super::{
     Fork, Snapshot, StorageKey, StorageValue,
 };
 use crypto::Hash;
-use storage::hash::{self, hash_leaf, hash_one, hash_pair};
+use storage::hash::HashTag;
 
 mod key;
 mod proof;
@@ -468,13 +468,13 @@ where
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
 
-        self.base.put(&key, hash_leaf(value.clone()));
+        self.base.put(&key, HashTag::hash_leaf(value.clone()));
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
-                hash_one(&self.get_branch_unchecked(key))
+                HashTag::hash_single_node(&self.get_branch_unchecked(key))
             } else {
-                hash_pair(
+                HashTag::hash_node(
                     &self.get_branch_unchecked(key.as_left()),
                     &self.get_branch_unchecked(key),
                 )
@@ -540,17 +540,17 @@ where
             );
         }
         let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, hash_leaf(value.clone()));
+        self.base.put(&key, HashTag::hash_leaf(value.clone()));
         self.base.put(&ProofListKey::leaf(index), value);
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
             let hash = if self.has_branch(right) {
-                hash_pair(
+                HashTag::hash_node(
                     &self.get_branch_unchecked(left),
                     &self.get_branch_unchecked(right),
                 )
             } else {
-                hash_one(&self.get_branch_unchecked(left))
+                HashTag::hash_single_node(&self.get_branch_unchecked(left))
             };
             key = key.parent();
             self.set_branch(key, hash);
@@ -617,9 +617,9 @@ where
 pub fn root_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
         0 => Hash::zero(),
-        1 => hash_leaf(hashes[0]),
+        1 => HashTag::hash_leaf(hashes[0]),
         _ => {
-            let hashes: Vec<Hash> = hashes.into_iter().map(|h| hash_leaf(*h)).collect();
+            let hashes: Vec<Hash> = hashes.into_iter().map(|h| HashTag::hash_leaf(*h)).collect();
 
             let mut current_hashes = combine_hash_list(&hashes);
 
@@ -635,8 +635,8 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
     hashes
         .chunks(2)
         .map(|pair| match pair {
-            [first, second] => hash_pair(first, second),
-            [single] => hash_one(single),
+            [first, second] => HashTag::hash_node(first, second),
+            [single] => HashTag::hash_single_node(single),
             _ => unreachable!(),
         }).collect()
 }

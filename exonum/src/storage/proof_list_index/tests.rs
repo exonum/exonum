@@ -21,10 +21,7 @@ use encoding::serialize::{
     json::reexport::{from_str, to_string},
     reexport::Serialize,
 };
-use storage::{
-    hash::{hash_leaf, hash_one, hash_pair, hash_with_prefix, LEAF_TAG, NODE_TAG},
-    Database,
-};
+use storage::{hash::HashTag, Database};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -124,12 +121,12 @@ fn list_index_proof(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
-    let h0 = hash_leaf(2u64);
-    let h1 = hash_leaf(4u64);
-    let h2 = hash_leaf(6u64);
-    let h01 = hash_pair(&h0, &h1);
-    let h22 = hash_one(&h2);
-    let h012 = hash_pair(&h01, &h22);
+    let h0 = HashTag::hash_leaf(2u64);
+    let h1 = HashTag::hash_leaf(4u64);
+    let h2 = HashTag::hash_leaf(6u64);
+    let h01 = HashTag::hash_node(&h0, &h1);
+    let h22 = HashTag::hash_single_node(&h2);
+    let h012 = HashTag::hash_node(&h01, &h22);
 
     assert_eq!(index.merkle_root(), Hash::default());
 
@@ -303,11 +300,11 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
 }
 
 fn hash_leaf_node(value: &[u8]) -> Hash {
-    hash_with_prefix(LEAF_TAG, value)
+    HashTag::Leaf.hash_stream().update(value).hash()
 }
 
 fn hash_branch_node(value: &[u8]) -> Hash {
-    hash_with_prefix(NODE_TAG, value)
+    HashTag::Node.hash_stream().update(value).hash()
 }
 
 fn index_and_proof_roots(db: Box<dyn Database>) {

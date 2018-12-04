@@ -17,14 +17,62 @@ use bytes::LittleEndian;
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 
-/// Hash prefix of the leaf node of a merkle tree.
-pub const LEAF_TAG: u8 = 0x0;
-/// Hash prefix of the branch node of a merkle tree.
-pub const NODE_TAG: u8 = 0x1;
-/// Hash prefix of the list object.
-pub const LIST_TAG: u8 = 0x2; // Subject of change in the future.
-/// Length of the hash prefix.
-pub const PREFIX_SIZE: usize = 1;
+#[repr(u8)]
+#[derive(Copy, Clone)]
+pub enum HashTag {
+    /// Hash prefix of the leaf node of a merkle tree.
+    Leaf = 0,
+    /// Hash prefix of the branch node of a merkle tree.
+    Node = 1,
+    /// Hash prefix of the list object.
+    List = 2,
+}
+
+/// Calculate hash value with specified prefix.
+///
+/// Different hashes for leaf and branch nodes are used to secure merkle tree from pre-image attack.
+/// More information here: https://tools.ietf.org/html/rfc6962#section-2.1
+impl HashTag {
+    pub fn hash_stream(&self) -> HashStream {
+        HashStream::new().update(&[*self as u8])
+    }
+
+    /// Convenient method to obtain hashed value of merkle tree node.
+    pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
+        HashTag::Node
+            .hash_stream()
+            .update(left_hash.as_ref())
+            .update(right_hash.as_ref())
+            .hash()
+    }
+
+    /// Convenient method to obtain hashed value of merkle tree node with one child.
+    pub fn hash_single_node(hash: &Hash) -> Hash {
+        HashTag::Node.hash_stream().update(hash.as_ref()).hash()
+    }
+
+    /// Convenient method to obtain hashed value of merkle tree leaf.
+    pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
+        HashTag::Leaf
+            .hash_stream()
+            .update(&value.into_bytes())
+            .hash()
+    }
+
+    /// Hash of the list object.
+    ///
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    pub fn list_hash(len: u64, root: Hash) -> Hash {
+        let mut len_bytes = [0; 8];
+        LittleEndian::write_u64(&mut len_bytes, len);
+
+        HashStream::new()
+            .update(&[HashTag::List as u8])
+            .update(&len_bytes)
+            .update(root.as_ref())
+            .hash()
+    }
+}
 
 /// A common trait for the ability to compute a unique hash.
 ///
