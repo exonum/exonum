@@ -87,6 +87,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New Features
 
+#### exonum-crypto
+
+- Added `utils` module with functions `create_keys_file` for creating
+  and `read_keys_from_file` for reading files that contain a
+  public key and encrypted secret key. (#1056)
+
 #### exonum
 
 - Added possibility to use domain names instead of IP addresses as a peer's
