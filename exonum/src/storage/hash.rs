@@ -14,7 +14,7 @@
 use byteorder::ByteOrder;
 use bytes::LittleEndian;
 
-use crypto::{hash, CryptoHash, HashStream, Hash, HASH_SIZE};
+use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 
 /// Hash prefix of the leaf node of a merkle tree.
@@ -36,71 +36,10 @@ pub trait UniqueHash {
     ///
     /// Hash must be unique, but not necessary cryptographic.
     fn hash(&self) -> Hash;
-
-    fn hash_to(&self, stream: HashStream) -> HashStream;
-
-    fn hash_with_prefix(&self) -> Hash;
 }
 
 impl<T: CryptoHash + StorageValue + Clone> UniqueHash for T {
     fn hash(&self) -> Hash {
         CryptoHash::hash(self)
     }
-
-    // To obtain hash with prefix:
-    fn hash_to(&self, stream: HashStream) -> HashStream {
-        stream.update(&self.clone().into_bytes())
-    }
-
-    fn hash_with_prefix(&self) -> Hash {
-        hash_with_prefix(LEAF_TAG, &self.clone().into_bytes())
-    }
-}
-
-/// Convenient method to obtain prefixed value of `StorageValue`.
-pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
-    // TODO: fix change value.hash() to value.as_ref()
-    HashStream::new()
-        .update(&[LEAF_TAG])
-        .update(&value.into_bytes())
-        .hash()
-}
-
-/// Convenient method to obtain prefixed value of `Hash`.
-pub fn hash_one(h: &Hash) -> Hash {
-    hash_with_prefix(NODE_TAG, h.as_ref())
-}
-
-/// Convenient method to obtain prefixed value of concatenation of two hashes.
-pub fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
-    let mut hash_bytes = [0u8; HASH_SIZE * 2 + PREFIX_SIZE];
-    hash_bytes[0] = NODE_TAG;
-    hash_bytes[PREFIX_SIZE..HASH_SIZE + PREFIX_SIZE].copy_from_slice(h1.as_ref());
-    hash_bytes[HASH_SIZE + PREFIX_SIZE..HASH_SIZE * 2 + PREFIX_SIZE].copy_from_slice(h2.as_ref());
-    hash(&hash_bytes)
-}
-
-/// Calculate hash value with specified prefix.
-///
-/// Different hashes for leaf and branch nodes are used to secure merkle tree from pre-image attack.
-/// More information here: https://tools.ietf.org/html/rfc6962#section-2.1
-pub fn hash_with_prefix(prefix: u8, value: &[u8]) -> Hash {
-    HashStream::new()
-        .update(&[prefix])
-        .update(value)
-        .hash()
-}
-
-/// Hash of the list object.
-///
-/// h = sha-256( LIST_TAG || len as u64 || merkle_root )
-pub fn list_hash(len: u64, root: Hash) -> Hash {
-    let mut len_bytes = [0; 8];
-    LittleEndian::write_u64(&mut len_bytes, len);
-
-    HashStream::new()
-        .update(&[LIST_TAG])
-        .update(&len_bytes)
-        .update(root.as_ref())
-        .hash()
 }

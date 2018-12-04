@@ -623,7 +623,6 @@ mod memorydb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_lower_bound() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -735,7 +734,6 @@ mod rocksdb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_lower_bound() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -836,8 +834,7 @@ mod list_hash_tests {
     use hex::FromHex;
 
     use crypto::Hash;
-    use storage::{hash::list_hash, Database, MemoryDB, ProofListIndex};
-    use storage::ListProof;
+    use storage::{hash::HashTag, Database, ListProof, MemoryDB, ProofListIndex};
 
     #[test]
     fn proof_of_absence_single() {
@@ -862,7 +859,7 @@ mod list_hash_tests {
             ListProof::Absent(index, actual_list_hash) => {
                 assert_eq!(index, non_existed_index);
 
-                let expected_hash = list_hash(list.len(), root_hash);
+                let expected_hash = HashTag::list_hash(list.len(), root_hash);
                 assert_eq!(expected_hash, actual_list_hash);
                 assert!(index >= list.len());
             }

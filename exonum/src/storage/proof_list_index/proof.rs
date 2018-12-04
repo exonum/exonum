@@ -15,7 +15,7 @@
 use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
-use super::{super::StorageValue, hash_leaf, hash_one, hash_pair, key::ProofListKey};
+use super::{super::StorageValue, key::ProofListKey, HashTag};
 use crypto::Hash;
 
 /// An enum that represents a proof of existence for a proof list elements.
@@ -30,7 +30,7 @@ pub enum ListProof<V> {
     /// A leaf of proof with requested element.
     Leaf(V),
     /// Proof of absence of element with specified index.
-    Absent(u64, Hash)
+    Absent(u64, Hash),
 }
 
 /// An error that is returned when the list proof is invalid.
@@ -73,8 +73,9 @@ impl<V: StorageValue + Clone> ListProof<V> {
                 hash_leaf(value.clone())
             }
             ListProof::Absent(_, _) => {
+                //TODO: modify to use in validate method
                 unreachable!()
-            }
+            },
         };
         Ok(hash)
     }
@@ -90,6 +91,9 @@ impl<V: StorageValue + Clone> ListProof<V> {
         if self.collect(ProofListKey::new(height, 0), &mut vec)? != merkle_root {
             return Err(ListProofError::UnmatchedRootHash);
         }
+
+        //TODO: add proof of absence validation
+
         Ok(vec)
     }
 }

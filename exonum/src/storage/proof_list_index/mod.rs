@@ -184,7 +184,7 @@ where
     }
 
     fn list_hash(&self) -> Hash {
-        hash::list_hash(self.len(), self.merkle_root())
+        HashTag::list_hash(self.len(), self.merkle_root())
     }
 
     /// Returns the element at the indicated position or `None` if the indicated position
