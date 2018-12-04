@@ -14,7 +14,6 @@
 
 // spell-checker:ignore cipherparams ciphertext
 
-#![allow(dead_code)] // TODO Remove after complete ECR-2518 and  ECR-2519
 use super::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use hex_buffer_serde::Hex;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, Suite};
@@ -30,7 +29,10 @@ use std::{
 use toml;
 
 /// Creates a TOML file that contains encrypted `SecretKey` and returns `PublicKey` for the secret key.
-pub fn create_keys_file<P: AsRef<Path>>(path: P, pass_phrase: &[u8]) -> Result<PublicKey, Error> {
+pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
+    path: P,
+    pass_phrase: W,
+) -> Result<PublicKey, Error> {
     let (pk, sk) = gen_keypair();
     let keys = EncryptedKeys::encrypt(pk, &sk, pass_phrase)?;
     let file_content =
@@ -46,9 +48,9 @@ pub fn create_keys_file<P: AsRef<Path>>(path: P, pass_phrase: &[u8]) -> Result<P
 }
 
 /// Reads and returns `PublicKey` and `SecretKey` from encrypted file located by path and returns its.
-pub fn read_keys_from_file<P: AsRef<Path>>(
+pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
-    pass_phrase: &[u8],
+    pass_phrase: W,
 ) -> Result<(PublicKey, SecretKey), Error> {
     let mut key_file = File::open(path)?;
 
@@ -96,7 +98,7 @@ impl EncryptedKeys {
     fn encrypt(
         public_key: PublicKey,
         secret_key: &SecretKey,
-        pass_phrase: &[u8],
+        pass_phrase: impl AsRef<[u8]>,
     ) -> Result<EncryptedKeys, Error> {
         let mut rng = thread_rng();
         let mut eraser = Eraser::new();
@@ -115,7 +117,7 @@ impl EncryptedKeys {
         })
     }
 
-    fn decrypt(self, pass_phrase: &[u8]) -> Result<(PublicKey, SecretKey), Error> {
+    fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<(PublicKey, SecretKey), Error> {
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
         let restored = eraser
@@ -150,7 +152,7 @@ mod tests {
         let dir = TempDir::new("test_utils").expect("Couldn't create TempDir");
         let file_path = dir.path().join("private_key.toml");
         let pass_phrase = b"passphrase";
-        let pk1 = create_keys_file(file_path.as_path(), pass_phrase).unwrap();
+        let pk1 = generate_keys_file(file_path.as_path(), pass_phrase).unwrap();
         let (pk2, _) = read_keys_from_file(file_path.as_path(), pass_phrase).unwrap();
         assert_eq!(pk1, pk2);
     }
