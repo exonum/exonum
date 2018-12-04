@@ -24,7 +24,6 @@
 extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
-extern crate exonum_crypto as crypto;
 extern crate protobuf;
 #[macro_use]
 extern crate failure;

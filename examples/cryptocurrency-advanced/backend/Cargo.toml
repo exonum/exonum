@@ -18,11 +18,10 @@ circle-ci = { repository = "exonum/exonum" }
 exonum = { version = "0.9.0", path = "../../../exonum" }
 exonum_derive = { path = "../../../exonum_derive" }
 exonum-configuration = { version = "0.9.0", path = "../../../services/configuration" }
-exonum-crypto = { path = "../../../crypto" }
 serde = "1.0.0"
 serde_derive = "1.0.0"
 failure = "0.1.2"
-protobuf = "=2.1.4"
+protobuf = "=2.2.0"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.9.0", path = "../../../testkit" }
@@ -32,4 +31,4 @@ assert_matches = "1.2.0"
 hex = "=0.3.2"
 
 [build-dependencies]
-protoc-rust = "=2.1.4"
+exonum_build = { version = "0.9.0", path = "../../../exonum_build" }

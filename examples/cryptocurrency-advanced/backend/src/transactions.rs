@@ -68,7 +68,7 @@ impl From<Error> for ExecutionError {
 
 /// Transfer `amount` of the currency from one wallet to another.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::Transfer")]
+#[exonum(pb = "proto::Transfer")]
 pub struct Transfer {
     /// `PublicKey` of receiver's wallet.
     pub to: PublicKey,
@@ -82,7 +82,7 @@ pub struct Transfer {
 
 /// Issue `amount` of the currency to the `wallet`.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::Issue")]
+#[exonum(pb = "proto::Issue")]
 pub struct Issue {
     /// Issued amount of currency.
     pub amount: u64,
@@ -94,7 +94,7 @@ pub struct Issue {
 
 /// Create wallet with the given `name`.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::CreateWallet")]
+#[exonum(pb = "proto::CreateWallet")]
 pub struct CreateWallet {
     /// Name of the new wallet.
     pub name: String,
@@ -129,17 +129,13 @@ impl Transfer {
     #[doc(hidden)]
     pub fn sign(
         pk: &PublicKey,
-        to: &PublicKey,
+        &to: &PublicKey,
         amount: u64,
         seed: u64,
         sk: &SecretKey,
     ) -> Signed<RawTransaction> {
         Message::sign_transaction(
-            Self {
-                to: *to,
-                amount,
-                seed,
-            },
+            Self { to, amount, seed },
             CRYPTOCURRENCY_SERVICE_ID,
             *pk,
             sk,

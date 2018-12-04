@@ -17,10 +17,8 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-mod cryptocurrency;
-
 pub use self::cryptocurrency::{CreateWallet, Issue, Transfer, Wallet};
 
-mod helpers {
-    pub use exonum::encoding::protobuf::{Hash, PublicKey};
-}
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+
+use exonum::encoding::protobuf::*;

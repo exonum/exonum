@@ -20,7 +20,7 @@ use super::proto;
 
 /// Wallet information stored in the database.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[protobuf_convert("proto::Wallet")]
+#[exonum(pb = "proto::Wallet")]
 pub struct Wallet {
     /// `PublicKey` of the wallet.
     pub pub_key: PublicKey,
@@ -37,18 +37,18 @@ pub struct Wallet {
 impl Wallet {
     /// Create new Wallet.
     pub fn new(
-        pub_key: &PublicKey,
+        &pub_key: &PublicKey,
         name: &str,
         balance: u64,
         history_len: u64,
-        history_hash: &Hash,
+        &history_hash: &Hash,
     ) -> Self {
         Self {
-            pub_key: *pub_key,
+            pub_key,
             name: name.to_owned(),
             balance,
             history_len,
-            history_hash: *history_hash,
+            history_hash,
         }
     }
     /// Returns a copy of this wallet with updated balance.

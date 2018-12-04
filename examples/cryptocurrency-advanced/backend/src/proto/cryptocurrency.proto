@@ -18,25 +18,40 @@ package exonum.examples.cryptocurrency_advanced;
 
 import "helpers.proto";
 
+/// Transfer `amount` of the currency from one wallet to another.
 message Transfer {
- exonum.PublicKey to = 1;
- uint64 amount = 2;
- uint64 seed = 3;
+  // `PublicKey` of receiver's wallet.
+  exonum.PublicKey to = 1;
+  // Amount of currency to transfer.
+  uint64 amount = 2;
+  // Auxiliary number to guarantee non-idempotence of transactions.
+  uint64 seed = 3;
 }
 
+// Issue `amount` of the currency to the `wallet`.
 message Issue {
+  // Issued amount of currency.
   uint64 amount = 1;
+  // Auxiliary number to guarantee non-idempotence of transactions.
   uint64 seed = 2;
 }
 
+// Create wallet with the given `name`.
 message CreateWallet {
+  // Name of the new wallet.
   string name = 1;
 }
 
+// Wallet information stored in the database.
 message Wallet {
- exonum.PublicKey pub_key = 1;
- string name = 2;
- uint64 balance = 3;
- uint64 history_len = 4;
- exonum.Hash history_hash = 5;
+  // `PublicKey` of the wallet.
+  exonum.PublicKey pub_key = 1;
+  // Name of the wallet.
+  string name = 2;
+  // Current balance of the wallet.
+  uint64 balance = 3;
+  // Length of the transactions history.
+  uint64 history_len = 4;
+  // `Hash` of the transactions history.
+  exonum.Hash history_hash = 5;
 }

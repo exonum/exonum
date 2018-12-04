@@ -96,6 +96,7 @@ proptest
 protobuf
 proto
 protoc
+protos
 pubkey
 pubkeys
 readonly
