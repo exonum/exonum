@@ -170,21 +170,21 @@ mod tests {
     fn test_decrypt_from_file() {
         let pass_phrase = b"passphrase";
         let file_content = r#"
-public_key = '2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8'
+            public_key = '2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8'
 
-[secret_key]
-ciphertext = '7fbb51090742482da42816b2c908ff61c470a19ca1b984014c7ac37dd46ef1ef'
-mac = '862f27c67b07f9665628b6f9a72a1c20'
-kdf = 'scrypt-nacl'
-cipher = 'xsalsa20-poly1305'
+            [secret_key]
+            ciphertext = '7fbb51090742482da42816b2c908ff61c470a19ca1b984014c7ac37dd46ef1ef'
+            mac = '862f27c67b07f9665628b6f9a72a1c20'
+            kdf = 'scrypt-nacl'
+            cipher = 'xsalsa20-poly1305'
 
-[secret_key.kdfparams]
-salt = '2ee70102a15aff032523a5df91e435172ef003ad9898a3a5eb2f5af447d28b63'
-memlimit = 16777216
-opslimit = 524288
+            [secret_key.kdfparams]
+            salt = '2ee70102a15aff032523a5df91e435172ef003ad9898a3a5eb2f5af447d28b63'
+            memlimit = 16777216
+            opslimit = 524288
 
-[secret_key.cipherparams]
-iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
+            [secret_key.cipherparams]
+            iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
         "#;
 
         let keys: EncryptedKeys =
@@ -194,8 +194,11 @@ iv = '374c8dc0ab8d753ae0515f485e24f6c76b469cde3dee285c'
             public_key.to_hex(),
             "2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8"
         );
-        assert_eq!(secret_key.to_hex(),
-"47782139daefd1c1764d9ed0faa3e8e591c89a9c4e786758d196ed5041ca9e572e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8")
+        assert_eq!(
+            secret_key.to_hex(),
+            "47782139daefd1c1764d9ed0faa3e8e591c89a9c4e786758d196ed5041ca9e57\
+             2e9d0b7ff996acdda58dd786950dec7361d3d81fd188cb250fd0cab2d064aaf8"
+        )
     }
 
     #[cfg(unix)]
