@@ -18,7 +18,7 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::blockchain::{Block, ConfigReference, TxLocation};
+pub use self::blockchain::{Block, ConfigReference, TransactionResult, TxLocation};
 pub use self::helpers::{BitVec, Hash, PublicKey};
 pub use self::protocol::{
     BlockRequest, BlockResponse, Connect, PeersRequest, Precommit, Prevote, PrevotesRequest,
@@ -182,6 +182,20 @@ impl ProtobufConvert for ValidatorId {
     }
 }
 
+impl ProtobufConvert for u16 {
+    type ProtoStruct = u32;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        u32::from(*self)
+    }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+        if pb <= u32::from(u16::max_value()) {
+            Ok(pb as u16)
+        } else {
+            Err(())
+        }
+    }
+}
+
 impl ProtobufConvert for u32 {
     type ProtoStruct = u32;
     fn to_pb(&self) -> Self::ProtoStruct {
@@ -208,7 +222,7 @@ where
 {
     type ProtoStruct = Vec<T::ProtoStruct>;
     fn to_pb(&self) -> Self::ProtoStruct {
-        self.into_iter().map(|v| v.to_pb()).collect()
+        self.iter().map(|v| v.to_pb()).collect()
     }
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
         pb.into_iter()

@@ -13,24 +13,29 @@ addons:
     sources:
     - sourceline: 'ppa:giskou/librocksdb'
     - sourceline: 'ppa:maarten-fonville/protobuf'
+    - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
+    - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+      key_url: https://packages.microsoft.com/keys/microsoft.asc    
     packages:
-    - gcc
-    - g++
-    - libssl-dev
-    - libcurl4-openssl-dev
-    - libelf-dev
-    - libdw-dev
     - binutils-dev
-    - libiberty-dev
-    - libsnappy-dev
-    - librocksdb
-    - cmake
-    - zlib1g-dev
     - build-essential
-    - pkg-config
-    - unzip
-    - protobuf-compiler
+    - cmake
+    - g++
+    - gcc
+    - libcurl4-openssl-dev
+    - libdw-dev
+    - libelf-dev
+    - libiberty-dev
     - libprotobuf-dev
+    - librocksdb
+    - libsnappy-dev
+    - libsodium-dev
+    - libssl-dev
+    - pkg-config
+    - powershell
+    - protobuf-compiler
+    - unzip
+    - zlib1g-dev
 
 rust:
   - 1.30.0
@@ -49,29 +54,11 @@ sudo: required
 env:
   global:
   - DEADLINKS_VERS=0.3.0
-  - SODIUM_VERS=1.0.13
-  - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
   - FEATURE=test
-
-# Separate jobs should use `install` hook in order not to override these common
-# instructions.
-before_install:
-- |
-  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
-    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
-    tar xvf libsodium.tar.gz
-    cd libsodium-$SODIUM_VERS
-    ./configure --prefix=$HOME/.local
-    make
-    make install
-    cd ..
-  fi
-- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
-- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
 
 jobs:
   include:
@@ -129,32 +116,6 @@ jobs:
 
   # Tests.
   - name: test
-    addons:
-      apt:
-        sources:
-        - sourceline: 'ppa:giskou/librocksdb'
-        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
-          key_url: https://packages.microsoft.com/keys/microsoft.asc
-        - sourceline: 'ppa:maarten-fonville/protobuf'
-        packages:
-        - gcc
-        - g++
-        - libssl-dev
-        - libcurl4-openssl-dev
-        - libelf-dev
-        - libdw-dev
-        - binutils-dev
-        - libiberty-dev
-        - libsnappy-dev
-        - librocksdb
-        - powershell
-        - cmake
-        - zlib1g-dev
-        - build-essential
-        - pkg-config
-        - protobuf-compiler
-        - libprotobuf-dev
-
     install:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
@@ -171,18 +132,18 @@ jobs:
  
  # Clippy linting.
   - name: clippy
-    rust: nightly-2018-10-23
+    rust: nightly-2018-11-28
     install:
-    - cargo clippy --version | rustup component add clippy-preview --toolchain=nightly-2018-10-23
+    - cargo clippy --version || rustup component add clippy-preview --toolchain=nightly-2018-11-28
     - cargo clippy --version
     script:
     - cargo clippy --all -- -D warnings
 
   # Benchmarks (compilation only).
   - name: benchmarks
-    rust: nightly-2018-10-23
+    rust: nightly-2018-11-28
     script:
-    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+    - RUST_LOG=off cargo check --benches --features "long_benchmarks"
 
 notifications:
   slack:
