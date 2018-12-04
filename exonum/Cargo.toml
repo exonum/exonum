@@ -11,6 +11,7 @@ keywords = ["database", "distributed", "blockchain", "framework", "exonum"]
 categories = ["cryptography", "database-implementations"]
 description = "An extensible framework for blockchain software projects."
 autobenches = true
+links = "exonum_protobuf"
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
