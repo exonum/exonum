@@ -1,4 +1,4 @@
-# Cryptocurrency Tutorial
+# Cryptocurrency: Example Service
 
 [![Build status][travis-image]][travis-url]
 [![Gitter][gitter-image]][gitter-url]
