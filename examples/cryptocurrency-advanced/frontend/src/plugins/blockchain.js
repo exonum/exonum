@@ -1,5 +1,10 @@
+
 import * as Exonum from 'exonum-client'
+//import * as Exonum from '../../exonum-client/dist/exonum-client'
+import * as Protobuf from 'protobufjs/light'
 import axios from 'axios'
+
+import * as proto from '../../proto/protocol.js'
 
 const TRANSACTION_URL = '/api/explorer/v1/transactions'
 const PER_PAGE = 10
@@ -23,40 +28,43 @@ const TransactionMetaData = Exonum.newType({
     { name: 'execution_status', type: Exonum.Bool }
   ]
 })
+const Type = Protobuf.Type;
+const Field = Protobuf.Field;
 
 function TransferTransaction(publicKey) {
+  const Transfer = new Type('Transfer');
+  Transfer.add(new Field('to', 1, 'bytes'));
+  Transfer.add(new Field('amount', 2, 'uint64'));
+  Transfer.add(new Field('seed', 3, 'uint64'));
+
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_TRANSFER_ID,
-    fields: [
-      { name: 'to', type: Exonum.PublicKey },
-      { name: 'amount', type: Exonum.Uint64 },
-      { name: 'seed', type: Exonum.Uint64 }
-    ]
+    schema: Transfer
   })
 }
 
 function IssueTransaction(publicKey) {
+  const Issue = new Type('Transfer');
+  Issue.add(new Field('amount', 1, 'uint64'));
+  Issue.add(new Field('seed', 2, 'uint64'));
+
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_ISSUE_ID,
-    fields: [
-      { name: 'amount', type: Exonum.Uint64 },
-      { name: 'seed', type: Exonum.Uint64 }
-    ]
+    schema: Issue
   })
 }
 
 function CreateTransaction(publicKey) {
+  
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_WALLET_ID,
-    fields: [
-      { name: 'name', type: Exonum.String }
-    ]
+    schema: proto.exonum.examples.cryptocurrency_advanced.CreateWallet
   })
 }
 
@@ -92,6 +100,8 @@ module.exports = {
           name: name
         }
 
+        console.log(TRANSACTION_URL, data, keyPair.secretKey, keyPair.publicKey)
+
         // Send transaction into blockchain
         return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
       },
@@ -116,7 +126,7 @@ module.exports = {
 
         // Transaction data
         const data = {
-          to: receiver,
+          to: Uint8Array.from(Exonum.hexadecimalToUint8Array(receiver)),
           amount: amountToTransfer,
           seed: seed
         }
