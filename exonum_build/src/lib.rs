@@ -102,7 +102,7 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 ///
 /// include!(concat!(env!("OUT_DIR"), "/example_mod.rs"));
 ///
-/// // If you use types from exonum .proto files.
+/// // If you use types from `exonum` .proto files.
 /// use exonum::encoding::protobuf::*;
 /// ```
 pub fn protobuf_generate<P, R, I, T>(input_dir: P, includes: I, mod_file_name: T)
@@ -152,9 +152,9 @@ where
     );
 }
 
-/// Get path where exonum protobuf files are located.
+/// Get path where `exonum` protobuf files are located.
 ///
-/// Needed for code generation of .proto files which include exonum provided .proto files.
+/// Needed for code generation of .proto files which import `exonum` provided .proto files.
 ///
 /// # Examples
 ///
