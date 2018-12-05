@@ -152,7 +152,7 @@ where
     );
 }
 
-/// Get path where `exonum` protobuf files are located.
+/// Get path to the folder containing `exonum` protobuf files.
 ///
 /// Needed for code generation of .proto files which import `exonum` provided .proto files.
 ///
