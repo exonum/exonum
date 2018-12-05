@@ -19,8 +19,8 @@ fn main() {
     );
 
     protobuf_generate(
-        "tests/service_hooks",
-        &["tests/service_hooks"],
+        "tests/service_hooks/proto",
+        &["tests/service_hooks/proto"],
         "hooks_example_protobuf_mod.rs",
     );
 
