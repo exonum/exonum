@@ -21,10 +21,7 @@ use encoding::serialize::{
     json::reexport::{from_str, to_string},
     reexport::Serialize,
 };
-use storage::{
-    hash::{hash_leaf, hash_one, hash_pair, hash_with_prefix, LEAF_TAG, NODE_TAG},
-    Database,
-};
+use storage::{hash::HashTag, Database};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -124,12 +121,12 @@ fn list_index_proof(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
-    let h0 = hash_leaf(2u64);
-    let h1 = hash_leaf(4u64);
-    let h2 = hash_leaf(6u64);
-    let h01 = hash_pair(&h0, &h1);
-    let h22 = hash_one(&h2);
-    let h012 = hash_pair(&h01, &h22);
+    let h0 = HashTag::hash_leaf(2u64);
+    let h1 = HashTag::hash_leaf(4u64);
+    let h2 = HashTag::hash_leaf(6u64);
+    let h01 = HashTag::hash_node(&h0, &h1);
+    let h22 = HashTag::hash_single_node(&h2);
+    let h012 = HashTag::hash_node(&h01, &h22);
 
     assert_eq!(index.merkle_root(), Hash::default());
 
@@ -303,11 +300,11 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
 }
 
 fn hash_leaf_node(value: &[u8]) -> Hash {
-    hash_with_prefix(LEAF_TAG, value)
+    HashTag::Leaf.hash_stream().update(value).hash()
 }
 
 fn hash_branch_node(value: &[u8]) -> Hash {
-    hash_with_prefix(NODE_TAG, value)
+    HashTag::Node.hash_stream().update(value).hash()
 }
 
 fn index_and_proof_roots(db: Box<dyn Database>) {
@@ -623,7 +620,6 @@ mod memorydb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_lower_bound() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -632,7 +628,6 @@ mod memorydb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_bound_empty() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -736,7 +731,6 @@ mod rocksdb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_lower_bound() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -745,7 +739,6 @@ mod rocksdb_tests {
     }
 
     #[test]
-    #[should_panic]
     fn test_proof_illegal_bound_empty() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
@@ -838,32 +831,43 @@ mod list_hash_tests {
     use hex::FromHex;
 
     use crypto::Hash;
-    use storage::{hash::list_hash, Database, MemoryDB, ProofListIndex};
+    use storage::{hash::HashTag, Database, ListProof, MemoryDB, ProofListIndex};
 
     #[test]
-    fn proof_of_absence() {
+    fn proof_of_absence_single() {
         let db = MemoryDB::new();
         let mut fork = db.fork();
-        let mut index = ProofListIndex::new("absence", &mut fork);
+        let mut list = ProofListIndex::new("absence", &mut fork);
 
-        index.push(vec![1]);
-        index.push(vec![2]);
-        index.push(vec![3]);
-        index.push(vec![4]);
-        index.push(vec![5]);
+        list.push(vec![1]);
+        list.push(vec![2]);
+        list.push(vec![3]);
+        list.push(vec![4]);
+        list.push(vec![5]);
 
-        let actual_list_hash = index.list_hash();
-
-        let existed_index = 5u64;
         let root_hash =
             Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9")
                 .unwrap();
 
-        let hash = list_hash(existed_index, root_hash);
-        assert_eq!(hash, actual_list_hash);
-
         let non_existed_index = 6u64;
-        let hash = list_hash(non_existed_index, index.merkle_root());
-        assert_ne!(hash, actual_list_hash);
+        let proof = list.get_proof(non_existed_index);
+
+        match proof {
+            ListProof::Absent(index, actual_list_hash) => {
+                assert_eq!(index, non_existed_index);
+
+                let expected_hash = HashTag::list_hash(list.len(), root_hash);
+                assert_eq!(expected_hash, actual_list_hash);
+                assert!(index >= list.len());
+            }
+            _ => {
+                panic!("Unexpected proof {:?}", proof);
+            }
+        }
+    }
+
+    #[test]
+    fn proof_of_absence_range() {
+        //TBD
     }
 }

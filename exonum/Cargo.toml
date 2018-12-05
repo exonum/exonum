@@ -51,11 +51,12 @@ chrono = { version = "=0.4.6", features = ["serde"] }
 uuid = { version = "=0.7.1", features = ["serde"] }
 snow = "=0.4.0"
 rust_decimal = "=0.10.2"
-protobuf = "=2.2.0"
+protobuf = { version = "=2.2.0", features = ["with-serde"] }
 
 exonum-crypto = { version = "0.9.0", path = "../crypto" }
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
+exonum_derive = { version = "0.9.0", path = "../exonum_derive" }
 
 [dev-dependencies]
 pretty_assertions = "=0.5.1"
@@ -72,11 +73,12 @@ harness = false
 path = "benches/criterion/lib.rs"
 
 [features]
-default = ["sodiumoxide-crypto"]
+default = ["sodiumoxide-crypto", "with-serde"]
 float_serialize = []
 long_benchmarks = []
 metrics-log = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
+with-serde = []
 
 [build-dependencies]
 protoc-rust = "=2.2.0"

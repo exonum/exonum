@@ -255,7 +255,7 @@ macro_rules! encoding_struct {
                 use $crate::encoding::serialize::json::ExonumJson;
                 self.serialize_field()
                     .map_err(|_| S::Error::custom(
-                                concat!("Can not serialize structure: ", stringify!($name))))?
+                                concat!("Cannot serialize structure: ", stringify!($name))))?
                     .serialize(serializer)
             }
         }

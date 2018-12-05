@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+// For rust-protobuf generated files.
+#![allow(bare_trait_objects)]
+#![allow(renamed_and_removed_lints)]
 
-package exonum;
+pub use self::tests_transactions::{CreateWallet, Transfer};
 
-message Hash { bytes data = 1; }
+include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
 
-message PublicKey { bytes data = 1; }
-
-message BitVec {
-  bytes data = 1;
-  uint64 len = 2;
+pub mod helpers {
+    pub use exonum::encoding::protobuf::helpers::*;
 }

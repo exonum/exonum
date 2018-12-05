@@ -72,6 +72,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Fork::remove_by_prefix()` method now specifies prefix as `Option<&[u8]>` instead
   of `Option<&Vec<u8>>`. (#1042)
+  
+- `exonum_derive` crate has been added with custom derives for `ProtobufConvert`
+  and `TransactionSet`. (#1055)
 
 #### exonum-configuration
 

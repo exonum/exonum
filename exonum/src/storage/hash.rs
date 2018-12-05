@@ -14,17 +14,65 @@
 use byteorder::ByteOrder;
 use bytes::LittleEndian;
 
-use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 
-/// Hash prefix of the leaf node of a merkle tree.
-pub const LEAF_TAG: u8 = 0x0;
-/// Hash prefix of the branch node of a merkle tree.
-pub const NODE_TAG: u8 = 0x1;
-/// Hash prefix of the list object.
-pub const LIST_TAG: u8 = 0x2; // Subject of change in the future.
-/// Length of the hash prefix.
-pub const PREFIX_SIZE: usize = 1;
+#[repr(u8)]
+#[derive(Copy, Clone)]
+pub enum HashTag {
+    /// Hash prefix of the leaf node of a merkle tree.
+    Leaf = 0,
+    /// Hash prefix of the branch node of a merkle tree.
+    Node = 1,
+    /// Hash prefix of the list object.
+    List = 2,
+}
+
+/// Calculate hash value with specified prefix.
+///
+/// Different hashes for leaf and branch nodes are used to secure merkle tree from pre-image attack.
+/// More information here: https://tools.ietf.org/html/rfc6962#section-2.1
+impl HashTag {
+    pub fn hash_stream(&self) -> HashStream {
+        HashStream::new().update(&[*self as u8])
+    }
+
+    /// Convenient method to obtain hashed value of merkle tree node.
+    pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
+        HashTag::Node
+            .hash_stream()
+            .update(left_hash.as_ref())
+            .update(right_hash.as_ref())
+            .hash()
+    }
+
+    /// Convenient method to obtain hashed value of merkle tree node with one child.
+    pub fn hash_single_node(hash: &Hash) -> Hash {
+        HashTag::Node.hash_stream().update(hash.as_ref()).hash()
+    }
+
+    /// Convenient method to obtain hashed value of merkle tree leaf.
+    pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
+        HashTag::Leaf
+            .hash_stream()
+            .update(&value.into_bytes())
+            .hash()
+    }
+
+    /// Hash of the list object.
+    ///
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    pub fn list_hash(len: u64, root: Hash) -> Hash {
+        let mut len_bytes = [0; 8];
+        LittleEndian::write_u64(&mut len_bytes, len);
+
+        HashStream::new()
+            .update(&[HashTag::List as u8])
+            .update(&len_bytes)
+            .update(root.as_ref())
+            .hash()
+    }
+}
 
 /// A common trait for the ability to compute a unique hash.
 ///
@@ -38,53 +86,8 @@ pub trait UniqueHash {
     fn hash(&self) -> Hash;
 }
 
-impl<T: CryptoHash> UniqueHash for T {
+impl<T: CryptoHash + StorageValue + Clone> UniqueHash for T {
     fn hash(&self) -> Hash {
         CryptoHash::hash(self)
     }
-}
-
-/// Convenient method to obtain prefixed value of `StorageValue`.
-pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
-    let value_bytes = value.into_bytes();
-    hash_with_prefix(LEAF_TAG, &value_bytes)
-}
-
-/// Convenient method to obtain prefixed value of `Hash`.
-pub fn hash_one(h: &Hash) -> Hash {
-    hash_with_prefix(NODE_TAG, h.as_ref())
-}
-
-/// Convenient method to obtain prefixed value of concatenation of two hashes.
-pub fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
-    let mut hash_bytes = [0u8; HASH_SIZE * 2 + PREFIX_SIZE];
-    hash_bytes[0] = NODE_TAG;
-    hash_bytes[PREFIX_SIZE..HASH_SIZE + PREFIX_SIZE].copy_from_slice(h1.as_ref());
-    hash_bytes[HASH_SIZE + PREFIX_SIZE..HASH_SIZE * 2 + PREFIX_SIZE].copy_from_slice(h2.as_ref());
-    hash(&hash_bytes)
-}
-
-/// Calculate hash value with specified prefix.
-///
-/// Different hashes for leaf and branch nodes are used to secure merkle tree from pre-image attack.
-/// More information here: https://tools.ietf.org/html/rfc6962#section-2.1
-pub fn hash_with_prefix(prefix: u8, value: &[u8]) -> Hash {
-    let value_length = value.len() + PREFIX_SIZE;
-    let mut hash_bytes = vec![0u8; value_length];
-    hash_bytes[0] = prefix;
-    hash_bytes[PREFIX_SIZE..value_length].copy_from_slice(value);
-    hash(&hash_bytes)
-}
-
-/// Hash of the list object.
-///
-/// h = sha-256( LIST_TAG || len as u64 || merkle_root )
-pub fn list_hash(len: u64, root: Hash) -> Hash {
-    let mut hash_bytes = [0u8; HASH_SIZE + PREFIX_SIZE + 8];
-
-    hash_bytes[0] = LIST_TAG;
-    LittleEndian::write_u64(&mut hash_bytes[PREFIX_SIZE..PREFIX_SIZE + 8], len);
-    hash_bytes[PREFIX_SIZE + 8..HASH_SIZE + PREFIX_SIZE + 8].copy_from_slice(root.as_ref());
-
-    hash(&hash_bytes)
 }
