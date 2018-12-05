@@ -1,4 +1,4 @@
-# Timestamping demo
+# Timestamping: Example Service
 
 This project demonstrates how to create simple timestamping service
 using [Exonum blockchain](https://github.com/exonum/exonum).

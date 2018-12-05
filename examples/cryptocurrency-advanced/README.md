@@ -1,7 +1,12 @@
-# Cryptocurrency demo
+# Cryptocurrency Advanced: Service with Data Proofs
 
-This project demonstrates how to bootstrap own cryptocurrency
-with [Exonum blockchain](https://github.com/exonum/exonum).
+The extended version of the
+[Cryptocurrency Service](https://github.com/exonum/exonum/tree/master/examples/cryptocurrency)
+implementing data proofs. This project demonstrates how to bootstrap your own
+cryptocurrency with [Exonum blockchain](https://github.com/exonum/exonum).
+
+See [the documentation](https://exonum.com/doc/get-started/data-proofs/)
+for a detailed step-by-step guide how to approach this example.
 
 ![Cryptocurrency demo](Screenshot.png)
 
