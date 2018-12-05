@@ -286,6 +286,19 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
+    #[doc(hidden)]
+    pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
+        let service_id = tx.service_id();
+        let msg = Message::sign_transaction(
+            tx.service_transaction(),
+            service_id,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        );
+
+        self.api_sender.broadcast_transaction(msg)
+    }
+
     /// Executes the given transactions from the pool.
     /// Then collects the resulting changes from the current storage state and returns them
     /// with the hash of the resulting block.
