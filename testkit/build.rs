@@ -3,30 +3,32 @@ extern crate exonum_build;
 use exonum_build::{get_exonum_protobuf_files_path, protobuf_generate};
 
 fn main() {
-    protobuf_generate("src/proto", &["src/proto"], "testkit_protobuf_mod.rs");
-
     let exonum_protos = get_exonum_protobuf_files_path();
-    protobuf_generate(
-        "tests/inflating_currency/proto",
-        &["tests/inflating_currency/proto", &exonum_protos],
-        "currency_example_protobuf_mod.rs",
-    );
+    let protobuf_gen_data = [
+        ("src/proto", vec!["src/proto"], "testkit_protobuf_mod.rs"),
+        (
+            "tests/inflating_currency/proto",
+            vec!["tests/inflating_currency/proto", &exonum_protos],
+            "currency_example_protobuf_mod.rs",
+        ),
+        (
+            "tests/counter/proto",
+            vec!["tests/counter/proto"],
+            "counter_example_protobuf_mod.rs",
+        ),
+        (
+            "tests/service_hooks/proto",
+            vec!["tests/service_hooks/proto"],
+            "hooks_example_protobuf_mod.rs",
+        ),
+        (
+            "examples/timestamping/proto",
+            vec!["examples/timestamping/proto"],
+            "timestamping_example_protobuf_mod.rs",
+        ),
+    ];
 
-    protobuf_generate(
-        "tests/counter/proto",
-        &["tests/counter/proto"],
-        "counter_example_protobuf_mod.rs",
-    );
-
-    protobuf_generate(
-        "tests/service_hooks/proto",
-        &["tests/service_hooks/proto"],
-        "hooks_example_protobuf_mod.rs",
-    );
-
-    protobuf_generate(
-        "examples/timestamping/proto",
-        &["examples/timestamping/proto"],
-        "timestamping_example_protobuf_mod.rs",
-    );
+    for (input_dir, includes, mod_file_name) in protobuf_gen_data.into_iter() {
+        protobuf_generate(input_dir, includes, mod_file_name);
+    }
 }
