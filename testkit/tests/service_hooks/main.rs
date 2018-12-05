@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
 extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 
 // HACK: Silent "dead_code" warning.
 pub use hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
@@ -27,6 +29,7 @@ use exonum::{blockchain::TransactionSet, helpers::Height, messages::Message};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
+mod proto;
 
 #[test]
 fn test_after_commit() {

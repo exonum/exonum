@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
@@ -32,21 +34,33 @@ use exonum::{
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
+mod proto;
+
 // Simple service implementation.
 
 const SERVICE_ID: u16 = 512;
 
-transactions! {
-    TimestampingServiceTransactions {
-        struct TxTimestamp {
-            msg: &str,
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxTimestamp")]
+struct TxTimestamp {
+    message: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+enum TimestampingServiceTransactions {
+    TxTimestamp(TxTimestamp),
 }
 
 impl TxTimestamp {
-    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxTimestamp::new(msg), SERVICE_ID, *author, key)
+    fn sign(author: &PublicKey, message: &str, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(
+            Self {
+                message: message.to_owned(),
+            },
+            SERVICE_ID,
+            *author,
+            key,
+        )
     }
 }
 

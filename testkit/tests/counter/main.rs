@@ -14,7 +14,6 @@
 
 #[macro_use]
 extern crate assert_matches;
-#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
@@ -27,6 +26,9 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
@@ -44,6 +46,7 @@ use counter::{
 };
 
 mod counter;
+mod proto;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let testkit = TestKit::for_service(CounterService);

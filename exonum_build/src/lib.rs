@@ -102,7 +102,7 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 ///
 /// include!(concat!(env!("OUT_DIR"), "/example_mod.rs"));
 ///
-/// // If you use types from exonum .proto files.
+/// // If you use types from `exonum` .proto files.
 /// use exonum::encoding::protobuf::*;
 /// ```
 pub fn protobuf_generate<P, R, I, T>(input_dir: P, includes: I, mod_file_name: T)
@@ -150,4 +150,26 @@ where
             .to_str()
             .expect("Input dir name is not convertible to &str")
     );
+}
+
+/// Get path to the folder containing `exonum` protobuf files.
+///
+/// Needed for code generation of .proto files which import `exonum` provided .proto files.
+///
+/// # Examples
+///
+/// ```no_run
+/// extern crate exonum_build;
+///
+/// use exonum_build::{protobuf_generate, get_exonum_protobuf_files_path};
+///
+/// let exonum_protos = get_exonum_protobuf_files_path();
+/// protobuf_generate(
+///    "src/proto",
+///    &["src/proto", &exonum_protos],
+///    "protobuf_mod.rs",
+/// );
+/// ```
+pub fn get_exonum_protobuf_files_path() -> String {
+    env::var("DEP_EXONUM_PROTOBUF_PROTOS").expect("Failed to get exonum protobuf path")
 }
