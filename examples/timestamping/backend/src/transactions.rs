@@ -55,13 +55,6 @@ pub struct TxTimestamp {
     pub content: Timestamp,
 }
 
-impl TxTimestamp {
-    /// New TxTimestamp.
-    pub fn new(content: Timestamp) -> Self {
-        Self { content }
-    }
-}
-
 /// Transaction group.
 #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
 pub enum TimeTransactions {
@@ -72,12 +65,7 @@ pub enum TimeTransactions {
 impl TxTimestamp {
     #[doc(hidden)]
     pub fn sign(author: &PublicKey, content: Timestamp, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            TxTimestamp::new(content),
-            TIMESTAMPING_SERVICE,
-            *author,
-            key,
-        )
+        Message::sign_transaction(Self { content }, TIMESTAMPING_SERVICE, *author, key)
     }
 }
 
