@@ -2,10 +2,8 @@ extern crate exonum_build;
 
 use exonum_build::protobuf_generate;
 
-use std::env;
-
 fn main() {
-    let exonum_protos = env::var("DEP_EXONUM_PROTOBUF_PROTOS").unwrap();
+    let exonum_protos = exonum_build::get_exonum_protobuf_files_path();
     protobuf_generate(
         "src/proto",
         &["src/proto", &exonum_protos],
