@@ -187,10 +187,6 @@ mod timestamping {
     }
 
     impl Transaction for PanickingTx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             panic!("panic text");
         }
