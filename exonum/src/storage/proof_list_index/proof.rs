@@ -108,8 +108,6 @@ impl<V: StorageValue + Clone> ListProof<V> {
             }
         }
 
-        //TODO: add proof of absence validation
-
         Ok(vec)
     }
 }
