@@ -39,6 +39,8 @@ use exonum::{
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
 
+mod proto;
+
 /// Marker service id.
 const SERVICE_ID: u16 = 128;
 /// Marker service name.
