@@ -84,6 +84,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Structures in tests and examples are serialized using protobuf now. (#1078)
 
+#### exonum-timestamping
+
+- Structures in tests and examples are serialized using protobuf now. (#1081)
+
+#### exonum-cryptocurrency
+
+- Structures in tests and examples are serialized using protobuf now. (#1081)
+
 #### exonum-configuration
 
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of

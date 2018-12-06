@@ -30,14 +30,18 @@
     bare_trait_objects
 )]
 
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate failure;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate protobuf;
 extern crate serde_json;
+
+pub mod proto;
 
 /// Persistent data.
 pub mod schema {
@@ -46,36 +50,46 @@ pub mod schema {
         storage::{Fork, MapIndex, Snapshot},
     };
 
+    use super::proto;
+
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
     //
     // [1]: https://exonum.com/doc/architecture/serialization
-
-    encoding_struct! {
-        /// Wallet struct used to persist data within the service.
-        struct Wallet {
-            /// Public key of the wallet owner.
-            pub_key: &PublicKey,
-            /// Name of the wallet owner.
-            name: &str,
-            /// Current balance.
-            balance: u64,
-        }
+    /// Wallet struct used to persist data within the service.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::Wallet")]
+    pub struct Wallet {
+        /// Public key of the wallet owner.
+        pub pub_key: PublicKey,
+        /// Name of the wallet owner.
+        pub name: String,
+        /// Current balance.
+        pub balance: u64,
     }
 
     /// Additional methods for managing balance of the wallet in an immutable fashion.
     impl Wallet {
+        /// Create new Wallet.
+        pub fn new(&pub_key: &PublicKey, name: &str, balance: u64) -> Self {
+            Self {
+                pub_key,
+                name: name.to_owned(),
+                balance,
+            }
+        }
+
         /// Returns a copy of this wallet with the balance increased by the specified amount.
         pub fn increase(self, amount: u64) -> Self {
-            let balance = self.balance() + amount;
-            Self::new(self.pub_key(), self.name(), balance)
+            let balance = self.balance + amount;
+            Self::new(&self.pub_key, &self.name, balance)
         }
 
         /// Returns a copy of this wallet with the balance decreased by the specified amount.
         pub fn decrease(self, amount: u64) -> Self {
-            debug_assert!(self.balance() >= amount);
-            let balance = self.balance() - amount;
-            Self::new(self.pub_key(), self.name(), balance)
+            debug_assert!(self.balance >= amount);
+            let balance = self.balance - amount;
+            Self::new(&self.pub_key, &self.name, balance)
         }
     }
 
@@ -119,44 +133,60 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
+    use super::proto;
     use super::service::SERVICE_ID;
     use exonum::{
         crypto::{PublicKey, SecretKey},
         messages::{Message, RawTransaction, Signed},
     };
-    transactions! {
-        /// Transaction group.
-        pub CurrencyTransactions {
-            /// Transaction type for creating a new wallet.
-            ///
-            /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
-            /// `TxCreateWallet` transactions are processed.
-            struct TxCreateWallet {
-                /// UTF-8 string with the owner's name.
-                name: &str,
-            }
+    /// Transaction type for creating a new wallet.
+    ///
+    /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
+    /// `TxCreateWallet` transactions are processed.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TxCreateWallet")]
+    pub struct TxCreateWallet {
+        /// UTF-8 string with the owner's name.
+        pub name: String,
+    }
 
-            /// Transaction type for transferring tokens between two wallets.
-            ///
-            /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
-            /// `TxTransfer` transactions are processed.
-            struct TxTransfer {
-                /// Public key of the receiver.
-                to: &PublicKey,
-                /// Number of tokens to transfer from sender's account to receiver's account.
-                amount: u64,
-                /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
-                ///
-                /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
-                seed: u64,
-            }
-        }
+    /// Transaction type for transferring tokens between two wallets.
+    ///
+    /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
+    /// `TxTransfer` transactions are processed.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TxTransfer")]
+    pub struct TxTransfer {
+        /// Public key of the receiver.
+        pub to: PublicKey,
+        /// Number of tokens to transfer from sender's account to receiver's account.
+        pub amount: u64,
+        /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+        ///
+        /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
+        pub seed: u64,
+    }
+
+    /// Transaction group.
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    pub enum CurrencyTransactions {
+        /// Create wallet transaction.
+        CreateWallet(TxCreateWallet),
+        /// Transfer tokens transaction.
+        Transfer(TxTransfer),
     }
 
     impl TxCreateWallet {
         #[doc(hidden)]
         pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
-            Message::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
+            Message::sign_transaction(
+                Self {
+                    name: name.to_owned(),
+                },
+                SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 
@@ -169,7 +199,16 @@ pub mod transactions {
             pk: &PublicKey,
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
-            Message::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sk)
+            Message::sign_transaction(
+                Self {
+                    to: *to,
+                    amount,
+                    seed,
+                },
+                SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 }
@@ -245,7 +284,7 @@ pub mod contracts {
             let view = context.fork();
             let mut schema = CurrencySchema::new(view);
             if schema.wallet(&author).is_none() {
-                let wallet = Wallet::new(&author, self.name(), INIT_BALANCE);
+                let wallet = Wallet::new(&author, &self.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
                 schema.wallets_mut().put(&author, wallet);
                 Ok(())
@@ -266,7 +305,7 @@ pub mod contracts {
             let author = context.author();
             let view = context.fork();
 
-            if &author == self.to() {
+            if author == self.to {
                 Err(Error::SenderSameAsReceiver)?
             }
 
@@ -277,19 +316,19 @@ pub mod contracts {
                 None => Err(Error::SenderNotFound)?,
             };
 
-            let receiver = match schema.wallet(self.to()) {
+            let receiver = match schema.wallet(&self.to) {
                 Some(val) => val,
                 None => Err(Error::ReceiverNotFound)?,
             };
 
-            let amount = self.amount();
-            if sender.balance() >= amount {
+            let amount = self.amount;
+            if sender.balance >= amount {
                 let sender = sender.decrease(amount);
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
                 let mut wallets = schema.wallets_mut();
                 wallets.put(&author, sender);
-                wallets.put(self.to(), receiver);
+                wallets.put(&self.to, receiver);
                 Ok(())
             } else {
                 Err(Error::InsufficientCurrencyAmount)?
