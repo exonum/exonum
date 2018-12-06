@@ -24,6 +24,8 @@ use exonum::{
     storage::{Entry, Fork, Snapshot},
 };
 
+use super::proto;
+
 pub const SERVICE_ID: u16 = 1;
 
 // "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
@@ -71,21 +73,29 @@ impl<'a> CounterSchema<&'a mut Fork> {
 
 // // // // Transactions // // // //
 
-transactions! {
-    pub CounterTransactions {
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxReset")]
+pub struct TxReset {}
 
-        struct TxIncrement {
-            by: u64,
-        }
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxIncrement")]
+pub struct TxIncrement {
+    by: u64,
+}
 
-        struct TxReset {
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum CounterTransactions {
+    Increment(TxIncrement),
+    Reset(TxReset),
 }
 
 impl TxIncrement {
+    pub fn new(by: u64) -> Self {
+        Self { by }
+    }
+
     pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxIncrement::new(by), SERVICE_ID, *author, key)
+        Message::sign_transaction(Self::new(by), SERVICE_ID, *author, key)
     }
 }
 
@@ -93,7 +103,7 @@ impl Transaction for TxIncrement {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        if self.by() == 0 {
+        if self.by == 0 {
             Err(ExecutionError::with_description(
                 0,
                 "Adding zero does nothing!".to_string(),
@@ -101,14 +111,14 @@ impl Transaction for TxIncrement {
         }
 
         let mut schema = CounterSchema::new(tc.fork());
-        schema.inc_count(self.by());
+        schema.inc_count(self.by);
         Ok(())
     }
 }
 
 impl TxReset {
     pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxReset::new(), SERVICE_ID, *author, key)
+        Message::sign_transaction(Self {}, SERVICE_ID, *author, key)
     }
 }
 

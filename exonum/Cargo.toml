@@ -11,15 +11,16 @@ keywords = ["database", "distributed", "blockchain", "framework", "exonum"]
 categories = ["cryptography", "database-implementations"]
 description = "An extensible framework for blockchain software projects."
 autobenches = true
+links = "exonum_protobuf"
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "=0.7.7"
+actix = "=0.7.8"
 actix-net = "=0.2.4"
-actix-web = "=0.7.14"
+actix-web = "=0.7.15"
 log = "=0.4.6"
 byteorder = "1.2.3"
 hex = "=0.3.2"

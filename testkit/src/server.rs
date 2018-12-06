@@ -161,24 +161,34 @@ mod tests {
     use exonum::messages::{Message, RawTransaction, Signed};
     use exonum::storage::Snapshot;
 
-    use super::*;
+    use super::{super::proto, *};
     use {TestKitApi, TestKitBuilder};
 
     type DeBlock = BlockWithTransactions;
     const TIMESTAMP_SERVICE_ID: u16 = 0;
-    transactions! {
-        Any {
 
-            struct TxTimestamp {
-                msg: &str,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::tests::TxTimestamp")]
+    struct TxTimestamp {
+        message: String,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    enum Any {
+        TxTimestamp(TxTimestamp),
     }
 
     impl TxTimestamp {
         fn for_str(s: &str) -> Signed<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            Message::sign_transaction(TxTimestamp::new(s), TIMESTAMP_SERVICE_ID, pubkey, &key)
+            Message::sign_transaction(
+                Self {
+                    message: s.to_owned(),
+                },
+                TIMESTAMP_SERVICE_ID,
+                pubkey,
+                &key,
+            )
         }
     }
 

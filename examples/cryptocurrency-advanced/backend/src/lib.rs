@@ -21,8 +21,10 @@
     bare_trait_objects
 )]
 
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 #[macro_use]
 extern crate failure;
 extern crate serde;
@@ -32,6 +34,7 @@ extern crate serde_derive;
 pub use schema::Schema;
 
 pub mod api;
+pub mod proto;
 pub mod schema;
 pub mod transactions;
 pub mod wallet;

@@ -16,30 +16,48 @@
 
 use exonum::crypto::{Hash, PublicKey};
 
-encoding_struct! {
-    /// Wallet information stored in the database.
-    struct Wallet {
-        /// `PublicKey` of the wallet.
-        pub_key:            &PublicKey,
-        /// Name of the wallet.
-        name:               &str,
-        /// Current balance of the wallet.
-        balance:            u64,
-        /// Length of the transactions history.
-        history_len:        u64,
-        /// `Hash` of the transactions history.
-        history_hash:       &Hash,
-    }
+use super::proto;
+
+/// Wallet information stored in the database.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Wallet")]
+pub struct Wallet {
+    /// `PublicKey` of the wallet.
+    pub pub_key: PublicKey,
+    /// Name of the wallet.
+    pub name: String,
+    /// Current balance of the wallet.
+    pub balance: u64,
+    /// Length of the transactions history.
+    pub history_len: u64,
+    /// `Hash` of the transactions history.
+    pub history_hash: Hash,
 }
 
 impl Wallet {
+    /// Create new Wallet.
+    pub fn new(
+        &pub_key: &PublicKey,
+        name: &str,
+        balance: u64,
+        history_len: u64,
+        &history_hash: &Hash,
+    ) -> Self {
+        Self {
+            pub_key,
+            name: name.to_owned(),
+            balance,
+            history_len,
+            history_hash,
+        }
+    }
     /// Returns a copy of this wallet with updated balance.
     pub fn set_balance(self, balance: u64, history_hash: &Hash) -> Self {
         Self::new(
-            self.pub_key(),
-            self.name(),
+            &self.pub_key,
+            &self.name,
             balance,
-            self.history_len() + 1,
+            self.history_len + 1,
             history_hash,
         )
     }

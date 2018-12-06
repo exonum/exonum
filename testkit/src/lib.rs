@@ -143,7 +143,6 @@ extern crate actix_web;
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
 extern crate assert_matches;
-#[cfg_attr(test, macro_use)]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
@@ -154,6 +153,11 @@ extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[cfg_attr(test, macro_use)]
+#[cfg(test)]
+extern crate exonum_derive;
+#[cfg(test)]
+extern crate protobuf;
 extern crate serde_json;
 extern crate serde_urlencoded;
 extern crate tokio_core;
@@ -163,6 +167,8 @@ pub use compare::ComparableSnapshot;
 pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
+#[cfg(test)]
+pub mod proto;
 
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
