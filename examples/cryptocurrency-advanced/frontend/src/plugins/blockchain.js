@@ -32,34 +32,24 @@ const Type = Protobuf.Type;
 const Field = Protobuf.Field;
 
 function TransferTransaction(publicKey) {
-  const Transfer = new Type('Transfer');
-  Transfer.add(new Field('to', 1, 'bytes'));
-  Transfer.add(new Field('amount', 2, 'uint64'));
-  Transfer.add(new Field('seed', 3, 'uint64'));
-
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_TRANSFER_ID,
-    schema: Transfer
+    schema: proto.exonum.examples.cryptocurrency_advanced.Transfer
   })
 }
 
 function IssueTransaction(publicKey) {
-  const Issue = new Type('Transfer');
-  Issue.add(new Field('amount', 1, 'uint64'));
-  Issue.add(new Field('seed', 2, 'uint64'));
-
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
     message_id: TX_ISSUE_ID,
-    schema: Issue
+    schema: proto.exonum.examples.cryptocurrency_advanced.Issue
   })
 }
 
 function CreateTransaction(publicKey) {
-  
   return Exonum.newTransaction({
     author: publicKey,
     service_id: SERVICE_ID,
