@@ -1,6 +1,6 @@
 
-import * as Exonum from 'exonum-client'
-//import * as Exonum from '../../exonum-client/dist/exonum-client'
+//import * as Exonum from 'exonum-client'
+import * as Exonum from '../../exonum-client/dist/exonum-client'
 import * as Protobuf from 'protobufjs/light'
 import axios from 'axios'
 
