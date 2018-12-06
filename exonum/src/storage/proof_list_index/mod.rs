@@ -624,7 +624,7 @@ pub fn root_hash(hashes: &[Hash]) -> Hash {
         0 => HashTag::default_list_hash(),
         1 => HashTag::hash_list(1, HashTag::hash_leaf(hashes[0])),
         _ => {
-            let hashes: Vec<Hash> = hashes.into_iter().map(|h| HashTag::hash_leaf(*h)).collect();
+            let hashes: Vec<Hash> = hashes.iter().map(|h| HashTag::hash_leaf(*h)).collect();
 
             let mut current_hashes = combine_hash_list(&hashes);
 

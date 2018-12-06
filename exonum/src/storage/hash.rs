@@ -35,8 +35,8 @@ pub enum HashTag {
 /// More information here: https://tools.ietf.org/html/rfc6962#section-2.1
 impl HashTag {
     ///`HashStream` object with corresponding hash prefix.
-    pub fn hash_stream(&self) -> HashStream {
-        HashStream::new().update(&[*self as u8])
+    pub fn hash_stream(self) -> HashStream {
+        HashStream::new().update(&[self as u8])
     }
 
     /// Convenient method to obtain hashed value of merkle tree node.

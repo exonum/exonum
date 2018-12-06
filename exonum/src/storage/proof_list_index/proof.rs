@@ -74,9 +74,7 @@ impl<V: StorageValue + Clone> ListProof<V> {
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(value.clone())
             }
-            ListProof::Absent(_, hash) => {
-                hash
-            }
+            ListProof::Absent(_, hash) => hash,
         };
         Ok(hash)
     }
@@ -95,7 +93,7 @@ impl<V: StorageValue + Clone> ListProof<V> {
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
 
         match *self {
-            ListProof::Absent(index, list_hash) => {
+            ListProof::Absent(_, list_hash) => {
                 if expected_list_hash != list_hash {
                     return Err(ListProofError::UnmatchedRootHash);
                 }

@@ -87,7 +87,7 @@ impl<'a> Schema<&'a mut Fork> {
             let mut history = self.wallet_history_mut(&wallet.pub_key);
             history.push(*transaction);
             let history_hash = history.list_hash();
-            let balance = wallet.balance();
+            let balance = wallet.balance;
             wallet.set_balance(balance + amount, &history_hash)
         };
         self.wallets_mut().put(&wallet.pub_key, wallet.clone());
@@ -101,7 +101,7 @@ impl<'a> Schema<&'a mut Fork> {
             let mut history = self.wallet_history_mut(&wallet.pub_key);
             history.push(*transaction);
             let history_hash = history.list_hash();
-            let balance = wallet.balance();
+            let balance = wallet.balance;
             wallet.set_balance(balance - amount, &history_hash)
         };
         self.wallets_mut().put(&wallet.pub_key, wallet.clone());
