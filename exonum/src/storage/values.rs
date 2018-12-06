@@ -15,7 +15,7 @@
 //! A definition of `StorageValue` trait and implementations for common types.
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -23,7 +23,6 @@ use std::{borrow::Cow, mem};
 
 use super::UniqueHash;
 use crypto::{Hash, PublicKey};
-use encoding::{Field, Offset};
 use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -270,24 +269,6 @@ impl StorageValue for DateTime<Utc> {
     }
 }
 
-/// Uses little-endian encoding.
-impl StorageValue for Duration {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut buffer = vec![0; Self::field_size() as usize];
-        let from: Offset = 0;
-        let to: Offset = Self::field_size();
-        self.write(&mut buffer, from, to);
-        buffer
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        #![allow(unsafe_code)]
-        let from: Offset = 0;
-        let to: Offset = Self::field_size();
-        unsafe { Self::read(&value, from, to) }
-    }
-}
-
 impl StorageValue for Round {
     fn into_bytes(self) -> Vec<u8> {
         self.0.into_bytes()
@@ -422,20 +403,20 @@ mod tests {
         assert_round_trip_eq(&times);
     }
 
-    #[test]
-    fn storage_value_for_duration_round_trip() {
-        let durations = [
-            Duration::zero(),
-            Duration::max_value(),
-            Duration::min_value(),
-            Duration::nanoseconds(999_999_999),
-            Duration::nanoseconds(-999_999_999),
-            Duration::seconds(42) + Duration::nanoseconds(15),
-            Duration::seconds(-42) + Duration::nanoseconds(-15),
-        ];
-
-        assert_round_trip_eq(&durations);
-    }
+    //    #[test]
+    //    fn storage_value_for_duration_round_trip() {
+    //        let durations = [
+    //            Duration::zero(),
+    //            Duration::max_value(),
+    //            Duration::min_value(),
+    //            Duration::nanoseconds(999_999_999),
+    //            Duration::nanoseconds(-999_999_999),
+    //            Duration::seconds(42) + Duration::nanoseconds(15),
+    //            Duration::seconds(-42) + Duration::nanoseconds(-15),
+    //        ];
+    //
+    //        assert_round_trip_eq(&durations);
+    //    }
 
     #[test]
     fn round_round_trip() {

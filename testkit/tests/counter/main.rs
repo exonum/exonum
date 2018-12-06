@@ -28,17 +28,18 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate exonum_derive;
+extern crate hex;
 extern crate protobuf;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::TransactionErrorType as ErrorType,
     crypto::{self, CryptoHash, PublicKey},
-    encoding::serialize::FromHex,
     helpers::Height,
     messages::{self, RawTransaction, Signed},
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use hex::FromHex;
 use serde_json::Value;
 
 use counter::{

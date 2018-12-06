@@ -14,88 +14,10 @@
 
 use std::{borrow::Cow, error::Error as StdError, fmt};
 
-use super::Offset;
-
 #[derive(Debug)]
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    // TODO: Check this message after refactor buffer. (ECR-156)
-    /// Payload is short for this message.
-    UnexpectedlyShortPayload {
-        /// real message size.
-        actual_size: Offset,
-        /// expected size of fixed part.
-        minimum_size: Offset,
-    },
-    /// Boolean value is incorrect.
-    IncorrectBoolean {
-        /// position in buffer where error appears.
-        position: Offset,
-        /// value that was parsed as bool.
-        value: u8,
-    },
-    /// Unsupported floating point value (Infinity, NaN or signaling NaN).
-    UnsupportedFloat {
-        /// Position in buffer where error appears.
-        position: Offset,
-        /// Value represented as `f64`.
-        value: f64,
-    },
-    /// SocketAddr header is neither 0 nor 1.
-    IncorrectSocketAddrHeader {
-        /// Position in buffer where error appears.
-        position: Offset,
-        /// Header value.
-        value: u8,
-    },
-    /// SocketAddr padding for IPv4 addresses must be 12 bytes of 0s.
-    IncorrectSocketAddrPadding {
-        /// Position in buffer where error appears.
-        position: Offset,
-        /// Padding value.
-        value: [u8; 12],
-    },
-    /// Segment reference is incorrect.
-    IncorrectSegmentReference {
-        /// position in buffer where error appears.
-        position: Offset,
-        /// value that was parsed as segment reference.
-        value: Offset,
-    },
-    /// Segment size is incorrect.
-    IncorrectSegmentSize {
-        /// position in buffer where error appears.
-        position: Offset,
-        /// value that was parsed as size.
-        value: Offset,
-    },
-    /// Unsupported message version.
-    UnsupportedProtocolVersion {
-        /// Actual message version.
-        version: u8,
-    },
-    /// Different segments overlaps.
-    OverlappingSegment {
-        /// last segment ended position.
-        last_end: Offset,
-        /// start of new segment.
-        start: Offset,
-    },
-    /// Spaces found between segments.
-    SpaceBetweenSegments {
-        /// last segment ended position.
-        last_end: Offset,
-        /// start of new segment.
-        start: Offset,
-    },
-    /// Error in parsing `Utf8` `String`.
-    Utf8 {
-        /// position in buffer where error appears.
-        position: Offset,
-        /// what error exact was.
-        error: ::std::str::Utf8Error,
-    },
     /// Overflow in Offsets.
     OffsetOverflow,
     /// Overflow in Duration.
@@ -122,17 +44,6 @@ impl fmt::Display for Error {
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
-            Error::IncorrectBoolean { .. } => "Incorrect boolean value",
-            Error::UnsupportedFloat { .. } => "Unsupported float value",
-            Error::IncorrectSocketAddrHeader { .. } => "Incorrect SocketAddr header value",
-            Error::IncorrectSocketAddrPadding { .. } => "Incorrect SocketAddr padding",
-            Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
-            Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
-            Error::UnsupportedProtocolVersion { .. } => "Unsupported protocol version",
-            Error::OverlappingSegment { .. } => "Overlapping segments",
-            Error::SpaceBetweenSegments { .. } => "Space between segments",
-            Error::Utf8 { .. } => "Utf8 error in parsing string",
             Error::OffsetOverflow => "Offset pointers overflow",
             Error::DurationOverflow => "Overflow in Duration object",
             Error::IncorrectDuration { .. } => "Incorrect Duration object representation",

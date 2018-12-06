@@ -312,7 +312,7 @@ mod tests {
     use std::{fmt::Debug, str::FromStr};
 
     use chrono::{Duration, TimeZone};
-    use encoding::serialize::FromHex;
+    use hex::FromHex;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;

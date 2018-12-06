@@ -53,12 +53,13 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::{self, serialize::json::reexport::Value},
+    encoding,
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
 use schema::TimeSchema;
+use serde_json::Value;
 
 use time_provider::{SystemTimeProvider, TimeProvider};
 use transactions::*;

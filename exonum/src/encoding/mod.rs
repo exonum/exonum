@@ -105,88 +105,8 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-#[cfg(feature = "float_serialize")]
-pub use self::float::{F32, F64};
-pub use self::{error::Error, fields::Field, segments::SegmentField};
+pub use self::error::Error;
 
-#[macro_use]
-pub mod serialize;
 pub mod protobuf;
 
-use std::{
-    convert::From,
-    ops::{Add, Div, Mul, Sub},
-};
-
 mod error;
-#[macro_use]
-mod fields;
-mod segments;
-#[macro_use]
-mod spec;
-#[cfg(feature = "float_serialize")]
-mod float;
-
-#[cfg(test)]
-mod tests;
-
-/// Type alias usable for reference in buffer
-pub type Offset = u32;
-
-/// Type alias that should be returned in `check` method of `Field`
-pub type Result = ::std::result::Result<CheckedOffset, Error>;
-
-// TODO: Replace by more generic type. (ECR-156)
-/// `CheckedOffset` is a type that take control over overflow,
-/// so you can't panic without `unwrap`,
-/// and work with this value without overflow checks.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub struct CheckedOffset {
-    offset: Offset,
-}
-
-impl CheckedOffset {
-    /// create checked value
-    pub fn new(offset: Offset) -> Self {
-        Self { offset }
-    }
-
-    /// return unchecked offset
-    pub fn unchecked_offset(self) -> Offset {
-        self.offset
-    }
-}
-
-macro_rules! implement_default_ops_checked {
-    ($trait_name:ident $function:ident $checked_function:ident) => {
-        impl $trait_name<CheckedOffset> for CheckedOffset {
-            type Output = ::std::result::Result<CheckedOffset, Error>;
-            fn $function(self, rhs: CheckedOffset) -> Self::Output {
-                self.offset
-                    .$checked_function(rhs.offset)
-                    .map(CheckedOffset::new)
-                    .ok_or(Error::OffsetOverflow)
-            }
-        }
-        impl $trait_name<Offset> for CheckedOffset {
-            type Output = ::std::result::Result<CheckedOffset, Error>;
-            fn $function(self, rhs: Offset) -> Self::Output {
-                self.offset
-                    .$checked_function(rhs)
-                    .map(CheckedOffset::new)
-                    .ok_or(Error::OffsetOverflow)
-            }
-        }
-    };
-}
-
-implement_default_ops_checked!{Add add checked_add }
-implement_default_ops_checked!{Sub sub checked_sub }
-implement_default_ops_checked!{Mul mul checked_mul }
-implement_default_ops_checked!{Div div checked_div }
-
-impl From<Offset> for CheckedOffset {
-    fn from(offset: Offset) -> Self {
-        Self::new(offset)
-    }
-}

@@ -30,10 +30,8 @@ use super::{
     HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
 use crypto::{hash, CryptoHash, Hash, HashStream};
-use encoding::{
-    protobuf,
-    serialize::reexport::{DeserializeOwned, Serialize},
-};
+use encoding::protobuf;
+use serde::{de::DeserializeOwned, Serialize};
 use storage::{Database, Fork, StorageValue};
 
 const IDX_NAME: &'static str = "idx_name";

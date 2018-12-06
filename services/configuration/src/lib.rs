@@ -89,9 +89,8 @@ pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use serde_json::to_value;
+use serde_json::{to_value, Value};
 
-use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
