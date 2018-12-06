@@ -90,8 +90,6 @@ module.exports = {
           name: name
         }
 
-        console.log(TRANSACTION_URL, data, keyPair.secretKey, keyPair.publicKey)
-
         // Send transaction into blockchain
         return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
       },
@@ -116,7 +114,7 @@ module.exports = {
 
         // Transaction data
         const data = {
-          to: Uint8Array.from(Exonum.hexadecimalToUint8Array(receiver)),
+          to: { data: Uint8Array.from(Exonum.hexadecimalToUint8Array(receiver)) },
           amount: amountToTransfer,
           seed: seed
         }
