@@ -181,12 +181,6 @@ mod timestamping {
     }
 
     impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            // We don't verify transactions within the benchmark, so in this
-            // and following transaction types the verification code is trivial.
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
@@ -337,10 +331,6 @@ mod cryptocurrency {
     }
 
     impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let from = context.author();
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
@@ -355,10 +345,6 @@ mod cryptocurrency {
     }
 
     impl Transaction for SimpleTx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let from = context.author();
 
@@ -374,10 +360,6 @@ mod cryptocurrency {
     }
 
     impl Transaction for RollbackTx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let from = context.author();
 
