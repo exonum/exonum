@@ -57,3 +57,21 @@ message Point {
   uint32 x = 1;
   uint32 y = 2;
 }
+
+message TestProtobufConvert {
+  exonum.PublicKey key = 1;
+  exonum.Hash hash = 2;
+  uint32 unsigned_32 = 3;
+  uint64 unsigned_64 = 4;
+  int32 regular_i32 = 5;
+  int64 regular_i64 = 6;
+  fixed32 fixed_u32 = 7;
+  fixed64 fixed_u64 = 8;
+  sfixed32 fixed_i32 = 9;
+  sfixed64 fixed_i64 = 10;
+  float float_32 = 11;
+  double float_64 = 12;
+  bool boolean = 13;
+  sint32 s_i32 = 14;
+  sint64 s_i64 = 15;
+}

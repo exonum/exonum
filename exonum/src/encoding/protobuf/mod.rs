@@ -196,36 +196,6 @@ impl ProtobufConvert for u16 {
     }
 }
 
-impl ProtobufConvert for u32 {
-    type ProtoStruct = u32;
-    fn to_pb(&self) -> Self::ProtoStruct {
-        *self
-    }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(pb)
-    }
-}
-
-impl ProtobufConvert for u64 {
-    type ProtoStruct = u64;
-    fn to_pb(&self) -> Self::ProtoStruct {
-        *self
-    }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(pb)
-    }
-}
-
-impl ProtobufConvert for i32 {
-    type ProtoStruct = i32;
-    fn to_pb(&self) -> Self::ProtoStruct {
-        *self
-    }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(pb)
-    }
-}
-
 impl<T> ProtobufConvert for Vec<T>
 where
     T: ProtobufConvert,
@@ -251,3 +221,25 @@ impl ProtobufConvert for Vec<u8> {
         Ok(pb)
     }
 }
+
+macro_rules! impl_protobuf_convert_scalar {
+    ($name:tt) => {
+        impl ProtobufConvert for $name {
+            type ProtoStruct = $name;
+            fn to_pb(&self) -> Self::ProtoStruct {
+                *self
+            }
+            fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+                Ok(pb)
+            }
+        }
+    };
+}
+
+impl_protobuf_convert_scalar!(bool);
+impl_protobuf_convert_scalar!(u32);
+impl_protobuf_convert_scalar!(u64);
+impl_protobuf_convert_scalar!(i32);
+impl_protobuf_convert_scalar!(i64);
+impl_protobuf_convert_scalar!(f32);
+impl_protobuf_convert_scalar!(f64);
