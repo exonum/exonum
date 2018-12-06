@@ -54,6 +54,7 @@ describe('Interaction with blockchain', () => {
    
     expect(1).toEqual(1)
   })
+  
   /*it('should generate new signing key pair', () => {
     const keyPair = Vue.prototype.$blockchain.generateKeyPair()
 
