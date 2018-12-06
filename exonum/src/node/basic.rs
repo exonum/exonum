@@ -127,7 +127,7 @@ impl NodeHandler {
         }
         self.state.add_peer(public_key, message.clone());
         info!(
-            "Received Connect message from {}, {}",
+            "Received Connect message from {}. Need to connect: {}",
             address, need_connect,
         );
         self.blockchain.save_peer(&public_key, message);
