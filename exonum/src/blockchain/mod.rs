@@ -289,6 +289,12 @@ impl Blockchain {
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
+        if !self.service_map.contains_key(&service_id) {
+            return format_err!(
+                "Unable to broadcast transaction: no service with ID={} found",
+                service_id
+            );
+        }
         let msg = Message::sign_transaction(
             tx.service_transaction(),
             service_id,
