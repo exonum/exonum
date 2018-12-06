@@ -117,7 +117,7 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
-    hash::UniqueHash,
+    hash::{HashTag, UniqueHash},
     key_set_index::KeySetIndex,
     keys::StorageKey,
     list_index::ListIndex,

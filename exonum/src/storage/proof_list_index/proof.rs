@@ -76,7 +76,7 @@ impl<V: StorageValue + Clone> ListProof<V> {
             }
             ListProof::Absent(_, hash) => {
                 hash
-            },
+            }
         };
         Ok(hash)
     }
@@ -86,11 +86,26 @@ impl<V: StorageValue + Clone> ListProof<V> {
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
-    pub fn validate(&self, merkle_root: Hash, len: u64) -> Result<Vec<(u64, &V)>, ListProofError> {
+    pub fn validate(
+        &self,
+        expected_list_hash: Hash,
+        len: u64,
+    ) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
-        if self.collect(ProofListKey::new(height, 0), &mut vec)? != merkle_root {
-            return Err(ListProofError::UnmatchedRootHash);
+
+        match *self {
+            ListProof::Absent(index, list_hash) => {
+                if expected_list_hash != list_hash {
+                    return Err(ListProofError::UnmatchedRootHash);
+                }
+            }
+            _ => {
+                let merkle_root = self.collect(ProofListKey::new(height, 0), &mut vec)?;
+                if HashTag::hash_list(len, merkle_root) != expected_list_hash {
+                    return Err(ListProofError::UnmatchedRootHash);
+                }
+            }
         }
 
         //TODO: add proof of absence validation

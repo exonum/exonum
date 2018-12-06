@@ -128,7 +128,7 @@ impl NodeHandler {
 
     /// Handles `BlockRequest` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: &Signed<BlockRequest>) {
-        trace!(
+        info!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),
             self.state.height()

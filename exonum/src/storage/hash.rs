@@ -18,7 +18,8 @@ use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 
 #[repr(u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
+///MerkleDB hash prefixes.
 pub enum HashTag {
     /// Hash prefix of the leaf node of a merkle tree.
     Leaf = 0,
@@ -33,6 +34,7 @@ pub enum HashTag {
 /// Different hashes for leaf and branch nodes are used to secure merkle tree from pre-image attack.
 /// More information here: https://tools.ietf.org/html/rfc6962#section-2.1
 impl HashTag {
+    ///`HashStream` object with corresponding hash prefix.
     pub fn hash_stream(&self) -> HashStream {
         HashStream::new().update(&[*self as u8])
     }
@@ -62,7 +64,7 @@ impl HashTag {
     /// Hash of the list object.
     ///
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
-    pub fn list_hash(len: u64, root: Hash) -> Hash {
+    pub fn hash_list(len: u64, root: Hash) -> Hash {
         let mut len_bytes = [0; 8];
         LittleEndian::write_u64(&mut len_bytes, len);
 
@@ -71,6 +73,11 @@ impl HashTag {
             .update(&len_bytes)
             .update(root.as_ref())
             .hash()
+    }
+
+    /// Default hash of the list object.
+    pub fn default_list_hash() -> Hash {
+        HashTag::hash_list(0, Hash::default())
     }
 }
 
