@@ -49,8 +49,6 @@ pub use self::{
     protocol::*,
 };
 
-#[macro_use]
-mod compatibility;
 mod authorization;
 mod helpers;
 mod protocol;
