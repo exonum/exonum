@@ -12,9 +12,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Transaction::execute` now accepts `TransactionContext` as the second
    parameter. `TransactionContext` provides the public key of transaction
-   author, ID of current service, and transaction hash (#943)
+   author, ID of current service, and transaction hash. (#943)
 
-- `Transaction::verify` method has been removed. (#???)
+- `Transaction::verify` method has been removed. (#1085)
 
 - Every transaction that contains the public key of the author was refactored
    to use the author indicated in `TransactionContext`. (#984 #980 #979 #975 #971)
