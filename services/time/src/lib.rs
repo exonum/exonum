@@ -27,7 +27,6 @@
 )]
 
 extern crate chrono;
-#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
@@ -35,9 +34,14 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 
 /// Node API.
 pub mod api;
+/// Protobuf generated structs.
+pub mod proto;
 /// Database schema.
 pub mod schema;
 /// System time provider.

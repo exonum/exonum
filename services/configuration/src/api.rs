@@ -131,7 +131,7 @@ impl PublicApi {
                 (cfg_hash, propose_data)
             }).filter(|&(_, ref propose_data)| {
                 let cfg = <StoredConfiguration as StorageValue>::from_bytes(
-                    propose_data.tx_propose().cfg().as_bytes().into(),
+                    propose_data.tx_propose.cfg.as_bytes().into(),
                 );
                 filter.matches(&cfg)
             }).map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
