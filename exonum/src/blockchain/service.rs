@@ -48,7 +48,7 @@ use storage::{Fork, Snapshot};
 ///
 /// The example below provides a bare-bones foundation for implementing a service.
 ///
-/// ```
+/// ```ignore TODO_DOC
 /// #[macro_use] extern crate exonum;
 /// #[macro_use] extern crate serde_derive;
 /// // Exports from `exonum` crate skipped

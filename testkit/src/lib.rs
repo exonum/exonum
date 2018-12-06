@@ -16,7 +16,7 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
-//! ```
+//! ```ignore TODO_DOC
 //! #[macro_use]
 //! extern crate exonum;
 //! #[macro_use]
@@ -502,7 +502,7 @@ impl TestKit {
     /// Rollbacks are useful in testing alternative scenarios (e.g., transactions executed
     /// in different order and/or in different blocks) that require an expensive setup:
     ///
-    /// ```
+    /// ```ignore TODO_DOC
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate serde_derive;
     /// # #[macro_use] extern crate exonum_testkit;

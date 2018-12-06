@@ -71,7 +71,7 @@ where
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore TODO_DOC
 /// # #[macro_use] extern crate exonum;
 /// # use exonum::storage::{MemoryDB, Database, ProofMapIndex, HashedKey};
 /// encoding_struct!{

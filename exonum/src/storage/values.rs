@@ -304,8 +304,8 @@ impl StorageValue for Decimal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::Debug;
-    use std::str::FromStr;
+    use chrono::Duration;
+    use std::{fmt::Debug, str::FromStr};
 
     #[test]
     fn u8_round_trip() {

@@ -135,7 +135,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore TODO_DOC
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate serde_derive;
     /// #

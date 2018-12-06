@@ -37,7 +37,7 @@
 //! To implement Exonum (de)serialization for this structure
 //! you need to use macros like this:
 //!
-//! ```
+//! ```ignore TODO_DOC
 //! # #[macro_use] extern crate exonum;
 //! # extern crate serde;
 //! # extern crate serde_json;

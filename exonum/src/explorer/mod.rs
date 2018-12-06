@@ -384,7 +384,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// Use of the custom type parameter for deserialization:
 ///
-/// ```
+/// ```ignore TODO_DOC
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
@@ -552,7 +552,7 @@ impl CommittedTransaction {
 ///
 /// Use of the custom type parameter for deserialization:
 ///
-/// ```
+/// ```ignore TODO_DOC
 /// # #[macro_use] extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
