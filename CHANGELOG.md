@@ -97,6 +97,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of
   full transaction message. (#984)
 
+- Structures are serialized using protobuf now. (#1086)
+
+#### exonum-time
+
+- Structures are serialized using protobuf now. (#1086)
+
 ### New Features
 
 #### exonum-crypto
