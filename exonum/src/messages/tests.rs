@@ -9,6 +9,7 @@ use super::{
 };
 use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, PublicKey, SecretKey};
+use encoding::protobuf;
 use helpers::{Height, Round, ValidatorId};
 
 #[test]
@@ -23,18 +24,27 @@ fn test_block_response_empty_size() {
     )
 }
 
-encoding_struct! {
-    struct CreateWallet {
-        pk: &PublicKey,
-        name: &str,
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[exonum(pb = "protobuf::tests::CreateWallet", crate = "crate")]
+struct CreateWallet {
+    pubkey: PublicKey,
+    name: String,
+}
+
+impl CreateWallet {
+    fn new(&pubkey: &PublicKey, name: &str) -> Self {
+        Self {
+            pubkey,
+            name: name.to_owned(),
+        }
     }
 }
 
 #[test]
 fn test_known_transaction() {
     let res = "57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d\
-    00008000020057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d280000000b000000\
-    746573745f77616c6c6574ff86a65814128dd86b2d267f7dd2de443c484139ae936e7c7405884c97619251f6a3d878d0ca140f026583a88777e074586d590388757159de3617f799959706";
+    0000800000000a220a2057d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d120b\
+    746573745f77616c6c6574a3dac954f891ff93d0da5d4540773532e81aa90e813f77dc8b95105dea6dcf08a6291fc4210335fc4aa37ba4a80ebc8a57b4cb23602d1b2b1800f25362f77d02";
 
     let pk =
         PublicKey::from_hex("57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d")
@@ -45,7 +55,7 @@ fn test_known_transaction() {
     ).unwrap();
     let data = CreateWallet::new(&pk, "test_wallet");
 
-    let set = ServiceTransaction::from_raw_unchecked(2, data.raw);
+    let set = ServiceTransaction::from_raw_unchecked(0, data.encode().unwrap());
     let msg = RawTransaction::new(128, set);
     let msg = Message::concrete(msg, pk, &sk);
     SignedMessage::from_raw_buffer(hex::decode(res).unwrap()).unwrap();
