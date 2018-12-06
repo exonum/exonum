@@ -52,3 +52,8 @@ message Transfer {
   exonum.PublicKey to = 2;
   uint64 amount = 3;
 }
+
+message Point {
+  uint32 x = 1;
+  uint32 y = 2;
+}
