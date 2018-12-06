@@ -14,9 +14,7 @@
 
 #![allow(dead_code, unsafe_code)]
 
-use chrono::{DateTime, TimeZone, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use serde_json;
 
 use blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
@@ -79,99 +77,6 @@ impl Transaction for Tx {
         index.push(42 / self.value);
         Ok(())
     }
-}
-
-#[test]
-fn encode_decode() {
-    encoding_struct! {
-        struct Parent {
-            child: Child,
-        }
-    }
-
-    encoding_struct! {
-        struct Child {
-            child: &Hash,
-        }
-    }
-    let content = Child::new(&Hash::zero());
-    let par = Parent::new(content);
-    let par_json = serde_json::to_value(par.clone()).unwrap();
-    assert_eq!(serde_json::from_value::<Parent>(par_json).unwrap(), par);
-}
-
-#[test]
-fn u64_json_serialization() {
-    encoding_struct! {
-        struct Test {
-            some_test: u64,
-        }
-    }
-    let test_data = r##"{"some_test":"1234"}"##;
-    let test = Test::new(1234);
-    let data = serde_json::to_string(&test).unwrap();
-    assert_eq!(data, test_data);
-}
-
-#[test]
-fn date_time_json_serialization() {
-    encoding_struct! {
-        struct Test {
-            some_test: DateTime<Utc>,
-        }
-    }
-
-    let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
-
-    let test = Test::new(Utc.timestamp(0, 0));
-    let data = serde_json::to_string(&test).unwrap();
-    assert_eq!(data, test_data);
-}
-
-use encoding::Field;
-
-encoding_struct! {
-    struct StructWithTwoSegments {
-        first: &[u8],
-        second: &[u8],
-    }
-}
-
-#[test]
-fn correct_encoding_struct() {
-    let dat: Vec<u8> = vec![
-        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2,
-    ];
-    let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
-    let mut buffer = vec![0; 8];
-    test.write(&mut buffer, 0, 8);
-    assert_eq!(buffer, dat);
-    <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into(), 8.into()).unwrap();
-    let struct_ = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
-    assert_eq!(struct_.first(), &[1u8]);
-    assert_eq!(struct_.second(), &[2u8]);
-}
-
-#[test]
-#[should_panic(expected = "OverlappingSegment")]
-fn overlap_segments() {
-    let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 1, 2];
-    let mut buffer = vec![0; 8];
-    test.write(&mut buffer, 0, 8);
-    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "SpaceBetweenSegments")]
-fn segments_has_spaces_between() {
-    let test = vec![
-        16u8, 0, 0, 0, 1, 0, 0, 0, 18, 0, 0, 0, 1, 0, 0, 0, // <-- link after space
-        1, 0, // <-- this is space one
-        2,
-    ];
-    let mut buffer = vec![0; 8];
-    test.write(&mut buffer, 0, 8);
-    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
 
 fn gen_tempdir_name() -> String {
