@@ -75,7 +75,6 @@ impl<V: StorageValue + Clone> ListProof<V> {
                 HashTag::hash_leaf(value.clone())
             }
             ListProof::Absent(_, hash) => {
-                //TODO: modify to use in validate method
                 hash
             },
         };
