@@ -8,5 +8,5 @@ categories = ["development-tools"]
 description = "Helper functions for writing build.rs for exonum services."
 
 [dependencies]
-protoc-rust = "=2.2.0"
+protoc-rust = "2.2.0"
 walkdir = "2.2.7"
