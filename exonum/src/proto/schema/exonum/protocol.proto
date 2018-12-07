@@ -16,8 +16,8 @@ syntax = "proto3";
 
 package exonum.consensus;
 
-import "helpers.proto";
-import "blockchain.proto";
+import "exonum/helpers.proto";
+import "exonum/blockchain.proto";
 import "google/protobuf/timestamp.proto";
 
 message Connect {

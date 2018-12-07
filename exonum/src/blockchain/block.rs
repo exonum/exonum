@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crypto::Hash;
-use encoding::protobuf;
 use helpers::{Height, ValidatorId};
 use messages::{Precommit, Signed};
+use proto;
 
 /// Exonum block header data structure.
 ///
@@ -26,7 +26,7 @@ use messages::{Precommit, Signed};
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "protobuf::Block", crate = "crate")]
+#[exonum(pb = "proto::Block", crate = "crate")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.
     proposer_id: ValidatorId,

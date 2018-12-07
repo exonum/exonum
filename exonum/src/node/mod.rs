@@ -1060,9 +1060,9 @@ mod tests {
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     };
     use crypto::gen_keypair;
-    use encoding::protobuf::{tests::TxSimple, ProtobufConvert};
     use events::EventHandler;
     use helpers;
+    use proto::{tests::TxSimple, ProtobufConvert};
     use storage::{Database, MemoryDB, Snapshot};
     const SERVICE_ID: u16 = 0;
 

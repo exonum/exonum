@@ -19,7 +19,7 @@ use serde_json::{self, Error as JsonError};
 use std::fmt;
 
 use crypto::{self, CryptoHash, Hash};
-use encoding::protobuf::{self, ProtobufConvert};
+use proto::{self, ProtobufConvert};
 use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
@@ -31,7 +31,7 @@ const CORE_STORAGE_METADATA: StorageMetadata = StorageMetadata { version: 0 };
 const CORE_STORAGE_METADATA_KEY: &str = "__STORAGE_METADATA__";
 
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "protobuf::storage::IndexMetadata", crate = "crate")]
+#[exonum(pb = "proto::storage::IndexMetadata", crate = "crate")]
 struct IndexMetadata {
     index_type: IndexType,
     is_family: bool,

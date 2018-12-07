@@ -1161,8 +1161,8 @@ mod tests {
     use super::*;
     use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
-    use encoding::protobuf::tests::TxAfterCommit;
     use messages::RawTransaction;
+    use proto::tests::TxAfterCommit;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::Snapshot;
 

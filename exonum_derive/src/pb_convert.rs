@@ -164,7 +164,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
 
             use self::_protobuf_crate::Message as _ProtobufMessage;
             use self::_failure::{bail, Error as _FailureError};
-            use #cr::encoding::protobuf::ProtobufConvert;
+            use #cr::proto::ProtobufConvert;
 
             #protobuf_convert
             #binary_form

@@ -20,9 +20,9 @@ use blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crypto::{gen_keypair, Hash, PublicKey};
-use encoding::protobuf;
 use helpers::{Height, ValidatorId};
 use messages::{Message, RawTransaction};
+use proto;
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
@@ -49,7 +49,7 @@ impl Service for TestService {
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "protobuf::tests::TestServiceTx", crate = "crate")]
+#[exonum(pb = "proto::tests::TestServiceTx", crate = "crate")]
 struct Tx {
     value: u64,
 }
@@ -168,7 +168,7 @@ mod transactions_tests {
     use messages::Message;
     use serde_json;
 
-    use encoding::protobuf::tests::{BlockchainTestTxA, BlockchainTestTxB};
+    use proto::tests::{BlockchainTestTxA, BlockchainTestTxB};
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
@@ -528,7 +528,7 @@ mod rocksdb_tests {
 }
 
 #[derive(Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::tests::TestProtobufConvert", crate = "crate")]
+#[exonum(pb = "proto::tests::TestProtobufConvert", crate = "crate")]
 struct TestProtobufConvertTypes {
     key: PublicKey,
     hash: Hash,

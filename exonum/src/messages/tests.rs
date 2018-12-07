@@ -9,8 +9,8 @@ use super::{
 };
 use blockchain::{Block, BlockProof};
 use crypto::{gen_keypair, hash, PublicKey, SecretKey};
-use encoding::protobuf;
 use helpers::{Height, Round, ValidatorId};
+use proto;
 
 #[test]
 fn test_block_response_empty_size() {
@@ -25,7 +25,7 @@ fn test_block_response_empty_size() {
 }
 
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "protobuf::tests::CreateWallet", crate = "crate")]
+#[exonum(pb = "proto::tests::CreateWallet", crate = "crate")]
 struct CreateWallet {
     pubkey: PublicKey,
     name: String,

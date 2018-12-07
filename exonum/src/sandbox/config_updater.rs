@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use encoding::protobuf::tests::TxConfig;
+pub use proto::tests::TxConfig;
 
 use blockchain::{
     ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
     TransactionSet,
 };
 use crypto::{Hash, PublicKey, SecretKey};
-use encoding::protobuf::ProtobufConvert;
 use helpers::Height;
 use messages::{Message, RawTransaction, Signed};
+use proto::ProtobufConvert;
 use storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;

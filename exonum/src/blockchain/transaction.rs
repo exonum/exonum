@@ -21,9 +21,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crypto::{CryptoHash, Hash, PublicKey};
-use encoding::{self, protobuf::ProtobufConvert};
 use hex::ToHex;
 use messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
+use proto::{self, ProtobufConvert};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -378,7 +378,7 @@ impl From<ExecutionError> for TransactionError {
 }
 
 impl ProtobufConvert for TransactionResult {
-    type ProtoStruct = encoding::protobuf::TransactionResult;
+    type ProtoStruct = proto::TransactionResult;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut proto = <Self as ProtobufConvert>::ProtoStruct::new();
@@ -465,10 +465,10 @@ mod tests {
     use super::*;
     use blockchain::{Blockchain, Schema, Service};
     use crypto;
-    use encoding::protobuf;
     use helpers::{Height, ValidatorId};
     use messages::Message;
     use node::ApiSender;
+    use proto;
     use storage::{Database, Entry, MemoryDB, Snapshot};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
@@ -690,7 +690,7 @@ mod tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "protobuf::tests::TestServiceTx", crate = "crate")]
+    #[exonum(pb = "proto::tests::TestServiceTx", crate = "crate")]
     struct TxResult {
         value: u64,
     }

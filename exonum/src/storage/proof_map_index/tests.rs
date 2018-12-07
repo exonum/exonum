@@ -30,7 +30,7 @@ use super::{
     HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
 use crypto::{hash, CryptoHash, Hash, HashStream};
-use encoding::protobuf;
+use proto;
 use serde::{de::DeserializeOwned, Serialize};
 use storage::{Database, Fork, StorageValue};
 
@@ -1258,7 +1258,7 @@ fn iter(db: Box<dyn Database>) {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "protobuf::tests::Point", crate = "crate")]
+#[exonum(pb = "proto::tests::Point", crate = "crate")]
 struct Point {
     x: u16,
     y: u16,
