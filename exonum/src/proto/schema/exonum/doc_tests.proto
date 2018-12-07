@@ -18,23 +18,29 @@ import "exonum/helpers.proto";
 
 package exonum.doc_tests;
 
-message CreateWallet {
-  string name = 1;
-}
+message CreateWallet { string name = 1; }
 
 message Point {
   int32 x = 1;
   int32 y = 2;
 }
 
-message TxA{
+message TxA {
   // Transaction fields
 }
 
-message TxB{
+message TxB {
   /// ...
 }
 
-message MyTransaction {
-  exonum.PublicKey public_key = 1;
+message MyTransaction { exonum.PublicKey public_key = 1; }
+
+message MyStructSmall {
+  exonum.PublicKey key = 1;
+  uint32 num_field = 2;
+  string string_field = 3;
+}
+message MyStructBig {
+  exonum.Hash hash = 1;
+  MyStructSmall my_struct_small = 2;
 }

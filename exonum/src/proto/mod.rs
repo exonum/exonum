@@ -13,6 +13,52 @@
 // limitations under the License.
 
 //! Protobuf generated structs and traits for conversion.
+//!
+//! Central part of this module is [`ProtobufConvert`].
+//! Main purpose of this trait is to allow
+//! users to create map between their types and types generated from .proto descriptions while
+//! providing mechanism for additional validation of protobuf data.
+//!
+//! Most of the time you do not have to implement this trait because most of the use cases are covered
+//! by `#[derive(ProtobufConvert)]` from `exonum_derive` crate.
+//!
+//! Typical example of such mapping with validation is manual implementation of this trait for `crypto::Hash`.
+//! `crypto::Hash` is fixed sized array of bytes but protobuf does not allow us to express this constraint since
+//! only dynamically sized arrays are supported.
+//! If you would like to use `Hash` as a part of your
+//! protobuf struct you would have to write conversion function from protobuf `proto::Hash`(which
+//! is dynamically sized array of bytes) to`crypto::Hash` and call it every time when you want to
+//! use `crypto::Hash` in your application.
+//! Provided `ProtobufConvert` implementation for `Hash` will allow you to embed this field into your
+//! struct and generate `ProtobufConvert` for it using `#[derive(ProtobufConvert)]` which will validate
+//! your struct based on the validation function for `Hash`.
+//!
+//! # Examples
+//! ```
+//! extern crate exonum;
+//! #[macro_use] extern crate exonum_derive;
+//!
+//! use exonum::crypto::{PublicKey, Hash};
+//!
+//! // See doc_tests.proto for protobuf definitions of this structs.
+//!
+//! #[derive(ProtobufConvert)]
+//! #[exonum(pb = "exonum::proto::doc_tests::MyStructSmall")]
+//! struct MyStructSmall {
+//!     key: PublicKey,
+//!     num_field: u32,
+//!     string_field: String,
+//! }
+//!
+//! #[derive(ProtobufConvert)]
+//! #[exonum(pb = "exonum::proto::doc_tests::MyStructBig")]
+//! struct MyStructBig {
+//!     hash: Hash,
+//!     my_struct_small: MyStructSmall,
+//! }
+//! ```
+//!
+//! [`ProtobufConvert`] ./trait.ProtobufConvert
 
 // For rust-protobuf generated files.
 #![allow(bare_trait_objects)]
