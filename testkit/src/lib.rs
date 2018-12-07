@@ -16,13 +16,15 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
-//! ```ignore TODO_DOC
-//! #[macro_use]
+//! ```
 //! extern crate exonum;
+//! #[macro_use]
+//! extern crate exonum_derive;
 //! #[macro_use]
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //! #[macro_use] extern crate serde_derive;
+//! extern crate failure;
 //!
 //! use serde_json::Value;
 //!
@@ -30,7 +32,6 @@
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionContext,
 //! TransactionSet, ExecutionResult};
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey, CryptoHash};
-//! use exonum::encoding;
 //! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
 //! use exonum::messages::{Signed, RawTransaction, Message};
@@ -41,16 +42,21 @@
 //!
 //! const SERVICE_ID: u16 = 1;
 //!
-//! transactions! {
-//!     TimestampingTransactions {
-//!         struct TxTimestamp {
-//!             msg: &str,
-//!         }
-//!     }
+//! #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+//! #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
+//! struct TxTimestamp {
+//!     message: String,
 //! }
+//!
+//! #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+//! enum TimestampingTransactions {
+//!     TxTimestamp(TxTimestamp),
+//! }
+//!
 //! impl TxTimestamp {
 //!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<RawTransaction> {
-//!        Message::sign_transaction(TxTimestamp::new(msg), SERVICE_ID, *author, key)
+//!        let tx = TxTimestamp{ message: msg.to_owned() };
+//!        Message::sign_transaction(tx, SERVICE_ID, *author, key)
 //!    }
 //! }
 //!
@@ -75,7 +81,7 @@
 //!         SERVICE_ID
 //!     }
 //!
-//!     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+//!     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
 //!         let tx = TimestampingTransactions::tx_from_raw(raw)?;
 //!         Ok(tx.into())
 //!     }
@@ -156,7 +162,6 @@ extern crate serde_derive;
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
 extern crate exonum_derive;
-#[cfg(test)]
 extern crate protobuf;
 extern crate serde_json;
 extern crate serde_urlencoded;
@@ -167,7 +172,6 @@ pub use compare::ComparableSnapshot;
 pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
-#[cfg(test)]
 pub mod proto;
 
 use futures::{sync::mpsc, Future, Stream};
@@ -252,12 +256,12 @@ mod server;
 ///
 /// # Example
 ///
-/// ```ignore TODO_DOC
+/// ```
 /// # extern crate exonum;
 /// # extern crate exonum_testkit;
+/// # extern crate failure;
 /// # use exonum::blockchain::{Service, Transaction};
 /// # use exonum::messages::RawTransaction;
-/// # use exonum::encoding;
 /// # use exonum_testkit::TestKitBuilder;
 /// # pub struct MyService;
 /// # impl Service for MyService {
@@ -270,7 +274,7 @@ mod server;
 /// #    fn service_id(&self) -> u16 {
 /// #        0
 /// #    }
-/// #    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+/// #    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
 /// #        unimplemented!();
 /// #    }
 /// # }
@@ -502,18 +506,19 @@ impl TestKit {
     /// Rollbacks are useful in testing alternative scenarios (e.g., transactions executed
     /// in different order and/or in different blocks) that require an expensive setup:
     ///
-    /// ```ignore TODO_DOC
-    /// # #[macro_use] extern crate exonum;
+    /// ```
+    /// # extern crate exonum;
+    /// # #[macro_use] extern crate exonum_derive;
     /// # #[macro_use] extern crate serde_derive;
     /// # #[macro_use] extern crate exonum_testkit;
+    /// # extern crate failure;
     ///
     /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
     /// # use exonum::messages::{Signed, RawTransaction, Message};
-    /// # use exonum::encoding;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum::crypto::{PublicKey, SecretKey};
     /// #
-    /// # type FromRawResult = Result<Box<Transaction>, encoding::Error>;
+    /// # type FromRawResult = Result<Box<Transaction>, failure::Error>;
     /// # const SERVICE_ID: u16 = 1;
     /// # pub struct MyService;
     /// # impl Service for MyService {
@@ -532,16 +537,21 @@ impl TestKit {
     /// #    }
     /// # }
     /// #
-    /// # transactions! {
-    /// #     MyServiceTransactions {
-    /// #         struct MyTransaction {
-    /// #             msg: &str,
-    /// #         }
-    /// #     }
+    /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+    /// # #[exonum(pb = "exonum_testkit::proto::examples::TxTimestamp")]
+    /// # struct MyTransaction {
+    /// #     message: String,
     /// # }
+    ///
+    /// # #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+    /// # enum MyServiceTransactions {
+    /// #     MyTransaction(MyTransaction),
+    /// # }
+    ///
     /// # impl MyTransaction {
     /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<RawTransaction> {
-    /// #        Message::sign_transaction(MyTransaction::new(msg), SERVICE_ID, *author, key)
+    /// #        let tx = MyTransaction{ message: msg.to_owned() };
+    /// #        Message::sign_transaction(tx, SERVICE_ID, *author, key)
     /// #    }
     /// # }
     /// # impl Transaction for MyTransaction {

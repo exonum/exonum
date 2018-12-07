@@ -19,15 +19,14 @@
 //! your service on top of Exonum blockchain you need to perform the following steps:
 //!
 //! - Define your own information schema.
-//! - Create one or more transaction types using the [`transactions!`] macro and
-//!   implement the [`Transaction`] trait for them.
+//! - Create one or more transaction types using the `TransactionSet` auto derive macro from
+//!   `exonum_derive` and implement the [`Transaction`] trait for them.
 //! - Create a data structure implementing the [`Service`] trait.
 //! - Write API handlers for the service, if required.
 //!
 //! You may consult [the service creation tutorial][doc:create-service] for a detailed
 //! instruction on how to create services.
 //!
-//! [`transactions!`]: ../macro.transactions.html
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service

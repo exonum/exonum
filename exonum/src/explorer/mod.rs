@@ -383,22 +383,28 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// Use of the custom type parameter for deserialization:
 ///
-/// ```ignore TODO_DOC
-/// # #[macro_use] extern crate exonum;
+/// ```
+/// # extern crate exonum;
+/// # #[macro_use] extern crate exonum_derive;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
 /// # use exonum::helpers::Height;
-/// transactions! {
-///     Transactions {
-///         struct CreateWallet {
-///             name: &str,
-///         }
-///         // other transaction types...
-///     }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::doc_tests::CreateWallet")]
+/// struct CreateWallet {
+///     name: String,
 /// }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+/// enum Transactions {
+///    CreateWallet(CreateWallet),
+///     // other transaction types...
+/// }
+///
 /// # impl Transaction for CreateWallet {
 /// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
@@ -551,22 +557,27 @@ impl CommittedTransaction {
 ///
 /// Use of the custom type parameter for deserialization:
 ///
-/// ```ignore TODO_DOC
-/// # #[macro_use] extern crate exonum;
+/// ```
+/// # extern crate exonum;
+/// # #[macro_use] extern crate exonum_derive;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{PublicKey, Signature};
 /// # use exonum::explorer::TransactionInfo;
-/// transactions! {
-///     Transactions {
-///         struct CreateWallet {
-///             public_key: &PublicKey,
-///             name: &str,
-///         }
-///         // other transaction types...
-///     }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::doc_tests::CreateWallet")]
+/// struct CreateWallet {
+///     name: String,
 /// }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+/// enum Transactions {
+///    CreateWallet(CreateWallet),
+///     // other transaction types...
+/// }
+///
 /// # impl Transaction for CreateWallet {
 /// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }

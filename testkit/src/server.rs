@@ -167,7 +167,7 @@ mod tests {
     const TIMESTAMP_SERVICE_ID: u16 = 0;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::tests::TxTimestamp")]
+    #[exonum(pb = "proto::examples::TxTimestamp")]
     struct TxTimestamp {
         message: String,
     }

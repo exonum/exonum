@@ -27,9 +27,9 @@ use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`transactions!`]
-/// macros. In case you need to implement it manually, use little-endian encoding
-/// for integer types for compatibility with modern architectures.
+/// `StorageValue` is automatically implemented by the `ProtobufConvert` and `TransactionSet`
+/// auto derives from `exonum_derive`. In case you need to implement it manually,
+/// use little-endian encoding for integer types for compatibility with modern architectures.
 ///
 /// # Examples
 ///
@@ -73,9 +73,6 @@ use helpers::Round;
 /// }
 /// # fn main() {}
 /// ```
-///
-/// [`encoding_struct!`]: ../macro.encoding_struct.html
-/// [`transactions!`]: ../macro.transactions.html
 pub trait StorageValue: UniqueHash + Sized {
     /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;

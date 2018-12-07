@@ -67,7 +67,7 @@ pub struct RawTransaction {
 }
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
-/// This type used inner inside `transactions!`
+/// This type used inner inside `#[derive(TransactionSet)]`
 /// to return raw transaction payload as part of service transaction set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ServiceTransaction {

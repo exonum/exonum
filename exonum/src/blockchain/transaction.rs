@@ -136,22 +136,26 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     ///
     /// # Examples
     ///
-    /// ```ignore TODO_DOC
-    /// # #[macro_use] extern crate exonum;
+    /// ```
+    /// # extern crate exonum;
+    /// # #[macro_use] extern crate exonum_derive;
     /// # #[macro_use] extern crate serde_derive;
     /// #
     /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
-    /// transactions! {
-    ///     MyTransactions {
+    /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+    /// #[exonum(pb = "exonum::proto::doc_tests::MyTransaction")]
+    /// struct MyTransaction {
+    ///     // Transaction definition...
+    ///     public_key: PublicKey,
+    /// }
     ///
-    ///         struct MyTransaction {
-    ///             // Transaction definition...
-    ///             public_key: &PublicKey,
-    ///         }
-    ///     }
+    ///
+    /// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+    /// enum MyTransactions {
+    ///     MyTransaction(MyTransaction),
     /// }
     ///
     /// impl Transaction for MyTransaction {
@@ -433,8 +437,8 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 }
 
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
-/// The implementation of this trait is generated automatically by the `transactions!`
-/// macro.
+/// The implementation of this trait is generated automatically by the `#[derive(TransactionSet)]`
+/// macro used on the enum with transactions as a variants.
 pub trait TransactionSet:
     Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
