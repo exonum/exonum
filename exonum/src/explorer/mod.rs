@@ -32,13 +32,12 @@ use blockchain::{
     TransactionResult, TxLocation,
 };
 use crypto::{CryptoHash, Hash};
-use encoding;
 use helpers::Height;
 use messages::{Precommit, RawTransaction, Signed};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<TransactionMessage, encoding::Error>;
+type ParseResult = Result<TransactionMessage, failure::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]

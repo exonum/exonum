@@ -65,15 +65,9 @@ impl ProtobufConvert for IndexType {
         (*self).into()
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        Ok(pb.into())
-    }
-}
-
-impl From<u32> for IndexType {
-    fn from(num: u32) -> Self {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         use self::IndexType::*;
-        match num {
+        let index = match pb {
             0 => Entry,
             1 => KeySet,
             2 => List,
@@ -82,12 +76,13 @@ impl From<u32> for IndexType {
             5 => ProofList,
             6 => ProofMap,
             7 => ValueSet,
-            invalid => panic!(
+            invalid => bail!(
                 "Unreachable pattern ({:?}) while constructing table type. \
                  Storage data is probably corrupted",
                 invalid
             ),
-        }
+        };
+        Ok(index)
     }
 }
 

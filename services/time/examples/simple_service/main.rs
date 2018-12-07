@@ -25,13 +25,13 @@ extern crate serde_json;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
+extern crate failure;
 extern crate protobuf;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
-    encoding,
     helpers::Height,
     messages::{Message, RawTransaction, Signed},
     storage::{Fork, ProofMapIndex, Snapshot},
@@ -134,7 +134,7 @@ impl Service for MarkerService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         let tx = MarkerTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

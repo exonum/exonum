@@ -114,7 +114,6 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-        encoding::Error as EncodingError,
         messages::{Message, RawTransaction, Signed},
         storage::Snapshot,
     };
@@ -137,7 +136,7 @@ mod timestamping {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, failure::Error> {
             use exonum::blockchain::TransactionSet;
             Ok(TimestampingTransactions::tx_from_raw(raw)?.into())
         }
@@ -215,7 +214,6 @@ mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{Hash, PublicKey, SecretKey},
-        encoding::Error as EncodingError,
         messages::{Message, RawTransaction, Signed},
         storage::{MapIndex, ProofMapIndex, Snapshot},
     };
@@ -243,7 +241,7 @@ mod cryptocurrency {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, failure::Error> {
             use exonum::blockchain::TransactionSet;
             Ok(CryptocurrencyTransactions::tx_from_raw(raw)?.into())
         }

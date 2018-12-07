@@ -20,7 +20,7 @@ use blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crypto::{gen_keypair, Hash, PublicKey};
-use encoding::{protobuf, Error as MessageError};
+use encoding::protobuf;
 use helpers::{Height, ValidatorId};
 use messages::{Message, RawTransaction};
 use storage::{Database, Error, Fork, ListIndex, Snapshot};
@@ -43,7 +43,7 @@ impl Service for TestService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         Ok(TestServiceTxs::tx_from_raw(raw)?.into())
     }
 }
@@ -288,7 +288,7 @@ impl Service for ServiceGood {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -313,7 +313,7 @@ impl Service for ServicePanic {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -337,7 +337,7 @@ impl Service for ServicePanicStorageError {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 

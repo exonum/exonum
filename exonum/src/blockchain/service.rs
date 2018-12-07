@@ -29,7 +29,6 @@ use super::transaction::Transaction;
 use api::{websocket, ServiceApiBuilder};
 use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
-use encoding::Error as MessageError;
 use events::network::ConnectedPeerAddr;
 use helpers::{Height, Milliseconds, ValidatorId};
 use messages::{Message, RawTransaction, ServiceTransaction, Signed};
@@ -169,7 +168,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// `transactions!` macro generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError>;
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>;
 
     /// Invoked for all deployed services during the blockchain initialization
     /// on genesis block creation each time a node is started.

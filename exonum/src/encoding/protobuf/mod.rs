@@ -29,10 +29,10 @@ include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
 
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
+use failure::Error;
 use protobuf::{well_known_types, Message};
 
 use crypto;
-use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 use messages::BinaryForm;
 
@@ -46,7 +46,7 @@ pub trait ProtobufConvert: Sized {
     fn to_pb(&self) -> Self::ProtoStruct;
 
     /// ProtoStruct -> Struct
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()>;
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error>;
 }
 
 impl<T> BinaryForm for T
@@ -54,13 +54,12 @@ where
     T: Message,
 {
     fn encode(&self) -> Result<Vec<u8>, Error> {
-        self.write_to_bytes().map_err(|e| Error::Other(Box::new(e)))
+        self.write_to_bytes().map_err(Error::from)
     }
 
     fn decode(buffer: &[u8]) -> Result<Self, Error> {
         let mut pb = Self::new();
-        pb.merge_from_bytes(buffer)
-            .map_err(|_| "Conversion from protobuf error")?;
+        pb.merge_from_bytes(buffer)?;
         Ok(pb)
     }
 }
@@ -74,13 +73,10 @@ impl ProtobufConvert for crypto::Hash {
         hash
     }
 
-    fn from_pb(pb: Hash) -> Result<Self, ()> {
+    fn from_pb(pb: Hash) -> Result<Self, Error> {
         let data = pb.get_data();
-        if data.len() == crypto::HASH_SIZE {
-            crypto::Hash::from_slice(data).ok_or(())
-        } else {
-            Err(())
-        }
+        ensure!(data.len() == crypto::HASH_SIZE, "Wrong Hash size");
+        crypto::Hash::from_slice(data).ok_or_else(|| format_err!("Cannot convert Hash from bytes"))
     }
 }
 
@@ -93,13 +89,14 @@ impl ProtobufConvert for crypto::PublicKey {
         key
     }
 
-    fn from_pb(pb: PublicKey) -> Result<Self, ()> {
+    fn from_pb(pb: PublicKey) -> Result<Self, Error> {
         let data = pb.get_data();
-        if data.len() == crypto::PUBLIC_KEY_LENGTH {
-            crypto::PublicKey::from_slice(data).ok_or(())
-        } else {
-            Err(())
-        }
+        ensure!(
+            data.len() == crypto::PUBLIC_KEY_LENGTH,
+            "Wrong PublicKey size"
+        );
+        crypto::PublicKey::from_slice(data)
+            .ok_or_else(|| format_err!("Cannot convert PublicKey from bytes"))
     }
 }
 
@@ -113,7 +110,7 @@ impl ProtobufConvert for bit_vec::BitVec {
         bit_vec
     }
 
-    fn from_pb(pb: BitVec) -> Result<Self, ()> {
+    fn from_pb(pb: BitVec) -> Result<Self, Error> {
         let data = pb.get_data();
         let mut bit_vec = bit_vec::BitVec::from_bytes(data);
         bit_vec.truncate(pb.get_len() as usize);
@@ -131,10 +128,10 @@ impl ProtobufConvert for DateTime<Utc> {
         ts
     }
 
-    fn from_pb(pb: well_known_types::Timestamp) -> Result<Self, ()> {
+    fn from_pb(pb: well_known_types::Timestamp) -> Result<Self, Error> {
         Utc.timestamp_opt(pb.get_seconds(), pb.get_nanos() as u32)
             .single()
-            .ok_or(())
+            .ok_or_else(|| format_err!("Failed to convert timestamp from bytes"))
     }
 }
 
@@ -143,7 +140,7 @@ impl ProtobufConvert for String {
     fn to_pb(&self) -> Self::ProtoStruct {
         self.clone()
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(pb)
     }
 }
@@ -153,7 +150,7 @@ impl ProtobufConvert for Height {
     fn to_pb(&self) -> Self::ProtoStruct {
         self.0
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(Height(pb))
     }
 }
@@ -163,7 +160,7 @@ impl ProtobufConvert for Round {
     fn to_pb(&self) -> Self::ProtoStruct {
         self.0
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(Round(pb))
     }
 }
@@ -173,12 +170,12 @@ impl ProtobufConvert for ValidatorId {
     fn to_pb(&self) -> Self::ProtoStruct {
         u32::from(self.0)
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        if pb <= u32::from(u16::max_value()) {
-            Ok(ValidatorId(pb as u16))
-        } else {
-            Err(())
-        }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        ensure!(
+            pb <= u32::from(u16::max_value()),
+            "u32 is our of range for valid ValidatorId"
+        );
+        Ok(ValidatorId(pb as u16))
     }
 }
 
@@ -187,12 +184,27 @@ impl ProtobufConvert for u16 {
     fn to_pb(&self) -> Self::ProtoStruct {
         u32::from(*self)
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
-        if pb <= u32::from(u16::max_value()) {
-            Ok(pb as u16)
-        } else {
-            Err(())
-        }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        ensure!(
+            pb <= u32::from(u16::max_value()),
+            "u32 is out of range for valid u16"
+        );
+        Ok(pb as u16)
+    }
+}
+
+impl ProtobufConvert for i16 {
+    type ProtoStruct = i32;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        i32::from(*self)
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        ensure!(
+            pb >= i32::from(i16::min_value()) && pb <= i32::from(i16::max_value()),
+            "i32 is our of range for valid i16"
+        );
+        Ok(pb as i16)
     }
 }
 
@@ -204,7 +216,7 @@ where
     fn to_pb(&self) -> Self::ProtoStruct {
         self.iter().map(|v| v.to_pb()).collect()
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         pb.into_iter()
             .map(ProtobufConvert::from_pb)
             .collect::<Result<Vec<_>, _>>()
@@ -217,7 +229,7 @@ impl ProtobufConvert for Vec<u8> {
     fn to_pb(&self) -> Self::ProtoStruct {
         self.clone()
     }
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(pb)
     }
 }
@@ -229,7 +241,7 @@ macro_rules! impl_protobuf_convert_scalar {
             fn to_pb(&self) -> Self::ProtoStruct {
                 *self
             }
-            fn from_pb(pb: Self::ProtoStruct) -> Result<Self, ()> {
+            fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
                 Ok(pb)
             }
         }

@@ -800,13 +800,11 @@ macro_rules! impl_protocol {
             /// Converts raw `SignedMessage` into concrete `Message` message.
             /// Returns error if fails.
             pub fn deserialize(message: SignedMessage) -> Result<Self, failure::Error> {
-            use $crate::events::error::into_failure;
                 match message.message_class() {
                     $($class_num =>
                         match message.message_type() {
                             $($type_num =>{
-                                let payload = $type::decode(message.payload())
-                                                .map_err(into_failure)?;
+                                let payload = $type::decode(message.payload())?;
                                 let message = Signed::new(payload, message);
                                 Ok($protocol_name::$class($class::$type(message)))
                             }),+

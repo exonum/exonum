@@ -20,7 +20,6 @@ use exonum::{
         ExecutionResult, Service, ServiceContext, Transaction, TransactionContext, TransactionSet,
     },
     crypto::Hash,
-    encoding,
     helpers::Height,
     messages::RawTransaction,
     storage::Snapshot,
@@ -66,7 +65,7 @@ impl Service for AfterCommitService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         let tx = HandleCommitTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

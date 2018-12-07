@@ -20,7 +20,6 @@ use blockchain::{
 };
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::protobuf::ProtobufConvert;
-use encoding::Error as MessageError;
 use helpers::Height;
 use messages::{Message, RawTransaction, Signed};
 use storage::Snapshot;
@@ -79,7 +78,7 @@ impl Service for ConfigUpdateService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

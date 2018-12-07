@@ -1061,7 +1061,6 @@ mod tests {
     };
     use crypto::gen_keypair;
     use encoding::protobuf::{tests::TxSimple, ProtobufConvert};
-    use encoding::Error as MessageError;
     use events::EventHandler;
     use helpers;
     use storage::{Database, MemoryDB, Snapshot};
@@ -1101,7 +1100,7 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(SimpleTransactions::tx_from_raw(raw)?.into())
         }
     }

@@ -105,8 +105,4 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-pub use self::error::Error;
-
 pub mod protobuf;
-
-mod error;

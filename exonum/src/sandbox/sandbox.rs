@@ -1161,7 +1161,6 @@ mod tests {
     use super::*;
     use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
-    use encoding;
     use encoding::protobuf::tests::TxAfterCommit;
     use messages::RawTransaction;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
@@ -1205,10 +1204,7 @@ mod tests {
             Vec::new()
         }
 
-        fn tx_from_raw(
-            &self,
-            raw: RawTransaction,
-        ) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

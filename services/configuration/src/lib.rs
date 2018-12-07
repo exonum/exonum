@@ -95,7 +95,6 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::Error as EncodingError,
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction,
     node::State,
@@ -140,7 +139,7 @@ impl blockchain::Service for Service {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, EncodingError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 

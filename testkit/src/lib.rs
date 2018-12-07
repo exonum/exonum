@@ -252,7 +252,7 @@ mod server;
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore TODO_DOC
 /// # extern crate exonum;
 /// # extern crate exonum_testkit;
 /// # use exonum::blockchain::{Service, Transaction};

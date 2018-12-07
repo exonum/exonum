@@ -14,6 +14,7 @@
 
 //! `Transaction` related types.
 
+use failure;
 use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -388,7 +389,7 @@ impl ProtobufConvert for TransactionResult {
         proto
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let status_code: u16 = ProtobufConvert::from_pb(pb.get_status())?;
         let description = if pb.get_description() != "" {
             Some(pb.take_description())
@@ -400,7 +401,7 @@ impl ProtobufConvert for TransactionResult {
             value @ 0...MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::panic(description)),
-            value => panic!("Invalid TransactionResult value: {}", value),
+            value => bail!("Invalid TransactionResult value: {}", value),
         }))
     }
 }
@@ -438,7 +439,7 @@ pub trait TransactionSet:
     Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
     /// Parses a transaction from this set from a `RawTransaction`.
-    fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
+    fn tx_from_raw(raw: RawTransaction) -> Result<Self, failure::Error>;
 }
 
 /// Tries to get a meaningful description from the given panic.
@@ -464,7 +465,7 @@ mod tests {
     use super::*;
     use blockchain::{Blockchain, Schema, Service};
     use crypto;
-    use encoding::{self, protobuf};
+    use encoding::protobuf;
     use helpers::{Height, ValidatorId};
     use messages::Message;
     use node::ApiSender;
@@ -683,10 +684,7 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(
-            &self,
-            raw: RawTransaction,
-        ) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(TestTxs::tx_from_raw(raw)?.into())
         }
     }

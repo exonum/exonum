@@ -19,7 +19,6 @@ use exonum::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey},
-    encoding,
     messages::{Message, RawTransaction, Signed},
     storage::{Entry, Fork, Snapshot},
 };
@@ -199,7 +198,7 @@ impl Service for CounterService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         let tx = CounterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

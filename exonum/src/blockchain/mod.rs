@@ -51,13 +51,11 @@ use failure;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    error::Error as StdError,
     fmt, iter, mem, panic,
     sync::Arc,
 };
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
 use messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use node::ApiSender;
@@ -148,11 +146,11 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let service = self
             .service_map
             .get(&raw.service_id())
-            .ok_or_else(|| MessageError::from("Service not found."))?;
+            .ok_or_else(|| format_err!("Service not found."))?;
         service.tx_from_raw(raw)
     }
 
@@ -427,13 +425,8 @@ impl Blockchain {
                     ))
                 })?.service_name();
 
-            let tx = self.tx_from_raw(raw.payload().clone()).or_else(|error| {
-                Err(failure::err_msg(format!(
-                    "Service <{}>: {}, tx: {:?}",
-                    service_name,
-                    error.description(),
-                    tx_hash
-                )))
+            let tx = self.tx_from_raw(raw.payload().clone()).map_err(|error| {
+                format_err!("Service <{}>: {}, tx: {:?}", service_name, error, tx_hash)
             })?;
             (tx, raw, service_name)
         };
