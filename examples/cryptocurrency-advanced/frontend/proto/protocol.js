@@ -40,9 +40,9 @@
                  * Properties of a Connect.
                  * @memberof exonum.consensus
                  * @interface IConnect
-                 * @property {string|null} [pubAddr] Connect pubAddr
+                 * @property {string|null} [pub_addr] Connect pub_addr
                  * @property {google.protobuf.ITimestamp|null} [time] Connect time
-                 * @property {string|null} [userAgent] Connect userAgent
+                 * @property {string|null} [user_agent] Connect user_agent
                  */
     
                 /**
@@ -61,12 +61,12 @@
                 }
     
                 /**
-                 * Connect pubAddr.
-                 * @member {string} pubAddr
+                 * Connect pub_addr.
+                 * @member {string} pub_addr
                  * @memberof exonum.consensus.Connect
                  * @instance
                  */
-                Connect.prototype.pubAddr = "";
+                Connect.prototype.pub_addr = "";
     
                 /**
                  * Connect time.
@@ -77,12 +77,12 @@
                 Connect.prototype.time = null;
     
                 /**
-                 * Connect userAgent.
-                 * @member {string} userAgent
+                 * Connect user_agent.
+                 * @member {string} user_agent
                  * @memberof exonum.consensus.Connect
                  * @instance
                  */
-                Connect.prototype.userAgent = "";
+                Connect.prototype.user_agent = "";
     
                 /**
                  * Creates a new Connect instance using the specified properties.
@@ -108,12 +108,12 @@
                 Connect.encode = function encode(message, writer) {
                     if (!writer)
                         writer = $Writer.create();
-                    if (message.pubAddr != null && message.hasOwnProperty("pubAddr"))
-                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.pubAddr);
+                    if (message.pub_addr != null && message.hasOwnProperty("pub_addr"))
+                        writer.uint32(/* id 1, wireType 2 =*/10).string(message.pub_addr);
                     if (message.time != null && message.hasOwnProperty("time"))
                         $root.google.protobuf.Timestamp.encode(message.time, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
-                    if (message.userAgent != null && message.hasOwnProperty("userAgent"))
-                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.userAgent);
+                    if (message.user_agent != null && message.hasOwnProperty("user_agent"))
+                        writer.uint32(/* id 3, wireType 2 =*/26).string(message.user_agent);
                     return writer;
                 };
     
@@ -149,13 +149,13 @@
                         var tag = reader.uint32();
                         switch (tag >>> 3) {
                         case 1:
-                            message.pubAddr = reader.string();
+                            message.pub_addr = reader.string();
                             break;
                         case 2:
                             message.time = $root.google.protobuf.Timestamp.decode(reader, reader.uint32());
                             break;
                         case 3:
-                            message.userAgent = reader.string();
+                            message.user_agent = reader.string();
                             break;
                         default:
                             reader.skipType(tag & 7);
@@ -192,17 +192,17 @@
                 Connect.verify = function verify(message) {
                     if (typeof message !== "object" || message === null)
                         return "object expected";
-                    if (message.pubAddr != null && message.hasOwnProperty("pubAddr"))
-                        if (!$util.isString(message.pubAddr))
-                            return "pubAddr: string expected";
+                    if (message.pub_addr != null && message.hasOwnProperty("pub_addr"))
+                        if (!$util.isString(message.pub_addr))
+                            return "pub_addr: string expected";
                     if (message.time != null && message.hasOwnProperty("time")) {
                         var error = $root.google.protobuf.Timestamp.verify(message.time);
                         if (error)
                             return "time." + error;
                     }
-                    if (message.userAgent != null && message.hasOwnProperty("userAgent"))
-                        if (!$util.isString(message.userAgent))
-                            return "userAgent: string expected";
+                    if (message.user_agent != null && message.hasOwnProperty("user_agent"))
+                        if (!$util.isString(message.user_agent))
+                            return "user_agent: string expected";
                     return null;
                 };
     
@@ -218,15 +218,15 @@
                     if (object instanceof $root.exonum.consensus.Connect)
                         return object;
                     var message = new $root.exonum.consensus.Connect();
-                    if (object.pubAddr != null)
-                        message.pubAddr = String(object.pubAddr);
+                    if (object.pub_addr != null)
+                        message.pub_addr = String(object.pub_addr);
                     if (object.time != null) {
                         if (typeof object.time !== "object")
                             throw TypeError(".exonum.consensus.Connect.time: object expected");
                         message.time = $root.google.protobuf.Timestamp.fromObject(object.time);
                     }
-                    if (object.userAgent != null)
-                        message.userAgent = String(object.userAgent);
+                    if (object.user_agent != null)
+                        message.user_agent = String(object.user_agent);
                     return message;
                 };
     
@@ -244,16 +244,16 @@
                         options = {};
                     var object = {};
                     if (options.defaults) {
-                        object.pubAddr = "";
+                        object.pub_addr = "";
                         object.time = null;
-                        object.userAgent = "";
+                        object.user_agent = "";
                     }
-                    if (message.pubAddr != null && message.hasOwnProperty("pubAddr"))
-                        object.pubAddr = message.pubAddr;
+                    if (message.pub_addr != null && message.hasOwnProperty("pub_addr"))
+                        object.pub_addr = message.pub_addr;
                     if (message.time != null && message.hasOwnProperty("time"))
                         object.time = $root.google.protobuf.Timestamp.toObject(message.time, options);
-                    if (message.userAgent != null && message.hasOwnProperty("userAgent"))
-                        object.userAgent = message.userAgent;
+                    if (message.user_agent != null && message.hasOwnProperty("user_agent"))
+                        object.user_agent = message.user_agent;
                     return object;
                 };
     
@@ -278,7 +278,7 @@
                  * @memberof exonum.consensus
                  * @interface IStatus
                  * @property {number|Long|null} [height] Status height
-                 * @property {exonum.IHash|null} [lastHash] Status lastHash
+                 * @property {exonum.IHash|null} [last_hash] Status last_hash
                  */
     
                 /**
@@ -305,12 +305,12 @@
                 Status.prototype.height = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
                 /**
-                 * Status lastHash.
-                 * @member {exonum.IHash|null|undefined} lastHash
+                 * Status last_hash.
+                 * @member {exonum.IHash|null|undefined} last_hash
                  * @memberof exonum.consensus.Status
                  * @instance
                  */
-                Status.prototype.lastHash = null;
+                Status.prototype.last_hash = null;
     
                 /**
                  * Creates a new Status instance using the specified properties.
@@ -338,8 +338,8 @@
                         writer = $Writer.create();
                     if (message.height != null && message.hasOwnProperty("height"))
                         writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.height);
-                    if (message.lastHash != null && message.hasOwnProperty("lastHash"))
-                        $root.exonum.Hash.encode(message.lastHash, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                    if (message.last_hash != null && message.hasOwnProperty("last_hash"))
+                        $root.exonum.Hash.encode(message.last_hash, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
                     return writer;
                 };
     
@@ -378,7 +378,7 @@
                             message.height = reader.uint64();
                             break;
                         case 2:
-                            message.lastHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.last_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         default:
                             reader.skipType(tag & 7);
@@ -418,10 +418,10 @@
                     if (message.height != null && message.hasOwnProperty("height"))
                         if (!$util.isInteger(message.height) && !(message.height && $util.isInteger(message.height.low) && $util.isInteger(message.height.high)))
                             return "height: integer|Long expected";
-                    if (message.lastHash != null && message.hasOwnProperty("lastHash")) {
-                        var error = $root.exonum.Hash.verify(message.lastHash);
+                    if (message.last_hash != null && message.hasOwnProperty("last_hash")) {
+                        var error = $root.exonum.Hash.verify(message.last_hash);
                         if (error)
-                            return "lastHash." + error;
+                            return "last_hash." + error;
                     }
                     return null;
                 };
@@ -447,10 +447,10 @@
                             message.height = object.height;
                         else if (typeof object.height === "object")
                             message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
-                    if (object.lastHash != null) {
-                        if (typeof object.lastHash !== "object")
-                            throw TypeError(".exonum.consensus.Status.lastHash: object expected");
-                        message.lastHash = $root.exonum.Hash.fromObject(object.lastHash);
+                    if (object.last_hash != null) {
+                        if (typeof object.last_hash !== "object")
+                            throw TypeError(".exonum.consensus.Status.last_hash: object expected");
+                        message.last_hash = $root.exonum.Hash.fromObject(object.last_hash);
                     }
                     return message;
                 };
@@ -474,15 +474,15 @@
                             object.height = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                         } else
                             object.height = options.longs === String ? "0" : 0;
-                        object.lastHash = null;
+                        object.last_hash = null;
                     }
                     if (message.height != null && message.hasOwnProperty("height"))
                         if (typeof message.height === "number")
                             object.height = options.longs === String ? String(message.height) : message.height;
                         else
                             object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
-                    if (message.lastHash != null && message.hasOwnProperty("lastHash"))
-                        object.lastHash = $root.exonum.Hash.toObject(message.lastHash, options);
+                    if (message.last_hash != null && message.hasOwnProperty("last_hash"))
+                        object.last_hash = $root.exonum.Hash.toObject(message.last_hash, options);
                     return object;
                 };
     
@@ -509,7 +509,7 @@
                  * @property {number|null} [validator] Propose validator
                  * @property {number|Long|null} [height] Propose height
                  * @property {number|null} [round] Propose round
-                 * @property {exonum.IHash|null} [prevHash] Propose prevHash
+                 * @property {exonum.IHash|null} [prev_hash] Propose prev_hash
                  * @property {Array.<exonum.IHash>|null} [transactions] Propose transactions
                  */
     
@@ -554,12 +554,12 @@
                 Propose.prototype.round = 0;
     
                 /**
-                 * Propose prevHash.
-                 * @member {exonum.IHash|null|undefined} prevHash
+                 * Propose prev_hash.
+                 * @member {exonum.IHash|null|undefined} prev_hash
                  * @memberof exonum.consensus.Propose
                  * @instance
                  */
-                Propose.prototype.prevHash = null;
+                Propose.prototype.prev_hash = null;
     
                 /**
                  * Propose transactions.
@@ -599,8 +599,8 @@
                         writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.height);
                     if (message.round != null && message.hasOwnProperty("round"))
                         writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.round);
-                    if (message.prevHash != null && message.hasOwnProperty("prevHash"))
-                        $root.exonum.Hash.encode(message.prevHash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    if (message.prev_hash != null && message.hasOwnProperty("prev_hash"))
+                        $root.exonum.Hash.encode(message.prev_hash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
                     if (message.transactions != null && message.transactions.length)
                         for (var i = 0; i < message.transactions.length; ++i)
                             $root.exonum.Hash.encode(message.transactions[i], writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
@@ -648,7 +648,7 @@
                             message.round = reader.uint32();
                             break;
                         case 4:
-                            message.prevHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.prev_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         case 5:
                             if (!(message.transactions && message.transactions.length))
@@ -699,10 +699,10 @@
                     if (message.round != null && message.hasOwnProperty("round"))
                         if (!$util.isInteger(message.round))
                             return "round: integer expected";
-                    if (message.prevHash != null && message.hasOwnProperty("prevHash")) {
-                        var error = $root.exonum.Hash.verify(message.prevHash);
+                    if (message.prev_hash != null && message.hasOwnProperty("prev_hash")) {
+                        var error = $root.exonum.Hash.verify(message.prev_hash);
                         if (error)
-                            return "prevHash." + error;
+                            return "prev_hash." + error;
                     }
                     if (message.transactions != null && message.hasOwnProperty("transactions")) {
                         if (!Array.isArray(message.transactions))
@@ -741,10 +741,10 @@
                             message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
                     if (object.round != null)
                         message.round = object.round >>> 0;
-                    if (object.prevHash != null) {
-                        if (typeof object.prevHash !== "object")
-                            throw TypeError(".exonum.consensus.Propose.prevHash: object expected");
-                        message.prevHash = $root.exonum.Hash.fromObject(object.prevHash);
+                    if (object.prev_hash != null) {
+                        if (typeof object.prev_hash !== "object")
+                            throw TypeError(".exonum.consensus.Propose.prev_hash: object expected");
+                        message.prev_hash = $root.exonum.Hash.fromObject(object.prev_hash);
                     }
                     if (object.transactions) {
                         if (!Array.isArray(object.transactions))
@@ -782,7 +782,7 @@
                         } else
                             object.height = options.longs === String ? "0" : 0;
                         object.round = 0;
-                        object.prevHash = null;
+                        object.prev_hash = null;
                     }
                     if (message.validator != null && message.hasOwnProperty("validator"))
                         object.validator = message.validator;
@@ -793,8 +793,8 @@
                             object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
                     if (message.round != null && message.hasOwnProperty("round"))
                         object.round = message.round;
-                    if (message.prevHash != null && message.hasOwnProperty("prevHash"))
-                        object.prevHash = $root.exonum.Hash.toObject(message.prevHash, options);
+                    if (message.prev_hash != null && message.hasOwnProperty("prev_hash"))
+                        object.prev_hash = $root.exonum.Hash.toObject(message.prev_hash, options);
                     if (message.transactions && message.transactions.length) {
                         object.transactions = [];
                         for (var j = 0; j < message.transactions.length; ++j)
@@ -826,8 +826,8 @@
                  * @property {number|null} [validator] Prevote validator
                  * @property {number|Long|null} [height] Prevote height
                  * @property {number|null} [round] Prevote round
-                 * @property {exonum.IHash|null} [proposeHash] Prevote proposeHash
-                 * @property {number|null} [lockedRound] Prevote lockedRound
+                 * @property {exonum.IHash|null} [propose_hash] Prevote propose_hash
+                 * @property {number|null} [locked_round] Prevote locked_round
                  */
     
                 /**
@@ -870,20 +870,20 @@
                 Prevote.prototype.round = 0;
     
                 /**
-                 * Prevote proposeHash.
-                 * @member {exonum.IHash|null|undefined} proposeHash
+                 * Prevote propose_hash.
+                 * @member {exonum.IHash|null|undefined} propose_hash
                  * @memberof exonum.consensus.Prevote
                  * @instance
                  */
-                Prevote.prototype.proposeHash = null;
+                Prevote.prototype.propose_hash = null;
     
                 /**
-                 * Prevote lockedRound.
-                 * @member {number} lockedRound
+                 * Prevote locked_round.
+                 * @member {number} locked_round
                  * @memberof exonum.consensus.Prevote
                  * @instance
                  */
-                Prevote.prototype.lockedRound = 0;
+                Prevote.prototype.locked_round = 0;
     
                 /**
                  * Creates a new Prevote instance using the specified properties.
@@ -915,10 +915,10 @@
                         writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.height);
                     if (message.round != null && message.hasOwnProperty("round"))
                         writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.round);
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        $root.exonum.Hash.encode(message.proposeHash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
-                    if (message.lockedRound != null && message.hasOwnProperty("lockedRound"))
-                        writer.uint32(/* id 5, wireType 0 =*/40).uint32(message.lockedRound);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        $root.exonum.Hash.encode(message.propose_hash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    if (message.locked_round != null && message.hasOwnProperty("locked_round"))
+                        writer.uint32(/* id 5, wireType 0 =*/40).uint32(message.locked_round);
                     return writer;
                 };
     
@@ -963,10 +963,10 @@
                             message.round = reader.uint32();
                             break;
                         case 4:
-                            message.proposeHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.propose_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         case 5:
-                            message.lockedRound = reader.uint32();
+                            message.locked_round = reader.uint32();
                             break;
                         default:
                             reader.skipType(tag & 7);
@@ -1012,14 +1012,14 @@
                     if (message.round != null && message.hasOwnProperty("round"))
                         if (!$util.isInteger(message.round))
                             return "round: integer expected";
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash")) {
-                        var error = $root.exonum.Hash.verify(message.proposeHash);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash")) {
+                        var error = $root.exonum.Hash.verify(message.propose_hash);
                         if (error)
-                            return "proposeHash." + error;
+                            return "propose_hash." + error;
                     }
-                    if (message.lockedRound != null && message.hasOwnProperty("lockedRound"))
-                        if (!$util.isInteger(message.lockedRound))
-                            return "lockedRound: integer expected";
+                    if (message.locked_round != null && message.hasOwnProperty("locked_round"))
+                        if (!$util.isInteger(message.locked_round))
+                            return "locked_round: integer expected";
                     return null;
                 };
     
@@ -1048,13 +1048,13 @@
                             message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
                     if (object.round != null)
                         message.round = object.round >>> 0;
-                    if (object.proposeHash != null) {
-                        if (typeof object.proposeHash !== "object")
-                            throw TypeError(".exonum.consensus.Prevote.proposeHash: object expected");
-                        message.proposeHash = $root.exonum.Hash.fromObject(object.proposeHash);
+                    if (object.propose_hash != null) {
+                        if (typeof object.propose_hash !== "object")
+                            throw TypeError(".exonum.consensus.Prevote.propose_hash: object expected");
+                        message.propose_hash = $root.exonum.Hash.fromObject(object.propose_hash);
                     }
-                    if (object.lockedRound != null)
-                        message.lockedRound = object.lockedRound >>> 0;
+                    if (object.locked_round != null)
+                        message.locked_round = object.locked_round >>> 0;
                     return message;
                 };
     
@@ -1079,8 +1079,8 @@
                         } else
                             object.height = options.longs === String ? "0" : 0;
                         object.round = 0;
-                        object.proposeHash = null;
-                        object.lockedRound = 0;
+                        object.propose_hash = null;
+                        object.locked_round = 0;
                     }
                     if (message.validator != null && message.hasOwnProperty("validator"))
                         object.validator = message.validator;
@@ -1091,10 +1091,10 @@
                             object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
                     if (message.round != null && message.hasOwnProperty("round"))
                         object.round = message.round;
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        object.proposeHash = $root.exonum.Hash.toObject(message.proposeHash, options);
-                    if (message.lockedRound != null && message.hasOwnProperty("lockedRound"))
-                        object.lockedRound = message.lockedRound;
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        object.propose_hash = $root.exonum.Hash.toObject(message.propose_hash, options);
+                    if (message.locked_round != null && message.hasOwnProperty("locked_round"))
+                        object.locked_round = message.locked_round;
                     return object;
                 };
     
@@ -1121,8 +1121,8 @@
                  * @property {number|null} [validator] Precommit validator
                  * @property {number|Long|null} [height] Precommit height
                  * @property {number|null} [round] Precommit round
-                 * @property {exonum.IHash|null} [proposeHash] Precommit proposeHash
-                 * @property {exonum.IHash|null} [blockHash] Precommit blockHash
+                 * @property {exonum.IHash|null} [propose_hash] Precommit propose_hash
+                 * @property {exonum.IHash|null} [block_hash] Precommit block_hash
                  * @property {google.protobuf.ITimestamp|null} [time] Precommit time
                  */
     
@@ -1166,20 +1166,20 @@
                 Precommit.prototype.round = 0;
     
                 /**
-                 * Precommit proposeHash.
-                 * @member {exonum.IHash|null|undefined} proposeHash
+                 * Precommit propose_hash.
+                 * @member {exonum.IHash|null|undefined} propose_hash
                  * @memberof exonum.consensus.Precommit
                  * @instance
                  */
-                Precommit.prototype.proposeHash = null;
+                Precommit.prototype.propose_hash = null;
     
                 /**
-                 * Precommit blockHash.
-                 * @member {exonum.IHash|null|undefined} blockHash
+                 * Precommit block_hash.
+                 * @member {exonum.IHash|null|undefined} block_hash
                  * @memberof exonum.consensus.Precommit
                  * @instance
                  */
-                Precommit.prototype.blockHash = null;
+                Precommit.prototype.block_hash = null;
     
                 /**
                  * Precommit time.
@@ -1219,10 +1219,10 @@
                         writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.height);
                     if (message.round != null && message.hasOwnProperty("round"))
                         writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.round);
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        $root.exonum.Hash.encode(message.proposeHash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
-                    if (message.blockHash != null && message.hasOwnProperty("blockHash"))
-                        $root.exonum.Hash.encode(message.blockHash, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        $root.exonum.Hash.encode(message.propose_hash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    if (message.block_hash != null && message.hasOwnProperty("block_hash"))
+                        $root.exonum.Hash.encode(message.block_hash, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
                     if (message.time != null && message.hasOwnProperty("time"))
                         $root.google.protobuf.Timestamp.encode(message.time, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
                     return writer;
@@ -1269,10 +1269,10 @@
                             message.round = reader.uint32();
                             break;
                         case 4:
-                            message.proposeHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.propose_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         case 5:
-                            message.blockHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.block_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         case 6:
                             message.time = $root.google.protobuf.Timestamp.decode(reader, reader.uint32());
@@ -1321,15 +1321,15 @@
                     if (message.round != null && message.hasOwnProperty("round"))
                         if (!$util.isInteger(message.round))
                             return "round: integer expected";
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash")) {
-                        var error = $root.exonum.Hash.verify(message.proposeHash);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash")) {
+                        var error = $root.exonum.Hash.verify(message.propose_hash);
                         if (error)
-                            return "proposeHash." + error;
+                            return "propose_hash." + error;
                     }
-                    if (message.blockHash != null && message.hasOwnProperty("blockHash")) {
-                        var error = $root.exonum.Hash.verify(message.blockHash);
+                    if (message.block_hash != null && message.hasOwnProperty("block_hash")) {
+                        var error = $root.exonum.Hash.verify(message.block_hash);
                         if (error)
-                            return "blockHash." + error;
+                            return "block_hash." + error;
                     }
                     if (message.time != null && message.hasOwnProperty("time")) {
                         var error = $root.google.protobuf.Timestamp.verify(message.time);
@@ -1364,15 +1364,15 @@
                             message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
                     if (object.round != null)
                         message.round = object.round >>> 0;
-                    if (object.proposeHash != null) {
-                        if (typeof object.proposeHash !== "object")
-                            throw TypeError(".exonum.consensus.Precommit.proposeHash: object expected");
-                        message.proposeHash = $root.exonum.Hash.fromObject(object.proposeHash);
+                    if (object.propose_hash != null) {
+                        if (typeof object.propose_hash !== "object")
+                            throw TypeError(".exonum.consensus.Precommit.propose_hash: object expected");
+                        message.propose_hash = $root.exonum.Hash.fromObject(object.propose_hash);
                     }
-                    if (object.blockHash != null) {
-                        if (typeof object.blockHash !== "object")
-                            throw TypeError(".exonum.consensus.Precommit.blockHash: object expected");
-                        message.blockHash = $root.exonum.Hash.fromObject(object.blockHash);
+                    if (object.block_hash != null) {
+                        if (typeof object.block_hash !== "object")
+                            throw TypeError(".exonum.consensus.Precommit.block_hash: object expected");
+                        message.block_hash = $root.exonum.Hash.fromObject(object.block_hash);
                     }
                     if (object.time != null) {
                         if (typeof object.time !== "object")
@@ -1403,8 +1403,8 @@
                         } else
                             object.height = options.longs === String ? "0" : 0;
                         object.round = 0;
-                        object.proposeHash = null;
-                        object.blockHash = null;
+                        object.propose_hash = null;
+                        object.block_hash = null;
                         object.time = null;
                     }
                     if (message.validator != null && message.hasOwnProperty("validator"))
@@ -1416,10 +1416,10 @@
                             object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
                     if (message.round != null && message.hasOwnProperty("round"))
                         object.round = message.round;
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        object.proposeHash = $root.exonum.Hash.toObject(message.proposeHash, options);
-                    if (message.blockHash != null && message.hasOwnProperty("blockHash"))
-                        object.blockHash = $root.exonum.Hash.toObject(message.blockHash, options);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        object.propose_hash = $root.exonum.Hash.toObject(message.propose_hash, options);
+                    if (message.block_hash != null && message.hasOwnProperty("block_hash"))
+                        object.block_hash = $root.exonum.Hash.toObject(message.block_hash, options);
                     if (message.time != null && message.hasOwnProperty("time"))
                         object.time = $root.google.protobuf.Timestamp.toObject(message.time, options);
                     return object;
@@ -1987,7 +1987,7 @@
                  * @interface IProposeRequest
                  * @property {exonum.IPublicKey|null} [to] ProposeRequest to
                  * @property {number|Long|null} [height] ProposeRequest height
-                 * @property {exonum.IHash|null} [proposeHash] ProposeRequest proposeHash
+                 * @property {exonum.IHash|null} [propose_hash] ProposeRequest propose_hash
                  */
     
                 /**
@@ -2022,12 +2022,12 @@
                 ProposeRequest.prototype.height = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
                 /**
-                 * ProposeRequest proposeHash.
-                 * @member {exonum.IHash|null|undefined} proposeHash
+                 * ProposeRequest propose_hash.
+                 * @member {exonum.IHash|null|undefined} propose_hash
                  * @memberof exonum.consensus.ProposeRequest
                  * @instance
                  */
-                ProposeRequest.prototype.proposeHash = null;
+                ProposeRequest.prototype.propose_hash = null;
     
                 /**
                  * Creates a new ProposeRequest instance using the specified properties.
@@ -2057,8 +2057,8 @@
                         $root.exonum.PublicKey.encode(message.to, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
                     if (message.height != null && message.hasOwnProperty("height"))
                         writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.height);
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        $root.exonum.Hash.encode(message.proposeHash, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        $root.exonum.Hash.encode(message.propose_hash, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                     return writer;
                 };
     
@@ -2100,7 +2100,7 @@
                             message.height = reader.uint64();
                             break;
                         case 3:
-                            message.proposeHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.propose_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         default:
                             reader.skipType(tag & 7);
@@ -2145,10 +2145,10 @@
                     if (message.height != null && message.hasOwnProperty("height"))
                         if (!$util.isInteger(message.height) && !(message.height && $util.isInteger(message.height.low) && $util.isInteger(message.height.high)))
                             return "height: integer|Long expected";
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash")) {
-                        var error = $root.exonum.Hash.verify(message.proposeHash);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash")) {
+                        var error = $root.exonum.Hash.verify(message.propose_hash);
                         if (error)
-                            return "proposeHash." + error;
+                            return "propose_hash." + error;
                     }
                     return null;
                 };
@@ -2179,10 +2179,10 @@
                             message.height = object.height;
                         else if (typeof object.height === "object")
                             message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
-                    if (object.proposeHash != null) {
-                        if (typeof object.proposeHash !== "object")
-                            throw TypeError(".exonum.consensus.ProposeRequest.proposeHash: object expected");
-                        message.proposeHash = $root.exonum.Hash.fromObject(object.proposeHash);
+                    if (object.propose_hash != null) {
+                        if (typeof object.propose_hash !== "object")
+                            throw TypeError(".exonum.consensus.ProposeRequest.propose_hash: object expected");
+                        message.propose_hash = $root.exonum.Hash.fromObject(object.propose_hash);
                     }
                     return message;
                 };
@@ -2207,7 +2207,7 @@
                             object.height = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                         } else
                             object.height = options.longs === String ? "0" : 0;
-                        object.proposeHash = null;
+                        object.propose_hash = null;
                     }
                     if (message.to != null && message.hasOwnProperty("to"))
                         object.to = $root.exonum.PublicKey.toObject(message.to, options);
@@ -2216,8 +2216,8 @@
                             object.height = options.longs === String ? String(message.height) : message.height;
                         else
                             object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        object.proposeHash = $root.exonum.Hash.toObject(message.proposeHash, options);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        object.propose_hash = $root.exonum.Hash.toObject(message.propose_hash, options);
                     return object;
                 };
     
@@ -2480,7 +2480,7 @@
                  * @property {exonum.IPublicKey|null} [to] PrevotesRequest to
                  * @property {number|Long|null} [height] PrevotesRequest height
                  * @property {number|null} [round] PrevotesRequest round
-                 * @property {exonum.IHash|null} [proposeHash] PrevotesRequest proposeHash
+                 * @property {exonum.IHash|null} [propose_hash] PrevotesRequest propose_hash
                  * @property {exonum.IBitVec|null} [validators] PrevotesRequest validators
                  */
     
@@ -2524,12 +2524,12 @@
                 PrevotesRequest.prototype.round = 0;
     
                 /**
-                 * PrevotesRequest proposeHash.
-                 * @member {exonum.IHash|null|undefined} proposeHash
+                 * PrevotesRequest propose_hash.
+                 * @member {exonum.IHash|null|undefined} propose_hash
                  * @memberof exonum.consensus.PrevotesRequest
                  * @instance
                  */
-                PrevotesRequest.prototype.proposeHash = null;
+                PrevotesRequest.prototype.propose_hash = null;
     
                 /**
                  * PrevotesRequest validators.
@@ -2569,8 +2569,8 @@
                         writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.height);
                     if (message.round != null && message.hasOwnProperty("round"))
                         writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.round);
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        $root.exonum.Hash.encode(message.proposeHash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        $root.exonum.Hash.encode(message.propose_hash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
                     if (message.validators != null && message.hasOwnProperty("validators"))
                         $root.exonum.BitVec.encode(message.validators, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
                     return writer;
@@ -2617,7 +2617,7 @@
                             message.round = reader.uint32();
                             break;
                         case 4:
-                            message.proposeHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                            message.propose_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                             break;
                         case 5:
                             message.validators = $root.exonum.BitVec.decode(reader, reader.uint32());
@@ -2668,10 +2668,10 @@
                     if (message.round != null && message.hasOwnProperty("round"))
                         if (!$util.isInteger(message.round))
                             return "round: integer expected";
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash")) {
-                        var error = $root.exonum.Hash.verify(message.proposeHash);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash")) {
+                        var error = $root.exonum.Hash.verify(message.propose_hash);
                         if (error)
-                            return "proposeHash." + error;
+                            return "propose_hash." + error;
                     }
                     if (message.validators != null && message.hasOwnProperty("validators")) {
                         var error = $root.exonum.BitVec.verify(message.validators);
@@ -2709,10 +2709,10 @@
                             message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
                     if (object.round != null)
                         message.round = object.round >>> 0;
-                    if (object.proposeHash != null) {
-                        if (typeof object.proposeHash !== "object")
-                            throw TypeError(".exonum.consensus.PrevotesRequest.proposeHash: object expected");
-                        message.proposeHash = $root.exonum.Hash.fromObject(object.proposeHash);
+                    if (object.propose_hash != null) {
+                        if (typeof object.propose_hash !== "object")
+                            throw TypeError(".exonum.consensus.PrevotesRequest.propose_hash: object expected");
+                        message.propose_hash = $root.exonum.Hash.fromObject(object.propose_hash);
                     }
                     if (object.validators != null) {
                         if (typeof object.validators !== "object")
@@ -2743,7 +2743,7 @@
                         } else
                             object.height = options.longs === String ? "0" : 0;
                         object.round = 0;
-                        object.proposeHash = null;
+                        object.propose_hash = null;
                         object.validators = null;
                     }
                     if (message.to != null && message.hasOwnProperty("to"))
@@ -2755,8 +2755,8 @@
                             object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
                     if (message.round != null && message.hasOwnProperty("round"))
                         object.round = message.round;
-                    if (message.proposeHash != null && message.hasOwnProperty("proposeHash"))
-                        object.proposeHash = $root.exonum.Hash.toObject(message.proposeHash, options);
+                    if (message.propose_hash != null && message.hasOwnProperty("propose_hash"))
+                        object.propose_hash = $root.exonum.Hash.toObject(message.propose_hash, options);
                     if (message.validators != null && message.hasOwnProperty("validators"))
                         object.validators = $root.exonum.BitVec.toObject(message.validators, options);
                     return object;
@@ -3831,12 +3831,12 @@
              * Properties of a Block.
              * @memberof exonum
              * @interface IBlock
-             * @property {number|null} [proposerId] Block proposerId
+             * @property {number|null} [proposer_id] Block proposer_id
              * @property {number|Long|null} [height] Block height
-             * @property {number|null} [txCount] Block txCount
-             * @property {exonum.IHash|null} [prevHash] Block prevHash
-             * @property {exonum.IHash|null} [txHash] Block txHash
-             * @property {exonum.IHash|null} [stateHash] Block stateHash
+             * @property {number|null} [tx_count] Block tx_count
+             * @property {exonum.IHash|null} [prev_hash] Block prev_hash
+             * @property {exonum.IHash|null} [tx_hash] Block tx_hash
+             * @property {exonum.IHash|null} [state_hash] Block state_hash
              */
     
             /**
@@ -3855,12 +3855,12 @@
             }
     
             /**
-             * Block proposerId.
-             * @member {number} proposerId
+             * Block proposer_id.
+             * @member {number} proposer_id
              * @memberof exonum.Block
              * @instance
              */
-            Block.prototype.proposerId = 0;
+            Block.prototype.proposer_id = 0;
     
             /**
              * Block height.
@@ -3871,36 +3871,36 @@
             Block.prototype.height = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
             /**
-             * Block txCount.
-             * @member {number} txCount
+             * Block tx_count.
+             * @member {number} tx_count
              * @memberof exonum.Block
              * @instance
              */
-            Block.prototype.txCount = 0;
+            Block.prototype.tx_count = 0;
     
             /**
-             * Block prevHash.
-             * @member {exonum.IHash|null|undefined} prevHash
+             * Block prev_hash.
+             * @member {exonum.IHash|null|undefined} prev_hash
              * @memberof exonum.Block
              * @instance
              */
-            Block.prototype.prevHash = null;
+            Block.prototype.prev_hash = null;
     
             /**
-             * Block txHash.
-             * @member {exonum.IHash|null|undefined} txHash
+             * Block tx_hash.
+             * @member {exonum.IHash|null|undefined} tx_hash
              * @memberof exonum.Block
              * @instance
              */
-            Block.prototype.txHash = null;
+            Block.prototype.tx_hash = null;
     
             /**
-             * Block stateHash.
-             * @member {exonum.IHash|null|undefined} stateHash
+             * Block state_hash.
+             * @member {exonum.IHash|null|undefined} state_hash
              * @memberof exonum.Block
              * @instance
              */
-            Block.prototype.stateHash = null;
+            Block.prototype.state_hash = null;
     
             /**
              * Creates a new Block instance using the specified properties.
@@ -3926,18 +3926,18 @@
             Block.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.proposerId != null && message.hasOwnProperty("proposerId"))
-                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.proposerId);
+                if (message.proposer_id != null && message.hasOwnProperty("proposer_id"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.proposer_id);
                 if (message.height != null && message.hasOwnProperty("height"))
                     writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.height);
-                if (message.txCount != null && message.hasOwnProperty("txCount"))
-                    writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.txCount);
-                if (message.prevHash != null && message.hasOwnProperty("prevHash"))
-                    $root.exonum.Hash.encode(message.prevHash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
-                if (message.txHash != null && message.hasOwnProperty("txHash"))
-                    $root.exonum.Hash.encode(message.txHash, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
-                if (message.stateHash != null && message.hasOwnProperty("stateHash"))
-                    $root.exonum.Hash.encode(message.stateHash, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                if (message.tx_count != null && message.hasOwnProperty("tx_count"))
+                    writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.tx_count);
+                if (message.prev_hash != null && message.hasOwnProperty("prev_hash"))
+                    $root.exonum.Hash.encode(message.prev_hash, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                if (message.tx_hash != null && message.hasOwnProperty("tx_hash"))
+                    $root.exonum.Hash.encode(message.tx_hash, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                if (message.state_hash != null && message.hasOwnProperty("state_hash"))
+                    $root.exonum.Hash.encode(message.state_hash, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
                 return writer;
             };
     
@@ -3973,22 +3973,22 @@
                     var tag = reader.uint32();
                     switch (tag >>> 3) {
                     case 1:
-                        message.proposerId = reader.uint32();
+                        message.proposer_id = reader.uint32();
                         break;
                     case 2:
                         message.height = reader.uint64();
                         break;
                     case 3:
-                        message.txCount = reader.uint32();
+                        message.tx_count = reader.uint32();
                         break;
                     case 4:
-                        message.prevHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                        message.prev_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                         break;
                     case 5:
-                        message.txHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                        message.tx_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                         break;
                     case 6:
-                        message.stateHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                        message.state_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -4025,29 +4025,29 @@
             Block.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.proposerId != null && message.hasOwnProperty("proposerId"))
-                    if (!$util.isInteger(message.proposerId))
-                        return "proposerId: integer expected";
+                if (message.proposer_id != null && message.hasOwnProperty("proposer_id"))
+                    if (!$util.isInteger(message.proposer_id))
+                        return "proposer_id: integer expected";
                 if (message.height != null && message.hasOwnProperty("height"))
                     if (!$util.isInteger(message.height) && !(message.height && $util.isInteger(message.height.low) && $util.isInteger(message.height.high)))
                         return "height: integer|Long expected";
-                if (message.txCount != null && message.hasOwnProperty("txCount"))
-                    if (!$util.isInteger(message.txCount))
-                        return "txCount: integer expected";
-                if (message.prevHash != null && message.hasOwnProperty("prevHash")) {
-                    var error = $root.exonum.Hash.verify(message.prevHash);
+                if (message.tx_count != null && message.hasOwnProperty("tx_count"))
+                    if (!$util.isInteger(message.tx_count))
+                        return "tx_count: integer expected";
+                if (message.prev_hash != null && message.hasOwnProperty("prev_hash")) {
+                    var error = $root.exonum.Hash.verify(message.prev_hash);
                     if (error)
-                        return "prevHash." + error;
+                        return "prev_hash." + error;
                 }
-                if (message.txHash != null && message.hasOwnProperty("txHash")) {
-                    var error = $root.exonum.Hash.verify(message.txHash);
+                if (message.tx_hash != null && message.hasOwnProperty("tx_hash")) {
+                    var error = $root.exonum.Hash.verify(message.tx_hash);
                     if (error)
-                        return "txHash." + error;
+                        return "tx_hash." + error;
                 }
-                if (message.stateHash != null && message.hasOwnProperty("stateHash")) {
-                    var error = $root.exonum.Hash.verify(message.stateHash);
+                if (message.state_hash != null && message.hasOwnProperty("state_hash")) {
+                    var error = $root.exonum.Hash.verify(message.state_hash);
                     if (error)
-                        return "stateHash." + error;
+                        return "state_hash." + error;
                 }
                 return null;
             };
@@ -4064,8 +4064,8 @@
                 if (object instanceof $root.exonum.Block)
                     return object;
                 var message = new $root.exonum.Block();
-                if (object.proposerId != null)
-                    message.proposerId = object.proposerId >>> 0;
+                if (object.proposer_id != null)
+                    message.proposer_id = object.proposer_id >>> 0;
                 if (object.height != null)
                     if ($util.Long)
                         (message.height = $util.Long.fromValue(object.height)).unsigned = true;
@@ -4075,22 +4075,22 @@
                         message.height = object.height;
                     else if (typeof object.height === "object")
                         message.height = new $util.LongBits(object.height.low >>> 0, object.height.high >>> 0).toNumber(true);
-                if (object.txCount != null)
-                    message.txCount = object.txCount >>> 0;
-                if (object.prevHash != null) {
-                    if (typeof object.prevHash !== "object")
-                        throw TypeError(".exonum.Block.prevHash: object expected");
-                    message.prevHash = $root.exonum.Hash.fromObject(object.prevHash);
+                if (object.tx_count != null)
+                    message.tx_count = object.tx_count >>> 0;
+                if (object.prev_hash != null) {
+                    if (typeof object.prev_hash !== "object")
+                        throw TypeError(".exonum.Block.prev_hash: object expected");
+                    message.prev_hash = $root.exonum.Hash.fromObject(object.prev_hash);
                 }
-                if (object.txHash != null) {
-                    if (typeof object.txHash !== "object")
-                        throw TypeError(".exonum.Block.txHash: object expected");
-                    message.txHash = $root.exonum.Hash.fromObject(object.txHash);
+                if (object.tx_hash != null) {
+                    if (typeof object.tx_hash !== "object")
+                        throw TypeError(".exonum.Block.tx_hash: object expected");
+                    message.tx_hash = $root.exonum.Hash.fromObject(object.tx_hash);
                 }
-                if (object.stateHash != null) {
-                    if (typeof object.stateHash !== "object")
-                        throw TypeError(".exonum.Block.stateHash: object expected");
-                    message.stateHash = $root.exonum.Hash.fromObject(object.stateHash);
+                if (object.state_hash != null) {
+                    if (typeof object.state_hash !== "object")
+                        throw TypeError(".exonum.Block.state_hash: object expected");
+                    message.state_hash = $root.exonum.Hash.fromObject(object.state_hash);
                 }
                 return message;
             };
@@ -4109,32 +4109,32 @@
                     options = {};
                 var object = {};
                 if (options.defaults) {
-                    object.proposerId = 0;
+                    object.proposer_id = 0;
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
                         object.height = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                     } else
                         object.height = options.longs === String ? "0" : 0;
-                    object.txCount = 0;
-                    object.prevHash = null;
-                    object.txHash = null;
-                    object.stateHash = null;
+                    object.tx_count = 0;
+                    object.prev_hash = null;
+                    object.tx_hash = null;
+                    object.state_hash = null;
                 }
-                if (message.proposerId != null && message.hasOwnProperty("proposerId"))
-                    object.proposerId = message.proposerId;
+                if (message.proposer_id != null && message.hasOwnProperty("proposer_id"))
+                    object.proposer_id = message.proposer_id;
                 if (message.height != null && message.hasOwnProperty("height"))
                     if (typeof message.height === "number")
                         object.height = options.longs === String ? String(message.height) : message.height;
                     else
                         object.height = options.longs === String ? $util.Long.prototype.toString.call(message.height) : options.longs === Number ? new $util.LongBits(message.height.low >>> 0, message.height.high >>> 0).toNumber(true) : message.height;
-                if (message.txCount != null && message.hasOwnProperty("txCount"))
-                    object.txCount = message.txCount;
-                if (message.prevHash != null && message.hasOwnProperty("prevHash"))
-                    object.prevHash = $root.exonum.Hash.toObject(message.prevHash, options);
-                if (message.txHash != null && message.hasOwnProperty("txHash"))
-                    object.txHash = $root.exonum.Hash.toObject(message.txHash, options);
-                if (message.stateHash != null && message.hasOwnProperty("stateHash"))
-                    object.stateHash = $root.exonum.Hash.toObject(message.stateHash, options);
+                if (message.tx_count != null && message.hasOwnProperty("tx_count"))
+                    object.tx_count = message.tx_count;
+                if (message.prev_hash != null && message.hasOwnProperty("prev_hash"))
+                    object.prev_hash = $root.exonum.Hash.toObject(message.prev_hash, options);
+                if (message.tx_hash != null && message.hasOwnProperty("tx_hash"))
+                    object.tx_hash = $root.exonum.Hash.toObject(message.tx_hash, options);
+                if (message.state_hash != null && message.hasOwnProperty("state_hash"))
+                    object.state_hash = $root.exonum.Hash.toObject(message.state_hash, options);
                 return object;
             };
     
@@ -4158,8 +4158,8 @@
              * Properties of a ConfigReference.
              * @memberof exonum
              * @interface IConfigReference
-             * @property {number|Long|null} [actualFrom] ConfigReference actualFrom
-             * @property {exonum.IHash|null} [cfgHash] ConfigReference cfgHash
+             * @property {number|Long|null} [actual_from] ConfigReference actual_from
+             * @property {exonum.IHash|null} [cfg_hash] ConfigReference cfg_hash
              */
     
             /**
@@ -4178,20 +4178,20 @@
             }
     
             /**
-             * ConfigReference actualFrom.
-             * @member {number|Long} actualFrom
+             * ConfigReference actual_from.
+             * @member {number|Long} actual_from
              * @memberof exonum.ConfigReference
              * @instance
              */
-            ConfigReference.prototype.actualFrom = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+            ConfigReference.prototype.actual_from = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
             /**
-             * ConfigReference cfgHash.
-             * @member {exonum.IHash|null|undefined} cfgHash
+             * ConfigReference cfg_hash.
+             * @member {exonum.IHash|null|undefined} cfg_hash
              * @memberof exonum.ConfigReference
              * @instance
              */
-            ConfigReference.prototype.cfgHash = null;
+            ConfigReference.prototype.cfg_hash = null;
     
             /**
              * Creates a new ConfigReference instance using the specified properties.
@@ -4217,10 +4217,10 @@
             ConfigReference.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.actualFrom != null && message.hasOwnProperty("actualFrom"))
-                    writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.actualFrom);
-                if (message.cfgHash != null && message.hasOwnProperty("cfgHash"))
-                    $root.exonum.Hash.encode(message.cfgHash, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                if (message.actual_from != null && message.hasOwnProperty("actual_from"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.actual_from);
+                if (message.cfg_hash != null && message.hasOwnProperty("cfg_hash"))
+                    $root.exonum.Hash.encode(message.cfg_hash, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
                 return writer;
             };
     
@@ -4256,10 +4256,10 @@
                     var tag = reader.uint32();
                     switch (tag >>> 3) {
                     case 1:
-                        message.actualFrom = reader.uint64();
+                        message.actual_from = reader.uint64();
                         break;
                     case 2:
-                        message.cfgHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                        message.cfg_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -4296,13 +4296,13 @@
             ConfigReference.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.actualFrom != null && message.hasOwnProperty("actualFrom"))
-                    if (!$util.isInteger(message.actualFrom) && !(message.actualFrom && $util.isInteger(message.actualFrom.low) && $util.isInteger(message.actualFrom.high)))
-                        return "actualFrom: integer|Long expected";
-                if (message.cfgHash != null && message.hasOwnProperty("cfgHash")) {
-                    var error = $root.exonum.Hash.verify(message.cfgHash);
+                if (message.actual_from != null && message.hasOwnProperty("actual_from"))
+                    if (!$util.isInteger(message.actual_from) && !(message.actual_from && $util.isInteger(message.actual_from.low) && $util.isInteger(message.actual_from.high)))
+                        return "actual_from: integer|Long expected";
+                if (message.cfg_hash != null && message.hasOwnProperty("cfg_hash")) {
+                    var error = $root.exonum.Hash.verify(message.cfg_hash);
                     if (error)
-                        return "cfgHash." + error;
+                        return "cfg_hash." + error;
                 }
                 return null;
             };
@@ -4319,19 +4319,19 @@
                 if (object instanceof $root.exonum.ConfigReference)
                     return object;
                 var message = new $root.exonum.ConfigReference();
-                if (object.actualFrom != null)
+                if (object.actual_from != null)
                     if ($util.Long)
-                        (message.actualFrom = $util.Long.fromValue(object.actualFrom)).unsigned = true;
-                    else if (typeof object.actualFrom === "string")
-                        message.actualFrom = parseInt(object.actualFrom, 10);
-                    else if (typeof object.actualFrom === "number")
-                        message.actualFrom = object.actualFrom;
-                    else if (typeof object.actualFrom === "object")
-                        message.actualFrom = new $util.LongBits(object.actualFrom.low >>> 0, object.actualFrom.high >>> 0).toNumber(true);
-                if (object.cfgHash != null) {
-                    if (typeof object.cfgHash !== "object")
-                        throw TypeError(".exonum.ConfigReference.cfgHash: object expected");
-                    message.cfgHash = $root.exonum.Hash.fromObject(object.cfgHash);
+                        (message.actual_from = $util.Long.fromValue(object.actual_from)).unsigned = true;
+                    else if (typeof object.actual_from === "string")
+                        message.actual_from = parseInt(object.actual_from, 10);
+                    else if (typeof object.actual_from === "number")
+                        message.actual_from = object.actual_from;
+                    else if (typeof object.actual_from === "object")
+                        message.actual_from = new $util.LongBits(object.actual_from.low >>> 0, object.actual_from.high >>> 0).toNumber(true);
+                if (object.cfg_hash != null) {
+                    if (typeof object.cfg_hash !== "object")
+                        throw TypeError(".exonum.ConfigReference.cfg_hash: object expected");
+                    message.cfg_hash = $root.exonum.Hash.fromObject(object.cfg_hash);
                 }
                 return message;
             };
@@ -4352,18 +4352,18 @@
                 if (options.defaults) {
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.actualFrom = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.actual_from = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                     } else
-                        object.actualFrom = options.longs === String ? "0" : 0;
-                    object.cfgHash = null;
+                        object.actual_from = options.longs === String ? "0" : 0;
+                    object.cfg_hash = null;
                 }
-                if (message.actualFrom != null && message.hasOwnProperty("actualFrom"))
-                    if (typeof message.actualFrom === "number")
-                        object.actualFrom = options.longs === String ? String(message.actualFrom) : message.actualFrom;
+                if (message.actual_from != null && message.hasOwnProperty("actual_from"))
+                    if (typeof message.actual_from === "number")
+                        object.actual_from = options.longs === String ? String(message.actual_from) : message.actual_from;
                     else
-                        object.actualFrom = options.longs === String ? $util.Long.prototype.toString.call(message.actualFrom) : options.longs === Number ? new $util.LongBits(message.actualFrom.low >>> 0, message.actualFrom.high >>> 0).toNumber(true) : message.actualFrom;
-                if (message.cfgHash != null && message.hasOwnProperty("cfgHash"))
-                    object.cfgHash = $root.exonum.Hash.toObject(message.cfgHash, options);
+                        object.actual_from = options.longs === String ? $util.Long.prototype.toString.call(message.actual_from) : options.longs === Number ? new $util.LongBits(message.actual_from.low >>> 0, message.actual_from.high >>> 0).toNumber(true) : message.actual_from;
+                if (message.cfg_hash != null && message.hasOwnProperty("cfg_hash"))
+                    object.cfg_hash = $root.exonum.Hash.toObject(message.cfg_hash, options);
                 return object;
             };
     
@@ -4387,8 +4387,8 @@
              * Properties of a TxLocation.
              * @memberof exonum
              * @interface ITxLocation
-             * @property {number|Long|null} [blockHeight] TxLocation blockHeight
-             * @property {number|Long|null} [positionInBlock] TxLocation positionInBlock
+             * @property {number|Long|null} [block_height] TxLocation block_height
+             * @property {number|Long|null} [position_in_block] TxLocation position_in_block
              */
     
             /**
@@ -4407,20 +4407,20 @@
             }
     
             /**
-             * TxLocation blockHeight.
-             * @member {number|Long} blockHeight
+             * TxLocation block_height.
+             * @member {number|Long} block_height
              * @memberof exonum.TxLocation
              * @instance
              */
-            TxLocation.prototype.blockHeight = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+            TxLocation.prototype.block_height = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
             /**
-             * TxLocation positionInBlock.
-             * @member {number|Long} positionInBlock
+             * TxLocation position_in_block.
+             * @member {number|Long} position_in_block
              * @memberof exonum.TxLocation
              * @instance
              */
-            TxLocation.prototype.positionInBlock = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+            TxLocation.prototype.position_in_block = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
             /**
              * Creates a new TxLocation instance using the specified properties.
@@ -4446,10 +4446,10 @@
             TxLocation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.blockHeight != null && message.hasOwnProperty("blockHeight"))
-                    writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.blockHeight);
-                if (message.positionInBlock != null && message.hasOwnProperty("positionInBlock"))
-                    writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.positionInBlock);
+                if (message.block_height != null && message.hasOwnProperty("block_height"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).uint64(message.block_height);
+                if (message.position_in_block != null && message.hasOwnProperty("position_in_block"))
+                    writer.uint32(/* id 2, wireType 0 =*/16).uint64(message.position_in_block);
                 return writer;
             };
     
@@ -4485,10 +4485,10 @@
                     var tag = reader.uint32();
                     switch (tag >>> 3) {
                     case 1:
-                        message.blockHeight = reader.uint64();
+                        message.block_height = reader.uint64();
                         break;
                     case 2:
-                        message.positionInBlock = reader.uint64();
+                        message.position_in_block = reader.uint64();
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -4525,12 +4525,12 @@
             TxLocation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.blockHeight != null && message.hasOwnProperty("blockHeight"))
-                    if (!$util.isInteger(message.blockHeight) && !(message.blockHeight && $util.isInteger(message.blockHeight.low) && $util.isInteger(message.blockHeight.high)))
-                        return "blockHeight: integer|Long expected";
-                if (message.positionInBlock != null && message.hasOwnProperty("positionInBlock"))
-                    if (!$util.isInteger(message.positionInBlock) && !(message.positionInBlock && $util.isInteger(message.positionInBlock.low) && $util.isInteger(message.positionInBlock.high)))
-                        return "positionInBlock: integer|Long expected";
+                if (message.block_height != null && message.hasOwnProperty("block_height"))
+                    if (!$util.isInteger(message.block_height) && !(message.block_height && $util.isInteger(message.block_height.low) && $util.isInteger(message.block_height.high)))
+                        return "block_height: integer|Long expected";
+                if (message.position_in_block != null && message.hasOwnProperty("position_in_block"))
+                    if (!$util.isInteger(message.position_in_block) && !(message.position_in_block && $util.isInteger(message.position_in_block.low) && $util.isInteger(message.position_in_block.high)))
+                        return "position_in_block: integer|Long expected";
                 return null;
             };
     
@@ -4546,24 +4546,24 @@
                 if (object instanceof $root.exonum.TxLocation)
                     return object;
                 var message = new $root.exonum.TxLocation();
-                if (object.blockHeight != null)
+                if (object.block_height != null)
                     if ($util.Long)
-                        (message.blockHeight = $util.Long.fromValue(object.blockHeight)).unsigned = true;
-                    else if (typeof object.blockHeight === "string")
-                        message.blockHeight = parseInt(object.blockHeight, 10);
-                    else if (typeof object.blockHeight === "number")
-                        message.blockHeight = object.blockHeight;
-                    else if (typeof object.blockHeight === "object")
-                        message.blockHeight = new $util.LongBits(object.blockHeight.low >>> 0, object.blockHeight.high >>> 0).toNumber(true);
-                if (object.positionInBlock != null)
+                        (message.block_height = $util.Long.fromValue(object.block_height)).unsigned = true;
+                    else if (typeof object.block_height === "string")
+                        message.block_height = parseInt(object.block_height, 10);
+                    else if (typeof object.block_height === "number")
+                        message.block_height = object.block_height;
+                    else if (typeof object.block_height === "object")
+                        message.block_height = new $util.LongBits(object.block_height.low >>> 0, object.block_height.high >>> 0).toNumber(true);
+                if (object.position_in_block != null)
                     if ($util.Long)
-                        (message.positionInBlock = $util.Long.fromValue(object.positionInBlock)).unsigned = true;
-                    else if (typeof object.positionInBlock === "string")
-                        message.positionInBlock = parseInt(object.positionInBlock, 10);
-                    else if (typeof object.positionInBlock === "number")
-                        message.positionInBlock = object.positionInBlock;
-                    else if (typeof object.positionInBlock === "object")
-                        message.positionInBlock = new $util.LongBits(object.positionInBlock.low >>> 0, object.positionInBlock.high >>> 0).toNumber(true);
+                        (message.position_in_block = $util.Long.fromValue(object.position_in_block)).unsigned = true;
+                    else if (typeof object.position_in_block === "string")
+                        message.position_in_block = parseInt(object.position_in_block, 10);
+                    else if (typeof object.position_in_block === "number")
+                        message.position_in_block = object.position_in_block;
+                    else if (typeof object.position_in_block === "object")
+                        message.position_in_block = new $util.LongBits(object.position_in_block.low >>> 0, object.position_in_block.high >>> 0).toNumber(true);
                 return message;
             };
     
@@ -4583,25 +4583,25 @@
                 if (options.defaults) {
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.blockHeight = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.block_height = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                     } else
-                        object.blockHeight = options.longs === String ? "0" : 0;
+                        object.block_height = options.longs === String ? "0" : 0;
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.positionInBlock = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.position_in_block = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                     } else
-                        object.positionInBlock = options.longs === String ? "0" : 0;
+                        object.position_in_block = options.longs === String ? "0" : 0;
                 }
-                if (message.blockHeight != null && message.hasOwnProperty("blockHeight"))
-                    if (typeof message.blockHeight === "number")
-                        object.blockHeight = options.longs === String ? String(message.blockHeight) : message.blockHeight;
+                if (message.block_height != null && message.hasOwnProperty("block_height"))
+                    if (typeof message.block_height === "number")
+                        object.block_height = options.longs === String ? String(message.block_height) : message.block_height;
                     else
-                        object.blockHeight = options.longs === String ? $util.Long.prototype.toString.call(message.blockHeight) : options.longs === Number ? new $util.LongBits(message.blockHeight.low >>> 0, message.blockHeight.high >>> 0).toNumber(true) : message.blockHeight;
-                if (message.positionInBlock != null && message.hasOwnProperty("positionInBlock"))
-                    if (typeof message.positionInBlock === "number")
-                        object.positionInBlock = options.longs === String ? String(message.positionInBlock) : message.positionInBlock;
+                        object.block_height = options.longs === String ? $util.Long.prototype.toString.call(message.block_height) : options.longs === Number ? new $util.LongBits(message.block_height.low >>> 0, message.block_height.high >>> 0).toNumber(true) : message.block_height;
+                if (message.position_in_block != null && message.hasOwnProperty("position_in_block"))
+                    if (typeof message.position_in_block === "number")
+                        object.position_in_block = options.longs === String ? String(message.position_in_block) : message.position_in_block;
                     else
-                        object.positionInBlock = options.longs === String ? $util.Long.prototype.toString.call(message.positionInBlock) : options.longs === Number ? new $util.LongBits(message.positionInBlock.low >>> 0, message.positionInBlock.high >>> 0).toNumber(true) : message.positionInBlock;
+                        object.position_in_block = options.longs === String ? $util.Long.prototype.toString.call(message.position_in_block) : options.longs === Number ? new $util.LongBits(message.position_in_block.low >>> 0, message.position_in_block.high >>> 0).toNumber(true) : message.position_in_block;
                 return object;
             };
     
@@ -5543,11 +5543,11 @@
                      * Properties of a Wallet.
                      * @memberof exonum.examples.cryptocurrency_advanced
                      * @interface IWallet
-                     * @property {exonum.IPublicKey|null} [pubKey] Wallet pubKey
+                     * @property {exonum.IPublicKey|null} [pub_key] Wallet pub_key
                      * @property {string|null} [name] Wallet name
                      * @property {number|Long|null} [balance] Wallet balance
-                     * @property {number|Long|null} [historyLen] Wallet historyLen
-                     * @property {exonum.IHash|null} [historyHash] Wallet historyHash
+                     * @property {number|Long|null} [history_len] Wallet history_len
+                     * @property {exonum.IHash|null} [history_hash] Wallet history_hash
                      */
     
                     /**
@@ -5566,12 +5566,12 @@
                     }
     
                     /**
-                     * Wallet pubKey.
-                     * @member {exonum.IPublicKey|null|undefined} pubKey
+                     * Wallet pub_key.
+                     * @member {exonum.IPublicKey|null|undefined} pub_key
                      * @memberof exonum.examples.cryptocurrency_advanced.Wallet
                      * @instance
                      */
-                    Wallet.prototype.pubKey = null;
+                    Wallet.prototype.pub_key = null;
     
                     /**
                      * Wallet name.
@@ -5590,20 +5590,20 @@
                     Wallet.prototype.balance = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
                     /**
-                     * Wallet historyLen.
-                     * @member {number|Long} historyLen
+                     * Wallet history_len.
+                     * @member {number|Long} history_len
                      * @memberof exonum.examples.cryptocurrency_advanced.Wallet
                      * @instance
                      */
-                    Wallet.prototype.historyLen = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
+                    Wallet.prototype.history_len = $util.Long ? $util.Long.fromBits(0,0,true) : 0;
     
                     /**
-                     * Wallet historyHash.
-                     * @member {exonum.IHash|null|undefined} historyHash
+                     * Wallet history_hash.
+                     * @member {exonum.IHash|null|undefined} history_hash
                      * @memberof exonum.examples.cryptocurrency_advanced.Wallet
                      * @instance
                      */
-                    Wallet.prototype.historyHash = null;
+                    Wallet.prototype.history_hash = null;
     
                     /**
                      * Creates a new Wallet instance using the specified properties.
@@ -5629,16 +5629,16 @@
                     Wallet.encode = function encode(message, writer) {
                         if (!writer)
                             writer = $Writer.create();
-                        if (message.pubKey != null && message.hasOwnProperty("pubKey"))
-                            $root.exonum.PublicKey.encode(message.pubKey, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                        if (message.pub_key != null && message.hasOwnProperty("pub_key"))
+                            $root.exonum.PublicKey.encode(message.pub_key, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
                         if (message.name != null && message.hasOwnProperty("name"))
                             writer.uint32(/* id 2, wireType 2 =*/18).string(message.name);
                         if (message.balance != null && message.hasOwnProperty("balance"))
                             writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.balance);
-                        if (message.historyLen != null && message.hasOwnProperty("historyLen"))
-                            writer.uint32(/* id 4, wireType 0 =*/32).uint64(message.historyLen);
-                        if (message.historyHash != null && message.hasOwnProperty("historyHash"))
-                            $root.exonum.Hash.encode(message.historyHash, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                        if (message.history_len != null && message.hasOwnProperty("history_len"))
+                            writer.uint32(/* id 4, wireType 0 =*/32).uint64(message.history_len);
+                        if (message.history_hash != null && message.hasOwnProperty("history_hash"))
+                            $root.exonum.Hash.encode(message.history_hash, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
                         return writer;
                     };
     
@@ -5674,7 +5674,7 @@
                             var tag = reader.uint32();
                             switch (tag >>> 3) {
                             case 1:
-                                message.pubKey = $root.exonum.PublicKey.decode(reader, reader.uint32());
+                                message.pub_key = $root.exonum.PublicKey.decode(reader, reader.uint32());
                                 break;
                             case 2:
                                 message.name = reader.string();
@@ -5683,10 +5683,10 @@
                                 message.balance = reader.uint64();
                                 break;
                             case 4:
-                                message.historyLen = reader.uint64();
+                                message.history_len = reader.uint64();
                                 break;
                             case 5:
-                                message.historyHash = $root.exonum.Hash.decode(reader, reader.uint32());
+                                message.history_hash = $root.exonum.Hash.decode(reader, reader.uint32());
                                 break;
                             default:
                                 reader.skipType(tag & 7);
@@ -5723,10 +5723,10 @@
                     Wallet.verify = function verify(message) {
                         if (typeof message !== "object" || message === null)
                             return "object expected";
-                        if (message.pubKey != null && message.hasOwnProperty("pubKey")) {
-                            var error = $root.exonum.PublicKey.verify(message.pubKey);
+                        if (message.pub_key != null && message.hasOwnProperty("pub_key")) {
+                            var error = $root.exonum.PublicKey.verify(message.pub_key);
                             if (error)
-                                return "pubKey." + error;
+                                return "pub_key." + error;
                         }
                         if (message.name != null && message.hasOwnProperty("name"))
                             if (!$util.isString(message.name))
@@ -5734,13 +5734,13 @@
                         if (message.balance != null && message.hasOwnProperty("balance"))
                             if (!$util.isInteger(message.balance) && !(message.balance && $util.isInteger(message.balance.low) && $util.isInteger(message.balance.high)))
                                 return "balance: integer|Long expected";
-                        if (message.historyLen != null && message.hasOwnProperty("historyLen"))
-                            if (!$util.isInteger(message.historyLen) && !(message.historyLen && $util.isInteger(message.historyLen.low) && $util.isInteger(message.historyLen.high)))
-                                return "historyLen: integer|Long expected";
-                        if (message.historyHash != null && message.hasOwnProperty("historyHash")) {
-                            var error = $root.exonum.Hash.verify(message.historyHash);
+                        if (message.history_len != null && message.hasOwnProperty("history_len"))
+                            if (!$util.isInteger(message.history_len) && !(message.history_len && $util.isInteger(message.history_len.low) && $util.isInteger(message.history_len.high)))
+                                return "history_len: integer|Long expected";
+                        if (message.history_hash != null && message.hasOwnProperty("history_hash")) {
+                            var error = $root.exonum.Hash.verify(message.history_hash);
                             if (error)
-                                return "historyHash." + error;
+                                return "history_hash." + error;
                         }
                         return null;
                     };
@@ -5757,10 +5757,10 @@
                         if (object instanceof $root.exonum.examples.cryptocurrency_advanced.Wallet)
                             return object;
                         var message = new $root.exonum.examples.cryptocurrency_advanced.Wallet();
-                        if (object.pubKey != null) {
-                            if (typeof object.pubKey !== "object")
-                                throw TypeError(".exonum.examples.cryptocurrency_advanced.Wallet.pubKey: object expected");
-                            message.pubKey = $root.exonum.PublicKey.fromObject(object.pubKey);
+                        if (object.pub_key != null) {
+                            if (typeof object.pub_key !== "object")
+                                throw TypeError(".exonum.examples.cryptocurrency_advanced.Wallet.pub_key: object expected");
+                            message.pub_key = $root.exonum.PublicKey.fromObject(object.pub_key);
                         }
                         if (object.name != null)
                             message.name = String(object.name);
@@ -5773,19 +5773,19 @@
                                 message.balance = object.balance;
                             else if (typeof object.balance === "object")
                                 message.balance = new $util.LongBits(object.balance.low >>> 0, object.balance.high >>> 0).toNumber(true);
-                        if (object.historyLen != null)
+                        if (object.history_len != null)
                             if ($util.Long)
-                                (message.historyLen = $util.Long.fromValue(object.historyLen)).unsigned = true;
-                            else if (typeof object.historyLen === "string")
-                                message.historyLen = parseInt(object.historyLen, 10);
-                            else if (typeof object.historyLen === "number")
-                                message.historyLen = object.historyLen;
-                            else if (typeof object.historyLen === "object")
-                                message.historyLen = new $util.LongBits(object.historyLen.low >>> 0, object.historyLen.high >>> 0).toNumber(true);
-                        if (object.historyHash != null) {
-                            if (typeof object.historyHash !== "object")
-                                throw TypeError(".exonum.examples.cryptocurrency_advanced.Wallet.historyHash: object expected");
-                            message.historyHash = $root.exonum.Hash.fromObject(object.historyHash);
+                                (message.history_len = $util.Long.fromValue(object.history_len)).unsigned = true;
+                            else if (typeof object.history_len === "string")
+                                message.history_len = parseInt(object.history_len, 10);
+                            else if (typeof object.history_len === "number")
+                                message.history_len = object.history_len;
+                            else if (typeof object.history_len === "object")
+                                message.history_len = new $util.LongBits(object.history_len.low >>> 0, object.history_len.high >>> 0).toNumber(true);
+                        if (object.history_hash != null) {
+                            if (typeof object.history_hash !== "object")
+                                throw TypeError(".exonum.examples.cryptocurrency_advanced.Wallet.history_hash: object expected");
+                            message.history_hash = $root.exonum.Hash.fromObject(object.history_hash);
                         }
                         return message;
                     };
@@ -5804,7 +5804,7 @@
                             options = {};
                         var object = {};
                         if (options.defaults) {
-                            object.pubKey = null;
+                            object.pub_key = null;
                             object.name = "";
                             if ($util.Long) {
                                 var long = new $util.Long(0, 0, true);
@@ -5813,13 +5813,13 @@
                                 object.balance = options.longs === String ? "0" : 0;
                             if ($util.Long) {
                                 var long = new $util.Long(0, 0, true);
-                                object.historyLen = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                                object.history_len = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                             } else
-                                object.historyLen = options.longs === String ? "0" : 0;
-                            object.historyHash = null;
+                                object.history_len = options.longs === String ? "0" : 0;
+                            object.history_hash = null;
                         }
-                        if (message.pubKey != null && message.hasOwnProperty("pubKey"))
-                            object.pubKey = $root.exonum.PublicKey.toObject(message.pubKey, options);
+                        if (message.pub_key != null && message.hasOwnProperty("pub_key"))
+                            object.pub_key = $root.exonum.PublicKey.toObject(message.pub_key, options);
                         if (message.name != null && message.hasOwnProperty("name"))
                             object.name = message.name;
                         if (message.balance != null && message.hasOwnProperty("balance"))
@@ -5827,13 +5827,13 @@
                                 object.balance = options.longs === String ? String(message.balance) : message.balance;
                             else
                                 object.balance = options.longs === String ? $util.Long.prototype.toString.call(message.balance) : options.longs === Number ? new $util.LongBits(message.balance.low >>> 0, message.balance.high >>> 0).toNumber(true) : message.balance;
-                        if (message.historyLen != null && message.hasOwnProperty("historyLen"))
-                            if (typeof message.historyLen === "number")
-                                object.historyLen = options.longs === String ? String(message.historyLen) : message.historyLen;
+                        if (message.history_len != null && message.hasOwnProperty("history_len"))
+                            if (typeof message.history_len === "number")
+                                object.history_len = options.longs === String ? String(message.history_len) : message.history_len;
                             else
-                                object.historyLen = options.longs === String ? $util.Long.prototype.toString.call(message.historyLen) : options.longs === Number ? new $util.LongBits(message.historyLen.low >>> 0, message.historyLen.high >>> 0).toNumber(true) : message.historyLen;
-                        if (message.historyHash != null && message.hasOwnProperty("historyHash"))
-                            object.historyHash = $root.exonum.Hash.toObject(message.historyHash, options);
+                                object.history_len = options.longs === String ? $util.Long.prototype.toString.call(message.history_len) : options.longs === Number ? new $util.LongBits(message.history_len.low >>> 0, message.history_len.high >>> 0).toNumber(true) : message.history_len;
+                        if (message.history_hash != null && message.hasOwnProperty("history_hash"))
+                            object.history_hash = $root.exonum.Hash.toObject(message.history_hash, options);
                         return object;
                     };
     

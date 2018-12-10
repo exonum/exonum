@@ -1,4 +1,5 @@
-import * as Exonum from 'exonum-client'
+//import * as Exonum from 'exonum-client'
+import * as Exonum from '../../exonum-client'
 import axios from 'axios'
 import * as proto from '../../proto/protocol.js'
 
@@ -94,7 +95,7 @@ module.exports = {
 
         // Transaction data
         const data = {
-          to: { data: Uint8Array.from(Exonum.hexadecimalToUint8Array(receiver)) },
+          to: { data: Exonum.hexadecimalToUint8Array(receiver) },
           amount: amountToTransfer,
           seed: seed
         }
