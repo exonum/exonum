@@ -51,21 +51,21 @@ impl IndexMetadata {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum IndexType {
-    Entry,
-    KeySet,
-    List,
-    SparseList,
-    Map,
-    ProofList,
-    ProofMap,
-    ValueSet,
+    Entry = 0,
+    KeySet = 1,
+    List = 2,
+    SparseList = 3,
+    Map = 4,
+    ProofList = 5,
+    ProofMap = 6,
+    ValueSet = 7,
 }
 
 impl ProtobufConvert for IndexType {
     type ProtoStruct = u32;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        (*self).into()
+        *self as u32
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
@@ -86,22 +86,6 @@ impl ProtobufConvert for IndexType {
             ),
         };
         Ok(index)
-    }
-}
-
-impl From<IndexType> for u32 {
-    fn from(idx: IndexType) -> Self {
-        use self::IndexType::*;
-        match idx {
-            Entry => 0,
-            KeySet => 1,
-            List => 2,
-            SparseList => 3,
-            Map => 4,
-            ProofList => 5,
-            ProofMap => 6,
-            ValueSet => 7,
-        }
     }
 }
 
