@@ -14,7 +14,7 @@
 
 //! Protobuf generated structs and traits for conversion.
 //!
-//! Central part of this module is [`ProtobufConvert`].
+//! Central part of this module is [`ProtobufConvert`](./trait.ProtobufConvert.html).
 //! Main purpose of this trait is to allow
 //! users to create map between their types and types generated from .proto descriptions while
 //! providing mechanism for additional validation of protobuf data.
@@ -57,8 +57,6 @@
 //!     my_struct_small: MyStructSmall,
 //! }
 //! ```
-//!
-//! [`ProtobufConvert`] ./trait.ProtobufConvert
 
 pub use self::schema::blockchain::{Block, ConfigReference, TransactionResult, TxLocation};
 pub use self::schema::helpers::{BitVec, Hash, PublicKey};
