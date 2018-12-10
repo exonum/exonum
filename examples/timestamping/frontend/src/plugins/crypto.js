@@ -17,9 +17,6 @@ export default {
           };
           reader.readAsBinaryString(file);
         })
-      },
-      fromHexString: hash => {
-        return Uint8Array.from(hash.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
       }
     }
   }

@@ -1,4 +1,3 @@
-
 import * as Exonum from '../../exonum-client/dist/exonum-client'
 // import * as Exonum from 'exonum-client'
 import * as Protobuf from 'protobufjs/light'
@@ -10,22 +9,40 @@ const SERVICE_ID = 130;
 const TX_ID = 0;
 const TABLE_INDEX = 0;
 const SystemTime = Exonum.newType({
-  fields: [
-    { name: 'secs', type: Exonum.Uint64 },
-    { name: 'nanos', type: Exonum.Uint32 }
+  fields: [{
+      name: 'secs',
+      type: Exonum.Uint64
+    },
+    {
+      name: 'nanos',
+      type: Exonum.Uint32
+    }
   ]
 });
 const Timestamp = Exonum.newType({
-  fields: [
-    { name: 'content_hash', type: Exonum.Hash },
-    { name: 'metadata', type: Exonum.String }
+  fields: [{
+      name: 'content_hash',
+      type: Exonum.Hash
+    },
+    {
+      name: 'metadata',
+      type: Exonum.String
+    }
   ]
 });
 const TimestampEntry = Exonum.newType({
-  fields: [
-    { name: 'timestamp', type: Timestamp },
-    { name: 'tx_hash', type: Exonum.Hash },
-    { name: 'time', type: SystemTime }
+  fields: [{
+      name: 'timestamp',
+      type: Timestamp
+    },
+    {
+      name: 'tx_hash',
+      type: Exonum.Hash
+    },
+    {
+      name: 'time',
+      type: SystemTime
+    }
   ]
 });
 
@@ -40,11 +57,12 @@ module.exports = {
         // Define transaction data
         const data = {
           content: {
-              contentHash: { data: Vue.prototype.$crypto.fromHexString(hash) },
-              metadata: metadata
+            contentHash: {
+              data: Uint8Array.from(hash.match(/.{1,2}/g).map(byte => parseInt(byte, 16)))
+            },
+            metadata: metadata
           }
         };
-
 
         // Define Exonum transaction
         const transaction = Exonum.newTransaction({
