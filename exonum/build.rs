@@ -1,71 +1,24 @@
-// spell-checker:ignore rustc, walkdir
+// spell-checker:ignore rustc
 
-extern crate protoc_rust;
-extern crate walkdir;
+extern crate exonum_build;
 
-use protoc_rust::Customize;
-use walkdir::WalkDir;
+use exonum_build::protobuf_generate;
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
 static USER_AGENT_FILE_NAME: &str = "user_agent";
 
-fn get_proto_files<P: AsRef<Path>>(path: P) -> Vec<String> {
-    WalkDir::new(path)
-        .into_iter()
-        .filter_map(|e| {
-            let e = e.ok()?;
-            if e.path().extension()?.to_str() == Some("proto") {
-                Some(e.path().to_str()?.to_owned())
-            } else {
-                None
-            }
-        }).collect()
+fn create_path_to_protobuf_schema_env() {
+    // Workaround for https://github.com/rust-lang/cargo/issues/3544
+    // We "link" exonum with exonum_protobuf library
+    // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
+    let path = env::current_dir()
+        .expect("Failed to get current dir.")
+        .join("src/encoding/protobuf/proto");
+    println!("cargo:protos={}", path.to_str().unwrap());
 }
 
-/// Workaround for https://github.com/stepancheg/rust-protobuf/issues/324
-fn generate_mod_rs(out_dir: &str, proto_files: &[String], mod_file: &str) {
-    let mod_file_content = {
-        proto_files
-            .iter()
-            .map(|f| {
-                let mod_name = Path::new(f)
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .expect("proto file name is not &str");
-                if mod_name == "tests" {
-                    format!("#[cfg(test)]\npub mod {};\n", mod_name)
-                } else {
-                    format!("pub mod {};\n", mod_name)
-                }
-            }).collect::<String>()
-    };
-    let dest_path = Path::new(&out_dir).join(mod_file);
-    let mut file = File::create(dest_path).expect("Unable to create output file");
-    file.write_all(mod_file_content.as_bytes())
-        .expect("Unable to write data to file");
-}
-
-fn protoc_generate(out_dir: &str, input_dir: &str, includes: &[&str], mod_file: &str) {
-    let proto_files = get_proto_files(input_dir);
-
-    generate_mod_rs(out_dir, &proto_files, mod_file);
-
-    protoc_rust::run(protoc_rust::Args {
-        out_dir,
-        input: &proto_files.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
-        includes,
-        customize: Customize {
-            serde_derive: Some(true),
-            ..Default::default()
-        },
-    }).expect("protoc");
-
-    println!("cargo:rerun-if-changed={}", input_dir);
-}
-
-fn main() {
+fn write_user_agent_file() {
     let package_name = option_env!("CARGO_PKG_NAME").unwrap_or("exonum");
     let package_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
     let rust_version = rust_version().unwrap_or("rust ?".to_string());
@@ -76,17 +29,21 @@ fn main() {
     let mut file = File::create(dest_path).expect("Unable to create output file");
     file.write_all(user_agent.as_bytes())
         .expect("Unable to write data to file");
+}
 
-    protoc_generate(
-        &out_dir,
+fn main() {
+    write_user_agent_file();
+
+    create_path_to_protobuf_schema_env();
+
+    protobuf_generate(
         "src/encoding/protobuf/proto/",
         &["src/encoding/protobuf/proto"],
         "exonum_proto_mod.rs",
     );
 
     // Exonum external tests.
-    protoc_generate(
-        &out_dir,
+    protobuf_generate(
         "tests/explorer/blockchain/proto",
         &[
             "tests/explorer/blockchain/proto",
@@ -96,8 +53,7 @@ fn main() {
     );
 
     // Exonum benchmarks.
-    protoc_generate(
-        &out_dir,
+    protobuf_generate(
         "benches/criterion/proto",
         &["benches/criterion/proto", "src/encoding/protobuf/proto"],
         "exonum_benches_proto_mod.rs",

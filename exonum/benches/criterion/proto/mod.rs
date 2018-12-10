@@ -20,6 +20,4 @@ pub use self::bench_transactions::{CurrencyTx, TimestampTx};
 
 include!(concat!(env!("OUT_DIR"), "/exonum_benches_proto_mod.rs"));
 
-pub mod helpers {
-    pub use exonum::encoding::protobuf::helpers::*;
-}
+use exonum::encoding::protobuf::*;

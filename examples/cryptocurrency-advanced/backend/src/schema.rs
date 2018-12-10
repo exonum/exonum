@@ -84,13 +84,13 @@ impl<'a> Schema<&'a mut Fork> {
     /// Panics if there is no wallet with given public key.
     pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
         let wallet = {
-            let mut history = self.wallet_history_mut(wallet.pub_key());
+            let mut history = self.wallet_history_mut(&wallet.pub_key);
             history.push(*transaction);
-            let history_hash = history.merkle_root();
-            let balance = wallet.balance();
+            let history_hash = history.list_hash();
+            let balance = wallet.balance;
             wallet.set_balance(balance + amount, &history_hash)
         };
-        self.wallets_mut().put(wallet.pub_key(), wallet.clone());
+        self.wallets_mut().put(&wallet.pub_key, wallet.clone());
     }
 
     /// Decrease balance of the wallet and append new record to its history.
@@ -98,13 +98,13 @@ impl<'a> Schema<&'a mut Fork> {
     /// Panics if there is no wallet with given public key.
     pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
         let wallet = {
-            let mut history = self.wallet_history_mut(wallet.pub_key());
+            let mut history = self.wallet_history_mut(&wallet.pub_key);
             history.push(*transaction);
-            let history_hash = history.merkle_root();
-            let balance = wallet.balance();
+            let history_hash = history.list_hash();
+            let balance = wallet.balance;
             wallet.set_balance(balance - amount, &history_hash)
         };
-        self.wallets_mut().put(wallet.pub_key(), wallet.clone());
+        self.wallets_mut().put(&wallet.pub_key, wallet.clone());
     }
 
     /// Create new wallet and append first record to its history.
@@ -112,7 +112,7 @@ impl<'a> Schema<&'a mut Fork> {
         let wallet = {
             let mut history = self.wallet_history_mut(key);
             history.push(*transaction);
-            let history_hash = history.merkle_root();
+            let history_hash = history.list_hash();
             Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash)
         };
         self.wallets_mut().put(key, wallet);

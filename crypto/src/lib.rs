@@ -23,9 +23,15 @@
 extern crate byteorder;
 extern crate chrono;
 extern crate hex;
+extern crate hex_buffer_serde;
+extern crate pwbox;
+extern crate rand;
 extern crate rust_decimal;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
+extern crate toml;
 extern crate uuid;
 
 #[doc(inline)]
@@ -34,6 +40,7 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
+pub use self::utils::{generate_keys_file, read_keys_from_file};
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
@@ -61,6 +68,7 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 mod macros;
 
 pub(crate) mod crypto_lib;
+pub(crate) mod utils;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;

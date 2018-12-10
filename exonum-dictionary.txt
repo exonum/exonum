@@ -50,6 +50,7 @@ hashable
 healthcheck
 idempotence
 interlayer
+kdfparams
 keepalive
 keypair
 keypairs
@@ -61,6 +62,7 @@ libsodium
 libssl
 maintainer's
 markdownlint
+memlimit
 memorydb
 mempool
 Merkelized
@@ -73,11 +75,13 @@ msgs
 multiproof
 multiproofs
 mutex
+nacl
 nanos
 nodelay
 nonoptimal
 oneshot
 openssl
+opslimit
 peekable
 permissioned
 postagainst
@@ -96,8 +100,10 @@ proptest
 protobuf
 proto
 protoc
+protos
 pubkey
 pubkeys
+pwbox
 readonly
 rebasing
 reddit
@@ -115,6 +121,7 @@ runtimes
 rustfmt
 rustup
 scalarmult
+scrypt
 seedable
 serde
 serializable
@@ -133,6 +140,7 @@ subsec
 supermajority
 supervisorctl
 supervisord
+symm
 tempdir
 terminfo
 testdata
@@ -161,4 +169,5 @@ validators
 websockets
 whitelisted
 writeln
+xsalsa
 xorshift

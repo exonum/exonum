@@ -254,7 +254,7 @@ impl Propose {
 
             ProposeData::new(
                 self.clone(),
-                &votes_table.merkle_root(),
+                &votes_table.list_hash(),
                 num_validators as u64,
             )
         };
@@ -368,7 +368,7 @@ impl VotingContext {
             votes.set(validator_id as u64, self.decision.into());
             ProposeData::new(
                 propose_data.tx_propose(),
-                &votes.merkle_root(),
+                &votes.list_hash(),
                 propose_data.num_validators(),
             )
         };

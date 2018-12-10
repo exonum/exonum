@@ -183,8 +183,8 @@ where
         }
     }
 
-    fn list_hash(&self) -> Hash {
-        HashTag::list_hash(self.len(), self.merkle_root())
+    fn merkle_root(&self) -> Hash {
+        self.get_branch(self.root_key()).unwrap_or_default()
     }
 
     /// Returns the element at the indicated position or `None` if the indicated position
@@ -299,8 +299,13 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the Merkle root hash of the proof list or the default hash value
-    /// if it is empty. The default hash consists solely of zeroes.
+    /// Returns the list hash of the proof list or the default hash value
+    /// if it is empty.
+    /// List hash is calculated as follows:
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// Default hash:
+    /// h = sha-256( HashTag::List || 0 || Hash::default() )
+    ///
     ///
     /// # Examples
     ///
@@ -313,15 +318,15 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
-    /// let default_hash = index.merkle_root();
-    /// assert_eq!(Hash::default(), default_hash);
+    /// let default_hash = index.list_hash();
+    /// assert_eq!(HashTag::default_list_hash(), default_hash);
     ///
     /// index.push(1);
-    /// let hash = index.merkle_root();
+    /// let hash = index.list_hash();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn merkle_root(&self) -> Hash {
-        self.get_branch(self.root_key()).unwrap_or_default()
+    pub fn list_hash(&self) -> Hash {
+        HashTag::hash_list(self.len(), self.merkle_root())
     }
 
     /// Returns the proof of existence for the list element at the specified position.
@@ -616,17 +621,17 @@ where
 /// If `hashes` are empty then `Hash::zero()` value is returned.
 pub fn root_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
-        0 => Hash::zero(),
-        1 => HashTag::hash_leaf(hashes[0]),
+        0 => HashTag::default_list_hash(),
+        1 => HashTag::hash_list(1, HashTag::hash_leaf(hashes[0])),
         _ => {
-            let hashes: Vec<Hash> = hashes.into_iter().map(|h| HashTag::hash_leaf(*h)).collect();
+            let hashes: Vec<Hash> = hashes.iter().map(|h| HashTag::hash_leaf(*h)).collect();
 
             let mut current_hashes = combine_hash_list(&hashes);
 
             while current_hashes.len() > 1 {
                 current_hashes = combine_hash_list(&current_hashes);
             }
-            current_hashes[0]
+            HashTag::hash_list(hashes.len() as u64, current_hashes[0])
         }
     }
 }

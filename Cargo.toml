@@ -10,5 +10,6 @@ members = [
     "examples/cryptocurrency-advanced/backend",
     "examples/timestamping/backend",
     "exonum_derive",
+    "exonum_build",
 ]
 exclude = [ "exonum/fuzz" ]

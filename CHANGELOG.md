@@ -76,12 +76,26 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `exonum_derive` crate has been added with custom derives for `ProtobufConvert`
   and `TransactionSet`. (#1055)
 
+- `TransactionResult` is now serialized using protobuf. Empty description
+  of the result is now the equivalent of there being no description
+  of the result. (#1075)
+
+#### exonum-testkit
+
+- Structures in tests and examples are serialized using protobuf now. (#1078)
+
 #### exonum-configuration
 
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of
   full transaction message. (#984)
 
 ### New Features
+
+#### exonum-crypto
+
+- Added `utils` module with functions `create_keys_file` for creating
+  and `read_keys_from_file` for reading files that contain a
+  public key and encrypted secret key. (#1056)
 
 #### exonum
 
@@ -108,6 +122,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Now peers require only one connection to exchange messages between
   them. (#945)
+
+#### exonum_build
+
+- `exonum_build` crate has been added to simplify writing `build.rs` files
+  for services that use protobuf code generation. (#1076)
 
 ### Bug Fixes
 
