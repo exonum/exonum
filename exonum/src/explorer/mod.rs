@@ -402,7 +402,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
 /// enum Transactions {
 ///    CreateWallet(CreateWallet),
-///     // other transaction types...
+///     // Other transaction types...
 /// }
 ///
 /// # impl Transaction for CreateWallet {
@@ -575,7 +575,7 @@ impl CommittedTransaction {
 /// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
 /// enum Transactions {
 ///    CreateWallet(CreateWallet),
-///     // other transaction types...
+///     // Other transaction types...
 /// }
 ///
 /// # impl Transaction for CreateWallet {

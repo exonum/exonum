@@ -14,23 +14,24 @@
 
 //! Protobuf generated structs and traits for conversion.
 //!
-//! Central part of this module is [`ProtobufConvert`](./trait.ProtobufConvert.html).
-//! Main purpose of this trait is to allow
-//! users to create map between their types and types generated from .proto descriptions while
-//! providing mechanism for additional validation of protobuf data.
+//! The central part of this module is [`ProtobufConvert`](./trait.ProtobufConvert.html).
+//! The main purpose of this trait is to allow
+//! users to create a map between their types and the types generated from .proto descriptions, while
+//! providing a mechanism for additional validation of protobuf data.
 //!
 //! Most of the time you do not have to implement this trait because most of the use cases are covered
 //! by `#[derive(ProtobufConvert)]` from `exonum_derive` crate.
 //!
-//! Typical example of such mapping with validation is manual implementation of this trait for `crypto::Hash`.
-//! `crypto::Hash` is fixed sized array of bytes but protobuf does not allow us to express this constraint since
+//! A typical example of such mapping with validation is manual implementation of this trait for `crypto::Hash`.
+//! `crypto::Hash` is a fixed sized array of bytes but protobuf does not allow us to express this constraint since
 //! only dynamically sized arrays are supported.
 //! If you would like to use `Hash` as a part of your
-//! protobuf struct you would have to write conversion function from protobuf `proto::Hash`(which
+//! protobuf struct, you would have to write a conversion function from protobuf `proto::Hash`(which
 //! is dynamically sized array of bytes) to`crypto::Hash` and call it every time when you want to
 //! use `crypto::Hash` in your application.
-//! Provided `ProtobufConvert` implementation for `Hash` will allow you to embed this field into your
-//! struct and generate `ProtobufConvert` for it using `#[derive(ProtobufConvert)]` which will validate
+//!
+//! The provided `ProtobufConvert` implementation for Hash allows you to embed this field into your
+//! struct and generate `ProtobufConvert` for it using `#[derive(ProtobufConvert)]`, which will validate
 //! your struct based on the validation function for `Hash`.
 //!
 //! # Examples

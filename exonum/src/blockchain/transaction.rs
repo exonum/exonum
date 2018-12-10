@@ -438,7 +438,8 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `#[derive(TransactionSet)]`
-/// attribute used on the enum with transactions as a variants.
+/// attribute.
+/// This attribute is used on the enum which has transactions as its variants.
 pub trait TransactionSet:
     Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
