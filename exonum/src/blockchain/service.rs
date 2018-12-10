@@ -83,13 +83,13 @@ use storage::{Fork, Snapshot};
 /// }
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::doc_tests::TxA")]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::TxA")]
 /// struct TxA {
 ///     // Transaction fields
 /// }
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::doc_tests::TxB")]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::TxB")]
 /// struct TxB {
 ///     // ...
 /// }

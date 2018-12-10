@@ -146,7 +146,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// use exonum::storage::Fork;
     ///
     /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-    /// #[exonum(pb = "exonum::proto::doc_tests::MyTransaction")]
+    /// #[exonum(pb = "exonum::proto::schema::doc_tests::MyTransaction")]
     /// struct MyTransaction {
     ///     // Transaction definition...
     ///     public_key: PublicKey,
@@ -694,7 +694,7 @@ mod tests {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::tests::TestServiceTx", crate = "crate")]
+    #[exonum(pb = "proto::schema::tests::TestServiceTx", crate = "crate")]
     struct TxResult {
         value: u64,
     }

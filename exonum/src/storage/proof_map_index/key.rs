@@ -77,7 +77,7 @@ where
 /// # use exonum::storage::{MemoryDB, Database, ProofMapIndex, HashedKey};
 ///
 /// #[derive(ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::doc_tests::Point")]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::Point")]
 /// struct Point {
 ///     x: i32,
 ///     y: i32,

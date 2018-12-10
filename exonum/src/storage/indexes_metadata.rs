@@ -31,7 +31,10 @@ const CORE_STORAGE_METADATA: StorageMetadata = StorageMetadata { version: 0 };
 const CORE_STORAGE_METADATA_KEY: &str = "__STORAGE_METADATA__";
 
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::storage::IndexMetadata", crate = "crate")]
+#[exonum(
+    pb = "proto::schema::storage::IndexMetadata",
+    crate = "crate"
+)]
 struct IndexMetadata {
     index_type: IndexType,
     is_family: bool,

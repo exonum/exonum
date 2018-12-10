@@ -25,7 +25,7 @@ fn test_block_response_empty_size() {
 }
 
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::tests::CreateWallet", crate = "crate")]
+#[exonum(pb = "proto::schema::tests::CreateWallet", crate = "crate")]
 struct CreateWallet {
     pubkey: PublicKey,
     name: String,

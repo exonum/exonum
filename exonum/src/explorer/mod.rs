@@ -394,7 +394,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # use exonum::helpers::Height;
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::doc_tests::CreateWallet")]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
 /// struct CreateWallet {
 ///     name: String,
 /// }
@@ -567,7 +567,7 @@ impl CommittedTransaction {
 /// # use exonum::explorer::TransactionInfo;
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "exonum::proto::doc_tests::CreateWallet")]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
 /// struct CreateWallet {
 ///     name: String,
 /// }

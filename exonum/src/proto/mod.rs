@@ -43,7 +43,7 @@
 //! // See doc_tests.proto for protobuf definitions of this structs.
 //!
 //! #[derive(ProtobufConvert)]
-//! #[exonum(pb = "exonum::proto::doc_tests::MyStructSmall")]
+//! #[exonum(pb = "exonum::proto::schema::doc_tests::MyStructSmall")]
 //! struct MyStructSmall {
 //!     key: PublicKey,
 //!     num_field: u32,
@@ -51,7 +51,7 @@
 //! }
 //!
 //! #[derive(ProtobufConvert)]
-//! #[exonum(pb = "exonum::proto::doc_tests::MyStructBig")]
+//! #[exonum(pb = "exonum::proto::schema::doc_tests::MyStructBig")]
 //! struct MyStructBig {
 //!     hash: Hash,
 //!     my_struct_small: MyStructSmall,
@@ -60,18 +60,16 @@
 //!
 //! [`ProtobufConvert`] ./trait.ProtobufConvert
 
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
-
-pub use self::blockchain::{Block, ConfigReference, TransactionResult, TxLocation};
-pub use self::helpers::{BitVec, Hash, PublicKey};
-pub use self::protocol::{
+pub use self::schema::blockchain::{Block, ConfigReference, TransactionResult, TxLocation};
+pub use self::schema::helpers::{BitVec, Hash, PublicKey};
+pub use self::schema::protocol::{
     BlockRequest, BlockResponse, Connect, PeersRequest, Precommit, Prevote, PrevotesRequest,
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
 };
 
-include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
+pub mod schema;
+#[cfg(test)]
+mod tests;
 
 use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};

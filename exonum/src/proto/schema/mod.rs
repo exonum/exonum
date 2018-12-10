@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module of the rust-protobuf generated files.
+//! Module with protobuf generated files from `schema/exonum`.
 
+// For rust-protobuf generated files.
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::cryptocurrency::{CreateWallet, Issue, Transfer, Wallet};
-
-include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
-
-use exonum::proto::schema::*;
+include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));

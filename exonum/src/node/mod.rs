@@ -1062,7 +1062,7 @@ mod tests {
     use crypto::gen_keypair;
     use events::EventHandler;
     use helpers;
-    use proto::{tests::TxSimple, ProtobufConvert};
+    use proto::{schema::tests::TxSimple, ProtobufConvert};
     use storage::{Database, MemoryDB, Snapshot};
     const SERVICE_ID: u16 = 0;
 

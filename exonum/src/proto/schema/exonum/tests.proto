@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 import "exonum/helpers.proto";
+import "google/protobuf/timestamp.proto";
 
 package exonum.tests;
 
@@ -74,4 +75,16 @@ message TestProtobufConvert {
   bool boolean = 13;
   sint32 s_i32 = 14;
   sint64 s_i64 = 15;
+  bytes bytes_field = 16;
+  string string_field = 17;
+  Point message_field = 18;
+  exonum.BitVec bit_vec = 19;
+  google.protobuf.Timestamp time = 20;
+}
+
+message TestProtobufConvertRepeated {
+  repeated exonum.PublicKey keys = 1;
+  repeated bytes bytes_array = 2;
+  repeated string string_array = 3;
+  repeated uint32 num_array = 4;
 }

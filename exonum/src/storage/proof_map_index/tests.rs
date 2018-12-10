@@ -1258,7 +1258,7 @@ fn iter(db: Box<dyn Database>) {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::tests::Point", crate = "crate")]
+#[exonum(pb = "proto::schema::tests::Point", crate = "crate")]
 struct Point {
     x: u16,
     y: u16,

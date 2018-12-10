@@ -22,4 +22,4 @@ pub use self::cryptocurrency::{TxCreateWallet, TxTransfer, Wallet};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::*;
+use exonum::proto::schema::*;

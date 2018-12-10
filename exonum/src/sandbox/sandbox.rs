@@ -1162,7 +1162,7 @@ mod tests {
     use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crypto::{gen_keypair_from_seed, Seed};
     use messages::RawTransaction;
-    use proto::tests::TxAfterCommit;
+    use proto::schema::tests::TxAfterCommit;
     use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use storage::Snapshot;
 

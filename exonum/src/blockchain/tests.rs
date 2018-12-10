@@ -19,7 +19,7 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
-use crypto::{gen_keypair, Hash, PublicKey};
+use crypto::{gen_keypair, Hash};
 use helpers::{Height, ValidatorId};
 use messages::{Message, RawTransaction};
 use proto;
@@ -49,7 +49,7 @@ impl Service for TestService {
 }
 
 #[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "proto::tests::TestServiceTx", crate = "crate")]
+#[exonum(pb = "proto::schema::tests::TestServiceTx", crate = "crate")]
 struct Tx {
     value: u64,
 }
@@ -168,7 +168,7 @@ mod transactions_tests {
     use messages::Message;
     use serde_json;
 
-    use proto::tests::{BlockchainTestTxA, BlockchainTestTxB};
+    use proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
@@ -525,24 +525,4 @@ mod rocksdb_tests {
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);
     }
-}
-
-#[derive(Debug, ProtobufConvert)]
-#[exonum(pb = "proto::tests::TestProtobufConvert", crate = "crate")]
-struct TestProtobufConvertTypes {
-    key: PublicKey,
-    hash: Hash,
-    unsigned_32: u32,
-    unsigned_64: u64,
-    regular_i32: i32,
-    regular_i64: i64,
-    fixed_u32: u32,
-    fixed_u64: u64,
-    fixed_i32: i32,
-    fixed_i64: i64,
-    float_32: f32,
-    float_64: f64,
-    boolean: bool,
-    s_i32: i32,
-    s_i64: i64,
 }
