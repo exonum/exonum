@@ -172,7 +172,7 @@ pub trait Service: Send + Sync + 'static {
     /// these operations should be performed in the `Transaction::verify` and
     /// `Transaction::execute` methods.
     ///
-    /// `#[derive(TransactionSet)]` macro generates code that allows simple implementation, see
+    /// `#[derive(TransactionSet)]` attribute generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>;
 
