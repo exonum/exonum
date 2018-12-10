@@ -37,7 +37,7 @@ use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use encoding::protobuf;
 use helpers::{Height, Round, ValidatorId};
-use storage::{proof_list_index as merkle, HashTag, StorageValue};
+use storage::{HashTag, StorageValue};
 
 /// `SignedMessage` size with zero bytes payload.
 #[doc(hidden)]
@@ -687,9 +687,9 @@ impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
         let list_hash =
-            HashTag::hash_list(self.transactions().len() as u64, *self.block().tx_hash());
+            HashTag::hash_list_node(self.transactions().len() as u64, *self.block().tx_hash());
 
-        list_hash == merkle::root_hash(self.transactions())
+        list_hash == HashTag::hash_list(self.transactions())
     }
 }
 

@@ -103,7 +103,7 @@ impl PublicApi {
 
         let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(&query.pub_key);
-            let proof = history.get_range_proof(0, history.len());
+            let proof = history.get_range_proof(0..history.len());
 
             let transactions = history
                 .iter()

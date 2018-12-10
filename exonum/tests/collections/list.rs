@@ -133,7 +133,7 @@ mod proof_list_index {
 
     impl<'a, V> Modifier<ProofListIndex<&'a mut Fork, V>> for ListAction<V>
     where
-        V: StorageValue,
+        V: StorageValue + Clone,
     {
         fn modify(self, list: &mut ProofListIndex<&mut Fork, V>) {
             match self {

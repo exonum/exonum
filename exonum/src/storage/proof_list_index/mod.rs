@@ -16,9 +16,13 @@
 
 pub use self::proof::{ListProof, ListProofError};
 
-use std::{cell::Cell, marker::PhantomData};
+use std::{
+    cell::Cell,
+    marker::PhantomData,
+    ops::{Bound, RangeBounds},
+};
 
-use self::key::ProofListKey;
+use self::{key::ProofListKey, proof::ProofOfAbsence};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
@@ -299,12 +303,16 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the list hash of the proof list or the default hash value
-    /// if it is empty.
+    /// Returns the list hash of the proof list or the hash value
+    /// of the empty list.
     /// List hash is calculated as follows:
+    /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
-    /// Default hash:
+    /// ```
+    /// Empty list hash:
+    /// ```text
     /// h = sha-256( HashTag::List || 0 || Hash::default() )
+    /// ```
     ///
     ///
     /// # Examples
@@ -326,14 +334,12 @@ where
     /// assert_ne!(hash, default_hash);
     /// ```
     pub fn list_hash(&self) -> Hash {
-        HashTag::hash_list(self.len(), self.merkle_root())
+        HashTag::hash_list_node(self.len(), self.merkle_root())
     }
 
     /// Returns the proof of existence for the list element at the specified position.
     ///
-    /// # Panics
-    ///
-    /// Panics if `index` is out of bounds.
+    /// Returns the proof of absence if list doesn't contains element with specified `index`.
     ///
     /// # Examples
     ///
@@ -348,10 +354,12 @@ where
     /// index.push(1);
     ///
     /// let proof = index.get_proof(0);
+    ///
+    /// let proof_of_absence = index.get_proof(1);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
-            return ListProof::Absent(index, self.list_hash());
+            return ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()));
         }
 
         self.construct_proof(self.root_key(), index, index + 1)
@@ -359,9 +367,12 @@ where
 
     /// Returns the proof of existence for the list elements in the specified range.
     ///
+    /// Returns the proof of absence of the element which index if equals to upper bound if the
+    /// upper bound is bigger than the list length.
+    ///
     /// # Panics
     ///
-    /// Panics if the range is out of bounds.
+    /// Panics if the range bounds if illegal.
     ///
     /// # Examples
     ///
@@ -375,9 +386,22 @@ where
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
-    /// let list_proof = index.get_range_proof(1, 3);
+    /// let list_proof = index.get_range_proof(1..3);
+    ///
+    /// let list_proof_of_absence = index.get_range_proof(1..10);
+    ///
     /// ```
-    pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
+    pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
+        let from = match range.start_bound() {
+            Bound::Unbounded => 0u64,
+            Bound::Included(from) | Bound::Excluded(from) => *from,
+        };
+
+        let to = match range.end_bound() {
+            Bound::Unbounded => panic!("Unbounded end bound is not valid range bound for proof.",),
+            Bound::Included(to) | Bound::Excluded(to) => *to,
+        };
+
         if to <= from {
             panic!(
                 "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
@@ -386,7 +410,7 @@ where
         }
 
         if to > self.len() {
-            ListProof::Absent(to, self.list_hash())
+            ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()))
         } else {
             self.construct_proof(self.root_key(), from, to)
         }
@@ -614,34 +638,4 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
     }
-}
-
-/// Computes Merkle root hash for a given list of hashes.
-///
-/// If `hashes` are empty then `Hash::zero()` value is returned.
-pub fn root_hash(hashes: &[Hash]) -> Hash {
-    match hashes.len() {
-        0 => HashTag::default_list_hash(),
-        1 => HashTag::hash_list(1, HashTag::hash_leaf(hashes[0])),
-        _ => {
-            let hashes: Vec<Hash> = hashes.iter().map(|h| HashTag::hash_leaf(*h)).collect();
-
-            let mut current_hashes = combine_hash_list(&hashes);
-
-            while current_hashes.len() > 1 {
-                current_hashes = combine_hash_list(&current_hashes);
-            }
-            HashTag::hash_list(hashes.len() as u64, current_hashes[0])
-        }
-    }
-}
-
-fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
-    hashes
-        .chunks(2)
-        .map(|pair| match pair {
-            [first, second] => HashTag::hash_node(first, second),
-            [single] => HashTag::hash_single_node(single),
-            _ => unreachable!(),
-        }).collect()
 }

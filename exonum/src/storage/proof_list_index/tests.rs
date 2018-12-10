@@ -16,7 +16,7 @@ use hex::FromHex;
 use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
 
 use self::ListProof::*;
-use super::{root_hash, ListProof, ProofListIndex};
+use super::{ListProof, ProofListIndex};
 use crypto::{hash, Hash};
 use encoding::serialize::{
     json::reexport::{from_str, to_string},
@@ -129,11 +129,11 @@ fn list_index_proof(db: Box<dyn Database>) {
     let h22 = HashTag::hash_single_node(&h2);
     let h012 = HashTag::hash_node(&h01, &h22);
 
-    assert_eq!(index.list_hash(), HashTag::default_list_hash());
+    assert_eq!(index.list_hash(), HashTag::empty_list_hash());
 
     index.push(2u64);
 
-    assert_eq!(index.list_hash(), HashTag::hash_list(1, h0));
+    assert_eq!(index.list_hash(), HashTag::hash_list_node(1, h0));
     assert_eq!(index.get_proof(0), Leaf(2));
     assert_eq!(
         index
@@ -144,7 +144,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
 
     index.push(4u64);
-    assert_eq!(index.list_hash(), HashTag::hash_list(2, h01));
+    assert_eq!(index.list_hash(), HashTag::hash_list_node(2, h01));
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
     assert_eq!(
         index
@@ -163,19 +163,19 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
 
     assert_eq!(
-        index.get_range_proof(0, 2),
+        index.get_range_proof(0..2),
         Full(Box::new(Leaf(2)), Box::new(Leaf(4)))
     );
     assert_eq!(
         index
-            .get_range_proof(0, 2)
+            .get_range_proof(0..2)
             .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
 
     index.push(6u64);
-    assert_eq!(index.list_hash(), HashTag::hash_list(3, h012));
+    assert_eq!(index.list_hash(), HashTag::hash_list_node(3, h012));
     assert_eq!(
         index.get_proof(0),
         Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
@@ -211,7 +211,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
 
     assert_eq!(
-        index.get_range_proof(0, 2),
+        index.get_range_proof(0..2),
         Left(
             Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
             Some(h22),
@@ -219,14 +219,14 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
     assert_eq!(
         index
-            .get_range_proof(0, 2)
+            .get_range_proof(0..2)
             .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
 
     assert_eq!(
-        index.get_range_proof(1, 3),
+        index.get_range_proof(1..3),
         Full(
             Box::new(Right(h0, Box::new(Leaf(4)))),
             Box::new(Left(Box::new(Leaf(6)), None)),
@@ -234,14 +234,14 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
     assert_eq!(
         index
-            .get_range_proof(1, 3)
+            .get_range_proof(1..3)
             .validate(index.list_hash(), index.len())
             .unwrap(),
         [(1, &4), (2, &6)]
     );
 
     assert_eq!(
-        index.get_range_proof(0, 3),
+        index.get_range_proof(0..3),
         Full(
             Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
             Box::new(Left(Box::new(Leaf(6)), None)),
@@ -249,7 +249,7 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
     assert_eq!(
         index
-            .get_range_proof(0, 3)
+            .get_range_proof(0..3)
             .validate(index.list_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4), (2, &6)]
@@ -271,7 +271,7 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
     for _ in 0..50 {
         let start_range = rng.gen_range(0, num_values);
         let end_range = rng.gen_range(start_range + 1, num_values + 1);
-        let range_proof = index.get_range_proof(start_range, end_range);
+        let range_proof = index.get_range_proof(start_range..end_range);
         {
             let (indices, actual_values): (Vec<_>, Vec<_>) = range_proof
                 .validate(table_merkle_root, index.len())
@@ -311,7 +311,7 @@ fn hash_branch_node(value: &[u8]) -> Hash {
 fn index_and_proof_roots(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.list_hash(), HashTag::default_list_hash());
+    assert_eq!(index.list_hash(), HashTag::empty_list_hash());
 
     let h1 = hash_leaf_node(&[1, 2]);
     let h2 = hash_leaf_node(&[2, 3]);
@@ -346,21 +346,21 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
     let h12345678 = hash_branch_node(&[h1234.as_ref(), h5678.as_ref()].concat());
 
     let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![
-        (vec![1, 2], HashTag::hash_list(1, h1), 0),
-        (vec![2, 3], HashTag::hash_list(2, h12), 1),
-        (vec![3, 4], HashTag::hash_list(3, h123), 2),
-        (vec![4, 5], HashTag::hash_list(4, h1234), 3),
-        (vec![5, 6], HashTag::hash_list(5, h12345), 4),
-        (vec![6, 7], HashTag::hash_list(6, h123456), 5),
-        (vec![7, 8], HashTag::hash_list(7, h1234567), 6),
-        (vec![8, 9], HashTag::hash_list(8, h12345678), 7),
+        (vec![1, 2], HashTag::hash_list_node(1, h1), 0),
+        (vec![2, 3], HashTag::hash_list_node(2, h12), 1),
+        (vec![3, 4], HashTag::hash_list_node(3, h123), 2),
+        (vec![4, 5], HashTag::hash_list_node(4, h1234), 3),
+        (vec![5, 6], HashTag::hash_list_node(5, h12345), 4),
+        (vec![6, 7], HashTag::hash_list_node(6, h123456), 5),
+        (vec![7, 8], HashTag::hash_list_node(7, h1234567), 6),
+        (vec![8, 9], HashTag::hash_list_node(8, h12345678), 7),
     ];
 
     for (inserted, exp_root, proof_ind) in expected_hash_comb {
         index.push(inserted);
 
         assert_eq!(index.list_hash(), exp_root);
-        let range_proof = index.get_range_proof(proof_ind, proof_ind + 1);
+        let range_proof = index.get_range_proof(proof_ind..proof_ind + 1);
         assert_eq!(
             range_proof
                 .validate(index.list_hash(), index.len())
@@ -371,7 +371,7 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
         let json_representation = to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
         assert_eq!(deserialized_proof, range_proof);
-        let range_proof = index.get_range_proof(0, proof_ind + 1);
+        let range_proof = index.get_range_proof(0..proof_ind + 1);
         assert_eq!(
             range_proof
                 .validate(index.list_hash(), index.len())
@@ -382,7 +382,7 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
         let json_representation = to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
         assert_eq!(deserialized_proof, range_proof);
-        let range_proof = index.get_range_proof(0, 1);
+        let range_proof = index.get_range_proof(0..1);
         assert_eq!(
             range_proof
                 .validate(index.list_hash(), index.len())
@@ -395,7 +395,7 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
         assert_eq!(deserialized_proof, range_proof);
     }
 
-    let range_proof = index.get_range_proof(0, 8);
+    let range_proof = index.get_range_proof(0..8);
     let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
         .validate(index.list_hash(), index.len())
         .unwrap()
@@ -417,7 +417,7 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
         assert_eq!(pair.0, *pair.1);
     }
 
-    let mut range_proof = index.get_range_proof(3, 5);
+    let mut range_proof = index.get_range_proof(3..5);
     assert_eq!(
         range_proof
             .validate(index.list_hash(), index.len())
@@ -425,7 +425,7 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
             .len(),
         2
     );
-    range_proof = index.get_range_proof(2, 6);
+    range_proof = index.get_range_proof(2..6);
     assert_eq!(
         range_proof
             .validate(index.list_hash(), index.len())
@@ -439,7 +439,7 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
 fn proof_illegal_lower_bound(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    index.get_range_proof(0, 1);
+    index.get_range_proof(0..1);
     index.push(vec![1]);
 }
 
@@ -449,7 +449,7 @@ fn proof_illegal_bound_empty(db: Box<dyn Database>) {
     for i in 0_u8..8 {
         index.push(vec![i]);
     }
-    index.get_range_proof(8, 9);
+    index.get_range_proof(8..9);
 }
 
 fn proof_illegal_range(db: Box<dyn Database>) {
@@ -458,13 +458,13 @@ fn proof_illegal_range(db: Box<dyn Database>) {
     for i in 0_u8..4 {
         index.push(vec![i]);
     }
-    index.get_range_proof(2, 2);
+    index.get_range_proof(2..2);
 }
 
 fn proof_structure(db: Box<dyn Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.list_hash(), HashTag::default_list_hash());
+    assert_eq!(index.list_hash(), HashTag::empty_list_hash());
 
     // spell-checker:ignore upup
 
@@ -484,10 +484,10 @@ fn proof_structure(db: Box<dyn Database>) {
         index.push(vec![i, i + 1, i + 2]);
     }
 
-    let list_hash = HashTag::hash_list(index.len(), h12345);
+    let list_hash = HashTag::hash_list_node(index.len(), h12345);
 
     assert_eq!(index.list_hash(), list_hash);
-    let range_proof = index.get_range_proof(4, 5);
+    let range_proof = index.get_range_proof(4..5);
 
     assert_eq!(
         vec![4, 5, 6],
@@ -518,8 +518,8 @@ fn proof_structure(db: Box<dyn Database>) {
 }
 
 fn simple_merkle_root(db: Box<dyn Database>) {
-    let h1 = HashTag::hash_list(1, hash(&[0x0, 1]));
-    let h2 = HashTag::hash_list(1, hash(&[0x0, 2]));
+    let h1 = HashTag::hash_list_node(1, hash(&[0x0, 1]));
+    let h2 = HashTag::hash_list_node(1, hash(&[0x0, 2]));
 
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
@@ -788,11 +788,11 @@ mod rocksdb_tests {
 
 mod root_hash_tests {
     use crypto::{self, Hash};
-    use storage::{Database, MemoryDB, ProofListIndex};
+    use storage::{Database, HashTag, MemoryDB, ProofListIndex};
 
     /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
     fn assert_root_hash_correct(hashes: &[Hash]) {
-        let root_actual = super::root_hash(hashes);
+        let root_actual = HashTag::hash_list(hashes);
         let root_index = proof_list_index_root(hashes);
         assert_eq!(root_actual, root_index);
     }
@@ -846,15 +846,14 @@ fn proof_of_absence_single() {
         Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9").unwrap();
 
     let non_existed_index = 6u64;
+    let expected_hash = HashTag::hash_list_node(list.len(), root_hash);
     let proof = list.get_proof(non_existed_index);
+    assert!(proof.validate(expected_hash, list.len()).is_ok());
 
     match proof {
-        ListProof::Absent(index, actual_list_hash) => {
-            assert_eq!(index, non_existed_index);
-
-            let expected_hash = HashTag::hash_list(list.len(), root_hash);
-            assert_eq!(expected_hash, actual_list_hash);
-            assert!(index >= list.len());
+        ListProof::Absent(proof) => {
+            let actual_hash = HashTag::hash_list_node(proof.len(), proof.merkle_root());
+            assert_eq!(expected_hash, actual_hash);
         }
         _ => {
             panic!("Unexpected proof {:?}", proof);
