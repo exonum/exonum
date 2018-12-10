@@ -19,9 +19,9 @@ const keyPair = {
 Vue.use(Blockchain)
 
 // Mock `createWallet` transaction
-const createWalletTxHash = 'f7248195b3d0e2ca5c018a7cd26159d44c2c7e27a9e1f9150a1779d4f7f2420d'
+const createWalletTxHash = 'c0649d252aed811b185d0868534dc11d86017c6d277ed87fdfb8d8a87df463d8'
 mock.onPost(TRANSACTION_URL, {
-  'tx_body': '24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b00008000020008000000080000004a6f686e20446f65470c0d186a70e22c1d7d62e92de644b8789172058a7dfff92655c050a8853d1000be72dfb2fe9f941ce705c61b9da2a476167e0ee2c7d91d265da28361132703'
+  'tx_body': '24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800002000a084a6f686e20446f65987e239da64e6bf40e8302f677c52f5ae39b928bdac17aaba516c6f492a0fef2bdd3cada6d62fea7f914c60c06eef3dc84eba88830bf0c05a688747447f3fb0b'
 }).replyOnce(200)
 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 'type': 'in-pool' })
@@ -29,17 +29,17 @@ mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 'type': 'committed' })
 
 // Mock `addFunds` transaction
-const addFundsTxHash = 'c8f0dbbfdf27f9118d4eb17eb0dbd0e4f3ecc5d62a69eb62d883e6f934750d7b'
+const addFundsTxHash = '3b703d5c8b3e27731c21ca73ed8afa8cf36ee4dce5d74a34d36845a4491b8a8e'
 mock.onPost(TRANSACTION_URL, {
-  'tx_body': '24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800001003200000000000000fb586a6206b7c25c7dc31bf63c8476bccf7b43f2b3c7521db5b7c7f13300d011309b91055ec1c2e8fe4d82b3944f67918884dd51fdc43e7ce15f366625a85d30d72f3a27f74ccd01'
+  'tx_body': '24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b000080000100083210fbb1a993e6e0ade15cd8a180512e0e1a962e8092963f0882c570ed45b5a5058d4d72fff5ca6bbbde077493533d5898f9a2dedc4d4cbe4160f9ee0bed1f5a9089008566de1df7ce6f08'
 }).replyOnce(200)
 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${addFundsTxHash}`).replyOnce(200, { 'type': 'committed' })
 
 // Mock `transfer` transaction
-const transferTxHash = '2a9c7c66ef597bae9c1758e75534c88c8fa9cf4a72977cda80d12f18feaf9020'
+const transferTxHash = '8d0349f704064a7ac381164308cf641958fdb1a59a635d2862a7c9327eafa611'
 mock.onPost(TRANSACTION_URL, {
-  'tx_body': '24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800000008740e2dbe13dfe028e4c4afe27bb3d732f1c45977fa523fcce0d3a90f7ca5c0a05000000000000000093ab9928d470e7f30500dfa46b886e42f1cdcfb18675c90213898c88da4ec05ed40bb170181c9c57b241abd45166f63858805ceda90827a3b1462718117b7150a6b39a9d9fd40c'
+  'tx_body': '24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800000000a220a208740e2dbe13dfe028e4c4afe27bb3d732f1c45977fa523fcce0d3a90f7ca5c0a10051880a6aecd8985b5b8e7015a52de477b336b990c77b326d58a59bdf05c1782edf4f0d4f59940bd2b71b58580fb62f35faa45cc0c6d8966f24048632f5e49f45099c6f0002409066e5ace0a '
 }).replyOnce(200)
 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${transferTxHash}`).replyOnce(200, { 'type': 'committed' })
@@ -50,26 +50,13 @@ mock.onGet('/api/services/configuration/v1/configs/actual').reply(200, actual)
 mock.onGet(`${PROOF_URL}${keyPair.publicKey}`).replyOnce(200, proof)
 
 describe('Interaction with blockchain', () => {
-  it('fake', () => {
-   
-    expect(1).toEqual(1)
-  })
-  
-  /*it('should generate new signing key pair', () => {
-    const keyPair = Vue.prototype.$blockchain.generateKeyPair()
-
-    expect(keyPair.publicKey).toMatch(hexRegex)
-    expect(keyPair.publicKey).toHaveLength(64)
-    expect(keyPair.secretKey).toMatch(hexRegex)
-    expect(keyPair.secretKey).toHaveLength(128)
-  })
-  
 
   it('should generate new random seed', () => {
     const seed = Vue.prototype.$blockchain.generateSeed()
 
     expect(seed).toMatch(bigIntRegex)
   })
+  /*
 
   it('should create new wallet', async () => {
     const name = 'John Doe'
