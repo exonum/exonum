@@ -120,47 +120,6 @@ impl ::serde::Serialize for dyn Transaction {
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
 pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
-    /// Verifies the internal consistency of the transaction. `verify` should include
-    /// only invariant checking. The message signature is checked internally.
-    /// `verify` has no access to the blockchain state;
-    /// checks involving the blockchain state must be preformed in [`execute`](#tymethod.execute).
-    ///
-    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
-    /// any correct block proposal. Incorrect transactions are never included into the blockchain.
-    ///
-    /// *This method should not use external data, that is, it must be a pure function.*
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #[macro_use] extern crate exonum;
-    /// # #[macro_use] extern crate serde_derive;
-    /// #
-    /// use exonum::blockchain::{Transaction, TransactionContext};
-    /// use exonum::crypto::PublicKey;
-    /// use exonum::messages::Signed;
-    /// # use exonum::blockchain::ExecutionResult;
-    ///
-    /// transactions! {
-    ///     MyTransactions {
-    ///
-    ///         struct MyTransaction {
-    ///             // Transaction definition...
-    ///             public_key: &PublicKey,
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// impl Transaction for MyTransaction {
-    ///     // Other methods...
-    ///     // ...
-    /// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
-    /// }
-    /// # fn main() {}
-    fn verify(&self) -> bool {
-        true
-    }
-
     /// Receives a `TransactionContext` witch contain fork
     /// of the current blockchain state and can modify it depending on the contents
     /// of the transaction.
@@ -221,7 +180,8 @@ pub struct TransactionContext<'a> {
 }
 
 impl<'a> TransactionContext<'a> {
-    pub(crate) fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
+    #[doc(hidden)]
+    pub fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),

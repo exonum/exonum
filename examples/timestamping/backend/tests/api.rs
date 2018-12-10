@@ -144,8 +144,8 @@ fn test_api_get_timestamp_entry() {
         .unwrap();
 
     let entry = entry.unwrap();
-    assert_eq!(entry.timestamp(), info);
-    assert_eq!(entry.tx_hash(), &tx.hash());
+    assert_eq!(entry.timestamp, info);
+    assert_eq!(entry.tx_hash, tx.hash());
 }
 
 #[test]

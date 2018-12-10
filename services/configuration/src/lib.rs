@@ -60,8 +60,9 @@
     bare_trait_objects
 )]
 
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -80,6 +81,7 @@ extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate protobuf;
 extern crate serde_json;
 extern crate toml;
 
@@ -108,6 +110,7 @@ mod api;
 mod cmd;
 mod config;
 mod errors;
+mod proto;
 mod schema;
 #[cfg(test)]
 mod tests;

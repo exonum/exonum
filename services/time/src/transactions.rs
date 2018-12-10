@@ -24,7 +24,7 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
-use super::SERVICE_ID;
+use super::{proto, SERVICE_ID};
 use schema::TimeSchema;
 
 /// Common errors emitted by transactions during execution.
@@ -47,16 +47,26 @@ impl From<Error> for ExecutionError {
     }
 }
 
-transactions! {
-    /// Define TimeService transaction.
-    pub TimeTransactions {
+/// Transaction that is sent by the validator after the commit of the block.
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::TxTime")]
+pub struct TxTime {
+    /// Time of the validator.
+    pub time: DateTime<Utc>,
+}
 
-        /// Transaction that is sent by the validator after the commit of the block.
-        struct TxTime {
-            /// Time of the validator.
-            time: DateTime<Utc>,
-        }
+impl TxTime {
+    /// New TxTime transaction.
+    pub fn new(time: DateTime<Utc>) -> Self {
+        Self { time }
     }
+}
+
+/// Define TimeService transaction.
+#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+pub enum TimeTransactions {
+    /// TxTime transaction.
+    TxTime(TxTime),
 }
 
 impl TxTime {
@@ -87,10 +97,10 @@ impl TxTime {
         let mut schema = TimeSchema::new(fork);
         match schema.validators_times().get(author) {
             // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsGreater)?,
+            Some(time) if time >= self.time => Err(Error::ValidatorTimeIsGreater)?,
             // Write the time for the validator.
             _ => {
-                schema.validators_times_mut().put(author, self.time());
+                schema.validators_times_mut().put(author, self.time);
                 Ok(())
             }
         }
