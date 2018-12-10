@@ -6,13 +6,14 @@
 
 # Base URL for demo service endpoints
 $BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency/v1';
+$TRANSACTION_URL = 'http://127.0.0.1:8000/api/explorer/v1/transactions';
 # Directory with the current script
 $wd = $myinvocation.mycommand.path | Split-Path;
 
 # Creates a wallet using a transaction stored in the specified file.
 function Create-Wallet ($jsonFilename) {
   $body = cat $jsonFilename;
-  $resp = Invoke-WebRequest "$BASE_URL/wallets" `
+  $resp = Invoke-WebRequest "$TRANSACTION_URL" `
     -Method POST `
     -ContentType 'application/json' `
     -Body $body;
@@ -27,7 +28,7 @@ function Create-Wallet ($jsonFilename) {
 # Performs a transfer using a transaction stored in the specified file.
 function Transfer ($jsonFilename) {
   $body = cat $jsonFilename;
-  $resp = Invoke-WebRequest "$BASE_URL/wallets/transfer" `
+  $resp = Invoke-WebRequest "$TRANSACTION_URL" `
     -Method POST `
     -ContentType 'application/json' `
     -Body $body;
@@ -82,12 +83,12 @@ function Main () {
     @{
       name = 'Alice';
       json = "$wd/create-wallet-1.json";
-      hash = '099d455ab563505cad55b7c6ec02e8a52bca86b0c4446d9879af70f5ceca5dd8';
+      hash = '75a9d95694f22823ae01a6feafb3d4e27b55b83bd6897aa581456ea5da382dde';
     },
     @{
       name = 'Bob';
       json = "$wd/create-wallet-2.json";
-      hash = '2fb289b9928f5a75acf261cc1e61fd654fcb63bf285688f0fc8e59f44dede048';
+      hash = '7a09053aa590704332b7a18f552150caa8b6e4f777afa4005d169038f481b7f7';
     }
   );
 
@@ -110,7 +111,7 @@ function Main () {
   }
 
   echo 'Transferring tokens between Alice and Bob...';
-  $transferHash = '4d6de957f58c894db2dca577d4fdd0da1249a8dff1df5eb69d23458e43320ee2';
+  $transferHash = 'ae3afbe35f1bfd102daea2f3f72884f04784a10aabe9d726749b1188a6b9fe9b';
   $hash = Transfer("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
@@ -126,9 +127,8 @@ function Main () {
   # determine his wallet as .[0] and hers as .[1].
   Check-Wallet $resp[0] 'Alice' '85';
   Check-Wallet $resp[1] 'Bob' '115';
-
   echo "Retrieving info on Alice's wallet...";
-  $pubkey = '6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85';
+  $pubkey = '114e49a764813f2e92609d103d90f23dc5b7e94e74b3e08134c1272441614bd9';
   $resp = (Invoke-WebRequest "$BASE_URL/wallet?pub_key=$pubkey").Content | ConvertFrom-Json;
   Check-Wallet $resp 'Alice' '85';
 }
