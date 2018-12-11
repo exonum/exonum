@@ -14,17 +14,13 @@
 
 //! Cryptocurrency wallet.
 
-use exonum::{
-    crypto::{Hash, PublicKey},
-    proto::ProtobufConvert,
-};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use exonum::crypto::{Hash, PublicKey};
 
 use super::proto;
 
 /// Wallet information stored in the database.
 #[derive(Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Wallet")]
+#[exonum(pb = "proto::Wallet", serde_pb_convert)]
 pub struct Wallet {
     /// `PublicKey` of the wallet.
     pub pub_key: PublicKey,
@@ -36,25 +32,6 @@ pub struct Wallet {
     pub history_len: u64,
     /// `Hash` of the transactions history.
     pub history_hash: Hash,
-}
-
-impl Serialize for Wallet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.to_pb().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Wallet {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let pb = <Wallet as ProtobufConvert>::ProtoStruct::deserialize(deserializer)?;
-        ProtobufConvert::from_pb(pb).map_err(de::Error::custom)
-    }
 }
 
 impl Wallet {

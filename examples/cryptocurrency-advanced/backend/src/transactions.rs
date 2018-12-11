@@ -22,9 +22,7 @@ use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
-    proto::ProtobufConvert,
 };
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use super::proto;
 use schema::Schema;
@@ -70,7 +68,7 @@ impl From<Error> for ExecutionError {
 
 /// Transfer `amount` of the currency from one wallet to another.
 #[derive(Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Transfer")]
+#[exonum(pb = "proto::Transfer", serde_pb_convert)]
 pub struct Transfer {
     /// `PublicKey` of receiver's wallet.
     pub to: PublicKey,
@@ -80,25 +78,6 @@ pub struct Transfer {
     ///
     /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
     pub seed: u64,
-}
-
-impl Serialize for Transfer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.to_pb().serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Transfer {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let pb = <Transfer as ProtobufConvert>::ProtoStruct::deserialize(deserializer)?;
-        ProtobufConvert::from_pb(pb).map_err(de::Error::custom)
-    }
 }
 
 /// Issue `amount` of the currency to the `wallet`.
