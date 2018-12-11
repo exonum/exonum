@@ -1,5 +1,4 @@
-//import * as Exonum from 'exonum-client'
-import * as Exonum from '../../exonum-client'
+import * as Exonum from 'exonum-client'
 import axios from 'axios'
 import * as proto from '../../proto/protocol.js'
 
@@ -130,7 +129,7 @@ module.exports = {
 
                 // get transactions
                 const transactionsMetaData = Exonum.merkleProof(
-                  wallet.history_hash,
+                  Exonum.uint8ArrayToHexadecimal(new Uint8Array(wallet.history_hash.data)),
                   wallet.history_len,
                   data.wallet_history.proof,
                   [0, wallet.history_len],
