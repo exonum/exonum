@@ -5,10 +5,11 @@
   "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
   "scripts": {
+    "proto": "pbjs --keep-case -t static-module ../../../exonum/src/proto/schema/exonum/protocol.proto ../backend/src/proto/timestamping.proto -o ./proto/protocol.js",
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
-    "build": "npm run lint && npm run compile && npm run test",
+    "build": "npm run proto && npm run lint && npm run compile && npm run test",
     "start": "node server.js"
   },
   "jest": {
@@ -30,6 +31,7 @@
     "moment": "^2.22.0",
     "noty": "^3.2.0-beta",
     "popper.js": "^1.14.3",
+    "protobufjs": "^6.8.8",
     "vue": "^2.5.16",
     "vue-router": "^3.0.1",
     "yargs-parser": "^10.0.0"
