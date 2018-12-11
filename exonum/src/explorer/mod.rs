@@ -32,13 +32,12 @@ use blockchain::{
     TransactionResult, TxLocation,
 };
 use crypto::{CryptoHash, Hash};
-use encoding;
 use helpers::Height;
 use messages::{Precommit, RawTransaction, Signed};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
-type ParseResult = Result<TransactionMessage, encoding::Error>;
+type ParseResult = Result<TransactionMessage, failure::Error>;
 
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -385,21 +384,27 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// Use of the custom type parameter for deserialization:
 ///
 /// ```
-/// # #[macro_use] extern crate exonum;
+/// # extern crate exonum;
+/// # #[macro_use] extern crate exonum_derive;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
 /// # use exonum::helpers::Height;
-/// transactions! {
-///     Transactions {
-///         struct CreateWallet {
-///             name: &str,
-///         }
-///         // other transaction types...
-///     }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
+/// struct CreateWallet {
+///     name: String,
 /// }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+/// enum Transactions {
+///    CreateWallet(CreateWallet),
+///     // Other transaction types...
+/// }
+///
 /// # impl Transaction for CreateWallet {
 /// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }
@@ -553,21 +558,26 @@ impl CommittedTransaction {
 /// Use of the custom type parameter for deserialization:
 ///
 /// ```
-/// # #[macro_use] extern crate exonum;
+/// # extern crate exonum;
+/// # #[macro_use] extern crate exonum_derive;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum::crypto::{PublicKey, Signature};
 /// # use exonum::explorer::TransactionInfo;
-/// transactions! {
-///     Transactions {
-///         struct CreateWallet {
-///             public_key: &PublicKey,
-///             name: &str,
-///         }
-///         // other transaction types...
-///     }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
+/// struct CreateWallet {
+///     name: String,
 /// }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+/// enum Transactions {
+///    CreateWallet(CreateWallet),
+///     // Other transaction types...
+/// }
+///
 /// # impl Transaction for CreateWallet {
 /// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
 /// # }

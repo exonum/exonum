@@ -40,7 +40,6 @@ use serde::ser::{Serialize, Serializer};
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
-use encoding;
 use storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
@@ -49,8 +48,6 @@ pub use self::{
     protocol::*,
 };
 
-#[macro_use]
-mod compatibility;
 mod authorization;
 mod helpers;
 mod protocol;
@@ -70,7 +67,7 @@ pub struct RawTransaction {
 }
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
-/// This type used inner inside `transactions!`
+/// This type is used inside `#[derive(TransactionSet)]`
 /// to return raw transaction payload as part of service transaction set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ServiceTransaction {
@@ -115,7 +112,7 @@ impl RawTransaction {
 }
 
 impl BinaryForm for RawTransaction {
-    fn encode(&self) -> Result<Vec<u8>, encoding::Error> {
+    fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
         let value = self.service_transaction.encode()?;
@@ -124,10 +121,11 @@ impl BinaryForm for RawTransaction {
     }
 
     /// Converts a serialized byte array into a transaction.
-    fn decode(buffer: &[u8]) -> Result<Self, encoding::Error> {
-        if buffer.len() < mem::size_of::<u16>() {
-            Err("Buffer too short in RawTransaction deserialization.")?
-        }
+    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+        ensure!(
+            buffer.len() >= mem::size_of::<u16>(),
+            "Buffer too short in RawTransaction deserialization."
+        );
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
         let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
         Ok(RawTransaction {
@@ -138,17 +136,18 @@ impl BinaryForm for RawTransaction {
 }
 
 impl BinaryForm for ServiceTransaction {
-    fn encode(&self) -> Result<Vec<u8>, encoding::Error> {
+    fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
         buffer.extend_from_slice(&self.payload);
         Ok(buffer)
     }
 
-    fn decode(buffer: &[u8]) -> Result<Self, encoding::Error> {
-        if buffer.len() < mem::size_of::<u16>() {
-            Err("Buffer too short in ServiceTransaction deserialization.")?
-        }
+    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+        ensure!(
+            buffer.len() >= mem::size_of::<u16>(),
+            "Buffer too short in ServiceTransaction deserialization."
+        );
         let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
         Ok(ServiceTransaction {

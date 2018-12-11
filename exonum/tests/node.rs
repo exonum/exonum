@@ -14,6 +14,7 @@
 
 // This is a regression test for exonum node.
 extern crate exonum;
+extern crate failure;
 extern crate futures;
 extern crate serde_json;
 extern crate tokio;
@@ -33,7 +34,6 @@ use std::{
 use exonum::{
     blockchain::{Service, ServiceContext, Transaction},
     crypto::Hash,
-    encoding::Error as EncodingError,
     helpers,
     messages::RawTransaction,
     node::{ApiSender, ExternalMessage, Node},
@@ -55,7 +55,7 @@ impl Service for CommitWatcherService {
         Vec::new()
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         unreachable!("An unknown transaction received");
     }
 
@@ -81,7 +81,7 @@ impl Service for InitializeCheckerService {
         Vec::new()
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         unreachable!("An unknown transaction received");
     }
 

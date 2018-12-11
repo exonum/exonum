@@ -25,4 +25,4 @@ include!(concat!(
     "/currency_example_protobuf_mod.rs"
 ));
 
-use exonum::encoding::protobuf::*;
+use exonum::proto::schema::*;

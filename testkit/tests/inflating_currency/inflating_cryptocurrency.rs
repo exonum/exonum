@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate failure;
 extern crate serde;
 extern crate serde_json;
 
@@ -22,7 +23,6 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey},
-    encoding,
     helpers::Height,
     messages::{Message, RawTransaction, Signed},
     storage::{Fork, MapIndex, Snapshot},
@@ -244,7 +244,7 @@ impl Service for CurrencyService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         let tx = CurrencyTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

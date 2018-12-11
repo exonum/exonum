@@ -16,10 +16,11 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
+use serde_json::error::Error as JsonError;
+
 use exonum::{
     blockchain::{ExecutionError, StoredConfiguration},
     crypto::Hash,
-    encoding::serialize::json::reexport::Error as JsonError,
     helpers::Height,
 };
 

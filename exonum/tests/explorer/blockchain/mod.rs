@@ -14,7 +14,9 @@
 
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
+extern crate failure;
 extern crate futures;
+
 use self::futures::sync::mpsc;
 
 use exonum::{
@@ -23,7 +25,6 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    encoding::Error as EncodingError,
     messages::{Message, RawTransaction, Signed},
     node::ApiSender,
     storage::{MemoryDB, Snapshot},
@@ -107,7 +108,7 @@ impl Service for MyService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         ExplorerTransactions::tx_from_raw(raw).map(ExplorerTransactions::into)
     }
 }

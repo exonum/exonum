@@ -21,4 +21,4 @@ pub use self::cryptocurrency::{CreateWallet, Issue, Transfer, Wallet};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::encoding::protobuf::*;
+use exonum::proto::schema::*;

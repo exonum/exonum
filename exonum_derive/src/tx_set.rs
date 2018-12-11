@@ -112,13 +112,11 @@ fn implement_transaction_set_trait(
         impl #cr::blockchain::TransactionSet for #name {
             fn tx_from_raw(
                 raw: #cr::messages::RawTransaction,
-            ) -> std::result::Result<Self, _EncodingError> {
+            ) -> std::result::Result<Self, _FailureError> {
                 let (id, vec) = raw.service_transaction().into_raw_parts();
                 match id {
                     #( #tx_set_impl )*
-                    num => Err(_EncodingError::Basic(
-                        format!("Tag {} not found for enum {}.", num, stringify!(#name)).into(),
-                    )),
+                    num => bail!("Tag {} not found for enum {}.", num, stringify!(#name)),
                 }
             }
         }
@@ -167,8 +165,10 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         mod #mod_name{
+            extern crate failure as _failure;
+
             use super::*;
-            use #cr::encoding::Error as _EncodingError;
+            use self::_failure::{bail, Error as _FailureError};
             use #cr::messages::BinaryForm as _BinaryForm;
 
             #conversions

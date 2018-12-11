@@ -27,7 +27,6 @@
 )]
 
 extern crate chrono;
-#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
@@ -35,9 +34,14 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+#[macro_use]
+extern crate exonum_derive;
+extern crate protobuf;
 
 /// Node API.
 pub mod api;
+/// Protobuf generated structs.
+pub mod proto;
 /// Database schema.
 pub mod schema;
 /// System time provider.
@@ -49,12 +53,12 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::{self, serialize::json::reexport::Value},
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
 use schema::TimeSchema;
+use serde_json::Value;
 
 use time_provider::{SystemTimeProvider, TimeProvider};
 use transactions::*;
@@ -107,7 +111,7 @@ impl Service for TimeService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 

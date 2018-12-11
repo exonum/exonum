@@ -60,8 +60,9 @@
     bare_trait_objects
 )]
 
-#[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -80,6 +81,7 @@ extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+extern crate protobuf;
 extern crate serde_json;
 extern crate toml;
 
@@ -87,14 +89,12 @@ pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use serde_json::to_value;
+use serde_json::{to_value, Value};
 
-use exonum::encoding::serialize::json::reexport::Value;
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::Error as EncodingError,
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction,
     node::State,
@@ -108,6 +108,7 @@ mod api;
 mod cmd;
 mod config;
 mod errors;
+mod proto;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -138,7 +139,7 @@ impl blockchain::Service for Service {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, EncodingError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 

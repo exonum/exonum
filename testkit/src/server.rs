@@ -155,7 +155,6 @@ mod tests {
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
     use exonum::crypto::{gen_keypair, Hash};
-    use exonum::encoding::Error as EncodingError;
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction, Signed};
@@ -168,7 +167,7 @@ mod tests {
     const TIMESTAMP_SERVICE_ID: u16 = 0;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::tests::TxTimestamp")]
+    #[exonum(pb = "proto::examples::TxTimestamp")]
     struct TxTimestamp {
         message: String,
     }
@@ -219,7 +218,7 @@ mod tests {
             fn tx_from_raw(
                 &self,
                 raw: RawTransaction,
-            ) -> Result<Box<dyn Transaction>, EncodingError> {
+            ) -> Result<Box<dyn Transaction>, failure::Error> {
                 use exonum::blockchain::TransactionSet;
 
                 Any::tx_from_raw(raw).map(Any::into)

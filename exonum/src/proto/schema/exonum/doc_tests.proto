@@ -16,39 +16,31 @@ syntax = "proto3";
 
 import "helpers.proto";
 
-package exonum.tests;
+package exonum.doc_tests;
 
-message TimestampTx { bytes data = 1; }
+message CreateWallet { string name = 1; }
 
-message TxAfterCommit { uint64 height = 1; }
-
-message TxConfig {
-  exonum.PublicKey from = 1;
-  bytes config = 2;
-  uint64 actual_from = 3;
+message Point {
+  int32 x = 1;
+  int32 y = 2;
 }
 
-message TxSimple {
-  exonum.PublicKey public_key = 1;
-  string msg = 2;
+message TxA {
+  // Transaction fields
 }
 
-message TestServiceTx { uint64 value = 1; }
-
-message BlockchainTestTxA { uint64 a = 1; }
-
-message BlockchainTestTxB {
-  uint64 b = 1;
-  uint32 c = 2;
+message TxB {
+  /// ...
 }
 
-message CreateWallet {
-  exonum.PublicKey pubkey = 1;
-  string name = 2;
-}
+message MyTransaction { exonum.PublicKey public_key = 1; }
 
-message Transfer {
-  exonum.PublicKey from = 1;
-  exonum.PublicKey to = 2;
-  uint64 amount = 3;
+message MyStructSmall {
+  exonum.PublicKey key = 1;
+  uint32 num_field = 2;
+  string string_field = 3;
+}
+message MyStructBig {
+  exonum.Hash hash = 1;
+  MyStructSmall my_struct_small = 2;
 }
