@@ -30,3 +30,9 @@ uuid = "0.7.1"
 
 [dev-dependencies]
 tempdir = "0.3.7"
+criterion = "0.2"
+
+[[bench]]
+name = "criterion"
+path = "benches/lib.rs"
+harness = false

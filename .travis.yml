@@ -82,6 +82,11 @@ jobs:
     script:
     - cargo test --all
 
+  # Tests
+  - name: linux-benches
+    script:
+    - cargo bench --all
+
   # Non-fatal checks
   - name: deadlinks
     env: FEATURE=non-fatal-checks
