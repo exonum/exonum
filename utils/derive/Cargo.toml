@@ -1,5 +1,5 @@
 [package]
-name = "exonum_derive"
+name = "exonum-derive"
 version = "0.9.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
