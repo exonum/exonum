@@ -22,17 +22,16 @@ codecov
 compat
 concat
 Cors
-cors
 CORS
+cors
 counterintuitive
 cryptocurrency
 cryptographically
 deadlinks
+decodable
 deque
 deref
 deserialization
-decodable
-encodable
 deserialize
 deserialized
 deserializer
@@ -42,6 +41,7 @@ DESTDIR
 diffie
 doctests
 emsp
+encodable
 Exonum
 fsync
 fuzzer
@@ -67,6 +67,7 @@ memorydb
 mempool
 Merkelized
 Merkle
+merkledb
 middlewares
 millis
 mkdir
@@ -93,12 +94,12 @@ precommit
 precommits
 precommitters
 prevote
-prevotes
 prevoters
+prevotes
 println
 proptest
-protobuf
 proto
+protobuf
 protoc
 protos
 pubkey
@@ -169,5 +170,5 @@ validators
 websockets
 whitelisted
 writeln
-xsalsa
 xorshift
+xsalsa
