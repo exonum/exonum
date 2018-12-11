@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.service.configuration;
 
-import "exonum/helpers.proto";
+import "helpers.proto";
 
 // Propose a new configuration.
 message Propose {

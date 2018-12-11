@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum;
 
-import "exonum/helpers.proto";
+import "helpers.proto";
 
 message Block {
   uint32 proposer_id = 1;

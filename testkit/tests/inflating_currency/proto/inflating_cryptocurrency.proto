@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.testkit;
 
-import "exonum/helpers.proto";
+import "helpers.proto";
 
 message TxCreateWallet { string name = 1; }
 

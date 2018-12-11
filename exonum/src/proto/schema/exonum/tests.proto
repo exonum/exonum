@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "exonum/helpers.proto";
+import "helpers.proto";
 import "google/protobuf/timestamp.proto";
 
 package exonum.tests;
