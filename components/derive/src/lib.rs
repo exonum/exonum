@@ -33,29 +33,52 @@ const PB_CONVERT_ATTRIBUTE: &str = "pb";
 const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
 
 /// Derives `ProtobufConvert` trait.
+///
 /// Attributes:
-/// `#[exonum( pb = "path" )]`
-/// Required. `path` is name of the corresponding protobuf struct(generated from .proto file)
-/// `#[exonum( crate = "path" )]`
-/// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
-/// `#[exonum( serde_pb_convert )]`
-/// Optional. Implements serde::{Serialize, Deserialize} using protobuf versions of structs.
+///
+/// * `#[exonum( pb = "path" )]`
+/// Required. `path` is the name of the corresponding protobuf generated struct.
+///
+/// * `#[exonum( crate = "path" )]`
+/// Optional. `path` is prefix of the `exonum` crate(usually "crate" or "exonum").
+///
+/// * `#[exonum( serde_pb_convert )]`
+/// Optional. Implements `serde::{Serialize, Deserialize}` using structs that were generated with
+/// protobuf.
+/// ```json
+/// // For example struct with `exonum::crypto::Hash` with this
+/// // (de)serializer will be represented as
+/// StructName {
+///     "hash": {
+///         data: [1, 2, ...]
+///     },
+///     // ...
+/// }
+///
+/// // With default (de)serializer.
+/// StructName {
+///     "hash": "12af..." // HEX
+///     // ...
+/// }
+/// ```
 #[proc_macro_derive(ProtobufConvert, attributes(exonum))]
 pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
     pb_convert::implement_protobuf_convert(input)
 }
 
 /// Derives `TransactionSet` trait for selected enum,
-/// enum should be set of variants with transactions inside.
+/// enum should have transactions as variants.
 ///
 /// Also implements:
-/// Conversion from Transaction types into this enum.
-/// Conversion from Transaction types, enum into `ServiceTransaction`.
-/// Conversion from enum into `Box<dyn Transaction>`.
+///
+/// * Conversion from Transaction types into this enum.
+/// * Conversion from Transaction types and this enum into `ServiceTransaction`.
+/// * Conversion from this enum into `Box<dyn Transaction>`.
 ///
 /// Attributes:
-/// `#[exonum( crate = "path" )]`
-/// Optional. `path` is prefix of the exonum crate(usually "crate" or "exonum")
+///
+/// * `#[exonum( crate = "path" )]`
+/// Optional. `path` is prefix of the `exonum` crate(usually "crate" or "exonum").
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
     tx_set::implement_transaction_set(input)
