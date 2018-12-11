@@ -85,7 +85,7 @@ jobs:
   # Tests
   - name: linux-benches
     script:
-    - cargo bench --all
+    - cargo bench --all --no-run
 
   # Non-fatal checks
   - name: deadlinks
