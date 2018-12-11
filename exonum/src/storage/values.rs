@@ -400,21 +400,6 @@ mod tests {
         assert_round_trip_eq(&times);
     }
 
-    //    #[test]
-    //    fn storage_value_for_duration_round_trip() {
-    //        let durations = [
-    //            Duration::zero(),
-    //            Duration::max_value(),
-    //            Duration::min_value(),
-    //            Duration::nanoseconds(999_999_999),
-    //            Duration::nanoseconds(-999_999_999),
-    //            Duration::seconds(42) + Duration::nanoseconds(15),
-    //            Duration::seconds(-42) + Duration::nanoseconds(-15),
-    //        ];
-    //
-    //        assert_round_trip_eq(&durations);
-    //    }
-
     #[test]
     fn round_round_trip() {
         let values = [
