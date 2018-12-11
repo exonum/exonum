@@ -75,13 +75,13 @@ where
 /// ```
 /// # use byteorder::{LittleEndian, ByteOrder};
 /// # use exonum_merkledb::{MemoryDB, Database, ProofMapIndex, HashedKey};
-/// 
+///
 /// #[derive(Debug, Copy, Clone, PartialEq)]
 /// struct Point {
 ///     y: i16,
 ///     x: i16,
 /// }
-/// 
+///
 /// impl exonum_crypto::CryptoHash for Point {
 ///     fn hash(&self) -> exonum_crypto::Hash {
 ///         let mut buffer = [0; 4];
@@ -90,10 +90,10 @@ where
 ///         exonum_crypto::hash(&buffer)
 ///     }
 /// }
-/// 
+///
 /// impl HashedKey for Point {}
-/// 
-/// 
+///
+///
 ///
 /// # fn main() {
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
@@ -477,7 +477,7 @@ impl PartialOrd for ProofPath {
 #[cfg(test)]
 mod tests {
     use rand::{self, Rng};
-    use serde_json::{self, Value, json};
+    use serde_json::{self, json, Value};
 
     use super::*;
 
@@ -487,7 +487,8 @@ mod tests {
             let mut buf = [0; 32];
             rng.fill_bytes(&mut buf);
             buf
-        }).prefix(1 + rng.gen::<u16>() % 255)
+        })
+        .prefix(1 + rng.gen::<u16>() % 255)
     }
 
     #[test]

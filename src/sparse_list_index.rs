@@ -635,8 +635,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::SparseListIndex;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use crate::db::Database;
+    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
 
@@ -755,8 +755,8 @@ mod tests {
     }
 
     mod memorydb_tests {
-        use std::path::Path;
         use crate::{Database, MemoryDB};
+        use std::path::Path;
         use tempdir::TempDir;
 
         fn create_database(_: &Path) -> Box<dyn Database> {
@@ -781,8 +781,8 @@ mod tests {
     }
 
     mod rocksdb_tests {
-        use std::path::Path;
         use crate::{Database, DbOptions, RocksDB};
+        use std::path::Path;
         use tempdir::TempDir;
 
         fn create_database(path: &Path) -> Box<dyn Database> {

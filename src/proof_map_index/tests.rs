@@ -14,7 +14,7 @@
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
-use byteorder::{LittleEndian, ByteOrder};
+use byteorder::{ByteOrder, LittleEndian};
 use rand::{
     self,
     distributions::Alphanumeric,
@@ -22,8 +22,8 @@ use rand::{
     Rng, RngCore, SeedableRng,
 };
 use rand_xorshift::XorShiftRng;
-use serde_json::{self, json};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{self, json};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HashStream};
 
@@ -1269,10 +1269,7 @@ fn tree_with_hashed_key(db: Box<dyn Database>) {
 
     impl Point {
         fn new(x: u16, y: u16) -> Self {
-            Self {
-                x, 
-                y,
-            }
+            Self { x, y }
         }
     }
 
@@ -1405,20 +1402,20 @@ macro_rules! common_tests {
 }
 
 mod memorydb_tests {
-    use std::path::Path;
     use crate::{Database, MemoryDB};
+    use std::path::Path;
     use tempdir::TempDir;
 
     fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
     }
 
-    common_tests!{}
+    common_tests! {}
 }
 
 mod rocksdb_tests {
-    use std::path::Path;
     use crate::{Database, DbOptions, RocksDB};
+    use std::path::Path;
     use tempdir::TempDir;
 
     fn create_database(path: &Path) -> Box<dyn Database> {
@@ -1426,5 +1423,5 @@ mod rocksdb_tests {
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
-    common_tests!{}
+    common_tests! {}
 }

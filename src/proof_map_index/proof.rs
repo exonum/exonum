@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use failure::Fail;
-use serde_derive::{Serialize, Deserialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::{CryptoHash, Hash, HashStream};
 
@@ -904,6 +904,7 @@ where
             .into_iter()
             .fold(MapProofBuilder::new(), |builder, key| {
                 builder.add_missing(key)
-            }).create(),
+            })
+            .create(),
     }
 }

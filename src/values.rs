@@ -266,7 +266,6 @@ impl StorageValue for DateTime<Utc> {
     }
 }
 
-
 impl StorageValue for Uuid {
     fn into_bytes(self) -> Vec<u8> {
         self.as_bytes().to_vec()

@@ -203,8 +203,8 @@ mod memorydb_tests {
 
 mod rocksdb_tests {
     use super::super::{DbOptions, RocksDB};
-    use std::path::Path;
     use crate::{Database, ListIndex, Snapshot};
+    use std::path::Path;
     use tempdir::TempDir;
 
     fn rocksdb_database(path: &Path) -> RocksDB {

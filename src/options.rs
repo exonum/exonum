@@ -14,7 +14,7 @@
 
 //! Abstract settings for databases.
 
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 /// Options for the database.
 ///

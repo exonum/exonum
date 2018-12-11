@@ -16,11 +16,15 @@
 
 //! An implementation of `RocksDB` database.
 
-pub use exonum_rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
+pub use exonum_rocksdb::{
+    BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions,
+};
 
 use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use exonum_rocksdb::{self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch};
+use exonum_rocksdb::{
+    self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch,
+};
 
 use crate::{db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
