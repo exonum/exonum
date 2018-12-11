@@ -16,10 +16,10 @@
 
 use toml;
 
-use std::{collections::BTreeMap, net::SocketAddr};
+use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
 use blockchain::config::{ConsensusConfig, ValidatorKeys};
-use crypto::{PublicKey, SecretKey};
+use crypto::PublicKey;
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;
@@ -78,12 +78,12 @@ pub struct NodePrivateConfig {
     pub external_address: String,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
-    /// Consensus secret key.
-    pub consensus_secret_key: SecretKey,
+    /// Path to the consensus secret key file.
+    pub consensus_secret_key: PathBuf,
     /// Service public key.
     pub service_public_key: PublicKey,
-    /// Service secret key.
-    pub service_secret_key: SecretKey,
+    /// Path to the service secret key file.
+    pub service_secret_key: PathBuf,
     /// Additional service secret config.
     #[serde(default)]
     pub services_secret_configs: AbstractConfig,

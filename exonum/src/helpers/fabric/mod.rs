@@ -147,7 +147,7 @@ impl Argument {
 
 /// Keys describing various pieces of data one can get from `Context`.
 pub mod keys {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, path::PathBuf};
 
     use toml;
 
@@ -157,7 +157,7 @@ pub mod keys {
 
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.
-    pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
+    pub const NODE_CONFIG: ContextKey<NodeConfig<PathBuf>> = context_key!("node_config");
 
     /// Configuration file path for this node. If set, `ConfigManager` will be created.
     /// Set by `run` command.
@@ -202,10 +202,11 @@ pub mod keys {
 /// # Examples
 ///
 /// ```
+/// use std::path::PathBuf;
 /// use exonum::node::NodeConfig;
 /// use exonum::helpers::fabric::{keys, Context};
 ///
-/// fn get_node_config(context: &Context) -> NodeConfig {
+/// fn get_node_config(context: &Context) -> NodeConfig<PathBuf> {
 ///     context.get(keys::NODE_CONFIG).unwrap()
 /// }
 /// ```
@@ -237,7 +238,7 @@ impl Context {
                         continue;
                     }
                 }
-                ArgumentType::Named(detail) if detail.multiple && !arg.takes_value => {
+                ArgumentType::Named(_) if !arg.takes_value => {
                     let occurrences = matches.occurrences_of(&arg.name);
                     if occurrences > 0 {
                         context.flags.insert(arg.name.to_owned(), occurrences);
@@ -306,6 +307,22 @@ impl Context {
     /// Panics if value could not be serialized as TOML.
     pub fn set<T: Serialize>(&mut self, key: ContextKey<T>, value: T) -> Option<Value> {
         self.set_raw(key.name(), value)
+    }
+
+    /// Gets flag occurrences count from the command line flags map.
+    pub fn get_flag_occurrences(&self, flag: &str) -> Option<u64> {
+        self.flags.get(flag).cloned()
+    }
+
+    /// Sets flag occurrences count to the command line flags map.
+    pub fn set_flag_occurrences(&mut self, flag: &str, occurrences: u64) {
+        self.flags.insert(flag.into(), occurrences);
+    }
+
+    /// Checks if the flag exists in command line flags map.
+    pub fn has_flag(&self, flag: &str) -> bool {
+        let occurrences = self.flags.get(flag);
+        occurrences.is_some() && *occurrences.unwrap() > 0
     }
 
     fn get_raw<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, failure::Error> {
