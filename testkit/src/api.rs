@@ -18,6 +18,7 @@ pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
 use reqwest::{Client, Response, StatusCode};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 use serde_urlencoded;
 
@@ -26,7 +27,6 @@ use std::fmt::{self, Display};
 use exonum::{
     api::{self, ApiAggregator, ServiceApiState},
     blockchain::SharedNodeState,
-    encoding::serialize::reexport::{DeserializeOwned, Serialize},
     messages::{RawTransaction, Signed},
     node::ApiSender,
 };

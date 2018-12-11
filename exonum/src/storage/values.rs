@@ -15,7 +15,7 @@
 //! A definition of `StorageValue` trait and implementations for common types.
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -23,14 +23,13 @@ use std::{borrow::Cow, mem};
 
 use super::UniqueHash;
 use crypto::{Hash, PublicKey};
-use encoding::{Field, Offset};
 use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`transactions!`]
-/// macros. In case you need to implement it manually, use little-endian encoding
-/// for integer types for compatibility with modern architectures.
+/// `StorageValue` is automatically implemented by the `ProtobufConvert` and `TransactionSet`
+/// auto derives from `exonum_derive`. In case you need to implement it manually,
+/// use little-endian encoding for integer types for compatibility with modern architectures.
 ///
 /// # Examples
 ///
@@ -74,9 +73,6 @@ use helpers::Round;
 /// }
 /// # fn main() {}
 /// ```
-///
-/// [`encoding_struct!`]: ../macro.encoding_struct.html
-/// [`transactions!`]: ../macro.transactions.html
 pub trait StorageValue: UniqueHash + Sized {
     /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;
@@ -270,24 +266,6 @@ impl StorageValue for DateTime<Utc> {
     }
 }
 
-/// Uses little-endian encoding.
-impl StorageValue for Duration {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut buffer = vec![0; Self::field_size() as usize];
-        let from: Offset = 0;
-        let to: Offset = Self::field_size();
-        self.write(&mut buffer, from, to);
-        buffer
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        #![allow(unsafe_code)]
-        let from: Offset = 0;
-        let to: Offset = Self::field_size();
-        unsafe { Self::read(&value, from, to) }
-    }
-}
-
 impl StorageValue for Round {
     fn into_bytes(self) -> Vec<u8> {
         self.0.into_bytes()
@@ -323,8 +301,8 @@ impl StorageValue for Decimal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::Debug;
-    use std::str::FromStr;
+    use chrono::Duration;
+    use std::{fmt::Debug, str::FromStr};
 
     #[test]
     fn u8_round_trip() {
@@ -420,21 +398,6 @@ mod tests {
         ];
 
         assert_round_trip_eq(&times);
-    }
-
-    #[test]
-    fn storage_value_for_duration_round_trip() {
-        let durations = [
-            Duration::zero(),
-            Duration::max_value(),
-            Duration::min_value(),
-            Duration::nanoseconds(999_999_999),
-            Duration::nanoseconds(-999_999_999),
-            Duration::seconds(42) + Duration::nanoseconds(15),
-            Duration::seconds(-42) + Duration::nanoseconds(-15),
-        ];
-
-        assert_round_trip_eq(&durations);
     }
 
     #[test]

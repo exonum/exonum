@@ -101,8 +101,7 @@ extern crate tempdir;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
 
-#[macro_use]
-pub mod encoding;
+pub mod proto;
 #[macro_use]
 pub mod messages;
 #[macro_use]

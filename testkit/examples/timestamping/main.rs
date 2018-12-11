@@ -20,6 +20,7 @@ extern crate serde_json;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
+extern crate failure;
 extern crate protobuf;
 
 use exonum::{
@@ -28,7 +29,6 @@ use exonum::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
-    encoding,
     messages::{Message, RawTransaction, Signed},
     storage::Snapshot,
 };
@@ -85,7 +85,7 @@ impl Service for TimestampingService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
         let tx = TimestampingServiceTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

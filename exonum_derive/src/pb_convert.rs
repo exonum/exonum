@@ -52,7 +52,7 @@ fn implement_protobuf_convert_from_pb(field_names: &[Ident]) -> impl quote::ToTo
     let our_struct_names = field_names.to_vec();
 
     quote! {
-        fn from_pb(pb: Self::ProtoStruct) -> std::result::Result<Self, ()> {
+        fn from_pb(pb: Self::ProtoStruct) -> std::result::Result<Self, _FailureError> {
           Ok(Self {
            #( #our_struct_names: ProtobufConvert::from_pb(pb.#getters().to_owned())?, )*
           })
@@ -97,14 +97,14 @@ fn implement_binary_form(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTo
     quote! {
         impl #cr::messages::BinaryForm for #name {
 
-            fn encode(&self) -> std::result::Result<Vec<u8>, _EncodingError> {
-                self.to_pb().write_to_bytes().map_err(|e| _EncodingError::Other(Box::new(e)))
+            fn encode(&self) -> std::result::Result<Vec<u8>, _FailureError> {
+                self.to_pb().write_to_bytes().map_err(_FailureError::from)
             }
 
-            fn decode(buffer: &[u8]) -> std::result::Result<Self, _EncodingError> {
+            fn decode(buffer: &[u8]) -> std::result::Result<Self, _FailureError> {
                 let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-                pb.merge_from_bytes(buffer).map_err(|e| _EncodingError::Other(Box::new(e)))?;
-                Self::from_pb(pb).map_err(|_| "Conversion from protobuf error.".into())
+                pb.merge_from_bytes(buffer)?;
+                Self::from_pb(pb)
             }
         }
     }
@@ -158,12 +158,13 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         mod #mod_name {
             extern crate protobuf as _protobuf_crate;
+            extern crate failure as _failure;
 
             use super::*;
 
-            use #cr::encoding::protobuf::ProtobufConvert;
-            use #cr::encoding::Error as _EncodingError;
             use self::_protobuf_crate::Message as _ProtobufMessage;
+            use self::_failure::{bail, Error as _FailureError};
+            use #cr::proto::ProtobufConvert;
 
             #protobuf_convert
             #binary_form

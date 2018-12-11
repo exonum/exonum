@@ -14,9 +14,9 @@
 
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{CryptoHash, Hash, PublicKey};
-use encoding::protobuf;
 use helpers::{Height, Round};
 use messages::{Connect, Message, Precommit, RawTransaction, Signed};
+use proto;
 use storage::{
     Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
     Snapshot,
@@ -53,7 +53,7 @@ define_names!(
 
 /// Configuration index.
 #[derive(Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "protobuf::ConfigReference", crate = "crate")]
+#[exonum(pb = "proto::ConfigReference", crate = "crate")]
 pub struct ConfigReference {
     /// Height since which this configuration becomes actual.
     actual_from: Height,
@@ -85,7 +85,7 @@ impl ConfigReference {
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
 #[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
-#[exonum(pb = "protobuf::TxLocation", crate = "crate")]
+#[exonum(pb = "proto::TxLocation", crate = "crate")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,

@@ -16,13 +16,10 @@
 
 use serde_json::{self, Error as JsonError};
 
-use std::{borrow::Cow, error::Error, fmt};
+use std::fmt;
 
 use crypto::{self, CryptoHash, Hash};
-use encoding::{
-    serialize::{json, WriteBufferWrapper},
-    CheckedOffset, Error as EncodingError, Field, Offset,
-};
+use proto::{self, ProtobufConvert};
 use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
@@ -33,30 +30,47 @@ pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 const CORE_STORAGE_METADATA: StorageMetadata = StorageMetadata { version: 0 };
 const CORE_STORAGE_METADATA_KEY: &str = "__STORAGE_METADATA__";
 
-encoding_struct! {
-    struct IndexMetadata {
-        index_type: IndexType,
-        is_family: bool,
+#[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+#[exonum(
+    pb = "proto::schema::storage::IndexMetadata",
+    crate = "crate"
+)]
+struct IndexMetadata {
+    index_type: IndexType,
+    is_family: bool,
+}
+
+impl IndexMetadata {
+    fn new(index_type: IndexType, is_family: bool) -> Self {
+        Self {
+            index_type,
+            is_family,
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum IndexType {
-    Entry,
-    KeySet,
-    List,
-    SparseList,
-    Map,
-    ProofList,
-    ProofMap,
-    ValueSet,
+    Entry = 0,
+    KeySet = 1,
+    List = 2,
+    SparseList = 3,
+    Map = 4,
+    ProofList = 5,
+    ProofMap = 6,
+    ValueSet = 7,
 }
 
-impl From<u8> for IndexType {
-    fn from(num: u8) -> Self {
+impl ProtobufConvert for IndexType {
+    type ProtoStruct = u32;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        *self as u32
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         use self::IndexType::*;
-        match num {
+        let index = match pb {
             0 => Entry,
             1 => KeySet,
             2 => List,
@@ -65,79 +79,21 @@ impl From<u8> for IndexType {
             5 => ProofList,
             6 => ProofMap,
             7 => ValueSet,
-            invalid => panic!(
+            invalid => bail!(
                 "Unreachable pattern ({:?}) while constructing table type. \
                  Storage data is probably corrupted",
                 invalid
             ),
-        }
-    }
-}
-
-impl CryptoHash for IndexType {
-    fn hash(&self) -> Hash {
-        (*self as u8).hash()
-    }
-}
-
-impl StorageValue for IndexType {
-    fn into_bytes(self) -> Vec<u8> {
-        (self as u8).into_bytes()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        <u8 as StorageValue>::from_bytes(value).into()
-    }
-}
-
-impl<'a> Field<'a> for IndexType {
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        u8::read(buffer, from, to).into()
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        (*self as u8).write(buffer, from, to)
-    }
-
-    fn field_size() -> Offset {
-        u8::field_size()
-    }
-
-    fn check(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> ::std::result::Result<CheckedOffset, EncodingError> {
-        u8::check(buffer, from, to, latest_segment)
-    }
-}
-
-impl json::ExonumJson for IndexType {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &json::reexport::Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<dyn Error>>
-    where
-        Self: Sized,
-    {
-        let v = value.as_u64().ok_or("Can't cast json as u64")? as u8;
-        buffer.write(from, to, v);
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<json::reexport::Value, Box<dyn Error + Send + Sync>> {
-        Ok(json::reexport::Value::from(*self as u8))
+        };
+        Ok(index)
     }
 }
 
 pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &dyn Snapshot) {
     let metadata = BaseIndex::indexes_metadata(view);
     if let Some(value) = metadata.get::<_, IndexMetadata>(name) {
-        let stored_type = value.index_type();
-        let stored_is_family = value.is_family();
+        let stored_type = value.index_type;
+        let stored_is_family = value.is_family;
         assert_eq!(
             stored_type, index_type,
             "Attempt to access index '{}' of type {:?}, \
@@ -255,8 +211,8 @@ mod tests {
         let is_family = [true, true, false, false, true, false, true, false];
         for (t, f) in index_types.iter().zip(&is_family) {
             let metadata = IndexMetadata::new(*t, *f);
-            assert_eq!(metadata.index_type(), *t);
-            assert_eq!(metadata.is_family(), *f)
+            assert_eq!(metadata.index_type, *t);
+            assert_eq!(metadata.is_family, *f)
         }
     }
 

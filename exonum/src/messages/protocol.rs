@@ -35,8 +35,8 @@ use std::{borrow::Cow, fmt::Debug, mem};
 use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use blockchain;
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use encoding::protobuf;
 use helpers::{Height, Round, ValidatorId};
+use proto;
 use storage::{proof_list_index as merkle, StorageValue};
 
 /// `SignedMessage` size with zero bytes payload.
@@ -66,7 +66,7 @@ pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::s
 /// initialization. Additionally, the node responds by its own `Connect`
 /// message after receiving `node::Event::Connected`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Connect", crate = "crate")]
+#[exonum(pb = "proto::Connect", crate = "crate")]
 pub struct Connect {
     /// The node's address.
     pub_addr: String,
@@ -117,7 +117,7 @@ impl Connect {
 /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
 /// after accepting a new block.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Status", crate = "crate")]
+#[exonum(pb = "proto::Status", crate = "crate")]
 pub struct Status {
     /// The height to which the message is related.
     height: Height,
@@ -163,7 +163,7 @@ impl Status {
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Propose", crate = "crate")]
+#[exonum(pb = "proto::Propose", crate = "crate")]
 pub struct Propose {
     /// The validator id.
     validator: ValidatorId,
@@ -236,7 +236,7 @@ impl Propose {
 /// A node broadcasts `Prevote` in response to `Propose` when it has
 /// received all the transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::Prevote", crate = "crate")]
+#[exonum(pb = "proto::Prevote", crate = "crate")]
 pub struct Prevote {
     /// The validator id.
     validator: ValidatorId,
@@ -309,7 +309,7 @@ impl Prevote {
 /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
 /// pre-votes and no unknown transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "protobuf::Precommit", crate = "crate")]
+#[exonum(pb = "proto::Precommit", crate = "crate")]
 pub struct Precommit {
     /// The validator id.
     validator: ValidatorId,
@@ -384,7 +384,7 @@ impl Precommit {
 /// ### Generation
 /// The message is sent as response to `BlockRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::BlockResponse", crate = "crate")]
+#[exonum(pb = "proto::BlockResponse", crate = "crate")]
 pub struct BlockResponse {
     /// Public key of the recipient.
     to: PublicKey,
@@ -443,7 +443,7 @@ impl BlockResponse {
 /// ### Generation
 /// The message is sent as response to `TransactionsRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::TransactionsResponse", crate = "crate")]
+#[exonum(pb = "proto::TransactionsResponse", crate = "crate")]
 pub struct TransactionsResponse {
     /// Public key of the recipient.
     to: PublicKey,
@@ -483,7 +483,7 @@ impl TransactionsResponse {
 /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::ProposeRequest", crate = "crate")]
+#[exonum(pb = "proto::ProposeRequest", crate = "crate")]
 pub struct ProposeRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -526,7 +526,7 @@ impl ProposeRequest {
 /// This message can be sent during `Propose`, `Prevote` and `Precommit`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::TransactionsRequest", crate = "crate")]
+#[exonum(pb = "proto::TransactionsRequest", crate = "crate")]
 pub struct TransactionsRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -565,7 +565,7 @@ impl TransactionsRequest {
 /// ### Generation
 /// This message can be sent during `Prevote` and `Precommit` handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::PrevotesRequest", crate = "crate")]
+#[exonum(pb = "proto::PrevotesRequest", crate = "crate")]
 pub struct PrevotesRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -632,7 +632,7 @@ impl PrevotesRequest {
 /// `PeersRequest` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::PeersRequest", crate = "crate")]
+#[exonum(pb = "proto::PeersRequest", crate = "crate")]
 pub struct PeersRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -660,7 +660,7 @@ impl PeersRequest {
 /// ### Generation
 /// This message can be sent during `Status` processing.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
-#[exonum(pb = "protobuf::BlockRequest", crate = "crate")]
+#[exonum(pb = "proto::BlockRequest", crate = "crate")]
 pub struct BlockRequest {
     /// Public key of the recipient.
     to: PublicKey,
@@ -800,13 +800,11 @@ macro_rules! impl_protocol {
             /// Converts raw `SignedMessage` into concrete `Message` message.
             /// Returns error if fails.
             pub fn deserialize(message: SignedMessage) -> Result<Self, failure::Error> {
-            use $crate::events::error::into_failure;
                 match message.message_class() {
                     $($class_num =>
                         match message.message_type() {
                             $($type_num =>{
-                                let payload = $type::decode(message.payload())
-                                                .map_err(into_failure)?;
+                                let payload = $type::decode(message.payload())?;
                                 let message = Signed::new(payload, message);
                                 Ok($protocol_name::$class($class::$type(message)))
                             }),+

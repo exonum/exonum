@@ -21,4 +21,4 @@ pub use self::configuration::{Propose, ProposeData, Vote, VoteAgainst};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::encoding::protobuf::*;
+use exonum::proto::schema::*;

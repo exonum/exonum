@@ -14,15 +14,16 @@
 
 //! `Transaction` related types.
 
+use failure;
 use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crypto::{CryptoHash, Hash, PublicKey};
-use encoding::{self, protobuf::ProtobufConvert};
 use hex::ToHex;
 use messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
+use proto::{self, ProtobufConvert};
 use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -136,21 +137,25 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// # Examples
     ///
     /// ```
-    /// # #[macro_use] extern crate exonum;
+    /// # extern crate exonum;
+    /// # #[macro_use] extern crate exonum_derive;
     /// # #[macro_use] extern crate serde_derive;
     /// #
     /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
-    /// transactions! {
-    ///     MyTransactions {
+    /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+    /// #[exonum(pb = "exonum::proto::schema::doc_tests::MyTransaction")]
+    /// struct MyTransaction {
+    ///     // Transaction definition...
+    ///     public_key: PublicKey,
+    /// }
     ///
-    ///         struct MyTransaction {
-    ///             // Transaction definition...
-    ///             public_key: &PublicKey,
-    ///         }
-    ///     }
+    ///
+    /// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+    /// enum MyTransactions {
+    ///     MyTransaction(MyTransaction),
     /// }
     ///
     /// impl Transaction for MyTransaction {
@@ -377,7 +382,7 @@ impl From<ExecutionError> for TransactionError {
 }
 
 impl ProtobufConvert for TransactionResult {
-    type ProtoStruct = encoding::protobuf::TransactionResult;
+    type ProtoStruct = proto::TransactionResult;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut proto = <Self as ProtobufConvert>::ProtoStruct::new();
@@ -388,7 +393,7 @@ impl ProtobufConvert for TransactionResult {
         proto
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, ()> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let status_code: u16 = ProtobufConvert::from_pb(pb.get_status())?;
         let description = if pb.get_description() != "" {
             Some(pb.take_description())
@@ -400,7 +405,7 @@ impl ProtobufConvert for TransactionResult {
             value @ 0...MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::panic(description)),
-            value => panic!("Invalid TransactionResult value: {}", value),
+            value => bail!("Invalid TransactionResult value: {}", value),
         }))
     }
 }
@@ -432,290 +437,14 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 }
 
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
-/// The implementation of this trait is generated automatically by the `transactions!`
-/// macro.
+/// The implementation of this trait is generated automatically by the `#[derive(TransactionSet)]`
+/// attribute.
+/// This attribute is used on the enum which has transactions as its variants.
 pub trait TransactionSet:
     Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
     /// Parses a transaction from this set from a `RawTransaction`.
-    fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
-}
-
-/// `transactions!` is used to declare a set of transactions of a particular service.
-///
-/// The macro generates a type for each transaction and a helper enum which can hold
-/// any of the transactions. You need to implement the `Transaction` trait for each of the
-/// transactions yourself.
-///
-/// See [`Service`] trait documentation for a full example of usage.
-///
-/// Each transaction is specified as a Rust struct. For additional information about
-/// data layout, see the documentation on the [`encoding` module](./encoding/index.html).
-///
-/// For each transaction, the macro creates getter methods for all defined fields.
-/// The names of the methods coincide with the field names. In addition,
-/// two constructors are defined:
-///
-/// - `new` accepts as arguments all fields in the order of their declaration in
-///   the macro. The constructor returns a transaction which contains
-///   the fields. This transaction could be converted into [`Signed<RawTransaction>`]
-///
-/// Each transaction also implements [`SegmentField`],
-/// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
-///
-///
-/// **Note.** `transactions!` uses other macros in the `exonum` crate internally.
-/// Be sure to add them to the global scope.
-///
-/// [`Transaction`]: ./blockchain/trait.Transaction.html
-/// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
-/// [`SecretKey`]: ../exonum_crypto/struct.SecretKey.html
-/// [`Signature`]: ../exonum_crypto/struct.Signature.html
-/// [`SegmentField`]: ./encoding/trait.SegmentField.html
-/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
-/// [`StorageValue`]: ./storage/trait.StorageValue.html
-/// [`Signed`]: ./messages/struct.Signed.html
-/// [`Signed<RawTransaction>`]: ./messages/struct.Signed.html
-/// [`Service`]: ./blockchain/trait.Service.html
-/// # Examples
-///
-/// The example below uses the `transactions!` macro; declares a set of
-/// transactions for a service with the indicated ID and adds two transactions.
-///
-/// ```
-/// #[macro_use] extern crate exonum;
-/// #[macro_use] extern crate serde_derive;
-/// use exonum::crypto::PublicKey;
-/// # use exonum::storage::Fork;
-/// # use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
-///
-/// transactions! {
-///     WalletTransactions {
-///
-///         struct Create {
-///             key: &PublicKey
-///         }
-///
-///         struct Transfer {
-///             from: &PublicKey,
-///             to: &PublicKey,
-///             amount: u64,
-///         }
-///     }
-/// }
-/// # impl Transaction for Create {
-/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
-/// # }
-/// #
-/// # impl Transaction for Transfer {
-/// #   fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
-/// # }
-/// #
-/// # fn main() { }
-/// ```
-#[macro_export]
-macro_rules! transactions {
-    // Empty variant.
-    {} => {};
-    // Variant with the private enum.
-    {
-        $(#[$tx_set_attr:meta])*
-        $transaction_set:ident {
-
-            $(
-                $(#[$tx_attr:meta])*
-                struct $name:ident {
-                    $($def:tt)*
-                }
-            )*
-        }
-    } => {
-        messages! {
-            $(
-                $(#[$tx_attr])*
-                struct $name {
-                    $($def)*
-                }
-            )*
-        }
-
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        $(#[$tx_set_attr])*
-        enum $transaction_set {
-            $(
-                #[allow(missing_docs)]
-                $name($name),
-            )*
-        }
-
-        transactions!(@implement $transaction_set, $($name)*);
-    };
-    // Variant with the public enum without restrictions.
-    {
-        $(#[$tx_set_attr:meta])*
-        pub $transaction_set:ident {
-
-            $(
-                $(#[$tx_attr:meta])*
-                struct $name:ident {
-                    $($def:tt)*
-                }
-            )*
-        }
-    } => {
-        messages! {
-            $(
-                $(#[$tx_attr])*
-                struct $name {
-                    $($def)*
-                }
-            )*
-        }
-
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        $(#[$tx_set_attr])*
-        pub enum $transaction_set {
-            $(
-                #[allow(missing_docs)]
-                $name($name),
-            )*
-        }
-
-        transactions!(@implement $transaction_set, $($name)*);
-    };
-    // Variant with the public enum with visibility restrictions.
-    {
-        $(#[$tx_set_attr:meta])*
-        pub($($vis:tt)+) $transaction_set:ident {
-
-            $(
-                $(#[$tx_attr:meta])*
-                struct $name:ident {
-                    $($def:tt)*
-                }
-            )*
-        }
-    } => {
-        messages! {
-            $(
-                $(#[$tx_attr])*
-                struct $name {
-                    $($def)*
-                }
-            )*
-        }
-
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        $(#[$tx_set_attr])*
-        pub($($vis)+) enum $transaction_set {
-            $(
-                #[allow(missing_docs)]
-                $name($name),
-            )*
-        }
-
-        transactions!(@implement $transaction_set, $($name)*);
-    };
-    // Implementation details
-    (@implement $transaction_set:ident, $($name:ident)*) => {
-
-        impl $crate::blockchain::TransactionSet for $transaction_set {
-            fn tx_from_raw(
-                raw: $crate::messages::RawTransaction
-            ) -> ::std::result::Result<Self, $crate::encoding::Error> {
-                let (id, vec) = raw.service_transaction().into_raw_parts();
-                __enum_from_id_vec!($transaction_set (id, vec), $( $name )*)
-            }
-        }
-
-        impl Into<$crate::messages::ServiceTransaction> for $transaction_set {
-            fn into(self) -> $crate::messages::ServiceTransaction {
-                let (id, vec) = __enum_to_vec_id!($transaction_set &self, $( $name )*);
-                $crate::messages::ServiceTransaction::from_raw_unchecked(id, vec)
-
-            }
-        }
-        $(
-        impl Into<$transaction_set> for $name {
-            fn into(self) -> $transaction_set {
-                $transaction_set::$name(self)
-            }
-        }
-
-        impl Into<$crate::messages::ServiceTransaction> for $name {
-            fn into(self) -> $crate::messages::ServiceTransaction {
-                let set: $transaction_set = self.into();
-                set.into()
-            }
-        }
-        )*
-        impl Into<Box<dyn $crate::blockchain::Transaction>> for $transaction_set {
-            fn into(self) -> Box<dyn $crate::blockchain::Transaction> {
-                match self {$(
-                    $transaction_set::$name(tx) => Box::new(tx),
-                )*}
-            }
-        }
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __enum_to_vec_id{
-    ($set:ident $this:expr, $($field_type:ident)*) => {
-        __enum_to_vec_id!(@inner $set $this, (0) (); $($field_type)* );
-    };
-    (@create $set:ident $this:expr, ( $((($name:ident) => ($num:expr)))* ) ) => {
-        match $this {
-            $(
-                &$set::$name(ref tx) => ($num, $crate::messages::BinaryForm::encode(tx).unwrap())
-            ),*
-        }
-    };
-    (@inner $set:ident $this:expr, ($num:expr) ($($processed:tt)*);
-        $field_type:ident $($rest:tt)*
-    ) => {
-        __enum_to_vec_id!(
-            @inner $set $this,
-            ($num + 1)
-            ($($processed)* (($field_type) => ($num)));
-            $($rest)*
-        );
-    };
-
-    (@inner $set:ident $this:expr, ($num:expr) ($($processed:tt)*);) => {
-        __enum_to_vec_id!(@create $set $this, ($($processed)*) );
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __enum_from_id_vec {
-    ($set:ident $this:tt, $($field_type:ident)*) => {
-        __enum_from_id_vec!(@inner $set $this, (0) (); $($field_type)* );
-    };
-    (@create $set:ident ($id:expr, $vec:expr), ( $((($name:ident) => ($num:expr)))* ) ) => {
-        match $id {
-            $(
-                num if num == $num => return <$name as $crate::messages::BinaryForm>::decode(&$vec).map($set::$name),
-            )*
-            num => Err($crate::encoding::Error::Basic(format!("Tag {} not found for enum {}.",num, stringify!($set)).into()))
-        }
-    };
-    (@inner $set:ident $this:tt, ($num:expr) ($($processed:tt)*);
-        $field_type:ident $($rest:tt)*
-    ) => {
-        __enum_from_id_vec!(
-            @inner $set $this,
-            ($num + 1)
-            ($($processed)* (($field_type) => ($num)));
-            $($rest)*
-        );
-    };
-
-    (@inner $set:ident $this:tt, ($num:expr) ($($processed:tt)*);) => {
-        __enum_from_id_vec!(@create $set $this, ($($processed)*) );
-    };
+    fn tx_from_raw(raw: RawTransaction) -> Result<Self, failure::Error>;
 }
 
 /// Tries to get a meaningful description from the given panic.
@@ -741,10 +470,10 @@ mod tests {
     use super::*;
     use blockchain::{Blockchain, Schema, Service};
     use crypto;
-    use encoding;
     use helpers::{Height, ValidatorId};
     use messages::Message;
     use node::ApiSender;
+    use proto;
     use storage::{Database, Entry, MemoryDB, Snapshot};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
@@ -752,9 +481,6 @@ mod tests {
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
     }
-
-    // Testing macro with empty body.
-    transactions!{}
 
     #[test]
     fn execution_error_new() {
@@ -874,8 +600,12 @@ mod tests {
 
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-            let transaction =
-                Message::sign_transaction(TxResult::new(index), TX_RESULT_SERVICE_ID, pk, &sec_key);
+            let transaction = Message::sign_transaction(
+                TxResult { value: index },
+                TX_RESULT_SERVICE_ID,
+                pk,
+                &sec_key,
+            );
             let hash = transaction.hash();
             {
                 let mut fork = blockchain.fork();
@@ -959,26 +689,27 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(
-            &self,
-            raw: RawTransaction,
-        ) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(TestTxs::tx_from_raw(raw)?.into())
         }
     }
 
-    transactions! {
-        TestTxs {
-            struct TxResult {
-                index: u64,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::schema::tests::TestServiceTx", crate = "crate")]
+    struct TxResult {
+        value: u64,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
+    enum TestTxs {
+        TxResult(TxResult),
     }
 
     impl Transaction for TxResult {
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let mut entry = create_entry(context.fork());
-            entry.set(self.index());
+            entry.set(self.value);
             EXECUTION_STATUS.lock().unwrap().clone()
         }
     }

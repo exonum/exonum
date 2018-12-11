@@ -53,12 +53,12 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::{self, serialize::json::reexport::Value},
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
 use schema::TimeSchema;
+use serde_json::Value;
 
 use time_provider::{SystemTimeProvider, TimeProvider};
 use transactions::*;
@@ -111,7 +111,7 @@ impl Service for TimeService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 

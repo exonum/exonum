@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use encoding::protobuf::tests::TimestampTx;
+pub use proto::schema::tests::TimestampTx;
 
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
 use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use encoding::Error as MessageError;
 use messages::{Message, RawTransaction, Signed};
 use storage::Snapshot;
 
@@ -105,7 +104,7 @@ impl Service for TimestampingService {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimestampingTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

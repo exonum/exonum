@@ -47,7 +47,6 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::Error as StreamStructError,
     helpers::fabric,
     messages::RawTransaction,
     storage::Snapshot,
@@ -78,7 +77,7 @@ impl blockchain::Service for Service {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, StreamStructError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimeTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

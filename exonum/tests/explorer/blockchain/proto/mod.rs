@@ -20,4 +20,4 @@ pub use self::tests_transactions::{CreateWallet, Transfer};
 
 include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
 
-use exonum::encoding::protobuf::*;
+use exonum::proto::schema::*;

@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module of the rust-protobuf generated files.
+syntax = "proto3";
 
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+package exonum;
 
-pub use self::cryptocurrency::{CreateWallet, Issue, Transfer, Wallet};
-
-include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
-
-use exonum::proto::schema::*;
+message IndexMetadata {
+  uint32 index_type = 1;
+  bool is_family = 2;
+}

@@ -1060,10 +1060,9 @@ mod tests {
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     };
     use crypto::gen_keypair;
-    use encoding::protobuf::{tests::TxSimple, ProtobufConvert};
-    use encoding::Error as MessageError;
     use events::EventHandler;
     use helpers;
+    use proto::{schema::tests::TxSimple, ProtobufConvert};
     use storage::{Database, MemoryDB, Snapshot};
     const SERVICE_ID: u16 = 0;
 
@@ -1101,7 +1100,7 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(SimpleTransactions::tx_from_raw(raw)?.into())
         }
     }

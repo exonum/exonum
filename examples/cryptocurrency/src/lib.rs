@@ -402,7 +402,6 @@ pub mod service {
         api::ServiceApiBuilder,
         blockchain::{Service, Transaction, TransactionSet},
         crypto::Hash,
-        encoding,
         messages::RawTransaction,
         storage::Snapshot,
     };
@@ -464,10 +463,7 @@ pub mod service {
         }
 
         // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(
-            &self,
-            raw: RawTransaction,
-        ) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             let tx = CurrencyTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

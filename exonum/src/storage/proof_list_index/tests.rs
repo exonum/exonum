@@ -17,10 +17,8 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
 use self::ListProof::*;
 use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
 use crypto::{hash, CryptoHash, Hash};
-use encoding::serialize::{
-    json::reexport::{from_str, to_string},
-    reexport::Serialize,
-};
+use serde::Serialize;
+use serde_json::{from_str, to_string};
 use storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";
