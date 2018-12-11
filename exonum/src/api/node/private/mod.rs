@@ -143,11 +143,6 @@ impl SystemApi {
                 );
             }
 
-            info!(
-                "shared_api_state.reconnects_timeout() {:?}",
-                self.shared_api_state.reconnects_timeout()
-            );
-
             for (s, delay) in self.shared_api_state.reconnects_timeout() {
                 outgoing_connections
                     .entry(s)
