@@ -8,8 +8,8 @@ members = [
     "services/time",
     "testkit",
     "testkit/server",
-    "utils/build",
-    "utils/crypto",
-    "utils/derive",
+    "components/build",
+    "components/crypto",
+    "components/derive",
 ]
 exclude = [ "exonum/fuzz" ]
