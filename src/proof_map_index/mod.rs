@@ -552,7 +552,7 @@ where
             new_branch.set_child(
                 child_path.bit(i),
                 &child_path.suffix(i),
-                parent.child_hash(proof_path.bit(0)),
+                &parent.child_hash(proof_path.bit(0)),
             );
 
             let hash = new_branch.hash();
@@ -654,7 +654,7 @@ where
 
                             self.base.remove(&child_path);
 
-                            return RemoveResult::Branch((key, *hash));
+                            return RemoveResult::Branch((key, hash));
                         }
                         RemoveResult::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
@@ -845,7 +845,7 @@ where
             fn child(&self, self_branch: &BranchNode, kind: ChildKind) -> Self {
                 Self::new(
                     self.index,
-                    *self_branch.child_hash(kind),
+                    self_branch.child_hash(kind),
                     self_branch.child_path(kind),
                 )
             }

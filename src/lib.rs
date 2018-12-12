@@ -109,7 +109,7 @@
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{
-    backends::{rocksdb::RocksDB, memorydb::MemoryDB},
+    backends::{memorydb::MemoryDB, rocksdb::RocksDB},
     db::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
         Snapshot,

@@ -16,11 +16,14 @@
 
 use std::borrow::Cow;
 
+use smallvec::{SmallVec, smallvec};
+
+use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+
 use super::{
     super::{StorageKey, StorageValue},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
-use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -30,7 +33,7 @@ pub enum Node<T: StorageValue> {
     Branch(BranchNode),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct BranchNode {
     raw: Vec<u8>,
 }
@@ -42,14 +45,12 @@ impl BranchNode {
         }
     }
 
-    pub fn child_hash(&self, kind: ChildKind) -> &Hash {
-        unsafe {
-            let from = match kind {
-                ChildKind::Right => HASH_SIZE,
-                ChildKind::Left => 0,
-            };
-            &*(&self.raw[from] as *const u8 as *const Hash)
-        }
+    pub fn child_hash(&self, kind: ChildKind) -> Hash {
+        let from = match kind {
+            ChildKind::Right => HASH_SIZE,
+            ChildKind::Left => 0,
+        };
+        Hash::read(&self.raw[from..from + HASH_SIZE])
     }
 
     pub fn child_path(&self, kind: ChildKind) -> ProofPath {
@@ -84,7 +85,17 @@ impl BranchNode {
 
 impl CryptoHash for BranchNode {
     fn hash(&self) -> Hash {
-        hash(&self.raw)
+        let mut bytes: SmallVec<[u8; 256]> = smallvec![0u8; 132];
+        let mut pos = HASH_SIZE * 2;
+        // Writes hashes to the buffer.
+        bytes[..pos].copy_from_slice(&self.raw[..pos]);
+        pos += self
+            .child_path(ChildKind::Left)
+            .write_compressed(&mut bytes[pos..]);
+        pos += self
+            .child_path(ChildKind::Right)
+            .write_compressed(&mut bytes[pos..]);
+        hash(&bytes[0..pos])
     }
 }
 
@@ -112,20 +123,50 @@ impl ::std::fmt::Debug for BranchNode {
     }
 }
 
-#[test]
-fn test_branch_node() {
-    let mut branch = BranchNode::empty();
+#[cfg(test)]
+mod tests {
+    use exonum_crypto;
 
-    let lh = hash(&[1, 2]);
-    let rh = hash(&[3, 4]);
-    let ls = ProofPath::new(&[253; 32]);
-    let rs = ProofPath::new(&[244; 32]);
+    use super::*;
+    use crate::proof_map_index::key::BitsRange;
 
-    branch.set_child(ChildKind::Left, &ls, &lh);
-    branch.set_child(ChildKind::Right, &rs, &rh);
+    #[test]
+    fn test_branch_node_layout() {
+        let mut branch = BranchNode::empty();
 
-    assert_eq!(branch.child_hash(ChildKind::Left), &lh);
-    assert_eq!(branch.child_hash(ChildKind::Right), &rh);
-    assert_eq!(branch.child_path(ChildKind::Left), ls);
-    assert_eq!(branch.child_path(ChildKind::Right), rs);
+        let lh = exonum_crypto::hash(&[1, 2]);
+        let rh = exonum_crypto::hash(&[3, 4]);
+        let ls = ProofPath::new(&[253; 32]);
+        let rs = ProofPath::new(&[244; 32]);
+
+        branch.set_child(ChildKind::Left, &ls, &lh);
+        branch.set_child(ChildKind::Right, &rs, &rh);
+
+        assert_eq!(branch.child_hash(ChildKind::Left), lh);
+        assert_eq!(branch.child_hash(ChildKind::Right), rh);
+        assert_eq!(branch.child_path(ChildKind::Left), ls);
+        assert_eq!(branch.child_path(ChildKind::Right), rs);
+    }
+
+    #[test]
+    fn test_branch_node_storage_value() {
+        let mut branch = BranchNode::empty();
+
+        let lh = exonum_crypto::hash(&[1, 2]);
+        let rh = exonum_crypto::hash(&[3, 4]);
+        let ls = ProofPath::new(&[253; 32]).suffix(9).prefix(15);
+        let rs = ProofPath::new(&[244; 32]);
+
+        branch.set_child(ChildKind::Left, &ls, &lh);
+        branch.set_child(ChildKind::Right, &rs, &rh);
+
+        let buf = branch.clone().into_bytes();
+        let branch2 = BranchNode::from_bytes(buf.into());
+        assert_eq!(branch, branch2);
+        assert_eq!(branch.hash(), branch2.hash());
+        assert_eq!(
+            branch.hash().to_hex(),
+            "828b8bfd6c1a67981f0bb8202a4d9b3cde30d092bbc2fcba03d64171f54a0676"
+        );
+    }
 }

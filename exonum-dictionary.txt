@@ -129,6 +129,7 @@ serializable
 serialize
 serializer
 signum
+smallvec
 socketaddr
 sodiumoxide
 stringify
