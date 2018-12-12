@@ -75,6 +75,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
 use protobuf::{well_known_types, Message};
 
+use std::collections::HashMap;
+
 use crypto;
 use helpers::{Height, Round, ValidatorId};
 use messages::BinaryForm;
@@ -274,6 +276,24 @@ impl ProtobufConvert for Vec<u8> {
     }
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(pb)
+    }
+}
+
+// According to protobuf specification only simple scalar types (not floats) and strings can be used
+// as a map keys.
+impl<K, T> ProtobufConvert for HashMap<K, T>
+where
+    K: Eq + std::hash::Hash + Clone,
+    T: ProtobufConvert,
+{
+    type ProtoStruct = HashMap<K, T::ProtoStruct>;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.iter().map(|(k, v)| (k.clone(), v.to_pb())).collect()
+    }
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        pb.drain()
+            .map(|(k, v)| ProtobufConvert::from_pb(v).map(|v| (k, v)))
+            .collect::<Result<HashMap<_, _>, _>>()
     }
 }
 

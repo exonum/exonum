@@ -88,3 +88,11 @@ message TestProtobufConvertRepeated {
   repeated string string_array = 3;
   repeated uint32 num_array = 4;
 }
+
+message TestProtobufConvertMap {
+  map<uint32, uint64> num_map = 1;
+  map<uint32, string> string_map = 2;
+  map<uint32, bytes> bytes_map = 4;
+  map<uint32, Point> point_map = 5;
+  map<string, uint64> key_string_map = 6;
+}
