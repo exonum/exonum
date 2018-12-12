@@ -147,25 +147,25 @@ fn implement_serde_protobuf_convert(name: &Ident) -> proc_macro2::TokenStream {
     quote! {
         extern crate serde as _serde;
 
-    impl _serde::Serialize for #name {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: _serde::Serializer,
-        {
-            self.to_pb().serialize(serializer)
+        impl _serde::Serialize for #name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: _serde::Serializer,
+            {
+                self.to_pb().serialize(serializer)
+            }
         }
-    }
 
-    impl<'de> _serde::Deserialize<'de> for #name {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: _serde::Deserializer<'de>,
-        {
-            let pb = <#name as ProtobufConvert>::ProtoStruct::deserialize(deserializer)?;
-            ProtobufConvert::from_pb(pb).map_err(_serde::de::Error::custom)
+        impl<'de> _serde::Deserialize<'de> for #name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: _serde::Deserializer<'de>,
+            {
+                let pb = <#name as ProtobufConvert>::ProtoStruct::deserialize(deserializer)?;
+                ProtobufConvert::from_pb(pb).map_err(_serde::de::Error::custom)
+            }
         }
     }
-        }
 }
 
 pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
