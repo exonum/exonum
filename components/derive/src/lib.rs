@@ -27,7 +27,8 @@ mod tx_set;
 use proc_macro::TokenStream;
 use syn::{Attribute, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
-/// Exonum derive attribute names, used as `#[exonum( ATTRIBUTE_NAME = .. or ATTRIBUTE_NAME )]`
+// Exonum derive attribute names, used as
+// `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
 const CRATE_PATH_ATTRIBUTE: &str = "crate";
 const PB_CONVERT_ATTRIBUTE: &str = "pb";
 const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
@@ -45,8 +46,10 @@ const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
 /// * `#[exonum( serde_pb_convert )]`
 /// Optional. Implements `serde::{Serialize, Deserialize}` using structs that were generated with
 /// protobuf.
-/// ```json
-/// // For example struct with `exonum::crypto::Hash` with this
+/// For example, it should be used if you want json representation of your struct
+/// to be compatible with protobuf representation (including proper nesting of fields).
+/// ```text
+/// // For example, struct with `exonum::crypto::Hash` with this
 /// // (de)serializer will be represented as
 /// StructName {
 ///     "hash": {
@@ -78,7 +81,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// Attributes:
 ///
 /// * `#[exonum( crate = "path" )]`
-/// Optional. `path` is prefix of the `exonum` crate(usually "crate" or "exonum").
+/// Optional. `path` is a prefix of types from the `exonum` crate (usually "crate" or "exonum").
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
     tx_set::implement_transaction_set(input)
