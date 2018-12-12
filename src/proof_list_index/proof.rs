@@ -15,8 +15,30 @@
 use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
-use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
+use super::{super::StorageValue, key::ProofListKey, HashTag};
 use exonum_crypto::Hash;
+
+#[derive(Debug, PartialEq, Eq)]
+/// Encapsulates proof of absence for `ProofListIndex`.
+pub struct ProofOfAbsence {
+    len: u64,
+    merkle_root: Hash,
+}
+
+impl ProofOfAbsence {
+    /// New `ProofOfAbsence` for specified list `len` and `merkle_root`.
+    pub fn new(len: u64, merkle_root: Hash) -> Self {
+        Self { len, merkle_root }
+    }
+
+    pub fn len(&self) -> u64 {
+        self.len
+    }
+
+    pub fn merkle_root(&self) -> Hash {
+        self.merkle_root
+    }
+}
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]
@@ -29,6 +51,8 @@ pub enum ListProof<V> {
     Right(Hash, Box<ListProof<V>>),
     /// A leaf of proof with requested element.
     Leaf(V),
+    /// Proof of absence of element with specified index.
+    Absent(ProofOfAbsence),
 }
 
 /// An error that is returned when the list proof is invalid.
@@ -42,7 +66,7 @@ pub enum ListProofError {
     UnmatchedRootHash,
 }
 
-impl<V: StorageValue> ListProof<V> {
+impl<V: StorageValue + Clone> ListProof<V> {
     fn collect<'a>(
         &'a self,
         key: ProofListKey,
@@ -52,24 +76,27 @@ impl<V: StorageValue> ListProof<V> {
             return Err(ListProofError::UnexpectedBranch);
         }
         let hash = match *self {
-            ListProof::Full(ref left, ref right) => hash_pair(
+            ListProof::Full(ref left, ref right) => HashTag::hash_node(
                 &left.collect(key.left(), vec)?,
                 &right.collect(key.right(), vec)?,
             ),
             ListProof::Left(ref left, Some(ref right)) => {
-                hash_pair(&left.collect(key.left(), vec)?, right)
+                HashTag::hash_node(&left.collect(key.left(), vec)?, right)
             }
-            ListProof::Left(ref left, None) => hash_one(&left.collect(key.left(), vec)?),
+            ListProof::Left(ref left, None) => {
+                HashTag::hash_single_node(&left.collect(key.left(), vec)?)
+            }
             ListProof::Right(ref left, ref right) => {
-                hash_pair(left, &right.collect(key.right(), vec)?)
+                HashTag::hash_node(left, &right.collect(key.right(), vec)?)
             }
             ListProof::Leaf(ref value) => {
                 if key.height() > 1 {
                     return Err(ListProofError::UnexpectedLeaf);
                 }
                 vec.push((key.index(), value));
-                value.hash()
+                HashTag::hash_leaf(value.clone())
             }
+            ListProof::Absent(ref proof) => HashTag::hash_list_node(proof.len, proof.merkle_root),
         };
         Ok(hash)
     }
@@ -79,11 +106,26 @@ impl<V: StorageValue> ListProof<V> {
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
-    pub fn validate(&self, merkle_root: Hash, len: u64) -> Result<Vec<(u64, &V)>, ListProofError> {
+    pub fn validate(
+        &self,
+        expected_list_hash: Hash,
+        len: u64,
+    ) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
-        if self.collect(ProofListKey::new(height, 0), &mut vec)? != merkle_root {
-            return Err(ListProofError::UnmatchedRootHash);
+        let root_hash = self.collect(ProofListKey::new(height, 0), &mut vec)?;
+
+        match *self {
+            ListProof::Absent(ref _proof) => {
+                if expected_list_hash != root_hash {
+                    return Err(ListProofError::UnmatchedRootHash);
+                }
+            }
+            _ => {
+                if HashTag::hash_list_node(len, root_hash) != expected_list_hash {
+                    return Err(ListProofError::UnmatchedRootHash);
+                }
+            }
         }
         Ok(vec)
     }
@@ -120,6 +162,11 @@ impl<V: Serialize> Serialize for ListProof<V> {
             Leaf(ref val) => {
                 state = ser.serialize_struct("Leaf", 1)?;
                 state.serialize_field("val", val)?;
+            }
+            ListProof::Absent(ref proof) => {
+                state = ser.serialize_struct("Absent", 2)?;
+                state.serialize_field("length", &proof.len)?;
+                state.serialize_field("hash", &proof.merkle_root)?;
             }
         }
         state.end()

@@ -16,15 +16,20 @@
 
 pub use self::proof::{ListProof, ListProofError};
 
-use std::{cell::Cell, marker::PhantomData};
+use std::{
+    cell::Cell,
+    marker::PhantomData,
+    ops::{Bound, RangeBounds},
+};
 
-use self::key::ProofListKey;
+use self::{key::ProofListKey, proof::ProofOfAbsence};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use exonum_crypto::{hash, Hash, HashStream};
+use crate::hash::HashTag;
+use exonum_crypto::Hash;
 
 mod key;
 mod proof;
@@ -57,17 +62,6 @@ pub struct ProofListIndex<T, V> {
 #[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
-}
-
-fn hash_one(h: &Hash) -> Hash {
-    hash(h.as_ref())
-}
-
-fn hash_pair(h1: &Hash, h2: &Hash) -> Hash {
-    HashStream::new()
-        .update(h1.as_ref())
-        .update(h2.as_ref())
-        .hash()
 }
 
 impl<T, V> ProofListIndex<T, V>
@@ -193,6 +187,10 @@ where
         }
     }
 
+    fn merkle_root(&self) -> Hash {
+        self.get_branch(self.root_key()).unwrap_or_default()
+    }
+
     /// Returns the element at the indicated position or `None` if the indicated position
     /// is out of bounds.
     ///
@@ -305,13 +303,22 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the Merkle root hash of the proof list or the default hash value
-    /// if it is empty. The default hash consists solely of zeroes.
+    /// Returns the list hash of the proof list or the hash value
+    /// of the empty list.
+    /// List hash is calculated as follows:
+    /// ```text
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// ```
+    /// Empty list hash:
+    /// ```text
+    /// h = sha-256( HashTag::List || 0 || Hash::default() )
+    /// ```
+    ///
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{MemoryDB, Database, ProofListIndex, HashTag};
     /// use exonum_crypto::Hash;
     ///
     /// let db = MemoryDB::new();
@@ -319,22 +326,20 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
-    /// let default_hash = index.merkle_root();
-    /// assert_eq!(Hash::default(), default_hash);
+    /// let default_hash = index.list_hash();
+    /// assert_eq!(HashTag::empty_list_hash(), default_hash);
     ///
     /// index.push(1);
-    /// let hash = index.merkle_root();
+    /// let hash = index.list_hash();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn merkle_root(&self) -> Hash {
-        self.get_branch(self.root_key()).unwrap_or_default()
+    pub fn list_hash(&self) -> Hash {
+        HashTag::hash_list_node(self.len(), self.merkle_root())
     }
 
     /// Returns the proof of existence for the list element at the specified position.
     ///
-    /// # Panics
-    ///
-    /// Panics if `index` is out of bounds.
+    /// Returns the proof of absence if list doesn't contains element with specified `index`.
     ///
     /// # Examples
     ///
@@ -349,23 +354,25 @@ where
     /// index.push(1);
     ///
     /// let proof = index.get_proof(0);
+    ///
+    /// let proof_of_absence = index.get_proof(1);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
-            panic!(
-                "Index out of bounds: the len is {} but the index is {}",
-                self.len(),
-                index
-            );
+            return ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()));
         }
+
         self.construct_proof(self.root_key(), index, index + 1)
     }
 
     /// Returns the proof of existence for the list elements in the specified range.
     ///
+    /// Returns the proof of absence of the element which index if equals to upper bound if the
+    /// upper bound is bigger than the list length.
+    ///
     /// # Panics
     ///
-    /// Panics if the range is out of bounds.
+    /// Panics if the range bounds if illegal.
     ///
     /// # Examples
     ///
@@ -379,16 +386,22 @@ where
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
-    /// let list_proof = index.get_range_proof(1, 3);
+    /// let list_proof = index.get_range_proof(1..3);
+    ///
+    /// let list_proof_of_absence = index.get_range_proof(1..10);
+    ///
     /// ```
-    pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
-        if to > self.len() {
-            panic!(
-                "Illegal range boundaries: the len is {:?}, but the range end is {:?}",
-                self.len(),
-                to
-            )
-        }
+    pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
+        let from = match range.start_bound() {
+            Bound::Unbounded => 0u64,
+            Bound::Included(from) | Bound::Excluded(from) => *from,
+        };
+
+        let to = match range.end_bound() {
+            Bound::Unbounded => panic!("Unbounded end bound is not valid range bound for proof.",),
+            Bound::Included(to) | Bound::Excluded(to) => *to,
+        };
+
         if to <= from {
             panic!(
                 "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
@@ -396,7 +409,11 @@ where
             )
         }
 
-        self.construct_proof(self.root_key(), from, to)
+        if to > self.len() {
+            ListProof::Absent(ProofOfAbsence::new(self.len(), self.merkle_root()))
+        } else {
+            self.construct_proof(self.root_key(), from, to)
+        }
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -447,7 +464,7 @@ where
 
 impl<'a, V> ProofListIndex<&'a mut Fork, V>
 where
-    V: StorageValue,
+    V: StorageValue + Clone,
 {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
@@ -479,13 +496,14 @@ where
         let len = self.len();
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
-        self.base.put(&key, value.hash());
+
+        self.base.put(&key, HashTag::hash_leaf(value.clone()));
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
-                hash_one(&self.get_branch_unchecked(key))
+                HashTag::hash_single_node(&self.get_branch_unchecked(key))
             } else {
-                hash_pair(
+                HashTag::hash_node(
                     &self.get_branch_unchecked(key.as_left()),
                     &self.get_branch_unchecked(key),
                 )
@@ -550,17 +568,17 @@ where
             );
         }
         let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, value.hash());
+        self.base.put(&key, HashTag::hash_leaf(value.clone()));
         self.base.put(&ProofListKey::leaf(index), value);
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
             let hash = if self.has_branch(right) {
-                hash_pair(
+                HashTag::hash_node(
                     &self.get_branch_unchecked(left),
                     &self.get_branch_unchecked(right),
                 )
             } else {
-                hash_one(&self.get_branch_unchecked(left))
+                HashTag::hash_single_node(&self.get_branch_unchecked(left))
             };
             key = key.parent();
             self.set_branch(key, hash);
@@ -619,32 +637,4 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
     }
-}
-
-/// Computes Merkle root hash for a given list of hashes.
-///
-/// If `hashes` are empty then `Hash::zero()` value is returned.
-pub fn root_hash(hashes: &[Hash]) -> Hash {
-    match hashes.len() {
-        0 => Hash::zero(),
-        1 => hashes[0],
-        _ => {
-            let mut current_hashes = combine_hash_list(hashes);
-            while current_hashes.len() > 1 {
-                current_hashes = combine_hash_list(&current_hashes);
-            }
-            current_hashes[0]
-        }
-    }
-}
-
-fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
-    hashes
-        .chunks(2)
-        .map(|pair| match pair {
-            [first, second] => hash_pair(first, second),
-            [single] => hash_one(single),
-            _ => unreachable!(),
-        })
-        .collect()
 }

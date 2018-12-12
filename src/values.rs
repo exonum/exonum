@@ -40,6 +40,7 @@ use exonum_crypto::{Hash, PublicKey};
 /// use exonum_crypto::{self, CryptoHash, Hash};
 /// use byteorder::{LittleEndian, ByteOrder};
 ///
+/// #[derive(Clone)]
 /// struct Data {
 ///     a: i16,
 ///     b: u32,
