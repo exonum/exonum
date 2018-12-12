@@ -39,7 +39,7 @@ pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
 thread_local = "=0.3.6"
 lazy_static = "1.0.0"
-exonum_derive = { version = "0.9.0", path = "../exonum_derive" }
+exonum-derive = { version = "0.9.0", path = "../components/derive" }
 
 [build-dependencies]
-exonum_build = { version = "0.9.0", path = "../exonum_build" }
+exonum-build = { version = "0.9.0", path = "../components/build" }

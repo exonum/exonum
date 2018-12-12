@@ -13,7 +13,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.9.0", path = "../../../exonum" }
-exonum_derive = { version = "0.9.0", path = "../../../exonum_derive" }
+exonum-derive = { version = "0.9.0", path = "../../../components/derive" }
 exonum-configuration = { version = "0.9.0", path = "../../../services/configuration" }
 exonum-time = { version = "0.9.0", path = "../../../services/time" }
 serde = "1.0.10"
@@ -29,4 +29,4 @@ exonum-testkit = { version = "0.9.0", path = "../../../testkit" }
 pretty_assertions = "=0.5.1"
 
 [build-dependencies]
-exonum_build = { version = "0.9.0", path = "../../../exonum_build" }
+exonum-build = { version = "0.9.0", path = "../../../components/build" }
