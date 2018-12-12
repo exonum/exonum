@@ -20,7 +20,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use super::{db::Change, Database, Iter, Iterator, Patch, Result, Snapshot};
+use crate::{db::Change, Database, Iter, Iterator, Patch, Result, Snapshot};
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
