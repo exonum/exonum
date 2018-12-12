@@ -84,7 +84,7 @@ pub struct Argument {
 }
 
 impl Argument {
-    /// Creates a new falg with `long` and optionally `short` names.
+    /// Creates a new flag with `long` and optionally `short` names.
     pub fn new_flag<T>(
         name: &'static str,
         help: &'static str,
