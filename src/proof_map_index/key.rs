@@ -519,8 +519,8 @@ impl ProofPath {
 #[cfg(test)]
 mod tests {
     use rand::{self, Rng};
-    use serde_json::{self, Value, json};
-    use smallvec::{SmallVec, smallvec};
+    use serde_json::{self, json, Value};
+    use smallvec::{smallvec, SmallVec};
 
     use std::io::Read;
 

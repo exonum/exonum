@@ -16,7 +16,7 @@
 
 use std::borrow::Cow;
 
-use smallvec::{SmallVec, smallvec};
+use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
