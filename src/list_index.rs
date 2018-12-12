@@ -470,11 +470,6 @@ where
 mod tests {
     use super::{Fork, ListIndex, Snapshot};
     use crate::Database;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
-
-    fn gen_tempdir_name() -> String {
-        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
-    }
 
     fn list_index_methods(list_index: &mut ListIndex<&mut Fork, i32>) {
         assert!(list_index.is_empty());
@@ -596,7 +591,7 @@ mod tests {
     mod memorydb_tests {
         use crate::{Database, ListIndex, MemoryDB};
         use std::path::Path;
-        use tempdir::TempDir;
+        use tempfile::TempDir;
 
         const IDX_NAME: &'static str = "idx_name";
 
@@ -606,7 +601,7 @@ mod tests {
 
         #[test]
         fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -616,7 +611,7 @@ mod tests {
 
         #[test]
         fn test_list_index_in_family_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -626,7 +621,7 @@ mod tests {
 
         #[test]
         fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -636,7 +631,7 @@ mod tests {
 
         #[test]
         fn test_list_index_in_family_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -647,7 +642,7 @@ mod tests {
         #[test]
         fn list_index_clear_in_family() {
             for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
-                let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+                let dir = TempDir::new().unwrap();
                 let path = dir.path();
                 let db = create_database(path);
                 super::list_index_clear_in_family(db, x, y, merge_before_clear);
@@ -658,7 +653,7 @@ mod tests {
     mod rocksdb_tests {
         use crate::{Database, DbOptions, ListIndex, RocksDB};
         use std::path::Path;
-        use tempdir::TempDir;
+        use tempfile::TempDir;
 
         const IDX_NAME: &'static str = "idx_name";
 
@@ -669,7 +664,7 @@ mod tests {
 
         #[test]
         fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -679,7 +674,7 @@ mod tests {
 
         #[test]
         fn test_list_index_in_family_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -689,7 +684,7 @@ mod tests {
 
         #[test]
         fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -699,7 +694,7 @@ mod tests {
 
         #[test]
         fn test_list_index_in_family_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
@@ -710,7 +705,7 @@ mod tests {
         #[test]
         fn list_index_clear_in_family() {
             for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
-                let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+                let dir = TempDir::new().unwrap();
                 let path = dir.path();
                 let db = create_database(path);
                 super::list_index_clear_in_family(db, x, y, merge_before_clear);

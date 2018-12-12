@@ -205,7 +205,7 @@ mod rocksdb_tests {
     use super::super::{DbOptions, RocksDB};
     use crate::{Database, ListIndex, Snapshot};
     use std::path::Path;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     fn rocksdb_database(path: &Path) -> RocksDB {
         let options = DbOptions::default();
@@ -214,14 +214,14 @@ mod rocksdb_tests {
 
     #[test]
     fn test_rocksdb_fork_iter() {
-        let dir = TempDir::new("exonum_rocksdb1").unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         super::fork_iter(rocksdb_database(path));
     }
 
     #[test]
     fn test_rocksdb_changelog() {
-        let dir = TempDir::new("exonum_rocksdb2").unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         super::changelog(rocksdb_database(path));
     }
@@ -229,7 +229,7 @@ mod rocksdb_tests {
     #[ignore]
     #[test]
     fn test_multiple_patch() {
-        let dir = TempDir::new("exonum_rocksdb_multiple_patch").unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = rocksdb_database(path);
         fn list_index<View: AsRef<dyn Snapshot>>(view: View) -> ListIndex<View, u64> {

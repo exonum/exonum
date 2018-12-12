@@ -19,7 +19,7 @@ use criterion::{
 };
 use rand::{Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
@@ -173,7 +173,7 @@ where
         ParameterizedBenchmark::new(
             "items",
             move |b: &mut Bencher, &len: &usize| {
-                let tempdir = TempDir::new("exonum").unwrap();
+                let tempdir = TempDir::new().unwrap();
                 let options = DbOptions::default();
                 let db = RocksDB::open(tempdir.path(), &options).unwrap();
                 benchmark(b, &db, len)

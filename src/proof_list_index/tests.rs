@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use hex::FromHex;
-use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
+use rand::{thread_rng, Rng, RngCore};
 use serde::Serialize;
 use serde_derive::Serialize;
 use serde_json::{from_str, to_string};
@@ -40,10 +39,6 @@ fn random_values(len: usize) -> Vec<Vec<u8>> {
     };
 
     (0..len).map(generator).collect::<Vec<_>>()
-}
-
-fn gen_tempdir_name() -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(10).collect()
 }
 
 fn list_methods(db: Box<dyn Database>) {
@@ -566,7 +561,7 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 mod memorydb_tests {
     use crate::{Database, MemoryDB};
     use std::path::Path;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
@@ -574,7 +569,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_list_methods() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::list_methods(db);
@@ -582,7 +577,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_height() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::height(db);
@@ -590,7 +585,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_iter() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::iter(db);
@@ -598,7 +593,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_list_index_proof() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::list_index_proof(db);
@@ -606,7 +601,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_randomly_generate_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::randomly_generate_proofs(db);
@@ -614,7 +609,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_index_and_proof_roots() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::index_and_proof_roots(db);
@@ -622,7 +617,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_proof_illegal_lower_bound() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_illegal_lower_bound(db);
@@ -630,7 +625,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_proof_illegal_bound_empty() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_illegal_bound_empty(db);
@@ -639,7 +634,7 @@ mod memorydb_tests {
     #[test]
     #[should_panic]
     fn test_proof_illegal_range() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_illegal_range(db);
@@ -647,7 +642,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_proof_structure() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_structure(db);
@@ -655,7 +650,7 @@ mod memorydb_tests {
 
     #[test]
     fn test_simple_merkle_root() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::simple_merkle_root(db);
@@ -663,10 +658,10 @@ mod memorydb_tests {
 
     #[test]
     fn test_same_merkle_root() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir1 = TempDir::new().unwrap();
         let path1 = dir1.path();
         let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir2 = TempDir::new().unwrap();
         let path2 = dir2.path();
         let db2 = create_database(path2);
         super::same_merkle_root(db1, db2);
@@ -676,7 +671,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use crate::{Database, DbOptions, RocksDB};
     use std::path::Path;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
@@ -685,7 +680,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_list_methods() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::list_methods(db);
@@ -693,7 +688,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_height() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::height(db);
@@ -701,7 +696,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_iter() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::iter(db);
@@ -709,7 +704,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_list_index_proof() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::list_index_proof(db);
@@ -717,7 +712,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_randomly_generate_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::randomly_generate_proofs(db);
@@ -725,7 +720,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_index_and_proof_roots() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::index_and_proof_roots(db);
@@ -733,7 +728,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_proof_illegal_lower_bound() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_illegal_lower_bound(db);
@@ -741,7 +736,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_proof_illegal_bound_empty() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_illegal_bound_empty(db);
@@ -750,7 +745,7 @@ mod rocksdb_tests {
     #[test]
     #[should_panic]
     fn test_proof_illegal_range() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_illegal_range(db);
@@ -758,7 +753,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_proof_structure() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::proof_structure(db);
@@ -766,7 +761,7 @@ mod rocksdb_tests {
 
     #[test]
     fn test_simple_merkle_root() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = TempDir::new().unwrap();
         let path = dir.path();
         let db = create_database(path);
         super::simple_merkle_root(db);
@@ -774,10 +769,10 @@ mod rocksdb_tests {
 
     #[test]
     fn test_same_merkle_root() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir1 = TempDir::new().unwrap();
         let path1 = dir1.path();
         let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir2 = TempDir::new().unwrap();
         let path2 = dir2.path();
         let db2 = create_database(path2);
         super::same_merkle_root(db1, db2);

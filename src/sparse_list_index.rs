@@ -636,13 +636,8 @@ where
 mod tests {
     use super::SparseListIndex;
     use crate::db::Database;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
-
-    fn gen_tempdir_name() -> String {
-        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
-    }
 
     fn list_index_methods(db: Box<dyn Database>) {
         let mut fork = db.fork();
@@ -757,7 +752,7 @@ mod tests {
     mod memorydb_tests {
         use crate::{Database, MemoryDB};
         use std::path::Path;
-        use tempdir::TempDir;
+        use tempfile::TempDir;
 
         fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
@@ -765,7 +760,7 @@ mod tests {
 
         #[test]
         fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::list_index_methods(db);
@@ -773,7 +768,7 @@ mod tests {
 
         #[test]
         fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::list_index_iter(db);
@@ -783,7 +778,7 @@ mod tests {
     mod rocksdb_tests {
         use crate::{Database, DbOptions, RocksDB};
         use std::path::Path;
-        use tempdir::TempDir;
+        use tempfile::TempDir;
 
         fn create_database(path: &Path) -> Box<dyn Database> {
             let opts = DbOptions::default();
@@ -792,7 +787,7 @@ mod tests {
 
         #[test]
         fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::list_index_methods(db);
@@ -800,7 +795,7 @@ mod tests {
 
         #[test]
         fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::list_index_iter(db);

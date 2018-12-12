@@ -17,7 +17,6 @@ use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 use byteorder::{ByteOrder, LittleEndian};
 use rand::{
     self,
-    distributions::Alphanumeric,
     seq::{IteratorRandom, SliceRandom},
     Rng, RngCore, SeedableRng,
 };
@@ -82,13 +81,6 @@ fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<([u8; KEY_S
     };
 
     (0..len).map(kv_generator).collect::<Vec<_>>()
-}
-
-fn gen_tempdir_name() -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(10)
-        .collect()
 }
 
 fn map_methods(db: Box<dyn Database>) {
@@ -1344,7 +1336,7 @@ macro_rules! test_on_db {
     {$test_name:ident, $fn_name:ident} => {
         #[test]
         fn $test_name() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = tempfile::tempdir().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::$fn_name(db);
@@ -1356,9 +1348,9 @@ macro_rules! test_on_2dbs {
     {$test_name:ident, $fn_name:ident} => {
         #[test]
         fn $test_name() {
-            let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir1 = tempfile::tempdir().unwrap();
             let path1 = dir1.path();
-            let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir2 = tempfile::tempdir().unwrap();
             let path2 = dir2.path();
             let db1 = create_database(path1);
             let db2 = create_database(path2);
@@ -1404,7 +1396,6 @@ macro_rules! common_tests {
 mod memorydb_tests {
     use crate::{Database, MemoryDB};
     use std::path::Path;
-    use tempdir::TempDir;
 
     fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
@@ -1416,7 +1407,6 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use crate::{Database, DbOptions, RocksDB};
     use std::path::Path;
-    use tempdir::TempDir;
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();

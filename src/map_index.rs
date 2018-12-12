@@ -471,7 +471,6 @@ where
 mod tests {
     use super::super::{Database, MemoryDB};
     use super::*;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
 
@@ -601,14 +600,10 @@ mod tests {
         );
     }
 
-    fn gen_tempdir_name() -> String {
-        thread_rng().sample_iter(&Alphanumeric).take(10).collect()
-    }
-
     mod memorydb_tests {
         use crate::{Database, MemoryDB};
         use std::path::Path;
-        use tempdir::TempDir;
+        use tempfile::TempDir;
 
         fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
@@ -616,7 +611,7 @@ mod tests {
 
         #[test]
         fn test_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::methods(db);
@@ -624,7 +619,7 @@ mod tests {
 
         #[test]
         fn test_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::iter(db);
@@ -634,7 +629,7 @@ mod tests {
     mod rocksdb_tests {
         use crate::Database;
         use std::path::Path;
-        use tempdir::TempDir;
+        use tempfile::TempDir;
 
         fn create_database(path: &Path) -> Box<dyn Database> {
             use crate::{DbOptions, RocksDB};
@@ -644,7 +639,7 @@ mod tests {
 
         #[test]
         fn test_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::methods(db);
@@ -652,7 +647,7 @@ mod tests {
 
         #[test]
         fn test_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let dir = TempDir::new().unwrap();
             let path = dir.path();
             let db = create_database(path);
             super::iter(db);
