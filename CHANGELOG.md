@@ -84,7 +84,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Service::tx_from_raw` now uses `failure::Error` as an error type. (#1088)
 
 - `transactions!` macro has been removed, `TransactionSet` derive macro
-  from `exonum_derive` should be used instead. (#1088)
+  from `exonum-derive` should be used instead. (#1088)
 
 - `encoding_struct!` macro has been removed, protobuf
   should be used instead. (#1088)
@@ -148,12 +148,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-build
 
-- `exonum_build` crate has been added to simplify writing `build.rs` files
+- `exonum-build` crate has been added to simplify writing `build.rs` files
   for services that use protobuf code generation. (#1076)
 
 #### exonum-derive
 
-- `exonum_derive` crate has been added with custom derives for `ProtobufConvert`
+- `exonum-derive` crate has been added with custom derives for `ProtobufConvert`
   and `TransactionSet`. (#1055)
 
 ### Bug Fixes
