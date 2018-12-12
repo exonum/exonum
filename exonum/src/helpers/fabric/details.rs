@@ -423,7 +423,7 @@ impl GenerateNodeConfig {
 
     fn prompt_passphrase<R: BufRead, W: Write>(mut reader: R, mut writer: W) -> io::Result<String> {
         loop {
-            write!(&mut writer, "Enter passphrase (empty for no passphrase): ").unwrap();
+            write!(&mut writer, "Enter passphrase (empty for no passphrase): ")?;
             let password = rpassword::read_password_with_reader(Some(&mut reader))?;
             write!(&mut writer, "Enter same passphrase again: ").unwrap();
             if password == rpassword::read_password_with_reader(Some(&mut reader))? {
