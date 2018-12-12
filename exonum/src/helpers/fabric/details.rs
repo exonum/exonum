@@ -474,7 +474,7 @@ impl Command for GenerateNodeConfig {
             Argument::new_named(
                 CONSENSUS_KEY_PATH,
                 false,
-                "Path to the pem file storing consensus private key (default: ./consensus.toml)",
+                "Path to the file storing consensus private key (default: ./consensus.toml)",
                 "c",
                 "consensus-path",
                 false,
@@ -482,7 +482,7 @@ impl Command for GenerateNodeConfig {
             Argument::new_named(
                 SERVICE_KEY_PATH,
                 false,
-                "Path to the pem file storing service private key (default: ./service.toml)",
+                "Path to the file storing service private key (default: ./service.toml)",
                 "s",
                 "service-path",
                 false,
