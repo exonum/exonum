@@ -429,7 +429,7 @@ impl GenerateNodeConfig {
             if password == rpassword::read_password_with_reader(Some(&mut reader))? {
                 return Ok(password);
             }
-            writeln!(&mut writer, "Passphrases do not match.  Try again.").unwrap();
+            writeln!(&mut writer, "Passphrases do not match. Try again.")?;
         }
     }
 
