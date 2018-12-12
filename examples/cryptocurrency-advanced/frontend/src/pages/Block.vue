@@ -105,9 +105,7 @@
       Navbar,
       Spinner
     },
-    props: {
-      height: String
-    },
+    props: ['height'],
     data() {
       return {
         block: {},
