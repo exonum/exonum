@@ -425,7 +425,7 @@ impl GenerateNodeConfig {
         loop {
             write!(&mut writer, "Enter passphrase (empty for no passphrase): ")?;
             let password = rpassword::read_password_with_reader(Some(&mut reader))?;
-            write!(&mut writer, "Enter same passphrase again: ").unwrap();
+            write!(&mut writer, "Enter same passphrase again: ")?;
             if password == rpassword::read_password_with_reader(Some(&mut reader))? {
                 return Ok(password);
             }
