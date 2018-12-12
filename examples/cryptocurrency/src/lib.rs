@@ -341,7 +341,7 @@ pub mod contracts {
 pub mod api {
     use exonum::{
         api::{self, ServiceApiBuilder, ServiceApiState},
-        crypto::{Hash, PublicKey},
+        crypto::PublicKey,
     };
 
     use schema::{CurrencySchema, Wallet};
@@ -355,13 +355,6 @@ pub mod api {
     pub struct WalletQuery {
         /// Public key of the queried wallet.
         pub pub_key: PublicKey,
-    }
-
-    /// The structure returned by the REST API.
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct TransactionResponse {
-        /// Hash of the transaction.
-        pub tx_hash: Hash,
     }
 
     impl CryptocurrencyApi {
@@ -383,9 +376,8 @@ pub mod api {
             Ok(wallets)
         }
 
-        /// 'ServiceApiBuilder' facilitates conversion between transactions/read requests and REST
-        /// endpoints; for example, it parses `POST`ed JSON into the binary transaction
-        /// representation used in Exonum internally.
+        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
+        /// endpoints.
         pub fn wire(builder: &mut ServiceApiBuilder) {
             // Binds handlers to specific routes.
             builder
@@ -422,7 +414,7 @@ pub mod service {
     ///
     /// ## Retrieve single wallet
     ///
-    /// GET `v1/wallet/?pub_key={hash}`
+    /// GET `api/services/cryptocurrency/v1/wallet/?pub_key={hash}`
     ///
     /// Returns information about a wallet with the specified public key (hex-encoded).
     /// If a wallet with the specified pubkey is not in the storage, returns a string
@@ -430,23 +422,21 @@ pub mod service {
     ///
     /// ## Dump wallets
     ///
-    /// GET `v1/wallets`
+    /// GET `api/services/cryptocurrency/v1/wallets`
     ///
     /// Returns an array of all wallets in the storage.
     ///
-    /// ## Create new wallet
+    /// ## Transactions endpoint
     ///
-    /// POST `v1/wallets`
+    /// POST `api/explorer/v1/transactions`
     ///
-    /// Accepts a [`TxCreateWallet`] transaction from an external client. Returns the hex-encoded
-    /// hash of the transaction encumbered in an object: `{ "tx_hash": <hash> }`.
+    /// Accepts a [`TxTransfer`] and [`TxCreateWallet`] transaction from an external client.
+    /// Transaction should be serialized into protobuf binary form and placed into signed
+    /// transaction message according to specification, endpoint accepts hex of this signed
+    /// transaction message as an object: `{ "tx_body": <hex> }`.
     ///
-    /// ## Transfer between wallets
-    ///
-    /// POST `v1/wallets/transfer`
-    ///
-    /// Accepts a [`TxTransfer`] transaction from an external client. Returns the hex-encoded
-    /// hash of the transaction encumbered in an object: `{ "tx_hash": <hash> }`.
+    /// Returns the hex-encoded hash of the transaction
+    /// encumbered in an object: `{ "tx_hash": <hash> }`.
     ///
     /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
     /// [`TxTransfer`]: ../transactions/struct.TxTransfer.html
