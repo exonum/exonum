@@ -1,6 +1,6 @@
 import * as Exonum from 'exonum-client'
 import axios from 'axios'
-import * as proto from '../../proto/protocol.js'
+import * as proto from '../../proto/stubs.js'
 
 const TRANSACTION_URL = '/api/explorer/v1/transactions'
 const PER_PAGE = 10

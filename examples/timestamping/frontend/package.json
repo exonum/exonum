@@ -5,7 +5,7 @@
   "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "proto": "pbjs --keep-case -t static-module ../../../exonum/src/proto/schema/exonum/protocol.proto ../backend/src/proto/timestamping.proto -o ./proto/protocol.js",
+    "proto": "pbjs --keep-case -t static-module ../../../exonum/src/proto/schema/exonum/protocol.proto ../backend/src/proto/timestamping.proto -o ./proto/stubs.js",
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
