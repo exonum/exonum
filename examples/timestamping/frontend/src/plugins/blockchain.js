@@ -1,4 +1,4 @@
-import * as Exonum from '../../exonum-client'
+import * as Exonum from 'exonum-client'
 import axios from 'axios'
 import * as proto from '../../proto/protocol.js'
 
