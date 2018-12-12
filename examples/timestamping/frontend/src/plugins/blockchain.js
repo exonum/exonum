@@ -57,12 +57,19 @@ module.exports = {
                 if (timestampProof.merkleRoot !== tableRootHash) {
                   throw new Error('Timestamp proof is corrupted')
                 }
-                const timestamp = timestampProof.entries.get(hash)
-                if (typeof timestamp === 'undefined') {
+                const timestampEntry = timestampProof.entries.get(hash)
+                if (typeof timestampEntry === 'undefined') {
                   throw new Error('Timestamp not found')
                 }
 
-                return timestamp
+                return {
+                  timestamp: {
+                    content_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.timestamp.content_hash.data)),
+                    metadata: timestampEntry.timestamp.metadata
+                  },
+                  tx_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.tx_hash.data)),
+                  time: timestampEntry.time
+                }
               })
             })
         })
