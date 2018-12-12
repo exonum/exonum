@@ -32,6 +32,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `tx_pool_capacity` parameter has been removed from `MemoryPoolConfig`. (#1036)
 
+- Custom serialization has been removed. (#1088)
+
 #### exonum
 
 - Trait `TransactionSend` was removed.
@@ -74,13 +76,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Fork::remove_by_prefix()` method now specifies prefix as `Option<&[u8]>` instead
   of `Option<&Vec<u8>>`. (#1042)
-  
-- `exonum_derive` crate has been added with custom derives for `ProtobufConvert`
-  and `TransactionSet`. (#1055)
 
 - `TransactionResult` is now serialized using protobuf. Empty description
   of the result is now the equivalent of there being no description
   of the result. (#1075)
+
+- `Service::tx_from_raw` now uses `failure::Error` as an error type. (#1088)
+
+- `transactions!` macro has been removed, `TransactionSet` derive macro
+  from `exonum_derive` should be used instead. (#1088)
+
+- `encoding_struct!` macro has been removed, protobuf
+  should be used instead. (#1088)
 
 #### exonum-testkit
 
@@ -139,10 +146,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Now peers require only one connection to exchange messages between
   them. (#945)
 
-#### exonum_build
+#### exonum-build
 
 - `exonum_build` crate has been added to simplify writing `build.rs` files
   for services that use protobuf code generation. (#1076)
+
+#### exonum-derive
+
+- `exonum_derive` crate has been added with custom derives for `ProtobufConvert`
+  and `TransactionSet`. (#1055)
 
 ### Bug Fixes
 
