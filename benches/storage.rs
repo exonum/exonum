@@ -19,12 +19,11 @@ use criterion::{
 };
 use rand::{Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use tempfile::TempDir;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, ProofListIndex,
-    ProofMapIndex, RocksDB,
+    proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, ProofListIndex,
+    ProofMapIndex, TemporaryDB,
 };
 
 const NAME: &str = "name";
@@ -32,32 +31,6 @@ const SAMPLE_SIZE: usize = 10;
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 16] = [100; 16];
 const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
-
-trait DatabaseFactory: Sized {
-    fn create(&mut self) -> Box<dyn Database>;
-}
-
-struct RocksdbDatabaseFactory(Option<TempDir>);
-
-impl Default for RocksdbDatabaseFactory {
-    fn default() -> Self {
-        RocksdbDatabaseFactory(None)
-    }
-}
-
-impl DatabaseFactory for RocksdbDatabaseFactory {
-    fn create(&mut self) -> Box<dyn Database> {
-        if let Some(dir) = self.0.take() {
-            dir.close().unwrap();
-        }
-
-        let dir = TempDir::new().unwrap();
-        let options = DbOptions::default();
-        let db = RocksDB::open(dir.path(), &options).unwrap();
-        self.0 = Some(dir);
-        Box::new(db)
-    }
-}
 
 fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
     let mut rng = XorShiftRng::from_seed(SEED);
@@ -84,7 +57,7 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
     (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
-fn proof_list_append(b: &mut Bencher, mut factory: impl DatabaseFactory, len: usize) {
+fn proof_list_append(b: &mut Bencher, len: usize) {
     let mut rng = XorShiftRng::from_seed(SEED);
     let data = (0..len)
         .map(|_| {
@@ -94,7 +67,7 @@ fn proof_list_append(b: &mut Bencher, mut factory: impl DatabaseFactory, len: us
         })
         .collect::<Vec<_>>();
 
-    let db = factory.create();
+    let db = TemporaryDB::default();
     b.iter_with_setup(
         || db.fork(),
         |mut storage| {
@@ -107,9 +80,9 @@ fn proof_list_append(b: &mut Bencher, mut factory: impl DatabaseFactory, len: us
     );
 }
 
-fn proof_map_insert_without_merge(b: &mut Bencher, mut factory: impl DatabaseFactory, len: usize) {
+fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
-    let db = factory.create();
+    let db = TemporaryDB::default();
     b.iter_with_setup(
         || db.fork(),
         |mut storage| {
@@ -122,10 +95,10 @@ fn proof_map_insert_without_merge(b: &mut Bencher, mut factory: impl DatabaseFac
     );
 }
 
-fn proof_map_insert_with_merge(b: &mut Bencher, mut factory: impl DatabaseFactory, len: usize) {
+fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
-        || factory.create(),
+        TemporaryDB::default,
         |db| {
             let mut fork = db.fork();
             {
@@ -140,9 +113,9 @@ fn proof_map_insert_with_merge(b: &mut Bencher, mut factory: impl DatabaseFactor
     );
 }
 
-fn proof_map_index_build_proofs(b: &mut Bencher, mut factory: impl DatabaseFactory, len: usize) {
+fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
-    let db = factory.create();
+    let db = TemporaryDB::default();
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(NAME, &mut storage);
 
@@ -164,9 +137,9 @@ fn proof_map_index_build_proofs(b: &mut Bencher, mut factory: impl DatabaseFacto
     }
 }
 
-fn proof_map_index_verify_proofs(b: &mut Bencher, mut factory: impl DatabaseFactory, len: usize) {
+fn proof_map_index_verify_proofs(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
-    let db = factory.create();
+    let db = TemporaryDB::default();
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(NAME, &mut storage);
 
@@ -185,9 +158,9 @@ fn proof_map_index_verify_proofs(b: &mut Bencher, mut factory: impl DatabaseFact
     });
 }
 
-fn bench_fn_rocksdb<F>(c: &mut Criterion, name: &str, benchmark: F)
+fn bench_fn<F>(c: &mut Criterion, name: &str, benchmark: F)
 where
-    F: Fn(&mut Bencher, RocksdbDatabaseFactory, usize) + 'static,
+    F: Fn(&mut Bencher, usize) + 'static,
 {
     let item_counts = ITEM_COUNTS.iter().cloned();
     c.bench(
@@ -195,7 +168,7 @@ where
         ParameterizedBenchmark::new(
             "items",
             move |b: &mut Bencher, &len: &usize| {
-                benchmark(b, RocksdbDatabaseFactory::default(), len)
+                benchmark(b, len)
             },
             item_counts,
         )
@@ -208,15 +181,15 @@ where
 pub fn bench_storage(c: &mut Criterion) {
     exonum_crypto::init();
 
-    bench_fn_rocksdb(c, "proof_list/append", proof_list_append);
-    bench_fn_rocksdb(
+    bench_fn(c, "proof_list/append", proof_list_append);
+    bench_fn(
         c,
         "proof_map/insert/no_merge",
         proof_map_insert_without_merge,
     );
-    bench_fn_rocksdb(c, "proof_map/insert/merge", proof_map_insert_with_merge);
-    bench_fn_rocksdb(c, "proof_map/proofs/build", proof_map_index_build_proofs);
-    bench_fn_rocksdb(
+    bench_fn(c, "proof_map/insert/merge", proof_map_insert_with_merge);
+    bench_fn(c, "proof_map/proofs/build", proof_map_index_build_proofs);
+    bench_fn(
         c,
         "proof_map/proofs/validate",
         proof_map_index_verify_proofs,
