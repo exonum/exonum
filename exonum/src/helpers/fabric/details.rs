@@ -60,6 +60,11 @@ const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
 const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
 const NO_PASSWORD: &str = "NO_PASSWORD";
 
+enum SecretKeyType {
+    Consensus,
+    Service,
+}
+
 /// Run command.
 pub struct Run;
 
@@ -408,7 +413,11 @@ impl GenerateNodeConfig {
     }
 
     /// * `key` - expects EXONUM_SERVICE_PASS or EXONUM_CONSENSUS_PASS.
-    fn get_passphrase(context: &Context, key: &str) -> Vec<u8> {
+    fn get_passphrase(context: &Context, secret_key_type: SecretKeyType) -> Vec<u8> {
+        let key = match secret_key_type {
+            SecretKeyType::Consensus => EXONUM_CONSENSUS_PASS,
+            SecretKeyType::Service => EXONUM_SERVICE_PASS,
+        };
         context
             .get_flag_occurrences(NO_PASSWORD)
             .map(|_| "".to_string())
@@ -416,16 +425,22 @@ impl GenerateNodeConfig {
             .or_else(|| {
                 let stdin = io::stdin();
                 let stdin_locked = stdin.lock();
-                Self::prompt_passphrase(stdin_locked, io::stdout()).ok()
+                Self::prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
             }).unwrap()
             .into_bytes()
     }
 
-    fn prompt_passphrase<R: BufRead, W: Write>(mut reader: R, mut writer: W) -> io::Result<String> {
+    fn prompt_passphrase<R: BufRead, W: Write>(mut reader: R, mut writer: W, secret_key_type: SecretKeyType) -> io::Result<String> {
+        let key_type = match secret_key_type {
+            SecretKeyType::Consensus => "consensus",
+            SecretKeyType::Service => "service",
+        };
         loop {
-            write!(&mut writer, "Enter passphrase (empty for no passphrase): ")?;
+            write!(&mut writer, "Enter passphrase for {} key: ", key_type)?;
+            writer.flush();
             let password = rpassword::read_password_with_reader(Some(&mut reader))?;
             write!(&mut writer, "Enter same passphrase again: ")?;
+            writer.flush();
             if password == rpassword::read_password_with_reader(Some(&mut reader))? {
                 return Ok(password);
             }
@@ -545,8 +560,8 @@ impl Command for GenerateNodeConfig {
         let services_public_configs = new_context.get(keys::SERVICES_PUBLIC_CONFIGS).unwrap();
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
-        let consensus_passphrase = Self::get_passphrase(&new_context, EXONUM_CONSENSUS_PASS);
-        let service_passphrase = Self::get_passphrase(&new_context, EXONUM_SERVICE_PASS);
+        let consensus_passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
+        let service_passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
         let consensus_public_key =
             Self::create_secret_key_file(&consensus_secret_key_path, &consensus_passphrase);
         let service_public_key =
