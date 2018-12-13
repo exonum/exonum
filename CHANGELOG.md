@@ -28,7 +28,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Removed obsolete `enable_blockchain_explorer` option from `NodeApiConfig`. (#891)
 
-- Consensus messages and inner structs now serialized with protobuf. (#1028)
+- Consensus messages and inner structs are now serialized with protobuf. (#1028)
 
 - `tx_pool_capacity` parameter has been removed from `MemoryPoolConfig`. (#1036)
 
@@ -59,17 +59,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Config parameter `external_address` is now a required value. (#826)
 
 - Config parameter `round_timeout` has been renamed to `first_round_timeout`.
-  Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`
-  where `round_timeout_increase` is determined as a some percentage of
-  `first_round_timeout`. Value of this percentage is defined in
+  Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`,
+  where `round_timeout_increase` is determined as a certain percentage of
+  `first_round_timeout`. The value of this percentage is defined in
   `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
 
 - `missing_keys`, `entries`, `all_entries` methods of `CheckedMapProof` and
   `MapProof::missing_keys_unchecked` method now return `impl Iterator` instead
   of `Vec`. (#918)
 
-- `Connect` message field `addr` with `SocketAddr` is removed, `pub_addr` with
-   `str` of unresolved external address of the peer is used instead. (#942)
+- `Connect` message field `addr` with `SocketAddr` has been removed, `pub_addr`
+   with `str` of unresolved external address of the peer is used instead. (#942)
 
 - Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
   of single IP-addresses. (#959)
@@ -126,7 +126,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   addresses. (#826)
 
 - Added `v1/rebroadcast` endpoint that can be used to broadcast all transactions
-  from the pool to the other nodes. (#859)
+  from the pool to other nodes. (#859)
 
 - Now each consecutive round is longer than previous by some constant percentage
   of `first_round_timeout`. (#848)
