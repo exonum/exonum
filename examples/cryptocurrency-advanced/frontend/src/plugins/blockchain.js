@@ -170,7 +170,11 @@ module.exports = {
                     throw new Error('Invalid transaction signature')
                   }
 
-                  transactions.push(Object.assign({ hash: hash }, transaction.debug))
+                  const transactionData = Object.assign({ hash: hash }, transaction.debug)
+                  if (transactionData.to) {
+                    transactionData.to = Exonum.uint8ArrayToHexadecimal(new Uint8Array(transactionData.to.data))
+                  }
+                  transactions.push(transactionData)
                 }
 
                 return {
