@@ -526,6 +526,8 @@ mod tests {
 
     use super::*;
 
+    const MAX_PROOF_PATH_BITS: u16 = 256;
+
     impl ProofPath {
         fn compressed(&self) -> SmallVec<[u8; 64]> {
             let mut buf = smallvec![0u8; 64];
@@ -550,7 +552,7 @@ mod tests {
                 raw[PROOF_PATH_KIND_POS] = BRANCH_KEY_PREFIX;
                 raw[PROOF_PATH_LEN_POS] = bits_len as u8;
             }
-            ProofPath::from_raw(raw)
+            Self::from_raw(raw)
         }
     }
 
@@ -709,6 +711,22 @@ mod tests {
     }
 
     #[test]
+    fn test_proof_path_storage_key_roundtrip() {
+        let origin = ProofPath::new(&[255_u8; 32]);
+        for i in 0..MAX_PROOF_PATH_BITS {
+            let key = origin.prefix(i);
+            let mut buf = vec![0; PROOF_PATH_SIZE];
+            key.write(&mut buf);
+            let mut key2 = ProofPath::read(&buf);
+            assert_eq!(key2, key);
+            key2.set_end(None);
+            for j in i..MAX_PROOF_PATH_BITS {
+                assert_eq!(key2.bit(j), ChildKind::Left);
+            }
+        }
+    }
+
+    #[test]
     fn test_proof_path_compress_leaf_regular() {
         let key = ProofPath::new(&[250; 32]);
         let buf = key.compressed();
@@ -754,6 +772,21 @@ mod tests {
         };
         assert_eq!(key2, trimmed_key);
         assert_eq!(key2.bytes.as_ref(), trimmed_key.bytes.as_ref());
+    }
+
+    #[test]
+    fn test_proof_path_compress_roundtrip() {
+        let origin = ProofPath::new(&[255_u8; 32]);
+        for i in 0..MAX_PROOF_PATH_BITS {
+            let key = origin.prefix(i);
+            let buf = key.compressed();
+            let mut key2 = ProofPath::read_compressed(buf.as_ref());
+            assert_eq!(key2, key);
+            key2.set_end(None);
+            for j in i..MAX_PROOF_PATH_BITS {
+                assert_eq!(key2.bit(j), ChildKind::Left);
+            }
+        }
     }
 
     #[test]

@@ -119,6 +119,7 @@
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
+    // Allow to use non ascii literals in strings.
 )]
 
 #[doc(no_inline)]
