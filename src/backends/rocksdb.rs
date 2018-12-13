@@ -56,7 +56,7 @@ impl From<&DbOptions> for RocksDbOptions {
         defaults.create_if_missing(opts.create_if_missing);
         defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
         defaults
-    }    
+    }
 }
 
 /// A snapshot of a `RocksDB`.
