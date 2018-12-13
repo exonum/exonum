@@ -13,13 +13,16 @@
 // limitations under the License.
 
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
+use proc_macro2::{self, Ident, Span};
 use syn::{Attribute, Data, DeriveInput, Lit, Path};
 
-use super::PB_CONVERT_ATTRIBUTE;
+use super::{
+    find_exonum_word_attribute, get_exonum_name_value_attributes, get_exonum_types_prefix,
+    PB_CONVERT_ATTRIBUTE, SERDE_PB_CONVERT_ATTRIBUTE,
+};
 
 fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
-    let map_attrs = super::get_exonum_attributes(attrs);
+    let map_attrs = get_exonum_name_value_attributes(attrs);
     let struct_path = map_attrs.into_iter().find_map(|nv| {
         if nv.ident == PB_CONVERT_ATTRIBUTE {
             match nv.lit {
@@ -140,12 +143,37 @@ fn implement_storage_traits(name: &Ident, cr: &quote::ToTokens) -> impl quote::T
     }
 }
 
+fn implement_serde_protobuf_convert(name: &Ident) -> proc_macro2::TokenStream {
+    quote! {
+        extern crate serde as _serde;
+
+        impl _serde::Serialize for #name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: _serde::Serializer,
+            {
+                self.to_pb().serialize(serializer)
+            }
+        }
+
+        impl<'de> _serde::Deserialize<'de> for #name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: _serde::Deserializer<'de>,
+            {
+                let pb = <#name as ProtobufConvert>::ProtoStruct::deserialize(deserializer)?;
+                ProtobufConvert::from_pb(pb).map_err(_serde::de::Error::custom)
+            }
+        }
+    }
+}
+
 pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
 
     let name = input.ident.clone();
     let proto_struct_name = get_protobuf_struct_path(&input.attrs);
-    let cr = super::get_exonum_types_prefix(&input.attrs);
+    let cr = get_exonum_types_prefix(&input.attrs);
 
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
 
@@ -154,6 +182,15 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
         implement_protobuf_convert_trait(&name, &proto_struct_name, &field_names);
     let binary_form = implement_binary_form(&name, &cr);
     let storage_traits = implement_storage_traits(&name, &cr);
+
+    let serde_traits = {
+        let serde_needed = find_exonum_word_attribute(&input.attrs, SERDE_PB_CONVERT_ATTRIBUTE);
+        if serde_needed {
+            implement_serde_protobuf_convert(&name)
+        } else {
+            quote!()
+        }
+    };
 
     let expanded = quote! {
         mod #mod_name {
@@ -169,6 +206,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
             #protobuf_convert
             #binary_form
             #storage_traits
+            #serde_traits
         }
     };
 

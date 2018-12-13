@@ -67,8 +67,8 @@ impl From<Error> for ExecutionError {
 }
 
 /// Transfer `amount` of the currency from one wallet to another.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Transfer")]
+#[derive(Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Transfer", serde_pb_convert)]
 pub struct Transfer {
     /// `PublicKey` of receiver's wallet.
     pub to: PublicKey,

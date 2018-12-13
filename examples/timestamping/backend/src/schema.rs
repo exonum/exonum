@@ -43,8 +43,8 @@ impl Timestamp {
 }
 
 /// Timestamp entry.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::TimestampEntry")]
+#[derive(Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TimestampEntry", serde_pb_convert)]
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,
