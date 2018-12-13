@@ -24,12 +24,11 @@ rust_decimal = "0.10.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-smallvec = "0.6"
+tempfile = "3.0"
 uuid = "0.7.1"
 bytes = "=0.4.11"
 
 [dev-dependencies]
-tempfile = "3.0"
 criterion = "0.2"
 rand = "0.6.1"
 rand_xorshift = "0.1.0"

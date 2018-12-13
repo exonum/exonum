@@ -222,11 +222,11 @@ mod tests {
         IndexMetadata, IndexType, StorageMetadata, CORE_STORAGE_METADATA,
         CORE_STORAGE_METADATA_KEY, INDEXES_METADATA_TABLE_NAME,
     };
-    use crate::{base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
+    use crate::{base_index::BaseIndex, Database, Fork, MapIndex, ProofMapIndex, TemporaryDB};
     use exonum_crypto::{Hash, PublicKey};
 
     #[test]
-    fn index_metadata_roundtrip() {
+    fn test_index_metadata_roundtrip() {
         use self::IndexType::*;
 
         let index_types = [
@@ -244,8 +244,8 @@ mod tests {
     }
 
     #[test]
-    fn access_indexes_metadata() {
-        let database = MemoryDB::new();
+    fn test_access_indexes_metadata() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
 
         let index: MapIndex<_, String, i32> = MapIndex::new(INDEXES_METADATA_TABLE_NAME, &mut fork);
@@ -254,8 +254,8 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Attempt to access an internal storage infrastructure")]
-    fn access_indexes_metadata_mut() {
-        let database = MemoryDB::new();
+    fn test_access_indexes_metadata_mut() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
 
         let mut index = MapIndex::new(INDEXES_METADATA_TABLE_NAME, &mut fork);
@@ -265,8 +265,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
                                while said index was initially created with type ProofMap")]
-    fn invalid_index_type() {
-        let database = MemoryDB::new();
+    fn test_invalid_index_type() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
@@ -277,8 +277,8 @@ mod tests {
     }
 
     #[test]
-    fn valid_index_type() {
-        let database = MemoryDB::new();
+    fn test_valid_index_type() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
@@ -291,8 +291,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "Attempt to access index family 'test_index' \
                                while it's an ordinary index")]
-    fn ordinary_index_as_index_family() {
-        let database = MemoryDB::new();
+    fn test_ordinary_index_as_index_family() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
         let index_id: i32 = 42;
         {
@@ -307,8 +307,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
                                while it's index family")]
-    fn index_family_as_ordinary_index() {
-        let database = MemoryDB::new();
+    fn test_index_family_as_ordinary_index() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
         let index_id: i32 = 42;
         {
@@ -320,8 +320,8 @@ mod tests {
     }
 
     #[test]
-    fn valid_index_type_in_family() {
-        let database = MemoryDB::new();
+    fn test_valid_index_type_in_family() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
         let index_id: i32 = 42;
         {
@@ -336,8 +336,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
                                while said index was initially created with type ProofMap")]
-    fn multiple_read_before_write() {
-        let database = MemoryDB::new();
+    fn test_multiple_read_before_write() {
+        let database = TemporaryDB::default();
         let mut fork = database.fork();
 
         // Type is unlocked, can read with any
@@ -368,7 +368,7 @@ mod tests {
 
     #[test]
     fn test_storage_version_write_current() {
-        let database = MemoryDB::new();
+        let database = TemporaryDB::default();
 
         let mut fork = database.fork();
         StorageMetadata::write_current(&mut fork);
@@ -385,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_storage_version_read() {
-        let database = MemoryDB::new();
+        let database = TemporaryDB::default();
         {
             let ver = StorageMetadata { version: 1337 };
             let mut fork = database.fork();

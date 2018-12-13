@@ -343,13 +343,13 @@ mod tests {
     }
 
     #[test]
-    fn check_valid_name() {
+    fn test_check_valid_name() {
         assert_valid_name("valid_name");
     }
 
     #[test]
     #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
-    fn check_invalid_name() {
+    fn test_check_invalid_name() {
         assert_valid_name("invalid-name");
     }
 }

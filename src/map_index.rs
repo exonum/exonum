@@ -97,9 +97,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -125,9 +125,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let index_id = vec![01];
     ///
@@ -152,9 +152,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
@@ -176,9 +176,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
@@ -200,9 +200,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -223,9 +223,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -246,9 +246,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -269,9 +269,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -296,9 +296,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -323,9 +323,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
@@ -354,9 +354,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
@@ -372,9 +372,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
@@ -402,9 +402,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, MapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
@@ -469,14 +469,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Database, MemoryDB};
+    use super::super::{Database, TemporaryDB};
     use super::*;
 
     const IDX_NAME: &'static str = "idx_name";
 
     #[test]
-    fn str_key() {
-        let db = MemoryDB::new();
+    fn test_str_key() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
 
         const KEY: &str = "key_1";
@@ -492,8 +492,8 @@ mod tests {
     }
 
     #[test]
-    fn u8_slice_key() {
-        let db = MemoryDB::new();
+    fn test_u8_slice_key() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
 
         const KEY: &[u8] = &[1, 2, 3];
@@ -508,7 +508,9 @@ mod tests {
         assert_eq!(false, index.contains(KEY));
     }
 
-    fn methods(db: Box<dyn Database>) {
+    #[test]
+    fn test_methods() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
         let mut map_index = MapIndex::new(IDX_NAME, &mut fork);
 
@@ -533,7 +535,9 @@ mod tests {
         assert!(!map_index.contains(&3u8));
     }
 
-    fn iter(db: Box<dyn Database>) {
+    #[test]
+    fn test_iter() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
         let mut map_index = MapIndex::new(IDX_NAME, &mut fork);
 
@@ -598,59 +602,5 @@ mod tests {
             map_index.iter_from(&1u8).collect::<Vec<(u8, u8)>>(),
             vec![(2, 2), (3, 3)]
         );
-    }
-
-    mod memorydb_tests {
-        use crate::{Database, MemoryDB};
-        use std::path::Path;
-        use tempfile::TempDir;
-
-        fn create_database(_: &Path) -> Box<dyn Database> {
-            Box::new(MemoryDB::new())
-        }
-
-        #[test]
-        fn test_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::methods(db);
-        }
-
-        #[test]
-        fn test_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::iter(db);
-        }
-    }
-
-    mod rocksdb_tests {
-        use crate::Database;
-        use std::path::Path;
-        use tempfile::TempDir;
-
-        fn create_database(path: &Path) -> Box<dyn Database> {
-            use crate::{DbOptions, RocksDB};
-            let opts = DbOptions::default();
-            Box::new(RocksDB::open(path, &opts).unwrap())
-        }
-
-        #[test]
-        fn test_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::methods(db);
-        }
-
-        #[test]
-        fn test_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::iter(db);
-        }
     }
 }

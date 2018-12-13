@@ -50,9 +50,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
@@ -77,9 +77,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let index_id = vec![01];
     /// let snapshot = db.snapshot();
@@ -102,9 +102,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
@@ -122,9 +122,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
@@ -142,10 +142,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     /// use exonum_crypto::{self, Hash};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
@@ -172,9 +172,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
@@ -191,9 +191,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
@@ -213,9 +213,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
@@ -240,9 +240,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, Entry};
+    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);

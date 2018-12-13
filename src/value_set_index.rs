@@ -82,9 +82,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
@@ -109,9 +109,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index_id = vec![123];
@@ -134,9 +134,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
@@ -154,10 +154,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
@@ -177,9 +177,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
@@ -200,10 +200,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
@@ -226,9 +226,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
@@ -249,10 +249,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
@@ -279,9 +279,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
@@ -298,9 +298,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
@@ -320,10 +320,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     /// use exonum_crypto;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
@@ -349,9 +349,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ValueSetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);

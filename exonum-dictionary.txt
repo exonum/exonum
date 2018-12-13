@@ -63,7 +63,7 @@ libssl
 maintainer's
 markdownlint
 memlimit
-memorydb
+TemporaryDB
 mempool
 Merkelized
 Merkle

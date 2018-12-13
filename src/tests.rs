@@ -14,13 +14,15 @@
 
 use super::{
     Database, Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
-    Snapshot, SparseListIndex, ValueSetIndex,
+    Snapshot, SparseListIndex, TemporaryDB, ValueSetIndex,
 };
 use exonum_crypto::Hash;
 
 const IDX_NAME: &'static str = "idx_name";
 
-fn fork_iter<T: Database>(db: T) {
+#[test]
+fn test_fork_iter() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
 
     fork.put(IDX_NAME, vec![10], vec![10]);
@@ -117,7 +119,9 @@ fn fork_iter<T: Database>(db: T) {
     assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
 }
 
-fn changelog<T: Database>(db: T) {
+#[test]
+fn test_changelog() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
 
     fork.put(IDX_NAME, vec![1], vec![1]);
@@ -183,85 +187,40 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(IDX_NAME, &[4]), None);
 }
 
-mod memorydb_tests {
-    use super::super::MemoryDB;
+#[ignore]
+#[test]
+fn test_multiple_patch() {
+    let db = TemporaryDB::default();
 
-    fn memorydb_database() -> MemoryDB {
-        MemoryDB::new()
+    fn list_index<View: AsRef<dyn Snapshot>>(view: View) -> ListIndex<View, u64> {
+        ListIndex::new("list_index", view)
     }
-
-    #[test]
-    fn test_memory_fork_iter() {
-        super::fork_iter(memorydb_database());
-    }
-
-    #[test]
-    fn test_memory_changelog() {
-        super::changelog(memorydb_database());
-    }
-}
-
-mod rocksdb_tests {
-    use super::super::{DbOptions, RocksDB};
-    use crate::{Database, ListIndex, Snapshot};
-    use std::path::Path;
-    use tempfile::TempDir;
-
-    fn rocksdb_database(path: &Path) -> RocksDB {
-        let options = DbOptions::default();
-        RocksDB::open(path, &options).unwrap()
-    }
-
-    #[test]
-    fn test_rocksdb_fork_iter() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        super::fork_iter(rocksdb_database(path));
-    }
-
-    #[test]
-    fn test_rocksdb_changelog() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        super::changelog(rocksdb_database(path));
-    }
-
-    #[ignore]
-    #[test]
-    fn test_multiple_patch() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = rocksdb_database(path);
-        fn list_index<View: AsRef<dyn Snapshot>>(view: View) -> ListIndex<View, u64> {
-            ListIndex::new("list_index", view)
+    // create first patch
+    let patch1 = {
+        let mut fork = db.fork();
+        {
+            let mut index = list_index(&mut fork);
+            index.push(1);
+            index.push(3);
+            index.push(4);
         }
-        // create first patch
-        let patch1 = {
-            let mut fork = db.fork();
-            {
-                let mut index = list_index(&mut fork);
-                index.push(1);
-                index.push(3);
-                index.push(4);
-            }
-            fork.into_patch()
-        };
-        // create second patch
-        let patch2 = {
-            let mut fork = db.fork();
-            {
-                let mut index = list_index(&mut fork);
-                index.push(2);
-            }
-            fork.into_patch()
-        };
-        db.merge(patch1).unwrap();
-        db.merge(patch2).unwrap();
-        let snapshot = db.snapshot();
-        let index = list_index(snapshot);
-        let iter = index.iter();
-        assert_eq!(index.len() as usize, iter.count());
-    }
+        fork.into_patch()
+    };
+    // create second patch
+    let patch2 = {
+        let mut fork = db.fork();
+        {
+            let mut index = list_index(&mut fork);
+            index.push(2);
+        }
+        fork.into_patch()
+    };
+    db.merge(patch1).unwrap();
+    db.merge(patch2).unwrap();
+    let snapshot = db.snapshot();
+    let index = list_index(snapshot);
+    let iter = index.iter();
+    assert_eq!(index.len() as usize, iter.count());
 }
 
 // This should compile to ensure ?Sized bound on `new_in_family` (see #1024).

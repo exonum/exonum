@@ -68,9 +68,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
@@ -95,9 +95,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index_id = vec![123];
@@ -120,9 +120,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
@@ -144,9 +144,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
@@ -167,9 +167,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
@@ -194,9 +194,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
@@ -214,9 +214,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
@@ -245,9 +245,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
@@ -289,14 +289,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Database, MemoryDB};
+    use super::super::{Database, TemporaryDB};
     use super::*;
 
     const INDEX_NAME: &str = "test_index_name";
 
     #[test]
-    fn str_key() {
-        let db = MemoryDB::new();
+    fn test_str_key() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
 
         const KEY: &str = "key_1";
@@ -312,8 +312,8 @@ mod tests {
     }
 
     #[test]
-    fn u8_slice_key() {
-        let db = MemoryDB::new();
+    fn test_u8_slice_key() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
 
         const KEY: &[u8] = &[1, 2, 3];

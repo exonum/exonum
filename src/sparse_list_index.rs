@@ -145,9 +145,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
@@ -173,9 +173,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index_id = vec![123];
@@ -213,9 +213,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(None, index.get(0));
@@ -236,9 +236,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert!(index.is_empty());
@@ -256,9 +256,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.capacity());
@@ -281,9 +281,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.len());
@@ -305,9 +305,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -328,9 +328,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -352,9 +352,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -376,9 +376,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -410,9 +410,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -433,9 +433,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.capacity());
@@ -470,9 +470,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert!(index.is_empty());
@@ -503,9 +503,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -542,9 +542,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
@@ -565,9 +565,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(None, index.pop());
@@ -635,11 +635,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::SparseListIndex;
-    use crate::db::Database;
+    use crate::{db::Database, TemporaryDB};
 
     const IDX_NAME: &'static str = "idx_name";
 
-    fn list_index_methods(db: Box<dyn Database>) {
+    #[test]
+    fn test_list_index_methods() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
@@ -707,7 +709,9 @@ mod tests {
         assert_eq!(0, list_index.len());
     }
 
-    fn list_index_iter(db: Box<dyn Database>) {
+    #[test]
+    fn test_list_index_iter() {
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
@@ -747,58 +751,5 @@ mod tests {
             vec![0_u64, 3, 4]
         );
         assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1_u8, 2, 3]);
-    }
-
-    mod memorydb_tests {
-        use crate::{Database, MemoryDB};
-        use std::path::Path;
-        use tempfile::TempDir;
-
-        fn create_database(_: &Path) -> Box<dyn Database> {
-            Box::new(MemoryDB::new())
-        }
-
-        #[test]
-        fn test_list_index_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_methods(db);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_iter(db);
-        }
-    }
-
-    mod rocksdb_tests {
-        use crate::{Database, DbOptions, RocksDB};
-        use std::path::Path;
-        use tempfile::TempDir;
-
-        fn create_database(path: &Path) -> Box<dyn Database> {
-            let opts = DbOptions::default();
-            Box::new(RocksDB::open(path, &opts).unwrap())
-        }
-
-        #[test]
-        fn test_list_index_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_methods(db);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_iter(db);
-        }
     }
 }

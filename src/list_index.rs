@@ -71,9 +71,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
@@ -99,9 +99,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let index_id = vec![01];
     /// let snapshot = db.snapshot();
@@ -126,9 +126,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -146,9 +146,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -169,9 +169,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -189,9 +189,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -217,9 +217,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -242,9 +242,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -276,9 +276,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -297,9 +297,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -325,9 +325,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -357,9 +357,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -387,9 +387,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -423,9 +423,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
@@ -469,7 +469,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{Fork, ListIndex, Snapshot};
-    use crate::Database;
+    use crate::{Database, TemporaryDB};
 
     fn list_index_methods(list_index: &mut ListIndex<&mut Fork, i32>) {
         assert!(list_index.is_empty());
@@ -527,7 +527,7 @@ mod tests {
         );
     }
 
-    fn list_index_clear_in_family(db: Box<dyn Database>, x: u32, y: u32, merge_before_clear: bool) {
+    fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
         assert_ne!(x, y);
         let mut fork = db.fork();
 
@@ -588,128 +588,45 @@ mod tests {
     const FAMILY_CLEAR_PARAMS: &[(u32, u32, bool)] =
         &[(0, 5, false), (5, 0, false), (1, 7, true), (7, 1, true)];
 
-    mod memorydb_tests {
-        use crate::{Database, ListIndex, MemoryDB};
-        use std::path::Path;
-        use tempfile::TempDir;
+    const IDX_NAME: &'static str = "idx_name";
 
-        const IDX_NAME: &'static str = "idx_name";
-
-        fn create_database(_: &Path) -> Box<dyn Database> {
-            Box::new(MemoryDB::new())
-        }
-
-        #[test]
-        fn test_list_index_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
-            super::list_index_methods(&mut list_index);
-        }
-
-        #[test]
-        fn test_list_index_in_family_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
-            super::list_index_methods(&mut list_index);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
-            super::list_index_iter(&mut list_index);
-        }
-
-        #[test]
-        fn test_list_index_in_family_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
-            super::list_index_iter(&mut list_index);
-        }
-
-        #[test]
-        fn list_index_clear_in_family() {
-            for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
-                let dir = TempDir::new().unwrap();
-                let path = dir.path();
-                let db = create_database(path);
-                super::list_index_clear_in_family(db, x, y, merge_before_clear);
-            }
-        }
+    #[test]
+    fn test_list_index_methods() {
+        let db = TemporaryDB::default();
+        let mut fork = db.fork();
+        let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
+        list_index_methods(&mut list_index);
     }
 
-    mod rocksdb_tests {
-        use crate::{Database, DbOptions, ListIndex, RocksDB};
-        use std::path::Path;
-        use tempfile::TempDir;
+    #[test]
+    fn test_list_index_in_family_methods() {
+        let db = TemporaryDB::default();
+        let mut fork = db.fork();
+        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
+        list_index_methods(&mut list_index);
+    }
 
-        const IDX_NAME: &'static str = "idx_name";
+    #[test]
+    fn test_list_index_iter() {
+        let db = TemporaryDB::default();
+        let mut fork = db.fork();
+        let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
+        list_index_iter(&mut list_index);
+    }
 
-        fn create_database(path: &Path) -> Box<dyn Database> {
-            let opts = DbOptions::default();
-            Box::new(RocksDB::open(path, &opts).unwrap())
-        }
+    #[test]
+    fn test_list_index_in_family_iter() {
+        let db = TemporaryDB::default();
+        let mut fork = db.fork();
+        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
+        list_index_iter(&mut list_index);
+    }
 
-        #[test]
-        fn test_list_index_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
-            super::list_index_methods(&mut list_index);
-        }
-
-        #[test]
-        fn test_list_index_in_family_methods() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
-            super::list_index_methods(&mut list_index);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
-            super::list_index_iter(&mut list_index);
-        }
-
-        #[test]
-        fn test_list_index_in_family_iter() {
-            let dir = TempDir::new().unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
-            super::list_index_iter(&mut list_index);
-        }
-
-        #[test]
-        fn list_index_clear_in_family() {
-            for &(x, y, merge_before_clear) in super::FAMILY_CLEAR_PARAMS {
-                let dir = TempDir::new().unwrap();
-                let path = dir.path();
-                let db = create_database(path);
-                super::list_index_clear_in_family(db, x, y, merge_before_clear);
-            }
+    #[test]
+    fn test_list_index_clear_in_family() {
+        for &(x, y, merge_before_clear) in FAMILY_CLEAR_PARAMS {
+            let db = TemporaryDB::default();
+            list_index_clear_in_family(&db, x, y, merge_before_clear);
         }
     }
 }

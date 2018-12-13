@@ -18,8 +18,8 @@ use serde_derive::Serialize;
 use serde_json::{from_str, to_string};
 
 use self::ListProof::*;
-use crate::{hash::HashTag, Database, ListProof, MemoryDB, ProofListIndex};
-use exonum_crypto::{hash, Hash};
+use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
+use crate::{Database, TemporaryDB};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -41,7 +41,9 @@ fn random_values(len: usize) -> Vec<Vec<u8>> {
     (0..len).map(generator).collect::<Vec<_>>()
 }
 
-fn list_methods(db: Box<dyn Database>) {
+#[test]
+fn test_list_methods() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -70,7 +72,9 @@ fn list_methods(db: Box<dyn Database>) {
     assert_eq!(index.len(), 0);
 }
 
-fn height(db: Box<dyn Database>) {
+#[test]
+fn test_height() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -96,7 +100,9 @@ fn height(db: Box<dyn Database>) {
     assert_eq!(index.get(1), Some(vec![10]));
 }
 
-fn iter(db: Box<dyn Database>) {
+#[test]
+fn test_iter() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut list_index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -111,7 +117,9 @@ fn iter(db: Box<dyn Database>) {
     );
 }
 
-fn list_index_proof(db: Box<dyn Database>) {
+#[test]
+fn test_list_index_proof() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
@@ -249,7 +257,9 @@ fn list_index_proof(db: Box<dyn Database>) {
     );
 }
 
-fn randomly_generate_proofs(db: Box<dyn Database>) {
+#[test]
+fn test_randomly_generate_proofs() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     let num_values = 100;
@@ -293,15 +303,9 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
     }
 }
 
-fn hash_leaf_node(value: &[u8]) -> Hash {
-    HashTag::Leaf.hash_stream().update(value).hash()
-}
-
-fn hash_branch_node(value: &[u8]) -> Hash {
-    HashTag::Node.hash_stream().update(value).hash()
-}
-
-fn index_and_proof_roots(db: Box<dyn Database>) {
+#[test]
+fn test_index_and_proof_roots() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.list_hash(), HashTag::empty_list_hash());
@@ -429,14 +433,20 @@ fn index_and_proof_roots(db: Box<dyn Database>) {
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
-fn proof_illegal_lower_bound(db: Box<dyn Database>) {
+#[test]
+#[should_panic(expected = "the len is 0, but the range end is 1")]
+fn test_proof_illegal_lower_bound() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     index.get_range_proof(0..1);
     index.push(vec![1]);
 }
 
-fn proof_illegal_bound_empty(db: Box<dyn Database>) {
+#[test]
+#[should_panic(expected = "the len is 8, but the range end is 9")]
+fn test_proof_illegal_bound_empty() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     for i in 0_u8..8 {
@@ -445,7 +455,10 @@ fn proof_illegal_bound_empty(db: Box<dyn Database>) {
     index.get_range_proof(8..9);
 }
 
-fn proof_illegal_range(db: Box<dyn Database>) {
+#[test]
+#[should_panic(expected = "the range start is 2, but the range end is 2")]
+fn test_proof_illegal_range() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     for i in 0_u8..4 {
@@ -454,7 +467,9 @@ fn proof_illegal_range(db: Box<dyn Database>) {
     index.get_range_proof(2..2);
 }
 
-fn proof_structure(db: Box<dyn Database>) {
+#[test]
+fn test_proof_structure() {
+    let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.list_hash(), HashTag::empty_list_hash());
@@ -510,9 +525,11 @@ fn proof_structure(db: Box<dyn Database>) {
     }
 }
 
-fn simple_merkle_root(db: Box<dyn Database>) {
-    let h1 = HashTag::hash_list_node(1, hash(&[0x0, 1]));
-    let h2 = HashTag::hash_list_node(1, hash(&[0x0, 2]));
+#[test]
+fn test_simple_merkle_root() {
+    let db = TemporaryDB::default();
+    let h1 = hash(&[1]);
+    let h2 = hash(&[2]);
 
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
@@ -524,7 +541,10 @@ fn simple_merkle_root(db: Box<dyn Database>) {
     assert_eq!(index.list_hash(), h2);
 }
 
-fn same_merkle_root(db1: Box<dyn Database>, db2: Box<dyn Database>) {
+#[test]
+fn test_same_merkle_root() {
+    let db1 = TemporaryDB::default();
+    let db2 = TemporaryDB::default();
     let mut fork1 = db1.fork();
 
     let mut i1 = ProofListIndex::new(IDX_NAME, &mut fork1);
@@ -558,229 +578,8 @@ struct ProofInfo<'a, V: Serialize + 'a> {
     range_end: u64,
 }
 
-mod memorydb_tests {
-    use crate::{Database, MemoryDB};
-    use std::path::Path;
-    use tempfile::TempDir;
-
-    fn create_database(_: &Path) -> Box<dyn Database> {
-        Box::new(MemoryDB::new())
-    }
-
-    #[test]
-    fn test_list_methods() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::list_methods(db);
-    }
-
-    #[test]
-    fn test_height() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::height(db);
-    }
-
-    #[test]
-    fn test_iter() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::iter(db);
-    }
-
-    #[test]
-    fn test_list_index_proof() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::list_index_proof(db);
-    }
-
-    #[test]
-    fn test_randomly_generate_proofs() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::randomly_generate_proofs(db);
-    }
-
-    #[test]
-    fn test_index_and_proof_roots() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::index_and_proof_roots(db);
-    }
-
-    #[test]
-    fn test_proof_illegal_lower_bound() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_lower_bound(db);
-    }
-
-    #[test]
-    fn test_proof_illegal_bound_empty() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_bound_empty(db);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_proof_illegal_range() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_range(db);
-    }
-
-    #[test]
-    fn test_proof_structure() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_structure(db);
-    }
-
-    #[test]
-    fn test_simple_merkle_root() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::simple_merkle_root(db);
-    }
-
-    #[test]
-    fn test_same_merkle_root() {
-        let dir1 = TempDir::new().unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new().unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::same_merkle_root(db1, db2);
-    }
-}
-
-mod rocksdb_tests {
-    use crate::{Database, DbOptions, RocksDB};
-    use std::path::Path;
-    use tempfile::TempDir;
-
-    fn create_database(path: &Path) -> Box<dyn Database> {
-        let opts = DbOptions::default();
-        Box::new(RocksDB::open(path, &opts).unwrap())
-    }
-
-    #[test]
-    fn test_list_methods() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::list_methods(db);
-    }
-
-    #[test]
-    fn test_height() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::height(db);
-    }
-
-    #[test]
-    fn test_iter() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::iter(db);
-    }
-
-    #[test]
-    fn test_list_index_proof() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::list_index_proof(db);
-    }
-
-    #[test]
-    fn test_randomly_generate_proofs() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::randomly_generate_proofs(db);
-    }
-
-    #[test]
-    fn test_index_and_proof_roots() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::index_and_proof_roots(db);
-    }
-
-    #[test]
-    fn test_proof_illegal_lower_bound() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_lower_bound(db);
-    }
-
-    #[test]
-    fn test_proof_illegal_bound_empty() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_bound_empty(db);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_proof_illegal_range() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_range(db);
-    }
-
-    #[test]
-    fn test_proof_structure() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_structure(db);
-    }
-
-    #[test]
-    fn test_simple_merkle_root() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::simple_merkle_root(db);
-    }
-
-    #[test]
-    fn test_same_merkle_root() {
-        let dir1 = TempDir::new().unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new().unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::same_merkle_root(db1, db2);
-    }
-}
-
 mod root_hash_tests {
-    use crate::{hash::HashTag, Database, MemoryDB, ProofListIndex};
+    use crate::{Database, ProofListIndex, TemporaryDB};
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
@@ -791,7 +590,7 @@ mod root_hash_tests {
     }
 
     fn proof_list_index_root(hashes: &[Hash]) -> Hash {
-        let db = MemoryDB::new();
+        let db = TemporaryDB::default();
         let mut fork = db.fork();
         let mut index = ProofListIndex::new("merkle_root", &mut fork);
         index.extend(hashes.iter().cloned());

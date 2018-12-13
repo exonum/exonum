@@ -24,7 +24,7 @@
 //! that is, the Exonum process has exclusive access to the DB during blockchain operation.
 //! You can interact with the `Database` from multiple threads by cloning its instance.
 //!
-//! Exonum provides two database types: [`RocksDB`] and [`MemoryDB`].
+//! Exonum provides two database types: [`RocksDB`] and [`TemporaryDB`].
 //!
 //! # Snapshot and Fork
 //!
@@ -81,7 +81,7 @@
 //!
 //! [`Database`]: trait.Database.html
 //! [`RocksDB`]: struct.RocksDB.html
-//! [`MemoryDB`]: struct.MemoryDB.html
+//! [`TemporaryDB`]: struct.TemporaryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
 //! [`Fork`]: struct.Fork.html
 //! [`Patch`]: struct.Patch.html
@@ -109,7 +109,7 @@
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{
-    backends::{memorydb::MemoryDB, rocksdb::RocksDB},
+    backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
         Snapshot,

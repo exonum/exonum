@@ -125,10 +125,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -157,10 +157,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let index_id = vec![01];
     ///
@@ -220,10 +220,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
@@ -251,10 +251,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
@@ -274,10 +274,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
@@ -297,10 +297,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new("index", &snapshot);
     ///
@@ -317,9 +317,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new("index", &snapshot);
     ///
@@ -340,10 +340,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -365,10 +365,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -390,10 +390,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -414,10 +414,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -440,10 +440,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -466,10 +466,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
@@ -566,10 +566,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
@@ -683,10 +683,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
@@ -743,10 +743,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);

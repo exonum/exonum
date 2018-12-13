@@ -387,10 +387,10 @@ mod tests {
     test_storage_key_for_int_type! {fuzz i64, 8 => test_storage_key_for_i64}
 
     #[test]
-    fn signed_int_key_in_index() {
-        use crate::{Database, MapIndex, MemoryDB};
+    fn test_signed_int_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
 
-        let db: Box<dyn Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &mut fork);
@@ -418,8 +418,8 @@ mod tests {
     // Example how to migrate from Exonum <= 0.5 implementation of `StorageKey`
     // for signed integers.
     #[test]
-    fn old_signed_int_key_in_index() {
-        use crate::{Database, MapIndex, MemoryDB};
+    fn test_old_signed_int_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
 
         // Simple wrapper around a signed integer type with the `StorageKey` implementation,
         // which was used in Exonum <= 0.5.
@@ -440,7 +440,7 @@ mod tests {
             }
         }
 
-        let db: Box<dyn Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &mut fork);
@@ -477,7 +477,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_key_for_chrono_date_time_round_trip() {
+    fn test_storage_key_for_chrono_date_time_round_trip() {
         let times = [
             Utc.timestamp(0, 0),
             Utc.timestamp(13, 23),
@@ -491,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn storage_key_for_system_time_ordering() {
+    fn test_storage_key_for_system_time_ordering() {
         use rand::{thread_rng, Rng};
 
         let mut rng = thread_rng();
@@ -513,10 +513,10 @@ mod tests {
     }
 
     #[test]
-    fn system_time_key_in_index() {
-        use crate::{Database, MapIndex, MemoryDB};
+    fn test_system_time_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
 
-        let db: Box<dyn Database> = Box::new(MemoryDB::new());
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
         let x1 = Utc.timestamp(80, 0);
         let x2 = Utc.timestamp(10, 0);
         let y1 = Utc::now();
@@ -557,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn str_key() {
+    fn test_str_key() {
         let values = ["eee", "hello world", ""];
         for val in values.iter() {
             let mut buffer = get_buffer(*val);
@@ -568,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn u8_slice_key() {
+    fn test_u8_slice_key() {
         let values: &[&[u8]] = &[&[1, 2, 3], &[255], &[]];
         for val in values.iter() {
             let mut buffer = get_buffer(*val);
@@ -579,7 +579,7 @@ mod tests {
     }
 
     #[test]
-    fn hash_round_trip() {
+    fn test_hash_round_trip() {
         let hashes =
             [
                 Hash::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78")
@@ -589,7 +589,7 @@ mod tests {
     }
 
     #[test]
-    fn public_key_round_trip() {
+    fn test_public_key_round_trip() {
         let hashes = [PublicKey::from_hex(
             "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
         )
@@ -598,13 +598,13 @@ mod tests {
     }
 
     #[test]
-    fn signature_round_trip() {
+    fn test_signature_round_trip() {
         let hashes = [Signature::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
         assert_round_trip_eq(&hashes);
     }
 
     #[test]
-    fn uuid_round_trip() {
+    fn test_uuid_round_trip() {
         let uuids = [
             Uuid::nil(),
             Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
@@ -615,7 +615,7 @@ mod tests {
     }
 
     #[test]
-    fn decimal_round_trip() {
+    fn test_decimal_round_trip() {
         let decimals = [
             Decimal::from_str("3.14").unwrap(),
             Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
