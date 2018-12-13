@@ -17,6 +17,14 @@
 
 // Cryptocurrency service stub.
 
+const proto = require('./stubs.js')
+const $protobuf = require('protobufjs/light')
+const Root = $protobuf.Root
+const Type = $protobuf.Type
+const Field = $protobuf.Field
+
+let root = new Root()
+
 const exonum = require('exonum-client')
 const fetch = require('node-fetch')
 const expect = require('chai').expect
@@ -24,93 +32,71 @@ const expect = require('chai').expect
 const SERVICE_ID = 1
 const TX_CREATE_WALLET_ID = 0
 const TX_TRANSFER_ID = 1
-const SERVICE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
+const SERVICE_URL = 'http://127.0.0.1:8000/api/explorer'
+const EXPLORER_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
 
-const TxCreateWallet = exports.TxCreateWallet = exonum.newMessage({
-  size: 40,
-  network_id: 0,
-  protocol_version: 0,
-  service_id: SERVICE_ID,
-  message_id: TX_CREATE_WALLET_ID,
+function haveTxBody (type, data, secretKey) {
 
-  fields: [
-    { name: 'pub_key', type: exonum.PublicKey },
-    { name: 'name', type: exonum.String }
-  ]
-})
+  // clone type
+  const typeCopy = exonum.newTransaction(type)
 
-TxCreateWallet.new = function (body) {
+  // sign transaction
+  typeCopy.signature = typeCopy.sign(secretKey, data)
+
+  // serialize transaction header and body
+  const buffer = typeCopy.serialize(data)
+
+  // convert buffer into hexadecimal string
+  const txBody = exonum.uint8ArrayToHexadecimal(new Uint8Array(buffer))
+
+  // get transaction hash
+  const txHash = exonum.hash(buffer)
+
   return {
-    network_id: 0,
-    protocol_version: 0,
-    service_id: SERVICE_ID,
-    message_id: TX_CREATE_WALLET_ID,
-    body,
-
-    hash () {
-      TxCreateWallet.signature = this.signature
-      const hash = TxCreateWallet.hash(this.body)
-      delete TxCreateWallet.signature
-      return hash
-    }
-  }
-}
-
-const TxTranfer = exports.TxTranfer = exonum.newMessage({
-  size: 80,
-  network_id: 0,
-  protocol_version: 0,
-  service_id: SERVICE_ID,
-  message_id: TX_TRANSFER_ID,
-
-  fields: [
-    { name: 'from', type: exonum.PublicKey },
-    { name: 'to', type: exonum.PublicKey },
-    { name: 'amount', type: exonum.Uint64 },
-    { name: 'seed', type: exonum.Uint64 }
-  ]
-})
-
-TxTranfer.new = function (body) {
-  return {
-    network_id: 0,
-    protocol_version: 0,
-    service_id: SERVICE_ID,
-    message_id: TX_TRANSFER_ID,
-    body,
-
-    hash () {
-      TxTranfer.signature = this.signature
-      const hash = TxTranfer.hash(this.body)
-      delete TxTranfer.signature
-      return hash
-    }
+    tx_body: txBody,
+    tx_hash: txHash
   }
 }
 
 exports.service = {
-  async createWallet (tx) {
-    let response = await fetch(`${SERVICE_URL}/v1/wallets`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tx)
-    })
-    response = await response.json()
-    expect(response.tx_hash).to.equal(tx.hash())
+  createWalletTransaction (author) {
+    const tx = exonum.newTransaction({
+      service_id: SERVICE_ID,
+      message_id: TX_CREATE_WALLET_ID,
+      author,
+      schema: proto.exonum.examples.cryptocurrency.TxCreateWallet 
+    }) 
+
+    return tx
   },
 
-  async transfer (tx) {
-    let response = await fetch(`${SERVICE_URL}/v1/wallets/transfer`, {
+  createTransferTransaction (author) {
+    const tx = exonum.newTransaction({
+      service_id: SERVICE_ID,
+      message_id: TX_TRANSFER_ID,
+      author,
+      schema: proto.exonum.examples.cryptocurrency.TxTransfer
+    }) 
+
+    return tx
+  },
+
+  async transactionSend (sk, tx, body) {
+
+    const { tx_body, tx_hash } = haveTxBody(tx, body, sk)
+
+    let response = await fetch(`${SERVICE_URL}/v1/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tx)
+      body: JSON.stringify({ tx_body: tx_body })
     })
     response = await response.json()
-    expect(response.tx_hash).to.equal(tx.hash())
+    expect(response.tx_hash).to.equal(tx_hash)
+    tx.hash = response.tx_hash;
   },
 
   async getWallet (pubkey) {
-    const response = await fetch(`${SERVICE_URL}/v1/wallet?pub_key=${pubkey}`)
+    const response = await fetch(`${EXPLORER_URL}/v1/wallet?pub_key=${pubkey}`)
     return response.json()
   }
 }
