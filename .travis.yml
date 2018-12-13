@@ -127,8 +127,7 @@ jobs:
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-# Update frontend integrity tests. [ECR-2481]
-#    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
  
  # Clippy linting.
   - name: clippy

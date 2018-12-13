@@ -17,7 +17,7 @@
 
 // Cryptocurrency service stub.
 
-const proto = require('./protocol.js')
+const proto = require('./stubs.js')
 const $protobuf = require('protobufjs/light')
 const Root = $protobuf.Root
 const Type = $protobuf.Type
