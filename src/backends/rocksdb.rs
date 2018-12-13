@@ -44,13 +44,19 @@ pub struct RocksDB {
     db: Arc<exonum_rocksdb::DB>,
 }
 
-impl DbOptions {
-    fn to_rocksdb(&self) -> RocksDbOptions {
-        let mut defaults = RocksDbOptions::default();
-        defaults.create_if_missing(self.create_if_missing);
-        defaults.set_max_open_files(self.max_open_files.unwrap_or(-1));
-        defaults
+impl From<DbOptions> for RocksDbOptions {
+    fn from(opts: DbOptions) -> Self {
+        Self::from(&opts)
     }
+}
+
+impl From<&DbOptions> for RocksDbOptions {
+    fn from(opts: &DbOptions) -> Self {
+        let mut defaults = RocksDbOptions::default();
+        defaults.create_if_missing(opts.create_if_missing);
+        defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
+        defaults
+    }    
 }
 
 /// A snapshot of a `RocksDB`.
@@ -76,9 +82,9 @@ impl RocksDB {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                exonum_rocksdb::DB::open_cf(&options.to_rocksdb(), path, cf_names.as_ref())?
+                exonum_rocksdb::DB::open_cf(&options.into(), path, cf_names.as_ref())?
             } else {
-                exonum_rocksdb::DB::open(&options.to_rocksdb(), path)?
+                exonum_rocksdb::DB::open(&options.into(), path)?
             }
         };
         Ok(Self { db: Arc::new(db) })
@@ -91,7 +97,7 @@ impl RocksDB {
                 Some(cf) => cf,
                 None => self
                     .db
-                    .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
+                    .create_cf(&cf_name, &DbOptions::default().into())
                     .unwrap(),
             };
             for (key, change) in changes {
