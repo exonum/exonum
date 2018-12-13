@@ -16,10 +16,14 @@
  */
 /* eslint-env node,mocha */
 
+
 const exonum = require('exonum-client')
 const expect = require('chai').expect
 const testkit = require('./testkit')
-const { service, TxCreateWallet, TxTranfer } = require('./service')
+const {
+  service,
+  TxTranfer
+} = require('./service')
 
 describe('CurrencyService', function () {
   this.slow(500)
@@ -29,53 +33,58 @@ describe('CurrencyService', function () {
   })
 
   it('should create wallet', async () => {
-    const { publicKey, secretKey } = exonum.keyPair()
-    const tx = TxCreateWallet.new({
-      pub_key: publicKey,
-      name: 'Alice'
+    const {
+      publicKey,
+      secretKey
+    } = exonum.keyPair()
+    const tx = service.createWalletTransaction(publicKey)
+    await service.transactionSend(secretKey, tx, {
+      name: 'Kate'
     })
-    tx.signature = TxCreateWallet.sign(secretKey, tx.body)
 
-    await service.createWallet(tx)
     await testkit.createBlock()
     expect(await testkit.getBlockchainHeight()).to.equal(1)
+
     const wallet = await service.getWallet(publicKey)
-    expect(wallet.name).to.equal('Alice')
     expect('' + wallet.balance).to.equal('100')
+    expect(wallet.name).to.equal('Kate')
   })
 
+
   it('should perform transfer between wallets', async () => {
-    const { publicKey: alicePK, secretKey: aliceKey } = exonum.keyPair()
-    const txAlice = TxCreateWallet.new({
-      pub_key: alicePK,
-      name: 'Alice'
-    })
-    txAlice.signature = TxCreateWallet.sign(aliceKey, txAlice.body)
+    const {
+      publicKey: alicePK,
+      secretKey: aliceKey
+    } = exonum.keyPair()
+    const txAlice = service.createWalletTransaction(alicePK)
 
-    const { publicKey: bobPK, secretKey: bobKey } = exonum.keyPair()
-    const txBob = TxCreateWallet.new({
-      pub_key: bobPK,
-      name: 'Bob'
-    })
-    txBob.signature = TxCreateWallet.sign(bobKey, txBob.body)
+    const {
+      publicKey: bobPK,
+      secretKey: bobKey
+    } = exonum.keyPair()
+    const txBob = service.createWalletTransaction(bobPK)
 
-    const transferTx = TxTranfer.new({
-      from: alicePK,
-      to: bobPK,
-      amount: '15',
-      seed: '0'
-    })
-    transferTx.signature = TxTranfer.sign(aliceKey, transferTx.body)
+    const transferTx = service.createTransferTransaction(alicePK)
 
     await Promise.all([
-      service.createWallet(txAlice),
-      service.createWallet(txBob),
-      service.transfer(transferTx)
+      service.transactionSend(aliceKey, txAlice, {
+        name: 'Alice'
+      }),
+      service.transactionSend(bobKey, txBob, {
+        name: 'Bob'
+      }),
+      service.transactionSend(aliceKey, transferTx, {
+        to: {
+          data: Uint8Array.from(exonum.hexadecimalToUint8Array(bobPK))
+        },
+        amount: '15',
+        seed: '0'
+      })
     ])
     await testkit.createBlock([
-      txAlice.hash(),
-      txBob.hash(),
-      transferTx.hash()
+      txAlice.hash,
+      txBob.hash,
+      transferTx.hash
     ])
     expect(await testkit.getBlockchainHeight()).to.equal(1)
     const [aliceWallet, bobWallet] = await Promise.all([
@@ -87,36 +96,38 @@ describe('CurrencyService', function () {
   })
 
   it('should not perform transfer between wallets if the receiver is unknown', async () => {
-    const { publicKey: alicePK, secretKey: aliceKey } = exonum.keyPair()
-    const txAlice = TxCreateWallet.new({
-      pub_key: alicePK,
-      name: 'Alice'
-    })
-    txAlice.signature = TxCreateWallet.sign(aliceKey, txAlice.body)
+    const {
+      publicKey: alicePK,
+      secretKey: aliceKey
+    } = exonum.keyPair()
+    const txAlice = service.createWalletTransaction(alicePK)
 
-    const { publicKey: bobPK, secretKey: bobKey } = exonum.keyPair()
-    const txBob = TxCreateWallet.new({
-      pub_key: bobPK,
-      name: 'Bob'
-    })
-    txBob.signature = TxCreateWallet.sign(bobKey, txBob.body)
+    const {
+      publicKey: bobPK,
+      secretKey: bobKey
+    } = exonum.keyPair()
+    const txBob = service.createWalletTransaction(bobPK)
 
-    const transferTx = TxTranfer.new({
-      from: alicePK,
-      to: bobPK,
-      amount: '15',
-      seed: '0'
-    })
-    transferTx.signature = TxTranfer.sign(aliceKey, transferTx.body)
+    const transferTx = service.createTransferTransaction(alicePK)
 
     await Promise.all([
-      service.createWallet(txAlice),
-      service.createWallet(txBob),
-      service.transfer(transferTx)
+      service.transactionSend(aliceKey, txAlice, {
+        name: 'Alice'
+      }),
+      service.transactionSend(bobKey, txBob, {
+        name: 'Bob'
+      }),
+      service.transactionSend(aliceKey, transferTx, {
+        to: {
+          data: Uint8Array.from(exonum.hexadecimalToUint8Array(bobPK))
+        },
+        amount: '15',
+        seed: '0'
+      })
     ])
     await testkit.createBlock([
-      txAlice.hash(),
-      transferTx.hash()
+      txAlice.hash,
+      transferTx.hash
     ])
     const [aliceWallet, bobWallet] = await Promise.all([
       service.getWallet(alicePK),
