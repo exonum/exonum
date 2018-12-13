@@ -46,6 +46,10 @@
     },
     methods: {
       async loadBlocks(latest) {
+        if (this.webSocket) {
+          this.webSocket.close()
+        }
+
         this.isSpinnerVisible = true
 
         try {
