@@ -281,19 +281,20 @@ impl ProtobufConvert for Vec<u8> {
 
 // According to protobuf specification only simple scalar types (not floats) and strings can be used
 // as a map keys.
-impl<K, T> ProtobufConvert for HashMap<K, T>
+impl<K, T, S> ProtobufConvert for HashMap<K, T, S>
 where
     K: Eq + std::hash::Hash + Clone,
     T: ProtobufConvert,
+    S: Default + std::hash::BuildHasher,
 {
-    type ProtoStruct = HashMap<K, T::ProtoStruct>;
+    type ProtoStruct = HashMap<K, T::ProtoStruct, S>;
     fn to_pb(&self) -> Self::ProtoStruct {
         self.iter().map(|(k, v)| (k.clone(), v.to_pb())).collect()
     }
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         pb.drain()
             .map(|(k, v)| ProtobufConvert::from_pb(v).map(|v| (k, v)))
-            .collect::<Result<HashMap<_, _>, _>>()
+            .collect::<Result<HashMap<_, _, _>, _>>()
     }
 }
 
