@@ -16,6 +16,8 @@ use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 use crypto::{self, Hash, PublicKey};
 
+use std::collections::HashMap;
+
 use super::schema;
 use super::ProtobufConvert;
 use messages::BinaryForm;
@@ -199,4 +201,47 @@ fn test_repeated_struct_round_trip() {
     let bytes = rep_struct.encode().unwrap();
     let struct_encode_round_trip = StructWithRepeatedTypes::decode(&bytes).unwrap();
     assert_eq!(struct_encode_round_trip, rep_struct);
+}
+
+#[derive(Debug, PartialEq, ProtobufConvert)]
+#[exonum(
+    pb = "schema::tests::TestProtobufConvertMap",
+    crate = "crate"
+)]
+struct StructWithMaps {
+    num_map: HashMap<u32, u64>,
+    string_map: HashMap<u32, String>,
+    bytes_map: HashMap<u32, Vec<u8>>,
+    point_map: HashMap<u32, Point>,
+    key_string_map: HashMap<String, u64>,
+}
+
+#[test]
+fn test_struct_with_maps_roundtrip() {
+    let map_struct = StructWithMaps {
+        num_map: vec![(1, 1), (2, u64::max_value())].into_iter().collect(),
+        string_map: vec![(1, String::from("abc")), (2, String::from("def"))]
+            .into_iter()
+            .collect(),
+        bytes_map: vec![(1, vec![1, 2, 3]), (2, vec![3, 4, 5])]
+            .into_iter()
+            .collect(),
+        point_map: vec![(1, Point { x: 1, y: 2 }), (2, Point { x: 3, y: 4 })]
+            .into_iter()
+            .collect(),
+        key_string_map: vec![
+            (String::from("abc"), 0),
+            (String::from("def"), u64::max_value()),
+        ].into_iter()
+        .collect(),
+    };
+
+    let map_struct_pb = map_struct.to_pb();
+    let struct_convert_round_trip: StructWithMaps =
+        ProtobufConvert::from_pb(map_struct_pb).unwrap();
+    assert_eq!(struct_convert_round_trip, map_struct);
+
+    let bytes = map_struct.encode().unwrap();
+    let struct_encode_round_trip = StructWithMaps::decode(&bytes).unwrap();
+    assert_eq!(struct_encode_round_trip, map_struct);
 }

@@ -33,13 +33,6 @@ pub struct WalletQuery {
     pub pub_key: PublicKey,
 }
 
-/// Response to an incoming transaction returned by the REST API.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransactionResponse {
-    /// Hash of the transaction.
-    pub tx_hash: Hash,
-}
-
 /// Proof of existence for specific wallet.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
