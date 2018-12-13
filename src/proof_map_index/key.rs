@@ -45,6 +45,12 @@ macro_rules! div_ceil {
     };
 }
 
+/// Resets bits higher than the given pos.
+fn reset_bits(value: &mut u8, pos: u16) {
+    let reset_bits_mask = !(255_u8 << pos as u8);
+    *value &= reset_bits_mask;
+}
+
 /// A trait that defines a subset of storage key types which are suitable for use with
 /// `ProofMapIndex`.
 ///
@@ -432,7 +438,7 @@ impl StorageKey for ProofPath {
         if !self.is_leaf() {
             let right = div_ceil!(self.end(), 8) as usize;
             if self.end() % 8 != 0 {
-                buffer[right] &= !(255_u8 << (self.end() % 8));
+                reset_bits(&mut buffer[right], self.end() % 8);
             }
             for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
                 *i = 0
@@ -465,8 +471,9 @@ impl PartialOrd for ProofPath {
 
             if i + 1 == right && right_bit % 8 != 0 {
                 // Cut possible junk after the end of path(s)
-                self_byte &= !(255 << (right_bit % 8));
-                other_byte &= !(255 << (right_bit % 8));
+                let tail = right_bit % 8;
+                reset_bits(&mut self_byte, tail);
+                reset_bits(&mut other_byte, tail);
             }
 
             // Try to find a first bit index at which this path is greater than the other path
@@ -509,8 +516,8 @@ impl ProofPath {
         // Trims insignificant bits in the last byte.
         let bits_in_last_byte = bits_len % 8;
         if whole_bytes_len > 0 && bits_in_last_byte != 0 {
-            let zero_bits_mask = !(255u8 << (self.end() % 8));
-            buffer[bytes_written - 1] &= zero_bits_mask;
+            let tail = self.end() % 8;
+            reset_bits(&mut buffer[bytes_written - 1], tail);
         }
         bytes_written
     }
@@ -787,7 +794,7 @@ mod tests {
                 assert_eq!(key2.bit(j), ChildKind::Left);
             }
         }
-    }
+    }    
 
     #[test]
     fn test_proof_path_suffix() {
