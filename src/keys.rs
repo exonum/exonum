@@ -121,11 +121,11 @@ impl StorageKey for i8 {
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        buffer[0] = self.wrapping_add(i8::min_value()) as u8;
+        buffer[0] = self.wrapping_add(Self::min_value()) as u8;
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        buffer[0].wrapping_sub(i8::min_value() as u8) as i8
+        buffer[0].wrapping_sub(Self::min_value() as u8) as Self
     }
 }
 

@@ -52,7 +52,7 @@ impl From<DbOptions> for RocksDbOptions {
 
 impl From<&DbOptions> for RocksDbOptions {
     fn from(opts: &DbOptions) -> Self {
-        let mut defaults = RocksDbOptions::default();
+        let mut defaults = Self::default();
         defaults.create_if_missing(opts.create_if_missing);
         defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
         defaults

@@ -94,7 +94,7 @@ impl StorageValue for IndexMetadata {
         let value = value.as_ref();
         let index_type = IndexType::from(value[0]);
         let is_family = value[1] != 0;
-        IndexMetadata {
+        Self {
             index_type,
             is_family,
         }
@@ -167,11 +167,11 @@ impl StorageMetadata {
             Some(ref ver) => Err(super::Error::new(format!(
                 "Unsupported storage version: [{}]. Current storage version: [{}].",
                 ver,
-                StorageMetadata::current(),
+                Self::current(),
             ))),
             None => Err(super::Error::new(format!(
                 "Storage version is not specified. Current storage version: [{}].",
-                StorageMetadata::current()
+                Self::current()
             ))),
         }
     }
@@ -190,7 +190,7 @@ impl StorageValue for StorageMetadata {
     }
 
     fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        StorageMetadata::try_deserialize(v.as_ref()).unwrap()
+        Self::try_deserialize(v.as_ref()).unwrap()
     }
 }
 

@@ -643,7 +643,9 @@ impl<'a> Iterator for ForkIter<'a> {
 }
 
 impl<T: Database> From<T> for Box<dyn Database> {
+    // False positive
+    #![allow(clippy::use_self)]
     fn from(db: T) -> Self {
-        Box::new(db) as Self
+        Box::new(db)
     }
 }

@@ -24,6 +24,7 @@ use crate::{Database, DbOptions, Patch, Result, Snapshot};
 ///
 /// This database is only used for testing and experimenting; is not designed to
 /// operate under load in production.
+#[derive(Debug)]
 pub struct TemporaryDB {
     inner: RocksDB,
     _dir: TempDir,
