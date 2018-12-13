@@ -36,7 +36,7 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
         .filter_map(|e| {
             let e = e.ok()?;
             if e.path().extension()?.to_str() == Some("proto") {
-                Some(e.path().into())
+                Some(clean_path(e.path()))
             } else {
                 None
             }
@@ -112,6 +112,9 @@ where
     I: IntoIterator<Item = R>,
     T: AsRef<str>,
 {
+    let input_dir = clean_path(input_dir);
+    let includes = includes.into_iter().map(clean_path).collect::<Vec<_>>();
+
     let out_dir = env::var("OUT_DIR")
         .map(PathBuf::from)
         .expect("Unable to get OUT_DIR");
@@ -132,8 +135,7 @@ where
         includes: &includes
             .iter()
             .map(|s| {
-                s.as_ref()
-                    .to_str()
+                s.to_str()
                     .expect("Include dir name is not convertible to &str")
             }).collect::<Vec<_>>(),
         customize: Customize {
@@ -146,7 +148,6 @@ where
     println!(
         "cargo:rerun-if-changed={}",
         input_dir
-            .as_ref()
             .to_str()
             .expect("Input dir name is not convertible to &str")
     );
@@ -172,4 +173,14 @@ where
 /// ```
 pub fn get_exonum_protobuf_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_PROTOS").expect("Failed to get exonum protobuf path")
+}
+
+// The problem is that
+// 1) On Windows path can contain both / and \.
+// 2) `protoc_rust` compares paths as strings but same path can have different representation as a string.
+fn clean_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    path.as_ref()
+        .to_str()
+        .map(|s| PathBuf::from(s.replace("\\", "/")))
+        .unwrap()
 }

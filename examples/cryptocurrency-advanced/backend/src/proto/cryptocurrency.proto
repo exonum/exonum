@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.examples.cryptocurrency_advanced;
 
-import "helpers.proto";
+import "exonum/helpers.proto";
 
 /// Transfer `amount` of the currency from one wallet to another.
 message Transfer {

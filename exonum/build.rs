@@ -14,7 +14,7 @@ fn create_path_to_protobuf_schema_env() {
     // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
     let path = env::current_dir()
         .expect("Failed to get current dir.")
-        .join("src/proto/schema/exonum");
+        .join("src/proto/schema");
     println!("cargo:protos={}", path.to_str().unwrap());
 }
 
@@ -38,21 +38,21 @@ fn main() {
 
     protobuf_generate(
         "src/proto/schema/exonum",
-        &["src/proto/schema/exonum"],
+        &["src/proto/schema"],
         "exonum_proto_mod.rs",
     );
 
     // Exonum external tests.
     protobuf_generate(
         "tests/explorer/blockchain/proto",
-        &["tests/explorer/blockchain/proto", "src/proto/schema/exonum"],
+        &["tests/explorer/blockchain/proto", "src/proto/schema"],
         "exonum_tests_proto_mod.rs",
     );
 
     // Exonum benchmarks.
     protobuf_generate(
         "benches/criterion/proto",
-        &["benches/criterion/proto", "src/proto/schema/exonum"],
+        &["benches/criterion/proto", "src/proto/schema"],
         "exonum_benches_proto_mod.rs",
     );
 }
