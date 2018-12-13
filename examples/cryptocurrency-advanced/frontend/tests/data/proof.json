@@ -1,28 +1,15 @@
 {
   "block_proof": {
     "block": {
-      "height": "56038",
-      "prev_hash": "0d0a93017cac1e75a7986a72f8046bcdd7eb4551b756db555a00b4268fac4a96",
       "proposer_id": 0,
-      "state_hash": "766997171fbb8973280c5c6bd4cd48755c241464517a0e171728aedc98661505",
-      "tx_count": 1,
-      "tx_hash": "2a9c7c66ef597bae9c1758e75534c88c8fa9cf4a72977cda80d12f18feaf9020"
+      "height": 22193,
+      "tx_count": 0,
+      "prev_hash": "257db8ed9d91f81c86167ff3993bb5d12a3b51f332e548007f5498eb8013359b",
+      "tx_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "state_hash": "2c13accce0aca541f3c5bf8036e18b872d57bf66256da2d0148b12ea8e2907c1"
     },
     "precommits": [
-      {
-        "payload": {
-          "block_hash": "7d87e35306760b29654c3b40ac580124d43ec766acb83c38995e9d7816221839",
-          "height": "56038",
-          "propose_hash": "9d06373063fd722bc6385dc548046107a89ac96917827b461bb8220afb778493",
-          "round": 1,
-          "time": {
-            "nanos": 811229000,
-            "secs": "1539691874"
-          },
-          "validator": 0
-        },
-        "message": "52b0e5b12eebfecfd39c79ff44a197542dabd958cb7e135a1e1354ec52c1237001000000e6da000000000000010000009d06373063fd722bc6385dc548046107a89ac96917827b461bb8220afb7784937d87e35306760b29654c3b40ac580124d43ec766acb83c38995e9d781622183962d5c55b00000000485f5a3011525e81d383c9e71d75ae31874e570b9707b81d0750c12990510d480c36ca81ce6f6886401822a860545661775196a06a365827f23f33747932f908ae84140d"
-      }
+      "d48c5ad2c3774a5394b35bbcbed3266e5abd31e01043c6d39c15f2fa9eea303a010010b1ad01180122220a2052748a8c4382f8ae2ee1d52bb9fc408cdfdcdeb3dc0a889a7bbae8586b8009f92a220a20c0561d70745b7536f6616f83ff7f2c77194deefb6098293b67dfa053c1733d94320b08cf9abee005109882ca7fd4756f5b41d0e86ba97ad38b3cd5f3eff2198dddcd8cc0602b7d81ab6acc426953b01ae20bc55f8fb2c2d0ec8f14cc3d8862e415636e1bd36b00b02241698801"
     ]
   },
   "wallet_proof": {
@@ -30,7 +17,7 @@
       "entries": [
         {
           "key": "50c8ba3a6170f0a2fb6736ece8a603576ef6309a35e810911599bc6211b554a9",
-          "value": "8b43e2041ef4af6253f34e3f76427664de49ac18d2efaa0664ffea4dfcceaeea"
+          "value": "11201587242a022421b323ef1f2f1f7891643ab6182da81b1a449eb117d3fae7"
         }
       ],
       "proof": [
@@ -40,72 +27,111 @@
         },
         {
           "path": "11",
-          "hash": "6a2b8b7b4b9341a0ea0fc353a5ebec913b8519888cc8e6c23a94bd47fcaec980"
+          "hash": "36f3f3b8670862b21f4bb9bc77466571bbad6e2c6f18d720189263917a7816e3"
         }
       ]
     },
     "to_wallet": {
       "entries": [
         {
-          "key": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b",
+          "key": "78cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e8",
           "value": {
-            "balance": "145",
-            "history_hash": "8bb3dd4745085255a18e44dcaace6f27014524398e162985fdea10b4fd91a6c2",
-            "history_len": "3",
+            "pub_key": {
+              "data": [
+                120,
+                207,
+                139,
+                94,
+                92,
+                2,
+                6,
+                150,
+                49,
+                158,
+                179,
+                42,
+                20,
+                8,
+                230,
+                198,
+                94,
+                125,
+                151,
+                115,
+                61,
+                52,
+                82,
+                143,
+                189,
+                206,
+                8,
+                67,
+                138,
+                2,
+                67,
+                232
+              ]
+            },
             "name": "John Doe",
-            "pub_key": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b"
+            "balance": 100,
+            "history_len": 1,
+            "history_hash": {
+              "data": [
+                85,
+                32,
+                155,
+                60,
+                107,
+                216,
+                89,
+                59,
+                156,
+                144,
+                234,
+                205,
+                58,
+                87,
+                207,
+                196,
+                72,
+                235,
+                192,
+                212,
+                115,
+                22,
+                35,
+                90,
+                76,
+                163,
+                161,
+                117,
+                21,
+                72,
+                163,
+                132
+              ]
+            }
           }
         }
       ],
       "proof": [
         {
-          "path": "0111101100001000010110011101001100101011010101101010010000100000111100100000010100101111011110010111001101001010101101110001010110010111001010110100110101011101010000001010000100111111101101110110001010011000111011010000111011100011010100011001111100000110",
-          "hash": "23f07d1e37fe9d6b98da13e0d8f34600368583e8fa6d287ff46c1ca4c03fe78d"
-        },
-        {
-          "path": "11100",
-          "hash": "38b47bb15bdbe5f4ce5d4cbb6a4b9051d098935861556f9819a71fa60d23c54e"
+          "path": "0010101000000000110101101100110010000111100101001000000011100000001111001011110101100000011010011101100101111000010111011110001000011110010110011111111010110110111010001001010111100010011001000011000011000110101010010010101001011000001010011111111101111101",
+          "hash": "04f07a81e313485e04c0bdb824b6ddca9450ccbd291f2d83b4e7e8061cda5144"
         }
       ]
     }
   },
   "wallet_history": {
     "proof": {
-      "left": {
-        "left": {
-          "val": "f7248195b3d0e2ca5c018a7cd26159d44c2c7e27a9e1f9150a1779d4f7f2420d"
-        },
-        "right": {
-          "val": "c8f0dbbfdf27f9118d4eb17eb0dbd0e4f3ecc5d62a69eb62d883e6f934750d7b"
-        }
-      },
-      "right": {
-        "left": {
-          "val": "2a9c7c66ef597bae9c1758e75534c88c8fa9cf4a72977cda80d12f18feaf9020"
-        }
-      }
+      "val": "55209b3c6bd8593b9c90eacd3a57cfc448ebc0d47316235a4ca3a1751548a384"
     },
     "transactions": [
       {
         "debug": {
           "name": "John Doe"
         },
-        "message": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b00008000020008000000080000004a6f686e20446f65470c0d186a70e22c1d7d62e92de644b8789172058a7dfff92655c050a8853d1000be72dfb2fe9f941ce705c61b9da2a476167e0ee2c7d91d265da28361132703"
-      },
-      {
-        "debug": {
-          "amount": "50",
-          "seed": "6684106035020060923"
-        },
-        "message": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800001003200000000000000fb586a6206b7c25c7dc31bf63c8476bccf7b43f2b3c7521db5b7c7f13300d011309b91055ec1c2e8fe4d82b3944f67918884dd51fdc43e7ce15f366625a85d30d72f3a27f74ccd01"
-      },
-      {
-        "debug": {
-          "amount": "5",
-          "seed": "16677062690994885376",
-          "to": "8740e2dbe13dfe028e4c4afe27bb3d732f1c45977fa523fcce0d3a90f7ca5c0a"
-        },
-        "message": "24cf3dd648b98abd9f76b427bcf32c2db4c509efa323c07dfbdad54b2bb9e87b0000800000008740e2dbe13dfe028e4c4afe27bb3d732f1c45977fa523fcce0d3a90f7ca5c0a05000000000000000093ab9928d470e7f30500dfa46b886e42f1cdcfb18675c90213898c88da4ec05ed40bb170181c9c57b241abd45166f63858805ceda90827a3b1462718117b7150a6b39a9d9fd40c"
+        "message": "78cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e80000800002000a084a6f686e20446f65a71558ef2f2d592acfffbac71ea13327a78be83d6977240d3ca8cf4a92ba3d87cd30b9df1ca9b83147be274a85369ce5a2ce3e3a490be6acbaca48c764b40907"
       }
     ]
   }

@@ -73,9 +73,7 @@
     components: {
       Spinner
     },
-    props: {
-      hash: String
-    },
+    props: ['hash'],
     data() {
       return {
         content: {},
