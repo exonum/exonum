@@ -17,7 +17,7 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-time = "0.9.0"
+exonum-time = "0.10.0"
 ```
 
 Add the time oracle service to the blockchain in the main project file:
@@ -47,21 +47,20 @@ which must be executed no later than the specified time
 (this time is written in the transaction body in a separate field):
 
 ```rust
-message! {
-    struct Tx {
-        time: SystemTime,
-        ...
-    }
+// Example transaction struct.
+struct Tx {
+    time: DateTime<Utc>,
+    // ...
 }
 
 impl Transaction for Tx {
-    ...
+    // ...
     fn execute(&self, view: &mut Fork) {
         // Import schema.
         let time_schema = exonum_time::TimeSchema::new(&view);
         // The time in the transaction should be less than in the blockchain.
         match time_schema.time().get() {
-            Some(current_time) if current_time <= self.time() => {
+            Some(current_time) if current_time <= self.time => {
                 // Execute transaction business logic.
             }
             _ => {}
