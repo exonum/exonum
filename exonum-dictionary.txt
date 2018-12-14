@@ -106,6 +106,7 @@ protos
 pubkey
 pubkeys
 pwbox
+quux
 readonly
 rebasing
 reddit
@@ -118,6 +119,7 @@ roadmap
 rocksdb
 roughtime
 roundtrip
+rpassword
 rtype
 runtimes
 rustfmt
