@@ -412,7 +412,6 @@ impl GenerateNodeConfig {
         (external_address, listen_address)
     }
 
-    /// * `key` - expects EXONUM_SERVICE_PASS or EXONUM_CONSENSUS_PASS.
     fn get_passphrase(context: &Context, secret_key_type: SecretKeyType) -> Vec<u8> {
         let key = match secret_key_type {
             SecretKeyType::Consensus => EXONUM_CONSENSUS_PASS,
@@ -425,42 +424,9 @@ impl GenerateNodeConfig {
             .or_else(|| {
                 let stdin = io::stdin();
                 let stdin_locked = stdin.lock();
-                Self::prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
+                prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
             }).unwrap()
             .into_bytes()
-    }
-
-    fn prompt_passphrase<R: BufRead, W: Write>(mut reader: R, mut writer: W, secret_key_type: SecretKeyType) -> io::Result<String> {
-        let key_type = match secret_key_type {
-            SecretKeyType::Consensus => "consensus",
-            SecretKeyType::Service => "service",
-        };
-        loop {
-            write!(&mut writer, "Enter passphrase for {} key: ", key_type)?;
-            writer.flush();
-            let password = rpassword::read_password_with_reader(Some(&mut reader))?;
-            write!(&mut writer, "Enter same passphrase again: ")?;
-            writer.flush();
-            if password == rpassword::read_password_with_reader(Some(&mut reader))? {
-                return Ok(password);
-            }
-            writeln!(&mut writer, "Passphrases do not match. Try again.")?;
-        }
-    }
-
-    fn create_secret_key_file(
-        secret_key_path: impl AsRef<Path>,
-        passphrase: impl AsRef<[u8]>,
-    ) -> PublicKey {
-        let secret_key_path = secret_key_path.as_ref();
-        if secret_key_path.exists() {
-            panic!("{}: File exists", secret_key_path.to_string_lossy(),);
-        } else {
-            if let Some(dir) = secret_key_path.parent() {
-                fs::create_dir_all(dir).unwrap();
-            }
-            generate_keys_file(&secret_key_path, &passphrase).unwrap()
-        }
     }
 }
 
@@ -563,9 +529,9 @@ impl Command for GenerateNodeConfig {
         let consensus_passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
         let service_passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
         let consensus_public_key =
-            Self::create_secret_key_file(&consensus_secret_key_path, &consensus_passphrase);
+            create_secret_key_file(&consensus_secret_key_path, &consensus_passphrase);
         let service_public_key =
-            Self::create_secret_key_file(&service_secret_key_path, &service_passphrase);
+            create_secret_key_file(&service_secret_key_path, &service_passphrase);
 
         let pub_config_folder = Path::new(&pub_config_path).parent().unwrap();
         let consensus_secret_key = if consensus_secret_key_path.is_absolute() {
@@ -884,11 +850,78 @@ impl Command for GenerateTestnet {
             .expect("Couldn't read testnet configs after exts call.");
 
         for (idx, cfg) in configs.into_iter().enumerate() {
-            let file_name = format!("{}.toml", idx);
-            ConfigFile::save(&cfg, &dir.join(file_name)).unwrap();
+            let cfg_filename = format!("{}.toml", idx);
+            let consensus_key_filename = format!("consensus{}.toml", idx);
+            let service_key_filename = format!("service{}.toml", idx);
+
+            let consensus_secret_key_path = dir.join(&consensus_key_filename);
+            let service_secret_key_path = dir.join(&service_key_filename);
+            let consensus_public_key = create_secret_key_file(&consensus_secret_key_path, &[]);
+            let service_public_key = create_secret_key_file(&service_secret_key_path, &[]);
+
+            let config_file_path = dir.join(cfg_filename);
+            let config: NodeConfig<PathBuf> = NodeConfig {
+                consensus_secret_key: consensus_key_filename.into(),
+                service_secret_key: service_key_filename.into(),
+                consensus_public_key: consensus_public_key,
+                service_public_key: service_public_key,
+                genesis: cfg.genesis,
+                listen_address: cfg.listen_address,
+                external_address: cfg.external_address,
+                network: cfg.network,
+                api: cfg.api,
+                mempool: cfg.mempool,
+                services_configs: cfg.services_configs,
+                database: cfg.database,
+                connect_list: cfg.connect_list,
+                thread_pool_size: cfg.thread_pool_size,
+            };
+
+            ConfigFile::save(&config, &config_file_path).unwrap();
         }
 
         Feedback::None
+    }
+}
+
+fn prompt_passphrase<R: BufRead, W: Write>(
+    mut reader: R,
+    mut writer: W,
+    secret_key_type: SecretKeyType,
+) -> io::Result<String> {
+    let key_type = match secret_key_type {
+        SecretKeyType::Consensus => "consensus",
+        SecretKeyType::Service => "service",
+    };
+    loop {
+        write!(&mut writer, "Enter passphrase for {} key: ", key_type)?;
+        writer.flush()?;
+        let password = rpassword::read_password_with_reader(Some(&mut reader))?;
+        if password.is_empty() {
+            writeln!(&mut writer, "Passphrase must not be empty. Try again.")?;
+            continue;
+        }
+        write!(&mut writer, "Enter same passphrase again: ")?;
+        writer.flush()?;
+        if password == rpassword::read_password_with_reader(Some(&mut reader))? {
+            return Ok(password);
+        }
+        writeln!(&mut writer, "Passphrases do not match. Try again.")?;
+    }
+}
+
+fn create_secret_key_file(
+    secret_key_path: impl AsRef<Path>,
+    passphrase: impl AsRef<[u8]>,
+) -> PublicKey {
+    let secret_key_path = secret_key_path.as_ref();
+    if secret_key_path.exists() {
+        panic!("{}: File exists", secret_key_path.to_string_lossy(),);
+    } else {
+        if let Some(dir) = secret_key_path.parent() {
+            fs::create_dir_all(dir).unwrap();
+        }
+        generate_keys_file(&secret_key_path, &passphrase).unwrap()
     }
 }
 
@@ -987,27 +1020,57 @@ mod test {
 
     #[test]
     fn test_prompt_password() {
-        let passwords_input = b"somepassword\nsomepassword\n";
+        // Enter "some password", repeat with "some password".
+        let passwords_input = b"some password\nsome password\n";
         let mut output = Vec::new();
-        let password = GenerateNodeConfig::prompt_passphrase(&passwords_input[..], &mut output);
+        let password =
+            prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Consensus);
         assert!(password.is_ok());
-        assert_eq!(password.unwrap(), String::from("somepassword"));
+        assert_eq!(password.unwrap(), String::from("some password"));
+
+        let output = String::from_utf8(output).unwrap();
+        assert_eq!(
+            output,
+            "Enter passphrase for consensus key: \
+             Enter same passphrase again: "
+        );
     }
 
     #[test]
     fn test_prompt_password_retry() {
+        // Enter "A", repeat with "B", then enter "A" and repeat with "A".
         let passwords_input = b"A\nB\nA\nA\n";
         let mut output = Vec::new();
-        let password = GenerateNodeConfig::prompt_passphrase(&passwords_input[..], &mut output);
+        let password = prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Service);
         assert!(password.is_ok());
 
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
-            "Enter passphrase (empty for no passphrase): \
+            "Enter passphrase for service key: \
              Enter same passphrase again: \
-             Passphrases do not match.  Try again.\n\
-             Enter passphrase (empty for no passphrase): \
+             Passphrases do not match. Try again.\n\
+             Enter passphrase for service key: \
+             Enter same passphrase again: "
+        );
+    }
+
+    #[test]
+    fn test_prompt_password_disallow_empty() {
+        // Enter empty password, then enter "A" and repeat with "A".
+        let passwords_input = b"\nA\nA\n";
+        let mut output = Vec::new();
+        let password =
+            prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Consensus);
+        eprintln!("password = {:?}", password);
+        assert!(password.is_ok());
+
+        let output = String::from_utf8(output).unwrap();
+        assert_eq!(
+            output,
+            "Enter passphrase for consensus key: \
+             Passphrase must not be empty. Try again.\n\
+             Enter passphrase for consensus key: \
              Enter same passphrase again: "
         );
     }
