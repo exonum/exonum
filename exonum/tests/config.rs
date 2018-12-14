@@ -40,6 +40,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+
 const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
 const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";
 
@@ -202,7 +205,15 @@ fn override_validators_count(config: &str, n: usize, folder: &str) {
 }
 
 fn copy_file_to_temp(file: &str, folder: &str) {
-    fs::copy(&full_testdata_name(file), &full_tmp_name(file, folder)).unwrap();
+    let source_file = full_testdata_name(file);
+    let destination_file = full_tmp_name(file, folder);
+    let contents = fs::read(source_file).unwrap();
+    let mut open_options = OpenOptions::new();
+    open_options.create(true).write(true);
+    #[cfg(unix)]
+    open_options.mode(0o600);
+    let mut file = open_options.open(&destination_file).unwrap();
+    file.write_all(contents.as_slice()).unwrap();
 }
 
 fn run_node(config: &str, folder: &str) {
@@ -210,7 +221,7 @@ fn run_node(config: &str, folder: &str) {
         "exonum-config-test",
         "run",
         "-c",
-        &full_testdata_name(config),
+        &full_tmp_name(config, folder),
         "-d",
         &full_tmp_folder(folder),
     ]));
