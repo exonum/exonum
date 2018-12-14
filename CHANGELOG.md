@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.10 - 2018-12-14
+
 ### Breaking Changes
 
 - Changed the message format, which, in turn, has led to changes in
