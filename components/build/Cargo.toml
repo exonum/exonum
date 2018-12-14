@@ -1,7 +1,11 @@
 [package]
 name = "exonum-build"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+documentation = "https://docs.rs/exonum-build"
+readme = "README.md"
 license = "Apache-2.0"
 keywords = ["protobuf", "exonum"]
 categories = ["development-tools"]
