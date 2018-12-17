@@ -170,9 +170,13 @@ impl BinaryForm for Vec<u8> {
         Ok(buf)
     }
 
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.len())
+    fn to_bytes(&self) -> Result<Vec<u8>, failure::Error> {
+        Ok(self.clone())
     }
+
+    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+        Ok(bytes.as_ref().to_vec())
+    }    
 }
 
 impl UniqueHash for Vec<u8> {}
