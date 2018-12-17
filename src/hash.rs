@@ -16,7 +16,7 @@ use bytes::LittleEndian;
 use hex::FromHex;
 
 use crate::BinaryForm;
-use exonum_crypto::{CryptoHash, Hash};
+use exonum_crypto::{self, Hash};
 
 /// A common trait for the ability to compute a unique hash.
 ///
@@ -28,7 +28,7 @@ pub trait UniqueHash: BinaryForm {
     ///
     /// Hash must be unique, but not necessary cryptographic.
     fn hash(&self) -> Hash {
-        CryptoHash::hash(&self.to_bytes().unwrap())
+        exonum_crypto::hash(&self.to_bytes().unwrap())
     }
 }
 

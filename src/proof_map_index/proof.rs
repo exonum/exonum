@@ -16,7 +16,7 @@ use failure::Fail;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
-use exonum_crypto::{CryptoHash, Hash, HashStream};
+use exonum_crypto::{Hash, HashStream};
 
 use super::{
     key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},

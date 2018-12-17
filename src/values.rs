@@ -176,7 +176,7 @@ impl BinaryForm for Vec<u8> {
 
     fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
         Ok(bytes.as_ref().to_vec())
-    }    
+    }
 }
 
 impl UniqueHash for Vec<u8> {}

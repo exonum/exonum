@@ -31,7 +31,7 @@ use super::{
     indexes_metadata::IndexType,
     BinaryForm, Fork, Snapshot, StorageKey, UniqueHash,
 };
-use exonum_crypto::{CryptoHash, Hash, HashStream};
+use exonum_crypto::{Hash, HashStream};
 
 mod key;
 mod node;

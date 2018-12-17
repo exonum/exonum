@@ -21,9 +21,10 @@ use smallvec::{smallvec, SmallVec};
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 use super::{
-    super::{BinaryForm, StorageKey},
+    super::{BinaryForm, StorageKey, UniqueHash},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
+use exonum_crypto::{self, Hash, HASH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -35,13 +36,13 @@ pub enum Node<T: BinaryForm> {
 
 #[derive(Clone, PartialEq)]
 pub struct BranchNode {
-    raw: Vec<u8>,
+    raw: [u8; BRANCH_NODE_SIZE],
 }
 
 impl BranchNode {
     pub fn empty() -> Self {
         Self {
-            raw: vec![0; BRANCH_NODE_SIZE],
+            raw: [0_u8; BRANCH_NODE_SIZE],
         }
     }
 
@@ -83,35 +84,25 @@ impl BranchNode {
     }
 }
 
-impl CryptoHash for BranchNode {
-    fn hash(&self) -> Hash {
-        let mut bytes: SmallVec<[u8; 256]> = smallvec![0u8; 132];
-        let mut pos = HASH_SIZE * 2;
-        // Writes hashes to the buffer.
-        bytes[..pos].copy_from_slice(&self.raw[..pos]);
-        pos += self
-            .child_path(ChildKind::Left)
-            .write_compressed(&mut bytes[pos..]);
-        pos += self
-            .child_path(ChildKind::Right)
-            .write_compressed(&mut bytes[pos..]);
-        hash(&bytes[0..pos])
-    }
-}
-
 impl BinaryForm for BranchNode {
     fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
         to.write_all(&self.raw).map_err(failure::Error::from)
     }
 
     fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut raw = Vec::default();
-        from.read_to_end(&mut raw)?;
+        let mut raw = [0u8; BRANCH_NODE_SIZE];
+        from.read_exact(&mut raw)?;
         Ok(Self { raw })
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.raw.len())
+        Some(BRANCH_NODE_SIZE)
+    }
+}
+
+impl UniqueHash for BranchNode {
+    fn hash(&self) -> Hash {
+        exonum_crypto::hash(&self.raw)
     }
 }
 
@@ -127,16 +118,10 @@ impl ::std::fmt::Debug for BranchNode {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use exonum_crypto;
-
-    use super::*;
-    use crate::proof_map_index::key::BitsRange;
-
-    #[test]
-    fn test_branch_node_layout() {
-        let mut branch = BranchNode::empty();
+#[test]
+fn test_branch_node() {
+    use exonum_crypto::hash;
+    let mut branch = BranchNode::empty();
 
         let lh = exonum_crypto::hash(&[1, 2]);
         let rh = exonum_crypto::hash(&[3, 4]);
