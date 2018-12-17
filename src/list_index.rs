@@ -22,7 +22,7 @@ use std::{cell::Cell, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    Fork, Snapshot, StorageKey, StorageValue,
+    BinaryForm, Fork, Snapshot, StorageKey,
 };
 
 /// A list of items where elements are added to the end of the list and are
@@ -31,9 +31,9 @@ use super::{
 /// Access to the elements is obtained using the indices of the list items.
 /// `ListIndex` implements an array list, storing the elements as values and
 /// using `u64` as an index. `ListIndex` requires that elements implement the
-/// [`StorageValue`] trait.
+/// [`BinaryForm`] trait.
 ///
-/// [`StorageValue`]: ../trait.StorageValue.html
+/// [`BinaryForm`]: ../trait.BinaryForm.html
 #[derive(Debug)]
 pub struct ListIndex<T, V> {
     base: BaseIndex<T>,
@@ -57,7 +57,7 @@ pub struct ListIndexIter<'a, V> {
 impl<T, V> ListIndex<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: StorageValue,
+    V: BinaryForm,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -264,7 +264,7 @@ where
 
 impl<'a, V> ListIndex<&'a mut Fork, V>
 where
-    V: StorageValue,
+    V: BinaryForm,
 {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
@@ -445,7 +445,7 @@ where
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: StorageValue,
+    V: BinaryForm,
 {
     type Item = V;
     type IntoIter = ListIndexIter<'a, V>;
@@ -457,7 +457,7 @@ where
 
 impl<'a, V> Iterator for ListIndexIter<'a, V>
 where
-    V: StorageValue,
+    V: BinaryForm,
 {
     type Item = V;
 

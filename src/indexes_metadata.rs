@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, fmt};
+use std::{
+    fmt,
+    io::{Read, Write},
+};
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{self, Error as JsonError};
 
 use exonum_crypto::{self, CryptoHash, Hash};
 
-use crate::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
+use crate::{base_index::BaseIndex, BinaryForm, Fork, Snapshot};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -75,35 +78,39 @@ impl CryptoHash for IndexType {
     }
 }
 
-impl StorageValue for IndexType {
-    fn into_bytes(self) -> Vec<u8> {
-        (self as u8).into_bytes()
+impl BinaryForm for IndexType {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        (*self as u8).encode(to)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        <u8 as StorageValue>::from_bytes(value).into()
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        <u8 as BinaryForm>::decode(from).map(Self::from)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        (*self as u8).size_hint()
     }
 }
 
-impl StorageValue for IndexMetadata {
-    fn into_bytes(self) -> Vec<u8> {
-        vec![self.index_type as u8, if self.is_family { 1 } else { 0 }]
+impl BinaryForm for IndexMetadata {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(&[self.index_type as u8, if self.is_family { 1 } else { 0 }])
+            .map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        let value = value.as_ref();
+    fn size_hint(&self) -> Option<usize> {
+        Some(2)
+    }
+
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut value = Vec::with_capacity(2);
+        from.read_to_end(&mut value)?;
         let index_type = IndexType::from(value[0]);
         let is_family = value[1] != 0;
-        Self {
+        Ok(Self {
             index_type,
             is_family,
-        }
-    }
-}
-
-impl CryptoHash for IndexMetadata {
-    fn hash(&self) -> Hash {
-        self.into_bytes().hash()
+        })
     }
 }
 
@@ -177,20 +184,16 @@ impl StorageMetadata {
     }
 }
 
-impl CryptoHash for StorageMetadata {
-    fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
-        exonum_crypto::hash(&vec_bytes)
-    }
-}
-
-impl StorageValue for StorageMetadata {
-    fn into_bytes(self) -> Vec<u8> {
-        self.try_serialize().unwrap()
+impl BinaryForm for StorageMetadata {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        let buf = self.try_serialize()?;
+        to.write_all(&buf).map_err(failure::Error::from)
     }
 
-    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        Self::try_deserialize(v.as_ref()).unwrap()
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut buf = Vec::new();
+        from.read_to_end(&mut buf)?;
+        Self::try_deserialize(&buf).map_err(failure::Error::from)
     }
 }
 

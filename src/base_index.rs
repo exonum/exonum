@@ -20,9 +20,9 @@
 
 // spell-checker:ignore subprefix
 
-use std::{borrow::Cow, marker::PhantomData};
+use std::marker::PhantomData;
 
-use super::{Fork, Iter, Snapshot, StorageKey, StorageValue};
+use super::{BinaryForm, Fork, Iter, Snapshot, StorageKey};
 use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
@@ -31,11 +31,11 @@ use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 /// of indices.
 ///
 /// `BaseIndex` requires that keys should implement the [`StorageKey`] trait and
-/// values should implement the [`StorageValue`] trait. However, this structure
+/// values should implement the [`BinaryForm`] trait. However, this structure
 /// is not bound to specific types and allows the use of *any* types as keys or values.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
-/// [`StorageValue`]: ../trait.StorageValue.html
+/// [`BinaryForm`]: ../trait.BinaryForm.html
 #[derive(Debug)]
 pub struct BaseIndex<T> {
     name: String,
@@ -163,12 +163,12 @@ where
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
         K: StorageKey + ?Sized,
-        V: StorageValue,
+        V: BinaryForm,
     {
         self.view
             .as_ref()
             .get(&self.name, &self.prefixed_key(key))
-            .map(|v| StorageValue::from_bytes(Cow::Owned(v)))
+            .map(|v| BinaryForm::from_bytes(v).expect("Unable to decode value"))
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -189,7 +189,7 @@ where
     where
         P: StorageKey,
         K: StorageKey,
-        V: StorageValue,
+        V: BinaryForm,
     {
         let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
@@ -210,7 +210,7 @@ where
         P: StorageKey,
         F: StorageKey + ?Sized,
         K: StorageKey,
-        V: StorageValue,
+        V: BinaryForm,
     {
         let iter_prefix = self.prefixed_key(subprefix);
         let iter_from = self.prefixed_key(from);
@@ -242,11 +242,15 @@ impl<'a> BaseIndex<&'a mut Fork> {
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: StorageKey,
-        V: StorageValue,
+        V: BinaryForm,
     {
         self.set_index_type();
         let key = self.prefixed_key(key);
-        self.view.put(&self.name, key, value.into_bytes());
+        self.view.put(
+            &self.name,
+            key,
+            value.to_bytes().expect("Unable to encode value"),
+        );
     }
 
     /// Removes the key of *any* type from the index.
@@ -277,7 +281,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
 impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V>
 where
     K: StorageKey,
-    V: StorageValue,
+    V: BinaryForm,
 {
     type Item = (K::Owned, V);
 
@@ -289,7 +293,7 @@ where
             if k.starts_with(&self.index_id) {
                 return Some((
                     K::read(&k[self.base_prefix_len..]),
-                    V::from_bytes(Cow::Borrowed(v)),
+                    V::from_bytes(v).expect("Unable to decode value"),
                 ));
             }
         }

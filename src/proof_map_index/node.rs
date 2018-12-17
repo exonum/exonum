@@ -14,21 +14,21 @@
 
 #![allow(unsafe_code)]
 
-use std::borrow::Cow;
+use std::io::{Read, Write};
 
 use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 use super::{
-    super::{StorageKey, StorageValue},
+    super::{BinaryForm, StorageKey},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
 #[derive(Debug)]
-pub enum Node<T: StorageValue> {
+pub enum Node<T: BinaryForm> {
     Leaf(T),
     Branch(BranchNode),
 }
@@ -99,15 +99,19 @@ impl CryptoHash for BranchNode {
     }
 }
 
-impl StorageValue for BranchNode {
-    fn into_bytes(self) -> Vec<u8> {
-        self.raw
+impl BinaryForm for BranchNode {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(&self.raw).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self {
-            raw: value.into_owned(),
-        }
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut raw = Vec::default();
+        from.read_to_end(&mut raw)?;
+        Ok(Self { raw })
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.raw.len())
     }
 }
 

@@ -15,7 +15,7 @@
 //! An implementation of a key-value map.
 //!
 //! `MapIndex` requires that keys implement the [`StorageKey`] trait and values implement
-//! the [`StorageValue`] trait. The given section contains methods related to
+//! the [`BinaryForm`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
 use std::{borrow::Borrow, marker::PhantomData};
@@ -23,16 +23,16 @@ use std::{borrow::Borrow, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    Fork, Snapshot, StorageKey, StorageValue,
+    BinaryForm, Fork, Snapshot, StorageKey,
 };
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
 /// `MapIndex` requires that keys implement the [`StorageKey`] trait and values implement
-/// the [`StorageValue`] trait.
+/// the [`BinaryForm`] trait.
 ///
 /// [`StorageKey`]: ../trait.StorageKey.html
-/// [`StorageValue`]: ../trait.StorageValue.html
+/// [`BinaryForm`]: ../trait.BinaryForm.html
 #[derive(Debug)]
 pub struct MapIndex<T, K, V> {
     base: BaseIndex<T>,
@@ -83,7 +83,7 @@ impl<T, K, V> MapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
     K: StorageKey,
-    V: StorageValue,
+    V: BinaryForm,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -347,7 +347,7 @@ where
 impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
 where
     K: StorageKey,
-    V: StorageValue,
+    V: BinaryForm,
 {
     /// Inserts a key-value pair into a map.
     ///
@@ -423,7 +423,7 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
     K: StorageKey,
-    V: StorageValue,
+    V: BinaryForm,
 {
     type Item = (K::Owned, V);
     type IntoIter = MapIndexIter<'a, K, V>;
@@ -436,7 +436,7 @@ where
 impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
 where
     K: StorageKey,
-    V: StorageValue,
+    V: BinaryForm,
 {
     type Item = (K::Owned, V);
 
@@ -458,7 +458,7 @@ where
 
 impl<'a, V> Iterator for MapIndexValues<'a, V>
 where
-    V: StorageValue,
+    V: BinaryForm,
 {
     type Item = V;
 

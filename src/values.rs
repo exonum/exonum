@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A definition of `StorageValue` trait and implementations for common types.
+//! A definition of `BinaryForm` trait and implementations for common types.
 
-use std::{borrow::Cow, mem};
+use std::io::{Read, Write};
 
-use byteorder::{ByteOrder, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
+use failure::{self, format_err};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -26,19 +27,15 @@ use exonum_crypto::{Hash, PublicKey};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`transactions!`]
-/// macros. In case you need to implement it manually, use little-endian encoding
-/// for integer types for compatibility with modern architectures.
-///
 /// # Examples
 ///
-/// Implementing `StorageValue` for the type:
+/// Implementing `BinaryForm` for the type:
 ///
 /// ```
-/// use std::borrow::Cow;
-/// use exonum_merkledb::StorageValue;
-/// use exonum_crypto::{self, CryptoHash, Hash};
-/// use byteorder::{LittleEndian, ByteOrder};
+/// use crate::BinaryForm;
+/// use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+/// use failure;
+/// use std::io::{Read, Write};
 ///
 /// #[derive(Clone)]
 /// struct Data {
@@ -46,248 +43,255 @@ use exonum_crypto::{Hash, PublicKey};
 ///     b: u32,
 /// }
 ///
-/// impl CryptoHash for Data {
-///     fn hash(&self) -> Hash {
-///         let mut buffer = [0; 6];
-///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
-///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
-///         exonum_crypto::hash(&buffer)
-///     }
-/// }
-///
-/// impl StorageValue for Data {
-///     fn into_bytes(self) -> Vec<u8> {
-///         let mut buffer = vec![0; 6];
-///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
-///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
-///         buffer
+/// impl BinaryForm for Data {
+///     fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+///         to.write_i16::<LittleEndian>(self.a)?;
+///         to.write_u32::<LittleEndian>(self.b)?;
+///         Ok(())
 ///     }
 ///
-///     fn from_bytes(value: Cow<[u8]>) -> Self {
-///         let a = LittleEndian::read_i16(&value[0..2]);
-///         let b = LittleEndian::read_u32(&value[2..6]);
-///         Data { a, b }
+///     fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+///         let a = from.read_i16::<LittleEndian>()?;
+///         let b = from.read_u32::<LittleEndian>()?;
+///         Ok(Self { a, b })
 ///     }
 /// }
 /// # fn main() {}
 /// ```
-///
-/// [`encoding_struct!`]: ../macro.encoding_struct.html
-/// [`transactions!`]: ../macro.transactions.html
-pub trait StorageValue: UniqueHash + Sized {
-    /// Serialize a value into a vector of bytes.
-    fn into_bytes(self) -> Vec<u8>;
+pub trait BinaryForm: Sized {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error>;
 
-    /// Deserialize a value from bytes.
-    fn from_bytes(value: Cow<[u8]>) -> Self;
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error>;
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(std::mem::size_of_val(self))
+    }
+
+    fn to_bytes(&self) -> Result<Vec<u8>, failure::Error> {
+        let mut buf = self
+            .size_hint()
+            .map_or_else(Vec::default, Vec::with_capacity);
+        self.encode(&mut buf)?;
+        Ok(buf)
+    }
+
+    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+        Self::decode(&mut bytes.as_ref())
+    }
 }
+
+macro_rules! impl_binary_form_scalar {
+    ($type:tt, $write:ident, $read:ident) => {
+        impl BinaryForm for $type {
+            fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+                use byteorder::WriteBytesExt;
+                to.$write(*self).map_err(failure::Error::from)
+            }
+
+            fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+                use byteorder::ReadBytesExt;
+                from.$read().map_err(failure::Error::from)
+            }
+        }
+
+        impl UniqueHash for $type {}
+    };
+    ($type:tt, $write:ident, $read:ident, $len:expr) => {
+        impl BinaryForm for $type {
+            fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+                use byteorder::{LittleEndian, WriteBytesExt};
+                to.$write::<LittleEndian>(*self)
+                    .map_err(failure::Error::from)
+            }
+
+            fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+                use byteorder::{LittleEndian, ReadBytesExt};
+                from.$read::<LittleEndian>().map_err(failure::Error::from)
+            }
+
+            fn size_hint(&self) -> Option<usize> {
+                Some($len)
+            }
+        }
+
+        impl UniqueHash for $type {}
+    };
+}
+
+// Unsigned scalar types
+impl_binary_form_scalar! { u8,  write_u8,  read_u8 }
+impl_binary_form_scalar! { u16, write_u16, read_u16, 2 }
+impl_binary_form_scalar! { u32, write_u32, read_u32, 4 }
+impl_binary_form_scalar! { u64, write_u64, read_u64, 8 }
+// Signed scalar types
+impl_binary_form_scalar! { i8,  write_i8,  read_i8 }
+impl_binary_form_scalar! { i16, write_i16, read_i16, 2 }
+impl_binary_form_scalar! { i32, write_i32, read_i32, 4 }
+impl_binary_form_scalar! { i64, write_i64, read_i64, 8 }
 
 /// No-op implementation.
-impl StorageValue for () {
-    fn into_bytes(self) -> Vec<u8> {
-        Vec::new()
+impl BinaryForm for () {
+    fn encode(&self, _to: &mut impl Write) -> Result<(), failure::Error> {
+        Ok(())
     }
 
-    fn from_bytes(_value: Cow<[u8]>) -> Self {}
+    fn decode(_from: &mut impl Read) -> Result<Self, failure::Error> {
+        Ok(())
+    }
 }
 
-impl StorageValue for bool {
-    fn into_bytes(self) -> Vec<u8> {
-        vec![self as u8]
+impl UniqueHash for () {}
+
+impl BinaryForm for bool {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        (*self as u8).encode(to)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        assert_eq!(value.len(), 1);
-
-        match value[0] {
-            0 => false,
-            1 => true,
-            value => panic!("Invalid value for bool: {}", value),
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let value = u8::decode(from)?;
+        match value {
+            0 => Ok(false),
+            1 => Ok(true),
+            other => Err(format_err!("Invalid value for bool: {}", other)),
         }
     }
 }
 
-impl StorageValue for u8 {
-    fn into_bytes(self) -> Vec<u8> {
-        vec![self]
+impl UniqueHash for bool {}
+
+impl BinaryForm for Vec<u8> {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(self.as_ref()).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        assert_eq!(value.len(), 1);
-        value[0]
-    }
-}
-
-/// Uses little-endian encoding.
-impl StorageValue for u16 {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; 2];
-        LittleEndian::write_u16(&mut v, self);
-        v
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut buf = Self::new();
+        from.read_to_end(&mut buf)?;
+        Ok(buf)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        LittleEndian::read_u16(value.as_ref())
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len())
     }
 }
 
-/// Uses little-endian encoding.
-impl StorageValue for u32 {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; 4];
-        LittleEndian::write_u32(&mut v, self);
-        v
+impl UniqueHash for Vec<u8> {}
+
+impl BinaryForm for String {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(self.as_ref()).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        LittleEndian::read_u32(value.as_ref())
-    }
-}
-
-/// Uses little-endian encoding.
-impl StorageValue for u64 {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<Self>()];
-        LittleEndian::write_u64(&mut v, self);
-        v
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut buf = Vec::new();
+        from.read_to_end(&mut buf)?;
+        Self::from_utf8(buf).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        LittleEndian::read_u64(value.as_ref())
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.len())
     }
 }
 
-impl StorageValue for i8 {
-    fn into_bytes(self) -> Vec<u8> {
-        vec![self as u8]
+impl UniqueHash for String {}
+
+impl BinaryForm for Hash {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(self.as_ref()).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        assert_eq!(value.len(), 1);
-        value[0] as Self
-    }
-}
-
-/// Uses little-endian encoding.
-impl StorageValue for i16 {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; 2];
-        LittleEndian::write_i16(&mut v, self);
-        v
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut buf = Vec::new();
+        from.read_to_end(&mut buf)?;
+        Self::from_slice(buf.as_ref())
+            .ok_or_else(|| format_err!("Unable to decode value from bytes"))
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        LittleEndian::read_i16(value.as_ref())
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.as_ref().len())
     }
 }
 
-/// Uses little-endian encoding.
-impl StorageValue for i32 {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; 4];
-        LittleEndian::write_i32(&mut v, self);
-        v
+impl BinaryForm for PublicKey {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(self.as_ref()).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        LittleEndian::read_i32(value.as_ref())
-    }
-}
-
-/// Uses little-endian encoding.
-impl StorageValue for i64 {
-    fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; 8];
-        LittleEndian::write_i64(&mut v, self);
-        v
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut buf = Vec::new();
+        from.read_to_end(&mut buf)?;
+        Self::from_slice(buf.as_ref())
+            .ok_or_else(|| format_err!("Unable to decode value from bytes"))
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        LittleEndian::read_i64(value.as_ref())
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.as_ref().len())
     }
 }
 
-impl StorageValue for Hash {
-    fn into_bytes(self) -> Vec<u8> {
-        self.as_ref().to_vec()
+impl UniqueHash for PublicKey {}
+
+// FIXME Maybe we should remove this implementations
+
+impl BinaryForm for DateTime<Utc> {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_i64::<LittleEndian>(self.timestamp())?;
+        to.write_u32::<LittleEndian>(self.timestamp_subsec_nanos())?;
+        Ok(())
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::from_slice(value.as_ref()).unwrap()
-    }
-}
-
-impl StorageValue for PublicKey {
-    fn into_bytes(self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::from_slice(value.as_ref()).unwrap()
-    }
-}
-
-impl StorageValue for Vec<u8> {
-    fn into_bytes(self) -> Vec<u8> {
-        self
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let secs = from.read_i64::<LittleEndian>()?;
+        let nanos = from.read_u32::<LittleEndian>()?;
+        Ok(Self::from_utc(
+            NaiveDateTime::from_timestamp(secs, nanos),
+            Utc,
+        ))
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        value.into_owned()
+    fn size_hint(&self) -> Option<usize> {
+        Some(12)
     }
 }
 
-/// Uses UTF-8 string serialization.
-impl StorageValue for String {
-    fn into_bytes(self) -> Vec<u8> {
-        Self::into_bytes(self)
+impl UniqueHash for DateTime<Utc> {}
+
+impl BinaryForm for Uuid {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(self.as_bytes()).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::from_utf8(value.into_owned()).unwrap()
-    }
-}
-
-/// Uses little-endian encoding.
-impl StorageValue for DateTime<Utc> {
-    fn into_bytes(self) -> Vec<u8> {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        buffer
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+        let mut buf = Vec::new();
+        from.read_to_end(&mut buf)?;
+        Self::from_slice(&buf).map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        let secs = LittleEndian::read_i64(&value[0..8]);
-        let nanos = LittleEndian::read_u32(&value[8..12]);
-        Self::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+    fn size_hint(&self) -> Option<usize> {
+        Some(self.as_bytes().len())
     }
 }
 
-impl StorageValue for Uuid {
-    fn into_bytes(self) -> Vec<u8> {
-        self.as_bytes().to_vec()
+impl UniqueHash for Uuid {}
+
+impl BinaryForm for Decimal {
+    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
+        to.write_all(&self.serialize())
+            .map_err(failure::Error::from)
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::from_slice(&value).unwrap()
-    }
-}
-
-impl StorageValue for Decimal {
-    fn into_bytes(self) -> Vec<u8> {
-        self.serialize().to_vec()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
         let mut buf: [u8; 16] = [0; 16];
-        buf.copy_from_slice(&value);
-        Self::deserialize(buf)
+        from.read_exact(&mut buf)?;
+        Ok(Self::deserialize(buf))
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        Some(16)
     }
 }
+
+impl UniqueHash for Decimal {}
 
 #[cfg(test)]
 mod tests {
@@ -298,88 +302,77 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn u8_round_trip() {
-        let values = [u8::min_value(), 1, u8::max_value()];
-
-        assert_round_trip_eq(&values);
+    fn assert_round_trip_eq<T: BinaryForm + PartialEq + Debug>(values: &[T]) {
+        for value in values {
+            let bytes = value.to_bytes().unwrap();
+            assert_eq!(*value, <T as BinaryForm>::from_bytes(bytes).unwrap());
+        }
     }
 
-    #[test]
-    fn i8_round_trip() {
-        let values = [i8::min_value(), -1, 0, 1, i8::max_value()];
-
-        assert_round_trip_eq(&values);
+    macro_rules! impl_test_binary_form_scalar_unsigned {
+        ($name:ident, $type:tt) => {
+            #[test]
+            fn $name() {
+                let values = [$type::min_value(), 1, $type::max_value()];
+                assert_round_trip_eq(&values);
+            }
+        };
     }
 
-    #[test]
-    fn u16_round_trip() {
-        let values = [u16::min_value(), 1, u16::max_value()];
-
-        assert_round_trip_eq(&values);
+    macro_rules! impl_test_binary_form_scalar_signed {
+        ($name:ident, $type:tt) => {
+            #[test]
+            fn $name() {
+                let values = [$type::min_value(), -1, 0, 1, $type::max_value()];
+                assert_round_trip_eq(&values);
+            }
+        };
     }
 
-    #[test]
-    fn i16_round_trip() {
-        let values = [i16::min_value(), -1, 0, 1, i16::max_value()];
+    // Impl tests for unsigned scalar types
+    impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u8,  u8 }
+    impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u32, u32 }
+    impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u16, u16 }
+    impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u64, u64 }
 
-        assert_round_trip_eq(&values);
-    }
+    // Impl tests for signed scalar types
+    impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i8,  i8 }
+    impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i16, i16 }
+    impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i32, i32 }
+    impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i64, i64 }
 
-    #[test]
-    fn u32_round_trip() {
-        let values = [u32::min_value(), 1, u32::max_value()];
-
-        assert_round_trip_eq(&values);
-    }
-
-    #[test]
-    fn i32_round_trip() {
-        let values = [i32::min_value(), -1, 0, 1, i32::max_value()];
-
-        assert_round_trip_eq(&values);
-    }
+    // Tests for the other types
 
     #[test]
-    fn u64_round_trip() {
-        let values = [u64::min_value(), 1, u64::max_value()];
-
-        assert_round_trip_eq(&values);
-    }
-
-    #[test]
-    fn i64_round_trip() {
-        let values = [i64::min_value(), -1, 0, 1, i64::max_value()];
-
-        assert_round_trip_eq(&values);
-    }
-
-    #[test]
-    fn bool_round_trip() {
-        let values = [false, true];
-
-        assert_round_trip_eq(&values);
-    }
-
-    #[test]
-    fn vec_round_trip() {
+    fn test_binary_form_vec_u8() {
         let values = [vec![], vec![1], vec![1, 2, 3], vec![255; 100]];
-
         assert_round_trip_eq(&values);
     }
 
     #[test]
-    fn string_round_trip() {
+    fn test_binary_form_bool_correct() {
+        let values = [true, false];
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid value for bool: 2")]
+    fn test_binary_form_bool_incorrect() {
+        let bytes = 2.to_bytes().unwrap();
+        <bool as BinaryForm>::from_bytes(&bytes).unwrap();
+    }
+
+    #[test]
+    fn test_binary_form_string() {
         let values: Vec<_> = ["", "e", "2", "hello"]
             .iter()
             .map(|v| v.to_string())
             .collect();
-
         assert_round_trip_eq(&values);
     }
 
     #[test]
-    fn storage_value_for_system_time_round_trip() {
+    fn test_binary_form_datetime() {
         use chrono::TimeZone;
 
         let times = [
@@ -390,23 +383,21 @@ mod tests {
             Utc.timestamp(0, 999_999_999),
             Utc.timestamp(0, 1_500_000_000), // leap second
         ];
-
         assert_round_trip_eq(&times);
     }
 
     #[test]
-    fn uuid_round_trip() {
+    fn test_binary_form_uuid() {
         let values = [
             Uuid::nil(),
             Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
             Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
         ];
-
         assert_round_trip_eq(&values);
     }
 
     #[test]
-    fn decimal_round_trip() {
+    fn test_binary_form_decimal() {
         let values = [
             Decimal::from_str("3.14").unwrap(),
             Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
@@ -414,17 +405,6 @@ mod tests {
             Decimal::from_str("0").unwrap(),
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
-
         assert_round_trip_eq(&values);
-    }
-
-    fn assert_round_trip_eq<T: StorageValue + Clone + PartialEq + Debug>(values: &[T]) {
-        for value in values.into_iter() {
-            let bytes = value.clone().into_bytes();
-            assert_eq!(
-                *value,
-                <T as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
-            );
-        }
     }
 }
