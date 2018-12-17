@@ -794,7 +794,7 @@ mod tests {
                 assert_eq!(key2.bit(j), ChildKind::Left);
             }
         }
-    }    
+    }
 
     #[test]
     fn test_proof_path_suffix() {
