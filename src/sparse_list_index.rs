@@ -17,13 +17,9 @@
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 
-use std::{
-    cell::Cell,
-    io::{Read, Write},
-    marker::PhantomData,
-};
+use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
@@ -40,20 +36,18 @@ struct SparseListSize {
 }
 
 impl BinaryForm for SparseListSize {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_u64::<LittleEndian>(self.capacity)?;
-        to.write_u64::<LittleEndian>(self.length)?;
-        Ok(())
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = vec![0; 16];
+        LittleEndian::write_u64(&mut buf[0..8], self.capacity);
+        LittleEndian::write_u64(&mut buf[8..16], self.length);
+        buf
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let capacity = from.read_u64::<LittleEndian>()?;
-        let length = from.read_u64::<LittleEndian>()?;
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut buf = bytes.as_ref();
+        let capacity = buf.read_u64::<LittleEndian>()?;
+        let length = buf.read_u64::<LittleEndian>()?;
         Ok(Self { capacity, length })
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(16)
     }
 }
 

@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    fmt,
-    io::{Read, Write},
-};
+use std::{borrow::Cow, fmt};
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{self, Error as JsonError};
 
-use exonum_crypto::{self, CryptoHash, Hash};
+use exonum_crypto;
 
-use crate::{base_index::BaseIndex, BinaryForm, Fork, Snapshot};
+use crate::{base_index::BaseIndex, BinaryForm, Fork, Snapshot, UniqueHash};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -72,39 +69,23 @@ impl From<u8> for IndexType {
     }
 }
 
-impl CryptoHash for IndexType {
-    fn hash(&self) -> Hash {
-        (*self as u8).hash()
-    }
-}
-
 impl BinaryForm for IndexType {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        (*self as u8).encode(to)
+    fn to_bytes(&self) -> Vec<u8> {
+        (*self as u8).to_bytes()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        <u8 as BinaryForm>::decode(from).map(Self::from)
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        (*self as u8).size_hint()
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        <u8 as BinaryForm>::from_bytes(bytes).map(Self::from)
     }
 }
 
 impl BinaryForm for IndexMetadata {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(&[self.index_type as u8, if self.is_family { 1 } else { 0 }])
-            .map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        vec![self.index_type as u8, if self.is_family { 1 } else { 0 }]
     }
 
-    fn size_hint(&self) -> Option<usize> {
-        Some(2)
-    }
-
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut value = Vec::with_capacity(2);
-        from.read_to_end(&mut value)?;
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let value = bytes.as_ref();
         let index_type = IndexType::from(value[0]);
         let is_family = value[1] != 0;
         Ok(Self {
@@ -185,17 +166,16 @@ impl StorageMetadata {
 }
 
 impl BinaryForm for StorageMetadata {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        let buf = self.try_serialize()?;
-        to.write_all(&buf).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.try_serialize().unwrap()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut buf = Vec::new();
-        from.read_to_end(&mut buf)?;
-        Self::try_deserialize(&buf).map_err(failure::Error::from)
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::try_deserialize(&bytes).map_err(From::from)
     }
 }
+
+impl UniqueHash for StorageMetadata {}
 
 impl fmt::Display for StorageMetadata {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

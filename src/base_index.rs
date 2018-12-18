@@ -168,7 +168,7 @@ where
         self.view
             .as_ref()
             .get(&self.name, &self.prefixed_key(key))
-            .map(|v| BinaryForm::from_bytes(v).expect("Unable to decode value"))
+            .map(|v| BinaryForm::from_bytes(v.into()).expect("Unable to decode value"))
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -246,11 +246,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     {
         self.set_index_type();
         let key = self.prefixed_key(key);
-        self.view.put(
-            &self.name,
-            key,
-            value.to_bytes().expect("Unable to encode value"),
-        );
+        self.view.put(&self.name, key, value.to_bytes());
     }
 
     /// Removes the key of *any* type from the index.
@@ -293,7 +289,7 @@ where
             if k.starts_with(&self.index_id) {
                 return Some((
                     K::read(&k[self.base_prefix_len..]),
-                    V::from_bytes(v).expect("Unable to decode value"),
+                    V::from_bytes(v.into()).expect("Unable to decode value"),
                 ));
             }
         }

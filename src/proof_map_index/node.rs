@@ -14,7 +14,7 @@
 
 #![allow(unsafe_code)]
 
-use std::io::{Read, Write};
+use std::borrow::Cow;
 
 use smallvec::{smallvec, SmallVec};
 
@@ -36,13 +36,13 @@ pub enum Node<T: BinaryForm> {
 
 #[derive(Clone, PartialEq)]
 pub struct BranchNode {
-    raw: [u8; BRANCH_NODE_SIZE],
+    raw: Vec<u8>,
 }
 
 impl BranchNode {
     pub fn empty() -> Self {
         Self {
-            raw: [0_u8; BRANCH_NODE_SIZE],
+            raw: vec![0_u8; BRANCH_NODE_SIZE],
         }
     }
 
@@ -85,18 +85,14 @@ impl BranchNode {
 }
 
 impl BinaryForm for BranchNode {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(&self.raw).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.raw.clone()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut raw = [0u8; BRANCH_NODE_SIZE];
-        from.read_exact(&mut raw)?;
-        Ok(Self { raw })
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(BRANCH_NODE_SIZE)
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Ok(Self {
+            raw: bytes.into_owned(),
+        })
     }
 }
 

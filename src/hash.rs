@@ -28,7 +28,7 @@ pub trait UniqueHash: BinaryForm {
     ///
     /// Hash must be unique, but not necessary cryptographic.
     fn hash(&self) -> Hash {
-        exonum_crypto::hash(&self.to_bytes().unwrap())
+        exonum_crypto::hash(&self.to_bytes())
     }
 }
 

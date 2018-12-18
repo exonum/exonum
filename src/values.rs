@@ -14,9 +14,9 @@
 
 //! A definition of `BinaryForm` trait and implementations for common types.
 
-use std::io::{Read, Write};
+use std::{borrow::Cow, io::Read};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use failure::{self, format_err};
 use rust_decimal::Decimal;
@@ -32,10 +32,10 @@ use exonum_crypto::{Hash, PublicKey};
 /// Implementing `BinaryForm` for the type:
 ///
 /// ```
-/// use crate::BinaryForm;
-/// use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+/// use std::{borrow::Cow, io::{Read, Write}};
+/// use byteorder::{LittleEndian, ReadBytesExt, ByteOrder};
 /// use failure;
-/// use std::io::{Read, Write};
+/// use exonum_merkledb::BinaryForm;
 ///
 /// #[derive(Clone)]
 /// struct Data {
@@ -44,53 +44,38 @@ use exonum_crypto::{Hash, PublicKey};
 /// }
 ///
 /// impl BinaryForm for Data {
-///     fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-///         to.write_i16::<LittleEndian>(self.a)?;
-///         to.write_u32::<LittleEndian>(self.b)?;
-///         Ok(())
+///     fn to_bytes(&self) -> Vec<u8> {
+///         let mut buf = vec![0_u8; 6];
+///         LittleEndian::write_i16(&mut buf[0..2], self.a);
+///         LittleEndian::write_u32(&mut buf[2..6], self.b);
+///         buf
 ///     }
 ///
-///     fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-///         let a = from.read_i16::<LittleEndian>()?;
-///         let b = from.read_u32::<LittleEndian>()?;
+///     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+///         let mut buf = bytes.as_ref();
+///         let a = buf.read_i16::<LittleEndian>()?;
+///         let b = buf.read_u32::<LittleEndian>()?;
 ///         Ok(Self { a, b })
 ///     }
 /// }
 /// # fn main() {}
 /// ```
 pub trait BinaryForm: Sized {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error>;
+    fn to_bytes(&self) -> Vec<u8>;
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error>;
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(std::mem::size_of_val(self))
-    }
-
-    fn to_bytes(&self) -> Result<Vec<u8>, failure::Error> {
-        let mut buf = self
-            .size_hint()
-            .map_or_else(Vec::default, Vec::with_capacity);
-        self.encode(&mut buf)?;
-        Ok(buf)
-    }
-
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
-        Self::decode(&mut bytes.as_ref())
-    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error>;
 }
 
 macro_rules! impl_binary_form_scalar {
-    ($type:tt, $write:ident, $read:ident) => {
+    ($type:tt, $read:ident) => {
         impl BinaryForm for $type {
-            fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-                use byteorder::WriteBytesExt;
-                to.$write(*self).map_err(failure::Error::from)
+            fn to_bytes(&self) -> Vec<u8> {
+                vec![*self as u8]
             }
 
-            fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+            fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
                 use byteorder::ReadBytesExt;
-                from.$read().map_err(failure::Error::from)
+                bytes.as_ref().$read().map_err(From::from)
             }
         }
 
@@ -98,19 +83,15 @@ macro_rules! impl_binary_form_scalar {
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
         impl BinaryForm for $type {
-            fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-                use byteorder::{LittleEndian, WriteBytesExt};
-                to.$write::<LittleEndian>(*self)
-                    .map_err(failure::Error::from)
+            fn to_bytes(&self) -> Vec<u8> {
+                let mut v = vec![0; $len];
+                LittleEndian::$write(&mut v, *self);
+                v
             }
 
-            fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-                use byteorder::{LittleEndian, ReadBytesExt};
-                from.$read::<LittleEndian>().map_err(failure::Error::from)
-            }
-
-            fn size_hint(&self) -> Option<usize> {
-                Some($len)
+            fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+                use byteorder::ReadBytesExt;
+                bytes.as_ref().$read::<LittleEndian>().map_err(From::from)
             }
         }
 
@@ -119,23 +100,23 @@ macro_rules! impl_binary_form_scalar {
 }
 
 // Unsigned scalar types
-impl_binary_form_scalar! { u8,  write_u8,  read_u8 }
+impl_binary_form_scalar! { u8,  read_u8 }
 impl_binary_form_scalar! { u16, write_u16, read_u16, 2 }
 impl_binary_form_scalar! { u32, write_u32, read_u32, 4 }
 impl_binary_form_scalar! { u64, write_u64, read_u64, 8 }
 // Signed scalar types
-impl_binary_form_scalar! { i8,  write_i8,  read_i8 }
+impl_binary_form_scalar! { i8,  read_i8 }
 impl_binary_form_scalar! { i16, write_i16, read_i16, 2 }
 impl_binary_form_scalar! { i32, write_i32, read_i32, 4 }
 impl_binary_form_scalar! { i64, write_i64, read_i64, 8 }
 
 /// No-op implementation.
 impl BinaryForm for () {
-    fn encode(&self, _to: &mut impl Write) -> Result<(), failure::Error> {
-        Ok(())
+    fn to_bytes(&self) -> Vec<u8> {
+        Vec::default()
     }
 
-    fn decode(_from: &mut impl Read) -> Result<Self, failure::Error> {
+    fn from_bytes(_bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Ok(())
     }
 }
@@ -143,16 +124,18 @@ impl BinaryForm for () {
 impl UniqueHash for () {}
 
 impl BinaryForm for bool {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        (*self as u8).encode(to)
+    fn to_bytes(&self) -> Vec<u8> {
+        vec![*self as u8]
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let value = u8::decode(from)?;
-        match value {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let value = bytes.as_ref();
+        assert_eq!(value.len(), 1);
+
+        match value[0] {
             0 => Ok(false),
             1 => Ok(true),
-            other => Err(format_err!("Invalid value for bool: {}", other)),
+            value => Err(format_err!("Invalid value for bool: {}", value)),
         }
     }
 }
@@ -160,76 +143,46 @@ impl BinaryForm for bool {
 impl UniqueHash for bool {}
 
 impl BinaryForm for Vec<u8> {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(self.as_ref()).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.clone()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut buf = Self::new();
-        from.read_to_end(&mut buf)?;
-        Ok(buf)
-    }
-
-    fn to_bytes(&self) -> Result<Vec<u8>, failure::Error> {
-        Ok(self.clone())
-    }
-
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
-        Ok(bytes.as_ref().to_vec())
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Ok(bytes.into_owned())
     }
 }
 
 impl UniqueHash for Vec<u8> {}
 
 impl BinaryForm for String {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(self.as_ref()).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.as_bytes().to_owned()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut buf = Vec::new();
-        from.read_to_end(&mut buf)?;
-        Self::from_utf8(buf).map_err(failure::Error::from)
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.len())
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::from_utf8(bytes.into_owned()).map_err(From::from)
     }
 }
 
 impl UniqueHash for String {}
 
 impl BinaryForm for Hash {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(self.as_ref()).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.as_ref().to_vec()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut buf = Vec::new();
-        from.read_to_end(&mut buf)?;
-        Self::from_slice(buf.as_ref())
-            .ok_or_else(|| format_err!("Unable to decode value from bytes"))
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.as_ref().len())
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::from_slice(&bytes).ok_or_else(|| format_err!("Unable to decode value"))
     }
 }
 
 impl BinaryForm for PublicKey {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(self.as_ref()).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.as_ref().to_vec()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut buf = Vec::new();
-        from.read_to_end(&mut buf)?;
-        Self::from_slice(buf.as_ref())
-            .ok_or_else(|| format_err!("Unable to decode value from bytes"))
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.as_ref().len())
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::from_slice(&bytes).ok_or_else(|| format_err!("Unable to decode value"))
     }
 }
 
@@ -238,60 +191,51 @@ impl UniqueHash for PublicKey {}
 // FIXME Maybe we should remove this implementations
 
 impl BinaryForm for DateTime<Utc> {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_i64::<LittleEndian>(self.timestamp())?;
-        to.write_u32::<LittleEndian>(self.timestamp_subsec_nanos())?;
-        Ok(())
+    fn to_bytes(&self) -> Vec<u8> {
+        let secs = self.timestamp();
+        let nanos = self.timestamp_subsec_nanos();
+
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_i64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        buffer
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let secs = from.read_i64::<LittleEndian>()?;
-        let nanos = from.read_u32::<LittleEndian>()?;
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut value = bytes.as_ref();
+        let secs = value.read_i64::<LittleEndian>()?;
+        let nanos = value.read_u32::<LittleEndian>()?;
         Ok(Self::from_utc(
             NaiveDateTime::from_timestamp(secs, nanos),
             Utc,
         ))
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(12)
     }
 }
 
 impl UniqueHash for DateTime<Utc> {}
 
 impl BinaryForm for Uuid {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(self.as_bytes()).map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
-        let mut buf = Vec::new();
-        from.read_to_end(&mut buf)?;
-        Self::from_slice(&buf).map_err(failure::Error::from)
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(self.as_bytes().len())
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::from_slice(&bytes).map_err(From::from)
     }
 }
 
 impl UniqueHash for Uuid {}
 
 impl BinaryForm for Decimal {
-    fn encode(&self, to: &mut impl Write) -> Result<(), failure::Error> {
-        to.write_all(&self.serialize())
-            .map_err(failure::Error::from)
+    fn to_bytes(&self) -> Vec<u8> {
+        self.serialize().to_vec()
     }
 
-    fn decode(from: &mut impl Read) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let mut value = bytes.as_ref();
         let mut buf: [u8; 16] = [0; 16];
-        from.read_exact(&mut buf)?;
+        value.read_exact(&mut buf)?;
         Ok(Self::deserialize(buf))
-    }
-
-    fn size_hint(&self) -> Option<usize> {
-        Some(16)
     }
 }
 
@@ -308,8 +252,8 @@ mod tests {
 
     fn assert_round_trip_eq<T: BinaryForm + PartialEq + Debug>(values: &[T]) {
         for value in values {
-            let bytes = value.to_bytes().unwrap();
-            assert_eq!(*value, <T as BinaryForm>::from_bytes(bytes).unwrap());
+            let bytes = value.to_bytes();
+            assert_eq!(*value, <T as BinaryForm>::from_bytes(bytes.into()).unwrap());
         }
     }
 
@@ -362,8 +306,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid value for bool: 2")]
     fn test_binary_form_bool_incorrect() {
-        let bytes = 2.to_bytes().unwrap();
-        <bool as BinaryForm>::from_bytes(&bytes).unwrap();
+        let bytes = 2_u8.to_bytes();
+        <bool as BinaryForm>::from_bytes(bytes.into()).unwrap();
     }
 
     #[test]
