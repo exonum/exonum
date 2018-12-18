@@ -74,7 +74,7 @@ impl BinaryForm for IndexType {
         (*self as u8).to_bytes()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
         <u8 as BinaryForm>::from_bytes(bytes).map(Self::from)
     }
 }
@@ -84,7 +84,7 @@ impl BinaryForm for IndexMetadata {
         vec![self.index_type as u8, if self.is_family { 1 } else { 0 }]
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
         let value = bytes.as_ref();
         let index_type = IndexType::from(value[0]);
         let is_family = value[1] != 0;
@@ -170,8 +170,8 @@ impl BinaryForm for StorageMetadata {
         self.try_serialize().unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        Self::try_deserialize(&bytes).map_err(From::from)
+    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+        Self::try_deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
 

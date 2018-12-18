@@ -89,9 +89,9 @@ impl BinaryForm for BranchNode {
         self.raw.clone()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
         Ok(Self {
-            raw: bytes.into_owned(),
+            raw: bytes.as_ref().to_owned(),
         })
     }
 }
@@ -145,8 +145,8 @@ fn test_branch_node() {
         branch.set_child(ChildKind::Left, &ls, &lh);
         branch.set_child(ChildKind::Right, &rs, &rh);
 
-        let buf = branch.clone().into_bytes();
-        let branch2 = BranchNode::from_bytes(buf.into());
+        let buf = branch.clone().to_bytes();
+        let branch2 = BranchNode::from_bytes(buf).unwrap();
         assert_eq!(branch, branch2);
         assert_eq!(branch.hash(), branch2.hash());
         assert_eq!(
