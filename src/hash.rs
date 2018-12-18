@@ -32,6 +32,7 @@ pub trait UniqueHash: BinaryForm {
     }
 }
 
+/// Just returns the origin hash.
 impl UniqueHash for Hash {
     fn hash(&self) -> Hash {
         *self

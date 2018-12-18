@@ -27,6 +27,9 @@ use exonum_crypto::{Hash, PublicKey};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
+/// If you need to implement `BinaryForm` for your types, use little-endian encoding
+/// for integer types for compatibility with modern architectures.
+///
 /// # Examples
 ///
 /// Implementing `BinaryForm` for the type:
@@ -61,8 +64,9 @@ use exonum_crypto::{Hash, PublicKey};
 /// # fn main() {}
 /// ```
 pub trait BinaryForm: Sized {
+    /// Serializes the given value to the vector of bytes.
     fn to_bytes(&self) -> Vec<u8>;
-
+    /// Deserializes the value from the given bytes array.
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error>;
 }
 
