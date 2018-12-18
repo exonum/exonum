@@ -239,6 +239,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     }
 
     /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: StorageKey,

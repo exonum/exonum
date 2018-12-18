@@ -22,11 +22,10 @@ codecov
 compat
 concat
 cors
-Cors
-CORS
 counterintuitive
 cryptocurrency
 cryptographically
+datetime
 deadlinks
 decodable
 deque
@@ -63,7 +62,6 @@ libssl
 maintainer's
 markdownlint
 memlimit
-TemporaryDB
 mempool
 Merkelized
 Merkle
@@ -145,6 +143,7 @@ supervisord
 symm
 tempdir
 tempfile
+TemporaryDB
 terminfo
 testdata
 testkit
