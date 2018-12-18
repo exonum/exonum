@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use hex::FromHex;
 use rand::{thread_rng, Rng, RngCore};
 use serde::Serialize;
 use serde_derive::Serialize;
 use serde_json::{from_str, to_string};
 
+use std::fmt::Debug;
+
 use self::ListProof::*;
-use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
-use crate::{Database, TemporaryDB};
+use crate::StorageValue;
+use crate::{hash::HashTag, Database, ListProof, ProofListIndex, TemporaryDB};
+use exonum_crypto::Hash;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -303,6 +307,14 @@ fn test_randomly_generate_proofs() {
     }
 }
 
+fn hash_leaf_node(value: &[u8]) -> Hash {
+    HashTag::Leaf.hash_stream().update(value).hash()
+}
+
+fn hash_branch_node(value: &[u8]) -> Hash {
+    HashTag::Node.hash_stream().update(value).hash()
+}
+
 #[test]
 fn test_index_and_proof_roots() {
     let db = TemporaryDB::default();
@@ -434,17 +446,17 @@ fn test_index_and_proof_roots() {
 }
 
 #[test]
-#[should_panic(expected = "the len is 0, but the range end is 1")]
 fn test_proof_illegal_lower_bound() {
     let db = TemporaryDB::default();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    index.get_range_proof(0..1);
+    let proof = index.get_range_proof(0..1);
+
+    assert_proof_of_absence(proof, index.list_hash(), index.len());
     index.push(vec![1]);
 }
 
 #[test]
-#[should_panic(expected = "the len is 8, but the range end is 9")]
 fn test_proof_illegal_bound_empty() {
     let db = TemporaryDB::default();
     let mut fork = db.fork();
@@ -452,7 +464,8 @@ fn test_proof_illegal_bound_empty() {
     for i in 0_u8..8 {
         index.push(vec![i]);
     }
-    index.get_range_proof(8..9);
+    let proof = index.get_range_proof(8..9);
+    assert_proof_of_absence(proof, index.list_hash(), index.len());
 }
 
 #[test]
@@ -528,8 +541,8 @@ fn test_proof_structure() {
 #[test]
 fn test_simple_merkle_root() {
     let db = TemporaryDB::default();
-    let h1 = hash(&[1]);
-    let h2 = hash(&[2]);
+    let h1 = HashTag::hash_list_node(1, hash_leaf_node(&[1]));
+    let h2 = HashTag::hash_list_node(1, hash_leaf_node(&[2]));
 
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
@@ -579,7 +592,7 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 }
 
 mod root_hash_tests {
-    use crate::{Database, ProofListIndex, TemporaryDB};
+    use crate::{hash::HashTag, Database, ProofListIndex, TemporaryDB};
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
@@ -627,7 +640,7 @@ mod root_hash_tests {
 
 #[test]
 fn proof_of_absence_single() {
-    let db = MemoryDB::new();
+    let db = TemporaryDB::new();
     let mut fork = db.fork();
     let mut list = ProofListIndex::new("absence", &mut fork);
 
@@ -643,7 +656,16 @@ fn proof_of_absence_single() {
     let non_existed_index = 6u64;
     let expected_hash = HashTag::hash_list_node(list.len(), root_hash);
     let proof = list.get_proof(non_existed_index);
-    assert!(proof.validate(expected_hash, list.len()).is_ok());
+
+    assert_proof_of_absence(proof, expected_hash, list.len())
+}
+
+fn assert_proof_of_absence<V: StorageValue + Clone + Debug>(
+    proof: ListProof<V>,
+    expected_hash: Hash,
+    len: u64,
+) {
+    assert!(proof.validate(expected_hash, len).is_ok());
 
     match proof {
         ListProof::Absent(proof) => {

@@ -318,7 +318,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex, HashTag};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -393,7 +393,7 @@ where
     /// ```
     pub fn get_range_proof<R: RangeBounds<u64>>(&self, range: R) -> ListProof<V> {
         let from = match range.start_bound() {
-            Bound::Unbounded => 0u64,
+            Bound::Unbounded => 0_u64,
             Bound::Included(from) | Bound::Excluded(from) => *from,
         };
 
