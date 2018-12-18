@@ -16,7 +16,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use rand::{thread_rng, Rng};
 use snow::{
     params::{CipherChoice, DHChoice, HashChoice}, types::{Cipher, Dh, Hash, Random},
-    CryptoResolver, DefaultResolver,
 };
 
 use crypto::{
@@ -26,6 +25,8 @@ use crypto::{
 use sodiumoxide::crypto::{
     aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
+use snow::resolvers::DefaultResolver;
+use snow::resolvers::CryptoResolver;
 
 pub struct SodiumResolver {
     parent: DefaultResolver,
@@ -46,25 +47,25 @@ impl Default for SodiumResolver {
 }
 
 impl CryptoResolver for SodiumResolver {
-    fn resolve_rng(&self) -> Option<Box<dyn Random + Send>> {
+    fn resolve_rng(&self) -> Option<Box<dyn Random>> {
         Some(Box::new(SodiumRandom::default()))
     }
 
-    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh + Send>> {
+    fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
             _ => self.parent.resolve_dh(choice),
         }
     }
 
-    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash + Send>> {
+    fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash>> {
         match *choice {
             HashChoice::SHA256 => Some(Box::new(SodiumSha256::default())),
             _ => self.parent.resolve_hash(choice),
         }
     }
 
-    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher + Send>> {
+    fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher>> {
         match *choice {
             CipherChoice::ChaChaPoly => Some(Box::new(SodiumChaChaPoly::default())),
             _ => self.parent.resolve_cipher(choice),
@@ -138,7 +139,7 @@ impl Dh for SodiumDh25519 {
         &self.privkey.as_ref()
     }
 
-    fn dh(&self, pubkey: &[u8], out: &mut [u8]) {
+    fn dh(&self, pubkey: &[u8], out: &mut [u8]) -> Result<(), ()> {
         assert_ne!(
             self.privkey,
             x25519::SecretKey::zero(),
@@ -152,10 +153,11 @@ impl Dh for SodiumDh25519 {
         // FIXME: `snow` is able to pass incorrect public key, so this is a temporary workaround. (ECR-1726)
         if result.is_err() {
             error!("Can't calculate dh, public key {:?}", &pubkey[..]);
-            return;
+            return Err(());
         }
 
         out[..self.pub_len()].copy_from_slice(&result.unwrap()[..self.pub_len()]);
+        Ok(())
     }
 }
 
@@ -298,7 +300,7 @@ mod tests {
             "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
         ).unwrap();
         let mut output = [0_u8; 32];
-        keypair.dh(&public, &mut output);
+        keypair.dh(&public, &mut output).unwrap();
 
         assert_eq!(
             output,
@@ -321,10 +323,10 @@ mod tests {
 
         // Create shared secrets with public keys of each other.
         let mut our_shared_secret = [0_u8; 32];
-        keypair_a.dh(keypair_b.pubkey(), &mut our_shared_secret);
+        keypair_a.dh(keypair_b.pubkey(), &mut our_shared_secret).unwrap();
 
         let mut remote_shared_secret = [0_u8; 32];
-        keypair_b.dh(keypair_a.pubkey(), &mut remote_shared_secret);
+        keypair_b.dh(keypair_a.pubkey(), &mut remote_shared_secret).unwrap();
 
         // Results are expected to be the same.
         assert_eq!(our_shared_secret, remote_shared_secret);

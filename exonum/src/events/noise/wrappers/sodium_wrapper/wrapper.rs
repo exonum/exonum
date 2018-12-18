@@ -18,7 +18,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use snow::{NoiseBuilder, Session};
+use snow::{Session};
 
 use std::{
     fmt::{self, Error, Formatter}, io,
@@ -26,6 +26,7 @@ use std::{
 
 use super::{handshake::HandshakeParams, resolver::SodiumResolver};
 use events::noise::{error::NoiseError, HEADER_LENGTH, MAX_MESSAGE_LENGTH, TAG_LENGTH};
+use snow::Builder;
 
 pub const HANDSHAKE_HEADER_LENGTH: usize = 1;
 pub const MAX_HANDSHAKE_MESSAGE_LENGTH: usize = 255;
@@ -45,7 +46,7 @@ pub struct NoiseWrapper {
 impl NoiseWrapper {
     pub fn initiator(params: &HandshakeParams) -> Self {
         if let Some(ref remote_key) = params.remote_key {
-            let builder: NoiseBuilder = Self::noise_builder()
+            let builder: Builder = Self::noise_builder()
                 .local_private_key(params.secret_key.as_ref())
                 .remote_public_key(remote_key.as_ref());
             let session = builder
@@ -58,7 +59,7 @@ impl NoiseWrapper {
     }
 
     pub fn responder(params: &HandshakeParams) -> Self {
-        let builder: NoiseBuilder = Self::noise_builder();
+        let builder: Builder = Self::noise_builder();
 
         let session = builder
             .local_private_key(params.secret_key.as_ref())
@@ -170,8 +171,8 @@ impl NoiseWrapper {
         raw_message_len + TAG_LENGTH * ((raw_message_len / MAX_MESSAGE_LENGTH) + 1)
     }
 
-    fn noise_builder<'a>() -> NoiseBuilder<'a> {
-        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
+    fn noise_builder<'a>() -> Builder<'a> {
+        Builder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
     }
 }
 

@@ -17,7 +17,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.9.2", path = "../../exonum" }
+exonum = { version = "0.9.5", path = "../../exonum" }
 failure = "0.1.2"
 serde = "1.0.0"
 serde_derive = "1.0.0"

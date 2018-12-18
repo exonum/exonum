@@ -17,9 +17,8 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-time = "0.9.0"
+exonum-time = "0.9.2"
 ```
-
 Add the time oracle service to the blockchain in the main project file:
 
 ```rust

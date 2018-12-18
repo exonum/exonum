@@ -19,14 +19,18 @@
 use failure;
 
 use std::io;
+use snow::SnowError;
 
-#[derive(Fail, Debug, Clone)]
+#[derive(Fail, Debug)]
 pub enum NoiseError {
     #[fail(display = "Wrong handshake message length {}", _0)]
     WrongMessageLength(usize),
 
     #[fail(display = "{}", _0)]
     Other(String),
+
+    #[fail(display = "Snow error: {}", _0)]
+    Snow(SnowError),
 }
 
 impl From<NoiseError> for io::Error {
@@ -43,5 +47,11 @@ impl From<NoiseError> for io::Error {
 impl From<failure::Error> for NoiseError {
     fn from(e: failure::Error) -> Self {
         NoiseError::Other(format!("{:?}", e))
+    }
+}
+
+impl From<SnowError> for NoiseError {
+    fn from(err: SnowError) -> NoiseError {
+        NoiseError::Snow(err)
     }
 }
