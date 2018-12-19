@@ -388,6 +388,7 @@ where
     ///
     /// let list_proof = index.get_range_proof(1..3);
     ///
+    /// // Range (1..10) doesn't exist in index.
     /// let list_proof_of_absence = index.get_range_proof(1..10);
     ///
     /// ```
@@ -398,7 +399,7 @@ where
         };
 
         let to = match range.end_bound() {
-            Bound::Unbounded => panic!("Unbounded end bound is not valid range bound for proof.",),
+            Bound::Unbounded => self.len(),
             Bound::Included(to) | Bound::Excluded(to) => *to,
         };
 

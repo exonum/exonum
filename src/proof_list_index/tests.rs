@@ -639,25 +639,49 @@ mod root_hash_tests {
 }
 
 #[test]
-fn proof_of_absence_single() {
+fn proof_of_absence() {
     let db = TemporaryDB::new();
     let mut fork = db.fork();
     let mut list = ProofListIndex::new("absence", &mut fork);
 
-    list.push(vec![1]);
-    list.push(vec![2]);
-    list.push(vec![3]);
-    list.push(vec![4]);
-    list.push(vec![5]);
+    for i in 1..=5 {
+        list.push(vec![i]);
+    }
 
     let root_hash =
         Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9").unwrap();
 
-    let non_existed_index = 6u64;
+    let non_existed_index = 6_u64;
     let expected_hash = HashTag::hash_list_node(list.len(), root_hash);
-    let proof = list.get_proof(non_existed_index);
 
-    assert_proof_of_absence(proof, expected_hash, list.len())
+    let proof = list.get_proof(non_existed_index);
+    assert_proof_of_absence(proof, expected_hash, list.len());
+
+    let proof = list.get_range_proof(2..non_existed_index);
+    assert_proof_of_absence(proof, expected_hash, list.len());
+}
+
+#[test]
+fn proof_of_absence_range() {
+    let db = TemporaryDB::new();
+    let mut fork = db.fork();
+    let mut list = ProofListIndex::new("absence", &mut fork);
+
+    for i in 1..=5 {
+        list.push(vec![i]);
+    }
+
+    let root_hash =
+        Hash::from_hex("5ba859b4d1799cb27ece9db8f7a76a50fc713a5d9d22f753eca42172996a88f9").unwrap();
+
+    let non_existed_index = 6_u64;
+    let expected_hash = HashTag::hash_list_node(list.len(), root_hash);
+
+    let proof = list.get_range_proof(2..);
+    assert!(proof.validate(expected_hash, list.len()).is_ok());
+
+    let proof = list.get_range_proof(2..non_existed_index);
+    assert_proof_of_absence(proof, expected_hash, list.len());
 }
 
 fn assert_proof_of_absence<V: StorageValue + Clone + Debug>(
