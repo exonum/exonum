@@ -5,10 +5,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+- Changed `ProofListIndex` hashing rules for leaf nodes and branch nodes according
+  to [certificate transparency](https://tools.ietf.org/html/rfc6962#section-2.1)
+  specification. Leaf nodes hashes with 0x0 prefix, branch nodes with 0x1.
+
 - Changed the hash algorithm of the intermediate nodes in `ProofMapIndex`. (#1)
 
   `ProofPath` now uses compact binary representation in the `BranchNode` hash calculation.
-  
+
   Binary representation is `|bits_len|bytes|`, where:
 
   - **bits_len** - total length of the given `ProofPath` in bits compressed
