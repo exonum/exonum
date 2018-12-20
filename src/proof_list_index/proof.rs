@@ -24,19 +24,31 @@ use exonum_crypto::Hash;
 
 #[derive(Debug, PartialEq, Eq)]
 /// Encapsulates proof of absence for `ProofListIndex`.
+///
+/// Proof of absence for element with specified `index`consists of
+/// `merkle_root` of `ProofListIndex` and `length` of the list.
+///
+/// Element with `index` is absent in the list with provided `length`
+/// and `merkle_root` when two conditions are met:
+/// ```text
+/// 1. list_hash == sha256( HashTag::List || length || merkle_root )
+/// 2. index > length
+/// ```
+///
+/// For range proof this rules applies for whole range.
 pub struct ProofOfAbsence {
-    len: u64,
+    length: u64,
     merkle_root: Hash,
 }
 
 impl ProofOfAbsence {
-    /// New `ProofOfAbsence` for specified list `len` and `merkle_root`.
-    pub fn new(len: u64, merkle_root: Hash) -> Self {
-        Self { len, merkle_root }
+    /// New `ProofOfAbsence` for specified list `length` and `merkle_root`.
+    pub fn new(length: u64, merkle_root: Hash) -> Self {
+        Self { length, merkle_root }
     }
 
-    pub fn len(&self) -> u64 {
-        self.len
+    pub fn length(&self) -> u64 {
+        self.length
     }
 
     pub fn merkle_root(&self) -> Hash {
@@ -103,16 +115,24 @@ where
                 vec.push((key.index(), value));
                 HashTag::hash_leaf(value.clone())
             }
-            ListProof::Absent(ref proof) => HashTag::hash_list_node(proof.len, proof.merkle_root),
+            ListProof::Absent(ref proof) => HashTag::hash_list_node(proof.length, proof.merkle_root),
         };
         Ok(hash)
     }
 
-    /// Verifies the correctness of the proof by the trusted Merkle root hash and the number of
+    /// Verifies the correctness of the proof by the trusted list hash and the number of
     /// elements in the tree.
+    ///
+    /// To validate proof one need to provide `expected_list_hash` calculated as follows:
+    /// ```text
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// ```
+    /// and `length` of the `ProofListIndex`.
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
+    ///
+    /// If proof is the proof of absence then empty vector will be returned.
     pub fn validate(
         &self,
         expected_list_hash: Hash,
@@ -172,7 +192,7 @@ impl<V: Serialize> Serialize for ListProof<V> {
             }
             ListProof::Absent(ref proof) => {
                 state = ser.serialize_struct("Absent", 2)?;
-                state.serialize_field("length", &proof.len)?;
+                state.serialize_field("length", &proof.length)?;
                 state.serialize_field("hash", &proof.merkle_root)?;
             }
         }

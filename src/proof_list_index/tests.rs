@@ -689,11 +689,13 @@ fn assert_proof_of_absence<V: StorageValue + Clone + Debug>(
     expected_hash: Hash,
     len: u64,
 ) {
-    assert!(proof.validate(expected_hash, len).is_ok());
+    let validation_result = proof.validate(expected_hash, len);
+    assert!(validation_result.is_ok());
+    assert!(validation_result.unwrap().is_empty());
 
     match proof {
         ListProof::Absent(proof) => {
-            let actual_hash = HashTag::hash_list_node(proof.len(), proof.merkle_root());
+            let actual_hash = HashTag::hash_list_node(proof.length(), proof.merkle_root());
             assert_eq!(expected_hash, actual_hash);
         }
         _ => {
