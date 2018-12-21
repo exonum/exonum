@@ -432,7 +432,7 @@ impl BinaryKey for ProofPath {
         PROOF_PATH_SIZE
     }
 
-    fn write(&self, buffer: &mut [u8]) {
+    fn write(&self, buffer: &mut [u8]) -> usize {
         buffer.copy_from_slice(&self.bytes);
         // Trims insignificant bits in the last byte.
         if !self.is_leaf() {
@@ -444,6 +444,7 @@ impl BinaryKey for ProofPath {
                 *i = 0
             }
         }
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {

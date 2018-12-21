@@ -95,8 +95,9 @@ impl BinaryKey for ProofListKey {
         8
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        BinaryKey::write(&self.as_db_key(), buffer)
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        BinaryKey::write(&self.as_db_key(), buffer);
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self {

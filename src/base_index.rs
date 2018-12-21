@@ -148,9 +148,9 @@ where
 
     fn prefixed_key<K: BinaryKey + ?Sized>(&self, key: &K) -> Vec<u8> {
         if let Some(ref prefix) = self.index_id {
-            let mut v = vec![0; prefix.len() + key.size()];
-            v[..prefix.len()].copy_from_slice(prefix);
-            key.write(&mut v[prefix.len()..]);
+            let mut v = vec![0; prefix.size() + key.size()];
+            let pos = prefix.write(&mut v);
+            key.write(&mut v[pos..]);
             v
         } else {
             let mut v = vec![0; key.size()];

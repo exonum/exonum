@@ -47,9 +47,10 @@ use exonum_crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SI
 ///         mem::size_of_val(&self.a) + mem::size_of_val(&self.b)
 ///     }
 ///
-///     fn write(&self, buffer: &mut [u8]) {
+///     fn write(&self, buffer: &mut [u8]) -> usize {
 ///         self.a.write(&mut buffer[0..2]);
 ///         self.b.write(&mut buffer[2..6]);
+///         self.size()
 ///     }
 ///
 ///     fn read(buffer: &[u8]) -> Self {
@@ -77,9 +78,9 @@ pub trait BinaryKey: ToOwned {
     /// Serializes the key into the specified buffer of bytes.
     ///
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
-    /// of the serialized key.
+    /// of the serialized key. Returns number of written bytes.
     // TODO: Should be unsafe? (ECR-174)
-    fn write(&self, buffer: &mut [u8]);
+    fn write(&self, buffer: &mut [u8]) -> usize;
 
     /// Deserializes the key from the specified buffer of bytes.
     // TODO: Should be unsafe? (ECR-174)
@@ -92,8 +93,9 @@ impl BinaryKey for () {
         0
     }
 
-    fn write(&self, _buffer: &mut [u8]) {
+    fn write(&self, _buffer: &mut [u8]) -> usize {
         // no-op
+        self.size()
     }
 
     fn read(_buffer: &[u8]) -> Self::Owned {}
@@ -104,8 +106,9 @@ impl BinaryKey for u8 {
         1
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer[0] = *self
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer[0] = *self;
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -120,8 +123,9 @@ impl BinaryKey for i8 {
         1
     }
 
-    fn write(&self, buffer: &mut [u8]) {
+    fn write(&self, buffer: &mut [u8]) -> usize {
         buffer[0] = self.wrapping_add(Self::min_value()) as u8;
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -139,8 +143,9 @@ macro_rules! storage_key_for_ints {
                 $size
             }
 
-            fn write(&self, buffer: &mut [u8]) {
+            fn write(&self, buffer: &mut [u8]) -> usize {
                 BigEndian::$write_method(buffer, *self);
+                self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
@@ -155,8 +160,9 @@ macro_rules! storage_key_for_ints {
                 $size
             }
 
-            fn write(&self, buffer: &mut [u8]) {
+            fn write(&self, buffer: &mut [u8]) -> usize {
                 BigEndian::$write_method(buffer, self.wrapping_add($itype::min_value()) as $utype);
+                self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
@@ -178,8 +184,9 @@ macro_rules! storage_key_for_crypto_types {
                 $size
             }
 
-            fn write(&self, buffer: &mut [u8]) {
-                buffer.copy_from_slice(self.as_ref())
+            fn write(&self, buffer: &mut [u8]) -> usize {
+                buffer[..self.size()].copy_from_slice(self.as_ref());
+                self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
@@ -198,8 +205,9 @@ impl BinaryKey for Vec<u8> {
         self.len()
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self)
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer[..self.size()].copy_from_slice(self);
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self {
@@ -212,8 +220,9 @@ impl BinaryKey for [u8] {
         self.len()
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self)
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer[..self.size()].copy_from_slice(self);
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -227,8 +236,9 @@ impl BinaryKey for String {
         self.len()
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_bytes())
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer[..self.size()].copy_from_slice(self.as_bytes());
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -241,8 +251,9 @@ impl BinaryKey for str {
         self.len()
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_bytes())
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer[..self.size()].copy_from_slice(self.as_bytes());
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -259,11 +270,12 @@ impl BinaryKey for DateTime<Utc> {
         12
     }
 
-    fn write(&self, buffer: &mut [u8]) {
+    fn write(&self, buffer: &mut [u8]) -> usize {
         let secs = self.timestamp();
         let nanos = self.timestamp_subsec_nanos();
         secs.write(&mut buffer[0..8]);
         nanos.write(&mut buffer[8..12]);
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -278,8 +290,9 @@ impl BinaryKey for Uuid {
         16
     }
 
-    fn write(&self, buffer: &mut [u8]) {
+    fn write(&self, buffer: &mut [u8]) -> usize {
         buffer.copy_from_slice(self.as_bytes());
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -292,8 +305,9 @@ impl BinaryKey for Decimal {
         16
     }
 
-    fn write(&self, buffer: &mut [u8]) {
+    fn write(&self, buffer: &mut [u8]) -> usize {
         buffer.copy_from_slice(&self.serialize());
+        self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
@@ -431,8 +445,9 @@ mod tests {
                 4
             }
 
-            fn write(&self, buffer: &mut [u8]) {
+            fn write(&self, buffer: &mut [u8]) -> usize {
                 BigEndian::write_i32(buffer, self.0);
+                self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
