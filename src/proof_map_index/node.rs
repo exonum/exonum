@@ -22,7 +22,7 @@ use failure::{self, ensure};
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 use super::{
-    super::{BinaryForm, StorageKey, UniqueHash},
+    super::{BinaryForm, BinaryKey, UniqueHash},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
 use exonum_crypto::{self, Hash, HASH_SIZE};

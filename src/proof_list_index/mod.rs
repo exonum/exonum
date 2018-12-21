@@ -26,7 +26,7 @@ use self::{key::ProofListKey, proof::ProofOfAbsence};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryForm, Fork, Snapshot, StorageKey, UniqueHash,
+    BinaryForm, Fork, Snapshot, BinaryKey, UniqueHash,
 };
 use crate::hash::HashTag;
 use exonum_crypto::Hash;
@@ -129,7 +129,7 @@ where
     /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
     where
-        I: StorageKey,
+        I: BinaryKey,
         I: ?Sized,
         S: AsRef<str>,
     {

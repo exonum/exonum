@@ -42,10 +42,10 @@
 //! as a [`Patch`]. A patch can be atomically [`merge`]d into a database. Different threads
 //! may call `merge` concurrently.
 //!
-//! # `StorageKey` and `BinaryForm` traits
+//! # `BinaryKey` and `BinaryForm` traits
 //!
 //! If you need to use your own data types as keys or values in the storage, you need to implement
-//! the [`StorageKey`] or [`BinaryForm`] traits respectively. These traits have already been
+//! the [`BinaryKey`] or [`BinaryForm`] traits respectively. These traits have already been
 //! implemented for most standard types.
 //!
 //! # Indices
@@ -88,7 +88,7 @@
 //! [1]: trait.Database.html#tymethod.snapshot
 //! [2]: trait.Database.html#method.fork
 //! [`merge`]: trait.Database.html#tymethod.merge
-//! [`StorageKey`]: trait.StorageKey.html
+//! [`BinaryKey`]: trait.BinaryKey.html
 //! [`BinaryForm`]: trait.BinaryForm.html
 //! [`Entry`]: struct.Entry.html
 //! [`ListIndex`]: list_index/struct.ListIndex.html
@@ -134,7 +134,7 @@ pub use self::{
     hash::{HashTag, UniqueHash},
     indexes_metadata::StorageMetadata,
     key_set_index::KeySetIndex,
-    keys::StorageKey,
+    keys::BinaryKey,
     list_index::ListIndex,
     map_index::MapIndex,
     options::DbOptions,

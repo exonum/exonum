@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::StorageKey;
+use super::super::BinaryKey;
 
 const HEIGHT_SHIFT: u64 = 56;
 const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2u64.pow(56) - 1
@@ -90,16 +90,16 @@ impl ProofListKey {
     }
 }
 
-impl StorageKey for ProofListKey {
+impl BinaryKey for ProofListKey {
     fn size(&self) -> usize {
         8
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        StorageKey::write(&self.as_db_key(), buffer)
+        BinaryKey::write(&self.as_db_key(), buffer)
     }
 
     fn read(buffer: &[u8]) -> Self {
-        Self::from_db_key(<u64 as StorageKey>::read(buffer))
+        Self::from_db_key(<u64 as BinaryKey>::read(buffer))
     }
 }

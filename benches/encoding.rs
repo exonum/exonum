@@ -22,7 +22,7 @@ use rand_xorshift::XorShiftRng;
 use exonum_crypto::{self, CryptoHash, Hash};
 use exonum_merkledb::{
     proof_map_index::{BranchNode, ProofPath},
-    StorageKey, StorageValue,
+    BinaryForm, BinaryKey, UniqueHash,
 };
 
 const CHUNK_SIZE: usize = 64;

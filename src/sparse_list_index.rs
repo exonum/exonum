@@ -24,7 +24,7 @@ use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryForm, Fork, Snapshot, StorageKey,
+    BinaryForm, Fork, Snapshot, BinaryKey,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -171,7 +171,7 @@ where
     /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
     where
-        I: StorageKey,
+        I: BinaryKey,
         I: ?Sized,
         S: AsRef<str>,
     {

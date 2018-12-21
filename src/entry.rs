@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    base_index::BaseIndex, indexes_metadata::IndexType, BinaryForm, Fork, Snapshot, StorageKey,
+    base_index::BaseIndex, indexes_metadata::IndexType, BinaryForm, Fork, Snapshot, BinaryKey,
     UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -88,7 +88,7 @@ where
     /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
     where
-        I: StorageKey,
+        I: BinaryKey,
         I: ?Sized,
         S: AsRef<str>,
     {

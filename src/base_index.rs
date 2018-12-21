@@ -22,7 +22,7 @@
 
 use std::marker::PhantomData;
 
-use super::{BinaryForm, Fork, Iter, Snapshot, StorageKey};
+use super::{BinaryForm, Fork, Iter, Snapshot, BinaryKey};
 use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
@@ -30,11 +30,11 @@ use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 /// This structure is not intended for direct use, rather it is the basis for building other types
 /// of indices.
 ///
-/// `BaseIndex` requires that keys should implement the [`StorageKey`] trait and
+/// `BaseIndex` requires that keys should implement the [`BinaryKey`] trait and
 /// values should implement the [`BinaryForm`] trait. However, this structure
 /// is not bound to specific types and allows the use of *any* types as keys or values.
 ///
-/// [`StorageKey`]: ../trait.StorageKey.html
+/// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryForm`]: ../trait.BinaryForm.html
 #[derive(Debug)]
 pub struct BaseIndex<T> {
@@ -107,7 +107,7 @@ where
     /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new_in_family<S, P>(family_name: S, index_id: &P, index_type: IndexType, view: T) -> Self
     where
-        P: StorageKey,
+        P: BinaryKey,
         P: ?Sized,
         S: AsRef<str>,
     {
@@ -146,7 +146,7 @@ where
         }
     }
 
-    fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
+    fn prefixed_key<K: BinaryKey + ?Sized>(&self, key: &K) -> Vec<u8> {
         if let Some(ref prefix) = self.index_id {
             let mut v = vec![0; prefix.len() + key.size()];
             v[..prefix.len()].copy_from_slice(prefix);
@@ -162,7 +162,7 @@ where
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
-        K: StorageKey + ?Sized,
+        K: BinaryKey + ?Sized,
         V: BinaryForm,
     {
         self.view
@@ -175,7 +175,7 @@ where
     /// *any* type.
     pub fn contains<K>(&self, key: &K) -> bool
     where
-        K: StorageKey + ?Sized,
+        K: BinaryKey + ?Sized,
     {
         self.view
             .as_ref()
@@ -187,8 +187,8 @@ where
     /// for iteration.
     pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
     where
-        P: StorageKey,
-        K: StorageKey,
+        P: BinaryKey,
+        K: BinaryKey,
         V: BinaryForm,
     {
         let iter_prefix = self.prefixed_key(subprefix);
@@ -207,9 +207,9 @@ where
     /// allows specifying a subset of iteration.
     pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
     where
-        P: StorageKey,
-        F: StorageKey + ?Sized,
-        K: StorageKey,
+        P: BinaryKey,
+        F: BinaryKey + ?Sized,
+        K: BinaryKey,
         V: BinaryForm,
     {
         let iter_prefix = self.prefixed_key(subprefix);
@@ -241,7 +241,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
-        K: StorageKey,
+        K: BinaryKey,
         V: BinaryForm,
     {
         self.set_index_type();
@@ -252,7 +252,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// Removes the key of *any* type from the index.
     pub fn remove<K>(&mut self, key: &K)
     where
-        K: StorageKey + ?Sized,
+        K: BinaryKey + ?Sized,
     {
         self.set_index_type();
         let key = self.prefixed_key(key);
@@ -276,7 +276,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
 
 impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V>
 where
-    K: StorageKey,
+    K: BinaryKey,
     V: BinaryForm,
 {
     type Item = (K::Owned, V);
