@@ -160,7 +160,7 @@ impl BinaryForm for Vec<u8> {
     }    
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        Ok(bytes.as_ref().to_owned())
+        Ok(bytes.into_owned())
     }
 }
 
@@ -176,7 +176,7 @@ impl BinaryForm for String {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        Self::from_utf8(bytes.as_ref().to_owned()).map_err(From::from)
+        Self::from_utf8(bytes.into_owned()).map_err(From::from)
     }
 }
 
