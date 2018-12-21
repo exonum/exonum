@@ -168,7 +168,7 @@ where
         self.view
             .as_ref()
             .get(&self.name, &self.prefixed_key(key))
-            .map(|v| BinaryForm::from_bytes(v).expect("Unable to decode value"))
+            .map(|v| BinaryForm::from_bytes(v.into()).expect("Unable to decode value"))
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -289,7 +289,7 @@ where
             if k.starts_with(&self.index_id) {
                 return Some((
                     K::read(&k[self.base_prefix_len..]),
-                    V::from_bytes(v).expect("Unable to decode value"),
+                    V::from_bytes(v.into()).expect("Unable to decode value"),
                 ));
             }
         }

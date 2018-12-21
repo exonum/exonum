@@ -14,6 +14,8 @@
 
 #![allow(unsafe_code)]
 
+use std::borrow::Cow;
+
 use smallvec::{smallvec, SmallVec};
 use failure::{self, ensure};
 
@@ -92,11 +94,11 @@ impl BinaryForm for BranchNode {
         self.raw
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
-        let bytes = bytes.as_ref();
-        ensure!(bytes.len() == BRANCH_NODE_SIZE, "Wrong buffer size");
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let raw = bytes.into_owned();
+        ensure!(raw.len() == BRANCH_NODE_SIZE, "Wrong buffer size");
         Ok(Self {
-            raw: bytes.to_owned(),
+            raw,
         })
     }
 }
@@ -151,7 +153,7 @@ fn test_branch_node() {
         branch.set_child(ChildKind::Right, &rs, &rh);
 
         let buf = branch.clone().to_bytes();
-        let branch2 = BranchNode::from_bytes(buf).unwrap();
+        let branch2 = BranchNode::from_bytes(buf.into()).unwrap();
         assert_eq!(branch, branch2);
         assert_eq!(branch.hash(), branch2.hash());
         assert_eq!(

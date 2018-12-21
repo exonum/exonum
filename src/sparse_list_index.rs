@@ -19,7 +19,7 @@
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 
-use std::{cell::Cell, marker::PhantomData};
+use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
@@ -43,7 +43,7 @@ impl BinaryForm for SparseListSize {
         buf
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut buf = bytes.as_ref();
         let capacity = buf.read_u64::<LittleEndian>()?;
         let length = buf.read_u64::<LittleEndian>()?;

@@ -14,7 +14,7 @@
 
 //! A definition of `BinaryForm` trait and implementations for common types.
 
-use std::{io::Read};
+use std::{borrow::Cow, io::Read};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -54,7 +54,7 @@ use exonum_crypto::{Hash, PublicKey};
 ///         buf
 ///     }
 ///
-///     fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+///     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
 ///         let mut buf = bytes.as_ref();
 ///         let a = buf.read_i16::<LittleEndian>()?;
 ///         let b = buf.read_u32::<LittleEndian>()?;
@@ -71,7 +71,7 @@ pub trait BinaryForm: Sized {
         self.to_bytes()
     }
     /// Deserializes the value from the given bytes array.
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error>;
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error>;
 }
 
 macro_rules! impl_binary_form_scalar {
@@ -81,7 +81,7 @@ macro_rules! impl_binary_form_scalar {
                 vec![*self as u8]
             }
 
-            fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+            fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
                 use byteorder::ReadBytesExt;
                 bytes.as_ref().$read().map_err(From::from)
             }
@@ -97,7 +97,7 @@ macro_rules! impl_binary_form_scalar {
                 v
             }
 
-            fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+            fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
                 use byteorder::ReadBytesExt;
                 bytes.as_ref().$read::<LittleEndian>().map_err(From::from)
             }
@@ -124,7 +124,7 @@ impl BinaryForm for () {
         Vec::default()
     }
 
-    fn from_bytes(_bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(_bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Ok(())
     }
 }
@@ -136,7 +136,7 @@ impl BinaryForm for bool {
         vec![*self as u8]
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let value = bytes.as_ref();
         assert_eq!(value.len(), 1);
 
@@ -159,7 +159,7 @@ impl BinaryForm for Vec<u8> {
         self    
     }    
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Ok(bytes.as_ref().to_owned())
     }
 }
@@ -175,7 +175,7 @@ impl BinaryForm for String {
         Self::into_bytes(self)
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Self::from_utf8(bytes.as_ref().to_owned()).map_err(From::from)
     }
 }
@@ -187,7 +187,7 @@ impl BinaryForm for Hash {
         self.as_ref().to_vec()
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Self::from_slice(bytes.as_ref()).ok_or_else(|| format_err!("Unable to decode value"))
     }
 }
@@ -197,7 +197,7 @@ impl BinaryForm for PublicKey {
         self.as_ref().to_vec()
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Self::from_slice(bytes.as_ref()).ok_or_else(|| format_err!("Unable to decode value"))
     }
 }
@@ -217,7 +217,7 @@ impl BinaryForm for DateTime<Utc> {
         buffer
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut value = bytes.as_ref();
         let secs = value.read_i64::<LittleEndian>()?;
         let nanos = value.read_u32::<LittleEndian>()?;
@@ -235,7 +235,7 @@ impl BinaryForm for Uuid {
         self.as_bytes().to_vec()
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Self::from_slice(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -247,7 +247,7 @@ impl BinaryForm for Decimal {
         self.serialize().to_vec()
     }
 
-    fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut value = bytes.as_ref();
         let mut buf: [u8; 16] = [0; 16];
         value.read_exact(&mut buf)?;
@@ -269,7 +269,7 @@ mod tests {
     fn assert_round_trip_eq<T: BinaryForm + PartialEq + Debug>(values: &[T]) {
         for value in values {
             let bytes = value.to_bytes();
-            assert_eq!(*value, <T as BinaryForm>::from_bytes(bytes).unwrap());
+            assert_eq!(*value, <T as BinaryForm>::from_bytes(bytes.into()).unwrap());
         }
     }
 
@@ -323,7 +323,7 @@ mod tests {
     #[should_panic(expected = "Invalid value for bool: 2")]
     fn test_binary_form_bool_incorrect() {
         let bytes = 2_u8.to_bytes();
-        <bool as BinaryForm>::from_bytes(bytes).unwrap();
+        <bool as BinaryForm>::from_bytes(bytes.into()).unwrap();
     }
 
     #[test]
