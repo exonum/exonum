@@ -88,6 +88,10 @@ impl BinaryForm for BranchNode {
         self.raw.clone()
     }
 
+    fn into_bytes(self) -> Vec<u8> {
+        self.raw
+    }
+
     fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
         let bytes = bytes.as_ref();
         ensure!(bytes.len() == BRANCH_NODE_SIZE, "Wrong buffer size");

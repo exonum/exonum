@@ -246,7 +246,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     {
         self.set_index_type();
         let key = self.prefixed_key(key);
-        self.view.put(&self.name, key, value.to_bytes());
+        self.view.put(&self.name, key, value.into_bytes());
     }
 
     /// Removes the key of *any* type from the index.
