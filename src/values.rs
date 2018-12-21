@@ -66,7 +66,9 @@ use exonum_crypto::{Hash, PublicKey};
 pub trait BinaryValue: Sized {
     /// Serializes the given value to the vector of bytes.
     fn to_bytes(&self) -> Vec<u8>;
-    /// TODO
+    /// Consumes and serializes the given value to the vector of bytes. 
+    /// This method is faster with the wrapped values, 
+    /// thus if you wouldn't use value after serialization use it.
     fn into_bytes(self) -> Vec<u8> {
         self.to_bytes()
     }
