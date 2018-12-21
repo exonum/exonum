@@ -74,8 +74,8 @@ struct CursorData {
     hash: Hash,
 }
 
-impl StorageValue for CursorData {
-    fn into_bytes(self) -> Vec<u8> {
+impl BinaryForm for CursorData {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut buf = vec![0; 40];
         let mut cursor = buf.as_mut_slice();
         cursor.write_u16::<LittleEndian>(self.id).unwrap();
