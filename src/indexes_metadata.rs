@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{self, Error as JsonError};
-
-use exonum_crypto;
 
 use crate::{base_index::BaseIndex, BinaryForm, Fork, Snapshot, UniqueHash};
 

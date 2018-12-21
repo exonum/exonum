@@ -14,8 +14,6 @@
 
 #![allow(unsafe_code)]
 
-use std::borrow::Cow;
-
 use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
