@@ -15,6 +15,7 @@
 #![allow(unsafe_code)]
 
 use smallvec::{smallvec, SmallVec};
+use failure::{self, ensure};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
@@ -88,8 +89,10 @@ impl BinaryForm for BranchNode {
     }
 
     fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, failure::Error> {
+        let bytes = bytes.as_ref();
+        ensure!(bytes.len() == BRANCH_NODE_SIZE, "Wrong buffer size");
         Ok(Self {
-            raw: bytes.as_ref().to_owned(),
+            raw: bytes.to_owned(),
         })
     }
 }
