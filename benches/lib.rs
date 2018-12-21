@@ -14,9 +14,10 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use crate::storage::bench_storage;
+use crate::{encoding::bench_encoding, storage::bench_storage};
 
+mod encoding;
 mod storage;
 
-criterion_group!(benches, bench_storage);
+criterion_group!(benches, bench_storage, bench_encoding);
 criterion_main!(benches);

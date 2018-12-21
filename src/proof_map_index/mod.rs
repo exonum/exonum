@@ -14,6 +14,8 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
+#[doc(hidden)]
+pub use self::node::{BranchNode, Node};
 pub use self::{
     key::{HashedKey, ProofMapKey, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError},
@@ -23,7 +25,6 @@ use std::{fmt, marker::PhantomData};
 
 use self::{
     key::{BitsRange, ChildKind, LEAF_KEY_PREFIX},
-    node::{BranchNode, Node},
     proof::{create_multiproof, create_proof},
 };
 use super::{
