@@ -23,7 +23,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryValue, Fork, Snapshot, BinaryKey,
+    BinaryKey, BinaryValue, Fork, Snapshot,
 };
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.

@@ -16,13 +16,13 @@
 
 use std::borrow::Cow;
 
-use smallvec::{smallvec, SmallVec};
 use failure::{self, ensure};
+use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 use super::{
-    super::{BinaryValue, BinaryKey, UniqueHash},
+    super::{BinaryKey, BinaryValue, UniqueHash},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
 use exonum_crypto::{self, Hash, HASH_SIZE};
@@ -97,9 +97,7 @@ impl BinaryValue for BranchNode {
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let raw = bytes.into_owned();
         ensure!(raw.len() == BRANCH_NODE_SIZE, "Wrong buffer size");
-        Ok(Self {
-            raw,
-        })
+        Ok(Self { raw })
     }
 }
 

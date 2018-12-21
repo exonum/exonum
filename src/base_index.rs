@@ -22,7 +22,7 @@
 
 use std::marker::PhantomData;
 
-use super::{BinaryValue, Fork, Iter, Snapshot, BinaryKey};
+use super::{BinaryKey, BinaryValue, Fork, Iter, Snapshot};
 use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.

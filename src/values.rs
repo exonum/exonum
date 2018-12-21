@@ -156,8 +156,8 @@ impl BinaryValue for Vec<u8> {
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        self    
-    }    
+        self
+    }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Ok(bytes.into_owned())
@@ -269,7 +269,10 @@ mod tests {
     fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
         for value in values {
             let bytes = value.to_bytes();
-            assert_eq!(*value, <T as BinaryValue>::from_bytes(bytes.into()).unwrap());
+            assert_eq!(
+                *value,
+                <T as BinaryValue>::from_bytes(bytes.into()).unwrap()
+            );
         }
     }
 

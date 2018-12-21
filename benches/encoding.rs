@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt::Debug, io::Write, borrow::Cow};
+use std::{borrow::Cow, fmt::Debug, io::Write};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use criterion::{black_box, Bencher, Criterion};
@@ -22,7 +22,7 @@ use rand_xorshift::XorShiftRng;
 use exonum_crypto::{self, CryptoHash, Hash};
 use exonum_merkledb::{
     proof_map_index::{BranchNode, ProofPath},
-    BinaryValue, BinaryKey, UniqueHash,
+    BinaryKey, BinaryValue, UniqueHash,
 };
 
 const CHUNK_SIZE: usize = 64;
@@ -158,7 +158,7 @@ where
         move |b: &mut Bencher| {
             b.iter_with_setup(f, |data| black_box(data.into_bytes()));
         },
-    );    
+    );
     c.bench_function(
         &format!("encoding/{}/from_bytes", name),
         move |b: &mut Bencher| {

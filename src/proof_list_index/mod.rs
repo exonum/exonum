@@ -26,7 +26,7 @@ use self::{key::ProofListKey, proof::ProofOfAbsence};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryValue, Fork, Snapshot, BinaryKey, UniqueHash,
+    BinaryKey, BinaryValue, Fork, Snapshot, UniqueHash,
 };
 use crate::hash::HashTag;
 use exonum_crypto::Hash;

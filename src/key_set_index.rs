@@ -23,7 +23,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    Fork, Snapshot, BinaryKey,
+    BinaryKey, Fork, Snapshot,
 };
 
 /// A set of key items.

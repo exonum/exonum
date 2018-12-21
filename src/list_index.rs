@@ -22,7 +22,7 @@ use std::{cell::Cell, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryValue, Fork, Snapshot, BinaryKey,
+    BinaryKey, BinaryValue, Fork, Snapshot,
 };
 
 /// A list of items where elements are added to the end of the list and are

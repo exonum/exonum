@@ -24,7 +24,7 @@ use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryValue, Fork, Snapshot, BinaryKey,
+    BinaryKey, BinaryValue, Fork, Snapshot,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
