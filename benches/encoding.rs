@@ -19,25 +19,28 @@ use std::{
 };
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use criterion::{Bencher, Criterion, black_box};
+use criterion::{black_box, Bencher, Criterion};
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use exonum_crypto::{self, CryptoHash, Hash};
-use exonum_merkledb::{proof_map_index::BranchNode, StorageValue};
+use exonum_merkledb::{
+    proof_map_index::{BranchNode, ProofPath},
+    StorageKey, StorageValue,
+};
 
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 16] = [100; 16];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct SampleData {
+struct SimpleData {
     id: u16,
     class: i16,
     value: i32,
     hash: Hash,
 }
 
-impl StorageValue for SampleData {
+impl StorageValue for SimpleData {
     fn into_bytes(self) -> Vec<u8> {
         let mut buffer = vec![0; 40];
         LittleEndian::write_u16(&mut buffer[0..2], self.id);
@@ -61,7 +64,7 @@ impl StorageValue for SampleData {
     }
 }
 
-impl CryptoHash for SampleData {
+impl CryptoHash for SimpleData {
     fn hash(&self) -> Hash {
         exonum_crypto::hash(&self.into_bytes())
     }
@@ -113,8 +116,8 @@ fn gen_bytes_data() -> Vec<u8> {
     v
 }
 
-fn gen_sample_data() -> SampleData {
-    SampleData {
+fn gen_sample_data() -> SimpleData {
+    SimpleData {
         id: 1,
         class: -5,
         value: 127,
@@ -172,11 +175,27 @@ where
     );
 }
 
+fn bench_storage_key_concat(b: &mut Bencher) {
+    b.iter_with_setup(
+        || ("prefixed.key", Hash::zero(), ProofPath::new(&Hash::zero())),
+        |(prefix, key, path)| {
+            let mut v = vec![0; prefix.size() + key.size() + path.size()];
+            let mut pos = 0;
+            prefix.write(&mut v[pos..pos + prefix.size()]);
+            pos += prefix.size();
+            key.write(&mut v[pos..pos + key.size()]);
+            pos += key.size();
+            path.write(&mut v[pos..pos + path.size()]);
+            black_box(v);
+        },
+    );
+}
+
 pub fn bench_encoding(c: &mut Criterion) {
     exonum_crypto::init();
-
     bench_binary_value(c, "bytes", gen_bytes_data);
-    bench_binary_value(c, "sample", gen_sample_data);
+    bench_binary_value(c, "simple", gen_sample_data);
     bench_binary_value(c, "cursor", gen_cursor_data);
     bench_binary_value(c, "branch_node", gen_branch_node_data);
+    c.bench_function("encoding/storage_key/concat", bench_storage_key_concat);
 }
