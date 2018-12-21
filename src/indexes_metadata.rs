@@ -17,7 +17,7 @@ use std::{borrow::Cow, fmt};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{self, Error as JsonError};
 
-use crate::{base_index::BaseIndex, BinaryForm, Fork, Snapshot, UniqueHash};
+use crate::{base_index::BaseIndex, BinaryValue, Fork, Snapshot, UniqueHash};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -67,17 +67,17 @@ impl From<u8> for IndexType {
     }
 }
 
-impl BinaryForm for IndexType {
+impl BinaryValue for IndexType {
     fn to_bytes(&self) -> Vec<u8> {
         (*self as u8).to_bytes()
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        <u8 as BinaryForm>::from_bytes(bytes).map(Self::from)
+        <u8 as BinaryValue>::from_bytes(bytes).map(Self::from)
     }
 }
 
-impl BinaryForm for IndexMetadata {
+impl BinaryValue for IndexMetadata {
     fn to_bytes(&self) -> Vec<u8> {
         vec![self.index_type as u8, if self.is_family { 1 } else { 0 }]
     }
@@ -163,7 +163,7 @@ impl StorageMetadata {
     }
 }
 
-impl BinaryForm for StorageMetadata {
+impl BinaryValue for StorageMetadata {
     fn to_bytes(&self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }

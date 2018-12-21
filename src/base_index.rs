@@ -22,7 +22,7 @@
 
 use std::marker::PhantomData;
 
-use super::{BinaryForm, Fork, Iter, Snapshot, BinaryKey};
+use super::{BinaryValue, Fork, Iter, Snapshot, BinaryKey};
 use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
@@ -31,11 +31,11 @@ use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 /// of indices.
 ///
 /// `BaseIndex` requires that keys should implement the [`BinaryKey`] trait and
-/// values should implement the [`BinaryForm`] trait. However, this structure
+/// values should implement the [`BinaryValue`] trait. However, this structure
 /// is not bound to specific types and allows the use of *any* types as keys or values.
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryForm`]: ../trait.BinaryForm.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct BaseIndex<T> {
     name: String,
@@ -163,12 +163,12 @@ where
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
         K: BinaryKey + ?Sized,
-        V: BinaryForm,
+        V: BinaryValue,
     {
         self.view
             .as_ref()
             .get(&self.name, &self.prefixed_key(key))
-            .map(|v| BinaryForm::from_bytes(v.into()).expect("Unable to decode value"))
+            .map(|v| BinaryValue::from_bytes(v.into()).expect("Unable to decode value"))
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -189,7 +189,7 @@ where
     where
         P: BinaryKey,
         K: BinaryKey,
-        V: BinaryForm,
+        V: BinaryValue,
     {
         let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
@@ -210,7 +210,7 @@ where
         P: BinaryKey,
         F: BinaryKey + ?Sized,
         K: BinaryKey,
-        V: BinaryForm,
+        V: BinaryValue,
     {
         let iter_prefix = self.prefixed_key(subprefix);
         let iter_from = self.prefixed_key(from);
@@ -242,7 +242,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: BinaryKey,
-        V: BinaryForm,
+        V: BinaryValue,
     {
         self.set_index_type();
         let key = self.prefixed_key(key);
@@ -277,7 +277,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
 impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V>
 where
     K: BinaryKey,
-    V: BinaryForm,
+    V: BinaryValue,
 {
     type Item = (K::Owned, V);
 

@@ -42,10 +42,10 @@
 //! as a [`Patch`]. A patch can be atomically [`merge`]d into a database. Different threads
 //! may call `merge` concurrently.
 //!
-//! # `BinaryKey` and `BinaryForm` traits
+//! # `BinaryKey` and `BinaryValue` traits
 //!
 //! If you need to use your own data types as keys or values in the storage, you need to implement
-//! the [`BinaryKey`] or [`BinaryForm`] traits respectively. These traits have already been
+//! the [`BinaryKey`] or [`BinaryValue`] traits respectively. These traits have already been
 //! implemented for most standard types.
 //!
 //! # Indices
@@ -89,7 +89,7 @@
 //! [2]: trait.Database.html#method.fork
 //! [`merge`]: trait.Database.html#tymethod.merge
 //! [`BinaryKey`]: trait.BinaryKey.html
-//! [`BinaryForm`]: trait.BinaryForm.html
+//! [`BinaryValue`]: trait.BinaryValue.html
 //! [`Entry`]: struct.Entry.html
 //! [`ListIndex`]: list_index/struct.ListIndex.html
 //! [`SparseListIndex`]: sparse_list_index/struct.SparseListIndex.html
@@ -141,7 +141,7 @@ pub use self::{
     proof_list_index::{ListProof, ProofListIndex},
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
-    values::BinaryForm,
+    values::BinaryValue,
 };
 
 /// A specialized `Result` type for I/O operations with storage.

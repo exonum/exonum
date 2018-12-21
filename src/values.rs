@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A definition of `BinaryForm` trait and implementations for common types.
+//! A definition of `BinaryValue` trait and implementations for common types.
 
 use std::{borrow::Cow, io::Read};
 
@@ -27,18 +27,18 @@ use exonum_crypto::{Hash, PublicKey};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// If you need to implement `BinaryForm` for your types, use little-endian encoding
+/// If you need to implement `BinaryValue` for your types, use little-endian encoding
 /// for integer types for compatibility with modern architectures.
 ///
 /// # Examples
 ///
-/// Implementing `BinaryForm` for the type:
+/// Implementing `BinaryValue` for the type:
 ///
 /// ```
 /// use std::{borrow::Cow, io::{Read, Write}};
 /// use byteorder::{LittleEndian, ReadBytesExt, ByteOrder};
 /// use failure;
-/// use exonum_merkledb::BinaryForm;
+/// use exonum_merkledb::BinaryValue;
 ///
 /// #[derive(Clone)]
 /// struct Data {
@@ -46,7 +46,7 @@ use exonum_crypto::{Hash, PublicKey};
 ///     b: u32,
 /// }
 ///
-/// impl BinaryForm for Data {
+/// impl BinaryValue for Data {
 ///     fn to_bytes(&self) -> Vec<u8> {
 ///         let mut buf = vec![0_u8; 6];
 ///         LittleEndian::write_i16(&mut buf[0..2], self.a);
@@ -63,7 +63,7 @@ use exonum_crypto::{Hash, PublicKey};
 /// }
 /// # fn main() {}
 /// ```
-pub trait BinaryForm: Sized {
+pub trait BinaryValue: Sized {
     /// Serializes the given value to the vector of bytes.
     fn to_bytes(&self) -> Vec<u8>;
     /// TODO
@@ -76,7 +76,7 @@ pub trait BinaryForm: Sized {
 
 macro_rules! impl_binary_form_scalar {
     ($type:tt, $read:ident) => {
-        impl BinaryForm for $type {
+        impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
                 vec![*self as u8]
             }
@@ -90,7 +90,7 @@ macro_rules! impl_binary_form_scalar {
         impl UniqueHash for $type {}
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
-        impl BinaryForm for $type {
+        impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
                 let mut v = vec![0; $len];
                 LittleEndian::$write(&mut v, *self);
@@ -119,7 +119,7 @@ impl_binary_form_scalar! { i32, write_i32, read_i32, 4 }
 impl_binary_form_scalar! { i64, write_i64, read_i64, 8 }
 
 /// No-op implementation.
-impl BinaryForm for () {
+impl BinaryValue for () {
     fn to_bytes(&self) -> Vec<u8> {
         Vec::default()
     }
@@ -131,7 +131,7 @@ impl BinaryForm for () {
 
 impl UniqueHash for () {}
 
-impl BinaryForm for bool {
+impl BinaryValue for bool {
     fn to_bytes(&self) -> Vec<u8> {
         vec![*self as u8]
     }
@@ -150,7 +150,7 @@ impl BinaryForm for bool {
 
 impl UniqueHash for bool {}
 
-impl BinaryForm for Vec<u8> {
+impl BinaryValue for Vec<u8> {
     fn to_bytes(&self) -> Vec<u8> {
         self.clone()
     }
@@ -166,7 +166,7 @@ impl BinaryForm for Vec<u8> {
 
 impl UniqueHash for Vec<u8> {}
 
-impl BinaryForm for String {
+impl BinaryValue for String {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_bytes().to_owned()
     }
@@ -182,7 +182,7 @@ impl BinaryForm for String {
 
 impl UniqueHash for String {}
 
-impl BinaryForm for Hash {
+impl BinaryValue for Hash {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_ref().to_vec()
     }
@@ -192,7 +192,7 @@ impl BinaryForm for Hash {
     }
 }
 
-impl BinaryForm for PublicKey {
+impl BinaryValue for PublicKey {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_ref().to_vec()
     }
@@ -206,7 +206,7 @@ impl UniqueHash for PublicKey {}
 
 // FIXME Maybe we should remove this implementations
 
-impl BinaryForm for DateTime<Utc> {
+impl BinaryValue for DateTime<Utc> {
     fn to_bytes(&self) -> Vec<u8> {
         let secs = self.timestamp();
         let nanos = self.timestamp_subsec_nanos();
@@ -230,7 +230,7 @@ impl BinaryForm for DateTime<Utc> {
 
 impl UniqueHash for DateTime<Utc> {}
 
-impl BinaryForm for Uuid {
+impl BinaryValue for Uuid {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
@@ -242,7 +242,7 @@ impl BinaryForm for Uuid {
 
 impl UniqueHash for Uuid {}
 
-impl BinaryForm for Decimal {
+impl BinaryValue for Decimal {
     fn to_bytes(&self) -> Vec<u8> {
         self.serialize().to_vec()
     }
@@ -266,10 +266,10 @@ mod tests {
 
     use super::*;
 
-    fn assert_round_trip_eq<T: BinaryForm + PartialEq + Debug>(values: &[T]) {
+    fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
         for value in values {
             let bytes = value.to_bytes();
-            assert_eq!(*value, <T as BinaryForm>::from_bytes(bytes.into()).unwrap());
+            assert_eq!(*value, <T as BinaryValue>::from_bytes(bytes.into()).unwrap());
         }
     }
 
@@ -323,7 +323,7 @@ mod tests {
     #[should_panic(expected = "Invalid value for bool: 2")]
     fn test_binary_form_bool_incorrect() {
         let bytes = 2_u8.to_bytes();
-        <bool as BinaryForm>::from_bytes(bytes.into()).unwrap();
+        <bool as BinaryValue>::from_bytes(bytes.into()).unwrap();
     }
 
     #[test]

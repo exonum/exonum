@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    base_index::BaseIndex, indexes_metadata::IndexType, BinaryForm, Fork, Snapshot, BinaryKey,
+    base_index::BaseIndex, indexes_metadata::IndexType, BinaryValue, Fork, Snapshot, BinaryKey,
     UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -25,9 +25,9 @@ use exonum_crypto::Hash;
 /// An index that may only contain one element.
 ///
 /// You can add an element to this index and check whether it exists. A value
-/// should implement [`BinaryForm`] trait.
+/// should implement [`BinaryValue`] trait.
 ///
-/// [`BinaryForm`]: trait.BinaryForm.html
+/// [`BinaryValue`]: trait.BinaryValue.html
 #[derive(Debug)]
 pub struct Entry<T, V> {
     base: BaseIndex<T>,
@@ -37,7 +37,7 @@ pub struct Entry<T, V> {
 impl<T, V> Entry<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -166,7 +166,7 @@ where
 
 impl<'a, V> Entry<&'a mut Fork, V>
 where
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     /// Changes a value of the entry.
     ///

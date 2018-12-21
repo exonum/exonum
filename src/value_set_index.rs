@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of a set of items that utilize the `BinaryForm` trait.
+//! An implementation of a set of items that utilize the `BinaryValue` trait.
 //!
 //! `ValueSetIndex` implements a set, storing an element as a value and using
 //! its hash as a key. The given section contains methods related to `ValueSetIndex`
@@ -23,16 +23,16 @@ use std::marker::PhantomData;
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryForm, Fork, Snapshot, BinaryKey, UniqueHash,
+    BinaryValue, Fork, Snapshot, BinaryKey, UniqueHash,
 };
 use exonum_crypto::Hash;
 
 /// A set of value items.
 ///
 /// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
-/// `ValueSetIndex` requires that elements should implement the [`BinaryForm`] trait.
+/// `ValueSetIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryForm`]: ../trait.BinaryForm.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T, V> {
     base: BaseIndex<T>,
@@ -68,7 +68,7 @@ pub struct ValueSetIndexHashes<'a> {
 impl<T, V> ValueSetIndex<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -272,7 +272,7 @@ where
 
 impl<'a, V> ValueSetIndex<&'a mut Fork, V>
 where
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     /// Adds a value to the set.
     ///
@@ -370,7 +370,7 @@ where
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     type Item = (Hash, V);
     type IntoIter = ValueSetIndexIter<'a, V>;
@@ -382,7 +382,7 @@ where
 
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
 where
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     type Item = (Hash, V);
 

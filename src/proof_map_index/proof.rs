@@ -22,7 +22,7 @@ use super::{
     key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crate::{BinaryForm, UniqueHash};
+use crate::{BinaryValue, UniqueHash};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -200,7 +200,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// to obtain information about the proof.
 ///
 /// ```
-/// # use exonum_merkledb::{Database, TemporaryDB, BinaryForm, MapProof, ProofMapIndex};
+/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex};
 /// # use exonum_crypto::hash;
 /// let mut fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
@@ -231,7 +231,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// ```
 /// # use serde_json::{self, json};
-/// # use exonum_merkledb::{Database, TemporaryDB, BinaryForm, MapProof, ProofMapIndex};
+/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex};
 /// # use exonum_merkledb::proof_map_index::ProofPath;
 /// # use exonum_crypto::{hash, CryptoHash};
 /// # fn main() {
@@ -475,7 +475,7 @@ impl<K, V> MapProof<K, V> {
 impl<K, V> MapProof<K, V>
 where
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;
@@ -630,7 +630,7 @@ pub fn create_proof<K, V, F>(
 ) -> MapProof<K, V>
 where
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
     F: Fn(&ProofPath) -> Node<V>,
 {
     fn combine(
@@ -766,7 +766,7 @@ fn process_key<K, V, F>(
     lookup: &F,
 ) -> MapProofBuilder<K, V>
 where
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
     F: Fn(&ProofPath) -> Node<V>,
 {
     // `unwrap()` is safe: there is at least 1 element in the contour by design
@@ -837,7 +837,7 @@ pub fn create_multiproof<K, V, KI, F>(
 ) -> MapProof<K, V>
 where
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
     KI: IntoIterator<Item = K>,
     F: Fn(&ProofPath) -> Node<V>,
 {

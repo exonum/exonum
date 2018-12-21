@@ -30,7 +30,7 @@ use self::{
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryForm, Fork, Snapshot, BinaryKey, UniqueHash,
+    BinaryValue, Fork, Snapshot, BinaryKey, UniqueHash,
 };
 use exonum_crypto::{Hash, HashStream};
 
@@ -45,13 +45,13 @@ mod tests;
 ///
 /// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
 /// `ProofMapIndex` requires that keys implement the [`ProofMapKey`] trait and
-/// values implement the [`BinaryForm`] trait.
+/// values implement the [`BinaryValue`] trait.
 ///
 /// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
 /// distribution.** Usually, [`Hash`] and [`PublicKey`] are used as types of proof map keys.
 ///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
-/// [`BinaryForm`]: ../trait.BinaryForm.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`Hash`]: ../../../exonum_crypto/struct.Hash.html
 /// [`PublicKey`]: ../../../exonum_crypto/struct.PublicKey.html
 pub struct ProofMapIndex<T, K, V> {
@@ -112,7 +112,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -490,7 +490,7 @@ where
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 where
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     fn insert_leaf(&mut self, key: &ProofPath, value: V) -> Hash {
         debug_assert!(key.is_leaf());
@@ -768,7 +768,7 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     type Item = (K::Output, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
@@ -781,7 +781,7 @@ where
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     type Item = (K::Output, V);
 
@@ -805,7 +805,7 @@ where
 
 impl<'a, V> Iterator for ProofMapIndexValues<'a, V>
 where
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     type Item = V;
 
@@ -818,10 +818,10 @@ impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
     K: ProofMapKey,
-    V: BinaryForm + UniqueHash + fmt::Debug,
+    V: BinaryValue + UniqueHash + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct Entry<'a, T: 'a, K: 'a, V: 'a + BinaryForm> {
+        struct Entry<'a, T: 'a, K: 'a, V: 'a + BinaryValue> {
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
             hash: Hash,
@@ -832,7 +832,7 @@ where
         where
             T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
-            V: BinaryForm + UniqueHash,
+            V: BinaryValue + UniqueHash,
         {
             fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
                 Entry {
@@ -856,7 +856,7 @@ where
         where
             T: AsRef<dyn Snapshot>,
             K: ProofMapKey,
-            V: BinaryForm + UniqueHash + fmt::Debug,
+            V: BinaryValue + UniqueHash + fmt::Debug,
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self.node {

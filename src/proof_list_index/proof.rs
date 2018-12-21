@@ -16,7 +16,7 @@ use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serializ
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use super::{
-    super::{BinaryForm, UniqueHash},
+    super::{BinaryValue, UniqueHash},
     hash_one, hash_pair,
     key::ProofListKey,
 };
@@ -87,7 +87,7 @@ pub enum ListProofError {
 
 impl<V> ListProof<V>
 where
-    V: BinaryForm + UniqueHash,
+    V: BinaryValue + UniqueHash,
 {
     fn collect<'a>(
         &'a self,

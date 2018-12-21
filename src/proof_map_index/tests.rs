@@ -32,7 +32,7 @@ use super::{
     proof::MapProofBuilder,
     HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
-use crate::{BinaryForm, Database, Fork, TemporaryDB, UniqueHash};
+use crate::{BinaryValue, Database, Fork, TemporaryDB, UniqueHash};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -345,7 +345,7 @@ fn check_map_proof<K, V>(
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
     K: ProofMapKey + PartialEq + Debug + Serialize + DeserializeOwned,
-    V: BinaryForm + UniqueHash + PartialEq + Debug + Serialize + DeserializeOwned,
+    V: BinaryValue + UniqueHash + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
     let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
@@ -382,7 +382,7 @@ fn check_map_multiproof<K, V>(
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
     K: ProofMapKey + Clone + PartialEq + Debug,
-    V: BinaryForm + UniqueHash + PartialEq + Debug,
+    V: BinaryValue + UniqueHash + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -436,7 +436,7 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 fn check_proofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
     K: ProofMapKey + Copy + PartialEq + Debug + Serialize + DeserializeOwned,
-    V: BinaryForm + UniqueHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
+    V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
@@ -470,7 +470,7 @@ where
 fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
     K: ProofMapKey + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
-    V: BinaryForm + UniqueHash + Clone + PartialEq + Debug + Serialize,
+    V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize,
 {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);

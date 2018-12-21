@@ -24,7 +24,7 @@ use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 use super::{
     base_index::{BaseIndex, BaseIndexIter},
     indexes_metadata::IndexType,
-    BinaryForm, Fork, Snapshot, BinaryKey,
+    BinaryValue, Fork, Snapshot, BinaryKey,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -35,7 +35,7 @@ struct SparseListSize {
     length: u64,
 }
 
-impl BinaryForm for SparseListSize {
+impl BinaryValue for SparseListSize {
     fn to_bytes(&self) -> Vec<u8> {
         let mut buf = vec![0; 16];
         LittleEndian::write_u64(&mut buf[0..8], self.capacity);
@@ -65,9 +65,9 @@ impl BinaryForm for SparseListSize {
 ///
 /// `SparseListIndex` implements an array list, storing an element as a value and using `u64`
 /// as an index.
-/// `SparseListIndex` requires that elements should implement the [`BinaryForm`] trait.
+/// `SparseListIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryForm`]: ../trait.BinaryForm.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
 pub struct SparseListIndex<T, V> {
@@ -115,7 +115,7 @@ pub struct SparseListIndexValues<'a, V> {
 impl<T, V> SparseListIndex<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: BinaryForm,
+    V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -382,7 +382,7 @@ where
 
 impl<'a, V> SparseListIndex<&'a mut Fork, V>
 where
-    V: BinaryForm,
+    V: BinaryValue,
 {
     fn set_size(&mut self, size: SparseListSize) {
         self.base.put(&(), size);
@@ -576,7 +576,7 @@ where
 impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
     T: AsRef<dyn Snapshot>,
-    V: BinaryForm,
+    V: BinaryValue,
 {
     type Item = (u64, V);
     type IntoIter = SparseListIndexIter<'a, V>;
@@ -588,7 +588,7 @@ where
 
 impl<'a, V> Iterator for SparseListIndexIter<'a, V>
 where
-    V: BinaryForm,
+    V: BinaryValue,
 {
     type Item = (u64, V);
 
@@ -607,7 +607,7 @@ impl<'a> Iterator for SparseListIndexKeys<'a> {
 
 impl<'a, V> Iterator for SparseListIndexValues<'a, V>
 where
-    V: BinaryForm,
+    V: BinaryValue,
 {
     type Item = V;
 
