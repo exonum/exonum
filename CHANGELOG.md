@@ -6,8 +6,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 - Changed `ProofListIndex` hashing rules for leaf nodes and branch nodes according
-  to [certificate transparency](https://tools.ietf.org/html/rfc6962#section-2.1)
-  specification. Leaf nodes hashes with 0x0 prefix, branch nodes with 0x1.
+  to the [certificate transparency](https://tools.ietf.org/html/rfc6962#section-2.1)
+  specification. Leaf nodes contain hashes with 0x00 prefix, branch nodes - with
+  0x01.
 
 - Changed the hash algorithm of the intermediate nodes in `ProofMapIndex`. (#1)
 

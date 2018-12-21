@@ -22,27 +22,29 @@ use exonum_crypto::{CryptoHash, Hash, HashStream};
 #[derive(Copy, Clone, Debug)]
 /// `MerkleDB` hash prefixes.
 pub enum HashTag {
-    /// Hash prefix of the leaf node of a merkle tree.
+    /// Hash prefix of a leaf node of the merkle tree.
     Leaf = 0,
-    /// Hash prefix of the branch node of a merkle tree.
+    /// Hash prefix of a branch node of the merkle tree.
     Node = 1,
     /// Hash prefix of the list object.
     ListNode = 2,
 }
 
-/// Calculate hash value with specified prefix.
+/// Calculate hash value with the specified prefix.
 ///
-/// Different hashes for leaf and branch nodes are used to secure merkle tree from pre-image attack.
-/// More information [here][1].
+/// Different hashes for leaf and branch nodes are used to secure merkle tree from
+/// the pre-image attack.
+///
+/// See more information [here][1].
 ///
 /// [1]: https://tools.ietf.org/html/rfc6962#section-2.1
 impl HashTag {
-    ///`HashStream` object with corresponding hash prefix.
+    ///`HashStream` object with the corresponding hash prefix.
     pub(crate) fn hash_stream(self) -> HashStream {
         HashStream::new().update(&[self as u8])
     }
 
-    /// Convenience method to obtain hashed value of merkle tree node.
+    /// Convenience method to obtain hashed value of the merkle tree node.
     pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
         HashTag::Node
             .hash_stream()
@@ -51,12 +53,12 @@ impl HashTag {
             .hash()
     }
 
-    /// Convenience method to obtain hashed value of merkle tree node with one child.
+    /// Convenience method to obtain a hashed value of the merkle tree node with one child.
     pub fn hash_single_node(hash: &Hash) -> Hash {
         HashTag::Node.hash_stream().update(hash.as_ref()).hash()
     }
 
-    /// Convenience method to obtain hashed value of merkle tree leaf.
+    /// Convenience method to obtain a hashed value of the merkle tree leaf.
     pub fn hash_leaf<V: StorageValue>(value: V) -> Hash {
         HashTag::Leaf
             .hash_stream()
@@ -90,13 +92,13 @@ impl HashTag {
         Hash::from_hex("c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9").unwrap()
     }
 
-    /// Computes list hash for a given list of hashes.
+    /// Computes a list hash for the given list of hashes.
     pub fn hash_list(hashes: &[Hash]) -> Hash {
         Self::hash_list_node(hashes.len() as u64, root_hash(hashes))
     }
 }
 
-/// Computes Merkle root hash for a given list of hashes.
+/// Computes a Merkle root hash for a the given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
 fn root_hash(hashes: &[Hash]) -> Hash {

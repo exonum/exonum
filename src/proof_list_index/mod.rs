@@ -303,8 +303,8 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the list hash of the proof list or the hash value
-    /// of the empty list.
+    /// Returns a list hash of the proof list or a hash value of the empty list.
+    ///
     /// List hash is calculated as follows:
     /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
@@ -337,9 +337,9 @@ where
         HashTag::hash_list_node(self.len(), self.merkle_root())
     }
 
-    /// Returns the proof of existence for the list element at the specified position.
+    /// Returns a proof of existence for the list element at the specified position.
     ///
-    /// Returns the proof of absence if list doesn't contains element with specified `index`.
+    /// Returns a proof of absence if the list doesn't contain an element with the specified `index`.
     ///
     /// # Examples
     ///
@@ -367,12 +367,12 @@ where
 
     /// Returns the proof of existence for the list elements in the specified range.
     ///
-    /// Returns the proof of absence of the element which index if equals to upper bound if the
-    /// upper bound is bigger than the list length.
+    /// Returns a proof of absence for a range of values, if either or both its bounds
+    /// exceed the list length.
     ///
     /// # Panics
     ///
-    /// Panics if the range bounds if illegal.
+    /// Panics if the range bounds are illegal.
     ///
     /// # Examples
     ///

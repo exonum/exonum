@@ -23,9 +23,9 @@ use super::{
 use exonum_crypto::Hash;
 
 #[derive(Debug, PartialEq, Eq)]
-/// Encapsulates proof of absence for `ProofListIndex`.
+/// Encapsulates a proof of absence for `ProofListIndex`.
 ///
-/// Proof of absence for element with specified `index`consists of
+/// Proof of absence for an element with the specified index consists of
 /// `merkle_root` of `ProofListIndex` and `length` of the list.
 ///
 /// Element with `index` is absent in the list with provided `length`
@@ -35,7 +35,7 @@ use exonum_crypto::Hash;
 /// 2. index > length
 /// ```
 ///
-/// For range proof this rules applies for whole range.
+/// In case of a range proof this rule applies to the whole range.
 pub struct ProofOfAbsence {
     length: u64,
     merkle_root: Hash,
@@ -59,7 +59,7 @@ impl ProofOfAbsence {
     }
 }
 
-/// An enum that represents a proof of existence for a proof list elements.
+/// An enum that represents a proof of existence for proof list elements.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ListProof<V> {
     /// A branch of proof in which both children contain requested elements.
@@ -68,9 +68,9 @@ pub enum ListProof<V> {
     Left(Box<ListProof<V>>, Option<Hash>),
     /// A branch of proof in which only the right child contains requested elements.
     Right(Hash, Box<ListProof<V>>),
-    /// A leaf of proof with requested element.
+    /// A leaf of the proof with the requested element.
     Leaf(V),
-    /// Proof of absence of element with specified index.
+    /// Proof of absence of an element with the specified index.
     Absent(ProofOfAbsence),
 }
 
@@ -128,7 +128,7 @@ where
     /// Verifies the correctness of the proof by the trusted list hash and the number of
     /// elements in the tree.
     ///
-    /// To validate proof one need to provide `expected_list_hash` calculated as follows:
+    /// To validate the proof one needs to provide `expected_list_hash` calculated as follows:
     /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
     /// ```
@@ -137,7 +137,7 @@ where
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
     ///
-    /// If proof is the proof of absence then empty vector will be returned.
+    /// If the proof is the proof of absence, then empty vector will be returned.
     pub fn validate(
         &self,
         expected_list_hash: Hash,
