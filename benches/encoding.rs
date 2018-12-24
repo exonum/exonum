@@ -92,7 +92,8 @@ impl BinaryValue for CursorData {
         let id = bytes.read_u16::<LittleEndian>()?;
         let class = bytes.read_i16::<LittleEndian>()?;
         let value = bytes.read_i32::<LittleEndian>()?;
-        let hash = Hash::from_slice(bytes).ok_or_else(|| format_err!("Unable to decode hash value"))?;
+        let hash =
+            Hash::from_slice(bytes).ok_or_else(|| format_err!("Unable to decode hash value"))?;
         Ok(Self {
             id,
             class,

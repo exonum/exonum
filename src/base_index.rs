@@ -20,7 +20,7 @@
 
 // spell-checker:ignore subprefix
 
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 
 use super::{BinaryKey, BinaryValue, Fork, Iter, Snapshot};
 use crate::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
@@ -168,7 +168,7 @@ where
         self.view
             .as_ref()
             .get(&self.name, &self.prefixed_key(key))
-            .map(|v| BinaryValue::from_bytes(v.into()).expect("Unable to decode value"))
+            .map(get_value)
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -287,10 +287,7 @@ where
         }
         if let Some((k, v)) = self.base_iter.next() {
             if k.starts_with(&self.index_id) {
-                return Some((
-                    K::read(&k[self.base_prefix_len..]),
-                    V::from_bytes(v.into()).expect("Unable to decode value"),
-                ));
+                return Some((K::read(&k[self.base_prefix_len..]), get_value(v)));
             }
         }
         self.ended = true;
@@ -302,6 +299,15 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "BaseIndexIter(..)")
     }
+}
+
+fn get_value<'a, B, V>(bytes: B) -> V
+where
+    B: Into<Cow<'a, [u8]>>,
+    V: BinaryValue,
+{
+    let bytes = bytes.into();
+    V::from_bytes(bytes).expect("Unable to decode value from bytes, an error occured")
 }
 
 /// A function that validates an index name. Allowable characters in name: ASCII characters, digits
@@ -351,5 +357,12 @@ mod tests {
     #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
     fn test_check_invalid_name() {
         assert_valid_name("invalid-name");
+    }
+
+    #[test]
+    #[should_panic(expected = "Unable to decode value from bytes")]
+    fn test_get_value_panic() {
+        let wrong_buf = vec![0_u8; 31];
+        let _hash: exonum_crypto::Hash = get_value(wrong_buf);
     }
 }

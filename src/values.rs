@@ -66,8 +66,8 @@ use exonum_crypto::{Hash, PublicKey};
 pub trait BinaryValue: Sized {
     /// Serializes the given value to the vector of bytes.
     fn to_bytes(&self) -> Vec<u8>;
-    /// Consumes and serializes the given value to the vector of bytes. 
-    /// This method is faster with the wrapped values, 
+    /// Consumes and serializes the given value to the vector of bytes.
+    /// This method is faster with the wrapped values,
     /// thus if you wouldn't use value after serialization use it.
     fn into_bytes(self) -> Vec<u8> {
         self.to_bytes()
@@ -190,7 +190,9 @@ impl BinaryValue for Hash {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        Self::from_slice(bytes.as_ref()).ok_or_else(|| format_err!("Unable to decode value"))
+        Self::from_slice(bytes.as_ref()).ok_or_else(|| {
+            format_err!("Unable to decode Hash from bytes: buffer size does not match")
+        })
     }
 }
 
@@ -200,7 +202,9 @@ impl BinaryValue for PublicKey {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        Self::from_slice(bytes.as_ref()).ok_or_else(|| format_err!("Unable to decode value"))
+        Self::from_slice(bytes.as_ref()).ok_or_else(|| {
+            format_err!("Unable to decode PublicKey from bytes: buffer size does not match")
+        })
     }
 }
 
