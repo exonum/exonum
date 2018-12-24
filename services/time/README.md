@@ -4,7 +4,7 @@
 ![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS%20Build)
 [![Docs.rs](https://docs.rs/exonum-time/badge.svg)](https://docs.rs/exonum-time)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.27.2+ required](https://img.shields.io/badge/rust-1.27.2+-blue.svg?label=Required%20Rust)
+![rust 1.30.0+ required](https://img.shields.io/badge/rust-1.30.0+-blue.svg?label=Required%20Rust)
 
 Exonum-time is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
 This service allows to determine time,
@@ -17,7 +17,8 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-time = "0.9.0"
+exonum = "0.10.0"
+exonum-time = "0.10.0"
 ```
 
 Add the time oracle service to the blockchain in the main project file:
@@ -47,21 +48,25 @@ which must be executed no later than the specified time
 (this time is written in the transaction body in a separate field):
 
 ```rust
-message! {
-    struct Tx {
-        time: SystemTime,
-        ...
-    }
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::TimeTx")]
+/// Transaction, which must be executed no later than the specified time (field `time`).
+struct TimeTx {
+    time: DateTime<Utc>,
 }
 
-impl Transaction for Tx {
-    ...
+#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+enum TimeTransactions {
+    TimeTx(TimeTx),
+}
+
+impl Transaction for TimeTx {
     fn execute(&self, view: &mut Fork) {
         // Import schema.
         let time_schema = exonum_time::TimeSchema::new(&view);
         // The time in the transaction should be less than in the blockchain.
         match time_schema.time().get() {
-            Some(current_time) if current_time <= self.time() => {
+            Some(current_time) if current_time <= self.time => {
                 // Execute transaction business logic.
             }
             _ => {}
@@ -95,4 +100,4 @@ and the proof of correctness.
 `exonum-time` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
 
-[service]: examples/simple_service.rs
+[service]: examples/simple_service/main.rs
