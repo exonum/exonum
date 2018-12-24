@@ -301,6 +301,8 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
     }
 }
 
+/// Decodes given bytes into the given value.
+/// This function panics if the given value can not be decoded from the given buffer.
 fn get_value<'a, B, V>(bytes: B) -> V
 where
     B: Into<Cow<'a, [u8]>>,
