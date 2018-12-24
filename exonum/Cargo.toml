@@ -19,7 +19,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix = "=0.7.9"
-actix-net = "=0.2.5"
+actix-net = "=0.2.6"
 actix-web = "=0.7.16"
 log = "=0.4.6"
 byteorder = "1.2.3"
