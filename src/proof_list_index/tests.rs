@@ -21,8 +21,10 @@ use serde_json::{from_str, to_string};
 use std::fmt::Debug;
 
 use self::ListProof::*;
-use crate::StorageValue;
-use crate::{hash::HashTag, Database, ListProof, ProofListIndex, TemporaryDB};
+use crate::{
+    hash::{HashTag, UniqueHash},
+    BinaryValue, Database, ListProof, ProofListIndex, TemporaryDB,
+};
 use exonum_crypto::Hash;
 
 const IDX_NAME: &'static str = "idx_name";
@@ -127,9 +129,9 @@ fn test_list_index_proof() {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
-    let h0 = HashTag::hash_leaf(2u64);
-    let h1 = HashTag::hash_leaf(4u64);
-    let h2 = HashTag::hash_leaf(6u64);
+    let h0 = HashTag::hash_leaf(&2u64.to_bytes());
+    let h1 = HashTag::hash_leaf(&4u64.to_bytes());
+    let h2 = HashTag::hash_leaf(&6u64.to_bytes());
     let h01 = HashTag::hash_node(&h0, &h1);
     let h22 = HashTag::hash_single_node(&h2);
     let h012 = HashTag::hash_node(&h01, &h22);
@@ -684,7 +686,7 @@ fn proof_of_absence_range() {
     assert_proof_of_absence(proof, expected_hash, list.len());
 }
 
-fn assert_proof_of_absence<V: StorageValue + Clone + Debug>(
+fn assert_proof_of_absence<V: BinaryValue + UniqueHash + Debug>(
     proof: ListProof<V>,
     expected_hash: Hash,
     len: u64,

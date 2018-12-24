@@ -17,7 +17,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   `ProofPath` now uses compact binary representation in the `BranchNode`
   hash calculation.
-  
+
   Binary representation is `|bits_len|bytes|`, where:
 
   - **bits_len** - total length of the given `ProofPath` in bits compressed

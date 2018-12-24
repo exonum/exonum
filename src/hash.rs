@@ -16,7 +16,118 @@ use bytes::LittleEndian;
 use hex::FromHex;
 
 use crate::BinaryValue;
-use exonum_crypto::{self, Hash};
+use exonum_crypto::{Hash, HashStream};
+
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+/// `MerkleDB` hash prefixes.
+pub enum HashTag {
+    /// Hash prefix of a leaf node of the merkle tree.
+    Leaf = 0,
+    /// Hash prefix of a branch node of the merkle tree.
+    Node = 1,
+    /// Hash prefix of the list object.
+    ListNode = 2,
+}
+
+/// Calculate hash value with the specified prefix.
+///
+/// Different hashes for leaf and branch nodes are used to secure merkle tree from
+/// the pre-image attack.
+///
+/// See more information [here][1].
+///
+/// [1]: https://tools.ietf.org/html/rfc6962#section-2.1
+impl HashTag {
+    ///`HashStream` object with the corresponding hash prefix.
+    pub(crate) fn hash_stream(self) -> HashStream {
+        HashStream::new().update(&[self as u8])
+    }
+
+    /// Convenience method to obtain hashed value of the merkle tree node.
+    pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
+        HashTag::Node
+            .hash_stream()
+            .update(left_hash.as_ref())
+            .update(right_hash.as_ref())
+            .hash()
+    }
+
+    /// Convenience method to obtain a hashed value of the merkle tree node with one child.
+    pub fn hash_single_node(hash: &Hash) -> Hash {
+        HashTag::Node.hash_stream().update(hash.as_ref()).hash()
+    }
+
+    /// Convenience method to obtain a hashed value of the merkle tree leaf.
+    pub fn hash_leaf(value: &[u8]) -> Hash {
+        HashTag::Leaf.hash_stream().update(value).hash()
+    }
+
+    /// Hash of the list object.
+    ///
+    /// ```text
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// ```
+    pub fn hash_list_node(len: u64, root: Hash) -> Hash {
+        let mut len_bytes = [0; 8];
+        LittleEndian::write_u64(&mut len_bytes, len);
+
+        HashStream::new()
+            .update(&[HashTag::ListNode as u8])
+            .update(&len_bytes)
+            .update(root.as_ref())
+            .hash()
+    }
+
+    /// Hash of the empty list object.
+    ///
+    /// Empty list hash:
+    /// ```text
+    /// h = sha-256( HashTag::List || 0 || Hash::default() )
+    /// ```
+    pub fn empty_list_hash() -> Hash {
+        Hash::from_hex("c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9").unwrap()
+    }
+
+    /// Computes a list hash for the given list of hashes.
+    pub fn hash_list(hashes: &[Hash]) -> Hash {
+        Self::hash_list_node(hashes.len() as u64, root_hash(hashes))
+    }
+}
+
+/// Computes a Merkle root hash for a the given list of hashes.
+///
+/// If `hashes` are empty then `Hash::zero()` value is returned.
+fn root_hash(hashes: &[Hash]) -> Hash {
+    match hashes.len() {
+        0 => Hash::zero(),
+        1 => HashTag::hash_leaf(&hashes[0].to_bytes()),
+        _ => {
+            let hashes: Vec<Hash> = hashes
+                .iter()
+                .map(|h| HashTag::hash_leaf(&h.to_bytes()))
+                .collect();
+
+            let mut current_hashes = combine_hash_list(&hashes);
+
+            while current_hashes.len() > 1 {
+                current_hashes = combine_hash_list(&current_hashes);
+            }
+            current_hashes[0]
+        }
+    }
+}
+
+fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
+    hashes
+        .chunks(2)
+        .map(|pair| match pair {
+            [first, second] => HashTag::hash_node(first, second),
+            [single] => HashTag::hash_single_node(single),
+            _ => unreachable!(),
+        })
+        .collect()
+}
 
 /// A common trait for the ability to compute a unique hash.
 ///

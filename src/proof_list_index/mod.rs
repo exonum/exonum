@@ -498,7 +498,7 @@ where
         self.set_len(len + 1);
         let mut key = ProofListKey::new(1, len);
 
-        self.base.put(&key, HashTag::hash_leaf(value.clone()));
+        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
@@ -569,7 +569,7 @@ where
             );
         }
         let mut key = ProofListKey::new(1, index);
-        self.base.put(&key, HashTag::hash_leaf(value.clone()));
+        self.base.put(&key, HashTag::hash_leaf(&value.to_bytes()));
         self.base.put(&ProofListKey::leaf(index), value);
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
