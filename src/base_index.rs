@@ -309,7 +309,7 @@ where
     V: BinaryValue,
 {
     let bytes = bytes.into();
-    V::from_bytes(bytes).expect("Unable to decode value from bytes, an error occured")
+    V::from_bytes(bytes).expect("Unable to decode value from bytes, an error occurred")
 }
 
 /// A function that validates an index name. Allowable characters in name: ASCII characters, digits
