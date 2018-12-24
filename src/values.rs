@@ -206,7 +206,7 @@ impl BinaryValue for PublicKey {
 
 impl UniqueHash for PublicKey {}
 
-// FIXME Maybe we should remove this implementations
+// FIXME Maybe we should remove this implementations. [ECR-2775]
 
 impl BinaryValue for DateTime<Utc> {
     fn to_bytes(&self) -> Vec<u8> {
@@ -298,19 +298,19 @@ mod tests {
         };
     }
 
-    // Impl tests for unsigned scalar types
+    // Impl tests for unsigned scalar types.
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u8,  u8 }
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u32, u32 }
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u16, u16 }
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u64, u64 }
 
-    // Impl tests for signed scalar types
+    // Impl tests for signed scalar types.
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i8,  i8 }
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i16, i16 }
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i32, i32 }
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i64, i64 }
 
-    // Tests for the other types
+    // Tests for the other types.
 
     #[test]
     fn test_binary_form_vec_u8() {

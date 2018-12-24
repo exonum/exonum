@@ -16,6 +16,7 @@ use std::{borrow::Cow, fmt::Debug, io::Write};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use criterion::{black_box, Bencher, Criterion};
+use failure::{self, format_err};
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
@@ -88,11 +89,11 @@ impl BinaryValue for CursorData {
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut bytes = bytes.as_ref();
-        let id = bytes.read_u16::<LittleEndian>().unwrap();
-        let class = bytes.read_i16::<LittleEndian>().unwrap();
-        let value = bytes.read_i32::<LittleEndian>().unwrap();
-        let hash = Hash::from_slice(bytes).unwrap();
-        Self {
+        let id = bytes.read_u16::<LittleEndian>()?;
+        let class = bytes.read_i16::<LittleEndian>()?;
+        let value = bytes.read_i32::<LittleEndian>()?;
+        let hash = Hash::from_slice(bytes).ok_or_else(|| format_err!("Unable to decode hash value"))?;
+        Ok(Self {
             id,
             class,
             value,

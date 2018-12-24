@@ -156,7 +156,7 @@ mod tests {
         branch.set_child(ChildKind::Left, &ls, &lh);
         branch.set_child(ChildKind::Right, &rs, &rh);
 
-        let buf = branch.clone().to_bytes();
+        let buf = branch.to_bytes();
         let branch2 = BranchNode::from_bytes(buf.into()).unwrap();
         assert_eq!(branch, branch2);
         assert_eq!(branch.hash(), branch2.hash());

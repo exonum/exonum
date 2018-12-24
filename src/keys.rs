@@ -527,49 +527,49 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_system_time_key_in_index() {
-    //     use crate::{Database, MapIndex, TemporaryDB};
+    #[test]
+    fn test_system_time_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
 
-    //     let db: Box<dyn Database> = Box::new(TemporaryDB::default());
-    //     let x1 = Utc.timestamp(80, 0);
-    //     let x2 = Utc.timestamp(10, 0);
-    //     let y1 = Utc::now();
-    //     let y2 = y1 + Duration::seconds(10);
-    //     let mut fork = db.fork();
-    //     {
-    //         let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
-    //             MapIndex::new("test_index", &mut fork);
-    //         index.put(&x1, y1);
-    //         index.put(&x2, y2);
-    //     }
-    //     db.merge(fork.into_patch()).unwrap();
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
+        let x1 = Utc.timestamp(80, 0);
+        let x2 = Utc.timestamp(10, 0);
+        let y1 = Utc::now();
+        let y2 = y1 + Duration::seconds(10);
+        let mut fork = db.fork();
+        {
+            let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
+                MapIndex::new("test_index", &mut fork);
+            index.put(&x1, y1);
+            index.put(&x2, y2);
+        }
+        db.merge(fork.into_patch()).unwrap();
 
-    //     let snapshot = db.snapshot();
-    //     let index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
-    //         MapIndex::new("test_index", snapshot);
-    //     assert_eq!(index.get(&x1), Some(y1));
-    //     assert_eq!(index.get(&x2), Some(y2));
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
+            MapIndex::new("test_index", snapshot);
+        assert_eq!(index.get(&x1), Some(y1));
+        assert_eq!(index.get(&x2), Some(y2));
 
-    //     assert_eq!(
-    //         index.iter_from(&Utc.timestamp(0, 0)).collect::<Vec<_>>(),
-    //         vec![(x2, y2), (x1, y1)]
-    //     );
-    //     assert_eq!(
-    //         index.iter_from(&Utc.timestamp(20, 0)).collect::<Vec<_>>(),
-    //         vec![(x1, y1)]
-    //     );
-    //     assert_eq!(
-    //         index.iter_from(&Utc.timestamp(80, 0)).collect::<Vec<_>>(),
-    //         vec![(x1, y1)]
-    //     );
-    //     assert_eq!(
-    //         index.iter_from(&Utc.timestamp(90, 0)).collect::<Vec<_>>(),
-    //         vec![]
-    //     );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(0, 0)).collect::<Vec<_>>(),
+            vec![(x2, y2), (x1, y1)]
+        );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(20, 0)).collect::<Vec<_>>(),
+            vec![(x1, y1)]
+        );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(80, 0)).collect::<Vec<_>>(),
+            vec![(x1, y1)]
+        );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(90, 0)).collect::<Vec<_>>(),
+            vec![]
+        );
 
-    //     assert_eq!(index.values().collect::<Vec<_>>(), vec![y2, y1]);
-    // }
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![y2, y1]);
+    }
 
     #[test]
     fn test_str_key() {
