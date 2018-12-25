@@ -111,7 +111,7 @@ enum RemoveResult {
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -489,7 +489,7 @@ where
 
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 where
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
 {
     fn insert_leaf(&mut self, key: &ProofPath, value: V) -> Hash {
@@ -767,7 +767,7 @@ where
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
 {
     type Item = (K::Output, V);
@@ -780,7 +780,7 @@ where
 
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
 {
     type Item = (K::Output, V);
@@ -794,7 +794,7 @@ where
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
 {
     type Item = K::Output;
 
@@ -817,7 +817,7 @@ where
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -831,7 +831,7 @@ where
         impl<'a, T, K, V> Entry<'a, T, K, V>
         where
             T: AsRef<dyn Snapshot>,
-            K: ProofMapKey,
+            K: ProofMapKey + BinaryKey,
             V: BinaryValue + UniqueHash,
         {
             fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
@@ -855,7 +855,7 @@ where
         impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
         where
             T: AsRef<dyn Snapshot>,
-            K: ProofMapKey,
+            K: ProofMapKey + BinaryKey,
             V: BinaryValue + UniqueHash + fmt::Debug,
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -22,7 +22,7 @@ use super::{
     key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crate::{BinaryValue, UniqueHash};
+use crate::{BinaryValue, UniqueHash, BinaryKey};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -474,7 +474,7 @@ impl<K, V> MapProof<K, V> {
 
 impl<K, V> MapProof<K, V>
 where
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
@@ -629,7 +629,7 @@ pub fn create_proof<K, V, F>(
     lookup: F,
 ) -> MapProof<K, V>
 where
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
     F: Fn(&ProofPath) -> Node<V>,
 {
@@ -836,7 +836,7 @@ pub fn create_multiproof<K, V, KI, F>(
     lookup: F,
 ) -> MapProof<K, V>
 where
-    K: ProofMapKey,
+    K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
     KI: IntoIterator<Item = K>,
     F: Fn(&ProofPath) -> Node<V>,
