@@ -101,7 +101,7 @@ pub struct ProofMapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, ProofPath, V>,
 }
 
-enum RemoveResult {
+enum RemoveAction {
     KeyNotFound,
     Leaf,
     Branch((ProofPath, Hash)),
@@ -633,7 +633,7 @@ where
         }
     }
 
-    fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath) -> RemoveResult {
+    fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath) -> RemoveAction {
         let child_path = parent
             .child_path(proof_path.bit(0))
             .start_from(proof_path.start());
@@ -643,40 +643,40 @@ where
             match self.get_node_unchecked(&child_path) {
                 Node::Leaf(_) => {
                     self.base.remove(proof_path);
-                    return RemoveResult::Leaf;
+                    return RemoveAction::Leaf;
                 }
                 Node::Branch(mut branch) => {
                     let suffix_path = proof_path.suffix(i);
                     match self.remove_node(&branch, &suffix_path) {
-                        RemoveResult::Leaf => {
+                        RemoveAction::Leaf => {
                             let child = !suffix_path.bit(0);
                             let key = branch.child_path(child);
                             let hash = branch.child_hash(child);
 
                             self.base.remove(&child_path);
 
-                            return RemoveResult::Branch((key, hash));
+                            return RemoveAction::Branch((key, hash));
                         }
-                        RemoveResult::Branch((key, hash)) => {
+                        RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
 
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             let h = branch.hash();
                             self.base.put(&child_path, branch);
-                            return RemoveResult::UpdateHash(h);
+                            return RemoveAction::UpdateHash(h);
                         }
-                        RemoveResult::UpdateHash(hash) => {
+                        RemoveAction::UpdateHash(hash) => {
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             let h = branch.hash();
                             self.base.put(&child_path, branch);
-                            return RemoveResult::UpdateHash(h);
+                            return RemoveAction::UpdateHash(h);
                         }
-                        RemoveResult::KeyNotFound => return RemoveResult::KeyNotFound,
+                        RemoveAction::KeyNotFound => return RemoveAction::KeyNotFound,
                     }
                 }
             }
         }
-        RemoveResult::KeyNotFound
+        RemoveAction::KeyNotFound
     }
 
     /// Removes a key from the proof map.
@@ -715,17 +715,17 @@ where
                 if i == prefix.len() {
                     let suffix_path = proof_path.suffix(i);
                     match self.remove_node(&branch, &suffix_path) {
-                        RemoveResult::Leaf => self.base.remove(&prefix),
-                        RemoveResult::Branch((key, hash)) => {
+                        RemoveAction::Leaf => self.base.remove(&prefix),
+                        RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             self.base.put(&prefix, branch);
                         }
-                        RemoveResult::UpdateHash(hash) => {
+                        RemoveAction::UpdateHash(hash) => {
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             self.base.put(&prefix, branch);
                         }
-                        RemoveResult::KeyNotFound => return,
+                        RemoveAction::KeyNotFound => return,
                     }
                 }
             }
