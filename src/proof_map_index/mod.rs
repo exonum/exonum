@@ -492,14 +492,14 @@ where
     K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
 {
-    fn insert_leaf(&mut self, proof_path: &ProofPath, value: V) -> Hash {
+    fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
         let hash = value.hash();
         self.base.put(proof_path, value);
         hash
     }
 
-    fn remove_leaf(&mut self, proof_path: &ProofPath) {
+    fn remove_leaf(&mut self, proof_path: &ProofPath, key: &K) {
         self.base.remove(proof_path);
     }
 
@@ -509,6 +509,7 @@ where
         &mut self,
         parent: &BranchNode,
         proof_path: &ProofPath,
+        key: &K, 
         value: V,
     ) -> (Option<u16>, Hash) {
         let child_path = parent
@@ -520,7 +521,7 @@ where
             // check that child is leaf to avoid unnecessary read
             if child_path.is_leaf() {
                 // there is a leaf in branch and we needs to update its value
-                let hash = self.insert_leaf(proof_path, value);
+                let hash = self.insert_leaf(proof_path, key, value);
                 (None, hash)
             } else {
                 match self.get_node_unchecked(&child_path) {
@@ -529,7 +530,7 @@ where
                     }
                     // There is a child in branch and we needs to lookup it recursively
                     Node::Branch(mut branch) => {
-                        let (j, h) = self.insert_branch(&branch, &proof_path.suffix(i), value);
+                        let (j, h) = self.insert_branch(&branch, &proof_path.suffix(i), key, value);
                         match j {
                             Some(j) => {
                                 branch.set_child(
@@ -551,7 +552,7 @@ where
             let suffix_path = proof_path.suffix(i);
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
-            let hash = self.insert_leaf(&suffix_path, value);
+            let hash = self.insert_leaf(&suffix_path, key, value);
             new_branch.set_child(suffix_path.bit(0), &suffix_path, &hash);
             // Move current branch
             new_branch.set_child(
@@ -590,7 +591,7 @@ where
                 let prefix_path = prefix;
                 let i = prefix_path.common_prefix_len(&proof_path);
 
-                let leaf_hash = self.insert_leaf(&proof_path, value);
+                let leaf_hash = self.insert_leaf(&proof_path, key, value);
                 if i < proof_path.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash);
@@ -610,7 +611,7 @@ where
                 if i == prefix_path.len() {
                     let suffix_path = proof_path.suffix(i);
                     // Just cut the prefix and recursively descent on.
-                    let (j, h) = self.insert_branch(&branch, &suffix_path, value);
+                    let (j, h) = self.insert_branch(&branch, &suffix_path, key, value);
                     match j {
                         Some(j) => branch.set_child(suffix_path.bit(0), &suffix_path.prefix(j), &h),
                         None => branch.set_child_hash(suffix_path.bit(0), &h),
@@ -618,7 +619,7 @@ where
                     self.base.put(&prefix_path, branch);
                 } else {
                     // Inserts a new branch and adds current branch as its child
-                    let hash = self.insert_leaf(&proof_path, value);
+                    let hash = self.insert_leaf(&proof_path, key, value);
                     let mut new_branch = BranchNode::empty();
                     new_branch.set_child(
                         prefix_path.bit(i),
@@ -632,12 +633,12 @@ where
                 }
             }
             None => {
-                self.insert_leaf(&proof_path, value);
+                self.insert_leaf(&proof_path, key, value);
             }
         }
     }
 
-    fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath) -> RemoveAction {
+    fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath, key: &K) -> RemoveAction {
         let child_path = parent
             .child_path(proof_path.bit(0))
             .start_from(proof_path.start());
@@ -646,12 +647,12 @@ where
         if i == child_path.len() {
             match self.get_node_unchecked(&child_path) {
                 Node::Leaf(_) => {
-                    self.remove_leaf(proof_path);
+                    self.remove_leaf(proof_path, key);
                     return RemoveAction::Leaf;
                 }
                 Node::Branch(mut branch) => {
                     let suffix_path = proof_path.suffix(i);
-                    match self.remove_node(&branch, &suffix_path) {
+                    match self.remove_node(&branch, &suffix_path, key) {
                         RemoveAction::Leaf => {
                             let child = !suffix_path.bit(0);
                             let key = branch.child_path(child);
@@ -709,7 +710,7 @@ where
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
                 if proof_path == prefix {
-                    self.remove_leaf(&proof_path);
+                    self.remove_leaf(&proof_path, key);
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
@@ -717,7 +718,7 @@ where
                 let i = prefix.common_prefix_len(&proof_path);
                 if i == prefix.len() {
                     let suffix_path = proof_path.suffix(i);
-                    match self.remove_node(&branch, &suffix_path) {
+                    match self.remove_node(&branch, &suffix_path, key) {
                         RemoveAction::Leaf => self.base.remove(&prefix),
                         RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
