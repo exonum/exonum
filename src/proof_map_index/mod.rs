@@ -217,14 +217,14 @@ where
             .map(|(k, _): (ProofPath, ())| k)
     }
 
-    fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
+    fn get_root_node(&self) -> Option<(ProofPath, Node)> {
         self.get_root_path().map(|key| {
             let node = self.get_node_unchecked(&key);
             (key, node)
         })
     }
 
-    fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
+    fn get_node_unchecked(&self, key: &ProofPath) -> Node {
         // TODO: Unwraps? (ECR-84)
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
@@ -500,7 +500,7 @@ where
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
         ProofMapIndexValues {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
+            base_iter: self.base.iter_from(&VALUE_KEY_PREFIX, &from.to_value_key()),
         }
     }
 }
@@ -513,7 +513,7 @@ where
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
         let hash = value.hash();
-        self.base.put(proof_path, value.clone());
+        self.base.put(proof_path, hash);
         self.base.put(&key.to_value_key(), value);
         hash
     }
@@ -849,7 +849,7 @@ where
             index: &'a ProofMapIndex<T, K, V>,
             path: ProofPath,
             hash: Hash,
-            node: Node<V>,
+            node: Node,
         }
 
         impl<'a, T, K, V> Entry<'a, T, K, V>
