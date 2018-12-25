@@ -230,6 +230,23 @@ impl BinaryKey for [u8] {
     }
 }
 
+impl BinaryKey for [u8; 32] {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        buffer[..self.size()].copy_from_slice(self);
+        self.size()
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        let mut value = [0_u8; 32];
+        value.copy_from_slice(buffer);
+        value
+    }
+}
+
 /// Uses UTF-8 string serialization.
 impl BinaryKey for String {
     fn size(&self) -> usize {

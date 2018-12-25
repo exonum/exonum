@@ -32,7 +32,7 @@ use super::{
     proof::MapProofBuilder,
     HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
-use crate::{BinaryValue, Database, Fork, TemporaryDB, UniqueHash};
+use crate::{BinaryKey, BinaryValue, Database, Fork, TemporaryDB, UniqueHash};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -1313,6 +1313,24 @@ fn test_tree_with_hashed_key() {
     impl Point {
         fn new(x: u16, y: u16) -> Self {
             Self { x, y }
+        }
+    }
+
+    impl BinaryKey for Point {
+        fn write(&self, buffer: &mut [u8]) -> usize {
+            LittleEndian::write_u16(&mut buffer[0..2], self.x);
+            LittleEndian::write_u16(&mut buffer[2..4], self.y);
+            self.size()
+        }
+
+        fn read(buffer: &[u8]) -> Self {
+            let x = LittleEndian::read_u16(&buffer[0..2]);
+            let y = LittleEndian::read_u16(&buffer[2..4]);
+            Self { x, y }
+        }
+
+        fn size(&self) -> usize {
+            4
         }
     }
 

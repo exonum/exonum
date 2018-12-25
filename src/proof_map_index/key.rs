@@ -24,6 +24,7 @@ use crate::BinaryKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
+pub const VALUE_KEY_PREFIX: u8 = 2;
 
 /// Size in bytes of the `ProofMapKey`.
 ///

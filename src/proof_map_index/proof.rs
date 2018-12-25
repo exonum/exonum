@@ -22,7 +22,7 @@ use super::{
     key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crate::{BinaryValue, UniqueHash, BinaryKey};
+use crate::{BinaryKey, BinaryValue, UniqueHash};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
