@@ -19,7 +19,7 @@ use serde_derive::{Deserialize, Serialize};
 use exonum_crypto::{Hash, HashStream};
 
 use super::{
-    key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
+    key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
 use crate::{BinaryKey, BinaryValue, UniqueHash};
@@ -87,9 +87,9 @@ impl<'de> Deserialize<'de> for ProofPath {
                 }
 
                 Ok(if len == 8 * KEY_SIZE {
-                    ProofPath::new(&bytes)
+                    ProofPath::from_bytes(&bytes)
                 } else {
-                    ProofPath::new(&bytes).prefix(len as u16)
+                    ProofPath::from_bytes(&bytes).prefix(len as u16)
                 })
             }
         }
@@ -474,7 +474,7 @@ impl<K, V> MapProof<K, V> {
 
 impl<K, V> MapProof<K, V>
 where
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
@@ -630,7 +630,7 @@ pub fn create_proof<K, V, F, M>(
     get_value: M,
 ) -> MapProof<K, V>
 where
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
     F: Fn(&ProofPath) -> Node,
     M: Fn(&K) -> V,
@@ -843,7 +843,7 @@ pub fn create_multiproof<K, V, KI, F, M>(
     get_value: M,
 ) -> MapProof<K, V>
 where
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
     KI: IntoIterator<Item = K>,
     F: Fn(&ProofPath) -> Node,

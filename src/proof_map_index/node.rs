@@ -132,8 +132,8 @@ mod tests {
 
         let lh = exonum_crypto::hash(&[1, 2]);
         let rh = exonum_crypto::hash(&[3, 4]);
-        let ls = ProofPath::new(&[253; 32]);
-        let rs = ProofPath::new(&[244; 32]);
+        let ls = ProofPath::from_bytes(&[253; 32]);
+        let rs = ProofPath::from_bytes(&[244; 32]);
 
         branch.set_child(ChildKind::Left, &ls, &lh);
         branch.set_child(ChildKind::Right, &rs, &rh);
@@ -150,8 +150,8 @@ mod tests {
 
         let lh = exonum_crypto::hash(&[1, 2]);
         let rh = exonum_crypto::hash(&[3, 4]);
-        let ls = ProofPath::new(&[253; 32]).suffix(9).prefix(15);
-        let rs = ProofPath::new(&[244; 32]);
+        let ls = ProofPath::from_bytes(&[253; 32]).suffix(9).prefix(15);
+        let rs = ProofPath::from_bytes(&[244; 32]);
 
         branch.set_child(ChildKind::Left, &ls, &lh);
         branch.set_child(ChildKind::Right, &rs, &rh);

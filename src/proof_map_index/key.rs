@@ -18,9 +18,9 @@ use std::ops;
 
 use leb128;
 
-use exonum_crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
+use exonum_crypto::HASH_SIZE;
 
-use crate::BinaryKey;
+use crate::{BinaryKey, UniqueHash};
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
@@ -50,131 +50,6 @@ macro_rules! div_ceil {
 fn reset_bits(value: &mut u8, pos: u16) {
     let reset_bits_mask = !(255_u8 << pos as u8);
     *value &= reset_bits_mask;
-}
-
-/// A trait that defines a subset of storage key types which are suitable for use with
-/// `ProofMapIndex`.
-///
-/// The size of the keys must be exactly [`PROOF_MAP_KEY_SIZE`] bytes and the keys must have
-/// a uniform distribution.
-///
-/// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-pub trait ProofMapKey
-where
-    Self::Output: ProofMapKey,
-{
-    /// The type of keys as read from the database.
-    ///
-    /// `Output` is not necessarily equal to `Self`, which provides flexibility
-    /// for [`HashedKey`]s and similar cases
-    /// where the key cannot be uniquely restored from the database.
-    ///
-    /// [`HashedKey`]: trait.HashedKey.html
-    type Output;
-
-    /// Writes this key into a byte buffer.
-    ///
-    /// The buffer is guaranteed to have size [`PROOF_MAP_KEY_SIZE`].
-    ///
-    /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-    fn write_key(&self, to: &mut [u8]);
-
-    /// Reads this key from the buffer.
-    fn read_key(from: &[u8]) -> Self::Output;
-}
-
-/// A trait denoting that a certain storage value is suitable for use as a key for
-/// `ProofMapIndex` after hashing.
-///
-/// **Warning:** The implementation of the [`ProofMapKey.write_key()`] method provided
-/// by this trait is not efficient; it calculates the hash anew on each call.
-///
-/// # Example
-///
-/// ```
-/// # use byteorder::{LittleEndian, ByteOrder};
-/// # use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex, HashedKey};
-///
-/// #[derive(Debug, Copy, Clone, PartialEq)]
-/// struct Point {
-///     y: i16,
-///     x: i16,
-/// }
-///
-/// impl exonum_crypto::CryptoHash for Point {
-///     fn hash(&self) -> exonum_crypto::Hash {
-///         let mut buffer = [0; 4];
-///         LittleEndian::write_i16(&mut buffer[0..2], self.x);
-///         LittleEndian::write_i16(&mut buffer[2..4], self.y);
-///         exonum_crypto::hash(&buffer)
-///     }
-/// }
-///
-/// impl HashedKey for Point {}
-///
-///
-///
-/// # fn main() {
-/// let mut fork = { let db = TemporaryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new("index", &mut fork);
-/// map.put(&Point { x: 3, y: -4 }, 5u32);
-/// assert_eq!(map.get(&Point { x: 3, y: -4 }), Some(5));
-/// assert_eq!(map.get(&Point { x: 3, y: 4 }), None);
-/// # }
-/// ```
-///
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
-/// [`ProofMapKey.write_key()`]: trait.ProofMapKey.html#tymethod.write_key
-pub trait HashedKey: CryptoHash {}
-
-impl<T: HashedKey> ProofMapKey for T {
-    type Output = Hash;
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        self.hash().write(buffer);
-    }
-
-    fn read_key(buffer: &[u8]) -> Hash {
-        <Hash as BinaryKey>::read(buffer)
-    }
-}
-
-impl ProofMapKey for PublicKey {
-    type Output = Self;
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        BinaryKey::write(self, buffer);
-    }
-
-    fn read_key(raw: &[u8]) -> Self {
-        <Self as BinaryKey>::read(raw)
-    }
-}
-
-impl ProofMapKey for Hash {
-    type Output = Self;
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        BinaryKey::write(self, buffer);
-    }
-
-    fn read_key(raw: &[u8]) -> Self {
-        <Self as BinaryKey>::read(raw)
-    }
-}
-
-impl ProofMapKey for [u8; 32] {
-    type Output = [u8; 32];
-
-    fn write_key(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self);
-    }
-
-    fn read_key(raw: &[u8]) -> [u8; 32] {
-        let mut value = [0; KEY_SIZE];
-        value.copy_from_slice(raw);
-        value
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -219,12 +94,8 @@ pub struct ProofPath {
 
 impl ProofPath {
     /// Creates a path from the given key.
-    pub fn new<K: ProofMapKey>(key: &K) -> Self {
-        let mut data = [0; PROOF_PATH_SIZE];
-        data[0] = LEAF_KEY_PREFIX;
-        key.write_key(&mut data[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]);
-        data[PROOF_PATH_LEN_POS] = 0;
-        Self::from_inner(data)
+    pub fn new(key: &impl UniqueHash) -> Self {
+        Self::from_bytes(key.hash())
     }
 
     /// Checks if this is a path to a leaf `ProofMapIndex` node.

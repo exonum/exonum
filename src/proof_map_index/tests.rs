@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
+use std::{borrow::Cow, cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
-use byteorder::{ByteOrder, LittleEndian};
 use rand::{
     self,
     seq::{IteratorRandom, SliceRandom},
@@ -24,13 +23,13 @@ use rand_xorshift::XorShiftRng;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{self, json};
 
-use exonum_crypto::{hash, CryptoHash, Hash, HashStream};
+use exonum_crypto::{hash, Hash, HashStream};
 
 use super::{
     key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
     node::BranchNode,
     proof::MapProofBuilder,
-    HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
+    MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
 use crate::{BinaryKey, BinaryValue, Database, Fork, TemporaryDB, UniqueHash};
 
@@ -81,6 +80,22 @@ fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<([u8; KEY_S
     };
 
     (0..len).map(kv_generator).collect::<Vec<_>>()
+}
+
+impl UniqueHash for [u8; 32] {
+    fn hash(&self) -> Hash {
+        Hash::new(*self)
+    }
+}
+
+impl BinaryValue for [u8; 32] {
+    fn to_bytes(&self) -> Vec<u8> {
+        unreachable!();
+    }
+
+    fn from_bytes(_bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        unreachable!();
+    }
 }
 
 #[test]
@@ -344,7 +359,7 @@ fn check_map_proof<K, V>(
     key: Option<K>,
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
-    K: ProofMapKey + BinaryKey + PartialEq + Debug + Serialize + DeserializeOwned,
+    K: BinaryKey + UniqueHash + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + UniqueHash + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
@@ -381,7 +396,7 @@ fn check_map_multiproof<K, V>(
     keys: Vec<K>,
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
-    K: ProofMapKey + BinaryKey + Clone + PartialEq + Debug,
+    K: BinaryKey + UniqueHash + PartialEq + Debug,
     V: BinaryValue + UniqueHash + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
@@ -435,7 +450,7 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
 fn check_proofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: ProofMapKey + BinaryKey + Copy + PartialEq + Debug + Serialize + DeserializeOwned,
+    K: BinaryKey + UniqueHash + Clone + Copy + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let mut storage = db.fork();
@@ -469,7 +484,7 @@ where
 
 fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: ProofMapKey + BinaryKey + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
+    K: BinaryKey + UniqueHash + Clone + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
     V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize,
 {
     let mut storage = db.fork();

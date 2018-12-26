@@ -122,7 +122,7 @@
 )]
 
 #[doc(no_inline)]
-pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
+pub use self::proof_map_index::{MapProof, ProofMapIndex};
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{

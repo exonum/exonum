@@ -17,14 +17,14 @@
 #[doc(hidden)]
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{HashedKey, ProofMapKey, ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
+    key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError},
 };
 
 use std::{fmt, marker::PhantomData};
 
 use self::{
-    key::{BitsRange, ChildKind, LEAF_KEY_PREFIX, VALUE_KEY_PREFIX},
+    key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof::{create_multiproof, create_proof},
 };
 use super::{
@@ -122,14 +122,14 @@ impl<T: BinaryKey> ValueKey for T {
     }
 
     fn from_value_key(buffer: &[u8]) -> Self::Owned {
-        T::read(&buffer[1..])
+        Self::read(&buffer[1..])
     }
 }
 
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -347,9 +347,9 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new("index", &snapshot);
+    /// let index: ProofMapIndex<_, Vec<u8>, u8> = ProofMapIndex::new("index", &snapshot);
     ///
-    /// let proof = index.get_multiproof(vec![[0; 32], [1; 32]]);
+    /// let proof = index.get_multiproof(vec![vec![0; 32], vec![1; 32]]);
     /// ```
     pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
     where
@@ -517,7 +517,7 @@ where
 
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 where
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash + Clone,
 {
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
@@ -806,7 +806,7 @@ where
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
 {
     type Item = (K::Owned, V);
@@ -819,7 +819,7 @@ where
 
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
 {
     type Item = (K::Owned, V);
@@ -833,7 +833,7 @@ where
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
 {
     type Item = K::Owned;
 
@@ -856,7 +856,7 @@ where
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: AsRef<dyn Snapshot>,
-    K: ProofMapKey + BinaryKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -870,7 +870,7 @@ where
         impl<'a, T, K, V> Entry<'a, T, K, V>
         where
             T: AsRef<dyn Snapshot>,
-            K: ProofMapKey + BinaryKey,
+            K: BinaryKey + UniqueHash,
             V: BinaryValue + UniqueHash,
         {
             fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
@@ -894,7 +894,7 @@ where
         impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
         where
             T: AsRef<dyn Snapshot>,
-            K: ProofMapKey + BinaryKey,
+            K: BinaryKey + UniqueHash,
             V: BinaryValue + UniqueHash + fmt::Debug,
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
