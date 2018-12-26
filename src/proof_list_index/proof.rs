@@ -148,7 +148,7 @@ where
         let root_hash = self.collect(ProofListKey::new(height, 0), &mut vec)?;
 
         match *self {
-            ListProof::Absent(ref _proof) => {
+            ListProof::Absent(_) => {
                 if expected_list_hash != root_hash {
                     return Err(ListProofError::UnmatchedRootHash);
                 }
