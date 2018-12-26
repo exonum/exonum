@@ -623,15 +623,17 @@ impl<K, V> CheckedMapProof<K, V> {
 }
 
 /// Creates a proof for a single key.
-pub fn create_proof<K, V, F>(
+pub fn create_proof<K, V, F, M>(
     key: K,
     root_node: Option<(ProofPath, Node)>,
     lookup: F,
+    get_value: M,
 ) -> MapProof<K, V>
 where
     K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
     F: Fn(&ProofPath) -> Node,
+    M: Fn(&K) -> V,
 {
     fn combine(
         mut left_hashes: Vec<(ProofPath, Hash)>,
@@ -672,15 +674,15 @@ where
                     let node = lookup(&node_path);
                     match node {
                         Node::Branch(branch_) => branch = branch_,
-                        Node::Leaf(value) => {
-                            unimplemented!();
+                        Node::Leaf(_hash) => {
                             // We have reached the leaf node and haven't diverged!
                             // The key is there, we've just gotten the value, so we just
                             // need to return it.
-                            // return MapProofBuilder::new()
-                            //     .add_entry(key, value)
-                            //     .add_proof_entries(combine(left_hashes, right_hashes))
-                            //     .create();
+                            let value = get_value(&key);
+                            return MapProofBuilder::new()
+                                .add_entry(key, value)
+                                .add_proof_entries(combine(left_hashes, right_hashes))
+                                .create();
                         }
                     }
                 } else {
@@ -700,14 +702,14 @@ where
             }
         }
 
-        Some((root_path, Node::Leaf(root_value))) => {
+        Some((root_path, Node::Leaf(hash))) => {
             if root_path == searched_path {
-                unimplemented!();
-                // MapProofBuilder::new().add_entry(key, root_value).create()
+                let value = get_value(&key);
+                MapProofBuilder::new().add_entry(key, value).create()
             } else {
                 MapProofBuilder::new()
                     .add_missing(key)
-                    .add_proof_entry(root_path, root_value.hash())
+                    .add_proof_entry(root_path, hash)
                     .create()
             }
         }
@@ -760,16 +762,18 @@ impl ContourNode {
 }
 
 /// Processes a single key in a map with multiple entries.
-fn process_key<K, V, F>(
+fn process_key<K, V, F, M>(
     contour: &mut Vec<ContourNode>,
     mut builder: MapProofBuilder<K, V>,
     proof_path: &ProofPath,
     key: K,
     lookup: &F,
+    get_value: &M,
 ) -> MapProofBuilder<K, V>
 where
     V: BinaryValue + UniqueHash,
     F: Fn(&ProofPath) -> Node,
+    M: Fn(&K) -> V,
 {
     // `unwrap()` is safe: there is at least 1 element in the contour by design
     let common_prefix = proof_path.common_prefix_len(&contour.last().unwrap().key);
@@ -820,12 +824,11 @@ where
             Node::Branch(branch) => {
                 contour.push(ContourNode::new(node_path, branch));
             }
-
-            Node::Leaf(value) => {
+            Node::Leaf(_hash) => {
                 // We have reached the leaf node and haven't diverged!
-                // builder = builder.add_entry(key, value);
-                unimplemented!();
-                // break 'traverse;
+                let value = get_value(&key);
+                builder = builder.add_entry(key, value);
+                break 'traverse;
             }
         }
     }
@@ -833,16 +836,18 @@ where
     builder
 }
 
-pub fn create_multiproof<K, V, KI, F>(
+pub fn create_multiproof<K, V, KI, F, M>(
     keys: KI,
     root_node: Option<(ProofPath, Node)>,
     lookup: F,
+    get_value: M,
 ) -> MapProof<K, V>
 where
     K: ProofMapKey + BinaryKey,
     V: BinaryValue + UniqueHash,
     KI: IntoIterator<Item = K>,
     F: Fn(&ProofPath) -> Node,
+    M: Fn(&K) -> V,
 {
     match root_node {
         Some((root_path, Node::Branch(root_branch))) => {
@@ -868,7 +873,7 @@ where
                     continue;
                 }
 
-                builder = process_key(&mut contour, builder, &proof_path, key, &lookup);
+                builder = process_key(&mut contour, builder, &proof_path, key, &lookup, &get_value);
                 last_searched_path = Some(proof_path);
             }
 
@@ -880,7 +885,7 @@ where
             builder.create()
         }
 
-        Some((root_path, Node::Leaf(root_value))) => {
+        Some((root_path, Node::Leaf(root_hash))) => {
             let mut builder = MapProofBuilder::new();
             // (One of) keys corresponding to the existing table entry.
             let mut found_key: Option<K> = None;
@@ -895,14 +900,13 @@ where
             }
 
             builder = if let Some(key) = found_key {
-                builder.add_entry(key, root_value)
+                let value = get_value(&key);
+                builder.add_entry(key, value)
             } else {
-                // builder.add_proof_entry(root_path, root_value.hash())
-                unimplemented!();
+                builder.add_proof_entry(root_path, root_hash)
             };
 
-            // builder.create()
-            unimplemented!();
+            builder.create()
         }
 
         None => keys

@@ -118,7 +118,7 @@ impl<T: BinaryKey> ValueKey for T {
         let mut buf = vec![0_u8; self.size() + 1];
         buf[0] = VALUE_KEY_PREFIX;
         self.write(&mut buf[1..]);
-        buf        
+        buf
     }
 
     fn from_value_key(buffer: &[u8]) -> Self::Owned {
@@ -233,6 +233,10 @@ where
         }
     }
 
+    fn get_value_unchecked(&self, key: &K) -> V {
+        self.get(key).expect("Value for the given key is absent")
+    }
+
     /// Returns the root hash of the proof map or default hash value if it is empty.
     /// The default hash consists solely of zeroes.
     ///
@@ -326,9 +330,12 @@ where
     /// let proof = index.get_proof(Hash::default());
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
-        create_proof(key, self.get_root_node(), |path| {
-            self.get_node_unchecked(path)
-        })
+        create_proof(
+            key,
+            self.get_root_node(),
+            |path| self.get_node_unchecked(path),
+            |key| self.get_value_unchecked(key),
+        )
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -348,9 +355,12 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
-        create_multiproof(keys, self.get_root_node(), |path| {
-            self.get_node_unchecked(path)
-        })
+        create_multiproof(
+            keys,
+            self.get_root_node(),
+            |path| self.get_node_unchecked(path),
+            |key| self.get_value_unchecked(key),
+        )
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
@@ -529,7 +539,7 @@ where
         &mut self,
         parent: &BranchNode,
         proof_path: &ProofPath,
-        key: &K, 
+        key: &K,
         value: V,
     ) -> (Option<u16>, Hash) {
         let child_path = parent
@@ -658,7 +668,12 @@ where
         }
     }
 
-    fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath, key: &K) -> RemoveAction {
+    fn remove_node(
+        &mut self,
+        parent: &BranchNode,
+        proof_path: &ProofPath,
+        key: &K,
+    ) -> RemoveAction {
         let child_path = parent
             .child_path(proof_path.bit(0))
             .start_from(proof_path.start());
