@@ -253,10 +253,7 @@ impl ProofPath {
             "ProofPath is inconsistent"
         );
 
-        Self {
-            bytes,
-            start: 0,
-        }
+        Self { bytes, start: 0 }
     }
 
     /// Sets the right border of the bit range.
@@ -639,9 +636,14 @@ mod tests {
     #[test]
     fn test_proof_path_ordering_fuzz() {
         assert!(ProofPath::from_bytes(&[1; 32]) > ProofPath::from_bytes(&[254; 32]));
-        assert!(ProofPath::from_bytes(&[0b0001_0001; 32]) > ProofPath::from_bytes(&[0b0010_0001; 32]));
+        assert!(
+            ProofPath::from_bytes(&[0b0001_0001; 32]) > ProofPath::from_bytes(&[0b0010_0001; 32])
+        );
         assert!(ProofPath::from_bytes(&[1; 32]) == ProofPath::from_bytes(&[1; 32]));
-        assert!(ProofPath::from_bytes(&[1; 32]).prefix(6) == ProofPath::from_bytes(&[129; 32]).prefix(6));
+        assert!(
+            ProofPath::from_bytes(&[1; 32]).prefix(6)
+                == ProofPath::from_bytes(&[129; 32]).prefix(6)
+        );
         assert!(ProofPath::from_bytes(&[1; 32]).prefix(254) < ProofPath::from_bytes(&[1; 32]));
 
         let mut rng = rand::thread_rng();
