@@ -237,13 +237,16 @@ impl ProofPath {
         &self.bytes
     }
 
+    /// Constructs the `ProofPath` from the raw bytes.
     pub(crate) fn from_bytes(bytes: impl AsRef<[u8]>) -> Self {
         let mut inner = [0; PROOF_PATH_SIZE];
-        inner.copy_from_slice(bytes.as_ref());
+        inner[0] = LEAF_KEY_PREFIX;
+        inner[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE].copy_from_slice(bytes.as_ref());
+        inner[PROOF_PATH_LEN_POS] = 0;
         Self::from_inner(inner)
     }
 
-    /// Constructs the `ProofPath` from inner buffer.
+    /// Constructs the `ProofPath` from the inner buffer.
     fn from_inner(bytes: [u8; PROOF_PATH_SIZE]) -> Self {
         debug_assert!(
             (bytes[PROOF_PATH_KIND_POS] != LEAF_KEY_PREFIX) || (bytes[PROOF_PATH_LEN_POS] == 0),
@@ -573,7 +576,7 @@ mod tests {
 
     /// Creates a random non-leaf, non-empty path.
     fn random_path<T: Rng>(rng: &mut T) -> ProofPath {
-        ProofPath::new(&{
+        ProofPath::from_bytes(&{
             let mut buf = [0; 32];
             rng.fill_bytes(&mut buf);
             buf
@@ -583,10 +586,10 @@ mod tests {
 
     #[test]
     fn test_proof_path_serialization_fuzz() {
-        let path = ProofPath::new(&[1; 32]).prefix(3);
+        let path = ProofPath::from_bytes(&[1; 32]).prefix(3);
         assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
         let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
-        assert_eq!(path, ProofPath::new(&[0b00_100101; 32]).prefix(6));
+        assert_eq!(path, ProofPath::from_bytes(&[0b00_100101; 32]).prefix(6));
 
         // Fuzz tests for roundtrip.
         let mut rng = rand::thread_rng();
@@ -635,11 +638,11 @@ mod tests {
 
     #[test]
     fn test_proof_path_ordering_fuzz() {
-        assert!(ProofPath::new(&[1; 32]) > ProofPath::new(&[254; 32]));
-        assert!(ProofPath::new(&[0b0001_0001; 32]) > ProofPath::new(&[0b0010_0001; 32]));
-        assert!(ProofPath::new(&[1; 32]) == ProofPath::new(&[1; 32]));
-        assert!(ProofPath::new(&[1; 32]).prefix(6) == ProofPath::new(&[129; 32]).prefix(6));
-        assert!(ProofPath::new(&[1; 32]).prefix(254) < ProofPath::new(&[1; 32]));
+        assert!(ProofPath::from_bytes(&[1; 32]) > ProofPath::from_bytes(&[254; 32]));
+        assert!(ProofPath::from_bytes(&[0b0001_0001; 32]) > ProofPath::from_bytes(&[0b0010_0001; 32]));
+        assert!(ProofPath::from_bytes(&[1; 32]) == ProofPath::from_bytes(&[1; 32]));
+        assert!(ProofPath::from_bytes(&[1; 32]).prefix(6) == ProofPath::from_bytes(&[129; 32]).prefix(6));
+        assert!(ProofPath::from_bytes(&[1; 32]).prefix(254) < ProofPath::from_bytes(&[1; 32]));
 
         let mut rng = rand::thread_rng();
         for _ in 0..1000 {
@@ -696,7 +699,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_storage_key_leaf() {
-        let key = ProofPath::new(&[250; 32]);
+        let key = ProofPath::from_bytes(&[250; 32]);
         let mut buf = vec![0; PROOF_PATH_SIZE];
         key.write(&mut buf);
         let key2 = ProofPath::read(&buf);
@@ -709,7 +712,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_storage_key_branch_regular() {
-        let mut key = ProofPath::new(&[255_u8; 32]);
+        let mut key = ProofPath::from_bytes(&[255_u8; 32]);
         key = key.prefix(11);
         key = key.suffix(5);
 
@@ -727,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_storage_key_roundtrip() {
-        let origin = ProofPath::new(&[255_u8; 32]);
+        let origin = ProofPath::from_bytes(&[255_u8; 32]);
         for i in 0..MAX_PROOF_PATH_BITS {
             let key = origin.prefix(i);
             let mut buf = vec![0; PROOF_PATH_SIZE];
@@ -743,7 +746,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_compress_leaf_regular() {
-        let key = ProofPath::new(&[250; 32]);
+        let key = ProofPath::from_bytes(&[250; 32]);
         let buf = key.compressed();
         let key2 = ProofPath::read_compressed(buf.as_ref());
         assert_eq!(key2, key);
@@ -751,7 +754,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_compress_leaf_shortest() {
-        let mut key = ProofPath::new(&[250; 32]);
+        let mut key = ProofPath::from_bytes(&[250; 32]);
         key = key.prefix(0);
         let buf = key.compressed();
         let key2 = ProofPath::read_compressed(buf.as_ref());
@@ -760,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_compress_leaf_longest() {
-        let mut key = ProofPath::new(&[250; 32]);
+        let mut key = ProofPath::from_bytes(&[250; 32]);
         key = key.prefix(255);
         let buf = key.compressed();
         let key2 = ProofPath::read_compressed(buf.as_ref());
@@ -769,7 +772,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_compress_branch() {
-        let mut key = ProofPath::new(&[255_u8; 32]);
+        let mut key = ProofPath::from_bytes(&[255_u8; 32]);
         key = key.prefix(11);
         key = key.suffix(5);
 
@@ -791,7 +794,7 @@ mod tests {
 
     #[test]
     fn test_proof_path_compress_roundtrip() {
-        let origin = ProofPath::new(&[255_u8; 32]);
+        let origin = ProofPath::from_bytes(&[255_u8; 32]);
         for i in 0..MAX_PROOF_PATH_BITS {
             let key = origin.prefix(i);
             let buf = key.compressed();
