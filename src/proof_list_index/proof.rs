@@ -22,7 +22,6 @@ use super::{
 };
 use exonum_crypto::Hash;
 
-#[derive(Debug, PartialEq, Eq)]
 /// Encapsulates a proof of absence for `ProofListIndex`.
 ///
 /// Proof of absence for an element with the specified index consists of
@@ -36,6 +35,7 @@ use exonum_crypto::Hash;
 /// ```
 ///
 /// In case of a range proof this rule applies to the whole range.
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProofOfAbsence {
     length: u64,
     merkle_root: Hash,

@@ -17,6 +17,8 @@ use hex::FromHex;
 use crate::BinaryValue;
 use exonum_crypto::{Hash, HashStream};
 
+const EMPTY_LIST_HASH: &str = "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9";
+
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 /// `MerkleDB` hash prefixes.
@@ -85,7 +87,7 @@ impl HashTag {
     /// h = sha-256( HashTag::List || 0 || Hash::default() )
     /// ```
     pub fn empty_list_hash() -> Hash {
-        Hash::from_hex("c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9").unwrap()
+        Hash::from_hex(EMPTY_LIST_HASH).unwrap()
     }
 
     /// Computes a list hash for the given list of hashes.
@@ -98,34 +100,38 @@ impl HashTag {
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
 fn root_hash(hashes: &[Hash]) -> Hash {
-    match hashes.len() {
-        0 => Hash::zero(),
-        1 => HashTag::hash_leaf(&hashes[0].to_bytes()),
-        _ => {
-            let hashes: Vec<Hash> = hashes
-                .iter()
-                .map(|h| HashTag::hash_leaf(&h.to_bytes()))
-                .collect();
+    if hashes.len() == 0 {
+        return Hash::zero();
+    }
 
-            let mut current_hashes = combine_hash_list(&hashes);
+    let mut hashes: Vec<Hash> = hashes
+        .iter()
+        .map(|h| HashTag::hash_leaf(&h.to_bytes()))
+        .collect();
 
-            while current_hashes.len() > 1 {
-                current_hashes = combine_hash_list(&current_hashes);
-            }
-            current_hashes[0]
+    let mut end = hashes.len();
+    let mut index = 0;
+
+    while end > 1 {
+        let first = hashes[index];
+
+        let result = if index < end - 1 {
+            HashTag::hash_node(&first, &hashes[index + 1])
+        } else {
+            HashTag::hash_single_node(&first)
+        };
+
+        hashes[index / 2] = result;
+
+        index += 2;
+
+        if index >= end {
+            index = 0;
+            end = end / 2 + end % 2;
         }
     }
-}
 
-fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
-    hashes
-        .chunks(2)
-        .map(|pair| match pair {
-            [first, second] => HashTag::hash_node(first, second),
-            [single] => HashTag::hash_single_node(single),
-            _ => unreachable!(),
-        })
-        .collect()
+    hashes[0]
 }
 
 /// A common trait for the ability to compute a unique hash.
