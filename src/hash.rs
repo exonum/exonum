@@ -100,7 +100,7 @@ impl HashTag {
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
 fn root_hash(hashes: &[Hash]) -> Hash {
-    if hashes.len() == 0 {
+    if hashes.is_empty() {
         return Hash::zero();
     }
 
