@@ -63,12 +63,13 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
 }
 
 // Makes large data set with unique keys
-fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
+fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<(Vec<u8>, Vec<u8>)> {
     let mut exists_keys = HashSet::new();
 
     let kv_generator = |_| {
         let mut v = vec![0; 8];
-        let mut new_key = [0; KEY_SIZE];
+        let key_size = rng.gen_range(0, 64);
+        let mut new_key = vec![0; key_size];
         rng.fill_bytes(&mut new_key);
 
         while exists_keys.contains(&new_key) {
@@ -450,7 +451,7 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
 fn check_proofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: BinaryKey + UniqueHash + Clone + Copy + PartialEq + Debug + Serialize + DeserializeOwned,
+    K: BinaryKey + UniqueHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let mut storage = db.fork();
@@ -468,8 +469,8 @@ where
     };
 
     for i in indexes {
-        let key = data[i].0;
-        let proof = table.get_proof(key);
+        let key = data[i].0.clone();
+        let proof = table.get_proof(key.clone());
         check_map_proof(proof, Some(key), &table);
     }
 
@@ -484,7 +485,7 @@ where
 
 fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: BinaryKey + UniqueHash + Clone + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
+    K: BinaryKey + UniqueHash + Clone + Ord + PartialEq + StdHash + Debug + Serialize,
     V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize,
 {
     let mut storage = db.fork();
@@ -500,7 +501,7 @@ where
         // Check the multiproof only for existing keys
         let keys = data
             .iter()
-            .map(|&(k, _)| k)
+            .map(|(k, _)| k.clone())
             .choose_multiple(&mut rng, proof_size);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
@@ -508,7 +509,7 @@ where
         // Check the multiproof for the equal number of existing and non-existing keys
         let mut keys = data
             .iter()
-            .map(|&(k, _)| k)
+            .map(|(k, _)| k.clone())
             .choose_multiple(&mut rng, proof_size);
         let non_keys = nonexisting_keys
             .iter()
@@ -1135,7 +1136,7 @@ fn test_fuzz_delete_build_proofs() {
     }
 
     for key in keys_to_remove_seq {
-        let proof = table.get_proof(key);
+        let proof = table.get_proof(key.clone());
         check_map_proof(proof, Some(key.clone()), &table);
         table.remove(&key);
         let proof = table.get_proof(key);
