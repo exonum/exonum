@@ -22,6 +22,7 @@ use rand::{
 use rand_xorshift::XorShiftRng;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{self, json};
+use pretty_assertions::assert_eq;
 
 use exonum_crypto::{hash, Hash, HashStream};
 
@@ -67,15 +68,15 @@ fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<(Vec<u8>, V
     let mut exists_keys = HashSet::new();
 
     let kv_generator = |_| {
-        let mut v = vec![0; 8];
-        let key_size = rng.gen_range(0, 64);
-        let mut new_key = vec![0; key_size];
+        let mut new_key = vec![0; rng.gen_range(0, 64)];
         rng.fill_bytes(&mut new_key);
-
         while exists_keys.contains(&new_key) {
+            new_key = vec![0; rng.gen_range(0, 64)];
             rng.fill_bytes(&mut new_key);
         }
         exists_keys.insert(new_key.clone());
+
+        let mut v = vec![0; 8];
         rng.fill_bytes(&mut v);
         (new_key, v)
     };
