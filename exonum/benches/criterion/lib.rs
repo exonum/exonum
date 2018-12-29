@@ -30,7 +30,6 @@ extern crate tokio_core;
 extern crate tokio_threadpool;
 
 use block::bench_block;
-use criterion::Criterion;
 use crypto::bench_crypto;
 use storage::bench_storage;
 use transactions::bench_verify_transactions;
