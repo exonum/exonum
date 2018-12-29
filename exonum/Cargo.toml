@@ -65,7 +65,7 @@ tempdir = "=0.3.7"
 lazy_static = "1.0.1"
 proptest = "=0.8.7"
 modifier = "0.1.0"
-criterion = "=0.2.6"
+criterion = "=0.2.7"
 num = "=0.2.0"
 
 [[bench]]
