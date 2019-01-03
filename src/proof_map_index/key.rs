@@ -26,7 +26,7 @@ pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
 pub const VALUE_KEY_PREFIX: u8 = 2;
 
-/// Size in bytes of the `ProofMapKey`.
+/// Size in bytes of the `Hash`.
 ///
 /// Equal to the size of the hash function output (32).
 pub const KEY_SIZE: usize = HASH_SIZE;
@@ -69,7 +69,7 @@ impl ops::Not for ChildKind {
     }
 }
 
-/// Bit slice type used internally to serialize `ProofMapKey`s.
+/// Bit slice type used internally to serialize `Hash`s.
 ///
 /// A single slice can contain from 1 to [`PROOF_MAP_KEY_SIZE`]`* 8` bits.
 ///
@@ -78,8 +78,8 @@ impl ops::Not for ChildKind {
 /// | Position in bytes     | Description                   	                    |
 /// |-------------------    |----------------------------------------------         |
 /// | 0               	    | `ProofPath` kind: (0 is branch, 1 is leaf)            |
-/// | 1..33                 | `ProofMapKey` bytes.    	                            |
-/// | 33                    | Total length in bits of `ProofMapKey` for branches.   |
+/// | 1..33                 | `Hash` bytes.    	                            |
+/// | 33                    | Total length in bits of `Hash` for branches.   |
 ///
 /// # JSON serialization
 ///
@@ -103,7 +103,7 @@ impl ProofPath {
         self.bytes[0] == LEAF_KEY_PREFIX
     }
 
-    /// Returns the byte representation of contained `ProofMapKey`.
+    /// Returns the byte representation of contained `Hash`.
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }

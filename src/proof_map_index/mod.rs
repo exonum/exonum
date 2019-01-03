@@ -44,13 +44,10 @@ mod tests;
 /// keys.
 ///
 /// `ProofMapIndex` implements a Merkle Patricia tree, storing values as leaves.
-/// `ProofMapIndex` requires that keys implement the [`ProofMapKey`] trait and
+/// `ProofMapIndex` requires that keys implement the [`BinaryKey`] trait and
 /// values implement the [`BinaryValue`] trait.
 ///
-/// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
-/// distribution.** Usually, [`Hash`] and [`PublicKey`] are used as types of proof map keys.
-///
-/// [`ProofMapKey`]: trait.ProofMapKey.html
+/// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`Hash`]: ../../../exonum_crypto/struct.Hash.html
 /// [`PublicKey`]: ../../../exonum_crypto/struct.PublicKey.html
