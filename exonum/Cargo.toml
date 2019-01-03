@@ -46,7 +46,7 @@ tokio-io = "=0.1.10"
 tokio-retry = "=0.2.0"
 tokio-threadpool = "=0.1.9"
 tokio-dns-unofficial = "=0.4.0"
-failure = "0.1.2"
+failure = "0.1.5"
 os_info = "1.0.1"
 chrono = { version = "=0.4.6", features = ["serde"] }
 uuid = { version = "=0.7.1", features = ["serde"] }
