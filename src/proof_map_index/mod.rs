@@ -105,20 +105,20 @@ enum RemoveAction {
     UpdateHash(Hash),
 }
 
-trait ValueKey: ToOwned {
-    fn to_value_key(&self) -> Vec<u8>;
-    fn from_value_key(bytes: &[u8]) -> Self::Owned;
+trait ValuePath: ToOwned {
+    fn to_value_path(&self) -> Vec<u8>;
+    fn from_value_path(bytes: &[u8]) -> Self::Owned;
 }
 
-impl<T: BinaryKey> ValueKey for T {
-    fn to_value_key(&self) -> Vec<u8> {
+impl<T: BinaryKey> ValuePath for T {
+    fn to_value_path(&self) -> Vec<u8> {
         let mut buf = vec![0_u8; self.size() + 1];
         buf[0] = VALUE_KEY_PREFIX;
         self.write(&mut buf[1..]);
         buf
     }
 
-    fn from_value_key(buffer: &[u8]) -> Self::Owned {
+    fn from_value_path(buffer: &[u8]) -> Self::Owned {
         Self::read(&buffer[1..])
     }
 }
@@ -286,7 +286,7 @@ where
     /// assert_eq!(Some(2), index.get(&hash));
     /// ```
     pub fn get(&self, key: &K) -> Option<V> {
-        self.base.get(&key.to_value_key())
+        self.base.get(&key.to_value_path())
     }
 
     /// Returns `true` if the map contains a value for the specified key.
@@ -309,7 +309,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn contains(&self, key: &K) -> bool {
-        self.base.contains(&key.to_value_key())
+        self.base.contains(&key.to_value_path())
     }
 
     /// Returns the proof of existence or non-existence for the specified key.
@@ -455,7 +455,9 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter_from(&VALUE_KEY_PREFIX, &from.to_value_key()),
+            base_iter: self
+                .base
+                .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
             _k: PhantomData,
         }
     }
@@ -481,7 +483,9 @@ where
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter_from(&VALUE_KEY_PREFIX, &from.to_value_key()),
+            base_iter: self
+                .base
+                .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
             _k: PhantomData,
         }
     }
@@ -507,7 +511,9 @@ where
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
         ProofMapIndexValues {
-            base_iter: self.base.iter_from(&VALUE_KEY_PREFIX, &from.to_value_key()),
+            base_iter: self
+                .base
+                .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
         }
     }
 }
@@ -521,13 +527,13 @@ where
         debug_assert!(proof_path.is_leaf());
         let hash = value.hash();
         self.base.put(proof_path, hash);
-        self.base.put(&key.to_value_key(), value);
+        self.base.put(&key.to_value_path(), value);
         hash
     }
 
     fn remove_leaf(&mut self, proof_path: &ProofPath, key: &K) {
         self.base.remove(proof_path);
-        self.base.remove(&key.to_value_key());
+        self.base.remove(&key.to_value_path());
     }
 
     // Inserts a new node of the current branch and returns the updated hash
@@ -824,7 +830,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter
             .next()
-            .map(|(k, v)| (K::from_value_key(&k), v))
+            .map(|(k, v)| (K::from_value_path(&k), v))
     }
 }
 
@@ -835,7 +841,7 @@ where
     type Item = K::Owned;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, _)| K::from_value_key(&k))
+        self.base_iter.next().map(|(k, _)| K::from_value_path(&k))
     }
 }
 
