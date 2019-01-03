@@ -14,6 +14,7 @@
 
 use std::{borrow::Cow, cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
+use pretty_assertions::assert_eq;
 use rand::{
     self,
     seq::{IteratorRandom, SliceRandom},
@@ -22,7 +23,6 @@ use rand::{
 use rand_xorshift::XorShiftRng;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{self, json};
-use pretty_assertions::assert_eq;
 
 use exonum_crypto::{hash, Hash, HashStream};
 
@@ -64,9 +64,11 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
 }
 
 // Makes large data set with unique keys
-fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<(Vec<u8>, Vec<u8>)> {
-    let mut exists_keys = HashSet::new();
-
+fn generate_random_data_keys<R: Rng>(
+    exists_keys: &mut HashSet<Vec<u8>>,
+    len: usize,
+    rng: &mut R,
+) -> Vec<(Vec<u8>, Vec<u8>)> {
     let kv_generator = |_| {
         let mut new_key = vec![0; rng.gen_range(0, 64)];
         rng.fill_bytes(&mut new_key);
@@ -1051,16 +1053,19 @@ fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let batch_sizes = (7..9).map(|x| 1 << x);
 
     for batch_size in batch_sizes {
-        let data: Vec<(Hash, Hash)> = generate_random_data_keys(batch_size, &mut rng)
-            .into_iter()
-            .map(|(key, val)| (hash(&key), hash(&val)))
-            .collect();
+        let mut exists_keys = HashSet::default();
+        let data: Vec<(Hash, Hash)> =
+            generate_random_data_keys(&mut exists_keys, batch_size, &mut rng)
+                .into_iter()
+                .map(|(key, val)| (hash(&key), hash(&val)))
+                .collect();
 
         let nonexisting_count = cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
-        let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count / 2, &mut rng)
-            .into_iter()
-            .flat_map(|(key, val)| vec![hash(&key), hash(&val)])
-            .collect();
+        let nonexisting_keys: Vec<_> =
+            generate_random_data_keys(&mut exists_keys, nonexisting_count / 2, &mut rng)
+                .into_iter()
+                .flat_map(|(key, val)| vec![hash(&key), hash(&val)])
+                .collect();
 
         check_proofs_for_data(&db, data, nonexisting_keys);
     }
@@ -1073,13 +1078,15 @@ fn test_fuzz_insert_build_proofs() {
     let batch_sizes = (7..9).map(|x| (1 << x) - 1);
 
     for batch_size in batch_sizes {
-        let data = generate_random_data_keys(batch_size, &mut rng);
+        let mut exists_keys = HashSet::default();
+        let data = generate_random_data_keys(&mut exists_keys, batch_size, &mut rng);
 
         let nonexisting_count = cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
-        let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count, &mut rng)
-            .into_iter()
-            .map(|(key, _)| key)
-            .collect();
+        let nonexisting_keys: Vec<_> =
+            generate_random_data_keys(&mut exists_keys, nonexisting_count, &mut rng)
+                .into_iter()
+                .map(|(key, _)| key)
+                .collect();
 
         check_proofs_for_data(&db, data, nonexisting_keys);
     }
@@ -1092,13 +1099,15 @@ fn test_fuzz_insert_build_multiproofs() {
     let batch_sizes = (7..9).map(|x| 1 << x);
 
     for batch_size in batch_sizes {
-        let data = generate_random_data_keys(batch_size, &mut rng);
+        let mut exists_keys = HashSet::default();
+        let data = generate_random_data_keys(&mut exists_keys, batch_size, &mut rng);
 
         let nonexisting_count = cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
-        let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count, &mut rng)
-            .into_iter()
-            .map(|(key, _)| key)
-            .collect();
+        let nonexisting_keys: Vec<_> =
+            generate_random_data_keys(&mut exists_keys, nonexisting_count, &mut rng)
+                .into_iter()
+                .map(|(key, _)| key)
+                .collect();
 
         check_multiproofs_for_data(&db, data, nonexisting_keys);
     }
@@ -1110,7 +1119,8 @@ fn test_fuzz_delete_build_proofs() {
     const SAMPLE_SIZE: usize = 200;
 
     let mut rng = XorShiftRng::from_seed(rand::random());
-    let data = generate_random_data_keys(SAMPLE_SIZE, &mut rng);
+    let mut exists_keys = HashSet::default();
+    let data = generate_random_data_keys(&mut exists_keys, SAMPLE_SIZE, &mut rng);
 
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
