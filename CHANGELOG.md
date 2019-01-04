@@ -5,6 +5,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+- Relaxed trait bounds for the `ProofMapIndex` keys (#7)
+  
+  Now keys should just implement `BinaryKey` trait instead of the
+  `ProofMapKey`, which will be ordered according to their binary
+  representation, as in the `MapIndex`.
+
+- Changed `ProofListIndex` hashing rules for leaf nodes and branch nodes according
+  to the [certificate transparency](https://tools.ietf.org/html/rfc6962#section-2.1)
+  specification. Leaf nodes contain hashes with 0x00 prefix, branch nodes - with
+  0x01. (#2)
+
 - `StorageValue` and `StorageKey` have been renamed to the `BinaryValue`
   and `BinaryKey`. (#4)
 
