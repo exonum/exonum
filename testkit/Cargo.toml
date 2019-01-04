@@ -34,7 +34,7 @@ protobuf = { version = "2.2.0", features = ["with-serde"] }
 
 [dev-dependencies]
 hex = "=0.3.2"
-rand = "=0.6.1"
+rand = "=0.6.2"
 pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
 thread_local = "=0.3.6"
