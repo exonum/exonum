@@ -27,6 +27,7 @@ CORS
 counterintuitive
 cryptocurrency
 cryptographically
+ctrlc
 deadlinks
 deque
 deref
