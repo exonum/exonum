@@ -5,7 +5,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## 0.10 - 2018-12-14
+## 0.10.0 - 2018-12-14
 
 ### Breaking Changes
 
@@ -227,6 +227,23 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `system/v1/peers` endpoint now properly returns
   incoming and outgoing connections of the node. (#942)
+
+## 0.9.5 - 2018-12-18
+
+### Internal Improvements
+
+#### exonum
+
+- A version of `snow` dependency has been updated.
+
+## 0.9.4 - 2018-10-24
+
+### New Features
+
+#### exonum
+
+- SegmentField implementation for Option has been added, allowing to
+  store optional values inside of transactions. (#1004)
 
 ## 0.9.3 - 2018-10-04
 
