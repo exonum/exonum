@@ -79,6 +79,7 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate ctrlc;
 extern crate protobuf;
 extern crate snow;
 extern crate tokio;
@@ -91,7 +92,6 @@ extern crate tokio_retry;
 extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
-extern crate ctrlc;
 
 // Test dependencies.
 #[cfg(test)]

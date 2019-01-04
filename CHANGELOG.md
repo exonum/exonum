@@ -3,7 +3,19 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.10.1 - 2019-01-04
+
+### Internal Improvements
+
+#### exonum
+
+- Dependencies have been updated. (#1111, #1162, #1167, #1168)
+
+- `ctrl+c` handler has been added for correct node stopping. (#1163)
+
+#### exonum-crypto
+
+- `pwbox` dependency has been updated. (#1164)
 
 ## 0.10.0 - 2018-12-14
 

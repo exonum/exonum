@@ -20,7 +20,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix-web = "=0.7.17"
-exonum = { version = "0.10.0", path = "../exonum" }
+exonum = { version = "0.10.1", path = "../exonum" }
 failure = "0.1.5"
 futures = "=0.1.25"
 reqwest = "=0.9.5"
@@ -34,7 +34,7 @@ protobuf = { version = "2.2.0", features = ["with-serde"] }
 
 [dev-dependencies]
 hex = "=0.3.2"
-rand = "=0.6.2"
+rand = "=0.6.3"
 pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
 thread_local = "=0.3.6"
