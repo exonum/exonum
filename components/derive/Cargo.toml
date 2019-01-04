@@ -8,7 +8,7 @@ documentation = "https://docs.rs/exonum-derive"
 license = "Apache-2.0"
 keywords = ["protobuf", "exonum"]
 categories = ["development-tools"]
-description = "Helper macroses for serialization structs in protobuf."
+description = "Helper macros for serialization structs in protobuf."
 
 [lib]
 proc-macro = true
