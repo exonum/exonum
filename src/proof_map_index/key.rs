@@ -109,6 +109,10 @@ impl ProofPath {
     }
 
     /// Constructs the `ProofPath` from the raw bytes.
+    /// 
+    /// # Panics
+    ///
+    /// Panics if the given bytes has different length than the `KEY_SIZE`.
     pub(crate) fn from_bytes(bytes: impl AsRef<[u8]>) -> Self {
         let mut inner = [0; PROOF_PATH_SIZE];
         inner[0] = LEAF_KEY_PREFIX;
