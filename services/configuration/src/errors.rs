@@ -74,10 +74,7 @@ pub enum ErrorCode {
 // Common error types for `Propose` and `Vote`.
 #[derive(Debug, Fail)]
 pub(crate) enum Error {
-    #[fail(
-        display = "Next configuration is already scheduled: {:?}",
-        _0
-    )]
+    #[fail(display = "Next configuration is already scheduled: {:?}", _0)]
     AlreadyScheduled(StoredConfiguration),
 
     #[fail(display = "Not authored by a validator")]
@@ -100,9 +97,7 @@ pub(crate) enum Error {
 
     #[fail(
         display = "Invalid majority count: {}, it should be >= {} and <= {}",
-        proposed,
-        min,
-        max
+        proposed, min, max
     )]
     InvalidMajorityCount {
         min: usize,
@@ -110,10 +105,7 @@ pub(crate) enum Error {
         proposed: usize,
     },
 
-    #[fail(
-        display = "Does not reference known config with hash {:?}",
-        _0
-    )]
+    #[fail(display = "Does not reference known config with hash {:?}", _0)]
     UnknownConfigRef(Hash),
 
     #[fail(display = "Validator already voted for a referenced proposal")]

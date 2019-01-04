@@ -66,7 +66,8 @@ fn proof_list_append(b: &mut Bencher, db: &dyn Database, len: usize) {
             let mut chunk = vec![0; CHUNK_SIZE];
             rng.fill_bytes(&mut chunk);
             chunk
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
     b.iter_with_setup(
         || db.fork(),
@@ -179,7 +180,8 @@ where
                 benchmark(b, &db, len)
             },
             item_counts,
-        ).throughput(|s| Throughput::Elements(*s as u32))
+        )
+        .throughput(|s| Throughput::Elements(*s as u32))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );

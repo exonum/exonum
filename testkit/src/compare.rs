@@ -235,7 +235,8 @@ mod tests {
             .assert_after("Array should have length 3", |new| new.len() == 3)
             .assert("Array should be transformed", |old, new| {
                 new.iter().enumerate().all(|(i, &x)| x == old[i] + 3)
-            }).map(Vec::len)
+            })
+            .map(Vec::len)
             .assert("Lengths should be the same", |old, new| old == new);
     }
 

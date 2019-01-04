@@ -207,7 +207,8 @@ fn test_unknown_wallet_request() {
         .public(ApiKind::Service("cryptocurrency"))
         .query(&WalletQuery {
             pub_key: tx.author(),
-        }).get::<Wallet>("v1/wallet")
+        })
+        .get::<Wallet>("v1/wallet")
         .unwrap_err();
 
     assert_matches!(

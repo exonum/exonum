@@ -92,7 +92,8 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
                 &s,
             );
             msg.into_bytes()
-        }).collect()
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -183,7 +184,8 @@ impl MessageVerifier {
                 messages
                     .into_iter()
                     .map(|message| InternalRequest::VerifyMessage(message)),
-            )).map(drop)
+            ))
+            .map(drop)
             .map_err(drop)
             .and_then(|()| finish_signal.map_err(drop))
     }

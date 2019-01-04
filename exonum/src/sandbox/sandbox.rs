@@ -645,7 +645,8 @@ impl Sandbox {
                     return false;
                 }
                 true
-            }).cloned()
+            })
+            .cloned()
             .collect()
     }
 
@@ -1050,7 +1051,8 @@ fn sandbox_with_services_uninitialized(
         .map(|(p, a)| ConnectInfo {
             address: a.clone(),
             public_key: *p,
-        }).collect();
+        })
+        .collect();
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
@@ -1393,7 +1395,8 @@ mod tests {
             .with_services(vec![
                 Box::new(AfterCommitService),
                 Box::new(TimestampingService::new()),
-            ]).build();
+            ])
+            .build();
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));

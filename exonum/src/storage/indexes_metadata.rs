@@ -31,10 +31,7 @@ const CORE_STORAGE_METADATA: StorageMetadata = StorageMetadata { version: 0 };
 const CORE_STORAGE_METADATA_KEY: &str = "__STORAGE_METADATA__";
 
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(
-    pb = "proto::schema::storage::IndexMetadata",
-    crate = "crate"
-)]
+#[exonum(pb = "proto::schema::storage::IndexMetadata", crate = "crate")]
 struct IndexMetadata {
     index_type: IndexType,
     is_family: bool,
@@ -236,10 +233,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "Attempt to access index 'test_index' of type Map, \
-                    while said index was initially created with type ProofMap"
-    )]
+    #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
+                               while said index was initially created with type ProofMap")]
     fn invalid_index_type() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -264,10 +259,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "Attempt to access index family 'test_index' \
-                    while it's an ordinary index"
-    )]
+    #[should_panic(expected = "Attempt to access index family 'test_index' \
+                               while it's an ordinary index")]
     fn ordinary_index_as_index_family() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -282,10 +275,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "Attempt to access an ordinary index 'test_index' \
-                    while it's index family"
-    )]
+    #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
+                               while it's index family")]
     fn index_family_as_ordinary_index() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -313,10 +304,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "Attempt to access index 'test_index' of type Map, \
-                    while said index was initially created with type ProofMap"
-    )]
+    #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
+                               while said index was initially created with type ProofMap")]
     fn multiple_read_before_write() {
         let database = MemoryDB::new();
         let mut fork = database.fork();

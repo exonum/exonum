@@ -1401,7 +1401,7 @@ mod memorydb_tests {
         Box::new(MemoryDB::new())
     }
 
-    common_tests!{}
+    common_tests! {}
 }
 
 mod rocksdb_tests {
@@ -1414,5 +1414,5 @@ mod rocksdb_tests {
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
-    common_tests!{}
+    common_tests! {}
 }

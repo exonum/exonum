@@ -157,7 +157,8 @@ impl ExplorerApi {
                 if query.add_blocks_time {
                     times.push(median_precommits_time(&block.precommits()));
                 }
-            }).map(|block| block.into_header())
+            })
+            .map(|block| block.into_header())
             .collect();
 
         let height = if blocks.len() < query.count {

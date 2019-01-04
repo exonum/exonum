@@ -29,10 +29,7 @@ impl EventHandler for NodeHandler {
 impl NodeHandler {
     // clippy sure that `InternalEvent` is not consumed in the body
     // this is because of internal `Copy` types in `JumpToRound`.
-    #![cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::needless_pass_by_value)
-    )]
+    #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     fn handle_internal_event(&mut self, event: InternalEvent) {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),

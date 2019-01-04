@@ -104,7 +104,8 @@ impl InternalPart {
 
                 let send_event = Self::send_event(event, internal_tx.clone());
                 handle.spawn(send_event);
-            }).for_each(Ok)
+            })
+            .for_each(Ok)
     }
 }
 

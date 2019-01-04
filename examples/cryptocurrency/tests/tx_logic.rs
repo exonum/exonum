@@ -231,7 +231,8 @@ fn test_fuzz_transfers() {
                 );
                 let amount = rng.gen_range(0, 250);
                 TxTransfer::sign(&receiver.0, amount, rng.gen::<u64>(), &sender.0, &sender.1)
-            }).collect();
+            })
+            .collect();
 
         testkit.create_block_with_transactions(txs);
 

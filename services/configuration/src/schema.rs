@@ -69,11 +69,7 @@ lazy_static! {
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
-#[serde(
-    rename_all = "lowercase",
-    tag = "vote_type",
-    content = "tx_hash"
-)]
+#[serde(rename_all = "lowercase", tag = "vote_type", content = "tx_hash")]
 pub enum VotingDecision {
     /// `Vote` transaction `Hash` variant.
     Yea(Hash),

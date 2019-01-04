@@ -468,7 +468,8 @@ impl SharedNodeState {
                 lock.validators
                     .iter()
                     .any(|v| v.consensus_key == ci.public_key)
-            }).count();
+            })
+            .count();
 
         if lock.node_role.is_validator() {
             // Peers list doesn't include current node address, so we have to increment its length.

@@ -143,7 +143,8 @@ impl NodeBuilder {
             Box::new(GenerateCommonConfig),
             Box::new(Finalize),
             Box::new(Maintenance),
-        ].into_iter()
+        ]
+        .into_iter()
         .map(|c| (c.name(), CollectedCommand::new(c)))
         .collect()
     }

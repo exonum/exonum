@@ -370,7 +370,8 @@ mod tests {
             .map(|i| ValidatorKeys {
                 consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
                 service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
-            }).collect();
+            })
+            .collect();
 
         StoredConfiguration {
             previous_cfg_hash: Hash::zero(),

@@ -906,6 +906,7 @@ where
             .into_iter()
             .fold(MapProofBuilder::new(), |builder, key| {
                 builder.add_missing(key)
-            }).create(),
+            })
+            .create(),
     }
 }

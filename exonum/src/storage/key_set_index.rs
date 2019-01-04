@@ -204,10 +204,7 @@ where
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::needless_pass_by_value)
-    )]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }

@@ -166,7 +166,8 @@ impl Handshake for NoiseHandshake {
             .read_handshake_msg(stream)
             .and_then(|(stream, handshake, _)| {
                 handshake.write_handshake_msg(stream, &connect.into_bytes())
-            }).and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            })
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake, message)| handshake.finalize(stream, message))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
@@ -189,7 +190,8 @@ impl Handshake for NoiseHandshake {
                     handshake.write_handshake_msg(stream, &connect.into_bytes()),
                     Ok(message),
                 )
-            }).and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
+            })
+            .and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
                     .into()

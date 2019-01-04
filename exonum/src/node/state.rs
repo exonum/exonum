@@ -415,7 +415,8 @@ impl SharedConnectList {
             .map(|(pk, a)| ConnectInfo {
                 address: a.address.clone(),
                 public_key: *pk,
-            }).collect()
+            })
+            .collect()
     }
 
     /// Update peer address in the connect list.
