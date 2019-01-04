@@ -185,7 +185,8 @@ impl ConnectionPool {
                         log_error(e);
                         write_pool.remove(&address);
                         Ok(())
-                    }).map(drop),
+                    })
+                    .map(drop),
             )
         } else {
             Either::B(future::ok(()))
@@ -540,7 +541,8 @@ impl NetworkHandler {
                         .ok_or_else(|| format_err!("shutdown twice"))
                         .into_future(),
                 ),
-            }.map_err(log_error);
+            }
+            .map_err(log_error);
 
             handle.spawn(fut);
             Ok(())

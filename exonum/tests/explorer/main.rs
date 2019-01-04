@@ -263,11 +263,9 @@ fn test_explorer_block_iter() {
         .flat_map(|info| info.with_transactions().transactions)
         .collect();
     assert_eq!(transactions.len(), 12);
-    assert!(
-        transactions
-            .iter()
-            .all(|tx| tx.location().block_height() < Height(10))
-    );
+    assert!(transactions
+        .iter()
+        .all(|tx| tx.location().block_height() < Height(10)));
 
     let heights: Vec<_> = explorer
         .blocks(..)
@@ -403,7 +401,8 @@ fn test_transaction_iterator() {
             } else {
                 false
             }
-        }).map(|tx| tx.location().position_in_block())
+        })
+        .map(|tx| tx.location().position_in_block())
         .collect();
     assert_eq!(create_wallet_positions, vec![0, 1]);
 }

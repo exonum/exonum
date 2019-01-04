@@ -40,7 +40,8 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
             } else {
                 None
             }
-        }).collect()
+        })
+        .collect()
 }
 
 /// Workaround for https://github.com/stepancheg/rust-protobuf/issues/324
@@ -67,7 +68,8 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
                 } else {
                     format!("pub mod {};\n", mod_name)
                 }
-            }).collect::<String>()
+            })
+            .collect::<String>()
     };
     let dest_path = out_dir.as_ref().join(mod_file);
     let mut file = File::create(dest_path).expect("Unable to create output file");
@@ -135,12 +137,14 @@ where
                 s.as_ref()
                     .to_str()
                     .expect("Include dir name is not convertible to &str")
-            }).collect::<Vec<_>>(),
+            })
+            .collect::<Vec<_>>(),
         customize: Customize {
             serde_derive: Some(true),
             ..Default::default()
         },
-    }).expect("protoc");
+    })
+    .expect("protoc");
 
     // rerun build.rs if .proto files changed.
     println!(

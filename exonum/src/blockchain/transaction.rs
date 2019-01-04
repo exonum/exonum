@@ -567,9 +567,9 @@ mod tests {
                 Some("(Not) really long error description".to_owned()),
             )),
         ]
-            .iter()
-            .map(|res| TransactionResult(res.to_owned()))
-            .collect::<Vec<_>>();
+        .iter()
+        .map(|res| TransactionResult(res.to_owned()))
+        .collect::<Vec<_>>();
 
         for result in &results {
             let bytes = result.clone().into_bytes();

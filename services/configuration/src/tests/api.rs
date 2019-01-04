@@ -88,7 +88,8 @@ impl ConfigurationApiTest for TestKitApi {
             .query(&FilterQuery {
                 previous_cfg_hash,
                 actual_from,
-            }).get("v1/configs/proposed")
+            })
+            .get("v1/configs/proposed")
             .unwrap()
     }
 
@@ -108,7 +109,8 @@ impl ConfigurationApiTest for TestKitApi {
             .query(&FilterQuery {
                 previous_cfg_hash,
                 actual_from,
-            }).get("v1/configs/committed")
+            })
+            .get("v1/configs/committed")
             .unwrap()
     }
 

@@ -171,10 +171,7 @@ fn test_scalar_struct_round_trip() {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(
-    pb = "schema::tests::TestProtobufConvertRepeated",
-    crate = "crate"
-)]
+#[exonum(pb = "schema::tests::TestProtobufConvertRepeated", crate = "crate")]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,
     bytes_array: Vec<Vec<u8>>,
@@ -204,10 +201,7 @@ fn test_repeated_struct_round_trip() {
 }
 
 #[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(
-    pb = "schema::tests::TestProtobufConvertMap",
-    crate = "crate"
-)]
+#[exonum(pb = "schema::tests::TestProtobufConvertMap", crate = "crate")]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
     string_map: HashMap<u32, String>,
@@ -232,7 +226,8 @@ fn test_struct_with_maps_roundtrip() {
         key_string_map: vec![
             (String::from("abc"), 0),
             (String::from("def"), u64::max_value()),
-        ].into_iter()
+        ]
+        .into_iter()
         .collect(),
     };
 

@@ -39,7 +39,8 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
             config.max_propose_timeout = MAX_PROPOSE_TIMEOUT;
             config.min_propose_timeout = MIN_PROPOSE_TIMEOUT;
             config.propose_timeout_threshold = PROPOSE_THRESHOLD;
-        }).build();
+        })
+        .build();
 
     // Wait for us to become the leader.
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));

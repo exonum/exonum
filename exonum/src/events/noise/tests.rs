@@ -387,7 +387,8 @@ fn run_handshake_listener(
                         .map_err(|e| panic!("{:?}", e))
                 });
                 Ok(())
-            }).map_err(into_failure),
+            })
+            .map_err(into_failure),
     )
 }
 
@@ -404,7 +405,8 @@ fn send_handshake(
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params, addr).send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, addr, message).send(sock),
-        }).map(|_| ());
+        })
+        .map(|_| ());
 
     core.run(stream)
 }

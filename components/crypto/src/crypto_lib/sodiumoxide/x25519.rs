@@ -55,10 +55,7 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// let (pk, sk) = exonum_crypto::gen_keypair();
 /// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
-#[cfg_attr(
-    feature = "cargo-clippy",
-    allow(clippy::needless_pass_by_value)
-)]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 pub fn into_x25519_keypair(
     pk: crypto_PublicKey,
     sk: crypto_SecretKey,
@@ -178,5 +175,5 @@ implement_x25519_type! {
     struct SecretKey, Curve25519Scalar, SECRET_KEY_LENGTH
 }
 
-implement_index_traits!{ PublicKey }
-implement_index_traits!{ SecretKey }
+implement_index_traits! { PublicKey }
+implement_index_traits! { SecretKey }

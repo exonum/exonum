@@ -183,7 +183,8 @@ where
                     handler(&context, query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
-                }).responder()
+                })
+                .responder()
         };
 
         Self {
@@ -239,7 +240,8 @@ where
                     handler(&context, query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
-                }).responder()
+                })
+                .responder()
         };
 
         Self {

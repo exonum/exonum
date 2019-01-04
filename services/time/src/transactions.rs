@@ -119,7 +119,8 @@ impl TxTime {
                     keys.iter()
                         .find(|validator| validator.service_key == public_key)
                         .map(|_| time)
-                }).collect::<Vec<_>>();
+                })
+                .collect::<Vec<_>>();
             // Ordering time from highest to lowest.
             times.sort_by(|a, b| b.cmp(a));
             times

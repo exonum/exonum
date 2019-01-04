@@ -171,7 +171,8 @@ fn test_fuzz_transfers() {
             let (pubkey, key) = crypto::gen_keypair();
             let tx = TxCreateWallet::sign(&format!("User #{}", i), &pubkey, &key);
             (key, tx)
-        }).collect();
+        })
+        .collect();
     let pubkeys: Vec<_> = keys_and_txs
         .iter()
         .map(|&(_, ref tx)| tx.author())

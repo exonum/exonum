@@ -68,7 +68,8 @@ impl HandshakeRawMessage {
             .and_then(|(stream, msg)| {
                 let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
                 read_exact(stream, vec![0_u8; len as usize])
-            }).map_err(into_failure)
+            })
+            .map_err(into_failure)
             .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
     }
 

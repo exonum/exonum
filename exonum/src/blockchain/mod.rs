@@ -422,7 +422,8 @@ impl Blockchain {
                         "Service not found. Service id: {}",
                         raw.service_id()
                     ))
-                })?.service_name();
+                })?
+                .service_name();
 
             let tx = self.tx_from_raw(raw.payload().clone()).map_err(|error| {
                 format_err!("Service <{}>: {}, tx: {:?}", service_name, error, tx_hash)

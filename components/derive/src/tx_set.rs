@@ -44,7 +44,8 @@ fn get_tx_variants(data: &DataEnum) -> Vec<Variant> {
                 ident: v.ident.clone(),
                 typ: field.ty.clone(),
             }
-        }).collect()
+        })
+        .collect()
 }
 
 fn implement_conversions_for_transactions(
@@ -69,7 +70,7 @@ fn implement_conversions_for_transactions(
         }
     });
 
-    quote!{
+    quote! {
         #(#conversions)*
     }
 }

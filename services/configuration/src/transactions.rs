@@ -465,7 +465,8 @@ mod tests {
             .with_validators(4)
             .with_service(ConfigurationService {
                 config: ConfigurationServiceConfig::default(),
-            }).create();
+            })
+            .create();
 
         let hash = Hash::default();
 

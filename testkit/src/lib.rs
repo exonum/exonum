@@ -302,7 +302,8 @@ impl fmt::Debug for TestKitBuilder {
                 &self
                     .our_validator_id
                     .map_or("Auditor".to_string(), |id| format!("Validator #{}", id.0)),
-            ).field("validator_count", &self.validator_count)
+            )
+            .field("validator_count", &self.validator_count)
             .field(
                 "services",
                 &self
@@ -310,7 +311,8 @@ impl fmt::Debug for TestKitBuilder {
                     .iter()
                     .map(|x| x.service_name())
                     .collect::<Vec<_>>(),
-            ).field("logger", &self.logger)
+            )
+            .field("logger", &self.logger)
             .finish()
     }
 }
@@ -735,7 +737,8 @@ impl TestKit {
                             schema.add_transaction_into_pool(tx.clone());
                         }
                         tx_id
-                    }).collect()
+                    })
+                    .collect()
             };
             blockchain.merge(fork.into_patch()).unwrap();
             hashes

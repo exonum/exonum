@@ -121,7 +121,8 @@ impl Actor for Session {
         self.server_address
             .send(Subscribe {
                 address: address.clone().recipient(),
-            }).into_actor(self)
+            })
+            .into_actor(self)
             .then(|response, actor, context| {
                 match response {
                     Ok(result) => {
@@ -130,7 +131,8 @@ impl Actor for Session {
                     _ => context.stop(),
                 }
                 fut::ok(())
-            }).wait(ctx);
+            })
+            .wait(ctx);
     }
 
     fn stopping(&mut self, _ctx: &mut <Self as Actor>::Context) -> Running {

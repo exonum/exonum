@@ -84,7 +84,8 @@ impl TestNetwork {
                     us.change_role(Some(validator_id));
                 }
                 validator
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         self.validators = validators;
         self.us.clone_from(&us);
     }
@@ -307,7 +308,8 @@ impl TestNetworkConfiguration {
             .map(|(idx, mut node)| {
                 node.change_role(Some(ValidatorId(idx as u16)));
                 node
-            }).collect();
+            })
+            .collect();
         self.stored_configuration.validator_keys = self
             .validators
             .iter()

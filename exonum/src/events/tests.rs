@@ -496,7 +496,8 @@ fn test_network_multiple_connect() {
         .map(|params| {
             let events = TestEvents::with_addr(params.address, &connect_list);
             params.spawn(events, connect_list.clone())
-        }).collect();
+        })
+        .collect();
 
     connectors[0].connect_with(main_key, connection_params[0].connect.clone());
     assert_eq!(

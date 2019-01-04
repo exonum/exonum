@@ -52,7 +52,8 @@ fn test_known_transaction() {
     let sk = SecretKey::from_hex(
         "d142addc3951d67a99f3fd25a4c1294ee088f7a907ed13c4cc6f7c74b5b3147f\
          57d4f9d3ebd09d09d6477546f2504b4da2e02c8dab89ece56a39e7e459e3be3d",
-    ).unwrap();
+    )
+    .unwrap();
     let data = CreateWallet::new(&pk, "test_wallet");
 
     let set = ServiceTransaction::from_raw_unchecked(0, data.encode().unwrap());
@@ -151,7 +152,8 @@ fn test_block() {
 
     let block2: Signed<BlockResponse> = ProtocolMessage::try_from(
         Message::deserialize(SignedMessage::from_raw_buffer(block.serialize()).unwrap()).unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
 
     assert_eq!(block2.author(), pub_key);
     assert_eq!(block2.to(), &pub_key);

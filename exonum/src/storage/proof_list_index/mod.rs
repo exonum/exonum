@@ -645,5 +645,6 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
             [first, second] => hash_pair(first, second),
             [single] => hash_one(single),
             _ => unreachable!(),
-        }).collect()
+        })
+        .collect()
 }

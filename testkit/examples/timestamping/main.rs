@@ -123,7 +123,8 @@ fn main() {
         .query(&BlocksQuery {
             count: 10,
             ..Default::default()
-        }).get("v1/blocks")
+        })
+        .get("v1/blocks")
         .unwrap();
     assert_eq!(blocks_range.blocks.len(), 2);
 

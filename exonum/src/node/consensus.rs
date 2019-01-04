@@ -600,10 +600,7 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::needless_pass_by_value)
-    )]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
@@ -737,7 +734,8 @@ impl NodeHandler {
                         &peer,
                         self.state.height(),
                         propose_hash,
-                    )).into(),
+                    ))
+                    .into(),
                 RequestData::ProposeTransactions(ref propose_hash) => {
                     let txs: Vec<_> = self
                         .state
@@ -767,7 +765,8 @@ impl NodeHandler {
                         round,
                         propose_hash,
                         self.state.known_prevotes(round, propose_hash),
-                    )).into(),
+                    ))
+                    .into(),
                 RequestData::Block(height) => {
                     self.sign_message(BlockRequest::new(&peer, height)).into()
                 }

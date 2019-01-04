@@ -100,7 +100,8 @@ mod test {
                 let mut key = [0; PUBLIC_KEY_LENGTH];
                 rng.fill_bytes(&mut key);
                 PublicKey::from_slice(&key).unwrap()
-            }).collect()
+            })
+            .collect()
     }
 
     fn check_in_connect_list(

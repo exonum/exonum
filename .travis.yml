@@ -38,7 +38,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.30.0
+  - 1.31.1
 
 cache:
   directories:
@@ -67,7 +67,7 @@ jobs:
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
-    - rustup component add rustfmt-preview
+    - rustup component add rustfmt
     - rustfmt -V
     - nvm install 8 && nvm use 8
     - npm install
@@ -131,9 +131,8 @@ jobs:
 
  # Clippy linting.
   - name: clippy
-    rust: nightly-2018-11-28
     install:
-    - cargo clippy --version || rustup component add clippy-preview --toolchain=nightly-2018-11-28
+    - rustup component add clippy
     - cargo clippy --version
     script:
     - cargo clippy --all -- -D warnings

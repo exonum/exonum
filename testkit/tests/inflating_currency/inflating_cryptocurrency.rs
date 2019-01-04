@@ -216,7 +216,8 @@ impl CryptocurrencyApi {
             .map(|wallet| {
                 let height = CoreSchema::new(&snapshot).height();
                 wallet.actual_balance(height)
-            }).ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
+            })
+            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
     fn wire(builder: &mut api::ServiceApiBuilder) {

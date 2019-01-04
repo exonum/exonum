@@ -96,14 +96,10 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
             lit: Lit::Str(path),
             ident,
             ..
-        }
-            if ident == CRATE_PATH_ATTRIBUTE =>
-        {
-            Some(
-                path.parse::<Path>()
-                    .expect("failed to parse crate path in the attribute"),
-            )
-        }
+        } if ident == CRATE_PATH_ATTRIBUTE => Some(
+            path.parse::<Path>()
+                .expect("failed to parse crate path in the attribute"),
+        ),
         _ => None,
     });
 
@@ -126,7 +122,8 @@ fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<Meta> {
             .filter_map(|n| match n {
                 NestedMeta::Meta(meta) => Some(meta),
                 _ => None,
-            }).collect(),
+            })
+            .collect(),
         Some(_) => panic!("`exonum` attribute should contain list of name value pairs"),
         None => vec![],
     }
@@ -138,7 +135,8 @@ fn get_exonum_name_value_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
         .filter_map(|meta| match meta {
             Meta::NameValue(name_value) => Some(name_value),
             _ => None,
-        }).collect()
+        })
+        .collect()
 }
 
 fn find_exonum_word_attribute(attrs: &[Attribute], ident_name: &str) -> bool {

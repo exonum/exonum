@@ -437,7 +437,8 @@ fn prepare_txs(
             .map(|tx| {
                 schema.add_transaction_into_pool(tx.clone());
                 tx.hash()
-            }).collect()
+            })
+            .collect()
     };
 
     blockchain.merge(fork.into_patch()).unwrap();
@@ -452,12 +453,10 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
 
-    assert!(
-        tx_hashes
-            .iter()
-            .all(|hash| schema.transactions_pool().contains(&hash)
-                && !schema.transactions_locations().contains(&hash))
-    );
+    assert!(tx_hashes
+        .iter()
+        .all(|hash| schema.transactions_pool().contains(&hash)
+            && !schema.transactions_locations().contains(&hash)));
     assert_eq!(tx_hashes.len() as u64, schema.transactions_pool_len());
 }
 
@@ -526,7 +525,8 @@ fn execute_block_rocksdb(
                 });
             },
             TXS_IN_BLOCK,
-        ).sample_size(50)
+        )
+        .sample_size(50)
         .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
     );
 }

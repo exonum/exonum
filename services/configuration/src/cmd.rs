@@ -65,7 +65,8 @@ impl CommandExtension for GenerateCommonConfig {
                 vec![(
                     "majority_count".to_owned(),
                     Value::try_from(majority_count).unwrap(),
-                )].into_iter(),
+                )]
+                .into_iter(),
             );
         };
 
@@ -211,5 +212,6 @@ pub fn generate_testnet_config(
             services_configs: service_config.clone(),
             database: Default::default(),
             thread_pool_size: Default::default(),
-        }).collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
 }
