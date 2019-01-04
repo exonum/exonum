@@ -32,7 +32,8 @@ uuid = "0.7.1"
 criterion = "0.2"
 rand = "0.6.1"
 rand_xorshift = "0.1.0"
-pretty_assertions = "0.5.1"
+proptest = "0.8"
+modifier = "0.1"
 
 [[bench]]
 name = "criterion"
