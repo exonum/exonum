@@ -387,6 +387,20 @@ mod tests {
     }
 
     #[test]
+    fn u128_round_trip() {
+        let values = [u128::min_value(), 1, u128::max_value()];
+
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    fn i128_round_trip() {
+        let values = [i128::min_value(), -1, 0, 1, i128::max_value()];
+
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
     fn bool_round_trip() {
         let values = [false, true];
 
