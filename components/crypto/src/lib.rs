@@ -559,6 +559,14 @@ impl CryptoHash for u64 {
     }
 }
 
+impl CryptoHash for u128 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 16];
+        LittleEndian::write_u128(&mut v, *self);
+        hash(&v)
+    }
+}
+
 impl CryptoHash for i8 {
     fn hash(&self) -> Hash {
         hash(&[*self as u8])
@@ -585,6 +593,14 @@ impl CryptoHash for i64 {
     fn hash(&self) -> Hash {
         let mut v = [0; 8];
         LittleEndian::write_i64(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i128 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 16];
+        LittleEndian::write_i128(&mut v, *self);
         hash(&v)
     }
 }

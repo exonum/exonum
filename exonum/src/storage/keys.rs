@@ -115,6 +115,20 @@ impl StorageKey for u8 {
     }
 }
 
+impl StorageKey for u128 {
+    fn size(&self) -> usize {
+        1
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer[0] = *self as u8
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        buffer[0] as u128
+    }
+}
+
 /// Uses encoding with the values mapped to `u8`
 /// by adding the corresponding constant (`128`) to the value.
 impl StorageKey for i8 {
@@ -128,6 +142,20 @@ impl StorageKey for i8 {
 
     fn read(buffer: &[u8]) -> Self::Owned {
         buffer[0].wrapping_sub(i8::min_value() as u8) as i8
+    }
+}
+
+impl StorageKey for i128 {
+    fn size(&self) -> usize {
+        1
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer[0] = self.wrapping_add(i128::min_value()) as u8;
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        buffer[0].wrapping_sub(i128::min_value() as u8) as i128
     }
 }
 
