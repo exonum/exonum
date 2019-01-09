@@ -86,7 +86,6 @@ extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_dns;
-extern crate tokio_executor;
 extern crate tokio_io;
 extern crate tokio_retry;
 extern crate tokio_threadpool;
