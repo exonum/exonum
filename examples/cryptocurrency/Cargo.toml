@@ -27,7 +27,7 @@ protobuf = "2.2.0"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.10.0", path = "../../testkit" }
-rand = "=0.6.3"
+rand = "=0.6.4"
 pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
 
