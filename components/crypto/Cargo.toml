@@ -11,7 +11,7 @@ categories = ["cryptography", "hashing"]
 description = "Cryptography related types, constants, traits and functions."
 
 [dependencies]
-byteorder = "1.2.3"
+byteorder = { version = "1.2.7", features = [ "i128" ] }
 chrono = "=0.4.6"
 hex = "=0.3.2"
 hex-buffer-serde = "=0.1.1"
