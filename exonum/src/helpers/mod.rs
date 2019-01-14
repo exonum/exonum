@@ -130,12 +130,15 @@ pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Opt
 
 #[test]
 fn test_path_relative_from() {
-    let baz: PathBuf = "/foo/bar/baz".into();
-    let bar: PathBuf = "/foo/bar".into();
-    let quux: PathBuf = "/foo/bar/quux".into();
-    assert_eq!(path_relative_from(&bar, &baz), Some("../".into()));
-    assert_eq!(path_relative_from(&baz, &bar), Some("baz".into()));
-    assert_eq!(path_relative_from(&quux, &baz), Some("../quux".into()));
-    assert_eq!(path_relative_from(&baz, &quux), Some("../baz".into()));
-    assert_eq!(path_relative_from(&bar, &quux), Some("../".into()));
+    let cases = vec![
+        ("/b", "/c", Some("../b".into())),
+        ("/a/b", "/a/c", Some("../b".into())),
+        ("/a", "/a/c", Some("../".into())),
+        ("/a/b/c", "/a/b", Some("c".into())),
+        ("/a/b/c", "/a/b/d", Some("../c".into())),
+        ("./a/b", "./a/c", Some("../b".into())),
+    ];
+    for c in cases {
+        assert_eq!(path_relative_from(c.0, c.1), c.2);
+    }
 }
