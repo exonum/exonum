@@ -156,6 +156,19 @@ impl StorageValue for u64 {
     }
 }
 
+/// Uses little-endian encoding.
+impl StorageValue for u128 {
+    fn into_bytes(self) -> Vec<u8> {
+        let mut v = vec![0; mem::size_of::<u128>()];
+        LittleEndian::write_u128(&mut v, self);
+        v
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_u128(value.as_ref())
+    }
+}
+
 impl StorageValue for i8 {
     fn into_bytes(self) -> Vec<u8> {
         vec![self as u8]
@@ -203,6 +216,19 @@ impl StorageValue for i64 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_i64(value.as_ref())
+    }
+}
+
+/// Uses little-endian encoding.
+impl StorageValue for i128 {
+    fn into_bytes(self) -> Vec<u8> {
+        let mut v = vec![0; 16];
+        LittleEndian::write_i128(&mut v, self);
+        v
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_i128(value.as_ref())
     }
 }
 
@@ -356,6 +382,20 @@ mod tests {
     #[test]
     fn i64_round_trip() {
         let values = [i64::min_value(), -1, 0, 1, i64::max_value()];
+
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    fn u128_round_trip() {
+        let values = [u128::min_value(), 1, u128::max_value()];
+
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    fn i128_round_trip() {
+        let values = [i128::min_value(), -1, 0, 1, i128::max_value()];
 
         assert_round_trip_eq(&values);
     }

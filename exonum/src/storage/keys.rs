@@ -172,6 +172,7 @@ macro_rules! storage_key_for_ints {
 storage_key_for_ints! {u16, i16, 2, read_u16, write_u16}
 storage_key_for_ints! {u32, i32, 4, read_u32, write_u32}
 storage_key_for_ints! {u64, i64, 8, read_u64, write_u64}
+storage_key_for_ints! {u128, i128, 16, read_u128, write_u128}
 
 macro_rules! storage_key_for_crypto_types {
     ($type:ident, $size:expr) => {
@@ -387,6 +388,8 @@ mod tests {
     test_storage_key_for_int_type! {fuzz i32, 4 => test_storage_key_for_i32}
     test_storage_key_for_int_type! {fuzz u64, 8 => test_storage_key_for_u64}
     test_storage_key_for_int_type! {fuzz i64, 8 => test_storage_key_for_i64}
+    test_storage_key_for_int_type! {fuzz u128, 16 => test_storage_key_for_u128}
+    test_storage_key_for_int_type! {fuzz i128, 16 => test_storage_key_for_i128}
 
     #[test]
     fn signed_int_key_in_index() {

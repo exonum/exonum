@@ -3,7 +3,17 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+
+### Internal Improvements
+
+#### exonum
+
+- Added i128/u128 support for `StorageKey`, `StorageValue`. (#1179)
+
+#### exonum-crypto
+
+- Added i128/u128 support for `CryptoHash`. (#1179)
 
 ### Breaking Changes
 
