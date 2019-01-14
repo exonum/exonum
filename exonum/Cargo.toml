@@ -56,7 +56,7 @@ ctrlc = "3.1.1"
 
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
-exonum-crypto = { version = "0.10.2", path = "../components/crypto" }
+exonum-crypto = { version = "0.10.3", path = "../components/crypto" }
 exonum-derive = { version = "0.10.0", path = "../components/derive" }
 
 [dev-dependencies]
