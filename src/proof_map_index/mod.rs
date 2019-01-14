@@ -521,7 +521,7 @@ where
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 where
     K: BinaryKey + UniqueHash,
-    V: BinaryValue + UniqueHash + Clone,
+    V: BinaryValue + UniqueHash,
 {
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
@@ -822,8 +822,8 @@ where
 
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
-    K: BinaryKey + UniqueHash,
-    V: BinaryValue + UniqueHash,
+    K: BinaryKey,
+    V: BinaryValue,
 {
     type Item = (K::Owned, V);
 
@@ -836,7 +836,7 @@ where
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
-    K: BinaryKey + UniqueHash,
+    K: BinaryKey,
 {
     type Item = K::Owned;
 
@@ -847,7 +847,7 @@ where
 
 impl<'a, V> Iterator for ProofMapIndexValues<'a, V>
 where
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue,
 {
     type Item = V;
 
