@@ -14,7 +14,7 @@
 
 //! Different assorted utilities.
 
-pub use self::types::{Height, Milliseconds, Round, ValidatorId};
+pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
 pub mod fabric;

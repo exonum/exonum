@@ -92,6 +92,7 @@ extern crate tokio_retry;
 extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
+extern crate zeroize;
 
 // Test dependencies.
 #[cfg(test)]

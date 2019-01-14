@@ -41,7 +41,7 @@ use super::{
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto::PublicKey;
-use helpers::{config::ConfigFile, generate_testnet_config};
+use helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
@@ -60,6 +60,7 @@ const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
 const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
 const NO_PASSWORD: &str = "NO_PASSWORD";
 
+#[derive(Copy, Clone)]
 enum SecretKeyType {
     Consensus,
     Service,
@@ -412,22 +413,24 @@ impl GenerateNodeConfig {
         (external_address, listen_address)
     }
 
-    fn get_passphrase(context: &Context, secret_key_type: SecretKeyType) -> Vec<u8> {
+    fn get_passphrase(context: &Context, secret_key_type: SecretKeyType) -> ZeroizeOnDrop<Vec<u8>> {
         let key = match secret_key_type {
             SecretKeyType::Consensus => EXONUM_CONSENSUS_PASS,
             SecretKeyType::Service => EXONUM_SERVICE_PASS,
         };
-        context
-            .get_flag_occurrences(NO_PASSWORD)
-            .map(|_| "".to_string())
-            .or_else(|| env::var(key).ok())
-            .or_else(|| {
-                let stdin = io::stdin();
-                let stdin_locked = stdin.lock();
-                prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
-            })
-            .unwrap()
-            .into_bytes()
+        ZeroizeOnDrop(
+            context
+                .get_flag_occurrences(NO_PASSWORD)
+                .map(|_| "".to_string())
+                .or_else(|| env::var(key).ok())
+                .or_else(|| {
+                    let stdin = io::stdin();
+                    let stdin_locked = stdin.lock();
+                    prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
+                })
+                .unwrap()
+                .into_bytes(),
+        )
     }
 }
 
@@ -529,11 +532,11 @@ impl Command for GenerateNodeConfig {
 
         let consensus_public_key = {
             let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
-            create_secret_key_file(&consensus_secret_key_path, &passphrase)
+            create_secret_key_file(&consensus_secret_key_path, &passphrase.0)
         };
         let service_public_key = {
             let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
-            create_secret_key_file(&service_secret_key_path, &passphrase)
+            create_secret_key_file(&service_secret_key_path, &passphrase.0)
         };
 
         let pub_config_folder = Path::new(&pub_config_path).parent().unwrap();
@@ -866,8 +869,8 @@ impl Command for GenerateTestnet {
             let config: NodeConfig<PathBuf> = NodeConfig {
                 consensus_secret_key: consensus_key_filename.into(),
                 service_secret_key: service_key_filename.into(),
-                consensus_public_key: consensus_public_key,
-                service_public_key: service_public_key,
+                consensus_public_key,
+                service_public_key,
                 genesis: cfg.genesis,
                 listen_address: cfg.listen_address,
                 external_address: cfg.external_address,
