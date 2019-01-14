@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Internal Improvements
+
 #### exonum
 
 - Add i128/u128 support for `StorageKey`, `StorageValue`. (#1179)
