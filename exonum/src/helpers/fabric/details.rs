@@ -418,19 +418,17 @@ impl GenerateNodeConfig {
             SecretKeyType::Consensus => EXONUM_CONSENSUS_PASS,
             SecretKeyType::Service => EXONUM_SERVICE_PASS,
         };
-        ZeroizeOnDrop(
-            context
-                .get_flag_occurrences(NO_PASSWORD)
-                .map(|_| "".to_string())
-                .or_else(|| env::var(key).ok())
-                .or_else(|| {
-                    let stdin = io::stdin();
-                    let stdin_locked = stdin.lock();
-                    prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
-                })
-                .unwrap()
-                .into_bytes(),
-        )
+        context
+            .get_flag_occurrences(NO_PASSWORD)
+            .map(|_| ZeroizeOnDrop("".to_string()))
+            .or_else(|| env::var(key).map(ZeroizeOnDrop).ok())
+            .or_else(|| {
+                let stdin = io::stdin();
+                let stdin_locked = stdin.lock();
+                prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
+            })
+            .map(|s| ZeroizeOnDrop(s.0.as_bytes().to_vec()))
+            .unwrap()
     }
 }
 
@@ -894,7 +892,7 @@ fn prompt_passphrase<R: BufRead, W: Write>(
     mut reader: R,
     mut writer: W,
     secret_key_type: SecretKeyType,
-) -> io::Result<String> {
+) -> io::Result<ZeroizeOnDrop<String>> {
     let key_type = match secret_key_type {
         SecretKeyType::Consensus => "consensus",
         SecretKeyType::Service => "service",
@@ -902,14 +900,16 @@ fn prompt_passphrase<R: BufRead, W: Write>(
     loop {
         write!(&mut writer, "Enter passphrase for {} key: ", key_type)?;
         writer.flush()?;
-        let password = rpassword::read_password_with_reader(Some(&mut reader))?;
-        if password.is_empty() {
+        let password = ZeroizeOnDrop(rpassword::read_password_with_reader(Some(&mut reader))?);
+        if password.0.is_empty() {
             writeln!(&mut writer, "Passphrase must not be empty. Try again.")?;
             continue;
         }
         write!(&mut writer, "Enter same passphrase again: ")?;
         writer.flush()?;
-        if password == rpassword::read_password_with_reader(Some(&mut reader))? {
+        let second_password =
+            ZeroizeOnDrop(rpassword::read_password_with_reader(Some(&mut reader))?);
+        if password.0 == second_password.0 {
             return Ok(password);
         }
         writeln!(&mut writer, "Passphrases do not match. Try again.")?;
@@ -1032,7 +1032,7 @@ mod test {
         let password =
             prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Consensus);
         assert!(password.is_ok());
-        assert_eq!(password.unwrap(), String::from("some password"));
+        assert_eq!(password.unwrap().0, String::from("some password"));
 
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
