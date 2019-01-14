@@ -15,7 +15,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.10.1", path = "../../../exonum" }
+exonum = { version = "0.10.2", path = "../../../exonum" }
 exonum-derive = { version = "0.10.0", path = "../../../components/derive" }
 exonum-configuration = { version = "0.10.0", path = "../../../services/configuration" }
 serde = "1.0.0"
@@ -24,7 +24,7 @@ failure = "0.1.5"
 protobuf = "2.2.0"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.10.0", path = "../../../testkit" }
+exonum-testkit = { version = "0.10.1", path = "../../../testkit" }
 serde_json = "1.0.0"
 pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
