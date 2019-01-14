@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## 0.9.6 - 2019-01-14
+
+### Internal Improvements
+
+#### exonum
+
+- Disabled default features of the `actix-web` dependency to get rid of
+  a `ring` dependency which leads to build crash.
+
+#### exonum-testkit
+
+- Disabled default features of the `actix-web` dependency to get rid of
+  a `ring` dependency which leads to build crash.
+
 ## 0.9.5 - 2018-12-18
 
 ### Internal Improvements
