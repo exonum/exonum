@@ -310,6 +310,23 @@ fn test_remove_reverse() {
 }
 
 #[test]
+fn test_merkle_root_leaf() {
+    let db = TemporaryDB::default();
+    let mut storage = db.fork();
+    let mut index = ProofMapIndex::new(IDX_NAME, &mut storage);
+
+    let key = vec![1, 2, 3];
+    let value = vec![4, 5, 6];
+    index.put(&key, value.clone());
+
+    let merkle_root = HashStream::new()
+        .update(ProofPath::new(&key).as_bytes())
+        .update(UniqueHash::hash(&value).as_ref())
+        .hash();
+    assert_eq!(merkle_root, index.merkle_root());
+}
+
+#[test]
 fn test_fuzz_insert() {
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();

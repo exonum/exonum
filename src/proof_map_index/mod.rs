@@ -257,9 +257,9 @@ where
     /// ```
     pub fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
-            Some((k, Node::Leaf(v))) => HashStream::new()
-                .update(k.as_bytes())
-                .update(v.hash().as_ref())
+            Some((path, Node::Leaf(hash))) => HashStream::new()
+                .update(path.as_bytes())
+                .update(hash.as_ref())
                 .hash(),
             Some((_, Node::Branch(branch))) => branch.hash(),
             None => Hash::zero(),
