@@ -19,7 +19,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix-web = "=0.7.17"
+actix-web = { version = "=0.7.17", default-features = false }
 exonum = { version = "0.10.1", path = "../exonum" }
 failure = "0.1.5"
 futures = "=0.1.25"
