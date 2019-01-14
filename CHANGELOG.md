@@ -9,11 +9,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- Add i128/u128 support for `StorageKey`, `StorageValue`. (#1179)
+- Added i128/u128 support for `StorageKey`, `StorageValue`. (#1179)
 
 #### exonum-crypto
 
-- Add i128/u128 support for `CryptoHash`. (#1179)
+- Added i128/u128 support for `CryptoHash`. (#1179)
 
 ## 0.10.1 - 2019-01-04
 
