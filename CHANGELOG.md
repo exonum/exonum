@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Breaking Changes
+
+#### exonum
+
+- Node secret keys are now stored in separate files in a secure way.
+  CLI for generating node configs and starting nodes has been extended
+  in order to reflect these changes. (#1222, #1096)
+
+#### exonum-crypto
+
+- Renamed `create_keys_file` function to `generate_keys_file`
+  in `utils` module. (#1222, #1096)
+
 ## 0.10.1 - 2019-01-04
 
 ### Internal Improvements
@@ -49,10 +64,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Custom serialization has been removed. (#1088)
 
 #### exonum
-
-- Node secret keys are now stored in separate files in a secure way.
-  CLI for generating node configs and starting nodes has been extended
-  in order to reflect these changes.
 
 - Trait `TransactionSend` was removed.
   `ApiSender` now contains `broadcast_transaction` method. (#943)
@@ -134,7 +145,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-crypto
 
-- Added `utils` module with functions `generate_keys_file` for creating
+- Added `utils` module with functions `create_keys_file` for creating
   and `read_keys_from_file` for reading files that contain a
   public key and encrypted secret key. (#1056)
 
