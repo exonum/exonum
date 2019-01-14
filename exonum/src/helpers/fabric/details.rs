@@ -425,7 +425,8 @@ impl GenerateNodeConfig {
                 let stdin = io::stdin();
                 let stdin_locked = stdin.lock();
                 prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
-            }).unwrap()
+            })
+            .unwrap()
             .into_bytes()
     }
 }

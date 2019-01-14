@@ -162,7 +162,8 @@ fn finalize_config(folder: &str, config: &str, sec_config: &str, pub_configs: &[
         full_testdata_name(sec_config),
         full_tmp_name(config, folder),
         "-p".to_owned(),
-    ].iter()
+    ]
+    .iter()
     .cloned()
     .chain(pub_config_paths)
     .collect::<Vec<_>>();
