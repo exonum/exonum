@@ -527,12 +527,14 @@ impl Command for GenerateNodeConfig {
         let services_public_configs = new_context.get(keys::SERVICES_PUBLIC_CONFIGS).unwrap();
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
-        let consensus_passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
-        let service_passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
-        let consensus_public_key =
-            create_secret_key_file(&consensus_secret_key_path, &consensus_passphrase);
-        let service_public_key =
-            create_secret_key_file(&service_secret_key_path, &service_passphrase);
+        let consensus_public_key = {
+            let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
+            create_secret_key_file(&consensus_secret_key_path, &passphrase)
+        };
+        let service_public_key = {
+            let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
+            create_secret_key_file(&service_secret_key_path, &passphrase)
+        };
 
         let pub_config_folder = Path::new(&pub_config_path).parent().unwrap();
         let consensus_secret_key = if consensus_secret_key_path.is_absolute() {
