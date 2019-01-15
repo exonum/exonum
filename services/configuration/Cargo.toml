@@ -1,6 +1,6 @@
 [package]
 name = "exonum-configuration"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/doc/advanced/configuration-updater/"
 repository = "https://github.com/exonum/exonum"
