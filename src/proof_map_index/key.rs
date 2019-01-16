@@ -78,8 +78,8 @@ impl ops::Not for ChildKind {
 /// | Position in bytes     | Description                   	                    |
 /// |-------------------    |----------------------------------------------         |
 /// | 0               	    | `ProofPath` kind: (0 is branch, 1 is leaf)            |
-/// | 1..33                 | `Hash` bytes.    	                            |
-/// | 33                    | Total length in bits of `Hash` for branches.   |
+/// | 1..33                 | `Hash` bytes.    	                                    |
+/// | 33                    | Total length in bits of `Hash` for branches.          |
 ///
 /// # JSON serialization
 ///
@@ -181,10 +181,11 @@ pub(crate) trait BitsRange {
     fn start_from(&self, pos: u16) -> Self;
 
     /// Returns a copy of this bit range shortened to the specified length.
+    /// This action changes the proof path kind to "branch".
     fn prefix(&self, len: u16) -> Self;
 
     /// Returns a copy of this bit range where the start is shifted by the `len`
-    /// bits to the right.
+    /// bits to the right. This action doesn't change the proof path kind.
     fn suffix(&self, len: u16) -> Self;
 
     /// Checks if this bit range contains the other bit range as a prefix,
