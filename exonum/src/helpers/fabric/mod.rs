@@ -241,7 +241,7 @@ impl Context {
                 ArgumentType::Named(_) if !arg.takes_value => {
                     let occurrences = matches.occurrences_of(&arg.name);
                     if occurrences > 0 {
-                        context.flags.insert(arg.name.to_owned(), occurrences);
+                        context.set_flag_occurrences(arg.name, occurrences);
                         continue;
                     }
                 }
@@ -321,8 +321,11 @@ impl Context {
 
     /// Checks if the flag exists in command line flags map.
     pub fn has_flag(&self, flag: &str) -> bool {
-        let occurrences = self.flags.get(flag);
-        occurrences.is_some() && *occurrences.unwrap() > 0
+        if let Some(&occurrences) = self.flags.get(flag) {
+            occurrences > 0
+        } else {
+            false
+        }
     }
 
     fn get_raw<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, failure::Error> {

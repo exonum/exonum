@@ -537,16 +537,18 @@ impl Command for GenerateNodeConfig {
             create_secret_key_file(&service_secret_key_path, &passphrase.0)
         };
 
-        let pub_config_folder = Path::new(&pub_config_path).parent().unwrap();
+        let pub_config_dir = Path::new(&pub_config_path)
+            .parent()
+            .expect("Cannot get directory with configuration file");
         let consensus_secret_key = if consensus_secret_key_path.is_absolute() {
             consensus_secret_key_path
         } else {
-            path_relative_from(&consensus_secret_key_path, &pub_config_folder).unwrap()
+            path_relative_from(&consensus_secret_key_path, &pub_config_dir).unwrap()
         };
         let service_secret_key = if service_secret_key_path.is_absolute() {
             service_secret_key_path
         } else {
-            path_relative_from(&service_secret_key_path, &pub_config_folder).unwrap()
+            path_relative_from(&service_secret_key_path, &pub_config_dir).unwrap()
         };
 
         let validator_keys = ValidatorKeys {
@@ -922,7 +924,10 @@ fn create_secret_key_file(
 ) -> PublicKey {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
-        panic!("{}: File exists", secret_key_path.to_string_lossy(),);
+        panic!(
+            "Failed to create secret key file. File exists: {}",
+            secret_key_path.to_string_lossy(),
+        );
     } else {
         if let Some(dir) = secret_key_path.parent() {
             fs::create_dir_all(dir).unwrap();

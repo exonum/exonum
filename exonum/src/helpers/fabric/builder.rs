@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ctrlc;
+
 use std::{
     collections::HashMap,
     env,
@@ -30,7 +32,7 @@ use super::{
     CommandName, Context, ServiceFactory,
 };
 use blockchain::Service;
-use ctrlc;
+use helpers::ZeroizeOnDrop;
 use node::{ExternalMessage, Node};
 
 const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
@@ -72,7 +74,7 @@ impl NodeBuilder {
     {
         let feedback = ClapBackend::execute_cmd_string(&self.commands, cmd_line);
         if let Feedback::RunNode(ref ctx) = feedback {
-            self.read_run_context(ctx);
+            self.node_from_run_context(ctx);
         }
         feedback != Feedback::None
     }
@@ -81,7 +83,7 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
-                let node = self.read_run_context(ctx);
+                let node = self.node_from_run_context(ctx);
                 Some(node)
             }
             _ => None,
@@ -146,7 +148,7 @@ impl NodeBuilder {
         .collect()
     }
 
-    fn read_run_context(self, ctx: &Context) -> Node {
+    fn node_from_run_context(self, ctx: &Context) -> Node {
         let config_file_path = ctx
             .get(keys::NODE_CONFIG_PATH)
             .expect("Could not find node_config_path");
@@ -160,13 +162,14 @@ impl NodeBuilder {
             .map(|mut factory| factory.make_service(ctx))
             .collect();
 
-        let consensus_passphrase = env::var(EXONUM_CONSENSUS_PASS).unwrap_or_default();
-        let service_passphrase = env::var(EXONUM_SERVICE_PASS).unwrap_or_default();
+        let consensus_passphrase =
+            ZeroizeOnDrop(env::var(EXONUM_CONSENSUS_PASS).unwrap_or_default());
+        let service_passphrase = ZeroizeOnDrop(env::var(EXONUM_SERVICE_PASS).unwrap_or_default());
 
         let config = config.read_secret_keys(
             &config_file_path,
-            consensus_passphrase.as_bytes(),
-            service_passphrase.as_bytes(),
+            consensus_passphrase.0.as_bytes(),
+            service_passphrase.0.as_bytes(),
         );
         Node::new(db, services, config, Some(config_file_path))
     }
