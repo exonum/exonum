@@ -23,8 +23,7 @@ use toml;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    env, fs,
-    io::{self, BufRead, Write},
+    env, fs, io,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
 };
@@ -422,11 +421,7 @@ impl GenerateNodeConfig {
             .get_flag_occurrences(NO_PASSWORD)
             .map(|_| ZeroizeOnDrop("".to_string()))
             .or_else(|| env::var(key).map(ZeroizeOnDrop).ok())
-            .or_else(|| {
-                let stdin = io::stdin();
-                let stdin_locked = stdin.lock();
-                prompt_passphrase(stdin_locked, io::stdout(), secret_key_type).ok()
-            })
+            .or_else(|| prompt_passphrase(secret_key_type).ok())
             .map(|s| ZeroizeOnDrop(s.0.as_bytes().to_vec()))
             .unwrap()
     }
@@ -890,31 +885,30 @@ impl Command for GenerateTestnet {
     }
 }
 
-fn prompt_passphrase<R: BufRead, W: Write>(
-    mut reader: R,
-    mut writer: W,
-    secret_key_type: SecretKeyType,
-) -> io::Result<ZeroizeOnDrop<String>> {
+fn prompt_passphrase(secret_key_type: SecretKeyType) -> io::Result<ZeroizeOnDrop<String>> {
     let key_type = match secret_key_type {
         SecretKeyType::Consensus => "consensus",
         SecretKeyType::Service => "service",
     };
     loop {
-        write!(&mut writer, "Enter passphrase for {} key: ", key_type)?;
-        writer.flush()?;
-        let password = ZeroizeOnDrop(rpassword::read_password_with_reader(Some(&mut reader))?);
+        let password = ZeroizeOnDrop(rpassword::read_password_from_tty(Some(&format!(
+            "Enter passphrase for {} key: ",
+            key_type
+        )))?);
         if password.0.is_empty() {
-            writeln!(&mut writer, "Passphrase must not be empty. Try again.")?;
+            eprintln!("Passphrase must not be empty. Try again.");
             continue;
         }
-        write!(&mut writer, "Enter same passphrase again: ")?;
-        writer.flush()?;
-        let second_password =
-            ZeroizeOnDrop(rpassword::read_password_with_reader(Some(&mut reader))?);
+
+        let second_password = ZeroizeOnDrop(rpassword::read_password_from_tty(Some(
+            "Enter same passphrase again: ",
+        ))?);
+
         if password.0 == second_password.0 {
             return Ok(password);
+        } else {
+            eprintln!("Passphrases do not match. Try again.");
         }
-        writeln!(&mut writer, "Passphrases do not match. Try again.")?;
     }
 }
 
@@ -1029,60 +1023,4 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_prompt_password() {
-        // Enter "some password", repeat with "some password".
-        let passwords_input = b"some password\nsome password\n";
-        let mut output = Vec::new();
-        let password =
-            prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Consensus);
-        assert!(password.is_ok());
-        assert_eq!(password.unwrap().0, String::from("some password"));
-
-        let output = String::from_utf8(output).unwrap();
-        assert_eq!(
-            output,
-            "Enter passphrase for consensus key: \
-             Enter same passphrase again: "
-        );
-    }
-
-    #[test]
-    fn test_prompt_password_retry() {
-        // Enter "A", repeat with "B", then enter "A" and repeat with "A".
-        let passwords_input = b"A\nB\nA\nA\n";
-        let mut output = Vec::new();
-        let password = prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Service);
-        assert!(password.is_ok());
-
-        let output = String::from_utf8(output).unwrap();
-        assert_eq!(
-            output,
-            "Enter passphrase for service key: \
-             Enter same passphrase again: \
-             Passphrases do not match. Try again.\n\
-             Enter passphrase for service key: \
-             Enter same passphrase again: "
-        );
-    }
-
-    #[test]
-    fn test_prompt_password_disallow_empty() {
-        // Enter empty password, then enter "A" and repeat with "A".
-        let passwords_input = b"\nA\nA\n";
-        let mut output = Vec::new();
-        let password =
-            prompt_passphrase(&passwords_input[..], &mut output, SecretKeyType::Consensus);
-        eprintln!("password = {:?}", password);
-        assert!(password.is_ok());
-
-        let output = String::from_utf8(output).unwrap();
-        assert_eq!(
-            output,
-            "Enter passphrase for consensus key: \
-             Passphrase must not be empty. Try again.\n\
-             Enter passphrase for consensus key: \
-             Enter same passphrase again: "
-        );
-    }
 }
