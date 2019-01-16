@@ -13,22 +13,57 @@
 // limitations under the License.
 
 use std::{
-    cmp::Ordering::{Equal, Greater, Less},
+    cell::{Ref, RefCell, RefMut}, cmp::Ordering::{Equal, Greater, Less},
     collections::{
-        btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range},
-        hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter},
-        Bound::{Included, Unbounded},
-        HashMap,
+        btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter},
+        hash_map::{IntoIter as HmIntoIter, Iter as HmIter}, Bound::{Included, Unbounded}, HashMap,
     },
-    iter::{Iterator as StdIterator, Peekable},
+    iter::{FromIterator, Iterator as StdIterator, Peekable}, mem,
 };
 
-use super::Result;
+use crate::{Result, views::{IndexAccess, IndexAccessMut, IndexAddress, View, ViewMut}};
+
+/// Finds a prefix immediately following the supplied one.
+pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
+    let change_idx = prefix.iter().rposition(|&byte| byte < u8::max_value());
+    change_idx.map(|idx| {
+        let mut next_prefix = prefix.to_vec();
+        next_prefix[idx] += 1;
+        for byte in &mut next_prefix[(idx + 1)..] {
+            *byte = 0;
+        }
+        next_prefix
+    })
+}
+
+/// Removes all keys from the table that start with the specified prefix.
+pub fn remove_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
+    if prefix.len() > 0 {
+        // Remove all keys starting from `prefix`.
+        let mut tail = table.split_off(prefix);
+        if let Some(next_prefix) = next_prefix(prefix) {
+            tail = tail.split_off(&next_prefix);
+            table.append(&mut tail);
+        }
+    } else {
+        // If the prefix is empty, we can be more efficient by clearing
+        // the entire changes in the patch.
+        table.clear();
+    }
+}
 
 /// Map containing changes with a corresponding key.
 #[derive(Debug, Clone)]
 pub struct Changes {
     data: BTreeMap<Vec<u8>, Change>,
+    removed_prefixes: Vec<Vec<u8>>,
+}
+
+/// Map containing changes with a corresponding key.
+#[derive(Debug, Clone)]
+pub struct ViewChanges {
+    pub(super) data: BTreeMap<Vec<u8>, Change>,
+    clear: bool,
 }
 
 impl Changes {
@@ -36,12 +71,36 @@ impl Changes {
     fn new() -> Self {
         Self {
             data: BTreeMap::new(),
+            removed_prefixes: Vec::new(),
         }
     }
 
     /// Returns an iterator over the changes.
     pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
         self.data.iter()
+    }
+
+    /// Returns prefixes of keys that should be removed from the database.
+    pub fn removed_prefixes(&self) -> &[Vec<u8>] {
+        &self.removed_prefixes
+    }
+}
+
+impl ViewChanges {
+    fn new() -> Self {
+        Self {
+            data: BTreeMap::new(),
+            clear: false,
+        }
+    }
+
+    pub fn is_cleared(&self) -> bool {
+        self.clear
+    }
+
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.clear = true;
     }
 }
 
@@ -80,32 +139,79 @@ pub struct Patch {
     changes: HashMap<String, Changes>,
 }
 
-impl Patch {
+pub struct WorkingPatch {
+    changes: HashMap<IndexAddress, RefCell<ViewChanges>>,
+}
+
+impl WorkingPatch {
     /// Creates a new empty `Patch` instance.
     fn new() -> Self {
-        Self {
+        WorkingPatch {
             changes: HashMap::new(),
         }
     }
 
     /// Returns changes for the given name.
-    fn changes(&self, name: &str) -> Option<&Changes> {
-        self.changes.get(name)
+    fn changes(&self, address: &IndexAddress) -> Ref<ViewChanges> {
+        if !self.changes.contains_key(address) {
+            self.initialize_changes(address);
+        }
+
+        self.changes.get(address).unwrap().borrow()
     }
 
     /// Returns a mutable reference to the changes corresponding to the `name`.
-    fn changes_mut(&mut self, name: &str) -> Option<&mut Changes> {
-        self.changes.get_mut(name)
+    fn changes_mut(&self, address: &IndexAddress) -> RefMut<ViewChanges> {
+        if !self.changes.contains_key(address) {
+            self.initialize_changes(address);
+        }
+
+        self.changes.get(address).unwrap().borrow_mut()
     }
 
-    /// Gets the corresponding entry in the map by the given name for in-place manipulation.
-    fn changes_entry(&mut self, name: String) -> HmEntry<String, Changes> {
-        self.changes.entry(name)
+    #[allow(unsafe_code)]
+    fn initialize_changes(&self, address: &IndexAddress) {
+        let ptr = self as *const Self;
+        // FIXME: describe soundness reasoning; check internal structure of `RefCell`
+        unsafe { &mut *(ptr as *mut Self) }
+            .changes
+            .insert(address.clone(), RefCell::new(ViewChanges::new()));
     }
 
-    /// Inserts changes with the given name.
-    fn insert_changes(&mut self, name: String, changes: Changes) {
-        self.changes.insert(name, changes);
+    // TODO: verify that this method updates `Change`s already in the `Patch`
+    fn merge_into(self, patch: &mut Patch) {
+        for (address, changes) in self.changes {
+            let changes = changes.into_inner();
+
+            let patch_changes = patch
+                .changes
+                .entry(address.name().to_owned())
+                .or_insert_with(Changes::new);
+
+            if changes.is_cleared() {
+                let prefix = address.bytes().map_or(vec![], |bytes| bytes.to_vec());
+                remove_prefix(&mut patch_changes.data, &prefix);
+
+                // Remember the prefix to be dropped from the database
+                patch_changes.removed_prefixes.push(prefix);
+            }
+
+            patch_changes.data.extend(
+                changes
+                    .data
+                    .into_iter()
+                    .map(|(key, value)| (address.keyed(&key).1, value)),
+            );
+        }
+    }
+}
+
+impl Patch {
+    /// Creates a new empty `Patch` instance.
+    fn new() -> Self {
+        Patch {
+            changes: HashMap::new(),
+        }
     }
 
     /// Returns iterator over changes.
@@ -123,6 +229,31 @@ impl Patch {
     /// Returns `true` if this patch contains no changes and `false` otherwise.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Produces a patch that would reverse the effects of this patch for a given
+    /// snapshot.
+    pub fn undo(self, snapshot: &dyn Snapshot) -> Self {
+        let mut rev_patch = Patch::new();
+
+        for (name, changes) in self {
+            let rev_changes = BTreeMap::from_iter(changes.into_iter().map(|(key, ..)| {
+                match snapshot.get(&name, &key) {
+                    Some(value) => (key, Change::Put(value)),
+                    None => (key, Change::Delete),
+                }
+            }));
+
+            rev_patch.changes.insert(
+                name,
+                Changes {
+                    data: rev_changes,
+                    removed_prefixes: vec![],
+                },
+            );
+        }
+
+        rev_patch
     }
 }
 
@@ -197,18 +328,19 @@ pub enum Change {
 /// [`checkpoint`]: #method.checkpoint
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
-
-// FIXME: make &mut Fork "unwind safe". (ECR-176)
 pub struct Fork {
-    snapshot: Box<dyn Snapshot>,
-    patch: Patch,
-    changelog: Vec<(String, Vec<u8>, Option<Change>)>,
-    logged: bool,
+    flushed: FlushedFork,
+    working_patch: WorkingPatch,
 }
 
-struct ForkIter<'a> {
+struct FlushedFork {
+    snapshot: Box<dyn Snapshot>,
+    patch: Patch,
+}
+
+pub(super) struct ForkIter<'a, T: StdIterator> {
     snapshot: Iter<'a>,
-    changes: Option<Peekable<Range<'a, Vec<u8>, Change>>>,
+    changes: Option<Peekable<T>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -235,10 +367,10 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum_merkledb::{Database, TemporaryDB};
+/// use exonum::storage::{Database, MemoryDB};
 ///
 /// // not declared as `mut db`!
-/// let db: Box<Database> = Box::new(TemporaryDB::new());
+/// let db: Box<Database> = Box::new(MemoryDB::new());
 /// let mut fork = db.fork();
 /// fork.put("index_name", vec![1, 2, 3], vec![123]);
 /// db.merge(fork.into_patch()).unwrap();
@@ -255,10 +387,11 @@ pub trait Database: Send + Sync + 'static {
     /// Creates a new fork of the database from its current state.
     fn fork(&self) -> Fork {
         Fork {
-            snapshot: self.snapshot(),
-            patch: Patch::new(),
-            changelog: Vec::new(),
-            logged: false,
+            flushed: FlushedFork {
+                snapshot: self.snapshot(),
+                patch: Patch::new(),
+            },
+            working_patch: WorkingPatch::new(),
         }
     }
 
@@ -309,7 +442,7 @@ pub trait Snapshot: 'static {
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
+    fn iter(&self, name: &str, from: &[u8]) -> Iter;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -323,9 +456,9 @@ pub trait Iterator {
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
-impl Snapshot for Fork {
+impl Snapshot for FlushedFork {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.patch.changes(name) {
+        if let Some(changes) = self.patch.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(ref v) => return Some(v.clone()),
@@ -337,7 +470,7 @@ impl Snapshot for Fork {
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        if let Some(changes) = self.patch.changes(name) {
+        if let Some(changes) = self.patch.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(..) => return true,
@@ -348,9 +481,9 @@ impl Snapshot for Fork {
         self.snapshot.contains(name, key)
     }
 
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
+    fn iter(&self, name: &str, from: &[u8]) -> Iter {
         let range = (Included(from), Unbounded);
-        let changes = match self.patch.changes(name) {
+        let changes = match self.patch.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
         };
@@ -363,33 +496,15 @@ impl Snapshot for Fork {
 }
 
 impl Fork {
-    /// Creates a new checkpoint.
-    ///
-    /// In Exonum checkpoints are created before applying each transaction to
-    /// the database.
-    ///
-    /// # Panics
-    ///
-    /// Panics if another checkpoint was created before and has not been committed or rolled back.
-    pub fn checkpoint(&mut self) {
-        if self.logged {
-            panic!("call checkpoint before rollback or commit");
-        }
-        self.logged = true;
-    }
-
     /// Finalizes all changes after the latest checkpoint.
     ///
     /// # Panics
     ///
     /// Panics if there is no active checkpoint, or the latest checkpoint
     /// is already committed or rolled back.
-    pub fn commit(&mut self) {
-        if !self.logged {
-            panic!("call commit before checkpoint");
-        }
-        self.changelog.clear();
-        self.logged = false;
+    pub fn flush(&mut self) {
+        let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
+        working_patch.merge_into(&mut self.flushed.patch);
     }
 
     /// Rolls back all changes after the latest checkpoint.
@@ -399,99 +514,13 @@ impl Fork {
     /// Panics if there is no active checkpoint, or the latest checkpoint
     /// is already committed or rolled back.
     pub fn rollback(&mut self) {
-        if !self.logged {
-            panic!("call rollback before checkpoint");
-        }
-        for (name, k, c) in self.changelog.drain(..).rev() {
-            if let Some(changes) = self.patch.changes_mut(&name) {
-                match c {
-                    Some(change) => changes.data.insert(k, change),
-                    None => changes.data.remove(&k),
-                };
-            }
-        }
-        self.logged = false;
-    }
-
-    /// Inserts a key-value pair into the fork.
-    pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        let changes = self
-            .patch
-            .changes_entry(name.to_string())
-            .or_insert_with(Changes::new);
-        if self.logged {
-            self.changelog.push((
-                name.to_string(),
-                key.clone(),
-                changes.data.insert(key, Change::Put(value)),
-            ));
-        } else {
-            changes.data.insert(key, Change::Put(value));
-        }
-    }
-
-    /// Removes a key from the fork.
-    pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        let changes = self
-            .patch
-            .changes_entry(name.to_string())
-            .or_insert_with(Changes::new);
-        if self.logged {
-            self.changelog.push((
-                name.to_string(),
-                key.clone(),
-                changes.data.insert(key, Change::Delete),
-            ));
-        } else {
-            changes.data.insert(key, Change::Delete);
-        }
-    }
-
-    /// Removes all keys starting with the specified prefix from the column family
-    /// with the given `name`.
-    pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&[u8]>) {
-        let changes = self
-            .patch
-            .changes_entry(name.to_string())
-            .or_insert_with(Changes::new);
-        // Remove changes
-        if let Some(prefix) = prefix {
-            let keys = changes
-                .data
-                .range::<[u8], _>((Included(prefix), Unbounded))
-                .map(|(k, _)| k.to_vec())
-                .take_while(|k| k.starts_with(prefix))
-                .collect::<Vec<_>>();
-            for k in keys {
-                changes.data.remove(&k);
-            }
-        } else {
-            changes.data.clear();
-        }
-
-        // Remove keys from storage.
-        let prefix_or_empty_slice = prefix.unwrap_or_default();
-        let mut iter = self.snapshot.iter(name, prefix_or_empty_slice);
-        while let Some((k, ..)) = iter.next() {
-            if !k.starts_with(prefix_or_empty_slice) {
-                break;
-            }
-
-            let change = changes.data.insert(k.to_vec(), Change::Delete);
-            if self.logged {
-                self.changelog.push((name.to_string(), k.to_vec(), change));
-            }
-        }
+        self.working_patch = WorkingPatch::new();
     }
 
     /// Converts the fork into `Patch` consuming the fork instance.
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Returns a reference to the list of changes made in this fork.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    pub fn into_patch(mut self) -> Patch {
+        self.flush();
+        self.flushed.patch
     }
 
     /// Merges a patch from another fork to this fork.
@@ -504,29 +533,53 @@ impl Fork {
     /// Panics if a checkpoint has been created before and has not been committed
     /// or rolled back yet.
     pub fn merge(&mut self, patch: Patch) {
-        if self.logged {
-            panic!("call merge before commit or rollback");
-        }
+        assert!(!self.is_dirty(), "cannot merge a dirty fork");
 
         for (name, changes) in patch {
-            if let Some(in_changes) = self.patch.changes_mut(&name) {
+            if let Some(in_changes) = self.flushed.patch.changes.get_mut(&name) {
                 in_changes.data.extend(changes.into_iter());
                 continue;
             }
+
             {
-                self.patch.insert_changes(name.to_owned(), changes);
+                self.flushed.patch.changes.insert(name.to_owned(), changes);
             }
         }
+    }
+
+    /// Checks if a fork has any unflushed changes.
+    pub fn is_dirty(&self) -> bool {
+        !self.working_patch.changes.is_empty()
+    }
+
+    /// TODO
+    pub fn to_snapshot(&mut self) -> &dyn Snapshot {
+        if self.is_dirty() {
+            self.flush();
+        }
+        &self.flushed
+    }
+}
+
+impl IndexAccess for Fork {
+    fn view<I: Into<IndexAddress>>(&self, address: I) -> View {
+        let address = address.into();
+        let changes = self.working_patch.changes(&address);
+
+        View::new(&self.flushed, address, changes)
+    }
+}
+
+impl IndexAccessMut for Fork {
+    fn view_mut<I: Into<IndexAddress>>(&self, address: I) -> ViewMut {
+        let address = address.into();
+        let changes = self.working_patch.changes_mut(&address);
+
+        ViewMut::new(&self.flushed, address, changes)
     }
 }
 
 impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
-    fn as_ref(&self) -> &dyn Snapshot {
-        self
-    }
-}
-
-impl AsRef<dyn Snapshot> for Fork {
     fn as_ref(&self) -> &dyn Snapshot {
         self
     }
@@ -538,7 +591,17 @@ impl ::std::fmt::Debug for Fork {
     }
 }
 
-impl<'a> ForkIter<'a> {
+impl<'a, T> ForkIter<'a, T>
+    where
+        T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
+{
+    pub fn new(snapshot: Iter<'a>, changes: Option<T>) -> Self {
+        ForkIter {
+            snapshot,
+            changes: changes.map(StdIterator::peekable),
+        }
+    }
+
     fn step(&mut self) -> NextIterValue {
         if let Some(ref mut changes) = self.changes {
             match changes.peek() {
@@ -574,7 +637,10 @@ impl<'a> ForkIter<'a> {
     }
 }
 
-impl<'a> Iterator for ForkIter<'a> {
+impl<'a, T> Iterator for ForkIter<'a, T>
+    where
+        T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
+{
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {
@@ -643,9 +709,7 @@ impl<'a> Iterator for ForkIter<'a> {
 }
 
 impl<T: Database> From<T> for Box<dyn Database> {
-    // False positive
-    #![allow(clippy::use_self)]
     fn from(db: T) -> Self {
-        Box::new(db)
+        Box::new(db) as Self
     }
 }
