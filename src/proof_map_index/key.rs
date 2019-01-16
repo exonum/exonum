@@ -22,8 +22,11 @@ use exonum_crypto::HASH_SIZE;
 
 use crate::{BinaryKey, UniqueHash};
 
+/// Given node is branch.
 pub const BRANCH_KEY_PREFIX: u8 = 0;
+/// Given node is leaf.
 pub const LEAF_KEY_PREFIX: u8 = 1;
+/// Given node is value.
 pub const VALUE_KEY_PREFIX: u8 = 2;
 
 /// Size in bytes of the `Hash`.

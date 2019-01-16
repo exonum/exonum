@@ -105,8 +105,13 @@ enum RemoveAction {
     UpdateHash(Hash),
 }
 
+/// The internal key representation that uses to address values.
+/// 
+/// Represents the original key bytes with the `VALUE_KEY_PREFIX` prefix.
 trait ValuePath: ToOwned {
+    /// Converts the given key to the value path bytes.
     fn to_value_path(&self) -> Vec<u8>;
+    /// Extracts the given key from the value path bytes.
     fn from_value_path(bytes: &[u8]) -> Self::Owned;
 }
 
