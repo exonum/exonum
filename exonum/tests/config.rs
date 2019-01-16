@@ -35,7 +35,7 @@ use std::{
     env,
     ffi::OsString,
     fs::{self, File, OpenOptions},
-    io::{Read, Write},
+    io::{copy, Read, Write},
     panic,
     path::{Path, PathBuf},
 };
@@ -206,15 +206,17 @@ fn override_validators_count(config: &str, n: usize, folder: &str) {
 }
 
 fn copy_file_to_temp(file: &str, folder: &str) {
-    let source_file = full_testdata_name(file);
-    let destination_file = full_tmp_name(file, folder);
-    let contents = fs::read(source_file).unwrap();
-    let mut open_options = OpenOptions::new();
-    open_options.create(true).write(true);
-    #[cfg(unix)]
-    open_options.mode(0o600);
-    let mut file = open_options.open(&destination_file).unwrap();
-    file.write_all(contents.as_slice()).unwrap();
+    let mut source_file = fs::File::open(&full_testdata_name(file)).unwrap();
+
+    let mut destination_file = {
+        let mut open_options = OpenOptions::new();
+        open_options.create(true).write(true);
+        #[cfg(unix)]
+        open_options.mode(0o600);
+        open_options.open(&full_tmp_name(file, folder)).unwrap()
+    };
+
+    copy(&mut source_file, &mut destination_file).unwrap();
 }
 
 fn run_node(config: &str, folder: &str) {
