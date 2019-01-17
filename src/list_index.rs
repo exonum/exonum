@@ -20,6 +20,9 @@
 use std::{cell::Cell, marker::PhantomData};
 
 use crate::{BinaryKey, BinaryValue, views::{FromView, Iter as ViewIter, ReadView, ViewMut}};
+use crate::Snapshot;
+use crate::views::IndexAccess;
+use crate::views::View;
 
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
@@ -57,6 +60,18 @@ where
 {
     fn from_view(view: T) -> Self {
         ListIndex::new(view)
+    }
+}
+
+impl<'a, T, V> ListIndex<T, V>
+    where
+        T: AsRef<dyn Snapshot> + IndexAccess + 'a,
+        V: BinaryValue,
+        ListIndex<T, V>: FromView<View<'a>>,
+{
+
+    pub fn old_new(index_name: &str, snapshot: T) -> Self {
+        snapshot.index(index_name)
     }
 }
 
