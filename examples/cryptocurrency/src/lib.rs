@@ -30,16 +30,12 @@
     bare_trait_objects
 )]
 
-extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
 extern crate failure;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate protobuf;
-extern crate serde_json;
 
 pub mod proto;
 
@@ -268,9 +264,11 @@ pub mod errors {
 pub mod contracts {
     use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 
-    use errors::Error;
-    use schema::{CurrencySchema, Wallet};
-    use transactions::{TxCreateWallet, TxTransfer};
+    use crate::{
+        errors::Error,
+        schema::{CurrencySchema, Wallet},
+        transactions::{TxCreateWallet, TxTransfer},
+    };
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -344,7 +342,7 @@ pub mod api {
         crypto::PublicKey,
     };
 
-    use schema::{CurrencySchema, Wallet};
+    use crate::schema::{CurrencySchema, Wallet};
 
     /// Public service API description.
     #[derive(Debug, Clone)]
@@ -398,8 +396,7 @@ pub mod service {
         storage::Snapshot,
     };
 
-    use api::CryptocurrencyApi;
-    use transactions::CurrencyTransactions;
+    use crate::{api::CryptocurrencyApi, transactions::CurrencyTransactions};
 
     /// Service ID for the `Service` trait.
     pub const SERVICE_ID: u16 = 1;

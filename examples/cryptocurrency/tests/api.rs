@@ -20,9 +20,6 @@
 
 #[macro_use]
 extern crate assert_matches;
-extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
-extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
@@ -34,13 +31,15 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::api::WalletQuery;
-use cryptocurrency::schema::Wallet;
-use cryptocurrency::service::CurrencyService;
-use cryptocurrency::transactions::{TxCreateWallet, TxTransfer};
+use exonum_cryptocurrency::{
+    api::WalletQuery,
+    schema::Wallet,
+    service::CurrencyService,
+    transactions::{TxCreateWallet, TxTransfer},
+};
 
 // Imports shared test constants.
-use constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME};
 
 mod constants;
 

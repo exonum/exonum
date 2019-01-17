@@ -2,6 +2,7 @@
 name = "exonum-cryptocurrency"
 publish = false
 version = "0.0.0"
+edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
