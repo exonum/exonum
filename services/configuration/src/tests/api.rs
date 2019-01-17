@@ -25,11 +25,11 @@ use super::{
     new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
     ConfigurationTestKit,
 };
-use api::{
+use crate::api::{
     ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
     VoteResponse, VotesInfo,
 };
-use SERVICE_NAME;
+use crate::SERVICE_NAME;
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;
@@ -292,7 +292,7 @@ fn test_votes_for_propose() {
 
 #[test]
 fn test_dissenting_votes_for_propose() {
-    use schema::VotingDecision;
+    use crate::schema::VotingDecision;
 
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();

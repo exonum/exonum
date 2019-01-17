@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate exonum_configuration as configuration;
-
 use exonum::helpers::fabric::NodeBuilder;
+use exonum_configuration as configuration;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();

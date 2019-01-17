@@ -20,15 +20,13 @@ use exonum::{
     storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
-use serde_json;
 
 use std::str;
 
-use config::ConfigurationServiceConfig;
-use SERVICE_NAME;
-use {
-    ConfigurationTransactions, Propose, Schema as ConfigurationSchema,
-    Service as ConfigurationService, Vote, VoteAgainst, VotingDecision,
+use crate::{
+    config::ConfigurationServiceConfig, ConfigurationTransactions, Propose,
+    Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
+    VotingDecision, SERVICE_NAME,
 };
 
 mod api;

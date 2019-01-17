@@ -14,8 +14,6 @@
 
 //! Transaction definitions for the configuration service.
 
-extern crate serde_json;
-
 use exonum::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
@@ -26,12 +24,13 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
-use proto;
-use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
-use SERVICE_ID;
-use SERVICE_NAME;
+use crate::{
+    config::ConfigurationServiceConfig,
+    errors::Error as ServiceError,
+    proto,
+    schema::{MaybeVote, ProposeData, Schema, VotingDecision},
+    SERVICE_ID, SERVICE_NAME,
+};
 
 /// Propose a new configuration.
 ///
@@ -453,11 +452,13 @@ mod tests {
     use exonum_testkit::{TestKit, TestKitBuilder};
 
     use super::{Hash, VotingContext};
-    use config::ConfigurationServiceConfig;
-    use errors::Error as ServiceError;
-    use schema::VotingDecision;
-    use tests::{new_tx_config_vote, new_tx_config_vote_against};
-    use Service as ConfigurationService;
+    use crate::{
+        config::ConfigurationServiceConfig,
+        errors::Error as ServiceError,
+        schema::VotingDecision,
+        tests::{new_tx_config_vote, new_tx_config_vote_against},
+        Service as ConfigurationService,
+    };
 
     #[test]
     fn test_vote_without_propose() {
