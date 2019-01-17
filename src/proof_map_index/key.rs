@@ -22,11 +22,11 @@ use exonum_crypto::HASH_SIZE;
 
 use crate::{BinaryKey, UniqueHash};
 
-/// Given node is branch.
+/// This prefix defines a node as a branch.
 pub const BRANCH_KEY_PREFIX: u8 = 0;
-/// Given node is leaf.
+/// This prefix defines a node as a leaf.
 pub const LEAF_KEY_PREFIX: u8 = 1;
-/// Given node is value.
+/// This prefix defines a node as a value.
 pub const VALUE_KEY_PREFIX: u8 = 2;
 
 /// Size in bytes of the `Hash`.
@@ -184,11 +184,11 @@ pub(crate) trait BitsRange {
     fn start_from(&self, pos: u16) -> Self;
 
     /// Returns a copy of this bit range shortened to the specified length.
-    /// This action changes the proof path kind to "branch".
+    /// This action changes the ProofPath's type to a branch as well.
     fn prefix(&self, len: u16) -> Self;
 
     /// Returns a copy of this bit range where the start is shifted by the `len`
-    /// bits to the right. This action doesn't change the proof path kind.
+    /// bits to the right. This action doesn't affect a type of ProofPath.
     fn suffix(&self, len: u16) -> Self;
 
     /// Checks if this bit range contains the other bit range as a prefix,
