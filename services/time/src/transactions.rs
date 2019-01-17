@@ -25,7 +25,7 @@ use exonum::{
 };
 
 use super::{proto, SERVICE_ID};
-use schema::TimeSchema;
+use crate::schema::TimeSchema;
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]

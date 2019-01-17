@@ -26,17 +26,12 @@
     bare_trait_objects
 )]
 
-extern crate chrono;
-extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 #[macro_use]
 extern crate exonum_derive;
-extern crate protobuf;
 
 /// Node API.
 pub mod api;
@@ -57,11 +52,13 @@ use exonum::{
     messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
-use schema::TimeSchema;
 use serde_json::Value;
 
-use time_provider::{SystemTimeProvider, TimeProvider};
-use transactions::*;
+use crate::{
+    schema::TimeSchema,
+    time_provider::{SystemTimeProvider, TimeProvider},
+    transactions::*,
+};
 
 /// Time service id.
 pub const SERVICE_ID: u16 = 4;
