@@ -29,9 +29,7 @@ use super::sodiumoxide::crypto::{
         PublicKey as PublicKeySodium, SecretKey as SecretKeySodium,
     },
 };
-use write_short_hex;
-use PublicKey as crypto_PublicKey;
-use SecretKey as crypto_SecretKey;
+use crate::{write_short_hex, PublicKey as crypto_PublicKey, SecretKey as crypto_SecretKey};
 
 /// Length of the public Curve25519 key.
 pub const PUBLIC_KEY_LENGTH: usize = 32;

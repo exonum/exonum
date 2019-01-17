@@ -29,7 +29,7 @@
 
 // spell-checker:ignore DIGESTBYTES, PUBLICKEYBYTES, SECRETKEYBYTES, SEEDBYTES, SIGNATUREBYTES
 
-extern crate exonum_sodiumoxide as sodiumoxide;
+use exonum_sodiumoxide as sodiumoxide;
 
 /// Digest type for sodiumoxide-based implementation.
 pub use self::sha256::Digest as Hash;
