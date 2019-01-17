@@ -16,9 +16,6 @@
 
 //! This crate simplifies writing build.rs for exonum and exonum services.
 
-extern crate protoc_rust;
-extern crate walkdir;
-
 use protoc_rust::Customize;
 use walkdir::WalkDir;
 
