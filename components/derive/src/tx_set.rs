@@ -14,6 +14,7 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
+use quote::quote;
 use syn::{Data, DataEnum, DeriveInput, Fields, Type};
 
 struct Variant {
@@ -51,7 +52,7 @@ fn get_tx_variants(data: &DataEnum) -> Vec<Variant> {
 fn implement_conversions_for_transactions(
     name: &Ident,
     variants: &[Variant],
-    cr: &quote::ToTokens,
+    cr: &dyn quote::ToTokens,
 ) -> impl quote::ToTokens {
     let conversions = variants.iter().map(|Variant { ident, typ, .. }| {
         quote! {
@@ -78,7 +79,7 @@ fn implement_conversions_for_transactions(
 fn implement_into_service_tx(
     name: &Ident,
     variants: &[Variant],
-    cr: &quote::ToTokens,
+    cr: &dyn quote::ToTokens,
 ) -> impl quote::ToTokens {
     let tx_set_impl = variants.iter().map(|Variant { id, ident, .. }| {
         quote! {
@@ -101,7 +102,7 @@ fn implement_into_service_tx(
 fn implement_transaction_set_trait(
     name: &Ident,
     variants: &[Variant],
-    cr: &quote::ToTokens,
+    cr: &dyn quote::ToTokens,
 ) -> impl quote::ToTokens {
     let tx_set_impl = variants.iter().map(|Variant { id, ident, typ }| {
         quote! {
@@ -127,7 +128,7 @@ fn implement_transaction_set_trait(
 fn implement_into_boxed_tx(
     name: &Ident,
     variants: &[Variant],
-    cr: &quote::ToTokens,
+    cr: &dyn quote::ToTokens,
 ) -> impl quote::ToTokens {
     let tx_set_impl = variants.iter().map(|Variant { ident, .. }| {
         quote! {

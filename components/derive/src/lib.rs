@@ -15,16 +15,12 @@
 #![recursion_limit = "256"]
 
 extern crate proc_macro;
-extern crate proc_macro2;
-
-extern crate syn;
-#[macro_use]
-extern crate quote;
 
 mod pb_convert;
 mod tx_set;
 
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::{Attribute, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
 // Exonum derive attribute names, used as
