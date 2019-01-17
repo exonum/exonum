@@ -25,8 +25,7 @@ use exonum::{
 };
 
 use super::proto;
-use schema::Schema;
-use CRYPTOCURRENCY_SERVICE_ID;
+use crate::{schema::Schema, CRYPTOCURRENCY_SERVICE_ID};
 
 const ERROR_SENDER_SAME_AS_RECEIVER: u8 = 0;
 
