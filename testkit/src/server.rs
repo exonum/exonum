@@ -161,7 +161,7 @@ mod tests {
     use exonum::storage::Snapshot;
 
     use super::{super::proto, *};
-    use {TestKitApi, TestKitBuilder};
+    use crate::{TestKitApi, TestKitBuilder};
 
     type DeBlock = BlockWithTransactions;
     const TIMESTAMP_SERVICE_ID: u16 = 0;

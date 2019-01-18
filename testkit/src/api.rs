@@ -19,8 +19,6 @@ pub use exonum::api::ApiAccess;
 use actix_web::{test::TestServer, App};
 use reqwest::{Client, Response, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json;
-use serde_urlencoded;
 
 use std::fmt::{self, Display};
 
@@ -31,7 +29,7 @@ use exonum::{
     node::ApiSender,
 };
 
-use TestKit;
+use crate::TestKit;
 
 /// Kind of public or private REST API of an Exonum node.
 ///
@@ -48,7 +46,7 @@ pub enum ApiKind {
     Service(&'static str),
 }
 
-impl ::fmt::Display for ApiKind {
+impl fmt::Display for ApiKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ApiKind::System => write!(f, "api/system"),

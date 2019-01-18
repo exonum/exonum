@@ -36,12 +36,12 @@ pub struct CounterSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<Snapshot>> CounterSchema<T> {
+impl<T: AsRef<dyn Snapshot>> CounterSchema<T> {
     pub fn new(view: T) -> Self {
         CounterSchema { view }
     }
 
-    fn entry(&self) -> Entry<&Snapshot, u64> {
+    fn entry(&self) -> Entry<&dyn Snapshot, u64> {
         Entry::new("counter.count", self.view.as_ref())
     }
 
@@ -189,7 +189,7 @@ impl Service for CounterService {
         "counter"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -198,7 +198,7 @@ impl Service for CounterService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = CounterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

@@ -14,22 +14,18 @@
 
 #[macro_use]
 extern crate assert_matches;
-extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate pretty_assertions;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate exonum_derive;
-extern crate hex;
-extern crate protobuf;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
@@ -42,7 +38,7 @@ use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBu
 use hex::FromHex;
 use serde_json::Value;
 
-use counter::{
+use crate::counter::{
     CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
 };
 

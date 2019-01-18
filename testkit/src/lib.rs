@@ -145,31 +145,22 @@
     bare_trait_objects
 )]
 
-extern crate actix_web;
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
 extern crate assert_matches;
-extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate futures;
 #[macro_use]
 extern crate log;
-extern crate reqwest;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[cfg_attr(test, macro_use)]
 #[cfg(test)]
 extern crate exonum_derive;
-extern crate protobuf;
-extern crate serde_json;
-extern crate serde_urlencoded;
-extern crate tokio_core;
 
-pub use api::{ApiKind, TestKitApi};
-pub use compare::ComparableSnapshot;
-pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
+pub use crate::api::{ApiKind, TestKitApi};
+pub use crate::compare::ComparableSnapshot;
+pub use crate::network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
 pub mod proto;
@@ -194,8 +185,8 @@ use exonum::{
     storage::{MemoryDB, Patch, Snapshot},
 };
 
-use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use poll_events::poll_events;
+use crate::checkpoint_db::{CheckpointDb, CheckpointDbHandler};
+use crate::poll_events::poll_events;
 
 #[macro_use]
 mod macros;
@@ -664,7 +655,7 @@ impl TestKit {
     /// Update test network configuration if such an update has been scheduled
     /// with `commit_configuration_change`.
     fn update_configuration(&mut self, new_block_height: Height) -> Option<Patch> {
-        use ConfigurationProposalState::*;
+        use crate::ConfigurationProposalState::*;
 
         let actual_from = new_block_height.next();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
@@ -696,7 +687,7 @@ impl TestKit {
     /// Returns a reference to the scheduled configuration proposal, or `None` if
     /// there is no such proposal.
     pub fn next_configuration(&self) -> Option<&TestNetworkConfiguration> {
-        use ConfigurationProposalState::*;
+        use crate::ConfigurationProposalState::*;
 
         self.cfg_proposal.as_ref().map(|p| match *p {
             Committed(ref proposal) | Uncommitted(ref proposal) => proposal,

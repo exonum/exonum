@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate failure;
-extern crate serde;
-extern crate serde_json;
-
 use exonum::{
     api,
     blockchain::{
@@ -80,12 +76,12 @@ pub struct CurrencySchema<S> {
     view: S,
 }
 
-impl<S: AsRef<Snapshot>> CurrencySchema<S> {
+impl<S: AsRef<dyn Snapshot>> CurrencySchema<S> {
     pub fn new(view: S) -> Self {
         CurrencySchema { view }
     }
 
-    pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+    pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
         MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
     }
 
@@ -120,7 +116,7 @@ pub struct TxTransfer {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub(in inflating_cryptocurrency) enum CurrencyTransactions {
+pub(in crate::inflating_cryptocurrency) enum CurrencyTransactions {
     TxCreateWallet(TxCreateWallet),
     TxTransfer(TxTransfer),
 }
@@ -236,7 +232,7 @@ impl Service for CurrencyService {
         "cryptocurrency"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -245,7 +241,7 @@ impl Service for CurrencyService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = CurrencyTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
