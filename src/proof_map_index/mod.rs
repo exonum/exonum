@@ -108,6 +108,7 @@ enum RemoveAction {
 /// The internal key representation that uses to address values.
 ///
 /// Represents the original key bytes with the `VALUE_KEY_PREFIX` prefix.
+/// TODO Clarify documentation. [ECR-2820]
 trait ValuePath: ToOwned {
     /// Converts the given key to the value path bytes.
     fn to_value_path(&self) -> Vec<u8>;

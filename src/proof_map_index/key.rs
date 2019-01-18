@@ -185,10 +185,12 @@ pub(crate) trait BitsRange {
 
     /// Returns a copy of this bit range shortened to the specified length.
     /// This action changes the ProofPath's type to a branch as well.
+    /// TODO Clarify documentation. [ECR-2820]
     fn prefix(&self, len: u16) -> Self;
 
     /// Returns a copy of this bit range where the start is shifted by the `len`
     /// bits to the right. This action doesn't affect a type of ProofPath.
+    /// TODO Clarify documentation. [ECR-2820]
     fn suffix(&self, len: u16) -> Self;
 
     /// Checks if this bit range contains the other bit range as a prefix,
