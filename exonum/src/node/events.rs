@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-use blockchain::Schema;
-use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
+use crate::blockchain::Schema;
+use crate::events::{
+    error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
+};
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {

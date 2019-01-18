@@ -39,8 +39,8 @@ use serde::ser::{Serialize, Serializer};
 
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
-use storage::StorageValue;
+use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
+use crate::storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
 pub use self::{
@@ -175,7 +175,7 @@ pub struct Signed<T> {
 
 impl<T: ProtocolMessage> Signed<T> {
     /// Creates a new instance of the message.
-    pub(in messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
+    pub(in crate::messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
         Signed { payload, message }
     }
 

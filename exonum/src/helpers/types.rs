@@ -14,11 +14,12 @@
 
 //! Common widely used type definitions.
 
-use std::{fmt, num::ParseIntError, str::FromStr};
-
-use crypto::{CryptoHash, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
+
+use std::{fmt, num::ParseIntError, str::FromStr};
+
+use crate::crypto::{CryptoHash, Hash};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;

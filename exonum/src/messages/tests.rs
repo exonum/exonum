@@ -1,20 +1,19 @@
 use chrono::Utc;
-use hex::{self, FromHex};
-use serde_json;
+use hex::FromHex;
 
 use super::{
     BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
     ServiceTransaction, Signed, SignedMessage, Status, TransactionsResponse,
     RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
-use blockchain::{Block, BlockProof};
-use crypto::{gen_keypair, hash, PublicKey, SecretKey};
-use helpers::{Height, Round, ValidatorId};
-use proto;
+use crate::blockchain::{Block, BlockProof};
+use crate::crypto::{gen_keypair, hash, PublicKey, SecretKey};
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::proto;
 
 #[test]
 fn test_block_response_empty_size() {
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crate::crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let msg = TransactionsResponse::new(&public_key, vec![]);
     let msg = Message::concrete(msg, public_key, &secret_key);
@@ -65,7 +64,7 @@ fn test_known_transaction() {
 
 #[test]
 fn test_empty_tx_size() {
-    use crypto::{gen_keypair_from_seed, Seed};
+    use crate::crypto::{gen_keypair_from_seed, Seed};
     let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
     let set = ServiceTransaction::from_raw_unchecked(0, vec![]);
     let msg = RawTransaction::new(0, set);
@@ -195,7 +194,7 @@ fn test_precommit_serde_correct() {
 #[test]
 #[should_panic(expected = "Cannot verify message.")]
 fn test_precommit_serde_wrong_signature() {
-    use crypto::SIGNATURE_LENGTH;
+    use crate::crypto::SIGNATURE_LENGTH;
 
     let (pub_key, secret_key) = gen_keypair();
     let ts = Utc::now();

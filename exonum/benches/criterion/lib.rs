@@ -14,25 +14,15 @@
 
 #[macro_use]
 extern crate criterion;
-extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
 extern crate serde_derive;
-extern crate futures;
-extern crate log;
-extern crate num;
-extern crate protobuf;
-extern crate rand;
-extern crate rand_xorshift;
-extern crate tempdir;
-extern crate tokio_core;
-extern crate tokio_threadpool;
 
-use block::bench_block;
-use crypto::bench_crypto;
-use storage::bench_storage;
-use transactions::bench_verify_transactions;
+use crate::block::bench_block;
+use crate::crypto::bench_crypto;
+use crate::storage::bench_storage;
+use crate::transactions::bench_verify_transactions;
 
 mod block;
 mod crypto;

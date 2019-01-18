@@ -22,11 +22,11 @@ use snow::{
     types::{Cipher, Dh, Hash, Random},
 };
 
-use crypto::{
+use crate::crypto::{
     x25519, PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
     SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
 };
-use sodiumoxide::crypto::{
+use crate::sodiumoxide::crypto::{
     aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 

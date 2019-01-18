@@ -14,12 +14,11 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure;
 use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 
-use events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
-use messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
+use crate::events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
+use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -89,12 +88,11 @@ impl Encoder for MessagesCodec {
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
-    use failure;
     use tokio_io::codec::{Decoder, Encoder};
 
     use super::MessagesCodec;
-    use events::noise::{HandshakeParams, NoiseWrapper};
-    use messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
+    use crate::events::noise::{HandshakeParams, NoiseWrapper};
+    use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
     pub fn raw_message(val: Vec<u8>) -> SignedMessage {
         SignedMessage::from_vec_unchecked(val)

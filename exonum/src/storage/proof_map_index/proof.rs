@@ -22,8 +22,8 @@ use super::{
     key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crypto::{CryptoHash, Hash, HashStream};
-use storage::StorageValue;
+use crate::crypto::{CryptoHash, Hash, HashStream};
+use crate::storage::StorageValue;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;

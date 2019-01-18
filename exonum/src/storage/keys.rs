@@ -21,7 +21,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use crate::crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
@@ -315,6 +315,8 @@ mod tests {
     use chrono::{Duration, TimeZone};
     use hex::FromHex;
 
+    use crate::storage::{Database, MapIndex, MemoryDB};
+
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
 
@@ -393,8 +395,6 @@ mod tests {
 
     #[test]
     fn signed_int_key_in_index() {
-        use storage::{Database, MapIndex, MemoryDB};
-
         let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let mut fork = db.fork();
         {
@@ -424,8 +424,6 @@ mod tests {
     // for signed integers.
     #[test]
     fn old_signed_int_key_in_index() {
-        use storage::{Database, MapIndex, MemoryDB};
-
         // Simple wrapper around a signed integer type with the `StorageKey` implementation,
         // which was used in Exonum <= 0.5.
         #[derive(Debug, PartialEq, Clone)]
@@ -519,8 +517,6 @@ mod tests {
 
     #[test]
     fn system_time_key_in_index() {
-        use storage::{Database, MapIndex, MemoryDB};
-
         let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let x1 = Utc.timestamp(80, 0);
         let x2 = Utc.timestamp(10, 0);

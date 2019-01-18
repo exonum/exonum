@@ -14,17 +14,16 @@
 
 //! `Transaction` related types.
 
-use failure;
+use hex::ToHex;
 use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
-use crypto::{CryptoHash, Hash, PublicKey};
-use hex::ToHex;
-use messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
-use proto::{self, ProtobufConvert};
-use storage::{Fork, StorageValue};
+use crate::crypto::{CryptoHash, Hash, PublicKey};
+use crate::messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
+use crate::proto::{self, ProtobufConvert};
+use crate::storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
@@ -402,7 +401,7 @@ impl ProtobufConvert for TransactionResult {
         };
 
         Ok(TransactionResult(match status_code {
-            value @ 0...MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
+            value @ 0..=MAX_ERROR_CODE => Err(TransactionError::code(value as u8, description)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::panic(description)),
             value => bail!("Invalid TransactionResult value: {}", value),
@@ -468,13 +467,13 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use blockchain::{Blockchain, Schema, Service};
-    use crypto;
-    use helpers::{Height, ValidatorId};
-    use messages::Message;
-    use node::ApiSender;
-    use proto;
-    use storage::{Database, Entry, MemoryDB, Snapshot};
+    use crate::blockchain::{Blockchain, Schema, Service};
+    use crate::crypto;
+    use crate::helpers::{Height, ValidatorId};
+    use crate::messages::Message;
+    use crate::node::ApiSender;
+    use crate::proto;
+    use crate::storage::{Database, Entry, MemoryDB, Snapshot};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 

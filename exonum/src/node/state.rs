@@ -15,7 +15,6 @@
 //! State of the `NodeHandler`.
 
 use bit_vec::BitVec;
-use failure;
 use serde_json::Value;
 
 use std::{
@@ -25,19 +24,19 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crypto::{Hash, PublicKey, SecretKey};
-use events::network::ConnectedPeerAddr;
-use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{
+use crate::blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
+use crate::crypto::{Hash, PublicKey, SecretKey};
+use crate::events::network::ConnectedPeerAddr;
+use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
+use crate::messages::{
     BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
     RawTransaction, Signed,
 };
-use node::{
+use crate::node::{
     connect_list::{ConnectList, PeerAddress},
     ConnectInfo,
 };
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
+use crate::storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 

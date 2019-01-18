@@ -22,8 +22,8 @@ use uuid::Uuid;
 use std::{borrow::Cow, mem};
 
 use super::UniqueHash;
-use crypto::{Hash, PublicKey};
-use helpers::Round;
+use crate::crypto::{Hash, PublicKey};
+use crate::helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///

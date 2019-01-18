@@ -16,7 +16,6 @@
 
 use failure::{Error, ResultExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use toml;
 
 use std::{
     fs::{self, File},
@@ -27,7 +26,7 @@ use std::{
     thread,
 };
 
-use node::{ConnectListConfig, NodeConfig};
+use crate::node::{ConnectListConfig, NodeConfig};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]

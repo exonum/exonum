@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // spell-checker:ignore uint
-use failure;
 
 #[cfg(feature = "sodiumoxide-crypto")]
 #[doc(inline)]
@@ -33,7 +32,7 @@ use tokio_io::{
     AsyncRead, AsyncWrite,
 };
 
-use events::{codec::MessagesCodec, error::into_failure};
+use crate::events::{codec::MessagesCodec, error::into_failure};
 
 pub mod error;
 pub mod wrappers;

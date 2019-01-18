@@ -15,9 +15,9 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
-use helpers::{Height, Round, ValidatorId};
-use messages::{Message, Propose};
-use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{Message, Propose};
+use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 /// HANDLE message
 /// - verify signature

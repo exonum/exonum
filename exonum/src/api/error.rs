@@ -18,10 +18,9 @@
 
 //! The set of errors for the Exonum API module.
 
-use failure;
 use std::io;
 
-use storage;
+use crate::storage;
 
 /// List of possible API errors.
 #[derive(Fail, Debug)]

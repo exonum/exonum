@@ -29,7 +29,7 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::{hash, CryptoHash, Hash};
+use crate::crypto::{hash, CryptoHash, Hash};
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
@@ -634,9 +634,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::SparseListIndex;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use storage::db::Database;
+
+    use super::SparseListIndex;
+    use crate::storage::db::Database;
 
     const IDX_NAME: &'static str = "idx_name";
 
@@ -755,9 +756,11 @@ mod tests {
     }
 
     mod memorydb_tests {
-        use std::path::Path;
-        use storage::{Database, MemoryDB};
         use tempdir::TempDir;
+
+        use std::path::Path;
+
+        use crate::storage::{Database, MemoryDB};
 
         fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
@@ -781,9 +784,11 @@ mod tests {
     }
 
     mod rocksdb_tests {
-        use std::path::Path;
-        use storage::{Database, DbOptions, RocksDB};
         use tempdir::TempDir;
+
+        use std::path::Path;
+
+        use crate::storage::{Database, DbOptions, RocksDB};
 
         fn create_database(path: &Path) -> Box<dyn Database> {
             let opts = DbOptions::default();

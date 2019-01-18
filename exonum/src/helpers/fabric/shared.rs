@@ -14,12 +14,10 @@
 
 //! This module is used to collect structures that is shared into `CommandExtension` from `Command`.
 
-use toml;
-
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
-use blockchain::config::{ConsensusConfig, ValidatorKeys};
-use crypto::PublicKey;
+use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
+use crate::crypto::PublicKey;
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;

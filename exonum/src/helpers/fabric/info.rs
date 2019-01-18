@@ -14,8 +14,6 @@
 
 //! This module implements information request commands.
 
-use serde_json;
-
 use std::collections::HashMap;
 
 use super::{

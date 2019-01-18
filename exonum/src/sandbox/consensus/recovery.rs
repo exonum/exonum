@@ -17,11 +17,10 @@
 
 use std::time::Duration;
 
-use crypto::CryptoHash;
-use helpers::{user_agent, Height, Round, ValidatorId};
-use node;
-
-use sandbox::{
+use crate::crypto::CryptoHash;
+use crate::helpers::{user_agent, Height, Round, ValidatorId};
+use crate::node;
+use crate::sandbox::{
     sandbox::{timestamping_sandbox, SandboxBuilder},
     sandbox_tests_helper::*,
 };

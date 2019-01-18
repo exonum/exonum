@@ -18,11 +18,11 @@ use bit_vec::BitVec;
 
 use std::time::Duration;
 
-use crypto::{gen_keypair, CryptoHash, Hash};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{RawTransaction, Signed};
-use node::state::TRANSACTIONS_REQUEST_TIMEOUT;
-use sandbox::{
+use crate::crypto::{gen_keypair, CryptoHash, Hash};
+use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
+use crate::messages::{RawTransaction, Signed};
+use crate::node::state::TRANSACTIONS_REQUEST_TIMEOUT;
+use crate::sandbox::{
     config_updater::TxConfig,
     sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
     sandbox_tests_helper::*,
@@ -318,8 +318,8 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
-    use storage::StorageValue;
+    use crate::messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
+    use crate::storage::StorageValue;
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();

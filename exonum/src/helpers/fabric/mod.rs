@@ -23,14 +23,12 @@ pub use self::{
     shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig},
 };
 
-use clap;
-use failure;
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
 use std::{collections::BTreeMap, str::FromStr};
 
-use blockchain::Service;
+use crate::blockchain::Service;
 
 mod builder;
 mod clap_backend;
@@ -149,11 +147,9 @@ impl Argument {
 pub mod keys {
     use std::{collections::BTreeMap, path::PathBuf};
 
-    use toml;
-
     use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
     use super::ContextKey;
-    use node::NodeConfig;
+    use crate::node::NodeConfig;
 
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.

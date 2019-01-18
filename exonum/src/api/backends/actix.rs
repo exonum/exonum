@@ -22,12 +22,10 @@ pub use actix_web::middleware::cors::Cors;
 use actix::{Addr, System};
 use actix_net::server::Server;
 use actix_web::{
-    self,
     error::ResponseError,
     server::{HttpServer, StopServer},
     AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
 };
-use failure;
 use futures::{Future, IntoFuture};
 use serde::{
     de::{self, DeserializeOwned},
@@ -43,7 +41,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use api::{
+use crate::api::{
     error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
     Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
@@ -117,7 +115,7 @@ impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
     where
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>,
     {
-        for mut item in items {
+        for item in items {
             self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
         }
         self

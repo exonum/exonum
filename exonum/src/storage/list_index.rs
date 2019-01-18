@@ -468,9 +468,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Fork, ListIndex, Snapshot};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use storage::Database;
+
+    use super::{Fork, ListIndex, Snapshot};
+    use crate::storage::Database;
 
     fn gen_tempdir_name() -> String {
         thread_rng().sample_iter(&Alphanumeric).take(10).collect()
@@ -594,9 +595,11 @@ mod tests {
         &[(0, 5, false), (5, 0, false), (1, 7, true), (7, 1, true)];
 
     mod memorydb_tests {
-        use std::path::Path;
-        use storage::{Database, ListIndex, MemoryDB};
         use tempdir::TempDir;
+
+        use std::path::Path;
+
+        use crate::storage::{Database, ListIndex, MemoryDB};
 
         const IDX_NAME: &'static str = "idx_name";
 
@@ -656,9 +659,11 @@ mod tests {
     }
 
     mod rocksdb_tests {
-        use std::path::Path;
-        use storage::{Database, DbOptions, ListIndex, RocksDB};
         use tempdir::TempDir;
+
+        use std::path::Path;
+
+        use crate::storage::{Database, DbOptions, ListIndex, RocksDB};
 
         const IDX_NAME: &'static str = "idx_name";
 

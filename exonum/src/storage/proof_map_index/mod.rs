@@ -31,7 +31,7 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::{CryptoHash, Hash, HashStream};
+use crate::crypto::{CryptoHash, Hash, HashStream};
 
 mod key;
 mod node;

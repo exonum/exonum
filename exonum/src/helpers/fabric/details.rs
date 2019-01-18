@@ -17,10 +17,6 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts, rsplitn
 
-use crypto::generate_keys_file;
-use rpassword;
-use toml;
-
 use std::{
     collections::{BTreeMap, HashMap},
     env, fs, io,
@@ -37,12 +33,12 @@ use super::{
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
-use api::backends::actix::AllowOrigin;
-use blockchain::{config::ValidatorKeys, GenesisConfig};
-use crypto::PublicKey;
-use helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
-use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
-use storage::{Database, DbOptions, RocksDB};
+use crate::api::backends::actix::AllowOrigin;
+use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
+use crate::crypto::{generate_keys_file, PublicKey};
+use crate::helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
+use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
+use crate::storage::{Database, DbOptions, RocksDB};
 
 const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
 const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";

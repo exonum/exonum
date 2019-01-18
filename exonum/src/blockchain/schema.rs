@@ -13,13 +13,15 @@
 // limitations under the License.
 
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
-use crypto::{CryptoHash, Hash, PublicKey};
-use helpers::{Height, Round};
-use messages::{Connect, Message, Precommit, RawTransaction, Signed};
-use proto;
-use storage::{
-    Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
-    Snapshot,
+use crate::{
+    crypto::{CryptoHash, Hash, PublicKey},
+    helpers::{Height, Round},
+    messages::{Connect, Message, Precommit, RawTransaction, Signed},
+    proto,
+    storage::{
+        Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
+        Snapshot,
+    },
 };
 
 /// Defines `&str` constants with given name and value.

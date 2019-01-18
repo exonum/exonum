@@ -16,7 +16,7 @@ use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serializ
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
-use crypto::Hash;
+use crate::crypto::Hash;
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]

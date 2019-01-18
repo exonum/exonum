@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ctrlc;
-
 use std::{
     collections::HashMap,
     env,
@@ -31,9 +29,9 @@ use super::{
     maintenance::Maintenance,
     CommandName, Context, ServiceFactory,
 };
-use blockchain::Service;
-use helpers::ZeroizeOnDrop;
-use node::{ExternalMessage, Node};
+use crate::blockchain::Service;
+use crate::helpers::ZeroizeOnDrop;
+use crate::node::{ExternalMessage, Node};
 
 const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
 const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";

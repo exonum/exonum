@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use proto::schema::tests::TxConfig;
+pub use crate::proto::schema::tests::TxConfig;
 
-use blockchain::{
+use crate::blockchain::{
     ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
     TransactionSet,
 };
-use crypto::{Hash, PublicKey, SecretKey};
-use helpers::Height;
-use messages::{Message, RawTransaction, Signed};
-use proto::ProtobufConvert;
-use storage::Snapshot;
+use crate::crypto::{Hash, PublicKey, SecretKey};
+use crate::helpers::Height;
+use crate::messages::{Message, RawTransaction, Signed};
+use crate::proto::ProtobufConvert;
+use crate::storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
 

@@ -25,7 +25,7 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::Hash;
+use crate::crypto::Hash;
 
 /// A set of value items.
 ///

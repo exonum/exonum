@@ -13,12 +13,6 @@
 // limitations under the License.
 
 // This is a regression test for exonum node.
-extern crate exonum;
-extern crate failure;
-extern crate futures;
-extern crate serde_json;
-extern crate tokio;
-extern crate tokio_core;
 
 use futures::{sync::oneshot, Future, IntoFuture};
 use serde_json::Value;
@@ -51,11 +45,11 @@ impl Service for CommitWatcherService {
         "commit_watcher"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unreachable!("An unknown transaction received");
     }
 
@@ -77,11 +71,11 @@ impl Service for InitializeCheckerService {
         "initialize_checker"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unreachable!("An unknown transaction received");
     }
 
@@ -152,7 +146,7 @@ fn test_node_restart_regression() {
         node_thread.join().unwrap();
     };
 
-    let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
+    let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
 
     let init_times = Arc::new(Mutex::new(0));
