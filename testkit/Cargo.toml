@@ -1,6 +1,6 @@
 [package]
 name = "exonum-testkit"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -20,7 +20,7 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix-web = { version = "=0.7.17", default-features = false }
-exonum = { version = "0.10.1", path = "../exonum" }
+exonum = { version = "0.10.2", path = "../exonum" }
 failure = "0.1.5"
 futures = "=0.1.25"
 reqwest = "=0.9.5"

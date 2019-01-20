@@ -3,9 +3,11 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
-### Internal Improvements
+## 0.10.2 - 2019-01-14
+
+### New Features
 
 #### exonum
 

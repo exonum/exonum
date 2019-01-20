@@ -41,6 +41,7 @@ rust:
   - 1.31.1
 
 cache:
+  timeout: 1000
   directories:
   - node_modules
   - $HOME/.cargo
