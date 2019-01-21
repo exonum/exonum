@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use ctrlc;
+
 use std::{
     collections::HashMap,
+    env,
     ffi::OsString,
     fmt,
     panic::{self, PanicInfo},
@@ -26,11 +29,14 @@ use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
     maintenance::Maintenance,
-    CommandName, ServiceFactory,
+    CommandName, Context, ServiceFactory,
 };
 use blockchain::Service;
-use ctrlc;
+use helpers::ZeroizeOnDrop;
 use node::{ExternalMessage, Node};
+
+const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
+const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -67,6 +73,9 @@ impl NodeBuilder {
         T: Into<OsString> + Clone,
     {
         let feedback = ClapBackend::execute_cmd_string(&self.commands, cmd_line);
+        if let Feedback::RunNode(ref ctx) = feedback {
+            self.node_from_run_context(ctx);
+        }
         feedback != Feedback::None
     }
 
@@ -74,17 +83,7 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
-                let config_file_path = ctx.get(keys::NODE_CONFIG_PATH).ok();
-                let config = ctx
-                    .get(keys::NODE_CONFIG)
-                    .expect("could not find node_config");
-                let db = Run::db_helper(ctx, &config.database);
-                let services: Vec<Box<dyn Service>> = self
-                    .service_factories
-                    .into_iter()
-                    .map(|mut factory| factory.make_service(ctx))
-                    .collect();
-                let node = Node::new(db, services, config, config_file_path);
+                let node = self.node_from_run_context(ctx);
                 Some(node)
             }
             _ => None,
@@ -147,6 +146,32 @@ impl NodeBuilder {
         .into_iter()
         .map(|c| (c.name(), CollectedCommand::new(c)))
         .collect()
+    }
+
+    fn node_from_run_context(self, ctx: &Context) -> Node {
+        let config_file_path = ctx
+            .get(keys::NODE_CONFIG_PATH)
+            .expect("Could not find node_config_path");
+        let config = ctx
+            .get(keys::NODE_CONFIG)
+            .expect("could not find node_config");
+        let db = Run::db_helper(ctx, &config.database);
+        let services: Vec<Box<dyn Service>> = self
+            .service_factories
+            .into_iter()
+            .map(|mut factory| factory.make_service(ctx))
+            .collect();
+
+        let consensus_passphrase =
+            ZeroizeOnDrop(env::var(EXONUM_CONSENSUS_PASS).unwrap_or_default());
+        let service_passphrase = ZeroizeOnDrop(env::var(EXONUM_SERVICE_PASS).unwrap_or_default());
+
+        let config = config.read_secret_keys(
+            &config_file_path,
+            consensus_passphrase.0.as_bytes(),
+            service_passphrase.0.as_bytes(),
+        );
+        Node::new(db, services, config, Some(config_file_path))
     }
 }
 

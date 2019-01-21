@@ -35,6 +35,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     fmt,
     net::SocketAddr,
+    path::{Path, PathBuf},
     sync::Arc,
     thread,
     time::{Duration, SystemTime},
@@ -47,7 +48,7 @@ use api::{
 use blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
@@ -235,7 +236,7 @@ impl Default for MemoryPoolConfig {
 
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NodeConfig {
+pub struct NodeConfig<T = SecretKey> {
     /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
     /// Network listening address.
@@ -247,11 +248,11 @@ pub struct NodeConfig {
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.
-    pub consensus_secret_key: SecretKey,
+    pub consensus_secret_key: T,
     /// Service public key.
     pub service_public_key: PublicKey,
     /// Service secret key.
-    pub service_secret_key: SecretKey,
+    pub service_secret_key: T,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -266,6 +267,51 @@ pub struct NodeConfig {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+}
+
+impl NodeConfig<PathBuf> {
+    /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
+    pub fn read_secret_keys(
+        self,
+        config_file_path: impl AsRef<Path>,
+        consensus_passphrase: &[u8],
+        service_passphrase: &[u8],
+    ) -> NodeConfig {
+        let config_folder = config_file_path.as_ref().parent().unwrap();
+        let consensus_key_path = if self.consensus_secret_key.is_absolute() {
+            self.consensus_secret_key
+        } else {
+            config_folder.join(&self.consensus_secret_key)
+        };
+        let service_key_path = if self.service_secret_key.is_absolute() {
+            self.service_secret_key
+        } else {
+            config_folder.join(&self.service_secret_key)
+        };
+
+        let consensus_secret_key = read_keys_from_file(&consensus_key_path, consensus_passphrase)
+            .expect("Could not read consensus_secret_key from file")
+            .1;
+        let service_secret_key = read_keys_from_file(&service_key_path, service_passphrase)
+            .expect("Could not read service_secret_key from file")
+            .1;
+        NodeConfig {
+            consensus_secret_key,
+            service_secret_key,
+            genesis: self.genesis,
+            listen_address: self.listen_address,
+            external_address: self.external_address,
+            network: self.network,
+            consensus_public_key: self.consensus_public_key,
+            service_public_key: self.service_public_key,
+            api: self.api,
+            mempool: self.mempool,
+            services_configs: self.services_configs,
+            database: self.database,
+            connect_list: self.connect_list,
+            thread_pool_size: self.thread_pool_size,
+        }
+    }
 }
 
 /// Configuration for the `NodeHandler`.

@@ -1,8 +1,8 @@
-consensus_public_key = "41dd7940903ca3102c041222a4c51f9f7978499b082833c733c3b15165202f80"
-consensus_secret_key = "2ee145b26b65df4c8441f035bc3ae6ac3950e76c7f3e48d11a00b2c0ca26d75d41dd7940903ca3102c041222a4c51f9f7978499b082833c733c3b15165202f80"
+consensus_public_key = "620fff1d2fb6d32af8d63e63c0891283da2fecb0b36cc60686f34778e71af188"
+consensus_secret_key = "consensus3.toml"
 listen_address = "0.0.0.0:6333"
 external_address = "127.0.0.1:6333"
-service_public_key = "066f9874c7b32fca4c1ad4dacbe9bc9aa0de38b480d8c71ea05e5b3c70422152"
-service_secret_key = "422acb782a4430c7dd982f73b88c29f03440248a010119410c7f522871919110066f9874c7b32fca4c1ad4dacbe9bc9aa0de38b480d8c71ea05e5b3c70422152"
+service_public_key = "1d42b689ed938bfd31d20f0b8c5d79219df10babb61fe837708979534dcaa4b9"
+service_secret_key = "service3.toml"
 
 [services_secret_configs]

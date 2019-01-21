@@ -79,9 +79,35 @@ pub struct Argument {
     pub required: bool,
     /// Help message.
     pub help: &'static str,
+    /// Used for named arguments: defines whether the argument is a flag or not (false for flags).
+    pub takes_value: bool,
 }
 
 impl Argument {
+    /// Creates a new flag with `long` and optionally `short` names.
+    pub fn new_flag<T>(
+        name: &'static str,
+        help: &'static str,
+        short_name: T,
+        long_name: &'static str,
+        multiple: bool,
+    ) -> Self
+    where
+        T: Into<Option<&'static str>>,
+    {
+        Self {
+            argument_type: ArgumentType::Named(NamedArgument {
+                short_name: short_name.into(),
+                long_name,
+                multiple,
+            }),
+            name,
+            help,
+            required: false,
+            takes_value: false,
+        }
+    }
+
     /// Creates a new argument with `long` and optionally `short` names.
     pub fn new_named<T>(
         name: &'static str,
@@ -103,6 +129,7 @@ impl Argument {
             name,
             help,
             required,
+            takes_value: true,
         }
     }
 
@@ -113,13 +140,14 @@ impl Argument {
             name,
             help,
             required,
+            takes_value: true,
         }
     }
 }
 
 /// Keys describing various pieces of data one can get from `Context`.
 pub mod keys {
-    use std::collections::BTreeMap;
+    use std::{collections::BTreeMap, path::PathBuf};
 
     use toml;
 
@@ -129,7 +157,7 @@ pub mod keys {
 
     /// Configuration for this node.
     /// Set by `finalize` and `run` commands.
-    pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
+    pub const NODE_CONFIG: ContextKey<NodeConfig<PathBuf>> = context_key!("node_config");
 
     /// Configuration file path for this node. If set, `ConfigManager` will be created.
     /// Set by `run` command.
@@ -174,10 +202,11 @@ pub mod keys {
 /// # Examples
 ///
 /// ```
+/// use std::path::PathBuf;
 /// use exonum::node::NodeConfig;
 /// use exonum::helpers::fabric::{keys, Context};
 ///
-/// fn get_node_config(context: &Context) -> NodeConfig {
+/// fn get_node_config(context: &Context) -> NodeConfig<PathBuf> {
 ///     context.get(keys::NODE_CONFIG).unwrap()
 /// }
 /// ```
@@ -186,6 +215,7 @@ pub struct Context {
     args: BTreeMap<String, String>,
     multiple_args: BTreeMap<String, Vec<String>>,
     variables: BTreeMap<String, Value>,
+    flags: BTreeMap<String, u64>,
 }
 
 impl Context {
@@ -193,8 +223,9 @@ impl Context {
         let mut context = Self::default();
         for arg in args {
             // processing multiple value arguments make code ugly =(
+            // ^ well, don't be sad, this ain't the worst thing you can see in programming
             match arg.argument_type {
-                ArgumentType::Named(detail) if detail.multiple => {
+                ArgumentType::Named(detail) if detail.multiple && arg.takes_value => {
                     if let Some(values) = matches.values_of(&arg.name) {
                         let values: Vec<String> = values.map(|e| e.to_owned()).collect();
                         if context
@@ -204,6 +235,13 @@ impl Context {
                         {
                             panic!("Duplicated argument: {}", arg.name);
                         }
+                        continue;
+                    }
+                }
+                ArgumentType::Named(_) if !arg.takes_value => {
+                    let occurrences = matches.occurrences_of(&arg.name);
+                    if occurrences > 0 {
+                        context.set_flag_occurrences(arg.name, occurrences);
                         continue;
                     }
                 }
@@ -269,6 +307,25 @@ impl Context {
     /// Panics if value could not be serialized as TOML.
     pub fn set<T: Serialize>(&mut self, key: ContextKey<T>, value: T) -> Option<Value> {
         self.set_raw(key.name(), value)
+    }
+
+    /// Gets flag occurrences count from the command line flags map.
+    pub fn get_flag_occurrences(&self, flag: &str) -> Option<u64> {
+        self.flags.get(flag).cloned()
+    }
+
+    /// Sets flag occurrences count to the command line flags map.
+    pub fn set_flag_occurrences(&mut self, flag: &str, occurrences: u64) {
+        self.flags.insert(flag.into(), occurrences);
+    }
+
+    /// Checks if the flag exists in command line flags map.
+    pub fn has_flag(&self, flag: &str) -> bool {
+        if let Some(&occurrences) = self.flags.get(flag) {
+            occurrences > 0
+        } else {
+            false
+        }
     }
 
     fn get_raw<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, failure::Error> {
