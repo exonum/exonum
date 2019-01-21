@@ -18,6 +18,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Renamed `create_keys_file` function to `generate_keys_file`
   in `utils` module. (#1222, #1096)
 
+### Internal improvements
+
+#### exonum
+
+- Added `allow-origin` for `localhost` for public and private api in
+  development mode by default. (#1234)
+
 ## 0.10.2 - 2019-01-14
 
 ### New Features
