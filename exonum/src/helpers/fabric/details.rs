@@ -18,12 +18,11 @@
 // spell-checker:ignore exts, rsplitn
 
 use crypto::generate_keys_file;
-use rpassword;
 use toml;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    env, fs, io,
+    fs,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
 };
@@ -32,8 +31,10 @@ use super::{
     super::path_relative_from,
     internal::{CollectedCommand, Command, Feedback},
     keys,
+    password::{PassInputMethod, SecretKeyType},
     shared::{
-        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig,
+        AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, NodeRunConfig,
+        SharedConfig,
     },
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
@@ -44,8 +45,6 @@ use helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
-const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
-const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
@@ -58,12 +57,8 @@ const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
 const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
 const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
 const NO_PASSWORD: &str = "NO_PASSWORD";
-
-#[derive(Copy, Clone)]
-enum SecretKeyType {
-    Consensus,
-    Service,
-}
+const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
+const SERVICE_KEY_PASS_METHOD: &str = "SERVICE_KEY_PASS_METHOD";
 
 /// Run command.
 pub struct Run;
@@ -92,6 +87,14 @@ impl Run {
 
     fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
         ctx.arg(PRIVATE_API_ADDRESS).ok()
+    }
+
+    fn pass_input_method(ctx: &Context, key_type: SecretKeyType) -> String {
+        let arg_key = match key_type {
+            SecretKeyType::Consensus => CONSENSUS_KEY_PASS_METHOD,
+            SecretKeyType::Service => SERVICE_KEY_PASS_METHOD,
+        };
+        ctx.arg(arg_key).unwrap_or_else(|_| "".into())
     }
 }
 
@@ -128,6 +131,22 @@ impl Command for Run {
                 "Listen address for private api.",
                 None,
                 "private-api-address",
+                false,
+            ),
+            Argument::new_named(
+                CONSENSUS_KEY_PASS_METHOD,
+                false,
+                "Passphrase for consensus key.",
+                None,
+                "consensus-key-pass",
+                false,
+            ),
+            Argument::new_named(
+                SERVICE_KEY_PASS_METHOD,
+                false,
+                "Passphrase for service key.",
+                None,
+                "service-key-pass",
                 false,
             ),
         ]
@@ -169,6 +188,17 @@ impl Command for Run {
         }
 
         new_context.set(keys::NODE_CONFIG, config);
+
+        let run_config = {
+            let consensus_pass_method =
+                Run::pass_input_method(&new_context, SecretKeyType::Consensus);
+            let service_pass_method = Run::pass_input_method(&new_context, SecretKeyType::Service);
+            NodeRunConfig {
+                consensus_pass_method,
+                service_pass_method,
+            }
+        };
+        new_context.set(keys::RUN_CONFIG, run_config);
 
         Feedback::RunNode(new_context)
     }
@@ -231,6 +261,8 @@ impl RunDev {
 
         // Arguments for run command.
         ctx.set_arg(NODE_CONFIG_PATH, output_config_path.clone());
+        ctx.set_arg(CONSENSUS_KEY_PASS_METHOD, "pass:".to_owned());
+        ctx.set_arg(SERVICE_KEY_PASS_METHOD, "pass:".to_owned());
     }
 
     fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: Context) -> Context {
@@ -420,18 +452,16 @@ impl GenerateNodeConfig {
         (external_address, listen_address)
     }
 
-    fn get_passphrase(context: &Context, secret_key_type: SecretKeyType) -> ZeroizeOnDrop<Vec<u8>> {
-        let key = match secret_key_type {
-            SecretKeyType::Consensus => EXONUM_CONSENSUS_PASS,
-            SecretKeyType::Service => EXONUM_SERVICE_PASS,
-        };
-        context
-            .get_flag_occurrences(NO_PASSWORD)
-            .map(|_| ZeroizeOnDrop("".to_string()))
-            .or_else(|| env::var(key).map(ZeroizeOnDrop).ok())
-            .or_else(|| prompt_passphrase(secret_key_type).ok())
-            .map(|s| ZeroizeOnDrop(s.0.as_bytes().to_vec()))
-            .unwrap()
+    fn get_passphrase(
+        context: &Context,
+        method: PassInputMethod,
+        secret_key_type: SecretKeyType,
+    ) -> ZeroizeOnDrop<String> {
+        if context.get_flag_occurrences(NO_PASSWORD).is_some() {
+            ZeroizeOnDrop("".to_owned())
+        } else {
+            method.get_passphrase(secret_key_type, false)
+        }
     }
 }
 
@@ -480,6 +510,22 @@ impl Command for GenerateNodeConfig {
                 "no-password",
                 false,
             ),
+            Argument::new_named(
+                CONSENSUS_KEY_PASS_METHOD,
+                false,
+                "Passphrase for consensus key.",
+                None,
+                "consensus-key-pass",
+                false,
+            ),
+            Argument::new_named(
+                SERVICE_KEY_PASS_METHOD,
+                false,
+                "Passphrase for service key.",
+                None,
+                "service-key-pass",
+                false,
+            ),
         ]
     }
 
@@ -514,6 +560,16 @@ impl Command for GenerateNodeConfig {
             .arg::<String>(SERVICE_KEY_PATH)
             .unwrap_or_else(|_| "service.toml".into())
             .into();
+        let consensus_key_pass_method: PassInputMethod = context
+            .arg::<String>(CONSENSUS_KEY_PASS_METHOD)
+            .unwrap_or_else(|_| "".to_owned())
+            .parse()
+            .expect("expected correct passphrase input method for consensus key");
+        let service_key_pass_method: PassInputMethod = context
+            .arg::<String>(SERVICE_KEY_PASS_METHOD)
+            .unwrap_or_else(|_| "".to_owned())
+            .parse()
+            .expect("expected correct passphrase input method for service key");
 
         let addresses = Self::addresses(&context);
         let common: CommonConfigTemplate =
@@ -532,11 +588,19 @@ impl Command for GenerateNodeConfig {
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
         let consensus_public_key = {
-            let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
+            let passphrase = Self::get_passphrase(
+                &new_context,
+                consensus_key_pass_method,
+                SecretKeyType::Consensus,
+            );
             create_secret_key_file(&consensus_secret_key_path, &passphrase.0)
         };
         let service_public_key = {
-            let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
+            let passphrase = Self::get_passphrase(
+                &new_context,
+                service_key_pass_method,
+                SecretKeyType::Service,
+            );
             create_secret_key_file(&service_secret_key_path, &passphrase.0)
         };
 
@@ -890,33 +954,6 @@ impl Command for GenerateTestnet {
         }
 
         Feedback::None
-    }
-}
-
-fn prompt_passphrase(secret_key_type: SecretKeyType) -> io::Result<ZeroizeOnDrop<String>> {
-    let key_type = match secret_key_type {
-        SecretKeyType::Consensus => "consensus",
-        SecretKeyType::Service => "service",
-    };
-    loop {
-        let password = ZeroizeOnDrop(rpassword::read_password_from_tty(Some(&format!(
-            "Enter passphrase for {} key: ",
-            key_type
-        )))?);
-        if password.0.is_empty() {
-            eprintln!("Passphrase must not be empty. Try again.");
-            continue;
-        }
-
-        let second_password = ZeroizeOnDrop(rpassword::read_password_from_tty(Some(
-            "Enter same passphrase again: ",
-        ))?);
-
-        if password.0 == second_password.0 {
-            return Ok(password);
-        } else {
-            eprintln!("Passphrases do not match. Try again.");
-        }
     }
 }
 

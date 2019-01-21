@@ -16,7 +16,6 @@ use ctrlc;
 
 use std::{
     collections::HashMap,
-    env,
     ffi::OsString,
     fmt,
     panic::{self, PanicInfo},
@@ -29,14 +28,11 @@ use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
     maintenance::Maintenance,
+    password::{PassInputMethod, SecretKeyType},
     CommandName, Context, ServiceFactory,
 };
 use blockchain::Service;
-use helpers::ZeroizeOnDrop;
 use node::{ExternalMessage, Node};
-
-const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
-const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -162,15 +158,25 @@ impl NodeBuilder {
             .map(|mut factory| factory.make_service(ctx))
             .collect();
 
-        let consensus_passphrase =
-            ZeroizeOnDrop(env::var(EXONUM_CONSENSUS_PASS).unwrap_or_default());
-        let service_passphrase = ZeroizeOnDrop(env::var(EXONUM_SERVICE_PASS).unwrap_or_default());
+        let config = {
+            let run_config = ctx.get(keys::RUN_CONFIG).unwrap();
+            let consensus_passphrase = run_config
+                .consensus_pass_method
+                .parse::<PassInputMethod>()
+                .expect("Incorrect passphrase input method for consensus key.")
+                .get_passphrase(SecretKeyType::Consensus, true);
+            let service_passphrase = run_config
+                .service_pass_method
+                .parse::<PassInputMethod>()
+                .expect("Incorrect passphrase input method for service key.")
+                .get_passphrase(SecretKeyType::Service, true);
 
-        let config = config.read_secret_keys(
-            &config_file_path,
-            consensus_passphrase.0.as_bytes(),
-            service_passphrase.0.as_bytes(),
-        );
+            config.read_secret_keys(
+                &config_file_path,
+                consensus_passphrase.0.as_bytes(),
+                service_passphrase.0.as_bytes(),
+            )
+        };
         Node::new(db, services, config, Some(config_file_path))
     }
 }

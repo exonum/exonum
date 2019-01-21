@@ -88,3 +88,10 @@ pub struct NodePrivateConfig {
     #[serde(default)]
     pub services_secret_configs: AbstractConfig,
 }
+
+/// Used for passing configuration for starting node from the command line that is not in the `NodeConfig`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeRunConfig {
+    pub consensus_pass_method: String,
+    pub service_pass_method: String,
+}
