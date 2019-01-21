@@ -23,6 +23,8 @@ use std::{borrow::Borrow, marker::PhantomData};
 use crate::{
     views::{Iter as ViewIter, View, IndexAccess}, Fork, BinaryKey,
 };
+use crate::views::IndexAddress;
+use crate::views::Mount;
 
 /// A set of key items.
 ///
@@ -54,6 +56,15 @@ impl<T, K> KeySetIndex<T, K>
         T: IndexAccess,
         K: BinaryKey,
 {
+
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
+
+        Self {
+            base: Mount::new(view).mount(index_name),
+            _k: PhantomData,
+        }
+    }
+
     /// Returns `true` if the set contains the indicated value.
     ///
     /// # Examples
@@ -233,22 +244,22 @@ mod tests {
 
     const INDEX_NAME: &str = "test_index_name";
 
-//    #[test]
-//    fn str_key() {
-//        let db = MemoryDB::new();
-//        let fork = db.fork();
-//        let mut index: KeySetIndex<_, String> = fork.mount_root().named_child(INDEX_NAME).mount();
-//
-//        const KEY: &str = "key_1";
-//
-//        assert_eq!(false, index.contains(KEY));
-//
-//        index.insert(KEY.to_owned());
-//        assert_eq!(true, index.contains(KEY));
-//
-//        index.remove(KEY);
-//        assert_eq!(false, index.contains(KEY));
-//    }
+    #[test]
+    fn str_key() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let mut index: KeySetIndex<_, String> = KeySetIndex::new(INDEX_NAME, &fork);
+
+        const KEY: &str = "key_1";
+
+        assert_eq!(false, index.contains(KEY));
+
+        index.insert(KEY.to_owned());
+        assert_eq!(true, index.contains(KEY));
+
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
 //
 //    #[test]
 //    fn u8_slice_key() {

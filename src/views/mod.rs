@@ -22,14 +22,11 @@ use super::{
 };
 use exonum_crypto::Hash;
 
-//#[cfg(test)]
-//mod tests;
-
 /// TODO
 pub struct View<T: IndexAccess> {
-    address: IndexAddress,
-    snapshot: T,
-    changes: T::Changes,
+    pub address: IndexAddress,
+    pub snapshot: T,
+    pub changes: T::Changes,
 }
 
 impl<T: IndexAccess> fmt::Debug for View<T> {
@@ -72,101 +69,30 @@ pub trait IndexAccess: Clone {
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
-#[derive(Clone)]
-pub struct Mount<T: IndexAccess> {
-    db_view: T,
-    address: IndexAddress,
+pub struct Mount<T> {
+    view: T,
 }
 
-impl<T: IndexAccess> fmt::Debug for Mount<T> {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter
-            .debug_struct("Mount")
-            .field("address", &self.address)
-            .finish()
+impl <T: IndexAccess> Mount<T> {
+    pub fn new(view: T) -> Self {
+        Self {
+            view
+        }
+    }
+
+    pub fn view(&self) -> &T {
+        &self.view
+    }
+
+    pub fn mount<S: AsRef<str>>(self, index_name: S) -> View<T> {
+        let address = IndexAddress::root().append_name(index_name.as_ref());
+        View {
+            snapshot: self.view.clone(),
+            changes: self.view.changes(&address),
+            address,
+        }
     }
 }
-
-//impl<T: IndexAccess> Mount<T> {
-//    pub fn root(db_view: T) -> Self {
-//        Mount {
-//            db_view,
-//            address: IndexAddress::root(),
-//        }
-//    }
-//
-//    fn db_view(&self) -> &T {
-//        &self.db_view
-//    }
-//
-//    pub fn address(&self) -> IndexAddress {
-//        self.address.clone()
-//    }
-//
-//    pub fn named_child(&self, suffix: &str) -> Self {
-//        Mount {
-//            db_view: self.db_view.clone(),
-//            address: self.address.append_name(suffix),
-//        }
-//    }
-//
-//    pub fn indexed_child(&self, suffix: u64) -> Self {
-//        Mount {
-//            db_view: self.db_view.clone(),
-//            address: self.address.append_bytes(&suffix),
-//        }
-//    }
-//
-//    pub fn hash_child(&self, suffix: &Hash) -> Self {
-//        Mount {
-//            db_view: self.db_view.clone(),
-//            address: self.address.append_bytes(suffix),
-//        }
-//    }
-//
-//    pub fn mount<C>(self) -> C
-//        where
-//            C: Component<T>,
-//    {
-//        C::mount(self)
-//    }
-//}
-
-//impl dyn Snapshot {
-    /// Creates a new mountpoint rooted at this snapshot.
-//    pub fn mount_root(&self) -> Mount<&dyn Snapshot> {
-//        Mount {
-//            db_view: self,
-//            address: IndexAddress::root(),
-//        }
-//    }
-//}
-
-//impl Fork {
-    /// Creates a new mountpoint rooted at this fork.
-//    pub fn mount_root(&self) -> Mount<&Fork> {
-//        Mount {
-//            db_view: self,
-//            address: IndexAddress::root(),
-//        }
-//    }
-//}
-
-//pub trait Component<T: IndexAccess> {
-//    fn mount(point: Mount<T>) -> Self;
-//}
-//
-//impl<T: IndexAccess> Component<T> for View<T> {
-//    fn mount(point: Mount<T>) -> Self {
-//        let address = point.address();
-//
-//        View {
-//            snapshot: point.db_view().clone(),
-//            changes: point.db_view().changes(&address),
-//            address,
-//        }
-//    }
-//}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct IndexAddress {
