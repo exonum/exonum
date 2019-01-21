@@ -18,6 +18,7 @@ use std::{fmt, num::ParseIntError, str::FromStr};
 
 use crypto::{CryptoHash, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use zeroize::Zeroize;
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -357,5 +358,15 @@ impl Iterator for RoundRangeIter {
         } else {
             None
         }
+    }
+}
+
+/// Struct used to call zeroize on inner type on drop.
+#[derive(Debug)]
+pub struct ZeroizeOnDrop<T: Zeroize>(pub T);
+
+impl<T: Zeroize> Drop for ZeroizeOnDrop<T> {
+    fn drop(&mut self) {
+        self.0.zeroize()
     }
 }

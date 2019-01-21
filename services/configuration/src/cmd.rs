@@ -83,7 +83,7 @@ impl CommandExtension for Finalize {
     }
 
     fn execute(&self, mut context: Context) -> Result<Context, failure::Error> {
-        let mut node_config: NodeConfig = context.get(keys::NODE_CONFIG).unwrap();
+        let mut node_config = context.get(keys::NODE_CONFIG).unwrap();
         let common_config = context.get(keys::COMMON_CONFIG).unwrap();
 
         // Local config section

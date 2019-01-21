@@ -73,6 +73,7 @@ extern crate log;
 extern crate os_info;
 extern crate rand;
 extern crate rand_xorshift;
+extern crate rpassword;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]
@@ -91,6 +92,7 @@ extern crate tokio_retry;
 extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
+extern crate zeroize;
 
 // Test dependencies.
 #[cfg(test)]

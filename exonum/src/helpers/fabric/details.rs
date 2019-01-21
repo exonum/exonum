@@ -17,17 +17,19 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts, rsplitn
 
-use crypto;
+use crypto::generate_keys_file;
+use rpassword;
 use toml;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fs,
+    env, fs, io,
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
 };
 
 use super::{
+    super::path_relative_from,
     internal::{CollectedCommand, Command, Feedback},
     keys,
     shared::{
@@ -37,10 +39,13 @@ use super::{
 };
 use api::backends::actix::AllowOrigin;
 use blockchain::{config::ValidatorKeys, GenesisConfig};
-use helpers::{config::ConfigFile, generate_testnet_config};
+use crypto::PublicKey;
+use helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
 use node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
+const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
+const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
@@ -50,6 +55,15 @@ const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
 const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
 const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
+const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
+const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
+const NO_PASSWORD: &str = "NO_PASSWORD";
+
+#[derive(Copy, Clone)]
+enum SecretKeyType {
+    Consensus,
+    Service,
+}
 
 /// Run command.
 pub struct Run;
@@ -68,7 +82,7 @@ impl Run {
             .unwrap_or_else(|_| panic!("{} not found.", NODE_CONFIG_PATH))
     }
 
-    fn node_config(path: String) -> NodeConfig {
+    fn node_config(path: String) -> NodeConfig<PathBuf> {
         ConfigFile::load(path).expect("Can't load node config file")
     }
 
@@ -184,6 +198,8 @@ impl RunDev {
         let pub_config_path = Self::artifacts_path("public.toml", &ctx);
         let sec_config_path = Self::artifacts_path("secret.toml", &ctx);
         let output_config_path = Self::artifacts_path("output.toml", &ctx);
+        let consensus_key_path = Self::artifacts_path("consensus.toml", &ctx);
+        let service_key_path = Self::artifacts_path("service.toml", &ctx);
 
         // Arguments for common config command.
         ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
@@ -194,6 +210,9 @@ impl RunDev {
         ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
         ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
         ctx.set_arg(PEER_ADDRESS, peer_addr.into());
+        ctx.set_arg(CONSENSUS_KEY_PATH, consensus_key_path);
+        ctx.set_arg(SERVICE_KEY_PATH, service_key_path);
+        ctx.set_flag_occurrences(NO_PASSWORD, 1);
 
         // Arguments for finalize config command.
         ctx.set_arg_multiple("PUBLIC_CONFIGS", vec![pub_config_path.clone()]);
@@ -400,6 +419,20 @@ impl GenerateNodeConfig {
 
         (external_address, listen_address)
     }
+
+    fn get_passphrase(context: &Context, secret_key_type: SecretKeyType) -> ZeroizeOnDrop<Vec<u8>> {
+        let key = match secret_key_type {
+            SecretKeyType::Consensus => EXONUM_CONSENSUS_PASS,
+            SecretKeyType::Service => EXONUM_SERVICE_PASS,
+        };
+        context
+            .get_flag_occurrences(NO_PASSWORD)
+            .map(|_| ZeroizeOnDrop("".to_string()))
+            .or_else(|| env::var(key).map(ZeroizeOnDrop).ok())
+            .or_else(|| prompt_passphrase(secret_key_type).ok())
+            .map(|s| ZeroizeOnDrop(s.0.as_bytes().to_vec()))
+            .unwrap()
+    }
 }
 
 impl Command for GenerateNodeConfig {
@@ -422,6 +455,29 @@ impl Command for GenerateNodeConfig {
                 "Listen address",
                 "l",
                 "listen-address",
+                false,
+            ),
+            Argument::new_named(
+                CONSENSUS_KEY_PATH,
+                false,
+                "Path to the file storing consensus private key (default: ./consensus.toml)",
+                "c",
+                "consensus-path",
+                false,
+            ),
+            Argument::new_named(
+                SERVICE_KEY_PATH,
+                false,
+                "Path to the file storing service private key (default: ./service.toml)",
+                "s",
+                "service-path",
+                false,
+            ),
+            Argument::new_flag(
+                NO_PASSWORD,
+                "Don't prompt for passwords when generating private keys (leave empty)",
+                "n",
+                "no-password",
                 false,
             ),
         ]
@@ -450,6 +506,14 @@ impl Command for GenerateNodeConfig {
         let private_config_path = context
             .arg::<String>("SEC_CONFIG")
             .expect("expected secret config path");
+        let consensus_secret_key_path: PathBuf = context
+            .arg::<String>(CONSENSUS_KEY_PATH)
+            .unwrap_or_else(|_| "consensus.toml".into())
+            .into();
+        let service_secret_key_path: PathBuf = context
+            .arg::<String>(SERVICE_KEY_PATH)
+            .unwrap_or_else(|_| "service.toml".into())
+            .into();
 
         let addresses = Self::addresses(&context);
         let common: CommonConfigTemplate =
@@ -467,8 +531,28 @@ impl Command for GenerateNodeConfig {
         let services_public_configs = new_context.get(keys::SERVICES_PUBLIC_CONFIGS).unwrap();
         let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
+        let consensus_public_key = {
+            let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Consensus);
+            create_secret_key_file(&consensus_secret_key_path, &passphrase.0)
+        };
+        let service_public_key = {
+            let passphrase = Self::get_passphrase(&new_context, SecretKeyType::Service);
+            create_secret_key_file(&service_secret_key_path, &passphrase.0)
+        };
+
+        let pub_config_dir = Path::new(&pub_config_path)
+            .parent()
+            .expect("Cannot get directory with configuration file");
+        let consensus_secret_key = if consensus_secret_key_path.is_absolute() {
+            consensus_secret_key_path
+        } else {
+            path_relative_from(&consensus_secret_key_path, &pub_config_dir).unwrap()
+        };
+        let service_secret_key = if service_secret_key_path.is_absolute() {
+            service_secret_key_path
+        } else {
+            path_relative_from(&service_secret_key_path, &pub_config_dir).unwrap()
+        };
 
         let validator_keys = ValidatorKeys {
             consensus_key: consensus_public_key,
@@ -775,11 +859,82 @@ impl Command for GenerateTestnet {
             .expect("Couldn't read testnet configs after exts call.");
 
         for (idx, cfg) in configs.into_iter().enumerate() {
-            let file_name = format!("{}.toml", idx);
-            ConfigFile::save(&cfg, &dir.join(file_name)).unwrap();
+            let cfg_filename = format!("{}.toml", idx);
+            let consensus_key_filename = format!("consensus{}.toml", idx);
+            let service_key_filename = format!("service{}.toml", idx);
+
+            let consensus_secret_key_path = dir.join(&consensus_key_filename);
+            let service_secret_key_path = dir.join(&service_key_filename);
+            let consensus_public_key = create_secret_key_file(&consensus_secret_key_path, &[]);
+            let service_public_key = create_secret_key_file(&service_secret_key_path, &[]);
+
+            let config_file_path = dir.join(cfg_filename);
+            let config: NodeConfig<PathBuf> = NodeConfig {
+                consensus_secret_key: consensus_key_filename.into(),
+                service_secret_key: service_key_filename.into(),
+                consensus_public_key,
+                service_public_key,
+                genesis: cfg.genesis,
+                listen_address: cfg.listen_address,
+                external_address: cfg.external_address,
+                network: cfg.network,
+                api: cfg.api,
+                mempool: cfg.mempool,
+                services_configs: cfg.services_configs,
+                database: cfg.database,
+                connect_list: cfg.connect_list,
+                thread_pool_size: cfg.thread_pool_size,
+            };
+
+            ConfigFile::save(&config, &config_file_path).unwrap();
         }
 
         Feedback::None
+    }
+}
+
+fn prompt_passphrase(secret_key_type: SecretKeyType) -> io::Result<ZeroizeOnDrop<String>> {
+    let key_type = match secret_key_type {
+        SecretKeyType::Consensus => "consensus",
+        SecretKeyType::Service => "service",
+    };
+    loop {
+        let password = ZeroizeOnDrop(rpassword::read_password_from_tty(Some(&format!(
+            "Enter passphrase for {} key: ",
+            key_type
+        )))?);
+        if password.0.is_empty() {
+            eprintln!("Passphrase must not be empty. Try again.");
+            continue;
+        }
+
+        let second_password = ZeroizeOnDrop(rpassword::read_password_from_tty(Some(
+            "Enter same passphrase again: ",
+        ))?);
+
+        if password.0 == second_password.0 {
+            return Ok(password);
+        } else {
+            eprintln!("Passphrases do not match. Try again.");
+        }
+    }
+}
+
+fn create_secret_key_file(
+    secret_key_path: impl AsRef<Path>,
+    passphrase: impl AsRef<[u8]>,
+) -> PublicKey {
+    let secret_key_path = secret_key_path.as_ref();
+    if secret_key_path.exists() {
+        panic!(
+            "Failed to create secret key file. File exists: {}",
+            secret_key_path.to_string_lossy(),
+        );
+    } else {
+        if let Some(dir) = secret_key_path.parent() {
+            fs::create_dir_all(dir).unwrap();
+        }
+        generate_keys_file(&secret_key_path, &passphrase).unwrap()
     }
 }
 
@@ -875,4 +1030,5 @@ mod test {
             )
         );
     }
+
 }

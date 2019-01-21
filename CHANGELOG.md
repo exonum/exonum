@@ -5,6 +5,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking Changes
+
+#### exonum
+
+- Node secret keys are now stored in separate files in a secure way.
+  CLI for generating node configs and starting nodes has been extended
+  in order to reflect these changes. (#1222, #1096)
+
+#### exonum-crypto
+
+- Renamed `create_keys_file` function to `generate_keys_file`
+  in `utils` module. (#1222, #1096)
+
 ### Internal improvements
 
 #### exonum
