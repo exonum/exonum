@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Internal improvements
+
+#### exonum
+
+- Added `allow-origin` for `localhost` for public and private api in
+  development mode by default. (#1234)
+
 ## 0.10.2 - 2019-01-14
 
 ### New Features
