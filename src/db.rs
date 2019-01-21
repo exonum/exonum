@@ -196,12 +196,16 @@ impl WorkingPatch {
                 patch_changes.removed_prefixes.push(prefix);
             }
 
-            patch_changes.data.extend(
-                changes
-                    .data
-                    .into_iter()
-                    .map(|(key, value)| (address.keyed(&key).1, value)),
-            );
+            if address.bytes().is_none() {
+                patch_changes.data.extend(changes.data);
+            } else {
+                patch_changes.data.extend(
+                    changes
+                        .data
+                        .into_iter()
+                        .map(|(key, value)| (address.keyed(&key).1, value)),
+                );
+            }
         }
     }
 }

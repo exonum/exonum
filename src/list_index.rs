@@ -63,18 +63,6 @@ where
     }
 }
 
-impl<'a, T, V> ListIndex<T, V>
-    where
-        T: AsRef<dyn Snapshot> + IndexAccess + 'a,
-        V: BinaryValue,
-        ListIndex<T, V>: FromView<View<'a>>,
-{
-
-    pub fn old_new(index_name: &str, snapshot: T) -> Self {
-        snapshot.index(index_name)
-    }
-}
-
 impl<T, V> ListIndex<T, V>
 where
     T: ReadView,
@@ -464,6 +452,11 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{Fork, ListIndex, Snapshot, Database, TemporaryDB, views::{ViewMut, IndexAccessMut}};
+    use crate::views::IndexAccess;
+    use crate::views::ReadView;
+    use std::string::String;
+    use crate::views::FromView;
+    use crate::views::View;
 
     fn list_index_methods<'a>(list_index: &mut ListIndex<ViewMut<'a>, i32>) {
         assert!(list_index.is_empty());
@@ -521,63 +514,72 @@ mod tests {
         );
     }
 
-    //TODO: revert test
-//    fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
-//        assert_ne!(x, y);
-//        let mut fork = db.fork();
-//
-//        fn list<T>(index: u32, view: T) -> ListIndex<T, String>
-//        where
-//            T: AsRef<dyn Snapshot>,
-//        {
-//            ListIndex::new_in_family("family", &index, view)
-//        }
-//
-//        // Write data to both indexes.
-//        {
-//            let mut index = list(x, &mut fork);
-//            index.push("foo".to_owned());
-//            index.push("bar".to_owned());
-//        }
-//        {
-//            let mut index = list(y, &mut fork);
-//            index.push("baz".to_owned());
-//            index.push("qux".to_owned());
-//        }
-//
-//        if merge_before_clear {
-//            db.merge_sync(fork.into_patch()).expect("merge");
-//            fork = db.fork();
-//        }
-//
-//        // Clear the index with the lower family key.
-//        {
-//            let mut index = list(x, &mut fork);
-//            index.clear();
-//        }
-//
-//        // The other index should be unaffected.
-//        {
-//            let index = list(x, &fork);
-//            assert!(index.is_empty());
-//            let index = list(y, &fork);
-//            assert_eq!(
-//                index.iter().collect::<Vec<_>>(),
-//                vec!["baz".to_owned(), "qux".to_owned()]
-//            );
-//        }
-//
-//        // ...even after fork merge.
-//        db.merge_sync(fork.into_patch()).expect("merge");
-//        let snapshot = db.snapshot();
-//        let index = list(x, &snapshot);
-//        assert!(index.is_empty());
-//        let index = list(y, &snapshot);
-//        assert_eq!(
-//            index.iter().collect::<Vec<_>>(),
-//            vec!["baz".to_owned(), "qux".to_owned()]
-//        );
-//    }
+    fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
+        assert_ne!(x, y);
+        let mut fork = db.fork();
+
+        fn list<'a, I, T>(index: u32, view: &'a I) -> ListIndex<T, String>
+        where
+            I: IndexAccess + 'a,
+            T: ReadView,
+            ListIndex<T, String>: FromView<View<'a>>,
+        {
+            view.index(("family", &index))
+        }
+
+        fn list_mut<'a, I, T>(index: u32, view: &'a I) -> ListIndex<ViewMut<'a>, String>
+            where
+                I: IndexAccessMut + 'a,
+                ListIndex<T, String>: FromView<View<'a>>,
+        {
+            view.index_mut(("family", &index))
+        }
+
+        // Write data to both indexes.
+        {
+            let mut index = list_mut(x, &fork);
+            index.push("foo".to_owned());
+            index.push("bar".to_owned());
+        }
+        {
+            let mut index = list_mut(y, &fork);
+            index.push("baz".to_owned());
+            index.push("qux".to_owned());
+        }
+
+        if merge_before_clear {
+            db.merge_sync(fork.into_patch()).expect("merge");
+            fork = db.fork();
+        }
+
+        // Clear the index with the lower family key.
+        {
+            let mut index = list_mut(x, &fork);
+            index.clear();
+        }
+
+        // The other index should be unaffected.
+        {
+            let index = list(x, &fork);
+            assert!(index.is_empty());
+            let index = list(y, &fork);
+            assert_eq!(
+                index.iter().collect::<Vec<_>>(),
+                vec!["baz".to_owned(), "qux".to_owned()]
+            );
+        }
+
+        // ...even after fork merge.
+        db.merge_sync(fork.into_patch()).expect("merge");
+        let snapshot = db.snapshot();
+        let index = list(x, &snapshot);
+        assert!(index.is_empty());
+        let index = list(y, &snapshot);
+        assert_eq!(
+            index.iter().collect::<Vec<_>>(),
+            vec!["baz".to_owned(), "qux".to_owned()]
+        );
+    }
 
     // Parameters for the `list_index_clear_in_family` test.
     const FAMILY_CLEAR_PARAMS: &[(u32, u32, bool)] =
@@ -618,11 +620,10 @@ mod tests {
     }
 
     #[test]
-    //TODO: revert test
     fn test_list_index_clear_in_family() {
         for &(x, y, merge_before_clear) in FAMILY_CLEAR_PARAMS {
             let db = TemporaryDB::default();
-//            list_index_clear_in_family(&db, x, y, merge_before_clear);
+            list_index_clear_in_family(&db, x, y, merge_before_clear);
         }
     }
 }
