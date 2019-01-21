@@ -13,15 +13,15 @@
 // limitations under the License.
 
 use std::{
-    cell::{Ref, RefCell, RefMut}, cmp::Ordering::{Equal, Greater, Less},
+    cell::RefCell, cmp::Ordering::{Equal, Greater, Less},
     collections::{
         btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter},
         hash_map::{IntoIter as HmIntoIter, Iter as HmIter}, Bound::{Included, Unbounded}, HashMap,
     },
-    iter::{FromIterator, Iterator as StdIterator, Peekable}, mem,
+    iter::{FromIterator, Iterator as StdIterator, Peekable}, mem, ops::{Deref, DerefMut},
 };
 
-use crate::{Result, views::{IndexAccess, IndexAccessMut, IndexAddress, View, ViewMut}};
+use crate::{views::{IndexAccess, IndexAddress}, Result};
 
 /// Finds a prefix immediately following the supplied one.
 pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
@@ -139,49 +139,87 @@ pub struct Patch {
     changes: HashMap<String, Changes>,
 }
 
+#[derive(Debug)]
 pub struct WorkingPatch {
-    changes: HashMap<IndexAddress, RefCell<ViewChanges>>,
+    changes: RefCell<HashMap<IndexAddress, Option<ViewChanges>>>,
+}
+
+/// `RefMut`, but dumber.
+#[derive(Debug)]
+pub struct ChangesRef<'a> {
+    parent: &'a WorkingPatch,
+    key: IndexAddress,
+    changes: Option<ViewChanges>,
+}
+
+impl<'a> Deref for ChangesRef<'a> {
+    type Target = ViewChanges;
+
+    fn deref(&self) -> &ViewChanges {
+        // `.unwrap()` is safe: `changes` can be equal to `None` only when
+        // the instance is being dropped.
+        self.changes.as_ref().unwrap()
+    }
+}
+
+impl<'a> DerefMut for ChangesRef<'a> {
+    fn deref_mut(&mut self) -> &mut ViewChanges {
+        // `.unwrap()` is safe: `changes` can be equal to `None` only when
+        // the instance is being dropped.
+        self.changes.as_mut().unwrap()
+    }
+}
+
+impl<'a> Drop for ChangesRef<'a> {
+    fn drop(&mut self) {
+        let mut change_map = self.parent.changes.borrow_mut();
+        let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
+            panic!("insertion point for changes disappeared at {:?}", self.key);
+        });
+
+        debug_assert!(changes.is_none(), "edit conflict at {:?}", self.key);
+        *changes = self.changes.take();
+    }
 }
 
 impl WorkingPatch {
-    /// Creates a new empty `Patch` instance.
+    /// Creates a new empty patch.
     fn new() -> Self {
         WorkingPatch {
-            changes: HashMap::new(),
+            changes: RefCell::new(HashMap::new()),
         }
     }
 
-    /// Returns changes for the given name.
-    fn changes(&self, address: &IndexAddress) -> Ref<ViewChanges> {
-        if !self.changes.contains_key(address) {
-            self.initialize_changes(address);
-        }
-
-        self.changes.get(address).unwrap().borrow()
+    fn is_empty(&self) -> bool {
+        self.changes.borrow().is_empty()
     }
 
-    /// Returns a mutable reference to the changes corresponding to the `name`.
-    fn changes_mut(&self, address: &IndexAddress) -> RefMut<ViewChanges> {
-        if !self.changes.contains_key(address) {
-            self.initialize_changes(address);
+    /// Returns a mutable reference to the changes corresponding to a certain index.
+    fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
+        let changes = self.changes
+            .borrow_mut()
+            .entry(address.clone())
+            .or_insert_with(|| Some(ViewChanges::new()))
+            .take();
+        assert!(
+            changes.is_some(),
+            "multiple mutable borrows of an index at {:?}",
+            address
+        );
+
+        ChangesRef {
+            changes,
+            key: address.clone(),
+            parent: self,
         }
-
-        self.changes.get(address).unwrap().borrow_mut()
-    }
-
-    #[allow(unsafe_code)]
-    fn initialize_changes(&self, address: &IndexAddress) {
-        let ptr = self as *const Self;
-        // FIXME: describe soundness reasoning; check internal structure of `RefCell`
-        unsafe { &mut *(ptr as *mut Self) }
-            .changes
-            .insert(address.clone(), RefCell::new(ViewChanges::new()));
     }
 
     // TODO: verify that this method updates `Change`s already in the `Patch`
     fn merge_into(self, patch: &mut Patch) {
-        for (address, changes) in self.changes {
-            let changes = changes.into_inner();
+        for (address, changes) in self.changes.into_inner() {
+            let changes = changes.unwrap_or_else(|| {
+                panic!("changes are still borrowed at address {:?}", address);
+            });
 
             let patch_changes = patch
                 .changes
@@ -203,7 +241,7 @@ impl WorkingPatch {
                     changes
                         .data
                         .into_iter()
-                        .map(|(key, value)| (address.keyed(&key).1, value)),
+                        .map(|(key, value)| (address.keyed(&key).1.into_owned(), value)),
                 );
             }
         }
@@ -553,36 +591,23 @@ impl Fork {
 
     /// Checks if a fork has any unflushed changes.
     pub fn is_dirty(&self) -> bool {
-        !self.working_patch.changes.is_empty()
+        !self.working_patch.is_empty()
     }
+}
 
-    /// TODO
-    pub fn to_snapshot(&mut self) -> &dyn Snapshot {
-        if self.is_dirty() {
-            self.flush();
-        }
+impl<'a> IndexAccess for &'a Fork {
+    type Changes = ChangesRef<'a>;
+
+    fn snapshot(&self) -> &dyn Snapshot {
         &self.flushed
     }
-}
 
-impl IndexAccess for Fork {
-    fn view<I: Into<IndexAddress>>(&self, address: I) -> View {
-        let address = address.into();
-        let changes = self.working_patch.changes(&address);
-
-        View::new(&self.flushed, address, changes)
+    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+        self.working_patch.changes_mut(address)
     }
 }
 
-impl IndexAccessMut for Fork {
-    fn view_mut<I: Into<IndexAddress>>(&self, address: I) -> ViewMut {
-        let address = address.into();
-        let changes = self.working_patch.changes_mut(&address);
-
-        ViewMut::new(&self.flushed, address, changes)
-    }
-}
-
+// TODO: remove
 impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
     fn as_ref(&self) -> &dyn Snapshot {
         self

@@ -14,25 +14,25 @@
 
 #![allow(missing_docs)]
 
-use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData, cell::{RefMut, Ref}};
+use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
 use super::{
-    db::{Change, ForkIter, ViewChanges}, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
-    BinaryKey, BinaryValue,
+    db::{Change, ChangesRef, ForkIter, ViewChanges}, Fork, Iter as BytesIter,
+    Iterator as BytesIterator, Snapshot, BinaryKey, BinaryValue,
 };
 use exonum_crypto::Hash;
 
 //#[cfg(test)]
 //mod tests;
 
-/// Base view struct responsible for accessing indexes.
-pub struct View<'a> {
-    snapshot: &'a dyn Snapshot,
+/// TODO
+pub struct View<T: IndexAccess> {
     address: IndexAddress,
-    changes: Option<Ref<'a, ViewChanges>>,
+    snapshot: T,
+    changes: T::Changes,
 }
 
-impl<'a> fmt::Debug for View<'a> {
+impl<T: IndexAccess> fmt::Debug for View<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("View")
             .field("address", &self.address)
@@ -40,58 +40,133 @@ impl<'a> fmt::Debug for View<'a> {
     }
 }
 
-impl<'a> View<'a> {
-    pub(super) fn new(
-        snapshot: &'a dyn Snapshot,
-        address: IndexAddress,
-        changes: Ref<'a, ViewChanges>,
-    ) -> Self {
-        View {
-            snapshot,
-            address,
-            changes: Some(changes),
-        }
+pub trait ChangeSet {
+    fn as_ref(&self) -> Option<&ViewChanges>;
+    fn as_mut(&mut self) -> Option<&mut ViewChanges>;
+}
+
+impl ChangeSet for () {
+    fn as_ref(&self) -> Option<&ViewChanges> {
+        None
+    }
+
+    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
+        None
     }
 }
 
-/// TODO
-pub struct ViewMut<'a> {
-    snapshot: &'a dyn Snapshot,
-    address: IndexAddress,
-    changes: RefMut<'a, ViewChanges>,
+impl<'a> ChangeSet for ChangesRef<'a> {
+    fn as_ref(&self) -> Option<&ViewChanges> {
+        Some(&*self)
+    }
+
+    fn as_mut(&mut self) -> Option<&mut ViewChanges> {
+        Some(&mut *self)
+    }
 }
 
-impl<'a> fmt::Debug for ViewMut<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ViewMut")
+pub trait IndexAccess: Clone {
+    type Changes: ChangeSet;
+
+    fn snapshot(&self) -> &dyn Snapshot;
+    fn changes(&self, address: &IndexAddress) -> Self::Changes;
+}
+
+#[derive(Clone)]
+pub struct Mount<T: IndexAccess> {
+    db_view: T,
+    address: IndexAddress,
+}
+
+impl<T: IndexAccess> fmt::Debug for Mount<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter
+            .debug_struct("Mount")
             .field("address", &self.address)
             .finish()
     }
 }
 
-pub trait IndexAccess {
-    fn view<I: Into<IndexAddress>>(&self, address: I) -> View;
+//impl<T: IndexAccess> Mount<T> {
+//    pub fn root(db_view: T) -> Self {
+//        Mount {
+//            db_view,
+//            address: IndexAddress::root(),
+//        }
+//    }
+//
+//    fn db_view(&self) -> &T {
+//        &self.db_view
+//    }
+//
+//    pub fn address(&self) -> IndexAddress {
+//        self.address.clone()
+//    }
+//
+//    pub fn named_child(&self, suffix: &str) -> Self {
+//        Mount {
+//            db_view: self.db_view.clone(),
+//            address: self.address.append_name(suffix),
+//        }
+//    }
+//
+//    pub fn indexed_child(&self, suffix: u64) -> Self {
+//        Mount {
+//            db_view: self.db_view.clone(),
+//            address: self.address.append_bytes(&suffix),
+//        }
+//    }
+//
+//    pub fn hash_child(&self, suffix: &Hash) -> Self {
+//        Mount {
+//            db_view: self.db_view.clone(),
+//            address: self.address.append_bytes(suffix),
+//        }
+//    }
+//
+//    pub fn mount<C>(self) -> C
+//        where
+//            C: Component<T>,
+//    {
+//        C::mount(self)
+//    }
+//}
 
-    fn index<'a, I, T>(&'a self, address: I) -> T
-        where
-            I: Into<IndexAddress>,
-            T: FromView<View<'a>>,
-    {
-        T::from_view(self.view(address))
-    }
-}
+//impl dyn Snapshot {
+    /// Creates a new mountpoint rooted at this snapshot.
+//    pub fn mount_root(&self) -> Mount<&dyn Snapshot> {
+//        Mount {
+//            db_view: self,
+//            address: IndexAddress::root(),
+//        }
+//    }
+//}
 
-pub trait IndexAccessMut: IndexAccess {
-    fn view_mut<I: Into<IndexAddress>>(&self, address: I) -> ViewMut;
+//impl Fork {
+    /// Creates a new mountpoint rooted at this fork.
+//    pub fn mount_root(&self) -> Mount<&Fork> {
+//        Mount {
+//            db_view: self,
+//            address: IndexAddress::root(),
+//        }
+//    }
+//}
 
-    fn index_mut<'a, I, T>(&'a self, address: I) -> T
-        where
-            I: Into<IndexAddress>,
-            T: FromView<ViewMut<'a>>,
-    {
-        T::from_view(self.view_mut(address))
-    }
-}
+//pub trait Component<T: IndexAccess> {
+//    fn mount(point: Mount<T>) -> Self;
+//}
+//
+//impl<T: IndexAccess> Component<T> for View<T> {
+//    fn mount(point: Mount<T>) -> Self {
+//        let address = point.address();
+//
+//        View {
+//            snapshot: point.db_view().clone(),
+//            changes: point.db_view().changes(&address),
+//            address,
+//        }
+//    }
+//}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct IndexAddress {
@@ -100,6 +175,13 @@ pub struct IndexAddress {
 }
 
 impl IndexAddress {
+    pub fn root() -> Self {
+        IndexAddress {
+            name: "".to_owned(),
+            bytes: None,
+        }
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -108,15 +190,41 @@ impl IndexAddress {
         self.bytes.as_ref().map(Vec::as_slice)
     }
 
-    pub fn keyed(&self, key: &[u8]) -> (&str, Vec<u8>) {
-        (&self.name, {
-            let mut bytes = self.bytes.clone().unwrap_or(vec![]);
-            bytes.extend(key);
-            bytes
+    pub fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
+        (&self.name, match self.bytes {
+            None => Cow::Borrowed(key),
+            Some(ref bytes) => {
+                let mut bytes = bytes.clone();
+                bytes.extend(key);
+                bytes.into()
+            }
         })
+    }
+
+    pub fn append_name(&self, suffix: &str) -> Self {
+        IndexAddress {
+            name: if self.name.is_empty() {
+                suffix.to_owned()
+            } else {
+                format!("{}.{}", self.name, suffix)
+            },
+
+            bytes: self.bytes.clone(),
+        }
+    }
+
+    pub fn append_bytes<K: BinaryKey>(&self, suffix: &K) -> Self {
+        let suffix = key_bytes(suffix);
+        let (name, bytes) = self.keyed(&suffix);
+
+        IndexAddress {
+            name: name.to_owned(),
+            bytes: Some(bytes.into_owned()),
+        }
     }
 }
 
+// TODO: remove
 impl<'a> From<&'a str> for IndexAddress {
     fn from(name: &'a str) -> Self {
         IndexAddress {
@@ -126,6 +234,7 @@ impl<'a> From<&'a str> for IndexAddress {
     }
 }
 
+// TODO: remove
 impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     fn from((name, key): (&'a str, &'a K)) -> Self {
         IndexAddress {
@@ -135,30 +244,28 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     }
 }
 
-impl IndexAccess for Box<dyn Snapshot> {
-    fn view<I: Into<IndexAddress>>(&self, address: I) -> View {
-        View {
-            snapshot: self.as_ref(),
-            address: address.into(),
-            changes: None,
-        }
+impl<'a> IndexAccess for &'a dyn Snapshot {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        *self
+    }
+
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {
+        ()
     }
 }
 
-impl<'a, T: IndexAccess> IndexAccess for &'a T {
-    fn view<I: Into<IndexAddress>>(&self, address: I) -> View {
-        (**self).view(address)
-    }
-}
+impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
+    type Changes = ();
 
-impl<'a, T: IndexAccessMut> IndexAccessMut for &'a T {
-    fn view_mut<I: Into<IndexAddress>>(&self, address: I) -> ViewMut {
-        (**self).view_mut(address)
+    fn snapshot(&self) -> &dyn Snapshot {
+        self.as_ref()
     }
-}
 
-pub trait FromView<T: ReadView> {
-    fn from_view(view: T) -> Self;
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {
+        ()
+    }
 }
 
 fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
@@ -167,37 +274,87 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     buffer
 }
 
-/// TODO
-pub trait ReadView {
-    /// Returns a value corresponding to the specified key as a raw vector of bytes,
-    /// or `None` if it does not exist.
-    fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>>;
+impl<T: IndexAccess> View<T> {
+    fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
+        if let Some(ref changes) = self.changes.as_ref() {
+            if let Some(change) = changes.data.get(key) {
+                match *change {
+                    Change::Put(ref v) => return Some(v.clone()),
+                    Change::Delete => return None,
+                }
+            }
 
-    /// Returns `true` if the snapshot contains a value for the specified key.
-    ///
-    /// Default implementation checks existence of the value using [`get`](#tymethod.get).
-    fn contains_raw_key(&self, key: &[u8]) -> bool {
-        self.get_bytes(key).is_some()
+            if changes.is_cleared() {
+                return None;
+            }
+        }
+
+        let (name, key) = self.address.keyed(key);
+        self.snapshot.snapshot().get(name, &key)
     }
 
-    /// Returns an iterator over the entries of the snapshot in ascending order starting from
-    /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter_bytes(&self, from: &[u8]) -> BytesIter;
+    fn contains_raw_key(&self, key: &[u8]) -> bool {
+        if let Some(ref changes) = self.changes.as_ref() {
+            if let Some(change) = changes.data.get(key) {
+                match *change {
+                    Change::Put(..) => return true,
+                    Change::Delete => return false,
+                }
+            }
+
+            if changes.is_cleared() {
+                return false;
+            }
+        }
+
+        let (name, key) = self.address.keyed(key);
+        self.snapshot.snapshot().contains(name, &key)
+    }
+
+    fn iter_bytes(&self, from: &[u8]) -> BytesIter {
+        use std::collections::Bound::*;
+
+        let (name, key) = self.address.keyed(from);
+        let prefix = self.address.bytes.clone().unwrap_or(vec![]);
+
+        let changes_iter = self.changes
+            .as_ref()
+            .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
+
+        let is_cleared = self.changes
+            .as_ref()
+            .map_or(false, |changes| changes.is_cleared());
+
+        if is_cleared {
+            // Ignore all changes from the snapshot
+            Box::new(ChangesIter::new(changes_iter.unwrap()))
+        } else {
+            Box::new(ForkIter::new(
+                Box::new(SnapshotIter::new(
+                    self.snapshot.snapshot(),
+                    name,
+                    prefix,
+                    &key,
+                )),
+                changes_iter,
+            ))
+        }
+    }
 
     /// Returns a value of *any* type corresponding to the key of *any* type.
-    fn get<K, V>(&self, key: &K) -> Option<V>
+    pub fn get<K, V>(&self, key: &K) -> Option<V>
         where
             K: BinaryKey + ?Sized,
             V: BinaryValue,
     {
-        //TODO: remove unwrap
+        //TODO: revert
         self.get_bytes(&key_bytes(key))
             .map(|v| BinaryValue::from_bytes(Cow::Owned(v)).unwrap())
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
     /// *any* type.
-    fn contains<K>(&self, key: &K) -> bool
+    pub fn contains<K>(&self, key: &K) -> bool
         where
             K: BinaryKey + ?Sized,
     {
@@ -207,7 +364,7 @@ pub trait ReadView {
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
     /// type is *any* key-value pair. An argument `subprefix` allows specifying a subset of keys
     /// for iteration.
-    fn iter<P, K, V>(&self, subprefix: &P) -> Iter<K, V>
+    pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<K, V>
         where
             P: BinaryKey + ?Sized,
             K: BinaryKey,
@@ -226,7 +383,7 @@ pub trait ReadView {
     /// Returns an iterator over the entries of the index in ascending order starting from the
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows specifying a subset of iteration.
-    fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<K, V>
+    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<K, V>
         where
             P: BinaryKey,
             F: BinaryKey + ?Sized,
@@ -241,68 +398,6 @@ pub trait ReadView {
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
-        }
-    }
-}
-
-impl<'a> ReadView for View<'a> {
-    fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(ref changes) = self.changes {
-            if let Some(change) = changes.data.get(key) {
-                match *change {
-                    Change::Put(ref v) => return Some(v.clone()),
-                    Change::Delete => return None,
-                }
-            }
-
-            if changes.is_cleared() {
-                return None;
-            }
-        }
-
-        let (name, key) = self.address.keyed(key);
-        self.snapshot.get(name, &key)
-    }
-
-    fn contains_raw_key(&self, key: &[u8]) -> bool {
-        if let Some(ref changes) = self.changes {
-            if let Some(change) = changes.data.get(key) {
-                match *change {
-                    Change::Put(..) => return true,
-                    Change::Delete => return false,
-                }
-            }
-
-            if changes.is_cleared() {
-                return false;
-            }
-        }
-
-        let (name, key) = self.address.keyed(key);
-        self.snapshot.contains(name, &key)
-    }
-
-    fn iter_bytes(&self, from: &[u8]) -> BytesIter {
-        use std::collections::Bound::*;
-
-        let (name, key) = self.address.keyed(from);
-        let prefix = self.address.bytes.clone().unwrap_or(vec![]);
-
-        let changes_iter = self.changes
-            .as_ref()
-            .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
-
-        if self.changes
-            .as_ref()
-            .map_or(false, |changes| changes.is_cleared())
-            {
-                // Ignore all changes from the snapshot
-                Box::new(ChangesIter::new(changes_iter.unwrap()))
-            } else {
-            Box::new(ForkIter::new(
-                Box::new(SnapshotIter::new(self.snapshot, name, prefix, &key)),
-                changes_iter,
-            ))
         }
     }
 }
@@ -367,61 +462,6 @@ impl<'a> BytesIterator for SnapshotIter<'a> {
     }
 }
 
-impl<'a> ReadView for ViewMut<'a> {
-    fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(change) = self.changes.data.get(key) {
-            match *change {
-                Change::Put(ref v) => return Some(v.clone()),
-                Change::Delete => return None,
-            }
-        }
-
-        if self.changes.is_cleared() {
-            return None;
-        }
-
-        let (name, key) = self.address.keyed(key);
-        self.snapshot.get(name, &key)
-    }
-
-    fn contains_raw_key(&self, key: &[u8]) -> bool {
-        if let Some(change) = self.changes.data.get(key) {
-            match *change {
-                Change::Put(..) => return true,
-                Change::Delete => return false,
-            }
-        }
-
-        if self.changes.is_cleared() {
-            return false;
-        }
-
-        let (name, key) = self.address.keyed(key);
-        self.snapshot.contains(name, &key)
-    }
-
-    fn iter_bytes(&self, from: &[u8]) -> BytesIter {
-        use std::collections::Bound::*;
-
-        let (name, key) = self.address.keyed(from);
-        let prefix = self.address.bytes.clone().unwrap_or(vec![]);
-
-        let changes_iter = self.changes
-            .data
-            .range::<[u8], _>((Included(from), Unbounded));
-
-        if self.changes.is_cleared() {
-            // Ignore all changes from the snapshot
-            Box::new(ChangesIter::new(changes_iter))
-        } else {
-            Box::new(ForkIter::new(
-                Box::new(SnapshotIter::new(self.snapshot, name, prefix, &key)),
-                Some(changes_iter),
-            ))
-        }
-    }
-}
-
 struct ChangesIter<'a, T: Iterator + 'a> {
     inner: Peekable<T>,
     _lifetime: PhantomData<&'a ()>,
@@ -473,17 +513,9 @@ impl<'a, T> BytesIterator for ChangesIter<'a, T>
     }
 }
 
-impl<'a> ViewMut<'a> {
-    pub(super) fn new(
-        snapshot: &'a dyn Snapshot,
-        address: IndexAddress,
-        changes: RefMut<'a, ViewChanges>,
-    ) -> Self {
-        ViewMut {
-            snapshot,
-            address,
-            changes,
-        }
+impl<'a> View<&'a Fork> {
+    fn changes(&mut self) -> &mut ViewChanges {
+        self.changes.as_mut().unwrap()
     }
 
     /// Inserts a key-value pair into the fork.
@@ -493,7 +525,7 @@ impl<'a> ViewMut<'a> {
             V: BinaryValue,
     {
         let key = key_bytes(key);
-        self.changes
+        self.changes()
             .data
             .insert(key, Change::Put(value.into_bytes()));
     }
@@ -503,12 +535,12 @@ impl<'a> ViewMut<'a> {
         where
             K: BinaryKey + ?Sized,
     {
-        self.changes.data.insert(key_bytes(key), Change::Delete);
+        self.changes().data.insert(key_bytes(key), Change::Delete);
     }
 
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
-        self.changes.clear();
+        self.changes().clear();
     }
 }
 
@@ -548,6 +580,7 @@ impl<'a, K, V> Iterator for Iter<'a, K, V>
 
         if let Some((k, v)) = self.base_iter.next() {
             if k.starts_with(&self.prefix) {
+                //TODO: revert
                 return Some((K::read(k), V::from_bytes(Cow::Borrowed(v)).unwrap()));
             }
         }

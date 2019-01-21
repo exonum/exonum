@@ -135,7 +135,7 @@ pub use self::{
 //    indexes_metadata::StorageMetadata,
 //    key_set_index::KeySetIndex,
     keys::BinaryKey,
-    list_index::ListIndex,
+//    list_index::ListIndex,
 //    map_index::MapIndex,
     options::DbOptions,
 //    proof_list_index::{ListProof, ProofListIndex},
@@ -160,7 +160,7 @@ mod values;
 mod views;
 
 pub mod key_set_index;
-pub mod list_index;
+//pub mod list_index;
 //pub mod map_index;
 //pub mod proof_list_index;
 //pub mod proof_map_index;
