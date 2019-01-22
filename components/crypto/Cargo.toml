@@ -12,17 +12,17 @@ description = "Cryptography related types, constants, traits and functions."
 
 [dependencies]
 byteorder = { version = "1.2.7", features = [ "i128" ] }
-chrono = "=0.4.6"
-hex = "=0.3.2"
-hex-buffer-serde = "=0.1.1"
+chrono = "0.4.6"
+hex = "0.3.2"
+hex-buffer-serde = "0.1.1"
 pwbox = "0.1.1"
 rand = "0.6"
-rust_decimal = "=0.10.2"
+rust_decimal = "0.10.2"
 serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
-toml = "=0.4.10"
-uuid = "=0.7.1"
+toml = "0.4.10"
+uuid = "0.7.1"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
 
 [dev-dependencies]

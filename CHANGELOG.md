@@ -25,6 +25,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `allow-origin` for `localhost` for public and private api in
   development mode by default. (#1234)
 
+- Unpin versions of dependencies. (#1237)
+
 ## 0.10.2 - 2019-01-14
 
 ### New Features
