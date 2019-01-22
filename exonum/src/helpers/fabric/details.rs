@@ -136,7 +136,9 @@ impl Command for Run {
             Argument::new_named(
                 CONSENSUS_KEY_PASS_METHOD,
                 false,
-                "Passphrase for consensus key.",
+                "Passphrase entry method for consensus key.\n\
+                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
+                 If ENV_VAR_NAME is not specified $EXONUM_CONSENSUS_PASS is used",
                 None,
                 "consensus-key-pass",
                 false,
@@ -144,7 +146,9 @@ impl Command for Run {
             Argument::new_named(
                 SERVICE_KEY_PASS_METHOD,
                 false,
-                "Passphrase for service key.",
+                "Passphrase entry method for service key.\n\
+                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
+                 If ENV_VAR_NAME is not specified $EXONUM_SERVICE_PASS is used",
                 None,
                 "service-key-pass",
                 false,
@@ -513,7 +517,9 @@ impl Command for GenerateNodeConfig {
             Argument::new_named(
                 CONSENSUS_KEY_PASS_METHOD,
                 false,
-                "Passphrase for consensus key.",
+                "Passphrase entry method for consensus key.\n\
+                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
+                 If ENV_VAR_NAME is not specified $EXONUM_CONSENSUS_PASS is used",
                 None,
                 "consensus-key-pass",
                 false,
@@ -521,7 +527,9 @@ impl Command for GenerateNodeConfig {
             Argument::new_named(
                 SERVICE_KEY_PASS_METHOD,
                 false,
-                "Passphrase for service key.",
+                "Passphrase entry method for service key.\n\
+                 Possible values are: stdin, env{:ENV_VAR_NAME}, pass:PASSWORD (default: stdin)\n\
+                 If ENV_VAR_NAME is not specified $EXONUM_SERVICE_PASS is used",
                 None,
                 "service-key-pass",
                 false,
