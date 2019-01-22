@@ -17,8 +17,8 @@
 use std::marker::PhantomData;
 
 use crate::{
-    BinaryKey, BinaryValue, Fork, views::{View, IndexAccess, Mount},
-    UniqueHash,
+    views::{IndexAccess, Mount, View},
+    BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::Hash;
 

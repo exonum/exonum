@@ -23,13 +23,13 @@ use std::{
 };
 
 use self::{key::ProofListKey, proof::ProofOfAbsence};
+use crate::hash::HashTag;
+use crate::views::Mount;
 use crate::{
-    views::{IndexAccess, View, Iter as ViewIter},
+    views::{IndexAccess, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
-use crate::hash::HashTag;
 use exonum_crypto::Hash;
-use crate::views::Mount;
 
 mod key;
 mod proof;

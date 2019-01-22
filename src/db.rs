@@ -13,15 +13,23 @@
 // limitations under the License.
 
 use std::{
-    cell::RefCell, cmp::Ordering::{Equal, Greater, Less},
+    cell::RefCell,
+    cmp::Ordering::{Equal, Greater, Less},
     collections::{
         btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter},
-        hash_map::{IntoIter as HmIntoIter, Iter as HmIter}, Bound::{Included, Unbounded}, HashMap,
+        hash_map::{IntoIter as HmIntoIter, Iter as HmIter},
+        Bound::{Included, Unbounded},
+        HashMap,
     },
-    iter::{FromIterator, Iterator as StdIterator, Peekable}, mem, ops::{Deref, DerefMut},
+    iter::{FromIterator, Iterator as StdIterator, Peekable},
+    mem,
+    ops::{Deref, DerefMut},
 };
 
-use crate::{views::{IndexAccess, IndexAddress}, Result};
+use crate::{
+    views::{IndexAccess, IndexAddress},
+    Result,
+};
 
 /// Finds a prefix immediately following the supplied one.
 pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
@@ -622,8 +630,8 @@ impl ::std::fmt::Debug for Fork {
 }
 
 impl<'a, T> ForkIter<'a, T>
-    where
-        T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
+where
+    T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
     pub fn new(snapshot: Iter<'a>, changes: Option<T>) -> Self {
         ForkIter {
@@ -668,8 +676,8 @@ impl<'a, T> ForkIter<'a, T>
 }
 
 impl<'a, T> Iterator for ForkIter<'a, T>
-    where
-        T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
+where
+    T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {

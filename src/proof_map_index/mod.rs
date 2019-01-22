@@ -27,12 +27,12 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof::{create_multiproof, create_proof},
 };
+use crate::views::Mount;
 use crate::{
-    views::{Iter as ViewIter, View, IndexAccess},
+    views::{IndexAccess, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::{Hash, HashStream};
-use crate::views::Mount;
 
 mod key;
 mod node;

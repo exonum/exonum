@@ -17,8 +17,8 @@
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
 use super::{
-    db::{Change, ChangesRef, ForkIter, ViewChanges}, Fork, Iter as BytesIter,
-    Iterator as BytesIterator, Snapshot, BinaryKey, BinaryValue,
+    db::{Change, ChangesRef, ForkIter, ViewChanges},
+    BinaryKey, BinaryValue, Fork, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
 #[cfg(test)]
@@ -34,7 +34,7 @@ pub struct View<T: IndexAccess> {
 impl<T: IndexAccess> fmt::Debug for View<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("View")
-            .field("address",&self.address)
+            .field("address", &self.address)
             .finish()
     }
 }
@@ -73,11 +73,9 @@ pub struct Mount<T> {
     view: T,
 }
 
-impl <T: IndexAccess> Mount<T> {
+impl<T: IndexAccess> Mount<T> {
     pub fn new(view: T) -> Self {
-        Self {
-            view
-        }
+        Self { view }
     }
 
     pub fn mount<S: AsRef<str>>(self, index_name: S) -> View<T> {
@@ -91,10 +89,11 @@ impl <T: IndexAccess> Mount<T> {
 
     pub fn mount2<S: AsRef<str>, I>(self, index_name: S, index_id: &I) -> View<T>
     where
-        I:BinaryKey + ?Sized,
+        I: BinaryKey + ?Sized,
     {
         let address = IndexAddress::root()
-            .append_name(index_name.as_ref()).append_bytes(index_id);
+            .append_name(index_name.as_ref())
+            .append_bytes(index_id);
         View {
             snapshot: self.view.clone(),
             changes: self.view.changes(&address),
@@ -126,14 +125,17 @@ impl IndexAddress {
     }
 
     pub fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
-        (&self.name, match self.bytes {
-            None => Cow::Borrowed(key),
-            Some(ref bytes) => {
-                let mut bytes = bytes.clone();
-                bytes.extend(key);
-                bytes.into()
-            }
-        })
+        (
+            &self.name,
+            match self.bytes {
+                None => Cow::Borrowed(key),
+                Some(ref bytes) => {
+                    let mut bytes = bytes.clone();
+                    bytes.extend(key);
+                    bytes.into()
+                }
+            },
+        )
     }
 
     pub fn append_name(&self, suffix: &str) -> Self {
@@ -248,11 +250,13 @@ impl<T: IndexAccess> View<T> {
         let (name, key) = self.address.keyed(from);
         let prefix = self.address.bytes.clone().unwrap_or_else(|| vec![]);
 
-        let changes_iter = self.changes
+        let changes_iter = self
+            .changes
             .as_ref()
             .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
 
-        let is_cleared = self.changes
+        let is_cleared = self
+            .changes
             .as_ref()
             .map_or(false, |changes| changes.is_cleared());
 
@@ -274,9 +278,9 @@ impl<T: IndexAccess> View<T> {
 
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
-        where
-            K: BinaryKey + ?Sized,
-            V: BinaryValue,
+    where
+        K: BinaryKey + ?Sized,
+        V: BinaryValue,
     {
         //TODO: revert
         self.get_bytes(&key_bytes(key))
@@ -286,8 +290,8 @@ impl<T: IndexAccess> View<T> {
     /// Returns `true` if the index contains a value of *any* type for the specified key of
     /// *any* type.
     pub fn contains<K>(&self, key: &K) -> bool
-        where
-            K: BinaryKey + ?Sized,
+    where
+        K: BinaryKey + ?Sized,
     {
         self.contains_raw_key(&key_bytes(key))
     }
@@ -296,10 +300,10 @@ impl<T: IndexAccess> View<T> {
     /// type is *any* key-value pair. An argument `subprefix` allows specifying a subset of keys
     /// for iteration.
     pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<K, V>
-        where
-            P: BinaryKey + ?Sized,
-            K: BinaryKey,
-            V: BinaryValue,
+    where
+        P: BinaryKey + ?Sized,
+        K: BinaryKey,
+        V: BinaryValue,
     {
         let iter_prefix = key_bytes(subprefix);
         Iter {
@@ -315,11 +319,11 @@ impl<T: IndexAccess> View<T> {
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows specifying a subset of iteration.
     pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<K, V>
-        where
-            P: BinaryKey,
-            F: BinaryKey + ?Sized,
-            K: BinaryKey,
-            V: BinaryValue,
+    where
+        P: BinaryKey,
+        F: BinaryKey + ?Sized,
+        K: BinaryKey,
+        V: BinaryValue,
     {
         let iter_prefix = key_bytes(subprefix);
         let iter_from = key_bytes(from);
@@ -400,8 +404,8 @@ struct ChangesIter<'a, T: Iterator + 'a> {
 
 /// Iterator over a set of changes.
 impl<'a, T> ChangesIter<'a, T>
-    where
-        T: Iterator<Item = (&'a Vec<u8>, &'a Change)>,
+where
+    T: Iterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
     fn new(iterator: T) -> Self {
         ChangesIter {
@@ -412,8 +416,8 @@ impl<'a, T> ChangesIter<'a, T>
 }
 
 impl<'a, T> BytesIterator for ChangesIter<'a, T>
-    where
-        T: Iterator<Item = (&'a Vec<u8>, &'a Change)>,
+where
+    T: Iterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
@@ -451,9 +455,9 @@ impl<'a> View<&'a Fork> {
 
     /// Inserts a key-value pair into the fork.
     pub fn put<K, V>(&mut self, key: &K, value: V)
-        where
-            K: BinaryKey + ?Sized,
-            V: BinaryValue,
+    where
+        K: BinaryKey + ?Sized,
+        V: BinaryValue,
     {
         let key = key_bytes(key);
         self.changes()
@@ -463,8 +467,8 @@ impl<'a> View<&'a Fork> {
 
     /// Removes a key from the view.
     pub fn remove<K>(&mut self, key: &K)
-        where
-            K: BinaryKey + ?Sized,
+    where
+        K: BinaryKey + ?Sized,
     {
         self.changes().data.insert(key_bytes(key), Change::Delete);
     }
@@ -498,9 +502,9 @@ impl<'a, K, V> fmt::Debug for Iter<'a, K, V> {
 }
 
 impl<'a, K, V> Iterator for Iter<'a, K, V>
-    where
-        K: BinaryKey,
-        V: BinaryValue,
+where
+    K: BinaryKey,
+    V: BinaryValue,
 {
     type Item = (K::Owned, V);
 

@@ -21,7 +21,8 @@ use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
-use crate::{views::{IndexAccess, View, Mount, Iter as ViewIter},
+use crate::{
+    views::{IndexAccess, Iter as ViewIter, Mount, View},
     BinaryKey, BinaryValue, Fork,
 };
 
@@ -68,7 +69,7 @@ impl BinaryValue for SparseListSize {
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
-pub struct SparseListIndex<T:IndexAccess, V> {
+pub struct SparseListIndex<T: IndexAccess, V> {
     base: View<T>,
     size: Cell<Option<SparseListSize>>,
     _v: PhantomData<V>,

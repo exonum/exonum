@@ -21,7 +21,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    views::{Mount, View, Iter as ViewIter, IndexAccess},
+    views::{IndexAccess, Iter as ViewIter, Mount, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -33,7 +33,7 @@ use exonum_crypto::Hash;
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ValueSetIndex<T:IndexAccess, V> {
+pub struct ValueSetIndex<T: IndexAccess, V> {
     base: View<T>,
     _v: PhantomData<V>,
 }

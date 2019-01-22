@@ -20,12 +20,15 @@ use serde_json::{from_str, to_string};
 
 use std::fmt::Debug;
 
+use crate::proof_list_index::{
+    ListProof::{self, *},
+    ProofListIndex,
+};
 use crate::{
     hash::{HashTag, UniqueHash},
     BinaryValue, Database, TemporaryDB,
 };
 use exonum_crypto::Hash;
-use crate::proof_list_index::{ProofListIndex, ListProof::{self, *}};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -594,7 +597,7 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 }
 
 mod root_hash_tests {
-    use crate::{hash::HashTag, Database, TemporaryDB, proof_list_index::ProofListIndex};
+    use crate::{hash::HashTag, proof_list_index::ProofListIndex, Database, TemporaryDB};
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.

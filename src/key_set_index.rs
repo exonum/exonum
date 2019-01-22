@@ -21,7 +21,8 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    views::{Iter as ViewIter, View, IndexAccess, Mount}, Fork, BinaryKey,
+    views::{IndexAccess, Iter as ViewIter, Mount, View},
+    BinaryKey, Fork,
 };
 
 /// A set of key items.
@@ -50,9 +51,9 @@ pub struct KeySetIndexIter<'a, K> {
 }
 
 impl<T, K> KeySetIndex<T, K>
-    where
-        T: IndexAccess,
-        K: BinaryKey,
+where
+    T: IndexAccess,
+    K: BinaryKey,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -80,32 +81,32 @@ impl<T, K> KeySetIndex<T, K>
         }
     }
 
-   /// Creates a new index representation based on the name, index ID in family
-   /// and storage view.
-   ///
-   /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-   /// immutable methods are available. In the second case, both immutable and mutable methods are
-   /// available.
-   ///
-   /// [`&Snapshot`]: ../trait.Snapshot.html
-   /// [`&mut Fork`]: ../struct.Fork.html
-   ///
-   /// # Examples
-   ///
-   /// ```
-   /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
-   ///
-   /// let db = TemporaryDB::default();
-   /// let snapshot = db.snapshot();
-   /// let name = "name";
-   /// let index_id = vec![123];
-   /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
-   /// ```
+    /// Creates a new index representation based on the name, index ID in family
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
+    /// available.
+    ///
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    ///
+    /// let db = TemporaryDB::default();
+    /// let snapshot = db.snapshot();
+    /// let name = "name";
+    /// let index_id = vec![123];
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
+    /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-        where
-            I: BinaryKey,
-            I: ?Sized,
-            S: AsRef<str>,
+    where
+        I: BinaryKey,
+        I: ?Sized,
+        S: AsRef<str>,
     {
         Self {
             base: Mount::new(view).mount2(family_name, index_id),
@@ -130,9 +131,9 @@ impl<T, K> KeySetIndex<T, K>
     /// assert!(index.contains(&1));
     /// ```
     pub fn contains<Q>(&self, item: &Q) -> bool
-        where
-            K: Borrow<Q>,
-            Q: BinaryKey + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: BinaryKey + ?Sized,
     {
         self.base.contains(item)
     }
@@ -184,8 +185,8 @@ impl<T, K> KeySetIndex<T, K>
 }
 
 impl<'a, K> KeySetIndex<&'a Fork, K>
-    where
-        K: BinaryKey,
+where
+    K: BinaryKey,
 {
     /// Adds a key to the set.
     ///
@@ -226,9 +227,9 @@ impl<'a, K> KeySetIndex<&'a Fork, K>
     /// assert!(!index.contains(&1));
     /// ```
     pub fn remove<Q>(&mut self, item: &Q)
-        where
-            K: Borrow<Q>,
-            Q: BinaryKey + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: BinaryKey + ?Sized,
     {
         self.base.remove(item)
     }
@@ -262,9 +263,9 @@ impl<'a, K> KeySetIndex<&'a Fork, K>
 }
 
 impl<'r, T, K> ::std::iter::IntoIterator for &'r KeySetIndex<T, K>
-    where
-        T: IndexAccess,
-        K: BinaryKey,
+where
+    T: IndexAccess,
+    K: BinaryKey,
 {
     type Item = K::Owned;
     type IntoIter = KeySetIndexIter<'r, K>;
@@ -275,8 +276,8 @@ impl<'r, T, K> ::std::iter::IntoIterator for &'r KeySetIndex<T, K>
 }
 
 impl<'a, K> Iterator for KeySetIndexIter<'a, K>
-    where
-        K: BinaryKey,
+where
+    K: BinaryKey,
 {
     type Item = K::Owned;
 
@@ -308,21 +309,21 @@ mod tests {
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
     }
-//
-//    #[test]
-//    fn u8_slice_key() {
-//        let db = MemoryDB::new();
-//        let fork = db.fork();
-//
-//        const KEY: &[u8] = &[1, 2, 3];
-//
-//        let mut index: KeySetIndex<_, Vec<u8>> = fork.mount_root().named_child(INDEX_NAME).mount();
-//        assert_eq!(false, index.contains(KEY));
-//
-//        index.insert(KEY.to_owned());
-//        assert_eq!(true, index.contains(KEY));
-//
-//        index.remove(KEY);
-//        assert_eq!(false, index.contains(KEY));
-//    }
+    //
+    //    #[test]
+    //    fn u8_slice_key() {
+    //        let db = MemoryDB::new();
+    //        let fork = db.fork();
+    //
+    //        const KEY: &[u8] = &[1, 2, 3];
+    //
+    //        let mut index: KeySetIndex<_, Vec<u8>> = fork.mount_root().named_child(INDEX_NAME).mount();
+    //        assert_eq!(false, index.contains(KEY));
+    //
+    //        index.insert(KEY.to_owned());
+    //        assert_eq!(true, index.contains(KEY));
+    //
+    //        index.remove(KEY);
+    //        assert_eq!(false, index.contains(KEY));
+    //    }
 }

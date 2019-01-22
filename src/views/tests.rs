@@ -12,15 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Database, Fork, views::{View, IndexAccess, IndexAddress, Mount}};
+use crate::{
+    views::{IndexAccess, IndexAddress, Mount, View},
+    Database, Fork,
+};
 
 const IDX_NAME: &str = "idx_name";
 const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1u8, 2, 3] as &[u8]);
 
 fn create_view<T, I>(db_view: T, address: I) -> View<T>
-    where
-        T: IndexAccess,
-        I: Into<IndexAddress>,
+where
+    T: IndexAccess,
+    I: Into<IndexAddress>,
 {
     Mount::new(db_view).mount(address.into().name())
 }
@@ -388,9 +391,9 @@ fn rollbacks_for_indexes_in_same_family<T: Database>(db: T) {
 }
 
 fn two_mutable_borrows<T, I>(db: T, address: I)
-    where
-        T: Database,
-        I: Into<IndexAddress> + Copy,
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
 {
     let fork = db.fork();
 
@@ -401,9 +404,9 @@ fn two_mutable_borrows<T, I>(db: T, address: I)
 }
 
 fn mutable_and_immutable_borrows<T, I>(db: T, address: I)
-    where
-        T: Database,
-        I: Into<IndexAddress> + Copy,
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
 {
     let fork = db.fork();
 
@@ -414,9 +417,9 @@ fn mutable_and_immutable_borrows<T, I>(db: T, address: I)
 }
 
 fn clear_view<T, I>(db: T, address: I)
-    where
-        T: Database,
-        I: Into<IndexAddress> + Copy,
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
 {
     let fork = db.fork();
     {

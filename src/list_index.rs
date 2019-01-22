@@ -19,7 +19,10 @@
 
 use std::{cell::Cell, marker::PhantomData};
 
-use crate::{BinaryKey, BinaryValue, Fork, views::{Iter as ViewIter, View, IndexAccess, Mount}};
+use crate::{
+    views::{IndexAccess, Iter as ViewIter, Mount, View},
+    BinaryKey, BinaryValue, Fork,
+};
 
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
@@ -75,18 +78,18 @@ where
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-            Self {
-                base: Mount::new(view).mount(index_name),
-                length: Cell::new(None),
-                _v: PhantomData,
-            }
+        Self {
+            base: Mount::new(view).mount(index_name),
+            length: Cell::new(None),
+            _v: PhantomData,
         }
+    }
 
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-        where
-            I: BinaryKey,
-            I: ?Sized,
-            S: AsRef<str>,
+    where
+        I: BinaryKey,
+        I: ?Sized,
+        S: AsRef<str>,
     {
         Self {
             base: Mount::new(view).mount2(family_name, index_id),
@@ -95,21 +98,21 @@ where
         }
     }
 
-//    pub fn new(view: T) -> Self {
-//        Self {
-//            base: view,
-//            length: Cell::new(None),
-//            _v: PhantomData,
-//        }
-//    }
+    //    pub fn new(view: T) -> Self {
+    //        Self {
+    //            base: view,
+    //            length: Cell::new(None),
+    //            _v: PhantomData,
+    //        }
+    //    }
 
-//    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-//        Self {
-//            base: view,
-//            length: Cell::new(None),
-//            _v: PhantomData,
-//        }
-//    }
+    //    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
+    //        Self {
+    //            base: view,
+    //            length: Cell::new(None),
+    //            _v: PhantomData,
+    //        }
+    //    }
 
     /// Returns an element at the indicated position or `None` if the indicated
     /// position is out of bounds.
@@ -459,7 +462,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Fork, Database, TemporaryDB, views::IndexAccess, list_index::ListIndex};
+    use crate::{list_index::ListIndex, views::IndexAccess, Database, Fork, TemporaryDB};
 
     use std::string::String;
 
@@ -602,7 +605,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-    let mut list_index = ListIndex::new(IDX_NAME, &fork);
+        let mut list_index = ListIndex::new(IDX_NAME, &fork);
         list_index_iter(&mut list_index);
     }
 

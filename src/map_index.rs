@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    views::{Iter as ViewIter, IndexAccess, Mount, View},
+    views::{IndexAccess, Iter as ViewIter, Mount, View},
     BinaryKey, BinaryValue, Fork,
 };
 
