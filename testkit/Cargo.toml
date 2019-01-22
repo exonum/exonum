@@ -19,25 +19,25 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix-web = { version = "=0.7.17", default-features = false }
+actix-web = { version = "0.7.18", default-features = false }
 exonum = { version = "0.10.2", path = "../exonum" }
 failure = "0.1.5"
-futures = "=0.1.25"
-reqwest = "=0.9.5"
-log = "=0.4.6"
+futures = "0.1.25"
+reqwest = "0.9.8"
+log = "0.4.6"
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"
-serde_urlencoded = "=0.5.4"
-tokio-core = "=0.1.17"
+serde_urlencoded = "0.5.4"
+tokio-core = "0.1.17"
 protobuf = { version = "2.2.0", features = ["with-serde"] }
 
 [dev-dependencies]
-hex = "=0.3.2"
-rand = "=0.6.4"
-pretty_assertions = "=0.5.1"
+hex = "0.3.2"
+rand = "0.6.4"
+pretty_assertions = "0.5.1"
 assert_matches = "1.2.0"
-thread_local = "=0.3.6"
+thread_local = "0.3.6"
 lazy_static = "1.0.0"
 exonum-derive = { version = "0.10.0", path = "../components/derive" }
 
