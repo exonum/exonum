@@ -100,7 +100,7 @@ fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     b.iter_with_setup(TemporaryDB::default, |db| {
         let fork = db.fork();
         {
-            let mut table = ProofMapIndex::new(NAME, &mut fork);
+            let mut table = ProofMapIndex::new(NAME, &fork);
             assert!(table.keys().next().is_none());
             for item in &data {
                 table.put(&item.0, item.1.clone());

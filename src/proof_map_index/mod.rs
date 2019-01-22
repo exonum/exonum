@@ -156,7 +156,7 @@ where
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &mut fork);
+    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &fork);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
@@ -197,7 +197,7 @@ where
     /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
     ///     name,
     ///     &index_id,
-    ///     &mut fork,
+    ///     &fork,
     ///  );
     /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
@@ -252,7 +252,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &fork);
     ///
     /// let default_hash = index.merkle_root();
     /// assert_eq!(Hash::default(), default_hash);
@@ -283,7 +283,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &fork);
     ///
     /// let hash = Hash::default();
     /// assert_eq!(None, index.get(&hash));
@@ -306,7 +306,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &fork);
     ///
     /// let hash = Hash::default();
     /// assert!(!index.contains(&hash));
@@ -617,7 +617,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -739,7 +739,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -798,7 +798,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);

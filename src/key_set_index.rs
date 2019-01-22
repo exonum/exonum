@@ -119,12 +119,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &mut fork);
+    /// let mut index = KeySetIndex::new(name, &fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -143,9 +143,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
@@ -166,9 +166,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
@@ -193,12 +193,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &mut fork);
+    /// let mut index = KeySetIndex::new(name, &fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -213,12 +213,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &mut fork);
+    /// let mut index = KeySetIndex::new(name, &fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -244,12 +244,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
     ///
-    /// let db = MemoryDB::new();
+    /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &mut fork);
+    /// let mut index = KeySetIndex::new(name, &fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -312,7 +312,7 @@ mod tests {
     //
     //    #[test]
     //    fn u8_slice_key() {
-    //        let db = MemoryDB::new();
+    //        let db = TemporaryDB::new();
     //        let fork = db.fork();
     //
     //        const KEY: &[u8] = &[1, 2, 3];

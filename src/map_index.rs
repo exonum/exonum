@@ -156,7 +156,7 @@ where
     /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &mut fork);
+    /// let mut index = MapIndex::new(name, &fork);
     /// assert!(index.get(&1).is_none());
     ///
     /// index.put(&1, 2);
@@ -180,7 +180,7 @@ where
     /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &mut fork);
+    /// let mut index = MapIndex::new(name, &fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.put(&1, 2);
@@ -358,7 +358,7 @@ where
     /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &mut fork);
+    /// let mut index = MapIndex::new(name, &fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -376,7 +376,7 @@ where
     /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &mut fork);
+    /// let mut index = MapIndex::new(name, &fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -406,7 +406,7 @@ where
     /// let db = TemporaryDB::default();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &mut fork);
+    /// let mut index = MapIndex::new(name, &fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));

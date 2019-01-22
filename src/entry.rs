@@ -108,7 +108,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -128,7 +128,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -149,7 +149,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     /// assert_eq!(Hash::default(), index.hash());
     ///
     /// let value = 10;
@@ -178,7 +178,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -197,7 +197,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -219,7 +219,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -246,7 +246,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &mut fork);
+    /// let mut index = Entry::new(name, &fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());

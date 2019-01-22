@@ -418,10 +418,10 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum::storage::{Database, MemoryDB};
+/// use exonum_merkledb::{Database, TemporaryDB};
 ///
 /// // not declared as `mut db`!
-/// let db: Box<Database> = Box::new(MemoryDB::new());
+/// let db: Box<Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
 /// fork.put("index_name", vec![1, 2, 3], vec![123]);
 /// db.merge(fork.into_patch()).unwrap();

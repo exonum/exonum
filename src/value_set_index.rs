@@ -138,7 +138,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -159,7 +159,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &fork);
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -283,7 +283,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -302,7 +302,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -325,7 +325,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &fork);
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = exonum_crypto::hash(&data);
@@ -353,7 +353,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name  = "name";
     /// let fork = db.fork();
-    /// let mut index = ValueSetIndex::new(name, &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));

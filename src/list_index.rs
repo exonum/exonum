@@ -125,7 +125,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -145,7 +145,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     /// assert_eq!(None, index.last());
     ///
     /// index.push(42);
@@ -168,7 +168,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -188,7 +188,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -216,7 +216,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -241,7 +241,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -275,7 +275,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -296,7 +296,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     /// assert_eq!(None, index.pop());
     ///
     /// index.push(1);
@@ -324,7 +324,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -356,7 +356,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -386,7 +386,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -422,7 +422,7 @@ where
     /// let db = TemporaryDB::new();
     /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = ListIndex::new(name, &mut fork);
+    /// let mut index = ListIndex::new(name, &fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
