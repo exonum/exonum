@@ -20,7 +20,9 @@ use super::{
     db::{Change, ChangesRef, ForkIter, ViewChanges}, Fork, Iter as BytesIter,
     Iterator as BytesIterator, Snapshot, BinaryKey, BinaryValue,
 };
-use exonum_crypto::Hash;
+
+#[cfg(test)]
+mod tests;
 
 /// TODO
 pub struct View<T: IndexAccess> {
@@ -46,7 +48,6 @@ impl ChangeSet for () {
     fn as_ref(&self) -> Option<&ViewChanges> {
         None
     }
-
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         None
     }
@@ -56,7 +57,6 @@ impl<'a> ChangeSet for ChangesRef<'a> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
     }
-
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         Some(&mut *self)
     }
@@ -78,10 +78,6 @@ impl <T: IndexAccess> Mount<T> {
         Self {
             view
         }
-    }
-
-    pub fn view(&self) -> &T {
-        &self.view
     }
 
     pub fn mount<S: AsRef<str>>(self, index_name: S) -> View<T> {

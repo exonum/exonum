@@ -25,7 +25,7 @@ use std::{
 use self::{key::ProofListKey, proof::ProofOfAbsence};
 use crate::{
     views::{IndexAccess, View, Iter as ViewIter},
-    BinaryKey, BinaryValue, Fork, Snapshot, UniqueHash,
+    BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use crate::hash::HashTag;
 use exonum_crypto::Hash;
@@ -89,7 +89,7 @@ where
     /// let snapshot = db.snapshot();
     /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
     ///
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &mut fork);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
@@ -123,7 +123,7 @@ where
     /// let index: ProofListIndex<_, u8> =
     ///                             ProofListIndex::new_in_family(name, &index_id, &snapshot);
     ///
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
     ///                                 ProofListIndex::new_in_family(name, &index_id, &mut fork);
     /// ```
@@ -201,7 +201,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.get(0));
     ///
@@ -221,7 +221,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.last());
     ///
@@ -244,7 +244,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert!(index.is_empty());
     ///
@@ -264,7 +264,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(0, index.len());
     ///
@@ -289,7 +289,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(1, index.height());
     ///
@@ -323,7 +323,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// let default_hash = index.list_hash();
@@ -348,7 +348,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
@@ -381,7 +381,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
@@ -487,7 +487,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
@@ -523,7 +523,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -551,7 +551,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
@@ -601,7 +601,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);

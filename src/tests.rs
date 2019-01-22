@@ -24,7 +24,7 @@ const IDX_NAME: &'static str = "idx_name";
 #[test]
 fn test_fork_iter() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
 
     fork.put(IDX_NAME, vec![10], vec![10]);
     fork.put(IDX_NAME, vec![20], vec![20]);
@@ -34,7 +34,7 @@ fn test_fork_iter() {
 
     db.merge(fork.into_patch()).unwrap();
 
-    let mut fork = db.fork();
+    let fork = db.fork();
 
     assert!(fork.contains(IDX_NAME, &[10]));
 
@@ -90,7 +90,7 @@ fn test_fork_iter() {
     );
 
     // Replaced
-    let mut fork = db.fork();
+    let fork = db.fork();
 
     fork.put(IDX_NAME, vec![10], vec![11]);
     assert_iter(&fork, 0, &[(10, 11), (20, 20), (30, 30)]);
@@ -98,7 +98,7 @@ fn test_fork_iter() {
     assert_iter(&fork, 0, &[(10, 11), (20, 20), (30, 31)]);
 
     // Deleted
-    let mut fork = db.fork();
+    let fork = db.fork();
 
     fork.remove(IDX_NAME, vec![20]);
     assert_iter(&fork, 0, &[(10, 10), (30, 30)]);
@@ -110,7 +110,7 @@ fn test_fork_iter() {
     assert_iter(&fork, 0, &[(30, 30)]);
 
     // MissDeleted
-    let mut fork = db.fork();
+    let fork = db.fork();
 
     fork.remove(IDX_NAME, vec![5]);
     assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
@@ -123,7 +123,7 @@ fn test_fork_iter() {
 #[test]
 fn test_changelog() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
 
     fork.put(IDX_NAME, vec![1], vec![1]);
     fork.put(IDX_NAME, vec![2], vec![2]);
@@ -198,7 +198,7 @@ fn test_multiple_patch() {
     }
     // create first patch
     let patch1 = {
-        let mut fork = db.fork();
+        let fork = db.fork();
         {
             let mut index = list_index(&fork);
             index.push(1);
@@ -209,7 +209,7 @@ fn test_multiple_patch() {
     };
     // create second patch
     let patch2 = {
-        let mut fork = db.fork();
+        let fork = db.fork();
         {
             let mut index = list_index(&fork);
             index.push(2);

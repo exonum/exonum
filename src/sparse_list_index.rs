@@ -22,7 +22,7 @@ use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
 use crate::{views::{IndexAccess, View, Mount, Iter as ViewIter},
-    BinaryKey, BinaryValue, Fork, Snapshot,
+    BinaryKey, BinaryValue, Fork,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -198,7 +198,7 @@ where
     /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(None, index.get(0));
     ///
@@ -221,7 +221,7 @@ where
     /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert!(index.is_empty());
     ///
@@ -241,7 +241,7 @@ where
     /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.capacity());
     ///
@@ -266,7 +266,7 @@ where
     /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.len());
     ///
@@ -290,7 +290,7 @@ where
     /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
@@ -624,7 +624,7 @@ mod tests {
     #[test]
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
-        let mut fork = db.fork();
+        let fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
 
         assert!(list_index.is_empty());
@@ -694,7 +694,7 @@ mod tests {
     #[test]
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
-        let mut fork = db.fork();
+        let fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
 
         list_index.extend(vec![1_u8, 15, 25, 2, 3]);

@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    BinaryKey, BinaryValue, Fork, Snapshot, views::{View, IndexAccess, Mount},
+    BinaryKey, BinaryValue, Fork, views::{View, IndexAccess, Mount},
     UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -107,7 +107,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     /// assert_eq!(None, index.get());
     ///
@@ -127,7 +127,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     /// assert!(!index.exists());
     ///
@@ -148,7 +148,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     /// assert_eq!(Hash::default(), index.hash());
     ///
@@ -177,7 +177,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     ///
     /// index.set(10);
@@ -196,7 +196,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     ///
     /// index.set(10);
@@ -218,7 +218,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     ///
     /// index.set(10);
@@ -245,7 +245,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = Entry::new(name, &mut fork);
     ///
     /// index.set(10);

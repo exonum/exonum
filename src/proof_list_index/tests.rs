@@ -20,7 +20,6 @@ use serde_json::{from_str, to_string};
 
 use std::fmt::Debug;
 
-use self::ListProof::*;
 use crate::{
     hash::{HashTag, UniqueHash},
     BinaryValue, Database, TemporaryDB,
@@ -51,7 +50,7 @@ fn random_values(len: usize) -> Vec<Vec<u8>> {
 #[test]
 fn test_list_methods() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
 
     assert!(index.is_empty());
@@ -82,7 +81,7 @@ fn test_list_methods() {
 #[test]
 fn test_height() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
 
     index.push(vec![1]);
@@ -110,7 +109,7 @@ fn test_height() {
 #[test]
 fn test_iter() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut list_index = ProofListIndex::new(IDX_NAME, &fork);
 
     list_index.extend(vec![1u8, 2, 3]);
@@ -127,7 +126,7 @@ fn test_iter() {
 #[test]
 fn test_list_index_proof() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
 
     let h0 = HashTag::hash_leaf(&2u64.to_bytes());
@@ -267,7 +266,7 @@ fn test_list_index_proof() {
 #[test]
 fn test_randomly_generate_proofs() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     let num_values = 100;
     let values = random_values(num_values as usize);
@@ -321,7 +320,7 @@ fn hash_branch_node(value: &[u8]) -> Hash {
 #[test]
 fn test_index_and_proof_roots() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     assert_eq!(index.list_hash(), HashTag::empty_list_hash());
 
@@ -451,7 +450,7 @@ fn test_index_and_proof_roots() {
 #[test]
 fn test_proof_illegal_lower_bound() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     let proof = index.get_range_proof(0..1);
 
@@ -462,7 +461,7 @@ fn test_proof_illegal_lower_bound() {
 #[test]
 fn test_proof_illegal_bound_empty() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     for i in 0_u8..8 {
         index.push(vec![i]);
@@ -475,7 +474,7 @@ fn test_proof_illegal_bound_empty() {
 #[should_panic(expected = "the range start is 2, but the range end is 2")]
 fn test_proof_illegal_range() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     for i in 0_u8..4 {
         index.push(vec![i]);
@@ -486,7 +485,7 @@ fn test_proof_illegal_range() {
 #[test]
 fn test_proof_structure() {
     let db = TemporaryDB::default();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     assert_eq!(index.list_hash(), HashTag::empty_list_hash());
 
@@ -547,7 +546,7 @@ fn test_simple_merkle_root() {
     let h1 = HashTag::hash_list_node(1, hash_leaf_node(&[1]));
     let h2 = HashTag::hash_list_node(1, hash_leaf_node(&[2]));
 
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     assert_eq!(index.get(0), None);
     index.push(vec![1]);
@@ -561,7 +560,7 @@ fn test_simple_merkle_root() {
 fn test_same_merkle_root() {
     let db1 = TemporaryDB::default();
     let db2 = TemporaryDB::default();
-    let mut fork1 = db1.fork();
+    let fork1 = db1.fork();
 
     let mut i1 = ProofListIndex::new(IDX_NAME, &fork1);
     i1.push(vec![1]);
@@ -574,7 +573,7 @@ fn test_same_merkle_root() {
     i1.set(2, vec![5]);
     i1.set(3, vec![1]);
 
-    let mut fork2 = db2.fork();
+    let fork2 = db2.fork();
 
     let mut i2 = ProofListIndex::new(IDX_NAME, &fork2);
     i2.push(vec![4]);
@@ -607,7 +606,7 @@ mod root_hash_tests {
 
     fn proof_list_index_root(hashes: &[Hash]) -> Hash {
         let db = TemporaryDB::default();
-        let mut fork = db.fork();
+        let fork = db.fork();
         let mut index = ProofListIndex::new("merkle_root", &fork);
         index.extend(hashes.iter().cloned());
         index.list_hash()
@@ -644,7 +643,7 @@ mod root_hash_tests {
 #[test]
 fn proof_of_absence() {
     let db = TemporaryDB::new();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut list = ProofListIndex::new("absence", &fork);
 
     for i in 1..=5 {
@@ -667,7 +666,7 @@ fn proof_of_absence() {
 #[test]
 fn proof_of_absence_range() {
     let db = TemporaryDB::new();
-    let mut fork = db.fork();
+    let fork = db.fork();
     let mut list = ProofListIndex::new("absence", &fork);
 
     for i in 1..=5 {

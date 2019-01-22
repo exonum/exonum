@@ -21,10 +21,8 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    views::{Iter as ViewIter, View, IndexAccess}, Fork, BinaryKey,
+    views::{Iter as ViewIter, View, IndexAccess, Mount}, Fork, BinaryKey,
 };
-use crate::views::IndexAddress;
-use crate::views::Mount;
 
 /// A set of key items.
 ///
@@ -124,7 +122,7 @@ impl<T, K> KeySetIndex<T, K>
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
@@ -198,13 +196,13 @@ impl<'a, K> KeySetIndex<&'a Fork, K>
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }
@@ -218,7 +216,7 @@ impl<'a, K> KeySetIndex<&'a Fork, K>
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
@@ -249,7 +247,7 @@ impl<'a, K> KeySetIndex<&'a Fork, K>
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);

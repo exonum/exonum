@@ -22,7 +22,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
     views::{Iter as ViewIter, IndexAccess, Mount, View},
-    BinaryKey, BinaryValue, Fork, Snapshot,
+    BinaryKey, BinaryValue, Fork,
 };
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
@@ -155,7 +155,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
     /// assert!(index.get(&1).is_none());
     ///
@@ -179,7 +179,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
@@ -357,7 +357,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
     ///
     /// index.put(&1, 2);
@@ -375,7 +375,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
     ///
     /// index.put(&1, 2);
@@ -405,7 +405,7 @@ where
     ///
     /// let db = TemporaryDB::default();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = MapIndex::new(name, &mut fork);
     ///
     /// index.put(&1, 2);
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn test_str_key() {
         let db = TemporaryDB::default();
-        let mut fork = db.fork();
+        let fork = db.fork();
 
         const KEY: &str = "key_1";
 

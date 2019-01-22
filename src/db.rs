@@ -414,7 +414,7 @@ enum NextIterValue {
 ///
 /// // not declared as `mut db`!
 /// let db: Box<Database> = Box::new(MemoryDB::new());
-/// let mut fork = db.fork();
+/// let fork = db.fork();
 /// fork.put("index_name", vec![1, 2, 3], vec![123]);
 /// db.merge(fork.into_patch()).unwrap();
 /// ```

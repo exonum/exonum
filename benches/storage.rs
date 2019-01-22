@@ -98,7 +98,7 @@ fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
 fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(TemporaryDB::default, |db| {
-        let mut fork = db.fork();
+        let fork = db.fork();
         {
             let mut table = ProofMapIndex::new(NAME, &mut fork);
             assert!(table.keys().next().is_none());
@@ -113,7 +113,7 @@ fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
 fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
-    let mut storage = db.fork();
+    let storage = db.fork();
     let mut table = ProofMapIndex::new(NAME, &mut storage);
 
     for item in &data {
@@ -137,7 +137,7 @@ fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
 fn proof_map_index_verify_proofs(b: &mut Bencher, len: usize) {
     let data = generate_random_kv(len);
     let db = TemporaryDB::default();
-    let mut storage = db.fork();
+    let storage = db.fork();
     let mut table = ProofMapIndex::new(NAME, &mut storage);
 
     for item in &data {

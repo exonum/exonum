@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 
 use super::{
     views::{Mount, View, Iter as ViewIter, IndexAccess},
-    BinaryKey, BinaryValue, Fork, Snapshot, UniqueHash,
+    BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::Hash;
 
@@ -137,7 +137,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name  = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
@@ -158,7 +158,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name  = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// let data = vec![1, 2, 3];
@@ -282,7 +282,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name  = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
@@ -301,7 +301,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name  = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
@@ -324,7 +324,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name  = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// let data = vec![1, 2, 3];
@@ -352,7 +352,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name  = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);

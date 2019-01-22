@@ -202,7 +202,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// ```
 /// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex};
 /// # use exonum_crypto::hash;
-/// let mut fork = { let db = TemporaryDB::new(); db.fork() };
+/// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
 /// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));
 /// map.put(&h1, 100u32);
@@ -235,7 +235,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # use exonum_merkledb::proof_map_index::ProofPath;
 /// # use exonum_crypto::{hash, CryptoHash};
 /// # fn main() {
-/// let mut fork = { let db = TemporaryDB::new(); db.fork() };
+/// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
 /// let (h1, h2) = (hash(&[1]), hash(&[2]));
 /// map.put(&h1, 100u32);
@@ -544,7 +544,7 @@ where
     /// ```
     /// # use exonum_merkledb::{Database, TemporaryDB, ProofMapIndex};
     /// # use exonum_crypto::hash;
-    /// let mut fork = { let db = TemporaryDB::new(); db.fork() };
+    /// let fork = { let db = TemporaryDB::new(); db.fork() };
     /// let mut map = ProofMapIndex::new("index", &mut fork);
     /// let (h1, h2) = (hash(&[1]), hash(&[2]));
     /// map.put(&h1, 100u32);

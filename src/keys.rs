@@ -334,8 +334,7 @@ impl BinaryKey for Decimal {
     }
 }
 
-//TODO: revert tests
-//#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -418,264 +417,262 @@ mod tests {
     test_storage_key_for_int_type! {fuzz u64, 8 => test_storage_key_for_u64}
     test_storage_key_for_int_type! {fuzz i64, 8 => test_storage_key_for_i64}
 
-//TODO: revert tests
+    #[test]
+    fn test_signed_int_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
 
-//    #[test]
-//    fn test_signed_int_key_in_index() {
-//        use crate::{Database, MapIndex, TemporaryDB};
-//
-//        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
-//        let mut fork = db.fork();
-//        {
-//            let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &mut fork);
-//            index.put(&5, 100);
-//            index.put(&-3, 200);
-//        }
-//        db.merge(fork.into_patch()).unwrap();
-//
-//        let snapshot = db.snapshot();
-//        let index: MapIndex<_, i32, u64> = MapIndex::new("test_index", snapshot);
-//        assert_eq!(index.get(&5), Some(100));
-//        assert_eq!(index.get(&-3), Some(200));
-//
-//        assert_eq!(
-//            index.iter_from(&-4).collect::<Vec<_>>(),
-//            vec![(-3, 200), (5, 100)]
-//        );
-//        assert_eq!(index.iter_from(&-2).collect::<Vec<_>>(), vec![(5, 100)]);
-//        assert_eq!(index.iter_from(&1).collect::<Vec<_>>(), vec![(5, 100)]);
-//        assert_eq!(index.iter_from(&6).collect::<Vec<_>>(), vec![]);
-//
-//        assert_eq!(index.values().collect::<Vec<_>>(), vec![200, 100]);
-//    }
-//
-//    // Example how to migrate from Exonum <= 0.5 implementation of `BinaryKey`
-//    // for signed integers.
-//    #[test]
-//    fn test_old_signed_int_key_in_index() {
-//        use crate::{Database, MapIndex, TemporaryDB};
-//
-//        // Simple wrapper around a signed integer type with the `BinaryKey` implementation,
-//        // which was used in Exonum <= 0.5.
-//        #[derive(Debug, PartialEq, Clone)]
-//        struct QuirkyI32Key(i32);
-//
-//        impl BinaryKey for QuirkyI32Key {
-//            fn size(&self) -> usize {
-//                4
-//            }
-//
-//            fn write(&self, buffer: &mut [u8]) -> usize {
-//                BigEndian::write_i32(buffer, self.0);
-//                self.size()
-//            }
-//
-//            fn read(buffer: &[u8]) -> Self {
-//                QuirkyI32Key(BigEndian::read_i32(buffer))
-//            }
-//        }
-//
-//        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
-//        let mut fork = db.fork();
-//        {
-//            let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &mut fork);
-//            index.put(&QuirkyI32Key(5), 100);
-//            index.put(&QuirkyI32Key(-3), 200);
-//        }
-//        db.merge(fork.into_patch()).unwrap();
-//
-//        let snapshot = db.snapshot();
-//        let index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", snapshot);
-//        assert_eq!(index.get(&QuirkyI32Key(5)), Some(100));
-//        assert_eq!(index.get(&QuirkyI32Key(-3)), Some(200));
-//
-//        // Bunch of counterintuitive behavior here
-//        assert_eq!(
-//            index.iter_from(&QuirkyI32Key(-4)).collect::<Vec<_>>(),
-//            vec![(QuirkyI32Key(-3), 200)]
-//        );
-//        assert_eq!(
-//            index.iter_from(&QuirkyI32Key(-2)).collect::<Vec<_>>(),
-//            vec![]
-//        );
-//        assert_eq!(
-//            index.iter_from(&QuirkyI32Key(1)).collect::<Vec<_>>(),
-//            vec![(QuirkyI32Key(5), 100), (QuirkyI32Key(-3), 200)]
-//        );
-//        assert_eq!(
-//            index.iter_from(&QuirkyI32Key(6)).collect::<Vec<_>>(),
-//            vec![(QuirkyI32Key(-3), 200)]
-//        );
-//
-//        // Notice the different order of values compared to the previous test
-//        assert_eq!(index.values().collect::<Vec<_>>(), vec![100, 200]);
-//    }
-//
-//    #[test]
-//    fn test_storage_key_for_chrono_date_time_round_trip() {
-//        let times = [
-//            Utc.timestamp(0, 0),
-//            Utc.timestamp(13, 23),
-//            Utc::now(),
-//            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
-//            Utc.timestamp(0, 999_999_999),
-//            Utc.timestamp(0, 1_500_000_000), // leap second
-//        ];
-//
-//        assert_round_trip_eq(&times);
-//    }
-//
-//    #[test]
-//    fn test_storage_key_for_system_time_ordering() {
-//        use rand::{thread_rng, Rng};
-//
-//        let mut rng = thread_rng();
-//
-//        let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
-//        for _ in 0..FUZZ_SAMPLES {
-//            let time1 = Utc.timestamp(
-//                rng.gen::<i64>() % (i32::max_value() as i64),
-//                rng.gen::<u32>() % 1_000_000_000,
-//            );
-//            let time2 = Utc.timestamp(
-//                rng.gen::<i64>() % (i32::max_value() as i64),
-//                rng.gen::<u32>() % 1_000_000_000,
-//            );
-//            time1.write(&mut buffer1);
-//            time2.write(&mut buffer2);
-//            assert_eq!(time1.cmp(&time2), buffer1.cmp(&buffer2));
-//        }
-//    }
-//
-//    #[test]
-//    fn test_system_time_key_in_index() {
-//        use crate::{Database, MapIndex, TemporaryDB};
-//
-//        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
-//        let x1 = Utc.timestamp(80, 0);
-//        let x2 = Utc.timestamp(10, 0);
-//        let y1 = Utc::now();
-//        let y2 = y1 + Duration::seconds(10);
-//        let mut fork = db.fork();
-//        {
-//            let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
-//                MapIndex::new("test_index", &mut fork);
-//            index.put(&x1, y1);
-//            index.put(&x2, y2);
-//        }
-//        db.merge(fork.into_patch()).unwrap();
-//
-//        let snapshot = db.snapshot();
-//        let index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
-//            MapIndex::new("test_index", snapshot);
-//        assert_eq!(index.get(&x1), Some(y1));
-//        assert_eq!(index.get(&x2), Some(y2));
-//
-//        assert_eq!(
-//            index.iter_from(&Utc.timestamp(0, 0)).collect::<Vec<_>>(),
-//            vec![(x2, y2), (x1, y1)]
-//        );
-//        assert_eq!(
-//            index.iter_from(&Utc.timestamp(20, 0)).collect::<Vec<_>>(),
-//            vec![(x1, y1)]
-//        );
-//        assert_eq!(
-//            index.iter_from(&Utc.timestamp(80, 0)).collect::<Vec<_>>(),
-//            vec![(x1, y1)]
-//        );
-//        assert_eq!(
-//            index.iter_from(&Utc.timestamp(90, 0)).collect::<Vec<_>>(),
-//            vec![]
-//        );
-//
-//        assert_eq!(index.values().collect::<Vec<_>>(), vec![y2, y1]);
-//    }
-//
-//    #[test]
-//    fn test_str_key() {
-//        let values = ["eee", "hello world", ""];
-//        for val in values.iter() {
-//            let mut buffer = get_buffer(*val);
-//            val.write(&mut buffer);
-//            let new_val = str::read(&buffer);
-//            assert_eq!(new_val, *val);
-//        }
-//    }
-//
-//    #[test]
-//    fn test_u8_slice_key() {
-//        let values: &[&[u8]] = &[&[1, 2, 3], &[255], &[]];
-//        for val in values.iter() {
-//            let mut buffer = get_buffer(*val);
-//            val.write(&mut buffer);
-//            let new_val = <[u8] as BinaryKey>::read(&buffer);
-//            assert_eq!(new_val, *val);
-//        }
-//    }
-//
-//    #[test]
-//    fn test_hash_round_trip() {
-//        let hashes =
-//            [
-//                Hash::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78")
-//                    .unwrap(),
-//            ];
-//        assert_round_trip_eq(&hashes);
-//    }
-//
-//    #[test]
-//    fn test_public_key_round_trip() {
-//        let hashes = [PublicKey::from_hex(
-//            "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
-//        )
-//        .unwrap()];
-//        assert_round_trip_eq(&hashes);
-//    }
-//
-//    #[test]
-//    fn test_signature_round_trip() {
-//        let hashes = [Signature::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
-//        assert_round_trip_eq(&hashes);
-//    }
-//
-//    #[test]
-//    fn test_uuid_round_trip() {
-//        let uuids = [
-//            Uuid::nil(),
-//            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
-//            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-//        ];
-//
-//        assert_round_trip_eq(&uuids);
-//    }
-//
-//    #[test]
-//    fn test_decimal_round_trip() {
-//        let decimals = [
-//            Decimal::from_str("3.14").unwrap(),
-//            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
-//            Decimal::new(9497628354687268, 12),
-//            Decimal::from_str("0").unwrap(),
-//            Decimal::from_str("-0.000000000000000000019").unwrap(),
-//        ];
-//
-//        assert_round_trip_eq(&decimals);
-//    }
-//
-//    fn assert_round_trip_eq<T>(values: &[T])
-//    where
-//        T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + Debug,
-//        <T as ToOwned>::Owned: Debug,
-//    {
-//        for original_value in values.iter() {
-//            let mut buffer = get_buffer(original_value);
-//            original_value.write(&mut buffer);
-//            let new_value = <T as BinaryKey>::read(&buffer);
-//            assert_eq!(*original_value, new_value);
-//        }
-//    }
-//
-//    fn get_buffer<T: BinaryKey + ?Sized>(key: &T) -> Vec<u8> {
-//        vec![0; key.size()]
-//    }
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
+        let fork = db.fork();
+        {
+            let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &fork);
+            index.put(&5, 100);
+            index.put(&-3, 200);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &snapshot);
+        assert_eq!(index.get(&5), Some(100));
+        assert_eq!(index.get(&-3), Some(200));
+
+        assert_eq!(
+            index.iter_from(&-4).collect::<Vec<_>>(),
+            vec![(-3, 200), (5, 100)]
+        );
+        assert_eq!(index.iter_from(&-2).collect::<Vec<_>>(), vec![(5, 100)]);
+        assert_eq!(index.iter_from(&1).collect::<Vec<_>>(), vec![(5, 100)]);
+        assert_eq!(index.iter_from(&6).collect::<Vec<_>>(), vec![]);
+
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![200, 100]);
+    }
+
+    // Example how to migrate from Exonum <= 0.5 implementation of `BinaryKey`
+    // for signed integers.
+    #[test]
+    fn test_old_signed_int_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
+
+        // Simple wrapper around a signed integer type with the `BinaryKey` implementation,
+        // which was used in Exonum <= 0.5.
+        #[derive(Debug, PartialEq, Clone)]
+        struct QuirkyI32Key(i32);
+
+        impl BinaryKey for QuirkyI32Key {
+            fn size(&self) -> usize {
+                4
+            }
+
+            fn write(&self, buffer: &mut [u8]) -> usize {
+                BigEndian::write_i32(buffer, self.0);
+                self.size()
+            }
+
+            fn read(buffer: &[u8]) -> Self {
+                QuirkyI32Key(BigEndian::read_i32(buffer))
+            }
+        }
+
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
+        let fork = db.fork();
+        {
+            let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &fork);
+            index.put(&QuirkyI32Key(5), 100);
+            index.put(&QuirkyI32Key(-3), 200);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &snapshot);
+        assert_eq!(index.get(&QuirkyI32Key(5)), Some(100));
+        assert_eq!(index.get(&QuirkyI32Key(-3)), Some(200));
+
+        // Bunch of counterintuitive behavior here
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(-4)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(-3), 200)]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(-2)).collect::<Vec<_>>(),
+            vec![]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(1)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(5), 100), (QuirkyI32Key(-3), 200)]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(6)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(-3), 200)]
+        );
+
+        // Notice the different order of values compared to the previous test
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![100, 200]);
+    }
+
+    #[test]
+    fn test_storage_key_for_chrono_date_time_round_trip() {
+        let times = [
+            Utc.timestamp(0, 0),
+            Utc.timestamp(13, 23),
+            Utc::now(),
+            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
+            Utc.timestamp(0, 999_999_999),
+            Utc.timestamp(0, 1_500_000_000), // leap second
+        ];
+
+        assert_round_trip_eq(&times);
+    }
+
+    #[test]
+    fn test_storage_key_for_system_time_ordering() {
+        use rand::{thread_rng, Rng};
+
+        let mut rng = thread_rng();
+
+        let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
+        for _ in 0..FUZZ_SAMPLES {
+            let time1 = Utc.timestamp(
+                rng.gen::<i64>() % (i32::max_value() as i64),
+                rng.gen::<u32>() % 1_000_000_000,
+            );
+            let time2 = Utc.timestamp(
+                rng.gen::<i64>() % (i32::max_value() as i64),
+                rng.gen::<u32>() % 1_000_000_000,
+            );
+            time1.write(&mut buffer1);
+            time2.write(&mut buffer2);
+            assert_eq!(time1.cmp(&time2), buffer1.cmp(&buffer2));
+        }
+    }
+
+    #[test]
+    fn test_system_time_key_in_index() {
+        use crate::{Database, MapIndex, TemporaryDB};
+
+        let db: Box<dyn Database> = Box::new(TemporaryDB::default());
+        let x1 = Utc.timestamp(80, 0);
+        let x2 = Utc.timestamp(10, 0);
+        let y1 = Utc::now();
+        let y2 = y1 + Duration::seconds(10);
+        let fork = db.fork();
+        {
+            let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
+                MapIndex::new("test_index", &fork);
+            index.put(&x1, y1);
+            index.put(&x2, y2);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =
+            MapIndex::new("test_index", &snapshot);
+        assert_eq!(index.get(&x1), Some(y1));
+        assert_eq!(index.get(&x2), Some(y2));
+
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(0, 0)).collect::<Vec<_>>(),
+            vec![(x2, y2), (x1, y1)]
+        );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(20, 0)).collect::<Vec<_>>(),
+            vec![(x1, y1)]
+        );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(80, 0)).collect::<Vec<_>>(),
+            vec![(x1, y1)]
+        );
+        assert_eq!(
+            index.iter_from(&Utc.timestamp(90, 0)).collect::<Vec<_>>(),
+            vec![]
+        );
+
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![y2, y1]);
+    }
+
+    #[test]
+    fn test_str_key() {
+        let values = ["eee", "hello world", ""];
+        for val in values.iter() {
+            let mut buffer = get_buffer(*val);
+            val.write(&mut buffer);
+            let new_val = str::read(&buffer);
+            assert_eq!(new_val, *val);
+        }
+    }
+
+    #[test]
+    fn test_u8_slice_key() {
+        let values: &[&[u8]] = &[&[1, 2, 3], &[255], &[]];
+        for val in values.iter() {
+            let mut buffer = get_buffer(*val);
+            val.write(&mut buffer);
+            let new_val = <[u8] as BinaryKey>::read(&buffer);
+            assert_eq!(new_val, *val);
+        }
+    }
+
+    #[test]
+    fn test_hash_round_trip() {
+        let hashes =
+            [
+                Hash::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78")
+                    .unwrap(),
+            ];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
+    fn test_public_key_round_trip() {
+        let hashes = [PublicKey::from_hex(
+            "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
+        )
+        .unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
+    fn test_signature_round_trip() {
+        let hashes = [Signature::from_hex("326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84").unwrap()];
+        assert_round_trip_eq(&hashes);
+    }
+
+    #[test]
+    fn test_uuid_round_trip() {
+        let uuids = [
+            Uuid::nil(),
+            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
+        ];
+
+        assert_round_trip_eq(&uuids);
+    }
+
+    #[test]
+    fn test_decimal_round_trip() {
+        let decimals = [
+            Decimal::from_str("3.14").unwrap(),
+            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
+            Decimal::new(9497628354687268, 12),
+            Decimal::from_str("0").unwrap(),
+            Decimal::from_str("-0.000000000000000000019").unwrap(),
+        ];
+
+        assert_round_trip_eq(&decimals);
+    }
+
+    fn assert_round_trip_eq<T>(values: &[T])
+    where
+        T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + Debug,
+        <T as ToOwned>::Owned: Debug,
+    {
+        for original_value in values.iter() {
+            let mut buffer = get_buffer(original_value);
+            original_value.write(&mut buffer);
+            let new_value = <T as BinaryKey>::read(&buffer);
+            assert_eq!(*original_value, new_value);
+        }
+    }
+
+    fn get_buffer<T: BinaryKey + ?Sized>(key: &T) -> Vec<u8> {
+        vec![0; key.size()]
+    }
 }

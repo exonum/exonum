@@ -19,10 +19,7 @@
 
 use std::{cell::Cell, marker::PhantomData};
 
-use crate::{BinaryKey, BinaryValue, Fork, views::{Iter as ViewIter, View}};
-use crate::Snapshot;
-use crate::views::IndexAccess;
-use crate::views::Mount;
+use crate::{BinaryKey, BinaryValue, Fork, views::{Iter as ViewIter, View, IndexAccess, Mount}};
 
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
@@ -124,7 +121,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.get(0));
     ///
@@ -144,7 +141,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.last());
     ///
@@ -167,7 +164,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     /// assert!(index.is_empty());
     ///
@@ -187,7 +184,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(0, index.len());
     ///
@@ -215,7 +212,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
@@ -240,7 +237,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
@@ -274,7 +271,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
@@ -295,7 +292,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.pop());
     ///
@@ -323,7 +320,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     /// assert!(index.is_empty());
     ///
@@ -355,7 +352,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
@@ -385,7 +382,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
@@ -421,7 +418,7 @@ where
     ///
     /// let db = TemporaryDB::new();
     /// let name = "name";
-    /// let mut fork = db.fork();
+    /// let fork = db.fork();
     /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
@@ -462,11 +459,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Fork, Snapshot, Database, TemporaryDB};
-    use crate::views::IndexAccess;
+    use crate::{Fork, Database, TemporaryDB, views::IndexAccess, list_index::ListIndex};
+
     use std::string::String;
-    use crate::views::View;
-    use crate::list_index::ListIndex;
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());
