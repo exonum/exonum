@@ -593,7 +593,7 @@ impl Command for GenerateNodeConfig {
                 consensus_key_pass_method,
                 SecretKeyType::Consensus,
             );
-            create_secret_key_file(&consensus_secret_key_path, &passphrase.0)
+            create_secret_key_file(&consensus_secret_key_path, passphrase.as_bytes())
         };
         let service_public_key = {
             let passphrase = Self::get_passphrase(
@@ -601,7 +601,7 @@ impl Command for GenerateNodeConfig {
                 service_key_pass_method,
                 SecretKeyType::Service,
             );
-            create_secret_key_file(&service_secret_key_path, &passphrase.0)
+            create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
         };
 
         let pub_config_dir = Path::new(&pub_config_path)

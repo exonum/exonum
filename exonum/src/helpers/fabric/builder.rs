@@ -19,6 +19,7 @@ use std::{
     ffi::OsString,
     fmt,
     panic::{self, PanicInfo},
+    str::FromStr,
 };
 
 use super::{
@@ -160,21 +161,17 @@ impl NodeBuilder {
 
         let config = {
             let run_config = ctx.get(keys::RUN_CONFIG).unwrap();
-            let consensus_passphrase = run_config
-                .consensus_pass_method
-                .parse::<PassInputMethod>()
+            let consensus_passphrase = PassInputMethod::from_str(&run_config.consensus_pass_method)
                 .expect("Incorrect passphrase input method for consensus key.")
                 .get_passphrase(SecretKeyType::Consensus, true);
-            let service_passphrase = run_config
-                .service_pass_method
-                .parse::<PassInputMethod>()
+            let service_passphrase = PassInputMethod::from_str(&run_config.service_pass_method)
                 .expect("Incorrect passphrase input method for service key.")
                 .get_passphrase(SecretKeyType::Service, true);
 
             config.read_secret_keys(
                 &config_file_path,
-                consensus_passphrase.0.as_bytes(),
-                service_passphrase.0.as_bytes(),
+                consensus_passphrase.as_bytes(),
+                service_passphrase.as_bytes(),
             )
         };
         Node::new(db, services, config, Some(config_file_path))

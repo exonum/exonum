@@ -43,14 +43,14 @@ impl PassInputMethod {
     /// Get passphrase using selected method.
     /// Details of this process differs for different secret key types and whether we run node
     /// or generate config files.
-    pub fn get_passphrase(self, key_type: SecretKeyType, run: bool) -> ZeroizeOnDrop<String> {
+    pub fn get_passphrase(self, key_type: SecretKeyType, node_run: bool) -> ZeroizeOnDrop<String> {
         match self {
             PassInputMethod::Terminal => {
                 let prompt = match key_type {
                     SecretKeyType::Consensus => "Enter consensus key passphrase",
                     SecretKeyType::Service => "Enter service key passphrase",
                 };
-                prompt_passphrase(prompt, run).expect("Failed to read password from stdin")
+                prompt_passphrase(prompt, node_run).expect("Failed to read password from stdin")
             }
             PassInputMethod::EnvVariable(name) => {
                 let var = if let Some(ref name) = name {
@@ -88,43 +88,39 @@ impl FromStr for PassInputMethod {
             return Ok(PassInputMethod::Terminal);
         }
 
-        if let Some(prefix) = s.get(0..3) {
-            if prefix == "env" {
-                let env_var = s.split(':').nth(1).map(|s| s.to_owned());
-                return Ok(PassInputMethod::EnvVariable(env_var));
-            }
+        if s.starts_with("env") {
+            let env_var = s.split(':').nth(1).map(|s| s.to_owned());
+            return Ok(PassInputMethod::EnvVariable(env_var));
         }
 
-        if let Some(prefix) = s.get(0..4) {
-            if prefix == "pass" {
-                let pass = s.split(':').nth(1).unwrap_or("");
-                return Ok(PassInputMethod::CmdLineParameter(ZeroizeOnDrop(
-                    pass.to_owned(),
-                )));
-            }
+        if s.starts_with("pass") {
+            let pass = s.split(':').nth(1).unwrap_or("");
+            return Ok(PassInputMethod::CmdLineParameter(ZeroizeOnDrop(
+                pass.to_owned(),
+            )));
         }
 
         bail!("Failed to parse passphrase input method");
     }
 }
 
-fn prompt_passphrase(prompt: &str, run: bool) -> io::Result<ZeroizeOnDrop<String>> {
-    if run {
+fn prompt_passphrase(prompt: &str, node_run: bool) -> io::Result<ZeroizeOnDrop<String>> {
+    if node_run {
         return Ok(ZeroizeOnDrop(read_password_from_tty(Some(prompt))?));
     }
 
     loop {
         let password = ZeroizeOnDrop(read_password_from_tty(Some(prompt))?);
-        if password.0.is_empty() {
+        if password.is_empty() {
             eprintln!("Passphrase must not be empty. Try again.");
             continue;
         }
 
-        let second_password = ZeroizeOnDrop(read_password_from_tty(Some(
+        let confirmation = ZeroizeOnDrop(read_password_from_tty(Some(
             "Enter same passphrase again: ",
         ))?);
 
-        if password.0 == second_password.0 {
+        if password == confirmation {
             return Ok(password);
         } else {
             eprintln!("Passphrases do not match. Try again.");
