@@ -27,9 +27,8 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof::{create_multiproof, create_proof},
 };
-use crate::views::Mount;
 use crate::{
-    views::{IndexAccess, Iter as ViewIter, View},
+    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::{Hash, HashStream};
@@ -160,7 +159,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: Mount::new(view).mount(index_name),
+            base: IndexBuilder::from_view(view).index_name(index_name).build(),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -207,7 +206,10 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: Mount::new(view).mount2(family_name, index_id),
+            base: IndexBuilder::from_view(view)
+                .index_name(family_name)
+                .index_id(index_id)
+                .build(),
             _k: PhantomData,
             _v: PhantomData,
         }

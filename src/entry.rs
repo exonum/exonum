@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    views::{IndexAccess, Mount, View},
+    views::{IndexAccess, IndexBuilder, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -60,7 +60,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: Mount::new(view).mount(index_name),
+            base: IndexBuilder::from_view(view).index_name(index_name).build(),
             _v: PhantomData,
         }
     }
@@ -93,7 +93,10 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: Mount::new(view).mount2(family_name, index_id),
+            base: IndexBuilder::from_view(view)
+                .index_name(family_name)
+                .index_id(index_id)
+                .build(),
             _v: PhantomData,
         }
     }

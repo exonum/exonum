@@ -23,10 +23,9 @@ use std::{
 };
 
 use self::{key::ProofListKey, proof::ProofOfAbsence};
-use crate::hash::HashTag;
-use crate::views::Mount;
 use crate::{
-    views::{IndexAccess, Iter as ViewIter, View},
+    hash::HashTag,
+    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -94,7 +93,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: Mount::new(view).mount(index_name),
+            base: IndexBuilder::from_view(view).index_name(index_name).build(),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -134,7 +133,10 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: Mount::new(view).mount2(family_name, index_id),
+            base: IndexBuilder::from_view(view)
+                .index_name(family_name)
+                .index_id(index_id)
+                .build(),
             length: Cell::new(None),
             _v: PhantomData,
         }

@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    views::{IndexAccess, Iter as ViewIter, Mount, View},
+    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, Fork,
 };
 
@@ -76,7 +76,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: Mount::new(view).mount(index_name),
+            base: IndexBuilder::from_view(view).index_name(index_name).build(),
             _k: PhantomData,
         }
     }
@@ -109,7 +109,10 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: Mount::new(view).mount2(family_name, index_id),
+            base: IndexBuilder::from_view(view)
+                .index_name(family_name)
+                .index_id(index_id)
+                .build(),
             _k: PhantomData,
         }
     }

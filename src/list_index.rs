@@ -20,7 +20,7 @@
 use std::{cell::Cell, marker::PhantomData};
 
 use crate::{
-    views::{IndexAccess, Iter as ViewIter, Mount, View},
+    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork,
 };
 
@@ -79,12 +79,33 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: Mount::new(view).mount(index_name),
+            base: IndexBuilder::from_view(view).index_name(index_name).build(),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
 
+    /// Creates a new index representation based on the name, index ID in family
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
+    /// available.
+    ///
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ListIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let name = "name";
+    /// let index_id = vec![01];
+    /// let snapshot = db.snapshot();
+    /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
+    /// ```
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
     where
         I: BinaryKey,
@@ -92,27 +113,14 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: Mount::new(view).mount2(family_name, index_id),
+            base: IndexBuilder::from_view(view)
+                .index_name(family_name)
+                .index_id(index_id)
+                .build(),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
-
-    //    pub fn new(view: T) -> Self {
-    //        Self {
-    //            base: view,
-    //            length: Cell::new(None),
-    //            _v: PhantomData,
-    //        }
-    //    }
-
-    //    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-    //        Self {
-    //            base: view,
-    //            length: Cell::new(None),
-    //            _v: PhantomData,
-    //        }
-    //    }
 
     /// Returns an element at the indicated position or `None` if the indicated
     /// position is out of bounds.

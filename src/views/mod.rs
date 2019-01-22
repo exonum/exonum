@@ -69,35 +69,48 @@ pub trait IndexAccess: Clone {
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
-pub struct Mount<T> {
+pub struct IndexBuilder<T> {
     view: T,
+    address: IndexAddress,
 }
 
-impl<T: IndexAccess> Mount<T> {
-    pub fn new(view: T) -> Self {
-        Self { view }
+impl<T: IndexAccess> IndexBuilder<T> {
+    pub fn from_view(view: T) -> Self {
+        Self {
+            view,
+            address: IndexAddress::root(),
+        }
     }
 
-    pub fn mount<S: AsRef<str>>(self, index_name: S) -> View<T> {
-        let address = IndexAddress::root().append_name(index_name.as_ref());
-        View {
-            snapshot: self.view.clone(),
-            changes: self.view.changes(&address),
+    #[allow(dead_code)]
+    pub fn from_address(view: T, address: IndexAddress) -> Self {
+        Self { view, address }
+    }
+
+    pub fn index_name<S: AsRef<str>>(&mut self, index_name: S) -> Self {
+        let address = self.address.append_name(index_name.as_ref());
+        Self {
+            view: self.view.clone(),
             address,
         }
     }
 
-    pub fn mount2<S: AsRef<str>, I>(self, index_name: S, index_id: &I) -> View<T>
+    pub fn index_id<I>(&mut self, index_id: &I) -> Self
     where
         I: BinaryKey + ?Sized,
     {
-        let address = IndexAddress::root()
-            .append_name(index_name.as_ref())
-            .append_bytes(index_id);
+        let address = self.address.append_bytes(index_id);
+        Self {
+            view: self.view.clone(),
+            address,
+        }
+    }
+
+    pub fn build(&mut self) -> View<T> {
         View {
             snapshot: self.view.clone(),
-            changes: self.view.changes(&address),
-            address,
+            changes: self.view.changes(&self.address),
+            address: self.address.clone(),
         }
     }
 }
