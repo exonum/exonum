@@ -17,6 +17,7 @@ use super::{
     Snapshot, SparseListIndex, TemporaryDB, ValueSetIndex,
 };
 use exonum_crypto::Hash;
+use crate::views::IndexAccess;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -192,14 +193,14 @@ fn test_changelog() {
 fn test_multiple_patch() {
     let db = TemporaryDB::default();
 
-    fn list_index<View: AsRef<dyn Snapshot>>(view: View) -> ListIndex<View, u64> {
+    fn list_index<View: IndexAccess>(view: View) -> ListIndex<View, u64> {
         ListIndex::new("list_index", view)
     }
     // create first patch
     let patch1 = {
         let mut fork = db.fork();
         {
-            let mut index = list_index(&mut fork);
+            let mut index = list_index(&fork);
             index.push(1);
             index.push(3);
             index.push(4);
@@ -210,7 +211,7 @@ fn test_multiple_patch() {
     let patch2 = {
         let mut fork = db.fork();
         {
-            let mut index = list_index(&mut fork);
+            let mut index = list_index(&fork);
             index.push(2);
         }
         fork.into_patch()
@@ -227,12 +228,12 @@ fn test_multiple_patch() {
 #[allow(dead_code, unreachable_code, unused_variables)]
 fn should_compile() {
     let fork: Fork = unimplemented!();
-    let _: Entry<_, ()> = Entry::new_in_family("", "", &mut fork);
-    let _: KeySetIndex<_, Hash> = KeySetIndex::new_in_family("", "", &mut fork);
-    let _: ListIndex<_, ()> = ListIndex::new_in_family("", "", &mut fork);
-    let _: MapIndex<_, Hash, ()> = MapIndex::new_in_family("", "", &mut fork);
-    let _: ProofListIndex<_, ()> = ProofListIndex::new_in_family("", "", &mut fork);
-    let _: ProofMapIndex<_, Hash, ()> = ProofMapIndex::new_in_family("", "", &mut fork);
-    let _: SparseListIndex<_, ()> = SparseListIndex::new_in_family("", "", &mut fork);
-    let _: ValueSetIndex<_, ()> = ValueSetIndex::new_in_family("", "", &mut fork);
+    let _: Entry<_, ()> = Entry::new_in_family("", "", &fork);
+    let _: KeySetIndex<_, Hash> = KeySetIndex::new_in_family("", "", &fork);
+    let _: ListIndex<_, ()> = ListIndex::new_in_family("", "", &fork);
+    let _: MapIndex<_, Hash, ()> = MapIndex::new_in_family("", "", &fork);
+    let _: ProofListIndex<_, ()> = ProofListIndex::new_in_family("", "", &fork);
+    let _: ProofMapIndex<_, Hash, ()> = ProofMapIndex::new_in_family("", "", &fork);
+    let _: SparseListIndex<_, ()> = SparseListIndex::new_in_family("", "", &fork);
+    let _: ValueSetIndex<_, ()> = ValueSetIndex::new_in_family("", "", &fork);
 }

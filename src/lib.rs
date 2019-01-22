@@ -151,7 +151,6 @@ mod db;
 mod entry;
 mod error;
 mod hash;
-//mod indexes_metadata;
 mod keys;
 mod options;
 mod values;
@@ -165,6 +164,5 @@ pub mod proof_map_index;
 pub mod sparse_list_index;
 pub mod value_set_index;
 
-//TODO: revert tests
 //#[cfg(test)]
 //mod tests;

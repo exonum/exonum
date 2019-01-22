@@ -63,11 +63,11 @@ where
 mod map_index {
     use super::*;
 
-    impl<'a, V> Modifier<MapIndex<&'a mut Fork, u8, V>> for MapAction<u8, V>
+    impl<'a, V> Modifier<MapIndex<&'a Fork, u8, V>> for MapAction<u8, V>
     where
         V: BinaryValue,
     {
-        fn modify(self, map: &mut MapIndex<&'a mut Fork, u8, V>) {
+        fn modify(self, map: &mut MapIndex<&'a Fork, u8, V>) {
             match self {
                 MapAction::Put(k, v) => {
                     map.put(&k, v);
@@ -84,7 +84,7 @@ mod map_index {
     }
 
     fn compare_collections(
-        map_index: &MapIndex<&mut Fork, u8, i32>,
+        map_index: &MapIndex<&Fork, u8, i32>,
         ref_map: &HashMap<u8, i32>,
     ) -> TestCaseResult {
         for k in ref_map.keys() {
@@ -111,11 +111,11 @@ mod map_index {
 mod proof_map_index {
     use super::*;
 
-    impl<'a, V> Modifier<ProofMapIndex<&'a mut Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
+    impl<'a, V> Modifier<ProofMapIndex<&'a Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
     where
         V: BinaryValue + UniqueHash,
     {
-        fn modify(self, map: &mut ProofMapIndex<&mut Fork, [u8; 32], V>) {
+        fn modify(self, map: &mut ProofMapIndex<&Fork, [u8; 32], V>) {
             match self {
                 MapAction::Put(k, v) => {
                     map.put(&k, v);
@@ -132,7 +132,7 @@ mod proof_map_index {
     }
 
     fn compare_collections(
-        map_index: &ProofMapIndex<&mut Fork, [u8; 32], i32>,
+        map_index: &ProofMapIndex<&Fork, [u8; 32], i32>,
         ref_map: &HashMap<[u8; 32], i32>,
     ) -> TestCaseResult {
         for k in ref_map.keys() {

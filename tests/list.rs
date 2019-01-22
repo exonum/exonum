@@ -75,11 +75,11 @@ impl<V> Modifier<Vec<V>> for ListAction<V> {
 mod list_index {
     use super::*;
 
-    impl<'a, V> Modifier<ListIndex<&'a mut Fork, V>> for ListAction<V>
+    impl<'a, V> Modifier<ListIndex<&'a Fork, V>> for ListAction<V>
     where
         V: BinaryValue,
     {
-        fn modify(self, list: &mut ListIndex<&mut Fork, V>) {
+        fn modify(self, list: &mut ListIndex<&Fork, V>) {
             match self {
                 ListAction::Push(val) => {
                     list.push(val);
@@ -111,7 +111,7 @@ mod list_index {
     }
 
     fn compare_collections(
-        list_index: &ListIndex<&mut Fork, i32>,
+        list_index: &ListIndex<&Fork, i32>,
         ref_list: &Vec<i32>,
     ) -> TestCaseResult {
         prop_assert!(ref_list.iter().map(|v| *v).eq(list_index));
@@ -136,11 +136,11 @@ mod list_index {
 mod proof_list_index {
     use super::*;
 
-    impl<'a, V> Modifier<ProofListIndex<&'a mut Fork, V>> for ListAction<V>
+    impl<'a, V> Modifier<ProofListIndex<&'a Fork, V>> for ListAction<V>
     where
         V: BinaryValue + UniqueHash,
     {
-        fn modify(self, list: &mut ProofListIndex<&mut Fork, V>) {
+        fn modify(self, list: &mut ProofListIndex<&Fork, V>) {
             match self {
                 ListAction::Push(val) => {
                     list.push(val);
@@ -163,7 +163,7 @@ mod proof_list_index {
     }
 
     fn compare_collections(
-        list_index: &ProofListIndex<&mut Fork, i32>,
+        list_index: &ProofListIndex<&Fork, i32>,
         ref_list: &Vec<i32>,
     ) -> TestCaseResult {
         prop_assert!(ref_list.iter().map(|v| *v).eq(list_index));
