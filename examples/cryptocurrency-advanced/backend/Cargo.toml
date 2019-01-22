@@ -27,9 +27,9 @@ protobuf = "2.2.0"
 [dev-dependencies]
 exonum-testkit = { version = "0.10.1", path = "../../../testkit" }
 serde_json = "1.0.0"
-pretty_assertions = "=0.5.1"
+pretty_assertions = "0.5.1"
 assert_matches = "1.2.0"
-hex = "=0.3.2"
+hex = "0.3.2"
 
 [build-dependencies]
 exonum-build = { version = "0.10.0", path = "../../../components/build" }

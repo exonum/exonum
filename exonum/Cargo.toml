@@ -19,43 +19,43 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "=0.7.9"
-actix-net = "=0.2.6"
-actix-web = { version = "=0.7.17", default-features = false }
-log = "=0.4.6"
+actix = "0.7.9"
+actix-net = "0.2.6"
+actix-web = { version = "0.7.18", default-features = false }
+log = "0.4.6"
 byteorder = { version = "1.2.7", features = [ "i128" ] }
-hex = "=0.3.2"
-bit-vec = "=0.5.0"
-rand = "=0.6.4"
-rand_xorshift = "=0.1.1"
+hex = "0.3.2"
+bit-vec = "0.5.0"
+rand = "0.6.4"
+rand_xorshift = "0.1.1"
 serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
 erased-serde = "0.3"
-toml = "=0.4.10"
+toml = "0.4.10"
 clap = "2.31.2"
-env_logger = "=0.6.0"
-atty = "=0.2.11"
-bytes = "=0.4.11"
-futures = "=0.1.25"
-tokio = "=0.1.14"
-tokio-codec = "=0.1.1"
-tokio-core = "=0.1.17"
-tokio-current-thread = "=0.1.4"
-tokio-io = "=0.1.11"
-tokio-retry = "=0.2.0"
-tokio-threadpool = "=0.1.10"
-tokio-dns-unofficial = "=0.4.0"
+env_logger = "0.6.0"
+atty = "0.2.11"
+bytes = "0.4.11"
+futures = "0.1.25"
+tokio = "0.1.14"
+tokio-codec = "0.1.1"
+tokio-core = "0.1.17"
+tokio-current-thread = "0.1.4"
+tokio-io = "0.1.11"
+tokio-retry = "0.2.0"
+tokio-threadpool = "0.1.10"
+tokio-dns-unofficial = "0.4.0"
 failure = "0.1.5"
 os_info = "1.0.1"
-chrono = { version = "=0.4.6", features = ["serde"] }
-uuid = { version = "=0.7.1", features = ["serde"] }
-snow = "=0.4.1"
-rust_decimal = "=0.10.2"
+chrono = { version = "0.4.6", features = ["serde"] }
+uuid = { version = "0.7.1", features = ["serde"] }
+snow = "0.4.2"
+rust_decimal = "0.10.2"
 protobuf = { version = "2.2.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "2.1.0"
-zeroize = "=0.5.2"
+zeroize = "0.5.2"
 
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
@@ -63,13 +63,13 @@ exonum-crypto = { version = "0.10.3", path = "../components/crypto" }
 exonum-derive = { version = "0.10.0", path = "../components/derive" }
 
 [dev-dependencies]
-pretty_assertions = "=0.5.1"
-tempdir = "=0.3.7"
+pretty_assertions = "0.5.1"
+tempdir = "0.3.7"
 lazy_static = "1.0.1"
-proptest = "=0.8.7"
+proptest = "0.8.7"
 modifier = "0.1.0"
-criterion = "=0.2.7"
-num = "=0.2.0"
+criterion = "0.2.8"
+num = "0.2.0"
 
 [[bench]]
 name = "criterion"
