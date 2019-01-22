@@ -16,7 +16,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-chrono = { version = "=0.4.6", features = ["serde"] }
+chrono = { version = "0.4.6", features = ["serde"] }
 exonum = { version = "0.10.2", path = "../../exonum" }
 exonum-derive = { version = "0.10.0", path = "../../components/derive" }
 failure = "0.1.5"
@@ -27,7 +27,7 @@ protobuf = "2.2.0"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.10.1", path = "../../testkit" }
-pretty_assertions = "=0.5.1"
+pretty_assertions = "0.5.1"
 
 [build-dependencies]
 exonum-build = { version = "0.10.0", path = "../../components/build" }
