@@ -122,25 +122,24 @@
 )]
 
 #[doc(no_inline)]
-//pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
+pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{
         Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch, PatchIterator,
         Snapshot,
     },
-//    entry::Entry,
+    entry::Entry,
     error::Error,
     hash::{HashTag, UniqueHash},
-//    indexes_metadata::StorageMetadata,
-//    key_set_index::KeySetIndex,
+    key_set_index::KeySetIndex,
     keys::BinaryKey,
-//    list_index::ListIndex,
-//    map_index::MapIndex,
+    list_index::ListIndex,
+    map_index::MapIndex,
     options::DbOptions,
-//    proof_list_index::{ListProof, ProofListIndex},
-//    sparse_list_index::SparseListIndex,
-//    value_set_index::ValueSetIndex,
+    proof_list_index::{ListProof, ProofListIndex},
+    sparse_list_index::SparseListIndex,
+    value_set_index::ValueSetIndex,
     values::BinaryValue,
 };
 
@@ -148,9 +147,8 @@ pub use self::{
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod backends;
-//mod base_index;
 mod db;
-//mod entry;
+mod entry;
 mod error;
 mod hash;
 //mod indexes_metadata;
@@ -160,12 +158,12 @@ mod values;
 mod views;
 
 pub mod key_set_index;
-//pub mod list_index;
-//pub mod map_index;
-//pub mod proof_list_index;
-//pub mod proof_map_index;
-//pub mod sparse_list_index;
-//pub mod value_set_index;
+pub mod list_index;
+pub mod map_index;
+pub mod proof_list_index;
+pub mod proof_map_index;
+pub mod sparse_list_index;
+pub mod value_set_index;
 
 //TODO: revert tests
 //#[cfg(test)]

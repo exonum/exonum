@@ -32,7 +32,7 @@ pub struct View<T: IndexAccess> {
 impl<T: IndexAccess> fmt::Debug for View<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("View")
-            .field("address", &self.address)
+            .field("address",&self.address)
             .finish()
     }
 }
@@ -92,6 +92,19 @@ impl <T: IndexAccess> Mount<T> {
             address,
         }
     }
+
+    pub fn mount2<S: AsRef<str>, I>(self, index_name: S, index_id: &I) -> View<T>
+    where
+        I:BinaryKey + ?Sized,
+    {
+        let address = IndexAddress::root()
+            .append_name(index_name.as_ref()).append_bytes(index_id);
+        View {
+            snapshot: self.view.clone(),
+            changes: self.view.changes(&address),
+            address,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -102,7 +115,7 @@ pub struct IndexAddress {
 
 impl IndexAddress {
     pub fn root() -> Self {
-        IndexAddress {
+        Self {
             name: "".to_owned(),
             bytes: None,
         }
@@ -128,7 +141,7 @@ impl IndexAddress {
     }
 
     pub fn append_name(&self, suffix: &str) -> Self {
-        IndexAddress {
+        Self {
             name: if self.name.is_empty() {
                 suffix.to_owned()
             } else {
@@ -139,11 +152,11 @@ impl IndexAddress {
         }
     }
 
-    pub fn append_bytes<K: BinaryKey>(&self, suffix: &K) -> Self {
+    pub fn append_bytes<K: BinaryKey + ?Sized>(&self, suffix: &K) -> Self {
         let suffix = key_bytes(suffix);
         let (name, bytes) = self.keyed(&suffix);
 
-        IndexAddress {
+        Self {
             name: name.to_owned(),
             bytes: Some(bytes.into_owned()),
         }
@@ -177,9 +190,7 @@ impl<'a> IndexAccess for &'a dyn Snapshot {
         *self
     }
 
-    fn changes(&self, _: &IndexAddress) -> Self::Changes {
-        ()
-    }
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
 }
 
 impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
@@ -189,13 +200,11 @@ impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
         self.as_ref()
     }
 
-    fn changes(&self, _: &IndexAddress) -> Self::Changes {
-        ()
-    }
+    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
 }
 
 fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
-    let mut buffer = vec![0u8; key.size()];
+    let mut buffer = vec![0_u8; key.size()];
     key.write(&mut buffer);
     buffer
 }
@@ -241,7 +250,7 @@ impl<T: IndexAccess> View<T> {
         use std::collections::Bound::*;
 
         let (name, key) = self.address.keyed(from);
-        let prefix = self.address.bytes.clone().unwrap_or(vec![]);
+        let prefix = self.address.bytes.clone().unwrap_or_else(|| vec![]);
 
         let changes_iter = self.changes
             .as_ref()

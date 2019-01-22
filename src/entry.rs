@@ -16,8 +16,8 @@
 
 use std::marker::PhantomData;
 
-use super::{
-    base_index::BaseIndex, indexes_metadata::IndexType, BinaryKey, BinaryValue, Fork, Snapshot,
+use crate::{
+    BinaryKey, BinaryValue, Fork, Snapshot, views::{View, IndexAccess, Mount},
     UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -29,14 +29,14 @@ use exonum_crypto::Hash;
 ///
 /// [`BinaryValue`]: trait.BinaryValue.html
 #[derive(Debug)]
-pub struct Entry<T, V> {
-    base: BaseIndex<T>,
+pub struct Entry<T: IndexAccess, V> {
+    base: View<T>,
     _v: PhantomData<V>,
 }
 
 impl<T, V> Entry<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -60,7 +60,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: BaseIndex::new(index_name.as_ref(), IndexType::Entry, view),
+            base: Mount::new(view).mount(index_name),
             _v: PhantomData,
         }
     }
@@ -93,7 +93,7 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: BaseIndex::new_in_family(family_name, index_id, IndexType::Entry, view),
+            base: Mount::new(view).mount2(family_name, index_id),
             _v: PhantomData,
         }
     }
@@ -164,7 +164,7 @@ where
     }
 }
 
-impl<'a, V> Entry<&'a mut Fork, V>
+impl<'a, V> Entry<&'a Fork, V>
 where
     V: BinaryValue + UniqueHash,
 {

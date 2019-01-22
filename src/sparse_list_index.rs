@@ -21,9 +21,7 @@ use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
-use super::{
-    base_index::{BaseIndex, BaseIndexIter},
-    indexes_metadata::IndexType,
+use crate::{views::{IndexAccess, View, Mount, Iter as ViewIter},
     BinaryKey, BinaryValue, Fork, Snapshot,
 };
 
@@ -70,8 +68,8 @@ impl BinaryValue for SparseListSize {
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
-pub struct SparseListIndex<T, V> {
-    base: BaseIndex<T>,
+pub struct SparseListIndex<T:IndexAccess, V> {
+    base: View<T>,
     size: Cell<Option<SparseListSize>>,
     _v: PhantomData<V>,
 }
@@ -85,7 +83,7 @@ pub struct SparseListIndex<T, V> {
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, u64, V>,
+    base_iter: ViewIter<'a, u64, V>,
 }
 
 /// Returns an iterator over the indices of a `SparseListIndex`.
@@ -97,7 +95,7 @@ pub struct SparseListIndexIter<'a, V> {
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexKeys<'a> {
-    base_iter: BaseIndexIter<'a, u64, ()>,
+    base_iter: ViewIter<'a, u64, ()>,
 }
 
 /// Returns an iterator over the values of a `SparseListIndex`.
@@ -109,12 +107,12 @@ pub struct SparseListIndexKeys<'a> {
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexValues<'a, V> {
-    base_iter: BaseIndexIter<'a, (), V>,
+    base_iter: ViewIter<'a, (), V>,
 }
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -138,7 +136,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: BaseIndex::new(index_name, IndexType::SparseList, view),
+            base: Mount::new(view).mount(index_name),
             size: Cell::new(None),
             _v: PhantomData,
         }
@@ -176,7 +174,7 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: BaseIndex::new_in_family(family_name, index_id, IndexType::SparseList, view),
+            base: Mount::new(view).mount2(family_name, index_id),
             size: Cell::new(None),
             _v: PhantomData,
         }
@@ -380,7 +378,7 @@ where
     }
 }
 
-impl<'a, V> SparseListIndex<&'a mut Fork, V>
+impl<'a, V> SparseListIndex<&'a Fork, V>
 where
     V: BinaryValue,
 {
@@ -575,7 +573,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue,
 {
     type Item = (u64, V);
@@ -627,7 +625,7 @@ mod tests {
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
         let mut fork = db.fork();
-        let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
+        let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
 
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.capacity());
@@ -697,7 +695,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
         let mut fork = db.fork();
-        let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
+        let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
 
         list_index.extend(vec![1_u8, 15, 25, 2, 3]);
         assert_eq!(

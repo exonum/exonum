@@ -38,17 +38,17 @@ pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
 
 /// Removes all keys from the table that start with the specified prefix.
 pub fn remove_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
-    if prefix.len() > 0 {
+    if prefix.is_empty() {
+        // If the prefix is empty, we can be more efficient by clearing
+        // the entire changes in the patch.
+        table.clear();
+    } else {
         // Remove all keys starting from `prefix`.
         let mut tail = table.split_off(prefix);
         if let Some(next_prefix) = next_prefix(prefix) {
             tail = tail.split_off(&next_prefix);
             table.append(&mut tail);
         }
-    } else {
-        // If the prefix is empty, we can be more efficient by clearing
-        // the entire changes in the patch.
-        table.clear();
     }
 }
 
@@ -152,7 +152,7 @@ pub struct ChangesRef<'a> {
     changes: Option<ViewChanges>,
 }
 
-impl<'a> Deref for ChangesRef<'a> {
+impl Deref for ChangesRef<'_> {
     type Target = ViewChanges;
 
     fn deref(&self) -> &ViewChanges {
@@ -162,7 +162,7 @@ impl<'a> Deref for ChangesRef<'a> {
     }
 }
 
-impl<'a> DerefMut for ChangesRef<'a> {
+impl DerefMut for ChangesRef<'_> {
     fn deref_mut(&mut self) -> &mut ViewChanges {
         // `.unwrap()` is safe: `changes` can be equal to `None` only when
         // the instance is being dropped.
@@ -170,7 +170,7 @@ impl<'a> DerefMut for ChangesRef<'a> {
     }
 }
 
-impl<'a> Drop for ChangesRef<'a> {
+impl Drop for ChangesRef<'_> {
     fn drop(&mut self) {
         let mut change_map = self.parent.changes.borrow_mut();
         let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
@@ -185,7 +185,7 @@ impl<'a> Drop for ChangesRef<'a> {
 impl WorkingPatch {
     /// Creates a new empty patch.
     fn new() -> Self {
-        WorkingPatch {
+        Self {
             changes: RefCell::new(HashMap::new()),
         }
     }
@@ -196,7 +196,8 @@ impl WorkingPatch {
 
     /// Returns a mutable reference to the changes corresponding to a certain index.
     fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
-        let changes = self.changes
+        let changes = self
+            .changes
             .borrow_mut()
             .entry(address.clone())
             .or_insert_with(|| Some(ViewChanges::new()))
@@ -251,7 +252,7 @@ impl WorkingPatch {
 impl Patch {
     /// Creates a new empty `Patch` instance.
     fn new() -> Self {
-        Patch {
+        Self {
             changes: HashMap::new(),
         }
     }
@@ -276,7 +277,7 @@ impl Patch {
     /// Produces a patch that would reverse the effects of this patch for a given
     /// snapshot.
     pub fn undo(self, snapshot: &dyn Snapshot) -> Self {
-        let mut rev_patch = Patch::new();
+        let mut rev_patch = Self::new();
 
         for (name, changes) in self {
             let rev_changes = BTreeMap::from_iter(changes.into_iter().map(|(key, ..)| {

@@ -21,8 +21,7 @@
 use std::marker::PhantomData;
 
 use super::{
-    base_index::{BaseIndex, BaseIndexIter},
-    indexes_metadata::IndexType,
+    views::{Mount, View, Iter as ViewIter, IndexAccess},
     BinaryKey, BinaryValue, Fork, Snapshot, UniqueHash,
 };
 use exonum_crypto::Hash;
@@ -34,8 +33,8 @@ use exonum_crypto::Hash;
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ValueSetIndex<T, V> {
-    base: BaseIndex<T>,
+pub struct ValueSetIndex<T:IndexAccess, V> {
+    base: View<T>,
     _v: PhantomData<V>,
 }
 
@@ -49,7 +48,7 @@ pub struct ValueSetIndex<T, V> {
 /// [`ValueSetIndex`]: struct.ValueSetIndex.html
 #[derive(Debug)]
 pub struct ValueSetIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, Hash, V>,
+    base_iter: ViewIter<'a, Hash, V>,
 }
 
 /// Returns an iterator over the hashes of items of a `ValueSetIndex`.
@@ -62,12 +61,12 @@ pub struct ValueSetIndexIter<'a, V> {
 /// [`ValueSetIndex`]: struct.ValueSetIndex.html
 #[derive(Debug)]
 pub struct ValueSetIndexHashes<'a> {
-    base_iter: BaseIndexIter<'a, Hash, ()>,
+    base_iter: ViewIter<'a, Hash, ()>,
 }
 
 impl<T, V> ValueSetIndex<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -91,7 +90,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: BaseIndex::new(index_name, IndexType::ValueSet, view),
+            base: Mount::new(view).mount(index_name),
             _v: PhantomData,
         }
     }
@@ -124,7 +123,7 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ValueSet, view),
+            base: Mount::new(view).mount2(family_name, index_id),
             _v: PhantomData,
         }
     }
@@ -270,7 +269,7 @@ where
     }
 }
 
-impl<'a, V> ValueSetIndex<&'a mut Fork, V>
+impl<'a, V> ValueSetIndex<&'a Fork, V>
 where
     V: BinaryValue + UniqueHash,
 {
@@ -369,7 +368,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue + UniqueHash,
 {
     type Item = (Hash, V);

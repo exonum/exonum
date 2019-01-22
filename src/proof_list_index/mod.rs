@@ -23,13 +23,13 @@ use std::{
 };
 
 use self::{key::ProofListKey, proof::ProofOfAbsence};
-use super::{
-    base_index::{BaseIndex, BaseIndexIter},
-    indexes_metadata::IndexType,
+use crate::{
+    views::{IndexAccess, View, Iter as ViewIter},
     BinaryKey, BinaryValue, Fork, Snapshot, UniqueHash,
 };
 use crate::hash::HashTag;
 use exonum_crypto::Hash;
+use crate::views::Mount;
 
 mod key;
 mod proof;
@@ -45,8 +45,8 @@ mod tests;
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ProofListIndex<T, V> {
-    base: BaseIndex<T>,
+pub struct ProofListIndex<T: IndexAccess, V> {
+    base: View<T>,
     length: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
@@ -61,12 +61,12 @@ pub struct ProofListIndex<T, V> {
 /// [`ProofListIndex`]: struct.ProofListIndex.html
 #[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, ProofListKey, V>,
+    base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
 impl<T, V> ProofListIndex<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -94,7 +94,7 @@ where
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Self {
-            base: BaseIndex::new(index_name, IndexType::ProofList, view),
+            base: Mount::new(view).mount(index_name),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -134,7 +134,7 @@ where
         S: AsRef<str>,
     {
         Self {
-            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
+            base: Mount::new(view).mount2(family_name, index_id),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -463,7 +463,7 @@ where
     }
 }
 
-impl<'a, V> ProofListIndex<&'a mut Fork, V>
+impl<'a, V> ProofListIndex<&'a Fork, V>
 where
     V: BinaryValue + UniqueHash,
 {
@@ -618,7 +618,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
     V: BinaryValue + UniqueHash,
 {
     type Item = V;

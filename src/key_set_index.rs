@@ -56,11 +56,61 @@ impl<T, K> KeySetIndex<T, K>
         T: IndexAccess,
         K: BinaryKey,
 {
-
+    /// Creates a new index representation based on the name and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
+    /// available.
+    ///
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    ///
+    /// let db = TemporaryDB::default();
+    /// let snapshot = db.snapshot();
+    /// let name = "name";
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
+    /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
-
         Self {
             base: Mount::new(view).mount(index_name),
+            _k: PhantomData,
+        }
+    }
+
+   /// Creates a new index representation based on the name, index ID in family
+   /// and storage view.
+   ///
+   /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+   /// immutable methods are available. In the second case, both immutable and mutable methods are
+   /// available.
+   ///
+   /// [`&Snapshot`]: ../trait.Snapshot.html
+   /// [`&mut Fork`]: ../struct.Fork.html
+   ///
+   /// # Examples
+   ///
+   /// ```
+   /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+   ///
+   /// let db = TemporaryDB::default();
+   /// let snapshot = db.snapshot();
+   /// let name = "name";
+   /// let index_id = vec![123];
+   /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
+   /// ```
+    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
+        where
+            I: BinaryKey,
+            I: ?Sized,
+            S: AsRef<str>,
+    {
+        Self {
+            base: Mount::new(view).mount2(family_name, index_id),
             _k: PhantomData,
         }
     }

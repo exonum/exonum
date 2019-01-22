@@ -19,10 +19,10 @@
 
 use std::{cell::Cell, marker::PhantomData};
 
-use crate::{BinaryKey, BinaryValue, views::{FromView, Iter as ViewIter, ReadView, ViewMut}};
+use crate::{BinaryKey, BinaryValue, Fork, views::{Iter as ViewIter, View}};
 use crate::Snapshot;
 use crate::views::IndexAccess;
-use crate::views::View;
+use crate::views::Mount;
 
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
@@ -34,8 +34,8 @@ use crate::views::View;
 ///
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct ListIndex<T, V> {
-    base: T,
+pub struct ListIndex<T: IndexAccess, V> {
+    base: View<T>,
     length: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
@@ -53,19 +53,9 @@ pub struct ListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
-impl<T, V> FromView<T> for ListIndex<T, V>
-where
-    T: ReadView,
-    V: BinaryValue,
-{
-    fn from_view(view: T) -> Self {
-        ListIndex::new(view)
-    }
-}
-
 impl<T, V> ListIndex<T, V>
 where
-    T: ReadView,
+    T: IndexAccess,
     V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -87,13 +77,34 @@ where
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// ```
-    pub fn new(view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
+            Self {
+                base: Mount::new(view).mount(index_name),
+                length: Cell::new(None),
+                _v: PhantomData,
+            }
+        }
+
+    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
+        where
+            I: BinaryKey,
+            I: ?Sized,
+            S: AsRef<str>,
+    {
         Self {
-            base: view,
+            base: Mount::new(view).mount2(family_name, index_id),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
+
+//    pub fn new(view: T) -> Self {
+//        Self {
+//            base: view,
+//            length: Cell::new(None),
+//            _v: PhantomData,
+//        }
+//    }
 
 //    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
 //        Self {
@@ -245,7 +256,7 @@ where
     }
 }
 
-impl<'a, V> ListIndex<ViewMut<'a>, V>
+impl<'a, V> ListIndex<&'a Fork, V>
 where
     V: BinaryValue,
 {
@@ -427,7 +438,7 @@ where
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
 where
-    T: ReadView,
+    T: IndexAccess,
     V: BinaryValue,
 {
     type Item = V;
@@ -451,14 +462,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Fork, ListIndex, Snapshot, Database, TemporaryDB, views::{ViewMut, IndexAccessMut}};
+    use crate::{Fork, Snapshot, Database, TemporaryDB};
     use crate::views::IndexAccess;
-    use crate::views::ReadView;
     use std::string::String;
-    use crate::views::FromView;
     use crate::views::View;
+    use crate::list_index::ListIndex;
 
-    fn list_index_methods<'a>(list_index: &mut ListIndex<ViewMut<'a>, i32>) {
+    fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.len());
         assert!(list_index.last().is_none());
@@ -501,7 +511,7 @@ mod tests {
         assert_eq!(0, list_index.len());
     }
 
-    fn list_index_iter<'a>(list_index: &mut ListIndex<ViewMut<'a>, u8>) {
+    fn list_index_iter(list_index: &mut ListIndex<&Fork, u8>) {
         list_index.extend(vec![1u8, 2, 3]);
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
@@ -518,31 +528,21 @@ mod tests {
         assert_ne!(x, y);
         let mut fork = db.fork();
 
-        fn list<'a, I, T>(index: u32, view: &'a I) -> ListIndex<T, String>
+        fn list<T>(index: u32, view: T) -> ListIndex<T, String>
         where
-            I: IndexAccess + 'a,
-            T: ReadView,
-            ListIndex<T, String>: FromView<View<'a>>,
+            T: IndexAccess,
         {
-            view.index(("family", &index))
-        }
-
-        fn list_mut<'a, I, T>(index: u32, view: &'a I) -> ListIndex<ViewMut<'a>, String>
-            where
-                I: IndexAccessMut + 'a,
-                ListIndex<T, String>: FromView<View<'a>>,
-        {
-            view.index_mut(("family", &index))
+            ListIndex::new_in_family("family", &index, view)
         }
 
         // Write data to both indexes.
         {
-            let mut index = list_mut(x, &fork);
+            let mut index = list(x, &fork);
             index.push("foo".to_owned());
             index.push("bar".to_owned());
         }
         {
-            let mut index = list_mut(y, &fork);
+            let mut index = list(y, &fork);
             index.push("baz".to_owned());
             index.push("qux".to_owned());
         }
@@ -554,7 +554,7 @@ mod tests {
 
         // Clear the index with the lower family key.
         {
-            let mut index = list_mut(x, &fork);
+            let mut index = list(x, &fork);
             index.clear();
         }
 
@@ -591,7 +591,7 @@ mod tests {
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = fork.index_mut(IDX_NAME);
+        let mut list_index = ListIndex::new(IDX_NAME, &fork);
         list_index_methods(&mut list_index);
     }
 
@@ -599,7 +599,7 @@ mod tests {
     fn test_list_index_in_family_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = fork.index_mut((IDX_NAME, &vec![01]));
+        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &fork);
         list_index_methods(&mut list_index);
     }
 
@@ -607,7 +607,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = fork.index_mut(IDX_NAME);
+    let mut list_index = ListIndex::new(IDX_NAME, &fork);
         list_index_iter(&mut list_index);
     }
 
@@ -615,7 +615,7 @@ mod tests {
     fn test_list_index_in_family_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = fork.index_mut((IDX_NAME, &vec![01]));
+        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &fork);
         list_index_iter(&mut list_index);
     }
 
