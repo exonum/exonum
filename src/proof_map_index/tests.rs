@@ -312,8 +312,8 @@ fn test_remove_reverse() {
 #[test]
 fn test_merkle_root_leaf() {
     let db = TemporaryDB::default();
-    let mut storage = db.fork();
-    let mut index = ProofMapIndex::new(IDX_NAME, &mut storage);
+    let storage = db.fork();
+    let mut index = ProofMapIndex::new(IDX_NAME, &storage);
 
     let key = vec![1, 2, 3];
     let value = vec![4, 5, 6];

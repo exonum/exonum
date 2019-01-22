@@ -164,7 +164,7 @@ impl IndexAddress {
 // TODO: remove
 impl<'a> From<&'a str> for IndexAddress {
     fn from(name: &'a str) -> Self {
-        IndexAddress {
+        Self {
             name: name.to_owned(),
             bytes: None,
         }
@@ -174,7 +174,7 @@ impl<'a> From<&'a str> for IndexAddress {
 // TODO: remove
 impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     fn from((name, key): (&'a str, &'a K)) -> Self {
-        IndexAddress {
+        Self {
             name: name.to_owned(),
             bytes: Some(key_bytes(key)),
         }

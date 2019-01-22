@@ -67,7 +67,7 @@ pub struct ProofMapIndex<T: IndexAccess, K, V> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
-    base_iter: ViewIter<'a, ProofPath, V>,
+    base_iter: ViewIter<'a, Vec<u8>, V>,
     _k: PhantomData<K>,
 }
 
@@ -81,7 +81,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
-    base_iter: ViewIter<'a, ProofPath, ()>,
+    base_iter: ViewIter<'a, Vec<u8>, ()>,
     _k: PhantomData<K>,
 }
 
@@ -95,7 +95,7 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
-    base_iter: ViewIter<'a, ProofPath, V>,
+    base_iter: ViewIter<'a, Vec<u8>, V>,
 }
 
 enum RemoveAction {
@@ -132,7 +132,7 @@ impl<T: BinaryKey> ValuePath for T {
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
-    K: ProofMapKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash,
 {
     /// Creates a new index representation based on the name and storage view.
@@ -865,7 +865,7 @@ where
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
-    K: ProofMapKey,
+    K: BinaryKey + UniqueHash,
     V: BinaryValue + UniqueHash + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -903,7 +903,7 @@ where
         impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
         where
             T: IndexAccess,
-            K: ProofMapKey,
+            K: BinaryKey + UniqueHash,
             V: BinaryValue + UniqueHash + fmt::Debug,
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
