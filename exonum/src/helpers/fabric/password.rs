@@ -80,7 +80,7 @@ impl FromStr for PassInputMethod {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "" {
+        if s.is_empty() {
             return Ok(Default::default());
         }
 
@@ -89,12 +89,12 @@ impl FromStr for PassInputMethod {
         }
 
         if s.starts_with("env") {
-            let env_var = s.split(':').nth(1).map(|s| s.to_owned());
+            let env_var = s.split(':').nth(1).map(String::from);
             return Ok(PassInputMethod::EnvVariable(env_var));
         }
 
         if s.starts_with("pass") {
-            let pass = s.split(':').nth(1).unwrap_or("");
+            let pass = s.split(':').nth(1).unwrap_or_default();
             return Ok(PassInputMethod::CmdLineParameter(ZeroizeOnDrop(
                 pass.to_owned(),
             )));

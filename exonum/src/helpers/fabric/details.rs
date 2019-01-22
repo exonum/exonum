@@ -94,7 +94,7 @@ impl Run {
             SecretKeyType::Consensus => CONSENSUS_KEY_PASS_METHOD,
             SecretKeyType::Service => SERVICE_KEY_PASS_METHOD,
         };
-        ctx.arg(arg_key).unwrap_or_else(|_| "".into())
+        ctx.arg(arg_key).unwrap_or_default()
     }
 }
 
@@ -462,7 +462,7 @@ impl GenerateNodeConfig {
         secret_key_type: SecretKeyType,
     ) -> ZeroizeOnDrop<String> {
         if context.get_flag_occurrences(NO_PASSWORD).is_some() {
-            ZeroizeOnDrop("".to_owned())
+            ZeroizeOnDrop::default()
         } else {
             method.get_passphrase(secret_key_type, false)
         }
@@ -570,12 +570,12 @@ impl Command for GenerateNodeConfig {
             .into();
         let consensus_key_pass_method: PassInputMethod = context
             .arg::<String>(CONSENSUS_KEY_PASS_METHOD)
-            .unwrap_or_else(|_| "".to_owned())
+            .unwrap_or_default()
             .parse()
             .expect("expected correct passphrase input method for consensus key");
         let service_key_pass_method: PassInputMethod = context
             .arg::<String>(SERVICE_KEY_PASS_METHOD)
-            .unwrap_or_else(|_| "".to_owned())
+            .unwrap_or_default()
             .parse()
             .expect("expected correct passphrase input method for service key");
 

@@ -362,7 +362,7 @@ impl Iterator for RoundRangeIter {
 }
 
 /// Struct used to call zeroize on inner type on drop.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct ZeroizeOnDrop<T: Zeroize>(pub T);
 
 impl<T: Zeroize> Drop for ZeroizeOnDrop<T> {
