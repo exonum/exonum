@@ -21,7 +21,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Internal improvements
 
 - All Exonum crates have been updated to Rust 2018 edition. This means that
-  we require at least Rust 1.31 for compilation. (#1230)
+  it is required to use Rust 1.31 or newer for compilation. (#1230)
 
 #### exonum
 
