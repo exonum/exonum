@@ -32,7 +32,7 @@ Notice that the repository uses a set of linters for static analysis:
 - [clippy]
 - [cargo audit]
 - [cargo-deadlinks]
-- [rustfmt 0.9.0]
+- [rustfmt]
 - [cspell]
 - [markdownlint-cli]
 
@@ -105,7 +105,7 @@ but we have several additional conventions:
 [clippy]: https://github.com/rust-lang-nursery/rust-clippy
 [cargo audit]: https://github.com/RustSec/cargo-audit
 [cargo-deadlinks]: https://github.com/deadlinks/cargo-deadlinks
-[rustfmt 0.9.0]: https://github.com/rust-lang-nursery/rustfmt
+[rustfmt]: https://github.com/rust-lang-nursery/rustfmt
 [cspell]: https://github.com/Jason3S/cspell
 [markdownlint-cli]: https://github.com/igorshubovych/markdownlint-cli
 [Travis script]: .travis.yml
