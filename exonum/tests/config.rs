@@ -226,6 +226,10 @@ fn run_node(config: &str, folder: &str) {
         &full_tmp_name(config, folder),
         "-d",
         &full_tmp_folder(folder),
+        "--service-key-pass",
+        "env",
+        "--consensus-key-pass",
+        "env",
     ]));
 }
 
@@ -288,6 +292,9 @@ fn test_generate_config_ipv6() {
 fn test_generate_full_config_run() {
     let command = "finalize";
     let result = panic::catch_unwind(|| {
+        env::set_var(EXONUM_CONSENSUS_PASS, "");
+        env::set_var(EXONUM_SERVICE_PASS, "");
+
         fs::create_dir_all(full_tmp_name("", command)).expect("Can't create temp folder");
         for i in 0..PUB_CONFIG.len() {
             copy_file_to_temp(&format!("consensus{}.toml", i), command);

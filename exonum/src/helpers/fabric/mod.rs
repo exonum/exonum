@@ -39,6 +39,7 @@ mod maintenance;
 mod shared;
 #[macro_use]
 mod context_key;
+mod password;
 
 /// Default port value.
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
@@ -147,7 +148,7 @@ impl Argument {
 pub mod keys {
     use std::{collections::BTreeMap, path::PathBuf};
 
-    use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
+    use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig, NodeRunConfig};
     use super::ContextKey;
     use crate::node::NodeConfig;
 
@@ -189,6 +190,9 @@ pub mod keys {
     /// Auditor mode.
     /// Set by `finalize` command.
     pub const AUDITOR_MODE: ContextKey<bool> = context_key!("auditor_mode");
+
+    /// Configuration for starting node that is not stored in the `NodeConfig`.
+    pub const RUN_CONFIG: ContextKey<NodeRunConfig> = context_key!("run_config");
 }
 
 /// `Context` is a type, used to keep some values from `Command` into
