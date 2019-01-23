@@ -29,7 +29,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.31.0
+  - 1.32.0
 
 matrix:
   allow_failures:
