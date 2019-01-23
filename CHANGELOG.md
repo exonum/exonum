@@ -5,8 +5,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+- Several mutable indexes now can be create from immutable reference to `Fork` (#10)
+
 - Relaxed trait bounds for the `ProofMapIndex` keys (#7)
-  
+
   Now keys should just implement `BinaryKey` trait instead of the
   `ProofMapKey`, which will be ordered according to their binary
   representation, as in the `MapIndex`.

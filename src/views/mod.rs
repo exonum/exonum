@@ -53,7 +53,7 @@ impl ChangeSet for () {
     }
 }
 
-impl<'a> ChangeSet for ChangesRef<'a> {
+impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
     }
@@ -295,9 +295,9 @@ impl<T: IndexAccess> View<T> {
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        //TODO: revert
-        self.get_bytes(&key_bytes(key))
-            .map(|v| BinaryValue::from_bytes(Cow::Owned(v)).unwrap())
+        self.get_bytes(&key_bytes(key)).map(|v| {
+            BinaryValue::from_bytes(Cow::Owned(v)).expect("Error while deserializing value")
+        })
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -528,8 +528,11 @@ where
 
         if let Some((k, v)) = self.base_iter.next() {
             if k.starts_with(&self.prefix) {
-                //TODO: revert
-                return Some((K::read(k), V::from_bytes(Cow::Borrowed(v)).unwrap()));
+                return Some((
+                    K::read(k),
+                    V::from_bytes(Cow::Borrowed(v))
+                        .expect("Unable to decode value from bytes, an error occurred"),
+                ));
             }
         }
 

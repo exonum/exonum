@@ -115,6 +115,7 @@ roadmap
 rocksdb
 roughtime
 roundtrip
+rposition
 rtype
 runtimes
 rustfmt
@@ -136,6 +137,7 @@ structfield
 structs
 subcommand
 subcommands
+subprefix
 subsec
 supermajority
 supervisorctl
@@ -160,6 +162,7 @@ txvec
 tymethod
 unboxed
 unreceived
+unflushed
 unsync
 untagged
 usize

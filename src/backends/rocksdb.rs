@@ -23,7 +23,7 @@ pub use exonum_rocksdb::{
 use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
 use exonum_rocksdb::{
-    self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch,
+    self, utils::get_cf_names, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
 };
 
 use crate::{db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
@@ -100,6 +100,11 @@ impl RocksDB {
                     .create_cf(&cf_name, &DbOptions::default().into())
                     .unwrap(),
             };
+
+            for prefix in changes.removed_prefixes() {
+                self.remove_prefix(&mut batch, cf, &cf_name, prefix)?;
+            }
+
             for (key, change) in changes {
                 match change {
                     Change::Put(ref value) => batch.put_cf(cf, key.as_ref(), value)?,
@@ -108,6 +113,27 @@ impl RocksDB {
             }
         }
         self.db.write_opt(batch, w_opts).map_err(Into::into)
+    }
+
+    // Removes all keys with a specified prefix from a column family.
+    fn remove_prefix(
+        &self,
+        batch: &mut WriteBatch,
+        cf: ColumnFamily,
+        cf_name: &str,
+        prefix: &[u8],
+    ) -> crate::Result<()> {
+        let snapshot = self.snapshot();
+        let mut iterator = snapshot.iter(cf_name, prefix);
+        while let Some((key, ..)) = iterator.next() {
+            if !key.starts_with(prefix) {
+                break;
+            }
+
+            batch.delete_cf(cf, key)?;
+        }
+
+        Ok(())
     }
 }
 

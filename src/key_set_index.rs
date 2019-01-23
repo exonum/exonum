@@ -265,13 +265,13 @@ where
     }
 }
 
-impl<'r, T, K> ::std::iter::IntoIterator for &'r KeySetIndex<T, K>
+impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
 where
     T: IndexAccess,
     K: BinaryKey,
 {
     type Item = K::Owned;
-    type IntoIter = KeySetIndexIter<'r, K>;
+    type IntoIter = KeySetIndexIter<'a, K>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -312,21 +312,21 @@ mod tests {
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
     }
-    //
-    //    #[test]
-    //    fn u8_slice_key() {
-    //        let db = TemporaryDB::new();
-    //        let fork = db.fork();
-    //
-    //        const KEY: &[u8] = &[1, 2, 3];
-    //
-    //        let mut index: KeySetIndex<_, Vec<u8>> = fork.mount_root().named_child(INDEX_NAME).mount();
-    //        assert_eq!(false, index.contains(KEY));
-    //
-    //        index.insert(KEY.to_owned());
-    //        assert_eq!(true, index.contains(KEY));
-    //
-    //        index.remove(KEY);
-    //        assert_eq!(false, index.contains(KEY));
-    //    }
+
+    #[test]
+    fn u8_slice_key() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        const KEY: &[u8] = &[1, 2, 3];
+
+        let mut index: KeySetIndex<_, Vec<u8>> = KeySetIndex::new(INDEX_NAME, &fork);
+        assert_eq!(false, index.contains(KEY));
+
+        index.insert(KEY.to_owned());
+        assert_eq!(true, index.contains(KEY));
+
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
 }
