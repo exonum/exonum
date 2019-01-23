@@ -62,9 +62,9 @@ but we have several additional conventions:
 
 - Use [Rust 2018 edition].
 
-  * Avoid `extern crate` unless it is required.
+  - Avoid `extern crate` unless it is required.
 
-  * Avoid `mod.rs` files, simply use directories for nested modules.
+  - Avoid `mod.rs` files, simply use directories for nested modules.
 
 - Prefer [nested imports] whenever possible.
 
