@@ -704,7 +704,7 @@ where
                                 Change::Delete => unreachable!(),
                             },
                         )
-                    })
+                    });
                 }
                 NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();
@@ -731,7 +731,7 @@ where
                                 Change::Delete => unreachable!(),
                             },
                         )
-                    })
+                    });
                 }
                 NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();

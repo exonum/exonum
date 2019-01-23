@@ -15,22 +15,23 @@
 use std::collections::HashSet;
 
 use criterion::{
-    AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
+    black_box, AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
 use rand::{Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, ProofListIndex, ProofMapIndex,
-    TemporaryDB,
+    proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, MapIndex, ProofListIndex,
+    ProofMapIndex, TemporaryDB,
 };
 
 const NAME: &str = "name";
+const FAMILY: &str = "index_family";
 const SAMPLE_SIZE: usize = 10;
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 16] = [100; 16];
-const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
+const ITEM_COUNTS: [usize; 4] = [1_000, 10_000, 100_000, 1_000_000];
 
 fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
     let mut rng = XorShiftRng::from_seed(SEED);
@@ -55,6 +56,83 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
     };
 
     (0..len).map(kv_generator).collect::<Vec<_>>()
+}
+
+fn map_index_insert(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
+    b.iter_with_setup(TemporaryDB::default, |db| {
+        let mut fork = db.fork();
+        {
+            let mut table = MapIndex::new(NAME, &mut fork);
+            for item in &data {
+                table.put(&item.0, item.1.clone());
+            }
+        }
+        db.merge_sync(fork.into_patch()).unwrap();
+    });
+}
+
+fn map_index_with_family_insert(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
+    b.iter_with_setup(TemporaryDB::default, |db| {
+        let mut fork = db.fork();
+        {
+            let mut table = MapIndex::new_in_family(NAME, FAMILY, &mut fork);
+            for item in &data {
+                table.put(&item.0, item.1.clone());
+            }
+        }
+        db.merge_sync(fork.into_patch()).unwrap();
+    });
+}
+
+fn map_index_iter(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
+    let db = TemporaryDB::default();
+    let mut fork = db.fork();
+
+    let mut table = ProofMapIndex::new(NAME, &mut fork);
+    assert!(table.keys().next().is_none());
+    for item in &data {
+        table.put(&item.0, item.1.clone());
+    }
+    db.merge_sync(fork.into_patch()).unwrap();
+
+    b.iter_with_setup(
+        || db.snapshot(),
+        |snapshot| {
+            let index: ProofMapIndex<_, Vec<u8>, Vec<u8>> = ProofMapIndex::new(NAME, &snapshot);
+            for (key, value) in &index {
+                black_box(key);
+                black_box(value);
+            }
+        },
+    );
+}
+
+fn map_index_with_family_iter(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
+    let db = TemporaryDB::default();
+    let mut fork = db.fork();
+
+    let mut table = ProofMapIndex::new_in_family(NAME, FAMILY, &mut fork);
+    assert!(table.keys().next().is_none());
+    for item in &data {
+        table.put(&item.0, item.1.clone());
+    }
+    db.merge(fork.into_patch()).unwrap();
+
+    b.iter_with_setup(
+        || db.snapshot(),
+        |snapshot| {
+            let index: ProofMapIndex<_, Vec<u8>, Vec<u8>> =
+                ProofMapIndex::new_in_family(NAME, FAMILY, &snapshot);
+            for (key, value) in &index {
+                black_box(key);
+                black_box(value);
+            }
+        },
+    );
 }
 
 fn proof_list_append(b: &mut Bencher, len: usize) {
@@ -85,9 +163,8 @@ fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
     let db = TemporaryDB::default();
     b.iter_with_setup(
         || db.fork(),
-        |storage| {
-            let mut table = ProofMapIndex::new(NAME, &storage);
-            assert!(table.keys().next().is_none());
+        |mut storage| {
+            let mut table = ProofMapIndex::new(NAME, &mut storage);
             for item in &data {
                 table.put(&item.0, item.1.clone());
             }
@@ -100,13 +177,12 @@ fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     b.iter_with_setup(TemporaryDB::default, |db| {
         let fork = db.fork();
         {
-            let mut table = ProofMapIndex::new(NAME, &fork);
-            assert!(table.keys().next().is_none());
+            let mut table = ProofMapIndex::new(NAME, &mut fork);
             for item in &data {
                 table.put(&item.0, item.1.clone());
             }
         }
-        db.merge(fork.into_patch()).unwrap();
+        db.merge_sync(fork.into_patch()).unwrap();
     });
 }
 
@@ -176,6 +252,10 @@ where
 pub fn bench_storage(c: &mut Criterion) {
     exonum_crypto::init();
 
+    bench_fn(c, "plain_map/insert", map_index_insert);
+    bench_fn(c, "plain_map/iter", map_index_iter);
+    bench_fn(c, "plain_map_with_family/insert", map_index_with_family_insert);
+    bench_fn(c, "plain_map_with_family/iter", map_index_with_family_iter);
     bench_fn(c, "proof_list/append", proof_list_append);
     bench_fn(
         c,

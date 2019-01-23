@@ -236,7 +236,7 @@ where
                             "Invalid json: Key {} not found. \
                              Value: {:?}",
                             "left", json
-                        )))
+                        )));
                     }
                     Some(left) => left,
                 };
@@ -246,7 +246,7 @@ where
                             "Invalid json: Key {} not found. \
                              Value: {:?}",
                             "right", json
-                        )))
+                        )));
                     }
                     Some(right) => right,
                 };
@@ -303,7 +303,7 @@ where
                     "Invalid json: Number of keys should be \
                      either 1 or 2. json: {:?}",
                     json
-                )))
+                )));
             }
         };
         Ok(res)
