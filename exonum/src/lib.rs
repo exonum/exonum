@@ -67,6 +67,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate snow;
 extern crate term;
+extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;

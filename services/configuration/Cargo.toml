@@ -1,6 +1,6 @@
 [package]
 name = "exonum-configuration"
-version = "0.9.2"
+version = "0.9.3"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/doc/advanced/configuration-updater/"
 repository = "https://github.com/exonum/exonum"
@@ -17,16 +17,16 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 clap = "2.30.0"
-env_logger = "=0.5.10"
-exonum = { version = "0.9.5", path = "../../exonum" }
+env_logger = "0.5.10"
+exonum = { version = "0.9.7", path = "../../exonum" }
 failure = "0.1.2"
 lazy_static = "1.0.0"
-log = "=0.4.3"
+log = "0.4.3"
 serde = "1.0.10"
 serde_derive = "1.0.10"
-tempdir = "=0.3.7"
+tempdir = "0.3.7"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.9.2", path = "../../testkit" }
-pretty_assertions = "=0.5.1"
+exonum-testkit = { version = "0.9.4", path = "../../testkit" }
+pretty_assertions = "0.5.1"
 assert_matches = "1.2.0"

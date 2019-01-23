@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use futures::future::{done, Future};
-use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
+use tokio_codec::{Decoder, Framed};
+use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::io;
 
@@ -99,7 +100,7 @@ impl NoiseHandshake {
         stream: S,
     ) -> Result<Framed<S, MessagesCodec>, io::Error> {
         let noise = self.noise.into_transport_mode()?;
-        let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
+        let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
         Ok(framed)
     }
 }

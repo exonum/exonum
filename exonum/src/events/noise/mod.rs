@@ -24,9 +24,8 @@ pub use self::wrappers::sodium_wrapper::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use futures::future::Future;
-use tokio_io::{
-    codec::Framed, io::{read_exact, write_all}, AsyncRead, AsyncWrite,
-};
+use tokio_codec::Framed;
+use tokio_io::{io::{read_exact, write_all}, AsyncRead, AsyncWrite};
 
 use std::io;
 
