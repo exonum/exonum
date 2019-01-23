@@ -16,14 +16,14 @@
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
-use blockchain::{
+use crate::blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
-use crypto::{gen_keypair, Hash};
-use helpers::{Height, ValidatorId};
-use messages::{Message, RawTransaction};
-use proto;
-use storage::{Database, Error, Fork, ListIndex, Snapshot};
+use crate::crypto::{gen_keypair, Hash};
+use crate::helpers::{Height, ValidatorId};
+use crate::messages::{Message, RawTransaction};
+use crate::proto;
+use crate::storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -163,12 +163,10 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 
 mod transactions_tests {
     use super::TEST_SERVICE_ID;
-    use blockchain::{ExecutionResult, Transaction, TransactionContext};
-    use crypto::gen_keypair;
-    use messages::Message;
-    use serde_json;
-
-    use proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
+    use crate::blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
+    use crate::crypto::gen_keypair;
+    use crate::messages::Message;
+    use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
@@ -251,8 +249,6 @@ mod transactions_tests {
 
     #[test]
     fn deserialize_from_raw() {
-        use blockchain::TransactionSet;
-
         fn round_trip<T: Into<MyTransactions>>(t: T) {
             let (pk, sec_key) = gen_keypair();
             use std::ops::Deref;
@@ -364,11 +360,12 @@ fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<dyn Databa
 }
 
 mod memorydb_tests {
-    use blockchain::{Blockchain, Service};
-    use crypto::gen_keypair;
     use futures::sync::mpsc;
-    use node::ApiSender;
-    use storage::{Database, MemoryDB};
+
+    use crate::blockchain::{Blockchain, Service};
+    use crate::crypto::gen_keypair;
+    use crate::node::ApiSender;
+    use crate::storage::{Database, MemoryDB};
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 
@@ -437,13 +434,15 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
-    use blockchain::{Blockchain, Service};
-    use crypto::gen_keypair;
     use futures::sync::mpsc;
-    use node::ApiSender;
-    use std::path::Path;
-    use storage::{Database, DbOptions, RocksDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::blockchain::{Blockchain, Service};
+    use crate::crypto::gen_keypair;
+    use crate::node::ApiSender;
+    use crate::storage::{Database, DbOptions, RocksDB};
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 

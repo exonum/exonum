@@ -46,7 +46,6 @@ pub use self::{
 pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
-use failure;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -54,11 +53,11 @@ use std::{
     sync::Arc,
 };
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use helpers::{Height, Round, ValidatorId};
-use messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
-use node::ApiSender;
-use storage::{self, Database, Error, Fork, Patch, Snapshot};
+use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
+use crate::node::ApiSender;
+use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
 
 mod block;
 mod genesis;

@@ -16,19 +16,14 @@
 //! integration test, with the difference that the balance of each created wallet increases by 1
 //! on each block. Correspondingly, the initial wallet balance is set to 0.
 
-extern crate exonum;
+#[macro_use]
+extern crate exonum_derive;
 #[macro_use]
 extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
-extern crate rand;
 #[macro_use]
 extern crate serde_derive;
-extern crate hex;
-#[macro_use]
-extern crate exonum_derive;
-extern crate protobuf;
-
 #[macro_use]
 extern crate serde_json;
 
@@ -41,7 +36,7 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 
-use inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
+use crate::inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
 
 mod inflating_cryptocurrency;
 mod proto;

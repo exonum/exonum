@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{CryptoHash, Hash};
+use crate::crypto::{CryptoHash, Hash};
 
 /// A common trait for the ability to compute a unique hash.
 ///

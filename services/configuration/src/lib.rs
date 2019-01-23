@@ -60,7 +60,6 @@
     bare_trait_objects
 )]
 
-extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
@@ -71,7 +70,6 @@ extern crate lazy_static;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-
 #[cfg(test)]
 #[macro_use]
 extern crate assert_matches;
@@ -81,13 +79,12 @@ extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-extern crate protobuf;
-extern crate serde_json;
-extern crate toml;
 
-pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
-pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
+pub use crate::{
+    errors::ErrorCode,
+    schema::{MaybeVote, ProposeData, Schema, VotingDecision},
+    transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst},
+};
 
 use serde_json::{to_value, Value};
 
@@ -101,8 +98,10 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
-use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
-use config::ConfigurationServiceConfig;
+use crate::{
+    cmd::{Finalize, GenerateCommonConfig, GenerateTestnet},
+    config::ConfigurationServiceConfig,
+};
 
 mod api;
 mod cmd;

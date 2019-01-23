@@ -23,7 +23,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use super::{Fork, Iter, Snapshot, StorageKey, StorageValue};
-use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
+use crate::storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -308,7 +308,7 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
 /// and underscores.
 fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref().as_bytes().iter().all(|c| match *c {
-        48...57 | 65...90 | 97...122 | 95 | 46 => true,
+        48..=57 | 65..=90 | 97..=122 | 95 | 46 => true,
         _ => false,
     })
 }

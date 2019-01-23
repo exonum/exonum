@@ -18,9 +18,6 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-extern crate exonum;
-extern crate exonum_cryptocurrency_advanced as cryptocurrency;
-extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
@@ -32,7 +29,7 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::{
+use exonum_cryptocurrency_advanced::{
     api::{WalletInfo, WalletQuery},
     transactions::{CreateWallet, Transfer},
     wallet::Wallet,
@@ -40,7 +37,7 @@ use cryptocurrency::{
 };
 
 // Imports shared test constants.
-use constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME};
 
 mod constants;
 

@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use super::NodeHandler;
-use blockchain::Schema;
-use messages::{
+use crate::blockchain::Schema;
+use crate::messages::{
     BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
     TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
     TRANSACTION_RESPONSE_EMPTY_SIZE,

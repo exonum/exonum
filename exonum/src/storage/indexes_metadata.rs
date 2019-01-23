@@ -14,13 +14,13 @@
 
 #![allow(unsafe_code)]
 
-use serde_json::{self, Error as JsonError};
+use serde_json::Error as JsonError;
 
 use std::fmt;
 
-use crypto::{self, CryptoHash, Hash};
-use proto::{self, ProtobufConvert};
-use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
+use crate::crypto::{self, CryptoHash, Hash};
+use crate::proto::{self, ProtobufConvert};
+use crate::storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -195,8 +195,10 @@ mod tests {
         IndexMetadata, IndexType, StorageMetadata, CORE_STORAGE_METADATA,
         CORE_STORAGE_METADATA_KEY, INDEXES_METADATA_TABLE_NAME,
     };
-    use crypto::{Hash, PublicKey};
-    use storage::{base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
+    use crate::crypto::{Hash, PublicKey};
+    use crate::storage::{
+        base_index::BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex,
+    };
 
     #[test]
     fn index_metadata_roundtrip() {

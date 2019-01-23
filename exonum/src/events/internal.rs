@@ -23,7 +23,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use messages::{Message, SignedMessage};
+use crate::messages::{Message, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -116,7 +116,7 @@ mod tests {
     use std::thread;
 
     use super::*;
-    use crypto::{gen_keypair, Signature};
+    use crate::crypto::{gen_keypair, Signature};
 
     fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);

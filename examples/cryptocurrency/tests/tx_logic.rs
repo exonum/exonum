@@ -18,11 +18,8 @@
 //! Note how business logic tests use `TestKit::create_block*` methods to send transactions,
 //! the service schema to make assertions about the storage state.
 
-extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate rand;
 
 use exonum::{
     crypto::{self, PublicKey, SecretKey},
@@ -31,14 +28,14 @@ use exonum::{
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::{
+use exonum_cryptocurrency::{
     schema::{CurrencySchema, Wallet},
     service::CurrencyService,
     transactions::{TxCreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
-use constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME};
 
 mod constants;
 

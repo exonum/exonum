@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},

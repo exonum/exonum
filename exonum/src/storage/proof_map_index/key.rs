@@ -15,8 +15,8 @@
 use std::cmp::{min, Ordering};
 use std::ops;
 
-use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
-use storage::StorageKey;
+use crate::crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
+use crate::storage::StorageKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
@@ -57,10 +57,10 @@ where
     /// The buffer is guaranteed to have size [`PROOF_MAP_KEY_SIZE`].
     ///
     /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-    fn write_key(&self, &mut [u8]);
+    fn write_key(&self, key: &mut [u8]);
 
     /// Reads this key from the buffer.
-    fn read_key(&[u8]) -> Self::Output;
+    fn read_key(key: &[u8]) -> Self::Output;
 }
 
 /// A trait denoting that a certain storage value is suitable for use as a key for
@@ -472,8 +472,8 @@ impl PartialOrd for ProofPath {
 
 #[cfg(test)]
 mod tests {
-    use rand::{self, Rng};
-    use serde_json::{self, Value};
+    use rand::Rng;
+    use serde_json::Value;
 
     use super::*;
 

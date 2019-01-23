@@ -23,20 +23,14 @@
     bare_trait_objects
 )]
 
-extern crate chrono;
-extern crate exonum;
-extern crate exonum_time;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate protobuf;
-extern crate serde_json;
 
 pub mod api;
 pub mod proto;
@@ -52,9 +46,7 @@ use exonum::{
     storage::Snapshot,
 };
 
-use api::PublicApi;
-use schema::Schema;
-use transactions::TimeTransactions;
+use crate::{api::PublicApi, schema::Schema, transactions::TimeTransactions};
 
 const TIMESTAMPING_SERVICE: u16 = 130;
 const SERVICE_NAME: &str = "timestamping";

@@ -4,7 +4,7 @@ use hex::{FromHex, ToHex};
 use std::fmt;
 
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
-use crypto::{
+use crate::crypto::{
     self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
 };
 
@@ -24,7 +24,7 @@ use crypto::{
 /// as every `SignedMessage` instance is guaranteed to have a correct signature.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SignedMessage {
-    pub(in messages) raw: Vec<u8>,
+    pub(in crate::messages) raw: Vec<u8>,
 }
 
 impl SignedMessage {
@@ -94,28 +94,28 @@ impl SignedMessage {
     }
 
     /// Returns `PublicKey` of message author.
-    pub(in messages) fn author(&self) -> PublicKey {
+    pub(in crate::messages) fn author(&self) -> PublicKey {
         PublicKey::from_slice(&self.raw[0..PUBLIC_KEY_LENGTH]).expect("Couldn't read PublicKey")
     }
 
     /// Returns message class, which is an ID inside protocol.
-    pub(in messages) fn message_class(&self) -> u8 {
+    pub(in crate::messages) fn message_class(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH]
     }
 
     /// Returns message type, which is an ID inside some class of messages.
-    pub(in messages) fn message_type(&self) -> u8 {
+    pub(in crate::messages) fn message_type(&self) -> u8 {
         self.raw[PUBLIC_KEY_LENGTH + 1]
     }
 
     /// Returns serialized payload of the message.
-    pub(in messages) fn payload(&self) -> &[u8] {
+    pub(in crate::messages) fn payload(&self) -> &[u8] {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         &self.raw[PUBLIC_KEY_LENGTH + 2..sign_idx]
     }
 
     /// Returns ed25519 signature for this message.
-    pub(in messages) fn signature(&self) -> Signature {
+    pub(in crate::messages) fn signature(&self) -> Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         Signature::from_slice(&self.raw[sign_idx..]).expect("Couldn't read signature")
     }

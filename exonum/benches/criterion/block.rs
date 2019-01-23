@@ -77,7 +77,7 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
     RocksDB::open(tempdir.path(), &options).unwrap()
 }
 
-fn create_blockchain(db: impl Database, services: Vec<Box<Service>>) -> Blockchain {
+fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Blockchain {
     use exonum::{
         blockchain::{GenesisConfig, ValidatorKeys},
         crypto,
@@ -132,7 +132,7 @@ mod timestamping {
             "timestamping"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             Vec::new()
         }
 
@@ -237,7 +237,7 @@ mod cryptocurrency {
             "cryptocurrency"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             Vec::new()
         }
 
@@ -532,7 +532,7 @@ fn execute_block_rocksdb(
 }
 
 pub fn bench_block(criterion: &mut Criterion) {
-    use log::{self, LevelFilter};
+    use log::LevelFilter;
     use std::panic;
 
     log::set_max_level(LevelFilter::Off);

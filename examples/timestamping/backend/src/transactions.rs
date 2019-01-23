@@ -26,8 +26,10 @@ use exonum::{
 use exonum_time::schema::TimeSchema;
 
 use super::proto;
-use schema::{Schema, Timestamp, TimestampEntry};
-use TIMESTAMPING_SERVICE;
+use crate::{
+    schema::{Schema, Timestamp, TimestampEntry},
+    TIMESTAMPING_SERVICE,
+};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]

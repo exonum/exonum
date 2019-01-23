@@ -20,19 +20,8 @@
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
-extern crate byteorder;
-extern crate chrono;
-extern crate hex;
-extern crate hex_buffer_serde;
-extern crate pwbox;
-extern crate rand;
-extern crate rust_decimal;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate toml;
-extern crate uuid;
 
 #[doc(inline)]
 pub use self::crypto_impl::{
@@ -687,7 +676,6 @@ mod tests {
     use super::*;
 
     use serde::de::DeserializeOwned;
-    use serde_json;
 
     use hex::FromHex;
 

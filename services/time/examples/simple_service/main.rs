@@ -14,19 +14,12 @@
 
 //! Service, which uses the time oracle.
 
-extern crate chrono;
-extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate exonum_time;
-extern crate serde;
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
-extern crate failure;
-extern crate protobuf;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -52,14 +45,14 @@ pub struct MarkerSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<Snapshot>> MarkerSchema<T> {
+impl<T: AsRef<dyn Snapshot>> MarkerSchema<T> {
     /// Constructs schema for the given `snapshot`.
     pub fn new(view: T) -> Self {
         MarkerSchema { view }
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
-    pub fn marks(&self) -> ProofMapIndex<&Snapshot, PublicKey, i32> {
+    pub fn marks(&self) -> ProofMapIndex<&dyn Snapshot, PublicKey, i32> {
         ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view.as_ref())
     }
 
@@ -125,7 +118,7 @@ impl Service for MarkerService {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = MarkerSchema::new(snapshot);
         schema.state_hash()
     }
@@ -134,7 +127,7 @@ impl Service for MarkerService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = MarkerTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate exonum_time;
-
 use exonum::helpers::fabric::NodeBuilder;
-
 use exonum_time::TimeServiceFactory;
 
 fn main() {

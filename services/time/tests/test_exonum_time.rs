@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate chrono;
-extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate exonum_time;
 #[macro_use]
 extern crate pretty_assertions;
 
@@ -36,7 +33,7 @@ use exonum_time::{
 
 use std::{collections::HashMap, iter::FromIterator};
 
-fn assert_storage_times_eq<T: AsRef<Snapshot>>(
+fn assert_storage_times_eq<T: AsRef<dyn Snapshot>>(
     snapshot: T,
     validators: &[TestNode],
     expected_current_time: Option<DateTime<Utc>>,
@@ -57,7 +54,7 @@ fn assert_storage_times_eq<T: AsRef<Snapshot>>(
     }
 }
 
-fn assert_transaction_result<S: AsRef<Snapshot>>(
+fn assert_transaction_result<S: AsRef<dyn Snapshot>>(
     snapshot: S,
     transaction: &Signed<RawTransaction>,
     expected_code: u8,
@@ -307,7 +304,7 @@ fn test_mock_provider() {
         .create();
 
     let validators = testkit.network().validators().to_vec();
-    let assert_storage_times = |snapshot: Box<Snapshot>| {
+    let assert_storage_times = |snapshot: Box<dyn Snapshot>| {
         assert_storage_times_eq(
             snapshot,
             &validators,

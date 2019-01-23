@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
-extern crate failure;
-extern crate protobuf;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
@@ -77,7 +73,7 @@ impl Service for TimestampingService {
         "timestamping"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -85,7 +81,7 @@ impl Service for TimestampingService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimestampingServiceTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

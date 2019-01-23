@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use blockchain::Blockchain;
-use crypto::{PublicKey, SecretKey};
-use node::ApiSender;
-use storage::Snapshot;
+use crate::blockchain::Blockchain;
+use crate::crypto::{PublicKey, SecretKey};
+use crate::node::ApiSender;
+use crate::storage::Snapshot;
 
 /// Provides the current blockchain state to API handlers.
 ///

@@ -27,14 +27,14 @@ use std::{
     slice,
 };
 
-use blockchain::{
+use crate::blockchain::{
     Block, Blockchain, Schema, TransactionError, TransactionErrorType, TransactionMessage,
     TransactionResult, TxLocation,
 };
-use crypto::{CryptoHash, Hash};
-use helpers::Height;
-use messages::{Precommit, RawTransaction, Signed};
-use storage::{ListProof, Snapshot};
+use crate::crypto::{CryptoHash, Hash};
+use crate::helpers::Height;
+use crate::messages::{Precommit, RawTransaction, Signed};
+use crate::storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
 type ParseResult = Result<TransactionMessage, failure::Error>;

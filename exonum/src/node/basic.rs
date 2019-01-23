@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{self, Rng};
+use rand::Rng;
 
 use super::{NodeHandler, NodeRole, RequestData};
-use crypto::PublicKey;
-use events::error::LogError;
-use events::network::ConnectedPeerAddr;
-use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
+use crate::crypto::PublicKey;
+use crate::events::error::LogError;
+use crate::events::network::ConnectedPeerAddr;
+use crate::helpers::Height;
+use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.

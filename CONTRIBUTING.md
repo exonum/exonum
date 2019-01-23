@@ -32,7 +32,7 @@ Notice that the repository uses a set of linters for static analysis:
 - [clippy]
 - [cargo audit]
 - [cargo-deadlinks]
-- [rustfmt 0.9.0]
+- [rustfmt]
 - [cspell]
 - [markdownlint-cli]
 
@@ -60,13 +60,20 @@ but we have several additional conventions:
   Public method should be documented, but meaningful parameter names are also
   helpful for better understanding.
 
+- Use [Rust 2018 edition].
+
+  - Avoid `extern crate` unless it is required.
+
+  - Avoid `mod.rs` files, simply use directories for nested modules.
+
 - Prefer [nested imports] whenever possible.
 
 - Don't try to minimize imports scope (for example don't put it inside a
   function), place them at the beginning of the file.
 
-- Avoid leading `::` in the type names (for example `::std::path::Path`),
-  instead import a type and use a shorter form:
+- Prefer importing a type name instead of using fully-qualified names.
+  For example, avoid writing `std::path::Path` in code, instead import
+  a type and use a shorter form:
 
   ```rust
   // Import type:
@@ -78,7 +85,7 @@ but we have several additional conventions:
 
 - Modules and imports (`use`) should be in the following order:
 
-  - `extern crate`s.
+  - `extern crate`s (if you really need them).
   - Reexporting (`pub use`).
   - Public modules (`pub mod`).
   - Imports (`use`):
@@ -98,8 +105,9 @@ but we have several additional conventions:
 [clippy]: https://github.com/rust-lang-nursery/rust-clippy
 [cargo audit]: https://github.com/RustSec/cargo-audit
 [cargo-deadlinks]: https://github.com/deadlinks/cargo-deadlinks
-[rustfmt 0.9.0]: https://github.com/rust-lang-nursery/rustfmt
+[rustfmt]: https://github.com/rust-lang-nursery/rustfmt
 [cspell]: https://github.com/Jason3S/cspell
 [markdownlint-cli]: https://github.com/igorshubovych/markdownlint-cli
 [Travis script]: .travis.yml
 [nested imports]: http://rust-lang.github.io/rfcs/2128-use-nested-groups.html
+[Rust 2018 edition]: https://rust-lang-nursery.github.io/edition-guide/rust-2018/index.html

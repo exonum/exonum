@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use failure::{self, Error};
+use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
@@ -41,28 +41,28 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use api::{
+use crate::api::{
     backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
     ApiAccess, ApiAggregator,
 };
-use blockchain::{
+use crate::blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
-use crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
-use events::{
+use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
     HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
     NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
-use helpers::{
+use crate::helpers::{
     config::ConfigManager,
     fabric::{NodePrivateConfig, NodePublicConfig},
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
-use messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
-use node::state::SharedConnectList;
-use storage::{Database, DbOptions};
+use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
+use crate::node::state::SharedConnectList;
+use crate::storage::{Database, DbOptions};
 
 mod basic;
 mod connect_list;
@@ -1108,14 +1108,15 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{
+    use crate::blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     };
-    use crypto::gen_keypair;
-    use events::EventHandler;
-    use helpers;
-    use proto::{schema::tests::TxSimple, ProtobufConvert};
-    use storage::{Database, MemoryDB, Snapshot};
+    use crate::crypto::gen_keypair;
+    use crate::events::EventHandler;
+    use crate::helpers;
+    use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
+    use crate::storage::{Database, MemoryDB, Snapshot};
+
     const SERVICE_ID: u16 = 0;
 
     #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]

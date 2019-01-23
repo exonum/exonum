@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use toml::Value;
 
 use exonum::{
@@ -25,8 +24,7 @@ use exonum::{
 
 use std::collections::BTreeMap;
 
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
+use crate::{config::ConfigurationServiceConfig, errors::Error as ServiceError};
 
 pub struct GenerateCommonConfig;
 

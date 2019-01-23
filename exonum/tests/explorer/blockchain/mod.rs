@@ -14,10 +14,7 @@
 
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
-extern crate failure;
-extern crate futures;
-
-use self::futures::sync::mpsc;
+use futures::sync::mpsc;
 
 use exonum::{
     blockchain::{
@@ -104,11 +101,11 @@ impl Service for MyService {
         "my-service"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         ExplorerTransactions::tx_from_raw(raw).map(ExplorerTransactions::into)
     }
 }

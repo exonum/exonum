@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 
 use exonum::{api, blockchain::Schema, crypto::PublicKey};
 
-use TimeSchema;
+use crate::TimeSchema;
 
 /// Structure for saving public key of the validator and last known local time.
 #[derive(Debug, Serialize, Deserialize)]

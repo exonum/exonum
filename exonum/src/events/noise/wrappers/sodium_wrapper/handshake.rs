@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use futures::future::{done, Future};
 use tokio_codec::{Decoder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -20,17 +19,19 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use std::net::SocketAddr;
 
 use super::wrapper::NoiseWrapper;
-use crypto::{
-    x25519::{self, into_x25519_keypair, into_x25519_public_key},
-    PublicKey, SecretKey,
+use crate::{
+    crypto::{
+        x25519::{self, into_x25519_keypair, into_x25519_public_key},
+        PublicKey, SecretKey,
+    },
+    events::{
+        codec::MessagesCodec,
+        noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+    },
+    messages::{Connect, Signed},
+    node::state::SharedConnectList,
+    storage::StorageValue,
 };
-use events::{
-    codec::MessagesCodec,
-    noise::{Handshake, HandshakeRawMessage, HandshakeResult},
-};
-use messages::{Connect, Signed};
-use node::state::SharedConnectList;
-use storage::StorageValue;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]

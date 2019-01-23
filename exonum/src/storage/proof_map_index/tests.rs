@@ -13,13 +13,12 @@
 // limitations under the License.
 
 use rand::{
-    self,
     distributions::Alphanumeric,
     seq::{IteratorRandom, SliceRandom},
     Rng, RngCore, SeedableRng,
 };
 use rand_xorshift::XorShiftRng;
-use serde_json;
+use serde::{de::DeserializeOwned, Serialize};
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
@@ -29,10 +28,9 @@ use super::{
     proof::MapProofBuilder,
     HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
-use crypto::{hash, CryptoHash, Hash, HashStream};
-use proto;
-use serde::{de::DeserializeOwned, Serialize};
-use storage::{Database, Fork, StorageValue};
+use crate::crypto::{hash, CryptoHash, Hash, HashStream};
+use crate::proto;
+use crate::storage::{Database, Fork, StorageValue};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -1393,9 +1391,11 @@ macro_rules! common_tests {
 }
 
 mod memorydb_tests {
-    use std::path::Path;
-    use storage::{Database, MemoryDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::storage::{Database, MemoryDB};
 
     fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
@@ -1405,9 +1405,11 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
-    use std::path::Path;
-    use storage::{Database, DbOptions, RocksDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::storage::{Database, DbOptions, RocksDB};
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();

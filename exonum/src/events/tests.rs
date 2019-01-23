@@ -22,18 +22,19 @@ use std::{
     time::{self, Duration, SystemTime},
 };
 
-use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use env_logger;
-use events::{
+use crate::blockchain::ConsensusConfig;
+use crate::crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crate::events::{
     error::log_error,
     network::{NetworkConfiguration, NetworkPart},
     noise::HandshakeParams,
     NetworkEvent, NetworkRequest,
 };
-use helpers::user_agent;
-use messages::{Connect, Message, Signed, SignedMessage};
-use node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel};
+use crate::helpers::user_agent;
+use crate::messages::{Connect, Message, Signed, SignedMessage};
+use crate::node::{
+    state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel,
+};
 
 #[derive(Debug)]
 pub struct TestHandler {

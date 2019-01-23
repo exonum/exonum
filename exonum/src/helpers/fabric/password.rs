@@ -14,12 +14,12 @@
 
 //! This module contains utilities for passphrase entry.
 
-use failure;
+use failure::bail;
 use rpassword::read_password_from_tty;
 
 use std::{env, io, str::FromStr};
 
-use helpers::ZeroizeOnDrop;
+use crate::helpers::ZeroizeOnDrop;
 
 /// Passphrase input methods
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -130,10 +130,10 @@ fn prompt_passphrase(prompt: &str, node_run: bool) -> io::Result<ZeroizeOnDrop<S
 
 #[cfg(test)]
 mod tests {
-    use helpers::ZeroizeOnDrop;
     use std::str::FromStr;
 
     use super::PassInputMethod;
+    use crate::helpers::ZeroizeOnDrop;
 
     #[test]
     fn test_pass_input_method_parse() {

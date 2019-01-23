@@ -14,18 +14,19 @@
 
 //! Tests in this module are designed to test configuration change protocol.
 
-use blockchain::Schema;
-use crypto::CryptoHash;
-use helpers::{Height, ValidatorId};
-use sandbox::{config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::blockchain::Schema;
+use crate::crypto::CryptoHash;
+use crate::helpers::{Height, ValidatorId};
+use crate::sandbox::{
+    config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*,
+};
+use crate::storage::StorageValue;
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus
 /// - node continues as `full node`
 #[test]
 fn test_exclude_validator_from_consensus() {
-    use storage::StorageValue;
-
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
@@ -55,8 +56,6 @@ fn test_exclude_validator_from_consensus() {
 /// - idea of the test is check configurations method from schema
 #[test]
 fn test_schema_config_changes() {
-    use storage::StorageValue;
-
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 

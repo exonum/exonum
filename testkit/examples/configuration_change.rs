@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate exonum_testkit;
-extern crate serde;
-extern crate serde_json;
-
 use exonum::{
     blockchain::Schema,
     crypto::CryptoHash,

@@ -20,11 +20,11 @@ use rand::{thread_rng, Rng};
 
 use std::collections::BTreeMap;
 
-use blockchain::{Blockchain, Schema, CORE_SERVICE};
-use crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
-use helpers::{Height, Round, ValidatorId};
-use messages::{Precommit, Signed};
-use sandbox::{
+use crate::blockchain::{Blockchain, Schema, CORE_SERVICE};
+use crate::crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SEED_LENGTH};
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{Precommit, Signed};
+use crate::sandbox::{
     sandbox::{self, timestamping_sandbox},
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},

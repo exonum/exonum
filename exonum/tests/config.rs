@@ -13,12 +13,11 @@
 // limitations under the License.
 
 // This is a regression test for exonum configuration.
-extern crate exonum;
+
 #[macro_use]
 extern crate pretty_assertions;
 #[macro_use]
 extern crate serde_derive;
-extern crate toml;
 
 use exonum::{
     api::backends::actix::AllowOrigin,
@@ -185,7 +184,7 @@ fn override_validators_count(config: &str, n: usize, folder: &str) {
 
         let mut value = contents.as_str().parse::<Value>().unwrap();
         {
-            let mut count = value
+            let count = value
                 .get_mut("common")
                 .unwrap()
                 .get_mut("general_config")

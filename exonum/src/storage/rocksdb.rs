@@ -16,13 +16,16 @@
 
 //! An implementation of `RocksDB` database.
 
-pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
-
-use rocksdb::{self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch};
+pub use crate::rocksdb::{
+    BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions,
+};
 
 use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
+use crate::rocksdb::{
+    self, utils::get_cf_names, DBIterator, Options as RocksDbOptions, WriteBatch,
+};
+use crate::storage::{self, db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
 impl From<rocksdb::Error> for storage::Error {
     fn from(err: rocksdb::Error) -> Self {
@@ -134,7 +137,7 @@ impl Snapshot for RocksDBSnapshot {
     }
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        use rocksdb::{Direction, IteratorMode};
+        use crate::rocksdb::{Direction, IteratorMode};
         let iter = match self.db.cf_handle(name) {
             Some(cf) => self
                 .snapshot

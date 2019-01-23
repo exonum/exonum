@@ -16,15 +16,14 @@
 
 use actix::*;
 use actix_web::ws;
-use serde_json;
 
-use rand::{self, rngs::ThreadRng, Rng};
+use rand::{rngs::ThreadRng, Rng};
 
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
-use api::ServiceApiState;
-use blockchain::Schema;
-use crypto::Hash;
+use crate::api::ServiceApiState;
+use crate::blockchain::Schema;
+use crate::crypto::Hash;
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]

@@ -21,14 +21,15 @@ pub mod fabric;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
-use crypto::gen_keypair;
+
 use env_logger::Builder;
 use log::SetLoggerError;
 
 use std::path::{Component, Path, PathBuf};
 
-use blockchain::{GenesisConfig, ValidatorKeys};
-use node::{ConnectListConfig, NodeConfig};
+use crate::blockchain::{GenesisConfig, ValidatorKeys};
+use crate::crypto::gen_keypair;
+use crate::node::{ConnectListConfig, NodeConfig};
 
 mod types;
 

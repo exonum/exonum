@@ -18,21 +18,24 @@ use actix::Arbiter;
 use actix_web::{http, ws};
 use chrono::{DateTime, Utc};
 use futures::IntoFuture;
-use serde_json;
 
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
-use api::{
-    backends::actix::{self, FutureResponse, HttpRequest, RawHandler, RequestHandler},
-    websocket::{Server, Session},
-    Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+use crate::{
+    api::{
+        backends::actix::{
+            self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
+        },
+        websocket::{Server, Session},
+        Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+    },
+    blockchain::{Block, SharedNodeState},
+    crypto::Hash,
+    explorer::{self, BlockchainExplorer, TransactionInfo},
+    helpers::Height,
+    messages::{Message, Precommit, RawTransaction, Signed, SignedMessage},
 };
-use blockchain::{Block, SharedNodeState};
-use crypto::Hash;
-use explorer::{self, BlockchainExplorer, TransactionInfo};
-use helpers::Height;
-use messages::{Message, Precommit, RawTransaction, Signed, SignedMessage};
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -206,8 +209,8 @@ impl ExplorerApi {
         state: &ServiceApiState,
         query: TransactionHex,
     ) -> Result<TransactionResponse, ApiError> {
-        use events::error::into_failure;
-        use messages::ProtocolMessage;
+        use crate::events::error::into_failure;
+        use crate::messages::ProtocolMessage;
 
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
         let signed = SignedMessage::from_raw_buffer(buf)?;
@@ -224,7 +227,7 @@ impl ExplorerApi {
     /// Subscribes to block commits events.
     pub fn handle_subscribe(
         name: &'static str,
-        backend: &mut actix::ApiBuilder,
+        backend: &mut actix_backend::ApiBuilder,
         service_api_state: ServiceApiState,
         shared_node_state: SharedNodeState,
     ) {

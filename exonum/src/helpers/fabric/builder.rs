@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ctrlc;
-
 use std::{
     collections::HashMap,
     ffi::OsString,
@@ -32,8 +30,9 @@ use super::{
     password::{PassInputMethod, SecretKeyType},
     CommandName, Context, ServiceFactory,
 };
-use blockchain::Service;
-use node::{ExternalMessage, Node};
+
+use crate::blockchain::Service;
+use crate::node::{ExternalMessage, Node};
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.

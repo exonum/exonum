@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use futures::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
@@ -23,7 +22,6 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
 use tokio_core::reactor::Handle;
 
-use tokio_dns;
 use tokio_retry::{
     strategy::{jitter, FixedInterval},
     Retry,
@@ -32,15 +30,17 @@ use tokio_retry::{
 use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
 
 use super::{error::log_error, to_box};
-use crypto::PublicKey;
-use events::{
-    codec::MessagesCodec,
-    error::into_failure,
-    noise::{Handshake, HandshakeParams, NoiseHandshake},
+use crate::{
+    crypto::PublicKey,
+    events::{
+        codec::MessagesCodec,
+        error::into_failure,
+        noise::{Handshake, HandshakeParams, NoiseHandshake},
+    },
+    helpers::Milliseconds,
+    messages::{Connect, Message, Service, Signed, SignedMessage},
+    node::state::SharedConnectList,
 };
-use helpers::Milliseconds;
-use messages::{Connect, Message, Service, Signed, SignedMessage};
-use node::state::SharedConnectList;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 

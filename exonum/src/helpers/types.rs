@@ -16,9 +16,10 @@
 
 use std::{fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 
-use crypto::{CryptoHash, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
+
+use crate::crypto::{CryptoHash, Hash};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;

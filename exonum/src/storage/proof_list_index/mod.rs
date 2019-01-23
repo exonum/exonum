@@ -24,7 +24,7 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::{hash, Hash, HashStream};
+use crate::crypto::{hash, Hash, HashStream};
 
 mod key;
 mod proof;

@@ -15,12 +15,9 @@
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 use bit_vec::BitVec;
-use chrono;
-use env_logger;
-use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
+use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    self,
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
     iter::FromIterator,
@@ -34,27 +31,29 @@ use super::{
     config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
     timestamping::TimestampingService,
 };
-use blockchain::{
-    Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-    SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+use crate::{
+    blockchain::{
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+        SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+    },
+    crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    events::{
+        network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
+        NetworkEvent, NetworkRequest, TimeoutRequest,
+    },
+    helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
+    messages::{
+        BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
+        SignedMessage, Status, TransactionsRequest, TransactionsResponse,
+    },
+    node::{
+        ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
+        ListenerConfig, NodeHandler, NodeSender, PeerAddress, ServiceConfig, State,
+        SystemStateProvider,
+    },
+    storage::{MapProof, MemoryDB},
 };
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use events::{
-    network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
-    NetworkEvent, NetworkRequest, TimeoutRequest,
-};
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{
-    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
-    SignedMessage, Status, TransactionsRequest, TransactionsResponse,
-};
-use node::ConnectInfo;
-use node::{
-    ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
-    NodeHandler, NodeSender, PeerAddress, ServiceConfig, State, SystemStateProvider,
-};
-use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -1161,12 +1160,12 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
-    use crypto::{gen_keypair_from_seed, Seed};
-    use messages::RawTransaction;
-    use proto::schema::tests::TxAfterCommit;
-    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use storage::Snapshot;
+    use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
+    use crate::crypto::{gen_keypair_from_seed, Seed};
+    use crate::messages::RawTransaction;
+    use crate::proto::schema::tests::TxAfterCommit;
+    use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
+    use crate::storage::Snapshot;
 
     const SERVICE_ID: u16 = 1;
 

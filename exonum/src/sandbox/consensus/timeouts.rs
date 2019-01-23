@@ -16,11 +16,10 @@
 
 use std::time::Duration;
 
-use crypto::CryptoHash;
-use helpers::{Height, Round, ValidatorId};
-use node::state::PROPOSE_REQUEST_TIMEOUT;
-
-use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::crypto::CryptoHash;
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::node::state::PROPOSE_REQUEST_TIMEOUT;
+use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 /// HANDLE ROUND TIMEOUT:
 /// - Ignore if height and round are not the same

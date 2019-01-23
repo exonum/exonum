@@ -14,18 +14,17 @@
 
 use std::collections::HashSet;
 
-use blockchain::Schema;
-use crypto::{CryptoHash, Hash, PublicKey};
-use events::InternalRequest;
-use failure;
-use helpers::{Height, Round, ValidatorId};
-use messages::{
+use crate::blockchain::Schema;
+use crate::crypto::{CryptoHash, Hash, PublicKey};
+use crate::events::InternalRequest;
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{
     BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
     PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
     TransactionsRequest, TransactionsResponse,
 };
-use node::{NodeHandler, RequestData};
-use storage::Patch;
+use crate::node::{NodeHandler, RequestData};
+use crate::storage::Patch;
 
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {

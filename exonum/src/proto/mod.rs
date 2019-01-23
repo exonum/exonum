@@ -70,16 +70,15 @@ pub mod schema;
 #[cfg(test)]
 mod tests;
 
-use bit_vec;
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
 use protobuf::{well_known_types, Message};
 
 use std::collections::HashMap;
 
-use crypto;
-use helpers::{Height, Round, ValidatorId};
-use messages::BinaryForm;
+use crate::crypto;
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::BinaryForm;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct

@@ -57,7 +57,7 @@ impl Service for AfterCommitService {
         "after_commit"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -65,7 +65,7 @@ impl Service for AfterCommitService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = HandleCommitTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

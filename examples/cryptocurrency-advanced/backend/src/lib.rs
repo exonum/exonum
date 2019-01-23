@@ -21,17 +21,14 @@
     bare_trait_objects
 )]
 
-extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
-extern crate protobuf;
 #[macro_use]
 extern crate failure;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-pub use schema::Schema;
+pub use crate::schema::Schema;
 
 pub mod api;
 pub mod proto;
@@ -48,7 +45,7 @@ use exonum::{
     storage::Snapshot,
 };
 
-use transactions::WalletTransactions;
+use crate::transactions::WalletTransactions;
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;

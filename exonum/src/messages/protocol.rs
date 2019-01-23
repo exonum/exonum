@@ -28,16 +28,15 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
-use failure;
 
 use std::{borrow::Cow, fmt::Debug, mem};
 
 use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
-use blockchain;
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use helpers::{Height, Round, ValidatorId};
-use proto;
-use storage::{proof_list_index as merkle, StorageValue};
+use crate::blockchain;
+use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::proto;
+use crate::storage::{proof_list_index as merkle, StorageValue};
 
 /// `SignedMessage` size with zero bytes payload.
 #[doc(hidden)]

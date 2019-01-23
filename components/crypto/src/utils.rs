@@ -26,7 +26,6 @@ use std::{
     io::{Error, ErrorKind, Read, Write},
     path::Path,
 };
-use toml;
 
 /// Creates a TOML file that contains encrypted `SecretKey` and returns `PublicKey` for the secret key.
 pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
@@ -141,11 +140,8 @@ impl EncryptedKeys {
 
 #[cfg(test)]
 mod tests {
-    extern crate tempdir;
-
-    use self::tempdir::TempDir;
     use super::*;
-    use toml;
+    use tempdir::TempDir;
 
     #[test]
     fn test_create_and_read_keys_file() {

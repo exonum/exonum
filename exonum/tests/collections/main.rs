@@ -16,8 +16,6 @@
 
 #[macro_use]
 extern crate proptest;
-extern crate exonum;
-extern crate modifier;
 
 macro_rules! proptest_compare_collections {
     ($name:ident, $collection:ident, $reference:ident, $action:ident) => {

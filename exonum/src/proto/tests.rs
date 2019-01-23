@@ -14,13 +14,13 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
-use crypto::{self, Hash, PublicKey};
 
 use std::collections::HashMap;
 
 use super::schema;
 use super::ProtobufConvert;
-use messages::BinaryForm;
+use crate::crypto::{self, Hash, PublicKey};
+use crate::messages::BinaryForm;
 
 #[test]
 fn test_hash_pb_convert() {

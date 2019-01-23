@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::Hash;
-use helpers::{Height, ValidatorId};
-use messages::{Precommit, Signed};
-use proto;
+use crate::crypto::Hash;
+use crate::helpers::{Height, ValidatorId};
+use crate::messages::{Precommit, Signed};
+use crate::proto;
 
 /// Exonum block header data structure.
 ///
@@ -107,7 +107,7 @@ pub struct BlockProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crypto::hash;
+    use crate::crypto::hash;
 
     #[test]
     fn test_block() {

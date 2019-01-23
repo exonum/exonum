@@ -21,8 +21,10 @@ use exonum::{
     storage::MapProof,
 };
 
-use schema::{Schema, TimestampEntry};
-use TIMESTAMPING_SERVICE;
+use crate::{
+    schema::{Schema, TimestampEntry},
+    TIMESTAMPING_SERVICE,
+};
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

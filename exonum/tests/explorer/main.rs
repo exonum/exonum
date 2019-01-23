@@ -14,19 +14,15 @@
 
 //! Tests for the blockchain explorer functionality.
 
-extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
 extern crate serde_json;
-
 #[macro_use]
 extern crate serde_derive;
-
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-extern crate protobuf;
 
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
@@ -36,7 +32,7 @@ use exonum::{
     messages::{self, Message, RawTransaction, Signed},
 };
 
-use blockchain::{
+use crate::blockchain::{
     create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
 };
 
@@ -205,7 +201,7 @@ fn test_explorer_pool_transaction() {
     assert_eq!(tx_info.content().signed_message(), &tx_alice);
 }
 
-fn tx_generator() -> Box<Iterator<Item = Signed<RawTransaction>>> {
+fn tx_generator() -> Box<dyn Iterator<Item = Signed<RawTransaction>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
         Message::sign_transaction(

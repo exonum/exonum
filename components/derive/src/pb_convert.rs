@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use proc_macro::TokenStream;
-use proc_macro2::{self, Ident, Span};
+use proc_macro2::{Ident, Span};
+use quote::quote;
 use syn::{Attribute, Data, DeriveInput, Lit, Path};
 
 use super::{
@@ -96,7 +97,7 @@ fn implement_protobuf_convert_trait(
     }
 }
 
-fn implement_binary_form(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
+fn implement_binary_form(name: &Ident, cr: &dyn quote::ToTokens) -> impl quote::ToTokens {
     quote! {
         impl #cr::messages::BinaryForm for #name {
 
@@ -113,7 +114,7 @@ fn implement_binary_form(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTo
     }
 }
 
-fn implement_storage_traits(name: &Ident, cr: &quote::ToTokens) -> impl quote::ToTokens {
+fn implement_storage_traits(name: &Ident, cr: &dyn quote::ToTokens) -> impl quote::ToTokens {
     quote! {
         impl #cr::crypto::CryptoHash for #name {
             fn hash(&self) -> #cr::crypto::Hash {

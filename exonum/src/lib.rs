@@ -46,62 +46,31 @@
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-extern crate actix;
-extern crate actix_net;
-extern crate actix_web;
-extern crate atty;
-extern crate bit_vec;
-extern crate byteorder;
-extern crate bytes;
-extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
-extern crate env_logger;
-extern crate erased_serde;
-pub extern crate exonum_crypto as crypto;
 #[macro_use]
 extern crate exonum_derive;
-extern crate exonum_rocksdb as rocksdb;
 #[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
 extern crate failure;
-extern crate futures;
-extern crate hex;
 #[macro_use]
 extern crate log;
-extern crate os_info;
-extern crate rand;
-extern crate rand_xorshift;
-extern crate rpassword;
-extern crate rust_decimal;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate ctrlc;
-extern crate protobuf;
-extern crate snow;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_core;
-extern crate tokio_dns;
-extern crate tokio_io;
-extern crate tokio_retry;
-extern crate tokio_threadpool;
-extern crate toml;
-extern crate uuid;
-extern crate zeroize;
 
 // Test dependencies.
 #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
-#[cfg(test)]
-extern crate tempdir;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
+
+pub use exonum_crypto as crypto;
+
+use exonum_rocksdb as rocksdb;
 
 pub mod proto;
 #[macro_use]

@@ -24,7 +24,7 @@ use exonum::{
     helpers::Height,
 };
 
-use transactions::Propose;
+use crate::transactions::Propose;
 
 /// Error codes emitted by `Propose` and/or `Vote` transactions during execution.
 #[derive(Debug)]

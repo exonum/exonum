@@ -1,6 +1,7 @@
 [package]
 name = "exonum-timestamping"
 version = "0.0.0"
+edition = "2018"
 publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 repository = "https://github.com/exonum/exonum"
