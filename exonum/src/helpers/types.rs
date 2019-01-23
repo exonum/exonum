@@ -14,7 +14,7 @@
 
 //! Common widely used type definitions.
 
-use std::{fmt, num::ParseIntError, str::FromStr};
+use std::{fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 
 use crypto::{CryptoHash, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -362,11 +362,25 @@ impl Iterator for RoundRangeIter {
 }
 
 /// Struct used to call zeroize on inner type on drop.
-#[derive(Debug)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct ZeroizeOnDrop<T: Zeroize>(pub T);
 
 impl<T: Zeroize> Drop for ZeroizeOnDrop<T> {
     fn drop(&mut self) {
         self.0.zeroize()
+    }
+}
+
+impl<T: Zeroize> Deref for ZeroizeOnDrop<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T: Zeroize> DerefMut for ZeroizeOnDrop<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
     }
 }
