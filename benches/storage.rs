@@ -59,8 +59,9 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
 }
 
 fn map_index_insert(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (TemporaryDB::default(), generate_random_kv(len)),
+        || (TemporaryDB::default(), data.clone()),
         |(db, data)| {
             let mut fork = db.fork();
             {
@@ -75,8 +76,9 @@ fn map_index_insert(b: &mut Bencher, len: usize) {
 }
 
 fn map_index_with_family_insert(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (TemporaryDB::default(), generate_random_kv(len)),
+        || (TemporaryDB::default(), data.clone()),
         |(db, data)| {
             let mut fork = db.fork();
             {
@@ -140,19 +142,18 @@ fn map_index_with_family_iter(b: &mut Bencher, len: usize) {
 }
 
 fn proof_list_append(b: &mut Bencher, len: usize) {
+    let mut rng = XorShiftRng::from_seed(SEED);
+    let data = (0..len)
+        .map(|_| {
+            let mut chunk = vec![0; CHUNK_SIZE];
+            rng.fill_bytes(&mut chunk);
+            chunk
+        })
+        .collect::<Vec<_>>();
+
     let db = TemporaryDB::default();
     b.iter_with_setup(
-        || {
-            let mut rng = XorShiftRng::from_seed(SEED);
-            let data = (0..len)
-                .map(|_| {
-                    let mut chunk = vec![0; CHUNK_SIZE];
-                    rng.fill_bytes(&mut chunk);
-                    chunk
-                })
-                .collect::<Vec<_>>();
-            (db.fork(), data)
-        },
+        || (db.fork(), data.clone()),
         |(mut storage, data)| {
             let mut table = ProofListIndex::new(NAME, &mut storage);
             assert!(table.is_empty());
@@ -165,8 +166,9 @@ fn proof_list_append(b: &mut Bencher, len: usize) {
 
 fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
     let db = TemporaryDB::default();
+    let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (db.fork(), generate_random_kv(len)),
+        || (db.fork(), data.clone()),
         |(mut storage, data)| {
             let mut table = ProofMapIndex::new(NAME, &mut storage);
             for item in data {
@@ -177,8 +179,9 @@ fn proof_map_insert_without_merge(b: &mut Bencher, len: usize) {
 }
 
 fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
+    let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (TemporaryDB::default(), generate_random_kv(len)),
+        || (TemporaryDB::default(), data.clone()),
         |(db, data)| {
             let mut fork = db.fork();
             {
