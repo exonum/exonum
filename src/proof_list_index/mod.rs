@@ -91,7 +91,7 @@ where
     /// let fork = db.fork();
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &fork);
     /// ```
-    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
+    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
         Self {
             base: IndexBuilder::from_view(view).index_name(index_name).build(),
             length: Cell::new(None),
@@ -130,7 +130,7 @@ where
     where
         I: BinaryKey,
         I: ?Sized,
-        S: AsRef<str>,
+        S: Into<String>,
     {
         Self {
             base: IndexBuilder::from_view(view)

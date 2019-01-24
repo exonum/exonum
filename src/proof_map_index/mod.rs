@@ -157,7 +157,7 @@ where
     /// let fork = db.fork();
     /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &fork);
     /// ```
-    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
+    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
         Self {
             base: IndexBuilder::from_view(view).index_name(index_name).build(),
             _k: PhantomData,
@@ -203,7 +203,7 @@ where
     where
         I: BinaryKey,
         I: ?Sized,
-        S: AsRef<str>,
+        S: Into<String>,
     {
         Self {
             base: IndexBuilder::from_view(view)

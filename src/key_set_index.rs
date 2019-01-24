@@ -74,7 +74,7 @@ where
     /// let name = "name";
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     /// ```
-    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
+    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
         Self {
             base: IndexBuilder::from_view(view).index_name(index_name).build(),
             _k: PhantomData,
@@ -106,7 +106,7 @@ where
     where
         I: BinaryKey,
         I: ?Sized,
-        S: AsRef<str>,
+        S: Into<String>,
     {
         Self {
             base: IndexBuilder::from_view(view)

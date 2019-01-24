@@ -21,8 +21,8 @@ use super::{
     BinaryKey, BinaryValue, Fork, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//mod tests;
 
 /// Base view struct responsible for accessing indexes.
 // TODO: add documentation [ECR-2820]
@@ -95,8 +95,8 @@ impl<T: IndexAccess> IndexBuilder<T> {
     }
 
     /// Provides first part of the index address.
-    pub fn index_name<S: AsRef<str>>(&mut self, index_name: S) -> Self {
-        let address = self.address.append_name(index_name.as_ref());
+    pub fn index_name<S: Into<String>>(&mut self, index_name: S) -> Self {
+        let address = self.address.append_name(index_name.into());
         Self {
             view: self.view.clone(),
             address,
@@ -161,10 +161,10 @@ impl IndexAddress {
         )
     }
 
-    pub fn append_name(&self, suffix: &str) -> Self {
+    pub fn append_name(&self, suffix: String) -> Self {
         Self {
             name: if self.name.is_empty() {
-                suffix.to_owned()
+                suffix
             } else {
                 format!("{}.{}", self.name, suffix)
             },
