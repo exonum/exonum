@@ -6,7 +6,6 @@ ENV SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 RUN apt-get update \
     && apt-get install -y software-properties-common \
     && add-apt-repository ppa:maarten-fonville/protobuf \ 
-    && apt-get update \
     && apt-get install -y curl git gcc cpp \
     libssl-dev pkg-config libsodium-dev libsnappy-dev librocksdb-dev \
     libprotobuf-dev protobuf-compiler
