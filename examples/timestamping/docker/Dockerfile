@@ -19,10 +19,10 @@ RUN curl -sL https://deb.nodesource.com/setup_8.x | bash \
 WORKDIR /usr/src
 RUN git clone --branch v0.10.3 https://github.com/exonum/exonum.git \
   && mv /root/.cargo/bin/* /usr/bin \
-  && cd exonum/examples/cryptocurrency-advanced/backend \
+  && cd exonum/examples/timestamping/backend \
   && cargo update && cargo install \
   && cd ../frontend && npm install && npm run build
-WORKDIR /usr/src/exonum/examples/cryptocurrency-advanced
+WORKDIR /usr/src/exonum/examples/timestamping
 COPY launch.sh .
 
 ENTRYPOINT ["./launch.sh"]

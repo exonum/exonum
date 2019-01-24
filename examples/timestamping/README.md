@@ -15,6 +15,37 @@ Be sure you installed necessary packages:
 
 ## Install and run
 
+### Using docker
+
+<!-- spell-checker:ignore serhiioryshych -->
+
+Simply run the following command to start the timestamping service on 4 nodes
+on the local machine:
+
+```bash
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-timestamping:demo
+```
+
+Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
+
+Docker will automatically pull image from the repository and
+run 4 nodes with public endpoints at `127.0.0.1:8000`, ..., `127.0.0.1:8003`
+and private ones at `127.0.0.1:8004`, ..., `127.0.0.1:8007`.
+
+To stop docker container, use `docker stop <container id>` command.
+
+### Manually
+
+#### Getting started
+
+Be sure you installed necessary packages:
+
+- [git](https://git-scm.com/downloads)
+- [Node.js with npm](https://nodejs.org/en/download/)
+- [Rust compiler](https://rustup.rs/)
+
+#### Install and run
+
 Below you will find a step-by-step guide to start the service
 on 4 nodes on the local machine.
 
