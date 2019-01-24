@@ -259,7 +259,7 @@ fn multiple_indexes<T: Database>(db: T) {
         let mut list = ListIndex::new(IDX_NAME, &fork);
         let mut map = MapIndex::new_in_family("idx", &3, &fork);
 
-        for i in 0..10 {
+        for i in 0..10 as u32 {
             list.push(i);
             if i % 2 == 0 {
                 map.put(&i, "??".to_owned());
@@ -270,15 +270,15 @@ fn multiple_indexes<T: Database>(db: T) {
 
     {
         let snapshot = db.snapshot();
-        let list: ListIndex<_, i32> = ListIndex::new(IDX_NAME, &snapshot);
-        let map: MapIndex<_, i32, String> = MapIndex::new_in_family("idx", &3, &snapshot);
+        let list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
+        let map: MapIndex<_, u32, String> = MapIndex::new_in_family("idx", &3, &snapshot);
 
         assert_eq!(list.len(), 10);
         assert!(map.values().all(|val| val == "??"));
     }
 
     let fork = db.fork();
-    let list: ListIndex<_, i32> = ListIndex::new(IDX_NAME, &fork);
+    let list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
     let mut map = MapIndex::new_in_family("idx", &3, &fork);
     for item in &list {
         map.put(&item, item.to_string());
