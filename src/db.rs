@@ -45,7 +45,7 @@ pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Removes all keys from the table that start with the specified prefix.
-pub fn remove_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
+pub fn remove_keys_by_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
     if prefix.is_empty() {
         // If the prefix is empty, we can be more efficient by clearing
         // the entire changes in the patch.
@@ -237,7 +237,7 @@ impl WorkingPatch {
 
             if changes.is_empty() {
                 let prefix = address.bytes().map_or(vec![], |bytes| bytes.to_vec());
-                remove_prefix(&mut patch_changes.data, &prefix);
+                remove_keys_by_prefix(&mut patch_changes.data, &prefix);
 
                 // Remember the prefix to be dropped from the database
                 patch_changes.removed_prefixes.push(prefix);
