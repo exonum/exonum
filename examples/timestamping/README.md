@@ -17,8 +17,6 @@ Be sure you installed necessary packages:
 
 ### Using docker
 
-<!-- spell-checker:ignore serhiioryshych -->
-
 Simply run the following command to start the timestamping service on 4 nodes
 on the local machine:
 

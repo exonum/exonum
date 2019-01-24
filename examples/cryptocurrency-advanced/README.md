@@ -23,8 +23,6 @@ It implements most basic operations:
 
 ### Using docker
 
-<!-- spell-checker:ignore serhiioryshych -->
-
 Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
