@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::TemporaryDB;
 use crate::{
     views::{IndexAccess, IndexAddress, IndexBuilder, View},
     Database, Fork,
@@ -38,7 +39,233 @@ fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     assert_eq!(values, assumed);
 }
 
-fn fork_iter<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
+fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
+    let mut fork = db.fork();
+    {
+        let mut view = create_view(&fork, address);
+        view.put(&vec![1], vec![1]);
+        view.put(&vec![2], vec![2]);
+        view.put(&vec![3], vec![3]);
+
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
+        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+    }
+    fork.flush();
+
+    {
+        let mut view = create_view(&fork, address);
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
+        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+
+        view.put(&vec![1], vec![10]);
+        view.put(&vec![4], vec![40]);
+        view.remove(&vec![2]);
+
+        assert_eq!(view.get_bytes(&[1]), Some(vec![10]));
+        assert_eq!(view.get_bytes(&[2]), None);
+        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_eq!(view.get_bytes(&[4]), Some(vec![40]));
+    }
+    fork.rollback();
+
+    {
+        let view = create_view(&fork, address);
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
+        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_eq!(view.get_bytes(&[4]), None);
+    }
+    fork.flush();
+
+    {
+        let mut view = create_view(&fork, address);
+        view.put(&vec![4], vec![40]);
+        view.put(&vec![4], vec![41]);
+        view.remove(&vec![2]);
+        view.put(&vec![2], vec![20]);
+
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+        assert_eq!(view.get_bytes(&[2]), Some(vec![20]));
+        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_eq!(view.get_bytes(&[4]), Some(vec![41]));
+    }
+    fork.rollback();
+
+    {
+        let view = create_view(&fork, address);
+        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
+        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_eq!(view.get_bytes(&[4]), None);
+    }
+
+    create_view(&fork, address).put(&vec![2], vec![20]);
+    fork.flush();
+    create_view(&fork, address).put(&vec![3], vec![30]);
+    fork.rollback();
+
+    let view = create_view(&fork, address);
+    assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+    assert_eq!(view.get_bytes(&[2]), Some(vec![20]));
+    assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+    assert_eq!(view.get_bytes(&[4]), None);
+}
+
+fn _views_in_same_family<T: Database>(db: T) {
+    const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
+    const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
+
+    let mut fork = db.fork();
+    {
+        let mut view1 = create_view(&fork, IDX_1);
+        let mut view2 = create_view(&fork, IDX_2);
+
+        view1.put(&vec![1], vec![10]);
+        view1.put(&vec![2], vec![20]);
+
+        assert_eq!(view1.get_bytes(&[1]), Some(vec![10]));
+        assert_eq!(view2.get_bytes(&[1]), None);
+        assert_iter(&view1, 1, &[(1, 10), (2, 20)]);
+        assert_iter(&view2, 1, &[]);
+
+        view2.put(&vec![1], vec![1]);
+        view2.put(&vec![1], vec![2]);
+        view2.put(&vec![2], vec![4]);
+        view2.put(&vec![0], vec![0, 1, 2, 3]);
+
+        assert_eq!(view1.get_bytes(&[1]), Some(vec![10]));
+        assert_eq!(view2.get_bytes(&[1]), Some(vec![2]));
+        assert_iter(&view1, 1, &[(1, 10), (2, 20)]);
+        assert_iter(&view2, 1, &[(1, 2), (2, 4)]);
+    }
+    fork.flush();
+
+    {
+        let mut view1 = create_view(&fork, IDX_1);
+        let view2 = create_view(&fork, IDX_2);
+
+        assert_iter(&view1, 1, &[(1, 10), (2, 20)]);
+        assert_iter(&view2, 1, &[(1, 2), (2, 4)]);
+
+        view1.put(&vec![2], vec![30]);
+        view1.put(&vec![3], vec![40]);
+        view1.put(&vec![0], vec![0]);
+
+        assert_iter(&view1, 1, &[(1, 10), (2, 30), (3, 40)]);
+        assert_iter(&view2, 1, &[(1, 2), (2, 4)]);
+
+        view1.remove(&vec![0]);
+    }
+    db.merge(fork.into_patch()).unwrap();
+
+    let snapshot = db.snapshot();
+    let view1 = create_view(&snapshot, IDX_1);
+    let view2 = create_view(&snapshot, IDX_2);
+
+    assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
+    assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
+}
+
+fn _two_mutable_borrows<T, I>(db: T, address: I)
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
+{
+    let fork = db.fork();
+
+    let view1 = create_view(&fork, address);
+    let view2 = create_view(&fork, address);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+}
+
+fn _mutable_and_immutable_borrows<T, I>(db: T, address: I)
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
+{
+    let fork = db.fork();
+
+    let view1 = create_view(&fork, address);
+    let view2 = create_view(&fork, address);
+    assert_eq!(view1.get_bytes(&[0]), None);
+    assert_eq!(view2.get_bytes(&[0]), None);
+}
+
+fn _clear_view<T, I>(db: T, address: I)
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
+{
+    let fork = db.fork();
+    {
+        let mut view = create_view(&fork, address);
+        view.put(&vec![1], vec![1, 2]);
+        view.put(&vec![2], vec![3, 4]);
+        view.clear();
+
+        assert_eq!(view.get_bytes(&[1]), None);
+        assert_iter(&view, 0, &[]);
+        assert_iter(&view, 1, &[]);
+
+        view.put(&vec![1], vec![5]);
+        view.put(&vec![3], vec![6]);
+        assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
+        assert_iter(&view, 0, &[(1, 5), (3, 6)]);
+        assert_iter(&view, 2, &[(3, 6)]);
+    }
+    db.merge(fork.into_patch()).unwrap();
+
+    {
+        let snapshot = db.snapshot();
+        let view = create_view(&snapshot, address);
+
+        assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
+        assert_iter(&view, 0, &[(1, 5), (3, 6)]);
+        assert_iter(&view, 2, &[(3, 6)]);
+    }
+
+    let fork = db.fork();
+    {
+        let mut view = create_view(&fork, address);
+        view.put(&vec![1], vec![3, 4]);
+
+        view.clear();
+        view.put(&vec![4], vec![0]);
+        view.put(&vec![3], vec![0]);
+
+        assert_eq!(view.get_bytes(&[1]), None);
+        assert_eq!(view.get_bytes(&[3]), Some(vec![0]));
+        assert_iter(&view, 0, &[(3, 0), (4, 0)]);
+        assert_iter(&view, 4, &[(4, 0)]);
+    }
+    {
+        let view = create_view(&fork, address);
+
+        assert_eq!(view.get_bytes(&[1]), None);
+        assert_eq!(view.get_bytes(&[3]), Some(vec![0]));
+        assert_iter(&view, 0, &[(3, 0), (4, 0)]);
+        assert_iter(&view, 4, &[(4, 0)]);
+    }
+
+    db.merge(fork.into_patch()).unwrap();
+    let snapshot = db.snapshot();
+    let view = create_view(&snapshot, address);
+    assert_iter(&view, 0, &[(3, 0), (4, 0)]);
+    assert_iter(&view, 4, &[(4, 0)]);
+}
+
+fn database() -> TemporaryDB {
+    TemporaryDB::new()
+}
+
+fn _fork_iter<T, I>(db: T, address: I)
+where
+    T: Database,
+    I: Into<IndexAddress> + Copy,
+{
     let fork = db.fork();
     {
         let view = create_view(&fork, address);
@@ -129,83 +356,30 @@ fn fork_iter<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     assert_iter(&view, 0, &[(10, 10), (20, 20), (30, 30)]);
 }
 
-fn changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
-    let mut fork = db.fork();
-    {
-        let mut view = create_view(&fork, address);
-        view.put(&vec![1], vec![1]);
-        view.put(&vec![2], vec![2]);
-        view.put(&vec![3], vec![3]);
-
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-    }
-    fork.flush();
-
-    {
-        let mut view = create_view(&fork, address);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-
-        view.put(&vec![1], vec![10]);
-        view.put(&vec![4], vec![40]);
-        view.remove(&vec![2]);
-
-        assert_eq!(view.get_bytes(&[1]), Some(vec![10]));
-        assert_eq!(view.get_bytes(&[2]), None);
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-        assert_eq!(view.get_bytes(&[4]), Some(vec![40]));
-    }
-    fork.rollback();
-
-    {
-        let view = create_view(&fork, address);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-        assert_eq!(view.get_bytes(&[4]), None);
-    }
-    fork.flush();
-
-    {
-        let mut view = create_view(&fork, address);
-        view.put(&vec![4], vec![40]);
-        view.put(&vec![4], vec![41]);
-        view.remove(&vec![2]);
-        view.put(&vec![2], vec![20]);
-
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![20]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-        assert_eq!(view.get_bytes(&[4]), Some(vec![41]));
-    }
-    fork.rollback();
-
-    {
-        let view = create_view(&fork, address);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-        assert_eq!(view.get_bytes(&[4]), None);
-    }
-
-    create_view(&fork, address).put(&vec![2], vec![20]);
-    fork.flush();
-    create_view(&fork, address).put(&vec![3], vec![30]);
-    fork.rollback();
-
-    let view = create_view(&fork, address);
-    assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-    assert_eq!(view.get_bytes(&[2]), Some(vec![20]));
-    assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-    assert_eq!(view.get_bytes(&[4]), None);
+#[test]
+fn fork_iter() {
+    _fork_iter(database(), IDX_NAME);
 }
 
-fn multiple_views<T: Database>(db: T) {
-    let fork = db.fork();
+#[test]
+fn fork_iter_prefixed() {
+    _fork_iter(database(), PREFIXED_IDX);
+}
 
+#[test]
+fn changelog() {
+    _changelog(database(), IDX_NAME);
+}
+
+#[test]
+fn changelog_prefixed() {
+    _changelog(database(), PREFIXED_IDX);
+}
+
+#[test]
+fn multiple_views() {
+    let db = database();
+    let fork = db.fork();
     {
         // Writing to multiple views at the same time
         let mut view = create_view(&fork, IDX_NAME);
@@ -251,15 +425,17 @@ fn multiple_views<T: Database>(db: T) {
     }
 }
 
-fn multiple_indexes<T: Database>(db: T) {
+#[test]
+fn multiple_indexes() {
     use crate::{ListIndex, MapIndex};
 
+    let db = database();
     let fork = db.fork();
     {
-        let mut list = ListIndex::new(IDX_NAME, &fork);
+        let mut list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
         let mut map = MapIndex::new_in_family("idx", &3, &fork);
 
-        for i in 0..10 as u32 {
+        for i in 0..10 {
             list.push(i);
             if i % 2 == 0 {
                 map.put(&i, "??".to_owned());
@@ -288,7 +464,9 @@ fn multiple_indexes<T: Database>(db: T) {
     assert!(map.iter_from(&3).all(|(k, v)| k < 10 && v == k.to_string()));
 }
 
-fn views_in_same_family<T: Database>(db: T) {
+#[test]
+fn views_in_same_family() {
+    let db = database();
     const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
 
@@ -343,8 +521,11 @@ fn views_in_same_family<T: Database>(db: T) {
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
 }
 
-fn rollbacks_for_indexes_in_same_family<T: Database>(db: T) {
+#[test]
+fn rollbacks_for_indexes_in_same_family() {
     use crate::ProofListIndex;
+
+    let db = database();
 
     fn indexes(fork: &Fork) -> (ProofListIndex<&Fork, i64>, ProofListIndex<&Fork, i64>) {
         let list1 = ProofListIndex::new_in_family("foo", &1, fork);
@@ -391,96 +572,19 @@ fn rollbacks_for_indexes_in_same_family<T: Database>(db: T) {
     assert_eq!(list2.iter().collect::<Vec<_>>(), vec![2, 3, 5, 8]);
 }
 
-fn two_mutable_borrows<T, I>(db: T, address: I)
-where
-    T: Database,
-    I: Into<IndexAddress> + Copy,
-{
-    let fork = db.fork();
-
-    let view1 = create_view(&fork, address);
-    let view2 = create_view(&fork, address);
-    assert_eq!(view1.get_bytes(&[0]), None);
-    assert_eq!(view2.get_bytes(&[0]), None);
+#[test]
+fn clear_view() {
+    _clear_view(database(), IDX_NAME);
 }
 
-fn mutable_and_immutable_borrows<T, I>(db: T, address: I)
-where
-    T: Database,
-    I: Into<IndexAddress> + Copy,
-{
-    let fork = db.fork();
-
-    let view1 = create_view(&fork, address);
-    let view2 = create_view(&fork, address);
-    assert_eq!(view1.get_bytes(&[0]), None);
-    assert_eq!(view2.get_bytes(&[0]), None);
+#[test]
+fn clear_prefixed_view() {
+    _clear_view(database(), PREFIXED_IDX);
 }
 
-fn clear_view<T, I>(db: T, address: I)
-where
-    T: Database,
-    I: Into<IndexAddress> + Copy,
-{
-    let fork = db.fork();
-    {
-        let mut view = create_view(&fork, address);
-        view.put(&vec![1], vec![1, 2]);
-        view.put(&vec![2], vec![3, 4]);
-        view.clear();
-
-        assert_eq!(view.get_bytes(&[1]), None);
-        assert_iter(&view, 0, &[]);
-        assert_iter(&view, 1, &[]);
-
-        view.put(&vec![1], vec![5]);
-        view.put(&vec![3], vec![6]);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
-        assert_iter(&view, 0, &[(1, 5), (3, 6)]);
-        assert_iter(&view, 2, &[(3, 6)]);
-    }
-    db.merge(fork.into_patch()).unwrap();
-
-    {
-        let snapshot = db.snapshot();
-        let view = create_view(&snapshot, address);
-
-        assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
-        assert_iter(&view, 0, &[(1, 5), (3, 6)]);
-        assert_iter(&view, 2, &[(3, 6)]);
-    }
-
-    let fork = db.fork();
-    {
-        let mut view = create_view(&fork, address);
-        view.put(&vec![1], vec![3, 4]);
-
-        view.clear();
-        view.put(&vec![4], vec![0]);
-        view.put(&vec![3], vec![0]);
-
-        assert_eq!(view.get_bytes(&[1]), None);
-        assert_eq!(view.get_bytes(&[3]), Some(vec![0]));
-        assert_iter(&view, 0, &[(3, 0), (4, 0)]);
-        assert_iter(&view, 4, &[(4, 0)]);
-    }
-    {
-        let view = create_view(&fork, address);
-
-        assert_eq!(view.get_bytes(&[1]), None);
-        assert_eq!(view.get_bytes(&[3]), Some(vec![0]));
-        assert_iter(&view, 0, &[(3, 0), (4, 0)]);
-        assert_iter(&view, 4, &[(4, 0)]);
-    }
-
-    db.merge(fork.into_patch()).unwrap();
-    let snapshot = db.snapshot();
-    let view = create_view(&snapshot, address);
-    assert_iter(&view, 0, &[(3, 0), (4, 0)]);
-    assert_iter(&view, 4, &[(4, 0)]);
-}
-
-fn clear_sibling_views<T: Database>(db: T) {
+#[test]
+fn clear_sibling_views() {
+    let db = database();
     const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
 
@@ -532,90 +636,26 @@ fn clear_sibling_views<T: Database>(db: T) {
     assert_iter(&view1, 0, &[(0, 5), (1, 8), (2, 7)]);
 }
 
-mod temporarydb {
-    use super::{IDX_NAME, PREFIXED_IDX};
-    use crate::TemporaryDB;
+#[test]
+#[should_panic]
+fn two_mutable_borrows() {
+    _two_mutable_borrows(database(), IDX_NAME);
+}
 
-    fn database() -> TemporaryDB {
-        TemporaryDB::new()
-    }
+#[test]
+#[should_panic]
+fn two_mutable_prefixed_borrows() {
+    _two_mutable_borrows(database(), PREFIXED_IDX);
+}
 
-    #[test]
-    fn fork_iter() {
-        super::fork_iter(database(), IDX_NAME);
-    }
+#[test]
+#[should_panic]
+fn mutable_and_immutable_borrows() {
+    _mutable_and_immutable_borrows(database(), IDX_NAME);
+}
 
-    #[test]
-    fn fork_iter_prefixed() {
-        super::fork_iter(database(), PREFIXED_IDX);
-    }
-
-    #[test]
-    fn changelog() {
-        super::changelog(database(), IDX_NAME);
-    }
-
-    #[test]
-    fn changelog_prefixed() {
-        super::changelog(database(), PREFIXED_IDX);
-    }
-
-    #[test]
-    fn multiple_views() {
-        super::multiple_views(database());
-    }
-
-    #[test]
-    fn multiple_indexes() {
-        super::multiple_indexes(database());
-    }
-
-    #[test]
-    fn views_in_same_family() {
-        super::views_in_same_family(database());
-    }
-
-    #[test]
-    fn rollbacks_for_indexes_in_same_family() {
-        super::rollbacks_for_indexes_in_same_family(database());
-    }
-
-    #[test]
-    fn clear_view() {
-        super::clear_view(database(), IDX_NAME);
-    }
-
-    #[test]
-    fn clear_prefixed_view() {
-        super::clear_view(database(), PREFIXED_IDX);
-    }
-
-    #[test]
-    fn clear_sibling_views() {
-        super::clear_sibling_views(database());
-    }
-
-    #[test]
-    #[should_panic]
-    fn two_mutable_borrows() {
-        super::two_mutable_borrows(database(), IDX_NAME);
-    }
-
-    #[test]
-    #[should_panic]
-    fn two_mutable_prefixed_borrows() {
-        super::two_mutable_borrows(database(), PREFIXED_IDX);
-    }
-
-    #[test]
-    #[should_panic]
-    fn mutable_and_immutable_borrows() {
-        super::mutable_and_immutable_borrows(database(), IDX_NAME);
-    }
-
-    #[test]
-    #[should_panic]
-    fn mutable_and_immutable_prefixed_borrows() {
-        super::mutable_and_immutable_borrows(database(), PREFIXED_IDX);
-    }
+#[test]
+#[should_panic]
+fn mutable_and_immutable_prefixed_borrows() {
+    _mutable_and_immutable_borrows(database(), PREFIXED_IDX);
 }

@@ -71,7 +71,7 @@ pub struct Changes {
 #[derive(Debug, Clone)]
 pub struct ViewChanges {
     pub(super) data: BTreeMap<Vec<u8>, Change>,
-    clear: bool,
+    empty: bool,
 }
 
 impl Changes {
@@ -98,17 +98,17 @@ impl ViewChanges {
     fn new() -> Self {
         Self {
             data: BTreeMap::new(),
-            clear: false,
+            empty: false,
         }
     }
 
-    pub fn is_cleared(&self) -> bool {
-        self.clear
+    pub fn is_empty(&self) -> bool {
+        self.empty
     }
 
     pub fn clear(&mut self) {
         self.data.clear();
-        self.clear = true;
+        self.empty = true;
     }
 }
 
@@ -223,7 +223,7 @@ impl WorkingPatch {
         }
     }
 
-    // TODO: verify that this method updates `Change`s already in the `Patch`
+    // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
             let changes = changes.unwrap_or_else(|| {
@@ -235,7 +235,7 @@ impl WorkingPatch {
                 .entry(address.name().to_owned())
                 .or_insert_with(Changes::new);
 
-            if changes.is_cleared() {
+            if changes.is_empty() {
                 let prefix = address.bytes().map_or(vec![], |bytes| bytes.to_vec());
                 remove_prefix(&mut patch_changes.data, &prefix);
 
@@ -418,12 +418,16 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use exonum_merkledb::{Database, TemporaryDB};
+/// use exonum_merkledb::{Database, TemporaryDB, IndexBuilder};
 ///
 /// // not declared as `mut db`!
 /// let db: Box<Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
-/// fork.put("index_name", vec![1, 2, 3], vec![123]);
+/// {
+///     let mut view  = IndexBuilder::from_address(&fork, "index_name".into()).build();
+///     view.put(&vec![1, 2, 3], vec![123]);
+/// }
+///
 /// db.merge(fork.into_patch()).unwrap();
 /// ```
 ///
@@ -616,7 +620,6 @@ impl<'a> IndexAccess for &'a Fork {
     }
 }
 
-// TODO: remove
 impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
     fn as_ref(&self) -> &dyn Snapshot {
         self

@@ -115,7 +115,7 @@ where
         Self {
             base: IndexBuilder::from_view(view)
                 .index_name(family_name)
-                .index_id(index_id)
+                .family_id(index_id)
                 .build(),
             length: Cell::new(None),
             _v: PhantomData,

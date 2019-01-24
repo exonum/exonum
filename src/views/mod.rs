@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_docs)]
+#![warn(missing_docs)]
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
@@ -24,7 +24,8 @@ use super::{
 #[cfg(test)]
 mod tests;
 
-/// TODO
+/// Base view struct responsible for accessing indexes.
+// TODO: add documentation [ECR-2820]
 pub struct View<T: IndexAccess> {
     pub address: IndexAddress,
     pub snapshot: T,
@@ -69,12 +70,17 @@ pub trait IndexAccess: Clone {
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
+/// Struct responsible for creating indexes from `view` with
+/// specified `address`.
+// TODO: add documentation [ECR-2820]
+#[derive(Debug)]
 pub struct IndexBuilder<T> {
     view: T,
     address: IndexAddress,
 }
 
 impl<T: IndexAccess> IndexBuilder<T> {
+    /// Create index from `view'.
     pub fn from_view(view: T) -> Self {
         Self {
             view,
@@ -83,10 +89,12 @@ impl<T: IndexAccess> IndexBuilder<T> {
     }
 
     #[allow(dead_code)]
+    /// Create index from `view' and `IndexAddress`.
     pub fn from_address(view: T, address: IndexAddress) -> Self {
         Self { view, address }
     }
 
+    /// Provides first part of the index address.
     pub fn index_name<S: AsRef<str>>(&mut self, index_name: S) -> Self {
         let address = self.address.append_name(index_name.as_ref());
         Self {
@@ -95,17 +103,19 @@ impl<T: IndexAccess> IndexBuilder<T> {
         }
     }
 
-    pub fn index_id<I>(&mut self, index_id: &I) -> Self
+    /// Provides `family_id` for the index address.
+    pub fn family_id<I>(&mut self, family_id: &I) -> Self
     where
         I: BinaryKey + ?Sized,
     {
-        let address = self.address.append_bytes(index_id);
+        let address = self.address.append_bytes(family_id);
         Self {
             view: self.view.clone(),
             address,
         }
     }
 
+    /// Returns index that builds upon specified `view` and `address`.
     pub fn build(&mut self) -> View<T> {
         View {
             snapshot: self.view.clone(),
@@ -174,7 +184,6 @@ impl IndexAddress {
     }
 }
 
-// TODO: remove
 impl<'a> From<&'a str> for IndexAddress {
     fn from(name: &'a str) -> Self {
         Self {
@@ -184,7 +193,6 @@ impl<'a> From<&'a str> for IndexAddress {
     }
 }
 
-// TODO: remove
 impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     fn from((name, key): (&'a str, &'a K)) -> Self {
         Self {
@@ -230,7 +238,7 @@ impl<T: IndexAccess> View<T> {
                 }
             }
 
-            if changes.is_cleared() {
+            if changes.is_empty() {
                 return None;
             }
         }
@@ -248,7 +256,7 @@ impl<T: IndexAccess> View<T> {
                 }
             }
 
-            if changes.is_cleared() {
+            if changes.is_empty() {
                 return false;
             }
         }
@@ -271,7 +279,7 @@ impl<T: IndexAccess> View<T> {
         let is_cleared = self
             .changes
             .as_ref()
-            .map_or(false, |changes| changes.is_cleared());
+            .map_or(false, |changes| changes.is_empty());
 
         if is_cleared {
             // Ignore all changes from the snapshot

@@ -208,7 +208,7 @@ where
         Self {
             base: IndexBuilder::from_view(view)
                 .index_name(family_name)
-                .index_id(index_id)
+                .family_id(index_id)
                 .build(),
             _k: PhantomData,
             _v: PhantomData,
