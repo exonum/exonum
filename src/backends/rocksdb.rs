@@ -102,7 +102,7 @@ impl RocksDB {
             };
 
             for prefix in changes.removed_prefixes() {
-                self.remove_prefix(&mut batch, cf, &cf_name, prefix)?;
+                self.remove_with_prefix(&mut batch, cf, &cf_name, prefix)?;
             }
 
             for (key, change) in changes {
@@ -116,7 +116,7 @@ impl RocksDB {
     }
 
     // Removes all keys with a specified prefix from a column family.
-    fn remove_prefix(
+    fn remove_with_prefix(
         &self,
         batch: &mut WriteBatch,
         cf: ColumnFamily,

@@ -193,6 +193,12 @@ impl<'a> From<&'a str> for IndexAddress {
     }
 }
 
+impl From<String> for IndexAddress {
+    fn from(name: String) -> Self {
+        Self { name, bytes: None }
+    }
+}
+
 impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     fn from((name, key): (&'a str, &'a K)) -> Self {
         Self {
