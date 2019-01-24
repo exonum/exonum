@@ -23,13 +23,11 @@ It implements most basic operations:
 
 ### Using docker
 
-<!-- spell-checker:ignore serhiioryshych -->
-
 Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 serhiioryshych/exonum-cryptocurrency-advanced-example
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:demo
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
