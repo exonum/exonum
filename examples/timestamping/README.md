@@ -38,9 +38,9 @@ To stop docker container, use `docker stop <container id>` command.
 
 Be sure you installed necessary packages:
 
-- [git](https://git-scm.com/downloads)
-- [Node.js with npm](https://nodejs.org/en/download/)
-- [Rust compiler](https://rustup.rs/)
+* [git](https://git-scm.com/downloads)
+* [Node.js with npm](https://nodejs.org/en/download/)
+* [Rust compiler](https://rustup.rs/)
 
 #### Install and run
 
