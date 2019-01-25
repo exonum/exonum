@@ -1,10 +1,1 @@
-{
-  "body": {
-    "pub_key": "ef687046e09962bb608d80f31188f1a385d17e9892a33c0396dc8c9ad11e6aa9",
-    "name": "Bob"
-  },
-  "protocol_version": 0,
-  "service_id": 128,
-  "message_id": 2,
-  "signature":"7fafacbe409ccd02fd0b5aba9ddc7357e923a142192a0ca8440d339b3ef0cfc56f14ad4fe1615b24a87f3aac0b1341a5dafd91e6422aaf45dfea47035c744000"
-}
+{"tx_body": "e73805c9f0cc566c0ecd61c56d2ac3b25187eec1e2922f23152b5f0c05af85310000800002000a03426f62b39ccbb5049e9b6df19951003b54f5b76451b2391e61beaea2516243f639c5ff2a4b165ad3f0e14c8144ec73e2023b9f9a6364c7b5ea910a9d713d832cbbec0d"}

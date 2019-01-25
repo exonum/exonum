@@ -1,10 +1,1 @@
-{
-  "body": {
-    "pub_key": "654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f",
-    "name": "Alice"
-  },
-  "protocol_version": 0,
-  "service_id": 128,
-  "message_id": 2,
-  "signature":"1ef7c7d4c20c49761cdd4d8fb1791f0587fcc1f1b7469770b6e874809e48521451322fbce6de1be06c1602a2cda2757d8aaf20576e81e23379f0742cedd9a90b"
-}
+{"tx_body": "cf6e0ddfe440ad799bb78ce2e9b99d60481c2aa0ca7bf968383e1b97981a255d0000800002000a05416c696365abc6ba518de0752748f60cd2c9cf85f70bf457c4b2a87cfcf29f9d63e22a8f1f3cd16e1c1c665d74215cae116add13b1b9a402b8a64b8fbeb73eb2fa49bb5509"}
