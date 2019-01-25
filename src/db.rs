@@ -45,7 +45,7 @@ pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// Removes all keys from the table that start with the specified prefix.
-pub fn remove_keys_by_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
+pub fn remove_keys_with_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
     if prefix.is_empty() {
         // If the prefix is empty, we can be more efficient by clearing
         // the entire changes in the patch.
@@ -64,7 +64,7 @@ pub fn remove_keys_by_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8])
 #[derive(Debug, Clone)]
 pub struct Changes {
     data: BTreeMap<Vec<u8>, Change>,
-    removed_prefixes: Vec<Vec<u8>>,
+    prefixes_to_remove: Vec<Vec<u8>>,
 }
 
 /// Map containing changes with a corresponding key.
@@ -79,7 +79,7 @@ impl Changes {
     fn new() -> Self {
         Self {
             data: BTreeMap::new(),
-            removed_prefixes: Vec::new(),
+            prefixes_to_remove: Vec::new(),
         }
     }
 
@@ -89,8 +89,8 @@ impl Changes {
     }
 
     /// Returns prefixes of keys that should be removed from the database.
-    pub fn removed_prefixes(&self) -> &[Vec<u8>] {
-        &self.removed_prefixes
+    pub fn prefixes_to_remove(&self) -> &[Vec<u8>] {
+        &self.prefixes_to_remove
     }
 }
 
@@ -237,10 +237,10 @@ impl WorkingPatch {
 
             if changes.is_empty() {
                 let prefix = address.bytes().map_or(vec![], |bytes| bytes.to_vec());
-                remove_keys_by_prefix(&mut patch_changes.data, &prefix);
+                remove_keys_with_prefix(&mut patch_changes.data, &prefix);
 
                 // Remember the prefix to be dropped from the database
-                patch_changes.removed_prefixes.push(prefix);
+                patch_changes.prefixes_to_remove.push(prefix);
             }
 
             if address.bytes().is_none() {
@@ -299,7 +299,7 @@ impl Patch {
                 name,
                 Changes {
                     data: rev_changes,
-                    removed_prefixes: vec![],
+                    prefixes_to_remove: vec![],
                 },
             );
         }

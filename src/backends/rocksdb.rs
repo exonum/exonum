@@ -101,7 +101,7 @@ impl RocksDB {
                     .unwrap(),
             };
 
-            for prefix in changes.removed_prefixes() {
+            for prefix in changes.prefixes_to_remove() {
                 self.remove_with_prefix(&mut batch, cf, &cf_name, prefix)?;
             }
 
