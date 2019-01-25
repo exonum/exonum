@@ -153,7 +153,6 @@ mod entry;
 mod error;
 mod hash;
 mod keys;
-mod metadata;
 mod options;
 mod values;
 mod views;

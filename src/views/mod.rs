@@ -21,8 +21,9 @@ use super::{
     BinaryKey, BinaryValue, Fork, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
-//#[cfg(test)]
-//mod tests;
+mod index_metadata;
+#[cfg(test)]
+mod tests;
 
 /// Base view struct responsible for accessing indexes.
 // TODO: add documentation [ECR-2820]
@@ -67,6 +68,7 @@ pub trait IndexAccess: Clone {
     type Changes: ChangeSet;
 
     fn snapshot(&self) -> &dyn Snapshot;
+    fn fork(&self) -> Option<& Fork>;
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
@@ -215,6 +217,10 @@ impl<'a> IndexAccess for &'a dyn Snapshot {
         *self
     }
 
+    fn fork(&self) -> Option<&Fork> {
+        None
+    }
+
     fn changes(&self, _: &IndexAddress) -> Self::Changes {}
 }
 
@@ -223,6 +229,10 @@ impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
 
     fn snapshot(&self) -> &dyn Snapshot {
         self.as_ref()
+    }
+
+    fn fork(&self) -> Option<&Fork> {
+        None
     }
 
     fn changes(&self, _: &IndexAddress) -> Self::Changes {}

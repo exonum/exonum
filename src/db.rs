@@ -615,6 +615,10 @@ impl<'a> IndexAccess for &'a Fork {
         &self.flushed
     }
 
+    fn fork(&self) -> Option<&Fork> {
+        Some(self)
+    }
+
     fn changes(&self, address: &IndexAddress) -> Self::Changes {
         self.working_patch.changes_mut(address)
     }
