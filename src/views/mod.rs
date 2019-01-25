@@ -89,7 +89,6 @@ impl<T: IndexAccess> IndexBuilder<T> {
         }
     }
 
-    #[allow(dead_code)]
     /// Create index from `view' and `IndexAddress`.
     pub fn from_address(view: T, address: IndexAddress) -> Self {
         Self { view, address }
