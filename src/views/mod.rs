@@ -21,7 +21,6 @@ use super::{
     BinaryKey, BinaryValue, Fork, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
-mod index_metadata;
 #[cfg(test)]
 mod tests;
 
@@ -136,7 +135,7 @@ pub struct IndexAddress {
 impl IndexAddress {
     pub fn root() -> Self {
         Self {
-            name: "".to_owned(),
+            name: String::new(),
             bytes: None,
         }
     }
@@ -292,12 +291,12 @@ impl<T: IndexAccess> View<T> {
             .as_ref()
             .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
 
-        let is_cleared = self
+        let is_empty = self
             .changes
             .as_ref()
             .map_or(false, |changes| changes.is_empty());
 
-        if is_cleared {
+        if is_empty {
             // Ignore all changes from the snapshot
             Box::new(ChangesIter::new(changes_iter.unwrap()))
         } else {
