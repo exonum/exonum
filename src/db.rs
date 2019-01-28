@@ -615,8 +615,9 @@ impl<'a> IndexAccess for &'a Fork {
         &self.flushed
     }
 
-    fn fork(&self) -> Option<&Fork> {
-        Some(self)
+    #[allow(unsafe_code)]
+    unsafe fn fork(self) -> Option<&'static Fork> {
+        Some(std::mem::transmute(self))
     }
 
     fn changes(&self, address: &IndexAddress) -> Self::Changes {

@@ -69,7 +69,9 @@ pub trait IndexAccess: Clone {
     type Changes: ChangeSet;
 
     fn snapshot(&self) -> &dyn Snapshot;
-    fn fork(&self) -> Option<& Fork>;
+    #[allow(unsafe_code)]
+    #[doc(hidden)]
+    unsafe fn fork(self) -> Option<&'static Fork>;
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
@@ -131,12 +133,21 @@ impl<T: IndexAccess> IndexBuilder<T> {
     }
 
     /// Returns index that builds upon specified `view` and `address`.
-    pub fn build(&mut self) -> View<T> {
-        View {
-            snapshot: self.view.clone(),
-            changes: self.view.changes(&self.address),
-            address: self.address.clone(),
+    ///
+    /// # Panics
+    ///
+    /// Panics if index metadata doesn't match expected.
+    pub fn build(self) -> View<T> {
+        if let Some(index_type) = self.index_type {
+            let has_parent = self.address.bytes.is_some();
+            index_metadata::check_or_create_metadata(
+                self.view.clone(),
+                &self.address,
+                index_type,
+                has_parent,
+            );
         }
+        View::new(self.view, self.address)
     }
 }
 
@@ -230,7 +241,8 @@ impl<'a> IndexAccess for &'a dyn Snapshot {
         *self
     }
 
-    fn fork(&self) -> Option<&Fork> {
+    #[allow(unsafe_code)]
+    unsafe fn fork(self) -> Option<&'static Fork> {
         None
     }
 
@@ -244,7 +256,8 @@ impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
         self.as_ref()
     }
 
-    fn fork(&self) -> Option<&Fork> {
+    #[allow(unsafe_code)]
+    unsafe fn fork(self) -> Option<&'static Fork> {
         None
     }
 
@@ -258,6 +271,16 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 }
 
 impl<T: IndexAccess> View<T> {
+    pub(super) fn new<I: Into<IndexAddress>>(snapshot: T, address: I) -> Self {
+        let address = address.into();
+        let changes = snapshot.changes(&address);
+        Self {
+            snapshot,
+            changes,
+            address,
+        }
+    }
+
     fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
         if let Some(ref changes) = self.changes.as_ref() {
             if let Some(change) = changes.data.get(key) {

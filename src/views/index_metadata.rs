@@ -19,7 +19,8 @@ use failure::{self, ensure, format_err};
 use num_traits::{FromPrimitive, ToPrimitive};
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{BinaryValue, views::{IndexAccess, View}, Fork};
+use super::{IndexAccess, IndexAddress, View};
+use crate::{BinaryValue, Fork};
 
 const INDEX_METADATA_NAME: &str = "__INDEX_METADATA__";
 
@@ -54,7 +55,49 @@ impl BinaryValue for IndexType {
     }
 }
 
-// pub fn assert_metadata<T>(view: &T, )
+#[allow(unsafe_code)]
+pub fn check_or_create_metadata<T: IndexAccess>(
+    snapshot: T,
+    address: &IndexAddress,
+    index_type: IndexType,
+    has_parent: bool,
+) {
+    let address = {
+        let mut metadata_address = address.append_name(INDEX_METADATA_NAME.into());
+        // Uses a single metadata insance for the all indexes in family.
+        metadata_address.bytes = None;
+        metadata_address
+    };
+
+    let maybe_fork = {
+        let metadata = IndexMetadata {
+            view: View::new(snapshot, address.clone()),
+        };
+        if let Some(saved_index_type) = metadata.index_type() {
+            let saved_has_parent = metadata
+                .has_parent()
+                .expect("Index metadata is inconsistent");
+            assert_eq!(
+                saved_index_type, index_type,
+                "Saved index type doesn't match specified"
+            );
+            assert_eq!(
+                saved_has_parent, has_parent,
+                "Saved index family doesn't match specified"
+            );
+            return;
+        }
+        unsafe { metadata.view.snapshot.fork() }
+    };
+
+    if let Some(fork) = maybe_fork {
+        let mut metadata_mut = IndexMetadata {
+            view: View::new(fork, address.clone()),
+        };
+        metadata_mut.set_index_type(index_type);
+        metadata_mut.set_has_parent(has_parent);
+    }
+}
 
 struct IndexMetadata<T: IndexAccess> {
     view: View<T>,
@@ -80,8 +123,8 @@ impl IndexMetadata<&Fork> {
     }
 
     fn set_has_parent(&mut self, has_parent: bool) {
-        self.set_attribute("index_type", has_parent)
-    }    
+        self.set_attribute("has_parent", has_parent)
+    }
 
     fn set_attribute<V: BinaryValue>(&mut self, name: &str, value: V) {
         self.view.put(name, value)

@@ -14,20 +14,12 @@
 
 use crate::TemporaryDB;
 use crate::{
-    views::{IndexAccess, IndexAddress, IndexBuilder, View},
+    views::{IndexAccess, IndexAddress, View},
     Database, Fork,
 };
 
 const IDX_NAME: &str = "idx_name";
 const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1u8, 2, 3] as &[u8]);
-
-fn create_view<T, I>(db_view: T, address: I) -> View<T>
-where
-    T: IndexAccess,
-    I: Into<IndexAddress>,
-{
-    IndexBuilder::from_address(db_view, address.into()).build()
-}
 
 fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     let mut iter = view.iter_bytes(&[from]);
@@ -42,7 +34,7 @@ fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
 fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     let mut fork = db.fork();
     {
-        let mut view = create_view(&fork, address);
+        let mut view = View::new(&fork, address);
         view.put(&vec![1], vec![1]);
         view.put(&vec![2], vec![2]);
         view.put(&vec![3], vec![3]);
@@ -54,7 +46,7 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     fork.flush();
 
     {
-        let mut view = create_view(&fork, address);
+        let mut view = View::new(&fork, address);
         assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
         assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
         assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
@@ -71,7 +63,7 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     fork.rollback();
 
     {
-        let view = create_view(&fork, address);
+        let view = View::new(&fork, address);
         assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
         assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
         assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
@@ -80,7 +72,7 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     fork.flush();
 
     {
-        let mut view = create_view(&fork, address);
+        let mut view = View::new(&fork, address);
         view.put(&vec![4], vec![40]);
         view.put(&vec![4], vec![41]);
         view.remove(&vec![2]);
@@ -94,19 +86,19 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     fork.rollback();
 
     {
-        let view = create_view(&fork, address);
+        let view = View::new(&fork, address);
         assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
         assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
         assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
         assert_eq!(view.get_bytes(&[4]), None);
     }
 
-    create_view(&fork, address).put(&vec![2], vec![20]);
+    View::new(&fork, address).put(&vec![2], vec![20]);
     fork.flush();
-    create_view(&fork, address).put(&vec![3], vec![30]);
+    View::new(&fork, address).put(&vec![3], vec![30]);
     fork.rollback();
 
-    let view = create_view(&fork, address);
+    let view = View::new(&fork, address);
     assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
     assert_eq!(view.get_bytes(&[2]), Some(vec![20]));
     assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
@@ -119,8 +111,8 @@ fn _views_in_same_family<T: Database>(db: T) {
 
     let mut fork = db.fork();
     {
-        let mut view1 = create_view(&fork, IDX_1);
-        let mut view2 = create_view(&fork, IDX_2);
+        let mut view1 = View::new(&fork, IDX_1);
+        let mut view2 = View::new(&fork, IDX_2);
 
         view1.put(&vec![1], vec![10]);
         view1.put(&vec![2], vec![20]);
@@ -143,8 +135,8 @@ fn _views_in_same_family<T: Database>(db: T) {
     fork.flush();
 
     {
-        let mut view1 = create_view(&fork, IDX_1);
-        let view2 = create_view(&fork, IDX_2);
+        let mut view1 = View::new(&fork, IDX_1);
+        let view2 = View::new(&fork, IDX_2);
 
         assert_iter(&view1, 1, &[(1, 10), (2, 20)]);
         assert_iter(&view2, 1, &[(1, 2), (2, 4)]);
@@ -161,8 +153,8 @@ fn _views_in_same_family<T: Database>(db: T) {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view1 = create_view(&snapshot, IDX_1);
-    let view2 = create_view(&snapshot, IDX_2);
+    let view1 = View::new(&snapshot, IDX_1);
+    let view2 = View::new(&snapshot, IDX_2);
 
     assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
@@ -175,8 +167,8 @@ where
 {
     let fork = db.fork();
 
-    let view1 = create_view(&fork, address);
-    let view2 = create_view(&fork, address);
+    let view1 = View::new(&fork, address);
+    let view2 = View::new(&fork, address);
     assert_eq!(view1.get_bytes(&[0]), None);
     assert_eq!(view2.get_bytes(&[0]), None);
 }
@@ -188,8 +180,8 @@ where
 {
     let fork = db.fork();
 
-    let view1 = create_view(&fork, address);
-    let view2 = create_view(&fork, address);
+    let view1 = View::new(&fork, address);
+    let view2 = View::new(&fork, address);
     assert_eq!(view1.get_bytes(&[0]), None);
     assert_eq!(view2.get_bytes(&[0]), None);
 }
@@ -201,7 +193,7 @@ where
 {
     let fork = db.fork();
     {
-        let mut view = create_view(&fork, address);
+        let mut view = View::new(&fork, address);
         view.put(&vec![1], vec![1, 2]);
         view.put(&vec![2], vec![3, 4]);
         view.clear();
@@ -220,7 +212,7 @@ where
 
     {
         let snapshot = db.snapshot();
-        let view = create_view(&snapshot, address);
+        let view = View::new(&snapshot, address);
 
         assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
         assert_iter(&view, 0, &[(1, 5), (3, 6)]);
@@ -229,7 +221,7 @@ where
 
     let fork = db.fork();
     {
-        let mut view = create_view(&fork, address);
+        let mut view = View::new(&fork, address);
         view.put(&vec![1], vec![3, 4]);
 
         view.clear();
@@ -242,7 +234,7 @@ where
         assert_iter(&view, 4, &[(4, 0)]);
     }
     {
-        let view = create_view(&fork, address);
+        let view = View::new(&fork, address);
 
         assert_eq!(view.get_bytes(&[1]), None);
         assert_eq!(view.get_bytes(&[3]), Some(vec![0]));
@@ -252,7 +244,7 @@ where
 
     db.merge(fork.into_patch()).unwrap();
     let snapshot = db.snapshot();
-    let view = create_view(&snapshot, address);
+    let view = View::new(&snapshot, address);
     assert_iter(&view, 0, &[(3, 0), (4, 0)]);
     assert_iter(&view, 4, &[(4, 0)]);
 }
@@ -268,7 +260,7 @@ where
 {
     let fork = db.fork();
     {
-        let view = create_view(&fork, address);
+        let view = View::new(&fork, address);
         let mut view = view;
         view.put(&vec![10], vec![10]);
         view.put(&vec![20], vec![20]);
@@ -278,7 +270,7 @@ where
     db.merge(fork.into_patch()).unwrap();
 
     let fork = db.fork();
-    let mut view = create_view(&fork, address);
+    let mut view = View::new(&fork, address);
     assert!(view.contains_raw_key(&[10]));
 
     // Stored
@@ -324,7 +316,7 @@ where
 
     // Replaced
     let fork = db.fork();
-    let mut view = create_view(&fork, address);
+    let mut view = View::new(&fork, address);
 
     view.put(&vec![10], vec![11]);
     assert_iter(&view, 0, &[(10, 11), (20, 20), (30, 30)]);
@@ -333,7 +325,7 @@ where
 
     // Deleted
     let fork = db.fork();
-    let mut view = create_view(&fork, address);
+    let mut view = View::new(&fork, address);
 
     view.remove(&vec![20]);
     assert_iter(&view, 0, &[(10, 10), (30, 30)]);
@@ -346,7 +338,7 @@ where
 
     // MissDeleted
     let fork = db.fork();
-    let mut view = create_view(&fork, address);
+    let mut view = View::new(&fork, address);
 
     view.remove(&vec![5]);
     assert_iter(&view, 0, &[(10, 10), (20, 20), (30, 30)]);
@@ -382,8 +374,8 @@ fn multiple_views() {
     let fork = db.fork();
     {
         // Writing to multiple views at the same time
-        let mut view = create_view(&fork, IDX_NAME);
-        let mut prefixed_view = create_view(&fork, PREFIXED_IDX);
+        let mut view = View::new(&fork, IDX_NAME);
+        let mut prefixed_view = View::new(&fork, PREFIXED_IDX);
 
         view.put(&vec![1], vec![10]);
         prefixed_view.put(&vec![1], vec![30]);
@@ -402,8 +394,8 @@ fn multiple_views() {
     {
         // Reading from a snapshot
         let snapshot = db.snapshot();
-        let view = create_view(&snapshot, IDX_NAME);
-        let prefixed_view = create_view(&snapshot, PREFIXED_IDX);
+        let view = View::new(&snapshot, IDX_NAME);
+        let prefixed_view = View::new(&snapshot, PREFIXED_IDX);
 
         assert_iter(&view, 0, &[(1, 10), (2, 20), (3, 30)]);
         assert_iter(&prefixed_view, 0, &[(1, 30), (3, 40), (5, 50)]);
@@ -412,8 +404,8 @@ fn multiple_views() {
     let fork = db.fork();
     {
         // Reading from one view and writing to other
-        let view = create_view(&fork, IDX_NAME);
-        let mut prefixed_view = create_view(&fork, PREFIXED_IDX);
+        let view = View::new(&fork, IDX_NAME);
+        let mut prefixed_view = View::new(&fork, PREFIXED_IDX);
 
         assert_iter(&view, 0, &[(1, 10), (2, 20), (3, 30)]);
         assert_iter(&prefixed_view, 0, &[(1, 30), (3, 40), (5, 50)]);
@@ -472,8 +464,8 @@ fn views_in_same_family() {
 
     let mut fork = db.fork();
     {
-        let mut view1 = create_view(&fork, IDX_1);
-        let mut view2 = create_view(&fork, IDX_2);
+        let mut view1 = View::new(&fork, IDX_1);
+        let mut view2 = View::new(&fork, IDX_2);
 
         view1.put(&vec![1], vec![10]);
         view1.put(&vec![2], vec![20]);
@@ -496,8 +488,8 @@ fn views_in_same_family() {
     fork.flush();
 
     {
-        let mut view1 = create_view(&fork, IDX_1);
-        let view2 = create_view(&fork, IDX_2);
+        let mut view1 = View::new(&fork, IDX_1);
+        let view2 = View::new(&fork, IDX_2);
 
         assert_iter(&view1, 1, &[(1, 10), (2, 20)]);
         assert_iter(&view2, 1, &[(1, 2), (2, 4)]);
@@ -514,8 +506,8 @@ fn views_in_same_family() {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view1 = create_view(&snapshot, IDX_1);
-    let view2 = create_view(&snapshot, IDX_2);
+    let view1 = View::new(&snapshot, IDX_1);
+    let view2 = View::new(&snapshot, IDX_2);
 
     assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
@@ -590,8 +582,8 @@ fn clear_sibling_views() {
 
     let fork = db.fork();
     {
-        let mut view1 = create_view(&fork, IDX_1);
-        let mut view2 = create_view(&fork, IDX_2);
+        let mut view1 = View::new(&fork, IDX_1);
+        let mut view2 = View::new(&fork, IDX_2);
 
         view1.put(&vec![0], vec![1]);
         view1.put(&vec![1], vec![2]);
@@ -609,8 +601,8 @@ fn clear_sibling_views() {
     db.merge(fork.into_patch()).unwrap();
 
     fn assert_view_states<I: IndexAccess + Copy>(db_view: I) {
-        let view1 = create_view(db_view, IDX_1);
-        let view2 = create_view(db_view, IDX_2);
+        let view1 = View::new(db_view, IDX_1);
+        let view2 = View::new(db_view, IDX_2);
 
         assert_eq!(view1.get_bytes(&[1]), None);
         assert_eq!(view1.get_bytes(&[0]), Some(vec![5]));
@@ -623,7 +615,7 @@ fn clear_sibling_views() {
 
     let fork = db.fork();
     assert_view_states(&fork);
-    let mut view1 = create_view(&fork, IDX_1);
+    let mut view1 = View::new(&fork, IDX_1);
     view1.remove(&vec![1]);
     view1.remove(&vec![2]);
     view1.remove(&vec![3]);
@@ -631,7 +623,7 @@ fn clear_sibling_views() {
     view1.put(&vec![1], vec![8]);
     assert_iter(&view1, 0, &[(0, 5), (1, 8), (2, 7)]);
 
-    let mut view2 = create_view(&fork, IDX_2);
+    let mut view2 = View::new(&fork, IDX_2);
     view2.clear();
     assert_iter(&view1, 0, &[(0, 5), (1, 8), (2, 7)]);
 }
