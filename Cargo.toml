@@ -33,7 +33,7 @@ uuid = "0.7.1"
 
 [dev-dependencies]
 criterion = "0.2"
-rand = "0.6.1"
+rand = "=0.6.4"
 rand_xorshift = "0.1.0"
 proptest = "0.8"
 modifier = "0.1"

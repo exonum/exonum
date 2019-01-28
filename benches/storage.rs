@@ -349,8 +349,16 @@ pub fn bench_storage(c: &mut Criterion) {
         "storage/proof_map/insert/no_merge",
         proof_map_insert_without_merge,
     );
-    bench_fn(c, "storage/proof_map/insert/merge", proof_map_insert_with_merge);
-    bench_fn(c, "storage/proof_map/proofs/build", proof_map_index_build_proofs);
+    bench_fn(
+        c,
+        "storage/proof_map/insert/merge",
+        proof_map_insert_with_merge,
+    );
+    bench_fn(
+        c,
+        "storage/proof_map/proofs/build",
+        proof_map_index_build_proofs,
+    );
     bench_fn(
         c,
         "storage/proof_map/proofs/validate",
