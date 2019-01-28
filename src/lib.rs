@@ -147,6 +147,9 @@ pub use self::{
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
+#[macro_use]
+pub mod macros;
+
 mod backends;
 mod db;
 mod entry;

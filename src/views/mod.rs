@@ -179,8 +179,7 @@ impl IndexAddress {
             match self.bytes {
                 None => Cow::Borrowed(key),
                 Some(ref bytes) => {
-                    let mut bytes = bytes.clone();
-                    bytes.extend(key);
+                    let bytes = concat_keys!(bytes, key);
                     bytes.into()
                 }
             },
