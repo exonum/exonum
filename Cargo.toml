@@ -42,3 +42,6 @@ modifier = "0.1"
 name = "criterion"
 path = "benches/lib.rs"
 harness = false
+
+[features]
+long_benchmarks = []

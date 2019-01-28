@@ -31,6 +31,11 @@ const FAMILY: &str = "index_family";
 const SAMPLE_SIZE: usize = 10;
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 16] = [100; 16];
+
+#[cfg(not(feature = "long_benchmarks"))]
+const ITEM_COUNTS: [usize; 2] = [1_000, 10_000];
+
+#[cfg(all(test, feature = "long_benchmarks"))]
 const ITEM_COUNTS: [usize; 4] = [1_000, 10_000, 100_000, 1_000_000];
 
 fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {

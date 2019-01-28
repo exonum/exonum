@@ -187,12 +187,13 @@ impl IndexAddress {
         )
     }
 
-    pub fn append_name(&self, suffix: String) -> Self {
+    pub fn append_name<'a, S: Into<Cow<'a, str>>>(&self, suffix: S) -> Self {
+        let suffix = suffix.into();
         Self {
             name: if self.name.is_empty() {
-                suffix
+                suffix.into_owned()
             } else {
-                format!("{}.{}", self.name, suffix)
+                format!("{}.{}", self.name, suffix.as_ref())
             },
 
             bytes: self.bytes.clone(),
