@@ -54,7 +54,9 @@ impl BinaryValue for IndexType {
     }
 }
 
-pub struct IndexMetadata<T: IndexAccess> {
+// pub fn assert_metadata<T>(view: &T, )
+
+struct IndexMetadata<T: IndexAccess> {
     view: View<T>,
 }
 

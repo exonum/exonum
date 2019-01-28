@@ -14,6 +14,8 @@
 
 #![warn(missing_docs)]
 
+pub use self::index_metadata::IndexType;
+
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
 use super::{
@@ -78,6 +80,7 @@ pub trait IndexAccess: Clone {
 pub struct IndexBuilder<T> {
     view: T,
     address: IndexAddress,
+    index_type: Option<IndexType>,
 }
 
 impl<T: IndexAccess> IndexBuilder<T> {
@@ -86,32 +89,44 @@ impl<T: IndexAccess> IndexBuilder<T> {
         Self {
             view,
             address: IndexAddress::root(),
+            index_type: None,
         }
     }
 
     /// Create index from `view' and `IndexAddress`.
     pub fn from_address(view: T, address: IndexAddress) -> Self {
-        Self { view, address }
+        Self { view, address, index_type: None, }
     }
 
     /// Provides first part of the index address.
-    pub fn index_name<S: Into<String>>(&mut self, index_name: S) -> Self {
+    pub fn index_name<S: Into<String>>(self, index_name: S) -> Self {
         let address = self.address.append_name(index_name.into());
         Self {
-            view: self.view.clone(),
+            view: self.view,
             address,
+            index_type: self.index_type,
         }
     }
 
     /// Provides `family_id` for the index address.
-    pub fn family_id<I>(&mut self, family_id: &I) -> Self
+    pub fn family_id<I>(self, family_id: &I) -> Self
     where
         I: BinaryKey + ?Sized,
     {
         let address = self.address.append_bytes(family_id);
         Self {
-            view: self.view.clone(),
+            view: self.view,
             address,
+            index_type: self.index_type,
+        }
+    }
+
+    /// TODO
+    pub fn index_type(self, index_type: IndexType) -> Self {
+        Self {
+            view: self.view,
+            address: self.address,
+            index_type: Some(index_type),
         }
     }
 
