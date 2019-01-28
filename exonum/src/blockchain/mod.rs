@@ -324,11 +324,12 @@ impl Blockchain {
                     .expect("Transaction execution error.");
             }
 
-            // Invoke execute method for all services.
-            for service in self.service_map.values() {
-                // Skip execution for genesis block.
-                if height > Height(0) {
-                    before_commit(service.as_ref(), &mut fork);
+            // Invoke before_commit handler for all enabled services. Skip this for genesis block.
+            if height > Height(0) {
+                for service in self.service_map.values() {
+                    if service_enabled(service.service_name(), &fork) {
+                        before_commit(service.as_ref(), &mut fork);
+                    }
                 }
             }
 
@@ -433,8 +434,15 @@ impl Blockchain {
         fork.checkpoint();
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let context = TransactionContext::new(&mut *fork, &raw);
-            tx.execute(context)
+            if service_enabled(service_name, fork) {
+                let context = TransactionContext::new(&mut *fork, &raw);
+                tx.execute(context)
+            } else {
+                Err(ExecutionError::with_description(
+                    255,
+                    format!("service is disabled: {}", service_name),
+                ))
+            }
         }));
 
         let tx_result = TransactionResult(match catch_result {
@@ -512,16 +520,19 @@ impl Blockchain {
         };
         self.merge(patch)?;
 
-        // Invokes `after_commit` for each service in order of their identifiers
+        // Invokes `after_commit` for each enabled service in order of their identifiers
         for (service_id, service) in self.service_map.iter() {
-            let context = ServiceContext::new(
-                self.service_keypair.0,
-                self.service_keypair.1.clone(),
-                self.api_sender.clone(),
-                self.fork(),
-                *service_id,
-            );
-            service.after_commit(&context);
+            let fork = self.fork();
+            if service_enabled(service.service_name(), &fork) {
+                let context = ServiceContext::new(
+                    self.service_keypair.0,
+                    self.service_keypair.1.clone(),
+                    self.api_sender.clone(),
+                    fork,
+                    *service_id,
+                );
+                service.after_commit(&context);
+            }
         }
         Ok(())
     }
@@ -602,6 +613,19 @@ fn before_commit(service: &dyn Service, fork: &mut Fork) {
             );
         }
     }
+}
+
+fn service_enabled(service_name: &str, fork: &Fork) -> bool {
+    let schema = Schema::new(fork);
+
+    // Configuration is not available before genesis block is created.
+    if schema.block_hashes_by_height().is_empty() {
+        return true;
+    }
+
+    let config = schema.actual_configuration();
+    // TODO: actually lookup service state in config
+    true
 }
 
 impl fmt::Debug for Blockchain {
