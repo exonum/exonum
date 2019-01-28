@@ -33,7 +33,7 @@ const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 16] = [100; 16];
 
 #[cfg(not(feature = "long_benchmarks"))]
-const ITEM_COUNTS: [usize; 2] = [1_000, 10_000];
+const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 const ITEM_COUNTS: [usize; 4] = [1_000, 10_000, 100_000, 1_000_000];
@@ -323,37 +323,37 @@ where
 pub fn bench_storage(c: &mut Criterion) {
     exonum_crypto::init();
     // MapIndex
-    bench_fn(c, "plain_map/insert", plain_map_index_insert);
-    bench_fn(c, "plain_map/iter", plain_map_index_iter);
+    bench_fn(c, "storage/plain_map/insert", plain_map_index_insert);
+    bench_fn(c, "storage/plain_map/iter", plain_map_index_iter);
     bench_fn(
         c,
-        "plain_map_with_family/insert",
+        "storage/plain_map_with_family/insert",
         plain_map_index_with_family_insert,
     );
     bench_fn(
         c,
-        "plain_map_with_family/iter",
+        "storage/plain_map_with_family/iter",
         plain_map_index_with_family_iter,
     );
-    bench_fn(c, "plain_map/read", plain_map_index_read);
+    bench_fn(c, "storage/plain_map/read", plain_map_index_read);
     bench_fn(
         c,
-        "plain_map_with_family/read",
+        "storage/plain_map_with_family/read",
         plain_map_index_with_family_read,
     );
     // ProofListIndex
-    bench_fn(c, "proof_list/append", proof_list_append);
+    bench_fn(c, "storage/proof_list/append", proof_list_append);
     // ProofMapIndex
     bench_fn(
         c,
-        "proof_map/insert/no_merge",
+        "storage/proof_map/insert/no_merge",
         proof_map_insert_without_merge,
     );
-    bench_fn(c, "proof_map/insert/merge", proof_map_insert_with_merge);
-    bench_fn(c, "proof_map/proofs/build", proof_map_index_build_proofs);
+    bench_fn(c, "storage/proof_map/insert/merge", proof_map_insert_with_merge);
+    bench_fn(c, "storage/proof_map/proofs/build", proof_map_index_build_proofs);
     bench_fn(
         c,
-        "proof_map/proofs/validate",
+        "storage/proof_map/proofs/validate",
         proof_map_index_verify_proofs,
     );
 }
