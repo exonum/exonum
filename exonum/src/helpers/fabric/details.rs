@@ -36,7 +36,7 @@ use super::{
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
 use crate::api::backends::actix::AllowOrigin;
-use crate::blockchain::{config::ValidatorKeys, GenesisConfig, GenesisConfigBuilder};
+use crate::blockchain::{config::ValidatorKeys, GenesisConfig, GenesisConfigBuilder, ServiceState};
 use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
@@ -389,6 +389,7 @@ impl Command for GenerateCommonConfig {
         );
 
         let template = CommonConfigTemplate {
+            // TODO: insert default "services" value here
             services_config,
             general_config,
             ..CommonConfigTemplate::default()
@@ -669,7 +670,7 @@ impl Finalize {
         GenesisConfigBuilder::new()
             .validators(configs.iter().map(|c| c.validator_keys))
             .consensus(template.consensus_config)
-            // TODO: set initial service state from configuration file
+            .service_state(service_state(&template.services))
             .finish()
     }
 
@@ -979,6 +980,18 @@ fn create_secret_key_file(
         }
         generate_keys_file(&secret_key_path, &passphrase).unwrap()
     }
+}
+
+fn service_state(services: &AbstractConfig) -> BTreeMap<String, ServiceState> {
+    services
+        .iter()
+        .filter_map(|(service_name, config)| {
+            config
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .map(|enabled| (service_name.clone(), ServiceState { enabled }))
+        })
+        .collect()
 }
 
 #[cfg(test)]

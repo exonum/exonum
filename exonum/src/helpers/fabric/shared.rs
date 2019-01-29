@@ -60,6 +60,9 @@ impl NodePublicConfig {
 pub struct CommonConfigTemplate {
     /// Consensus configuration.
     pub consensus_config: ConsensusConfig,
+    /// Service state configuration.
+    #[serde(default)]
+    pub services: AbstractConfig,
     /// Services configuration.
     #[serde(default)]
     pub services_config: AbstractConfig,

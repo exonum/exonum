@@ -34,7 +34,7 @@
 pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, ServiceConfig, StoredConfiguration, ValidatorKeys},
-    genesis::{GenesisConfig, GenesisConfigBuilder},
+    genesis::{GenesisConfig, GenesisConfigBuilder, ServiceState},
     schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
