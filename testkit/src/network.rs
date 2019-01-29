@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{ConsensusConfig, GenesisConfig, ServiceConfig, StoredConfiguration, ValidatorKeys},
     crypto::{self, CryptoHash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     messages::{Message, Precommit, Propose, Signed},
@@ -327,8 +327,10 @@ impl TestNetworkConfiguration {
             .stored_configuration
             .services
             .get(id)
-            .expect("Unable to find configuration for service");
-        serde_json::from_value(value.clone()).unwrap()
+            .expect("Unable to find configuration for service")
+            .private
+            .clone();
+        serde_json::from_value(value).unwrap()
     }
 
     /// Modifies the configuration of the service with the given identifier.
@@ -337,7 +339,17 @@ impl TestNetworkConfiguration {
         D: Serialize,
     {
         let value = serde_json::to_value(config).unwrap();
-        self.stored_configuration.services.insert(id.into(), value);
+        if let Some(config) = self.stored_configuration.services.get_mut(id) {
+            config.private = value;
+        } else {
+            self.stored_configuration.services.insert(
+                id.into(),
+                ServiceConfig {
+                    enabled: true,
+                    private: value,
+                },
+            );
+        }
     }
 
     /// Returns the resulting exonum blockchain configuration.

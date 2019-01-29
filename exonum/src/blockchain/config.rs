@@ -64,10 +64,10 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Services specific variables.
-    /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
+    /// Servic-specific configuration.
+    /// Keys are `service_name` from the `Service` trait.
     #[serde(default)]
-    pub services: BTreeMap<String, serde_json::Value>,
+    pub services: BTreeMap<String, ServiceConfig>,
 }
 
 /// Consensus algorithm parameters.
@@ -121,6 +121,15 @@ pub struct ConsensusConfig {
     /// in a block if the transaction pool is almost empty, and create blocks faster when there are
     /// enough transactions in the pool.
     pub propose_timeout_threshold: u32,
+}
+
+/// Service parameters.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ServiceConfig {
+    /// This service is considered enabled.
+    pub enabled: bool,
+    /// Opaque service-specific configuration serialized as JSON.
+    pub private: serde_json::Value,
 }
 
 impl ConsensusConfig {

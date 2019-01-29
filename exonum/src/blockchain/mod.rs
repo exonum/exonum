@@ -33,7 +33,7 @@
 
 pub use self::{
     block::{Block, BlockProof},
-    config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+    config::{ConsensusConfig, ServiceConfig, StoredConfiguration, ValidatorKeys},
     genesis::GenesisConfig,
     schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
@@ -243,7 +243,14 @@ impl Blockchain {
                         name
                     );
                 }
-                config_propose.services.insert(name.into(), cfg);
+                config_propose.services.insert(
+                    name.into(),
+                    ServiceConfig {
+                        /// TODO: thread initial "enabled" state via GenesisConfig
+                        enabled: true,
+                        private: cfg,
+                    },
+                );
             }
             // Commit actual configuration
             {
@@ -624,8 +631,11 @@ fn service_enabled(service_name: &str, fork: &Fork) -> bool {
     }
 
     let config = schema.actual_configuration();
-    // TODO: actually lookup service state in config
-    true
+    config
+        .services
+        .get(service_name)
+        .map(|s| s.enabled)
+        .unwrap_or(true)
 }
 
 impl fmt::Debug for Blockchain {

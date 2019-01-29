@@ -305,7 +305,7 @@ impl ServiceContext {
 
     /// Returns service specific global variables as a JSON value.
     pub fn actual_service_config(&self, service: &dyn Service) -> &Value {
-        &self.stored_configuration.services[service.service_name()]
+        &self.stored_configuration.services[service.service_name()].private
     }
 
     /// Signs and broadcasts transaction to other nodes in the network.

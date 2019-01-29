@@ -174,7 +174,9 @@ fn get_service_config(config: &StoredConfiguration) -> ConfigurationServiceConfi
     config
         .services
         .get(SERVICE_NAME)
-        .map(|config| serde_json::from_value(config.clone()).expect("Configuration is invalid"))
+        .map(|config| {
+            serde_json::from_value(config.private.clone()).expect("Configuration is invalid")
+        })
         .unwrap_or_default()
 }
 

@@ -15,7 +15,6 @@
 //! State of the `NodeHandler`.
 
 use bit_vec::BitVec;
-use serde_json::Value;
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
@@ -24,7 +23,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
+use crate::blockchain::{ConsensusConfig, ServiceConfig, StoredConfiguration, ValidatorKeys};
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -551,7 +550,7 @@ impl State {
     }
 
     /// Returns `BTreeMap` with service configs identified by name.
-    pub fn services_config(&self) -> &BTreeMap<String, Value> {
+    pub fn services_config(&self) -> &BTreeMap<String, ServiceConfig> {
         &self.config.services
     }
 

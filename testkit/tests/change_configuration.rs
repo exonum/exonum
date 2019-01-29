@@ -169,7 +169,7 @@ fn test_change_service_config() {
 
     assert_eq!(
         serde_json::to_value(service_cfg).unwrap(),
-        testkit.actual_configuration().services["my_service"]
+        testkit.actual_configuration().services["my_service"].private
     );
 }
 
