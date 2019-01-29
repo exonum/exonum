@@ -109,6 +109,6 @@ jobs:
     install:
     - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     script:
-    - cargo doc --no-deps
-    - cargo deadlinks --dir target/doc
+    - cargo doc
+    - cargo deadlinks --dir target/doc/exonum_merkledb
     

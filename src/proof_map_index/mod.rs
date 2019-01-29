@@ -48,8 +48,6 @@ mod tests;
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
-/// [`Hash`]: ../../../exonum_crypto/struct.Hash.html
-/// [`PublicKey`]: ../../../exonum_crypto/struct.PublicKey.html
 pub struct ProofMapIndex<T: IndexAccess, K, V> {
     base: View<T>,
     _k: PhantomData<K>,
