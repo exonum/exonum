@@ -45,7 +45,7 @@ env:
 matrix:
   allow_failures:
   - env: FEATURE=non-fatal-checks
-  fast_finish: true    
+  fast_finish: true
 
 cache:
   cargo: true
@@ -125,4 +125,3 @@ jobs:
     script:
     - cargo doc
     - cargo deadlinks --dir target/doc/exonum_merkledb
-    
