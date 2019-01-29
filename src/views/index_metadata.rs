@@ -55,14 +55,17 @@ impl BinaryValue for IndexType {
     }
 }
 
+/// Metadata for each index that currently stored in the merkledb.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IndexMetadata {
+    /// Type of the specified index.
     pub index_type: IndexType,
+    /// Property that indicates whether the index is a family.
     pub has_parent: bool,
 }
 
 impl IndexMetadata {
-    pub fn try_read_from_view<T: IndexAccess>(view: &View<T>) -> Option<Self> {
+    fn try_read_from_view<T: IndexAccess>(view: &View<T>) -> Option<Self> {
         let index_type = view.get("index_type")?;
         let has_parent = view
             .get("has_parent")
@@ -74,7 +77,7 @@ impl IndexMetadata {
         })
     }
 
-    pub fn write_to_view(self, mut view: View<&Fork>) {
+     fn write_to_view(self, mut view: View<&Fork>) {
         view.put("index_type", self.index_type);
         view.put("has_parent", self.has_parent);
     }
