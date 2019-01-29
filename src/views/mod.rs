@@ -143,8 +143,10 @@ impl<T: IndexAccess> IndexBuilder<T> {
             index_metadata::check_or_create_metadata(
                 self.view.clone(),
                 &self.address,
-                index_type,
-                has_parent,
+                index_metadata::IndexMetadata {
+                    index_type,
+                    has_parent,
+                },
             );
         }
         View::new(self.view, self.address)

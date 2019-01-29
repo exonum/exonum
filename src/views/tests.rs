@@ -683,7 +683,7 @@ fn test_metadata_index_family_correct() {
 }
 
 #[test]
-#[should_panic(expected = "Saved index type doesn't match specified")]
+#[should_panic(expected = "Saved metadata doesn't match specified")]
 fn test_metadata_index_usual_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
@@ -701,7 +701,7 @@ fn test_metadata_index_usual_incorrect() {
 }
 
 #[test]
-#[should_panic(expected = "Saved index type doesn't match specified")]
+#[should_panic(expected = "Saved metadata doesn't match specified")]
 fn test_metadata_index_family_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
@@ -715,6 +715,6 @@ fn test_metadata_index_family_incorrect() {
     // Checks the index metadata.
     IndexBuilder::from_view(&db.snapshot())
         .index_name("simple")
-        .index_type(IndexType::ProofList)
+        .index_type(IndexType::ProofMap)
         .build();
 }
