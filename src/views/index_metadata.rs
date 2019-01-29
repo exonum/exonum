@@ -63,7 +63,7 @@ pub fn check_or_create_metadata<T: IndexAccess>(
     has_parent: bool,
 ) {
     let address = {
-        let mut metadata_address = address.append_name(INDEX_METADATA_NAME.into());
+        let mut metadata_address = address.append_name(INDEX_METADATA_NAME);
         // Uses a single metadata insance for the all indexes in family.
         metadata_address.bytes = None;
         metadata_address

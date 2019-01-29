@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of an array list of items.
-//!
-//! The given section contains methods related to `ListIndex` and the iterator
-//! over the items of this list.
-
+/// TODO Clarify documentation. [ECR-2820]
 macro_rules! concat_keys {
     (@capacity $key:expr) => ( $key.size() );
     (@capacity $key:expr, $($tail:expr),+) => (
