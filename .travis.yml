@@ -25,6 +25,11 @@ addons:
     - protobuf-compiler
     - unzip
     - zlib1g-dev
+  homebrew:
+    packages:
+    - rocksdb
+    - snappy
+    - libsodium
 
 rust:
   # Feel free to bump this version if you need features of newer Rust.
@@ -37,17 +42,10 @@ env:
   - SODIUM_VERS=1.0.16
   - RUSTFLAGS="-D warnings"
 
-
 matrix:
   allow_failures:
   - env: FEATURE=non-fatal-checks
-  fast_finish: true
-
-  include:
-    - os: linux
-      env:
-      - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
-      - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  fast_finish: true    
 
 cache:
   cargo: true
@@ -56,10 +54,23 @@ cache:
 
 dist: trusty
 
+before_script:
+  - cargo update
+  - |
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
+      export ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+      export SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+    fi
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      export ROCKSDB_LIB_DIR=$(brew --prefix)/lib
+      export SNAPPY_LIB_DIR=$(brew --prefix)/lib
+    fi
+
 jobs:
   include:
   # Formatting & other lints that do not require compilation
   - name: lints
+    os: linux
     install:
     - rustup component add rustfmt
     - rustfmt -V
@@ -76,6 +87,7 @@ jobs:
 
   # Clippy linting
   - name: clippy
+    os: linux
     install:
     - rustup component add clippy
     - cargo clippy --version
@@ -100,11 +112,13 @@ jobs:
 
   # Benchmarks
   - name: linux-benches
+    os: linux
     script:
     - cargo bench --all --no-run
 
   # Non-fatal checks
   - name: deadlinks
+    os: linux
     env: FEATURE=non-fatal-checks
     install:
     - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
