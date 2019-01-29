@@ -31,10 +31,23 @@ rust:
   # Sync with badge in README.md
   - 1.31.0
 
+env:
+  global:
+  - DEADLINKS_VERS=0.3.0
+  - SODIUM_VERS=1.0.16
+  - RUSTFLAGS="-D warnings"
+
+
 matrix:
   allow_failures:
   - env: FEATURE=non-fatal-checks
   fast_finish: true
+
+  include:
+    - os: linux
+      env:
+      - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+      - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 
 cache:
   cargo: true
@@ -42,14 +55,6 @@ cache:
   - node_modules
 
 dist: trusty
-
-env:
-  global:
-  - DEADLINKS_VERS=0.3.0
-  - SODIUM_VERS=1.0.16
-  - RUSTFLAGS="-D warnings"
-  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
-  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 
 jobs:
   include:
@@ -79,10 +84,21 @@ jobs:
 
   # Tests
   - name: linux-tests
+    os: linux
     script:
     - cargo test --all
 
-  # Tests
+  - name: windows-tests
+    os: windows
+    script:
+    - cargo test --all    
+  
+  - name: osx-tests
+    os: osx
+    script:
+    - cargo test --all  
+
+  # Benchmarks
   - name: linux-benches
     script:
     - cargo bench --all --no-run
