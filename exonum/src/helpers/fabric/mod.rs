@@ -164,6 +164,10 @@ pub mod keys {
     /// Set by `generate-testnet` command.
     pub const CONFIGS: ContextKey<Vec<NodeConfig>> = context_key!("configs");
 
+    /// Initial service state.
+    /// Set by `generate-common` command.
+    pub const SERVICES: ContextKey<AbstractConfig> = context_key!("services");
+
     /// Services configuration.
     /// Set by `generate-testnet` command.
     pub const SERVICES_CONFIG: ContextKey<AbstractConfig> = context_key!("services_config");

@@ -378,8 +378,10 @@ impl Command for GenerateCommonConfig {
             .arg::<u16>("VALIDATORS_COUNT")
             .expect("VALIDATORS_COUNT not found");
 
+        context.set(keys::SERVICES, AbstractConfig::default());
         context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
+        let services = new_context.get(keys::SERVICES).unwrap_or_default();
         let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
         let mut general_config = AbstractConfig::default();
@@ -389,7 +391,7 @@ impl Command for GenerateCommonConfig {
         );
 
         let template = CommonConfigTemplate {
-            // TODO: insert default "services" value here
+            services,
             services_config,
             general_config,
             ..CommonConfigTemplate::default()

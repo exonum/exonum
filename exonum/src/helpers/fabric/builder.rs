@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     ffi::OsString,
     fmt,
     panic::{self, PanicInfo},
@@ -28,7 +28,7 @@ use super::{
     keys,
     maintenance::Maintenance,
     password::{PassInputMethod, SecretKeyType},
-    CommandName, Context, ServiceFactory,
+    Argument, CommandExtension, CommandName, Context, ServiceFactory,
 };
 
 use crate::blockchain::Service;
@@ -107,9 +107,14 @@ impl NodeBuilder {
                 .iter()
                 .map(|f| f.service_name().to_owned())
                 .collect();
-            let info: Box<dyn Command> = Box::new(Info::new(services));
+            let info: Box<dyn Command> = Box::new(Info::new(services.clone()));
             self.commands
                 .insert(info.name(), CollectedCommand::new(info));
+            if let Some(command) = self.commands.get_mut(GenerateCommonConfig.name()) {
+                command.extend(Some(Box::new(DefaultServiceStateExtension {
+                    service_names: services,
+                })));
+            }
         }
 
         let old_hook = panic::take_hook();
@@ -185,5 +190,28 @@ impl fmt::Debug for NodeBuilder {
             self.commands.values(),
             self.service_factories.len()
         )
+    }
+}
+
+struct DefaultServiceStateExtension {
+    service_names: Vec<String>,
+}
+
+impl CommandExtension for DefaultServiceStateExtension {
+    fn args(&self) -> Vec<Argument> {
+        vec![]
+    }
+
+    fn execute(&self, mut context: Context) -> Result<Context, failure::Error> {
+        let mut enabled = BTreeMap::new();
+        enabled.insert("enabled", true);
+
+        let mut services = context.get(keys::SERVICES).unwrap_or_default();
+        for name in &self.service_names {
+            services.insert(name.clone(), enabled.clone().into());
+        }
+        context.set(keys::SERVICES, services);
+
+        Ok(context)
     }
 }
