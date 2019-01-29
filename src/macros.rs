@@ -26,6 +26,7 @@ macro_rules! concat_keys {
         let capacity = concat_keys!(@capacity $($key),+);
         let mut buf = Vec::with_capacity(capacity);
 
+        #[allow(unsafe_code)]
         unsafe {
             buf.set_len(capacity);
         }

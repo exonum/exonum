@@ -106,7 +106,7 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
-#![warn(missing_debug_implementations, bare_trait_objects)]
+#![warn(missing_debug_implementations, unsafe_code, bare_trait_objects)]
 #![warn(clippy::pedantic)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
