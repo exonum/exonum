@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{GenesisConfig, ValidatorKeys},
+    blockchain::{GenesisConfigBuilder, ValidatorKeys},
     node::{Node, NodeApiConfig, NodeConfig},
     storage::MemoryDB,
 };
@@ -27,7 +27,9 @@ fn node_config() -> NodeConfig {
         consensus_key: consensus_public_key,
         service_key: service_public_key,
     };
-    let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
+    let genesis = GenesisConfigBuilder::new()
+        .validators(std::iter::once(validator_keys))
+        .finish();
 
     let api_address = "0.0.0.0:8000".parse().unwrap();
     let api_cfg = NodeApiConfig {

@@ -34,7 +34,7 @@
 pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, ServiceConfig, StoredConfiguration, ValidatorKeys},
-    genesis::GenesisConfig,
+    genesis::{GenesisConfig, GenesisConfigBuilder},
     schema::{Schema, TxLocation},
     service::{Service, ServiceContext, SharedNodeState},
     transaction::{
@@ -235,6 +235,11 @@ impl Blockchain {
             let mut fork = self.fork();
             // Update service tables
             for (_, service) in self.service_map.iter() {
+                let enabled = cfg
+                    .services
+                    .get(service.service_name())
+                    .map(|s| s.enabled)
+                    .unwrap_or(true);
                 let cfg = service.initialize(&mut fork);
                 let name = service.service_name();
                 if config_propose.services.contains_key(name) {
@@ -246,8 +251,7 @@ impl Blockchain {
                 config_propose.services.insert(
                     name.into(),
                     ServiceConfig {
-                        /// TODO: thread initial "enabled" state via GenesisConfig
-                        enabled: true,
+                        enabled,
                         private: cfg,
                     },
                 );

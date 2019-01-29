@@ -15,7 +15,10 @@
 use serde::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ConsensusConfig, GenesisConfig, ServiceConfig, StoredConfiguration, ValidatorKeys},
+    blockchain::{
+        ConsensusConfig, GenesisConfig, GenesisConfigBuilder, ServiceConfig, StoredConfiguration,
+        ValidatorKeys,
+    },
     crypto::{self, CryptoHash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     messages::{Message, Precommit, Propose, Signed},
@@ -68,7 +71,9 @@ impl TestNetwork {
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
     pub fn genesis_config(&self) -> GenesisConfig {
-        GenesisConfig::new(self.validators.iter().map(TestNode::public_keys))
+        GenesisConfigBuilder::new()
+            .validators(self.validators.iter().map(TestNode::public_keys))
+            .finish()
     }
 
     /// Updates the test network by the new set of nodes.

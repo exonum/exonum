@@ -15,7 +15,7 @@
 use toml::Value;
 
 use exonum::{
-    blockchain::{GenesisConfig, ValidatorKeys},
+    blockchain::{GenesisConfigBuilder, ValidatorKeys},
     crypto::gen_keypair,
     helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
     node::State,
@@ -168,8 +168,8 @@ pub fn generate_testnet_config(
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .unzip();
-    let genesis =
-        GenesisConfig::new(
+    let genesis = GenesisConfigBuilder::new()
+        .validators(
             validators
                 .iter()
                 .zip(services.iter())
@@ -177,7 +177,8 @@ pub fn generate_testnet_config(
                     consensus_key: (x.0).0,
                     service_key: (x.1).0,
                 }),
-        );
+        )
+        .finish();
 
     let mut service_config: BTreeMap<String, Value> = BTreeMap::new();
 

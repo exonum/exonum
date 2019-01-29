@@ -21,6 +21,8 @@ min_propose_timeout = 10
 max_propose_timeout = 200
 propose_timeout_threshold = 500
 
+[genesis.services]
+
 [mempool]
 
 [mempool.events_pool_capacity]

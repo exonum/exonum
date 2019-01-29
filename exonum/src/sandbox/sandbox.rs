@@ -33,7 +33,7 @@ use super::{
 };
 use crate::{
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfigBuilder, Schema, Service,
         SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
@@ -1063,16 +1063,18 @@ fn sandbox_with_services_uninitialized(
         ApiSender::new(api_channel.0.clone()),
     );
 
-    let genesis = GenesisConfig::new_with_consensus(
-        consensus,
-        validators
-            .iter()
-            .zip(service_keys.iter())
-            .map(|x| ValidatorKeys {
-                consensus_key: (x.0).0,
-                service_key: (x.1).0,
-            }),
-    );
+    let genesis = GenesisConfigBuilder::new()
+        .consensus(consensus)
+        .validators(
+            validators
+                .iter()
+                .zip(service_keys.iter())
+                .map(|x| ValidatorKeys {
+                    consensus_key: (x.0).0,
+                    service_key: (x.1).0,
+                }),
+        )
+        .finish();
 
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);

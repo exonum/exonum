@@ -119,7 +119,7 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 
 /// Creates a blockchain with no blocks.
 pub fn create_blockchain() -> Blockchain {
-    use exonum::blockchain::{GenesisConfig, ValidatorKeys};
+    use exonum::blockchain::{GenesisConfigBuilder, ValidatorKeys};
 
     let (consensus_key, _) = consensus_keys();
     let service_keys = crypto::gen_keypair();
@@ -137,9 +137,10 @@ pub fn create_blockchain() -> Blockchain {
         consensus_key,
         service_key: service_keys.0,
     };
-    blockchain
-        .initialize(GenesisConfig::new(vec![keys].into_iter()))
-        .unwrap();
+    let genesis = GenesisConfigBuilder::new()
+        .validators(std::iter::once(keys))
+        .finish();
+    blockchain.initialize(genesis).unwrap();
     blockchain
 }
 

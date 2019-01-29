@@ -36,7 +36,7 @@ use super::{
     Argument, CommandName, Context, DEFAULT_EXONUM_LISTEN_PORT,
 };
 use crate::api::backends::actix::AllowOrigin;
-use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
+use crate::blockchain::{config::ValidatorKeys, GenesisConfig, GenesisConfigBuilder};
 use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
@@ -666,10 +666,11 @@ impl Finalize {
         template: CommonConfigTemplate,
         configs: &[NodePublicConfig],
     ) -> GenesisConfig {
-        GenesisConfig::new_with_consensus(
-            template.consensus_config,
-            configs.iter().map(|c| c.validator_keys),
-        )
+        GenesisConfigBuilder::new()
+            .validators(configs.iter().map(|c| c.validator_keys))
+            .consensus(template.consensus_config)
+            // TODO: set initial service state from configuration file
+            .finish()
     }
 
     fn reduce_configs(

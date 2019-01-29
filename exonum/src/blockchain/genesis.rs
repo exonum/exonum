@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::BTreeMap;
+
 use super::config::{ConsensusConfig, ValidatorKeys};
 
 /// The initial configuration which is committed into the genesis block.
@@ -20,30 +22,67 @@ use super::config::{ConsensusConfig, ValidatorKeys};
 /// when the blockchain is initially launched. This block can contain some service
 /// data, but does not include transactions.
 ///
-/// `GenesisConfig` includes consensus related configuration and the public keys of validators.
+/// `GenesisConfig` includes consensus related configuration, the public keys of validators,
+/// and initial service state.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GenesisConfig {
     /// Consensus configuration.
     pub consensus: ConsensusConfig,
     /// List of public keys of validators.
     pub validator_keys: Vec<ValidatorKeys>,
+    /// Initial state of services.
+    #[serde(default)]
+    pub services: BTreeMap<String, ServiceState>,
 }
 
-impl GenesisConfig {
-    /// Creates a default configuration from the given list of public keys.
-    pub fn new<I: Iterator<Item = ValidatorKeys>>(validators: I) -> Self {
-        Self::new_with_consensus(ConsensusConfig::default(), validators)
+/// Initial service state.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ServiceState {
+    /// Service is enabled.
+    pub enabled: bool,
+}
+
+/// A builder for [`GenesisConfig`].
+///
+/// [`GenesisConfig`]: struct.GenesisConfig.html
+#[derive(Debug)]
+pub struct GenesisConfigBuilder {
+    config: GenesisConfig,
+}
+
+impl GenesisConfigBuilder {
+    /// Initializes a new builder with an empty configuration.
+    pub fn new() -> Self {
+        GenesisConfigBuilder {
+            config: GenesisConfig {
+                consensus: ConsensusConfig::default(),
+                validator_keys: Vec::new(),
+                services: BTreeMap::new(),
+            },
+        }
     }
 
-    /// Creates a configuration from the given consensus configuration and list of public keys.
-    pub fn new_with_consensus<I>(consensus: ConsensusConfig, validator_keys: I) -> Self
-    where
-        I: Iterator<Item = ValidatorKeys>,
-    {
-        consensus.warn_if_nonoptimal();
-        Self {
-            consensus,
-            validator_keys: validator_keys.collect(),
-        }
+    /// Sets validator keys.
+    pub fn validators(mut self, validator_keys: impl Iterator<Item = ValidatorKeys>) -> Self {
+        self.config.validator_keys = validator_keys.collect();
+        self
+    }
+
+    /// Sets consensus configuration.
+    pub fn consensus(mut self, consensus: ConsensusConfig) -> Self {
+        self.config.consensus = consensus;
+        self
+    }
+
+    /// Sets service state configuration.
+    pub fn service_state(mut self, services: BTreeMap<String, ServiceState>) -> Self {
+        self.config.services = services;
+        self
+    }
+
+    /// Returns a complete genesis configuration.
+    pub fn finish(self) -> GenesisConfig {
+        self.config.consensus.warn_if_nonoptimal();
+        self.config
     }
 }
