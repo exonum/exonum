@@ -14,7 +14,7 @@
 
 use crate::TemporaryDB;
 use crate::{
-    views::{IndexAccess, IndexAddress, View},
+    views::{IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
     Database, Fork,
 };
 
@@ -249,10 +249,6 @@ where
     assert_iter(&view, 4, &[(4, 0)]);
 }
 
-fn database() -> TemporaryDB {
-    TemporaryDB::new()
-}
-
 fn _fork_iter<T, I>(db: T, address: I)
 where
     T: Database,
@@ -350,27 +346,27 @@ where
 
 #[test]
 fn fork_iter() {
-    _fork_iter(database(), IDX_NAME);
+    _fork_iter(TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn fork_iter_prefixed() {
-    _fork_iter(database(), PREFIXED_IDX);
+    _fork_iter(TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn changelog() {
-    _changelog(database(), IDX_NAME);
+    _changelog(TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn changelog_prefixed() {
-    _changelog(database(), PREFIXED_IDX);
+    _changelog(TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn multiple_views() {
-    let db = database();
+    let db = TemporaryDB::new();
     let fork = db.fork();
     {
         // Writing to multiple views at the same time
@@ -421,7 +417,7 @@ fn multiple_views() {
 fn multiple_indexes() {
     use crate::{ListIndex, MapIndex};
 
-    let db = database();
+    let db = TemporaryDB::new();
     let fork = db.fork();
     {
         let mut list: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &fork);
@@ -458,7 +454,7 @@ fn multiple_indexes() {
 
 #[test]
 fn views_in_same_family() {
-    let db = database();
+    let db = TemporaryDB::new();
     const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
 
@@ -517,7 +513,7 @@ fn views_in_same_family() {
 fn rollbacks_for_indexes_in_same_family() {
     use crate::ProofListIndex;
 
-    let db = database();
+    let db = TemporaryDB::new();
 
     fn indexes(fork: &Fork) -> (ProofListIndex<&Fork, i64>, ProofListIndex<&Fork, i64>) {
         let list1 = ProofListIndex::new_in_family("foo", &1, fork);
@@ -566,17 +562,17 @@ fn rollbacks_for_indexes_in_same_family() {
 
 #[test]
 fn clear_view() {
-    _clear_view(database(), IDX_NAME);
+    _clear_view(TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn clear_prefixed_view() {
-    _clear_view(database(), PREFIXED_IDX);
+    _clear_view(TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn clear_sibling_views() {
-    let db = database();
+    let db = TemporaryDB::new();
     const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
     const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
 
@@ -631,23 +627,94 @@ fn clear_sibling_views() {
 #[test]
 #[should_panic]
 fn two_mutable_borrows() {
-    _two_mutable_borrows(database(), IDX_NAME);
+    _two_mutable_borrows(TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn two_mutable_prefixed_borrows() {
-    _two_mutable_borrows(database(), PREFIXED_IDX);
+    _two_mutable_borrows(TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_borrows() {
-    _mutable_and_immutable_borrows(database(), IDX_NAME);
+    _mutable_and_immutable_borrows(TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_prefixed_borrows() {
-    _mutable_and_immutable_borrows(database(), PREFIXED_IDX);
+    _mutable_and_immutable_borrows(TemporaryDB::new(), PREFIXED_IDX);
+}
+
+#[test]
+fn test_metadata_index_usual_correct() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    IndexBuilder::from_view(&db.fork())
+        .index_name("simple")
+        .index_type(IndexType::ProofMap)
+        .build();
+    // Checks the index metadata.
+    IndexBuilder::from_view(&db.snapshot())
+        .index_name("simple")
+        .index_type(IndexType::ProofMap)
+        .build();
+}
+
+#[test]
+fn test_metadata_index_family_correct() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    let fork = db.fork();
+    IndexBuilder::from_view(&fork)
+        .index_name("simple")
+        .family_id("family")
+        .index_type(IndexType::ProofMap)
+        .build();
+    db.merge(fork.into_patch()).unwrap();
+    // Checks the index metadata.
+    IndexBuilder::from_view(&db.snapshot())
+        .index_name("simple")
+        .family_id("family")
+        .index_type(IndexType::ProofMap)
+        .build();
+}
+
+#[test]
+#[should_panic(expected = "Saved index type doesn't match specified")]
+fn test_metadata_index_usual_incorrect() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    let fork = db.fork();
+    IndexBuilder::from_view(&fork)
+        .index_name("simple")
+        .index_type(IndexType::ProofMap)
+        .build();
+    db.merge(fork.into_patch()).unwrap();
+    // Checks the index metadata.
+    IndexBuilder::from_view(&db.snapshot())
+        .index_name("simple")
+        .index_type(IndexType::ProofList)
+        .build();
+}
+
+#[test]
+#[should_panic(expected = "Saved index type doesn't match specified")]
+fn test_metadata_index_family_incorrect() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    let fork = db.fork();
+    IndexBuilder::from_view(&fork)
+        .index_name("simple")
+        .index_type(IndexType::ProofMap)
+        .family_id("family")
+        .build();
+    db.merge(fork.into_patch()).unwrap();
+    // Checks the index metadata.
+    IndexBuilder::from_view(&db.snapshot())
+        .index_name("simple")
+        .index_type(IndexType::ProofList)
+        .build();
 }
