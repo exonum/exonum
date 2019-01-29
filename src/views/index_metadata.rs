@@ -55,7 +55,6 @@ impl BinaryValue for IndexType {
     }
 }
 
-#[allow(unsafe_code)]
 pub fn check_or_create_metadata<T: IndexAccess>(
     snapshot: T,
     address: &IndexAddress,
@@ -64,12 +63,12 @@ pub fn check_or_create_metadata<T: IndexAccess>(
 ) {
     let address = {
         let mut metadata_address = address.append_name(INDEX_METADATA_NAME);
-        // Uses a single metadata insance for the all indexes in family.
+        // We sses a single metadata insance for the all indexes in family.
         metadata_address.bytes = None;
         metadata_address
     };
 
-    let maybe_fork = {
+    let snapshot = {
         let metadata = IndexMetadata {
             view: View::new(snapshot, address.clone()),
         };
@@ -87,15 +86,19 @@ pub fn check_or_create_metadata<T: IndexAccess>(
             );
             return;
         }
-        unsafe { metadata.view.snapshot.fork() }
+        metadata.view.snapshot
     };
 
-    if let Some(fork) = maybe_fork {
-        let mut metadata_mut = IndexMetadata {
-            view: View::new(fork, address.clone()),
-        };
-        metadata_mut.set_index_type(index_type);
-        metadata_mut.set_has_parent(has_parent);
+    // Unsafe method `snapshot.fork()` here is safe because we never use fork outside this block.
+    #[allow(unsafe_code)]
+    unsafe {
+        if let Some(fork) = snapshot.fork() {
+            let mut metadata_mut = IndexMetadata {
+                view: View::new(fork, address.clone()),
+            };
+            metadata_mut.set_index_type(index_type);
+            metadata_mut.set_has_parent(has_parent);
+        }
     }
 }
 
