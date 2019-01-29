@@ -91,12 +91,12 @@ jobs:
   - name: windows-tests
     os: windows
     script:
-    - cargo test --all    
+    - cargo test --tests
   
   - name: osx-tests
     os: osx
     script:
-    - cargo test --all  
+    - cargo test --tests
 
   # Benchmarks
   - name: linux-benches
