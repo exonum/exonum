@@ -113,32 +113,33 @@ impl StaticServiceDispatcher {
         self.service_map.clone()
     }
 
-    // TODO clarify if we need this method
-    pub fn service(&self, service_id: u16) -> Option<&Box<dyn Service>>
+    fn service(&self, service_id: u16) -> Result<&Box<dyn Service>, failure::Error>
     {
         self.service_map.get(&service_id)
+            .ok_or_else(|| {
+                failure::err_msg(format!(
+                    "Service not found. Service id: {}",
+                    service_id
+                ))
+            })
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>
+    // TODO Do we need this method? It's only used in `struct Blockchain`.
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>
     {
         // TODO getting service twice? in execute_transaction and here
-        let service = self.service(raw.service_id()).ok_or_else(|| format_err!("Service not found."))?;
+        let service = self.service(raw.service_id())?;
         service.tx_from_raw(raw)
     }
 
     pub fn execute_transaction(&self, raw: Signed<RawTransaction>, fork: &mut Fork) -> Result<TransactionResult, failure::Error>
     {
         let (tx, raw, service_name) = {
-            let service_name = self.service(raw.service_id())
-                .ok_or_else(|| {
-                    failure::err_msg(format!(
-                        "Service not found. Service id: {}",
-                        raw.service_id()
-                    ))
-                })?
-                .service_name();
+            let service = self.service(raw.service_id())?;
+            
+            let service_name = service.service_name();
 
-            let tx = self.tx_from_raw(raw.payload().clone()).map_err(|error| {
+            let tx = service.tx_from_raw(raw.payload().clone()).map_err(|error| {
                 format_err!("Service <{}>: {}, tx: {:?}", service_name, error, raw.hash())
             })?;
             (tx, raw, service_name)
@@ -238,11 +239,9 @@ impl Blockchain {
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        let service = self
-            .dispatcher
-            .service(raw.service_id())
-            .ok_or_else(|| format_err!("Service not found."))?;
-        service.tx_from_raw(raw)
+        // TODO do we need this method to be public?
+        // It's used for checking in consensus.rs and in explorer/mod.rs
+        self.dispatcher.tx_from_raw(raw)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -375,6 +374,7 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
+    // This method is needed for EJB.
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
