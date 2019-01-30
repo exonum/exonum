@@ -16,11 +16,12 @@
 
 use std::marker::PhantomData;
 
+use exonum_crypto::Hash;
+
 use crate::{
     views::{IndexAccess, IndexBuilder, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
-use exonum_crypto::Hash;
 
 /// An index that may only contain one element.
 ///

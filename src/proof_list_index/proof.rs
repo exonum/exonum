@@ -15,12 +15,13 @@
 use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
+use exonum_crypto::Hash;
+
 use super::{
     super::{BinaryValue, UniqueHash},
     key::ProofListKey,
     HashTag,
 };
-use exonum_crypto::Hash;
 
 /// Encapsulates a proof of absence for `ProofListIndex`.
 ///

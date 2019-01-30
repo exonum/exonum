@@ -12,23 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt::Debug;
+
 use hex::FromHex;
 use rand::{thread_rng, Rng, RngCore};
 use serde::Serialize;
 use serde_derive::Serialize;
 use serde_json::{from_str, to_string};
 
-use std::fmt::Debug;
+use exonum_crypto::Hash;
 
-use crate::proof_list_index::{
-    ListProof::{self, *},
-    ProofListIndex,
-};
 use crate::{
+    proof_list_index::{
+        ListProof::{self, {Full, Leaf, Left, Right}},
+        ProofListIndex,
+    },
     hash::{HashTag, UniqueHash},
     BinaryValue, Database, TemporaryDB,
 };
-use exonum_crypto::Hash;
 
 const IDX_NAME: &'static str = "idx_name";
 

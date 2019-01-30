@@ -16,16 +16,17 @@
 
 //! Property testing for list index and proof list index as a rust collection.
 
-mod common;
-
 use modifier::Modifier;
 use proptest::{
     collection::vec, num, prop_assert, prop_oneof, strategy, strategy::Strategy,
     test_runner::TestCaseResult,
 };
 
-use crate::common::ACTIONS_MAX_LEN;
 use exonum_merkledb::{BinaryValue, Fork, ListIndex, ProofListIndex, UniqueHash};
+
+use crate::common::ACTIONS_MAX_LEN;
+
+mod common;
 
 #[derive(Debug, Clone)]
 enum ListAction<V> {

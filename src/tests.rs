@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::Hash;
+
 use super::{
     Database, Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
     Snapshot, SparseListIndex, TemporaryDB, ValueSetIndex,
 };
-use exonum_crypto::Hash;
 use crate::views::IndexAccess;
 
 const IDX_NAME: &'static str = "idx_name";

@@ -20,11 +20,12 @@
 
 use std::marker::PhantomData;
 
+use exonum_crypto::Hash;
+
 use super::{
     views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
-use exonum_crypto::Hash;
 
 /// A set of value items.
 ///

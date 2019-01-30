@@ -77,7 +77,7 @@ impl IndexMetadata {
         })
     }
 
-     fn write_to_view(self, mut view: View<&Fork>) {
+    fn write_to_view(self, mut view: View<&Fork>) {
         view.put("index_type", self.index_type);
         view.put("has_parent", self.has_parent);
     }

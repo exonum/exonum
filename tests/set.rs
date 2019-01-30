@@ -16,7 +16,8 @@
 
 //! Property testing for key set index and value set index as a rust collection.
 
-mod common;
+use std::collections::HashSet;
+use std::hash::Hash;
 
 use modifier::Modifier;
 use proptest::{
@@ -24,11 +25,11 @@ use proptest::{
     test_runner::TestCaseResult,
 };
 
-use std::collections::HashSet;
-use std::hash::Hash;
+use exonum_merkledb::{Fork, KeySetIndex, ValueSetIndex};
 
 use crate::common::ACTIONS_MAX_LEN;
-use exonum_merkledb::{Fork, KeySetIndex, ValueSetIndex};
+
+mod common;
 
 #[derive(Debug, Clone)]
 enum SetAction<V> {

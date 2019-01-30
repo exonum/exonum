@@ -22,13 +22,14 @@ use std::{
     ops::{Bound, RangeBounds},
 };
 
-use self::{key::ProofListKey, proof::ProofOfAbsence};
+use exonum_crypto::Hash;
+
 use crate::{
     hash::HashTag,
     views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
-use exonum_crypto::Hash;
+use self::{key::ProofListKey, proof::ProofOfAbsence};
 
 mod key;
 mod proof;

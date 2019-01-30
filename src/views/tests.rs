@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::TemporaryDB;
 use crate::{
     views::{IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
-    Database, Fork,
+    Database, Fork, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";

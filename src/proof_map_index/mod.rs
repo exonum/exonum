@@ -23,15 +23,16 @@ pub use self::{
 
 use std::{fmt, marker::PhantomData};
 
-use self::{
-    key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
-    proof::{create_multiproof, create_proof},
-};
+use exonum_crypto::{Hash, HashStream};
+
 use crate::{
     views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork, UniqueHash,
 };
-use exonum_crypto::{Hash, HashStream};
+use self::{
+    key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
+    proof::{create_multiproof, create_proof},
+};
 
 mod key;
 mod node;
