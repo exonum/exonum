@@ -47,6 +47,7 @@ impl Serialize for ProofPath {
     }
 }
 
+#[allow(clippy::use_self)]
 impl<'de> Deserialize<'de> for ProofPath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

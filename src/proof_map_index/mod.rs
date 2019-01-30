@@ -862,6 +862,7 @@ where
     }
 }
 
+#[allow(clippy::use_self)]
 impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: IndexAccess,

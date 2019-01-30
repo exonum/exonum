@@ -3,7 +3,6 @@ language: rust
 addons:
   apt:
     sources:
-    - sourceline: 'ppa:giskou/librocksdb'
     - sourceline: 'ppa:maarten-fonville/protobuf'
     - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
     packages:
@@ -17,7 +16,6 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
@@ -34,7 +32,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.31.0
+  - 1.32.0
 
 env:
   global:
@@ -58,7 +56,6 @@ before_script:
   - cargo update
   - |
     if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
-      export ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
       export SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
     fi
     if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
@@ -110,7 +107,7 @@ jobs:
     script:
     - cargo test --tests
 
-  # Benchmarks
+# Benchmarks
   - name: linux-benches
     os: linux
     script:

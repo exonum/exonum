@@ -16,20 +16,16 @@
 
 //! An implementation of `RocksDB` database.
 
-pub use exonum_rocksdb::{
-    BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions,
-};
+pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
 use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use exonum_rocksdb::{
-    self, utils::get_cf_names, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
-};
+use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
 
 use crate::{db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 
-impl From<exonum_rocksdb::Error> for crate::Error {
-    fn from(err: exonum_rocksdb::Error) -> Self {
+impl From<rocksdb::Error> for crate::Error {
+    fn from(err: rocksdb::Error) -> Self {
         Self::new(err.description())
     }
 }
@@ -41,7 +37,7 @@ impl From<exonum_rocksdb::Error> for crate::Error {
 /// This structure is required to potentially adapt the interface to
 /// use different databases.
 pub struct RocksDB {
-    db: Arc<exonum_rocksdb::DB>,
+    db: Arc<rocksdb::DB>,
 }
 
 impl From<DbOptions> for RocksDbOptions {
@@ -61,8 +57,8 @@ impl From<&DbOptions> for RocksDbOptions {
 
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
-    snapshot: exonum_rocksdb::Snapshot<'static>,
-    db: Arc<exonum_rocksdb::DB>,
+    snapshot: rocksdb::Snapshot<'static>,
+    db: Arc<rocksdb::DB>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -80,11 +76,11 @@ impl RocksDB {
     /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> crate::Result<Self> {
         let db = {
-            if let Ok(names) = get_cf_names(&path) {
+            if let Ok(names) = rocksdb::DB::list_cf(&RocksDbOptions::default(), &path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                exonum_rocksdb::DB::open_cf(&options.into(), path, cf_names.as_ref())?
+                rocksdb::DB::open_cf(&options.into(), path, cf_names.as_ref())?
             } else {
-                exonum_rocksdb::DB::open(&options.into(), path)?
+                rocksdb::DB::open(&options.into(), path)?
             }
         };
         Ok(Self { db: Arc::new(db) })
@@ -170,7 +166,7 @@ impl Snapshot for RocksDBSnapshot {
     }
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        use exonum_rocksdb::{Direction, IteratorMode};
+        use rocksdb::{Direction, IteratorMode};
         let iter = match self.db.cf_handle(name) {
             Some(cf) => self
                 .snapshot
