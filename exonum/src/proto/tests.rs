@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use super::schema;
 use super::ProtobufConvert;
-use crate::crypto::{self, Hash, PublicKey};
+use crate::crypto::{self, Hash, PublicKey, Signature};
 use crate::messages::BinaryForm;
 
 #[test]
@@ -72,6 +72,32 @@ fn test_pubkey_wrong_pb_convert() {
     let mut pb_key = schema::helpers::PublicKey::new();
     pb_key.set_data([7; crypto::PUBLIC_KEY_LENGTH - 1].to_vec());
     assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
+}
+
+#[test]
+fn test_signature_pb_convert() {
+    let data: &[u8] = &[8; crypto::SIGNATURE_LENGTH];
+    let sign = Signature::from_slice(data).unwrap();
+
+    let pb_sign = sign.to_pb();
+    assert_eq!(pb_sign.get_data(), data);
+
+    let sign_round_trip: Signature = ProtobufConvert::from_pb(pb_sign).unwrap();
+    assert_eq!(sign_round_trip, sign);
+}
+
+#[test]
+fn test_signature_wrong_pb_convert() {
+    let pb_sign = schema::helpers::Signature::new();
+    assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
+
+    let mut pb_sign = schema::helpers::Signature::new();
+    pb_sign.set_data([8; crypto::SIGNATURE_LENGTH + 1].to_vec());
+    assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
+
+    let mut pb_sign = schema::helpers::Signature::new();
+    pb_sign.set_data([8; crypto::SIGNATURE_LENGTH - 1].to_vec());
+    assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
 }
 
 #[test]

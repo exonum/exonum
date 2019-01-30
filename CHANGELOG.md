@@ -28,6 +28,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `allow-origin` for `localhost` for public and private api in
   development mode by default. (#1234)
 
+- Added `ProtobufConvert` implementation for `Signature`. (#1241)
+
 ## 0.10.3 - 2019-01-22
 
 ### Internal Improvements
