@@ -136,15 +136,16 @@ impl<T: IndexAccess> IndexBuilder<T> {
     /// # Panics
     ///
     /// Panics if index metadata doesn't match expected.
-    pub fn build(self) -> View<T> {
-        if let Some(index_type) = self.index_type {
+    pub fn build(self) -> (View<T>, Option<index_metadata::IndexMetadataAddress>) {
+        let metadata_address = self.index_type.map(|index_type| {
             index_metadata::check_or_create_metadata(
                 self.index_access.clone(),
                 &self.address,
                 &index_metadata::IndexMetadata { index_type },
-            );
-        }
-        View::new(self.index_access, self.address)
+            )
+        });
+        let view = View::new(self.index_access, self.address);
+        (view, metadata_address)
     }
 }
 

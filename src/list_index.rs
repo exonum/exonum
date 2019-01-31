@@ -17,7 +17,7 @@
 //! The given section contains methods related to `ListIndex` and the iterator
 //! over the items of this list.
 
-use std::{cell::Cell, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
@@ -77,12 +77,12 @@ where
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let base = IndexBuilder::new(view)
+    pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
+        let (base, metadata_address) = IndexBuilder::new(index_access.clone())
             .index_type(IndexType::List)
             .index_name(index_name)
             .build();
-        let length = IndexState::new(&base);
+        let length = IndexState::new(index_access, metadata_address.unwrap());
 
         Self {
             base,
@@ -112,18 +112,18 @@ where
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
+    pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
     where
         I: BinaryKey,
         I: ?Sized,
         S: Into<String>,
     {
-        let base = IndexBuilder::new(view)
+        let (base, metadata_address) = IndexBuilder::new(index_access.clone())
             .index_type(IndexType::List)
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let length = IndexState::new(&base);
+        let length = IndexState::new(index_access, metadata_address.unwrap());
 
         Self {
             base,

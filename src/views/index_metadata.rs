@@ -174,8 +174,8 @@ where
     T: IndexAccess,
 {
     /// TODO Add documentation. [ECR-2820]
-    pub fn new(view: &View<T>) -> Self {
-        let view = IndexMetadataView::new(view.index_access.clone(), &view.address);
+    pub fn new(index_access: T, metadata_address: IndexMetadataAddress) -> Self {
+        let view = IndexMetadataView::new(index_access, metadata_address);
         Self {
             view,
             state: Cell::new(None),

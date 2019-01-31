@@ -79,7 +79,7 @@ where
             base: IndexBuilder::new(view)
                 .index_type(IndexType::KeySet)
                 .index_name(index_name)
-                .build(),
+                .build().0,
             _k: PhantomData,
         }
     }
@@ -116,7 +116,7 @@ where
                 .index_type(IndexType::KeySet)
                 .index_name(family_name)
                 .family_id(index_id)
-                .build(),
+                .build().0,
             _k: PhantomData,
         }
     }
