@@ -23,6 +23,7 @@ use super::{IndexAccess, IndexAddress, View};
 use crate::{BinaryValue, Fork};
 
 const INDEX_METADATA_NAME: &str = "__INDEX_METADATA__";
+const INDEX_TYPE_NAME: &str = "index_type";
 
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
 pub enum IndexType {
@@ -72,8 +73,6 @@ impl From<&IndexAddress> for IndexMetadataAddress {
 pub struct IndexMetadata {
     /// Type of the specified index.
     pub index_type: IndexType,
-    /// Property that indicates whether the index is a family.
-    pub has_parent: bool,
 }
 
 pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
@@ -117,23 +116,15 @@ impl<T: IndexAccess> IndexMetadataView<T> {
     }
 
     pub fn index_metadata(&self) -> Option<IndexMetadata> {
-        let index_type = self.view.get("index_type")?;
-        let has_parent = self
-            .view
-            .get("has_parent")
-            .expect("Index metadata is inconsistent");
-
-        Some(IndexMetadata {
-            index_type,
-            has_parent,
-        })
+        self.view
+            .get(INDEX_TYPE_NAME)
+            .map(|index_type| IndexMetadata { index_type })
     }
 }
 
 impl IndexMetadataView<&Fork> {
     fn set_index_metadata(&mut self, metadata: &IndexMetadata) {
-        self.view.put("index_type", metadata.index_type);
-        self.view.put("has_parent", metadata.has_parent);
+        self.view.put(INDEX_TYPE_NAME, metadata.index_type);
     }
 }
 

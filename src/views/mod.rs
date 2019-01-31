@@ -123,7 +123,7 @@ impl<T: IndexAccess> IndexBuilder<T> {
         }
     }
 
-    /// TODO
+    /// Sets the type of the given index.
     pub fn index_type(self, index_type: IndexType) -> Self {
         Self {
             view: self.view,
@@ -139,14 +139,10 @@ impl<T: IndexAccess> IndexBuilder<T> {
     /// Panics if index metadata doesn't match expected.
     pub fn build(self) -> View<T> {
         if let Some(index_type) = self.index_type {
-            let has_parent = self.address.bytes.is_some();
             index_metadata::check_or_create_metadata(
                 self.view.clone(),
                 &self.address,
-                &index_metadata::IndexMetadata {
-                    index_type,
-                    has_parent,
-                },
+                &index_metadata::IndexMetadata { index_type },
             );
         }
         View::new(self.view, self.address)

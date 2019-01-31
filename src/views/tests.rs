@@ -688,14 +688,14 @@ fn test_metadata_index_usual_incorrect() {
     // Creates the index metadata.
     let fork = db.fork();
     IndexBuilder::from_view(&fork)
-        .index_name("simple")
         .index_type(IndexType::ProofMap)
+        .index_name("simple")
         .build();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
     IndexBuilder::from_view(&db.snapshot())
-        .index_name("simple")
         .index_type(IndexType::ProofList)
+        .index_name("simple")
         .build();
 }
 
@@ -706,14 +706,15 @@ fn test_metadata_index_family_incorrect() {
     // Creates the index metadata.
     let fork = db.fork();
     IndexBuilder::from_view(&fork)
-        .index_name("simple")
         .index_type(IndexType::ProofMap)
+        .index_name("simple")
         .family_id("family")
         .build();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
     IndexBuilder::from_view(&db.snapshot())
+        .index_type(IndexType::Map)
         .index_name("simple")
-        .index_type(IndexType::ProofMap)
+        .family_id("family")
         .build();
 }
