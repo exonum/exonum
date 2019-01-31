@@ -86,3 +86,9 @@ impl GenesisConfigBuilder {
         self.config
     }
 }
+
+impl Default for GenesisConfigBuilder {
+    fn default() -> Self {
+        GenesisConfigBuilder::new()
+    }
+}
