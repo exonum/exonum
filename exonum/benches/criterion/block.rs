@@ -79,7 +79,7 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 
 fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Blockchain {
     use exonum::{
-        blockchain::{GenesisConfig, ValidatorKeys},
+        blockchain::{GenesisConfigBuilder, ValidatorKeys},
         crypto,
     };
     use std::sync::Arc;
@@ -95,10 +95,12 @@ fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Bloc
     );
 
     let consensus_keypair = crypto::gen_keypair();
-    let config = GenesisConfig::new(iter::once(ValidatorKeys {
-        consensus_key: consensus_keypair.0,
-        service_key: service_keypair.0,
-    }));
+    let config = GenesisConfigBuilder::new()
+        .validators(iter::once(ValidatorKeys {
+            consensus_key: consensus_keypair.0,
+            service_key: service_keypair.0,
+        }))
+        .finish();
     blockchain.initialize(config).unwrap();
 
     blockchain
