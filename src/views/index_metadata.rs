@@ -61,9 +61,7 @@ pub struct IndexMetadataAddress(IndexAddress);
 
 impl From<&IndexAddress> for IndexMetadataAddress {
     fn from(address: &IndexAddress) -> Self {
-        let mut address = address.append_name(INDEX_METADATA_NAME);
-        // We uses a single metadata insance for the all indexes in family.
-        address.bytes = None;
+        let address = address.append_name(INDEX_METADATA_NAME);
         IndexMetadataAddress(address)
     }
 }
@@ -108,7 +106,10 @@ pub struct IndexMetadataView<T: IndexAccess> {
 }
 
 impl<T: IndexAccess> IndexMetadataView<T> {
-    pub fn new<I: Into<IndexMetadataAddress>>(index_access: T, address: I) -> Self {
+    pub fn new<I>(index_access: T, address: I) -> Self
+    where
+        I: Into<IndexMetadataAddress>,
+    {
         let address = address.into().0;
         Self {
             view: View::new(index_access, address),

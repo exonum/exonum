@@ -68,6 +68,9 @@ impl ChangeSet for ChangesRef<'_> {
 pub trait IndexAccess: Clone {
     type Changes: ChangeSet;
 
+    fn root(&self) -> &str {
+        ""
+    }
     fn snapshot(&self) -> &dyn Snapshot;
     #[allow(unsafe_code)]
     #[doc(hidden)]
@@ -88,9 +91,10 @@ pub struct IndexBuilder<T> {
 impl<T: IndexAccess> IndexBuilder<T> {
     /// Create index from `view'.
     pub fn new(index_access: T) -> Self {
+        let address = IndexAddress::with_root(index_access.root());
         Self {
             index_access,
-            address: IndexAddress::root(),
+            address,
             index_type: None,
         }
     }
@@ -151,9 +155,9 @@ pub struct IndexAddress {
 }
 
 impl IndexAddress {
-    pub fn root() -> Self {
+    pub fn with_root<S: Into<String>>(root: S) -> Self {
         Self {
-            name: String::new(),
+            name: root.into(),
             bytes: None,
         }
     }
@@ -205,19 +209,17 @@ impl IndexAddress {
 
 impl<'a> From<&'a str> for IndexAddress {
     fn from(name: &'a str) -> Self {
-        Self {
-            name: name.to_owned(),
-            bytes: None,
-        }
+        Self::with_root(name)
     }
 }
 
 impl From<String> for IndexAddress {
     fn from(name: String) -> Self {
-        Self { name, bytes: None }
+        Self::with_root(name)
     }
 }
 
+/// TODO should we have this impl in public interface? ECR-2834
 impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     fn from((name, key): (&'a str, &'a K)) -> Self {
         Self {

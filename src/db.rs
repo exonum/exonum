@@ -424,7 +424,9 @@ enum NextIterValue {
 /// let db: Box<Database> = Box::new(TemporaryDB::new());
 /// let fork = db.fork();
 /// {
-///     let mut view  = IndexBuilder::from_address(&fork, "index_name".into()).build();
+///     let mut view  = IndexBuilder::new(&fork)
+///         .index_name("index_name")
+///         .build();
 ///     view.put(&vec![1, 2, 3], vec![123]);
 /// }
 ///
