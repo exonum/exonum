@@ -651,12 +651,12 @@ fn mutable_and_immutable_prefixed_borrows() {
 fn test_metadata_index_usual_correct() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
-    IndexBuilder::from_view(&db.fork())
+    IndexBuilder::new(&db.fork())
         .index_name("simple")
         .index_type(IndexType::ProofMap)
         .build();
     // Checks the index metadata.
-    IndexBuilder::from_view(&db.snapshot())
+    IndexBuilder::new(&db.snapshot())
         .index_name("simple")
         .index_type(IndexType::ProofMap)
         .build();
@@ -667,14 +667,14 @@ fn test_metadata_index_family_correct() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::from_view(&fork)
+    IndexBuilder::new(&fork)
         .index_name("simple")
         .family_id("family")
         .index_type(IndexType::ProofMap)
         .build();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
-    IndexBuilder::from_view(&db.snapshot())
+    IndexBuilder::new(&db.snapshot())
         .index_name("simple")
         .family_id("family")
         .index_type(IndexType::ProofMap)
@@ -687,13 +687,13 @@ fn test_metadata_index_usual_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::from_view(&fork)
+    IndexBuilder::new(&fork)
         .index_type(IndexType::ProofMap)
         .index_name("simple")
         .build();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
-    IndexBuilder::from_view(&db.snapshot())
+    IndexBuilder::new(&db.snapshot())
         .index_type(IndexType::ProofList)
         .index_name("simple")
         .build();
@@ -705,14 +705,14 @@ fn test_metadata_index_family_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::from_view(&fork)
+    IndexBuilder::new(&fork)
         .index_type(IndexType::ProofMap)
         .index_name("simple")
         .family_id("family")
         .build();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
-    IndexBuilder::from_view(&db.snapshot())
+    IndexBuilder::new(&db.snapshot())
         .index_type(IndexType::Map)
         .index_name("simple")
         .family_id("family")

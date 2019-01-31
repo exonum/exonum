@@ -76,27 +76,27 @@ pub struct IndexMetadata {
 }
 
 pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
-    snapshot: T,
+    index_access: T,
     address: I,
     metadata: &IndexMetadata,
 ) {
     let address = address.into();
 
-    let snapshot = {
-        let metadata_view = IndexMetadataView::new(snapshot, address.clone());
+    let index_access = {
+        let metadata_view = IndexMetadataView::new(index_access, address.clone());
         if let Some(saved_metadata) = metadata_view.index_metadata() {
             assert_eq!(
                 metadata, &saved_metadata,
                 "Saved metadata doesn't match specified"
             )
         }
-        metadata_view.view.snapshot
+        metadata_view.view.index_access
     };
 
-    // Unsafe method `snapshot.fork()` here is safe because we never use fork outside this block.
+    // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
     #[allow(unsafe_code)]
     unsafe {
-        if let Some(fork) = snapshot.fork() {
+        if let Some(fork) = index_access.fork() {
             let mut metadata_view = IndexMetadataView::new(fork, address);
             metadata_view.set_index_metadata(&metadata);
         }
@@ -108,10 +108,10 @@ pub struct IndexMetadataView<T: IndexAccess> {
 }
 
 impl<T: IndexAccess> IndexMetadataView<T> {
-    pub fn new<I: Into<IndexMetadataAddress>>(snapshot: T, address: I) -> Self {
+    pub fn new<I: Into<IndexMetadataAddress>>(index_access: T, address: I) -> Self {
         let address = address.into().0;
         Self {
-            view: View::new(snapshot, address),
+            view: View::new(index_access, address),
         }
     }
 

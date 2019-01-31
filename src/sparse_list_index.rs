@@ -137,7 +137,10 @@ where
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
         Self {
-            base: IndexBuilder::from_view(view).index_name(index_name).build(),
+            base: IndexBuilder::new(view)
+                .index_type(IndexType::SparseList)
+                .index_name(index_name)
+                .build(),
             size: Cell::new(None),
             _v: PhantomData,
         }
@@ -175,7 +178,8 @@ where
         S: Into<String>,
     {
         Self {
-            base: IndexBuilder::from_view(view)
+            base: IndexBuilder::new(view)
+                .index_type(IndexType::SparseList)
                 .index_name(family_name)
                 .family_id(index_id)
                 .build(),

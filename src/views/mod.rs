@@ -30,7 +30,7 @@ mod tests;
 // TODO: add documentation [ECR-2820]
 pub struct View<T: IndexAccess> {
     pub address: IndexAddress,
-    pub snapshot: T,
+    pub index_access: T,
     pub changes: T::Changes,
 }
 
@@ -80,31 +80,26 @@ pub trait IndexAccess: Clone {
 // TODO: add documentation [ECR-2820]
 #[derive(Debug)]
 pub struct IndexBuilder<T> {
-    view: T,
+    index_access: T,
     address: IndexAddress,
     index_type: Option<IndexType>,
 }
 
 impl<T: IndexAccess> IndexBuilder<T> {
     /// Create index from `view'.
-    pub fn from_view(view: T) -> Self {
+    pub fn new(index_access: T) -> Self {
         Self {
-            view,
+            index_access,
             address: IndexAddress::root(),
             index_type: None,
         }
-    }
-
-    /// Create index from `view' and `IndexAddress`.
-    pub fn from_address(view: T, address: IndexAddress) -> Self {
-        Self { view, address, index_type: None, }
     }
 
     /// Provides first part of the index address.
     pub fn index_name<S: Into<String>>(self, index_name: S) -> Self {
         let address = self.address.append_name(index_name.into());
         Self {
-            view: self.view,
+            index_access: self.index_access,
             address,
             index_type: self.index_type,
         }
@@ -117,7 +112,7 @@ impl<T: IndexAccess> IndexBuilder<T> {
     {
         let address = self.address.append_bytes(family_id);
         Self {
-            view: self.view,
+            index_access: self.index_access,
             address,
             index_type: self.index_type,
         }
@@ -126,7 +121,7 @@ impl<T: IndexAccess> IndexBuilder<T> {
     /// Sets the type of the given index.
     pub fn index_type(self, index_type: IndexType) -> Self {
         Self {
-            view: self.view,
+            index_access: self.index_access,
             address: self.address,
             index_type: Some(index_type),
         }
@@ -140,12 +135,12 @@ impl<T: IndexAccess> IndexBuilder<T> {
     pub fn build(self) -> View<T> {
         if let Some(index_type) = self.index_type {
             index_metadata::check_or_create_metadata(
-                self.view.clone(),
+                self.index_access.clone(),
                 &self.address,
                 &index_metadata::IndexMetadata { index_type },
             );
         }
-        View::new(self.view, self.address)
+        View::new(self.index_access, self.address)
     }
 }
 
@@ -269,14 +264,18 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 }
 
 impl<T: IndexAccess> View<T> {
-    pub(super) fn new<I: Into<IndexAddress>>(snapshot: T, address: I) -> Self {
+    pub(super) fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
         let address = address.into();
-        let changes = snapshot.changes(&address);
+        let changes = index_access.changes(&address);
         Self {
-            snapshot,
+            index_access,
             changes,
             address,
         }
+    }
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        self.index_access.snapshot()
     }
 
     fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
@@ -294,7 +293,7 @@ impl<T: IndexAccess> View<T> {
         }
 
         let (name, key) = self.address.keyed(key);
-        self.snapshot.snapshot().get(name, &key)
+        self.snapshot().get(name, &key)
     }
 
     fn contains_raw_key(&self, key: &[u8]) -> bool {
@@ -312,7 +311,7 @@ impl<T: IndexAccess> View<T> {
         }
 
         let (name, key) = self.address.keyed(key);
-        self.snapshot.snapshot().contains(name, &key)
+        self.snapshot().contains(name, &key)
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter {
@@ -336,12 +335,7 @@ impl<T: IndexAccess> View<T> {
             Box::new(ChangesIter::new(changes_iter.unwrap()))
         } else {
             Box::new(ForkIter::new(
-                Box::new(SnapshotIter::new(
-                    self.snapshot.snapshot(),
-                    name,
-                    prefix,
-                    &key,
-                )),
+                Box::new(SnapshotIter::new(self.snapshot(), name, prefix, &key)),
                 changes_iter,
             ))
         }
