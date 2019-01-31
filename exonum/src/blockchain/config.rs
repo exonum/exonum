@@ -64,7 +64,7 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Servic-specific configuration.
+    /// Service-specific configuration.
     /// Keys are `service_name` from the `Service` trait.
     #[serde(default)]
     pub services: BTreeMap<String, ServiceConfig>,
