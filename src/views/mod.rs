@@ -23,6 +23,8 @@ use super::{
     BinaryKey, BinaryValue, Fork, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
+mod index_id_pool;
+mod index_metadata;
 #[cfg(test)]
 mod tests;
 
@@ -91,7 +93,7 @@ pub struct IndexBuilder<T> {
 impl<T: IndexAccess> IndexBuilder<T> {
     /// Create index from `view'.
     pub fn new(index_access: T) -> Self {
-        let address = IndexAddress::with_root(index_access.root());
+        let address = IndexAddress::new();
         Self {
             index_access,
             address,
@@ -137,14 +139,18 @@ impl<T: IndexAccess> IndexBuilder<T> {
     ///
     /// Panics if index metadata doesn't match expected.
     pub fn build(self) -> (View<T>, Option<index_metadata::IndexMetadataAddress>) {
-        let metadata_address = self.index_type.map(|index_type| {
+        let index_type = self.index_type;
+        let index_access = self.index_access;
+
+        let index_id = index_id_pool::get_index_id(index_access.clone(), self.address);
+        let metadata_address = index_type.map(|index_type| {
             index_metadata::check_or_create_metadata(
-                self.index_access.clone(),
-                &self.address,
+                index_access.clone(),
+                &index_id,
                 &index_metadata::IndexMetadata { index_type },
             )
         });
-        let view = View::new(self.index_access, self.address);
+        let view = View::new(index_access, index_id);
         (view, metadata_address)
     }
 }
@@ -156,6 +162,13 @@ pub struct IndexAddress {
 }
 
 impl IndexAddress {
+    pub fn new() -> Self {
+        Self {
+            name: String::new(),
+            bytes: None,
+        }
+    }
+
     pub fn with_root<S: Into<String>>(root: S) -> Self {
         Self {
             name: root.into(),

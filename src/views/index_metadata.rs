@@ -127,11 +127,15 @@ impl IndexMetadataView<&Fork> {
 }
 
 /// TODO Add documentation. [ECR-2820]
-pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
+pub fn check_or_create_metadata<T, I>(
     index_access: T,
     address: I,
     metadata: &IndexMetadata,
-) -> IndexMetadataAddress {
+) -> IndexMetadataAddress
+where
+    T: IndexAccess,
+    I: Into<IndexMetadataAddress>,
+{
     let address = address.into();
 
     let (index_access, address) = {
@@ -148,8 +152,8 @@ pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
     // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
     #[allow(unsafe_code)]
     unsafe {
-        if let Some(fork) = index_access.fork() {
-            let mut metadata_view = IndexMetadataView::new(fork, address);
+        if let Some(index_access_mut) = index_access.fork() {
+            let mut metadata_view = IndexMetadataView::new(index_access_mut, address);
             metadata_view.set_index_metadata(&metadata);
             metadata_view.into_inner().1
         } else {
