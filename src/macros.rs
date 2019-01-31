@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// TODO Clarify documentation. [ECR-2820]
 macro_rules! concat_keys {
     (@capacity $key:expr) => ( $key.size() );
     (@capacity $key:expr, $($tail:expr),+) => (

@@ -30,6 +30,10 @@ pub enum HashTag {
     Node = 1,
     /// Hash prefix of the list object.
     ListNode = 2,
+    /// Hash prefix of the map object.
+    MapNode = 3,
+    MapBranchNode = 4,
+    MapLeafNode = 5,
 }
 
 /// Calculate hash value with the specified prefix.
@@ -85,7 +89,7 @@ impl HashTag {
     ///
     /// Empty list hash:
     /// ```text
-    /// h = sha-256( HashTag::List || 0 || Hash::default() )
+    /// h = sha-256( HashTag::ListNode || 0 || Hash::default() )
     /// ```
     pub fn empty_list_hash() -> Hash {
         Hash::from_hex(EMPTY_LIST_HASH).unwrap()
@@ -94,6 +98,32 @@ impl HashTag {
     /// Computes a list hash for the given list of hashes.
     pub fn hash_list(hashes: &[Hash]) -> Hash {
         Self::hash_list_node(hashes.len() as u64, root_hash(hashes))
+    }
+
+    /// Hash of the list object.
+    ///
+    /// ```text
+    /// h = sha-256( HashTag::MapNode || len as u64 || merkle_root )
+    /// ```
+    pub fn hash_map_node(root: Hash) -> Hash {
+        HashStream::new()
+            .update(&[HashTag::MapNode as u8])
+            .update(root.as_ref())
+            .hash()
+    }
+
+    pub fn hash_map_branch(branch_node: &[u8]) -> Hash {
+        HashStream::new()
+            .update(&[HashTag::MapBranchNode as u8])
+            .update(branch_node.as_ref())
+            .hash()
+    }
+
+    pub fn hash_map_leaf(leaf_node: &[u8]) -> Hash {
+        HashStream::new()
+            .update(&[HashTag::MapLeafNode as u8])
+            .update(leaf_node.as_ref())
+            .hash()
     }
 }
 

@@ -627,6 +627,8 @@ fn test_build_proof_in_empty_tree() {
     let proof = table.get_proof([244; 32]);
     assert_eq!(proof.proof_unchecked(), vec![]);
     check_map_proof(proof, None, &table);
+
+    proof.check();
 }
 
 #[test]
@@ -1458,4 +1460,20 @@ fn test_tree_with_hashed_key() {
         table.merkle_root(),
         hash_isolated_node(&ProofPath::new(&other_key), &hash(&vec![1, 2, 3]))
     );
+}
+
+#[test]
+fn test_pmi() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+
+    let mut pmi = ProofMapIndex::new("map", &fork);
+
+    pmi.put(&vec![1], 1);
+    pmi.put(&vec![1, 0], 1);
+    pmi.put(&vec![1, 0, 1], 1);
+
+    dbg!(pmi);
+
+//    dbg!(pmi.get(&vec![1]));
 }

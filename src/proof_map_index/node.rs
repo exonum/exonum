@@ -21,11 +21,10 @@ use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
-use super::{
-    super::{BinaryKey, BinaryValue, UniqueHash},
-    key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
+use crate::{
+    BinaryKey, BinaryValue, UniqueHash, HashTag
 };
-use exonum_crypto::{self, Hash, HASH_SIZE};
+use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
@@ -103,7 +102,19 @@ impl BinaryValue for BranchNode {
 
 impl UniqueHash for BranchNode {
     fn hash(&self) -> Hash {
-        exonum_crypto::hash(&self.raw)
+        let mut bytes: SmallVec<[u8; 256]> = smallvec![0_u8; 132];
+        let mut pos = HASH_SIZE * 2;
+        // Writes hashes to the buffer.
+        bytes[..pos].copy_from_slice(&self.raw[..pos]);
+        pos += self
+            .child_path(ChildKind::Left)
+            .write_compressed(&mut bytes[pos..]);
+        pos += self
+            .child_path(ChildKind::Right)
+            .write_compressed(&mut bytes[pos..]);
+//        exonum_crypto::hash(&bytes[..pos]);
+
+        HashTag::hash_map_branch(&bytes[..pos])
     }
 }
 
