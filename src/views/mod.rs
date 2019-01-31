@@ -14,7 +14,7 @@
 
 #![warn(missing_docs)]
 
-pub use self::index_metadata::IndexType;
+pub use self::index_metadata::{IndexState, IndexType};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 

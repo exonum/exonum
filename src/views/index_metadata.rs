@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
+use std::{borrow::Cow, cell::Cell, fmt};
 
 use enum_primitive_derive::Primitive;
 use failure::{self, ensure, format_err};
@@ -24,7 +24,9 @@ use crate::{BinaryValue, Fork};
 
 const INDEX_METADATA_NAME: &str = "__INDEX_METADATA__";
 const INDEX_TYPE_NAME: &str = "index_type";
+const INDEX_STATE_NAME: &str = "index_state";
 
+/// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
 pub enum IndexType {
     Map = 1,
@@ -56,6 +58,14 @@ impl BinaryValue for IndexType {
     }
 }
 
+/// Metadata for each index that currently stored in the merkledb.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IndexMetadata {
+    /// Type of the specified index.
+    pub index_type: IndexType,
+}
+
+/// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndexMetadataAddress(IndexAddress);
 
@@ -66,47 +76,14 @@ impl From<&IndexAddress> for IndexMetadataAddress {
     }
 }
 
-/// Metadata for each index that currently stored in the merkledb.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct IndexMetadata {
-    /// Type of the specified index.
-    pub index_type: IndexType,
-}
-
-pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
-    index_access: T,
-    address: I,
-    metadata: &IndexMetadata,
-) {
-    let address = address.into();
-
-    let index_access = {
-        let metadata_view = IndexMetadataView::new(index_access, address.clone());
-        if let Some(saved_metadata) = metadata_view.index_metadata() {
-            assert_eq!(
-                metadata, &saved_metadata,
-                "Saved metadata doesn't match specified"
-            )
-        }
-        metadata_view.view.index_access
-    };
-
-    // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
-    #[allow(unsafe_code)]
-    unsafe {
-        if let Some(fork) = index_access.fork() {
-            let mut metadata_view = IndexMetadataView::new(fork, address);
-            metadata_view.set_index_metadata(&metadata);
-        }
-    }
-}
-
-pub struct IndexMetadataView<T: IndexAccess> {
+/// TODO Add documentation. [ECR-2820]
+struct IndexMetadataView<T: IndexAccess> {
     view: View<T>,
 }
 
 impl<T: IndexAccess> IndexMetadataView<T> {
-    pub fn new<I>(index_access: T, address: I) -> Self
+    /// TODO Add documentation. [ECR-2820]
+    fn new<I>(index_access: T, address: I) -> Self
     where
         I: Into<IndexMetadataAddress>,
     {
@@ -116,16 +93,124 @@ impl<T: IndexAccess> IndexMetadataView<T> {
         }
     }
 
-    pub fn index_metadata(&self) -> Option<IndexMetadata> {
+    /// TODO Add documentation. [ECR-2820]
+    fn index_metadata(&self) -> Option<IndexMetadata> {
         self.view
             .get(INDEX_TYPE_NAME)
             .map(|index_type| IndexMetadata { index_type })
     }
+
+    /// TODO Add documentation. [ECR-2820]
+    fn index_state<V: BinaryValue>(&self) -> Option<V> {
+        self.view.get(INDEX_STATE_NAME)
+    }
+
+    /// TODO Add documentation. [ECR-2820]
+    fn into_inner(self) -> (T, IndexMetadataAddress) {
+        (
+            self.view.index_access,
+            IndexMetadataAddress(self.view.address),
+        )
+    }
 }
 
 impl IndexMetadataView<&Fork> {
+    /// TODO Add documentation. [ECR-2820]
+    fn set_index_state<V: BinaryValue>(&mut self, state: V) {
+        self.view.put(INDEX_STATE_NAME, state);
+    }
+
+    /// TODO Add documentation. [ECR-2820]
     fn set_index_metadata(&mut self, metadata: &IndexMetadata) {
         self.view.put(INDEX_TYPE_NAME, metadata.index_type);
+    }
+}
+
+/// TODO Add documentation. [ECR-2820]
+pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
+    index_access: T,
+    address: I,
+    metadata: &IndexMetadata,
+) -> IndexMetadataAddress {
+    let address = address.into();
+
+    let (index_access, address) = {
+        let metadata_view = IndexMetadataView::new(index_access, address);
+        if let Some(saved_metadata) = metadata_view.index_metadata() {
+            assert_eq!(
+                metadata, &saved_metadata,
+                "Saved metadata doesn't match specified"
+            )
+        }
+        metadata_view.into_inner()
+    };
+
+    // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
+    #[allow(unsafe_code)]
+    unsafe {
+        if let Some(fork) = index_access.fork() {
+            let mut metadata_view = IndexMetadataView::new(fork, address);
+            metadata_view.set_index_metadata(&metadata);
+            metadata_view.into_inner().1
+        } else {
+            address
+        }
+    }
+}
+
+/// TODO Add documentation. [ECR-2820]
+pub struct IndexState<T, V>
+where
+    V: BinaryValue,
+    T: IndexAccess,
+{
+    view: IndexMetadataView<T>,
+    state: Cell<Option<V>>,
+}
+
+impl<T, V> IndexState<T, V>
+where
+    V: BinaryValue + Clone + Copy + Default,
+    T: IndexAccess,
+{
+    /// TODO Add documentation. [ECR-2820]
+    pub fn new(view: &View<T>) -> Self {
+        let view = IndexMetadataView::new(view.index_access.clone(), &view.address);
+        Self {
+            view,
+            state: Cell::new(None),
+        }
+    }
+
+    /// TODO Add documentation. [ECR-2820]
+    pub fn get(&self) -> V {
+        if let Some(state) = self.state.get() {
+            return state;
+        }
+        let state = self.view.index_state().unwrap_or_default();
+        self.state.set(Some(state));
+        state
+    }
+}
+
+impl<V> IndexState<&Fork, V>
+where
+    V: BinaryValue + Clone + Copy + Default,
+{
+    /// TODO Add documentation. [ECR-2820]
+    pub fn set(&mut self, state: V) {
+        self.state.set(Some(state));
+        self.view.set_index_state(state)
+    }
+}
+
+impl<T, V> fmt::Debug for IndexState<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "IndexState(..)")
     }
 }
 
