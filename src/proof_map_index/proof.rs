@@ -18,11 +18,11 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::{Hash, HashStream};
 
-use crate::{BinaryKey, BinaryValue, UniqueHash};
 use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
+use crate::{BinaryKey, BinaryValue, UniqueHash};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;

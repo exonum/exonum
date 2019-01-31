@@ -23,11 +23,13 @@ use serde_json::{from_str, to_string};
 use exonum_crypto::Hash;
 
 use crate::{
+    hash::{HashTag, UniqueHash},
     proof_list_index::{
-        ListProof::{self, {Full, Leaf, Left, Right}},
+        ListProof::{
+            self, {Full, Leaf, Left, Right},
+        },
         ProofListIndex,
     },
-    hash::{HashTag, UniqueHash},
     BinaryValue, Database, TemporaryDB,
 };
 

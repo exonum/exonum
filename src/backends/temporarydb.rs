@@ -16,8 +16,8 @@
 
 use tempfile::TempDir;
 
-use crate::{Database, DbOptions, Patch, Result, Snapshot};
 use super::rocksdb::RocksDB;
+use crate::{Database, DbOptions, Patch, Result, Snapshot};
 
 /// Wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.

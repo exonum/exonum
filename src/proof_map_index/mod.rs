@@ -25,13 +25,13 @@ use std::{fmt, marker::PhantomData};
 
 use exonum_crypto::{Hash, HashStream};
 
-use crate::{
-    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork, UniqueHash,
-};
 use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof::{create_multiproof, create_proof},
+};
+use crate::{
+    views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
+    BinaryKey, BinaryValue, Fork, UniqueHash,
 };
 
 mod key;

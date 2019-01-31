@@ -55,6 +55,18 @@ impl BinaryValue for IndexType {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndexMetadataAddress(IndexAddress);
+
+impl From<&IndexAddress> for IndexMetadataAddress {
+    fn from(address: &IndexAddress) -> Self {
+        let mut address = address.append_name(INDEX_METADATA_NAME);
+        // We uses a single metadata insance for the all indexes in family.
+        address.bytes = None;
+        IndexMetadataAddress(address)
+    }
+}
+
 /// Metadata for each index that currently stored in the merkledb.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IndexMetadata {
@@ -64,55 +76,64 @@ pub struct IndexMetadata {
     pub has_parent: bool,
 }
 
-impl IndexMetadata {
-    fn try_read_from_view<T: IndexAccess>(view: &View<T>) -> Option<Self> {
-        let index_type = view.get("index_type")?;
-        let has_parent = view
-            .get("has_parent")
-            .expect("Index metadata is inconsistent");
-
-        Some(Self {
-            index_type,
-            has_parent,
-        })
-    }
-
-    fn write_to_view(self, mut view: View<&Fork>) {
-        view.put("index_type", self.index_type);
-        view.put("has_parent", self.has_parent);
-    }
-}
-
-pub fn check_or_create_metadata<T: IndexAccess>(
+pub fn check_or_create_metadata<T: IndexAccess, I: Into<IndexMetadataAddress>>(
     snapshot: T,
-    address: &IndexAddress,
-    metadata: IndexMetadata,
+    address: I,
+    metadata: &IndexMetadata,
 ) {
-    let address = {
-        let mut metadata_address = address.append_name(INDEX_METADATA_NAME);
-        // We uses a single metadata insance for the all indexes in family.
-        metadata_address.bytes = None;
-        metadata_address
-    };
+    let address = address.into();
 
     let snapshot = {
-        let metadata_view = View::new(snapshot, address.clone());
-        if let Some(saved_metadata) = IndexMetadata::try_read_from_view(&metadata_view) {
+        let metadata_view = IndexMetadataView::new(snapshot, address.clone());
+        if let Some(saved_metadata) = metadata_view.index_metadata() {
             assert_eq!(
-                metadata, saved_metadata,
+                metadata, &saved_metadata,
                 "Saved metadata doesn't match specified"
             )
         }
-        metadata_view.snapshot
+        metadata_view.view.snapshot
     };
 
     // Unsafe method `snapshot.fork()` here is safe because we never use fork outside this block.
     #[allow(unsafe_code)]
     unsafe {
         if let Some(fork) = snapshot.fork() {
-            let metadata_view_mut = View::new(fork, address.clone());
-            metadata.write_to_view(metadata_view_mut);
+            let mut metadata_view = IndexMetadataView::new(fork, address);
+            metadata_view.set_index_metadata(&metadata);
         }
+    }
+}
+
+pub struct IndexMetadataView<T: IndexAccess> {
+    view: View<T>,
+}
+
+impl<T: IndexAccess> IndexMetadataView<T> {
+    pub fn new<I: Into<IndexMetadataAddress>>(snapshot: T, address: I) -> Self {
+        let address = address.into().0;
+        Self {
+            view: View::new(snapshot, address),
+        }
+    }
+
+    pub fn index_metadata(&self) -> Option<IndexMetadata> {
+        let index_type = self.view.get("index_type")?;
+        let has_parent = self
+            .view
+            .get("has_parent")
+            .expect("Index metadata is inconsistent");
+
+        Some(IndexMetadata {
+            index_type,
+            has_parent,
+        })
+    }
+}
+
+impl IndexMetadataView<&Fork> {
+    fn set_index_metadata(&mut self, metadata: &IndexMetadata) {
+        self.view.put("index_type", metadata.index_type);
+        self.view.put("has_parent", metadata.has_parent);
     }
 }
 
