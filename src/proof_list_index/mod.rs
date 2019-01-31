@@ -46,7 +46,7 @@ mod tests;
 #[derive(Debug)]
 pub struct ProofListIndex<T: IndexAccess, V> {
     base: View<T>,
-    state: IndexState<T, u64>,
+    length: IndexState<T, u64>,
     _v: PhantomData<V>,
 }
 
@@ -96,11 +96,11 @@ where
             .index_type(IndexType::ProofList)
             .index_name(index_name)
             .build();
-        let state = IndexState::new(&base);
+        let length = IndexState::new(&base);
 
         Self {
             base,
-            state,
+            length,
             _v: PhantomData,
         }
     }
@@ -143,11 +143,11 @@ where
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let state = IndexState::new(&base);
+        let length = IndexState::new(&base);
 
         Self {
             base,
-            state,
+            length,
             _v: PhantomData,
         }
     }
@@ -284,7 +284,7 @@ where
     /// assert_eq!(1, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.state.get()
+        self.length.get()
     }
 
     /// Returns the height of the proof list.
@@ -475,7 +475,7 @@ where
     V: BinaryValue + UniqueHash,
 {
     fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        self.length.set(len)
     }
 
     fn set_branch(&mut self, key: ProofListKey, hash: Hash) {

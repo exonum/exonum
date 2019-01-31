@@ -20,7 +20,7 @@
 use std::{cell::Cell, marker::PhantomData};
 
 use crate::{
-    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
+    views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork,
 };
 
@@ -36,7 +36,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ListIndex<T: IndexAccess, V> {
     base: View<T>,
-    length: Cell<Option<u64>>,
+    length: IndexState<T, u64>,
     _v: PhantomData<V>,
 }
 
@@ -78,12 +78,15 @@ where
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
+        let base = IndexBuilder::new(view)
+            .index_type(IndexType::List)
+            .index_name(index_name)
+            .build();
+        let length = IndexState::new(&base);
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::List)
-                .index_name(index_name)
-                .build(),
-            length: Cell::new(None),
+            base,
+            length,
             _v: PhantomData,
         }
     }
@@ -115,13 +118,16 @@ where
         I: ?Sized,
         S: Into<String>,
     {
+        let base = IndexBuilder::new(view)
+            .index_type(IndexType::List)
+            .index_name(family_name)
+            .family_id(index_id)
+            .build();
+        let length = IndexState::new(&base);
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::List)
-                .index_name(family_name)
-                .family_id(index_id)
-                .build(),
-            length: Cell::new(None),
+            base,
+            length,
             _v: PhantomData,
         }
     }
@@ -210,12 +216,7 @@ where
     /// assert_eq!(2, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        if let Some(len) = self.length.get() {
-            return len;
-        }
-        let len = self.base.get(&()).unwrap_or(0);
-        self.length.set(Some(len));
-        len
+        self.length.get()
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -273,8 +274,7 @@ where
     V: BinaryValue,
 {
     fn set_len(&mut self, len: u64) {
-        self.base.put(&(), len);
-        self.length.set(Some(len));
+        self.length.set(len)
     }
 
     /// Appends an element to the back of the list.
@@ -443,8 +443,8 @@ where
     /// assert!(index.is_empty());
     /// ```
     pub fn clear(&mut self) {
-        self.length.set(Some(0));
-        self.base.clear()
+        self.base.clear();
+        self.set_len(0);
     }
 }
 
