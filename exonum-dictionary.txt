@@ -5,6 +5,7 @@ atomicity
 backend
 backends
 bigint
+bincode
 bitfury
 bitvec
 blockchain
@@ -161,8 +162,8 @@ toolchain
 txvec
 tymethod
 unboxed
-unreceived
 unflushed
+unreceived
 unsync
 untagged
 usize
