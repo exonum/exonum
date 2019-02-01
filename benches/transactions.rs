@@ -32,26 +32,6 @@ const USERS_COUNT: usize = 10_000;
 const SAMPLE_SIZE: usize = 10;
 
 #[cfg(all(test, not(feature = "long_benchmarks")))]
-const ITEM_COUNT: [BenchParams; 4] = [
-    BenchParams {
-        blocks_count: 1,
-        txs_in_block_count: 10_000,
-    },
-    BenchParams {
-        blocks_count: 10,
-        txs_in_block_count: 1_000,
-    },
-    BenchParams {
-        blocks_count: 100,
-        txs_in_block_count: 100,
-    },
-    BenchParams {
-        blocks_count: 1_000,
-        txs_in_block_count: 10,
-    },
-];
-
-#[cfg(all(test, feature = "long_benchmarks"))]
 const ITEM_COUNT: [BenchParams; 5] = [
     BenchParams {
         blocks_count: 1,
@@ -68,6 +48,34 @@ const ITEM_COUNT: [BenchParams; 5] = [
     BenchParams {
         blocks_count: 1_000,
         txs_in_block_count: 10,
+    },
+    BenchParams {
+        blocks_count: 10_000,
+        txs_in_block_count: 1,
+    },
+];
+
+#[cfg(all(test, feature = "long_benchmarks"))]
+const ITEM_COUNT: [BenchParams; 6] = [
+    BenchParams {
+        blocks_count: 1,
+        txs_in_block_count: 10_000,
+    },
+    BenchParams {
+        blocks_count: 10,
+        txs_in_block_count: 1_000,
+    },
+    BenchParams {
+        blocks_count: 100,
+        txs_in_block_count: 100,
+    },
+    BenchParams {
+        blocks_count: 1_000,
+        txs_in_block_count: 10,
+    },
+    BenchParams {
+        blocks_count: 10_000,
+        txs_in_block_count: 1,
     },
     BenchParams {
         blocks_count: 1_000,
