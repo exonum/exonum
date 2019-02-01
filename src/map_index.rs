@@ -21,7 +21,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
-    views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
+    views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork,
 };
 
@@ -35,7 +35,6 @@ use super::{
 #[derive(Debug)]
 pub struct MapIndex<T: IndexAccess, K, V> {
     base: View<T>,
-    length: IndexState<T, u64>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -105,15 +104,13 @@ where
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let (base, metadata_address) = IndexBuilder::new(index_access.clone())
+        let (base, _metadata_address) = IndexBuilder::new(index_access.clone())
             .index_type(IndexType::Map)
             .index_name(index_name)
             .build();
-        let length = IndexState::new(index_access, metadata_address.unwrap());
 
         Self {
             base,
-            length,
             _v: PhantomData,
             _k: PhantomData,
         }
@@ -147,16 +144,14 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let (base, metadata_address) = IndexBuilder::new(index_access.clone())
+        let (base, _metadata_address) = IndexBuilder::new(index_access.clone())
             .index_type(IndexType::Map)
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let length = IndexState::new(index_access, metadata_address.unwrap());
 
         Self {
             base,
-            length,
             _v: PhantomData,
             _k: PhantomData,
         }
@@ -207,49 +202,6 @@ where
         Q: BinaryKey + ?Sized,
     {
         self.base.contains(key)
-    }
-
-    /// Returns `true` if the list contains no elements.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
-    /// assert!(index.is_empty());
-    ///
-    /// index.put(&0, 42);
-    /// assert!(!index.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Returns the number of elements in the map.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = MapIndex::new(name, &fork);
-    /// assert_eq!(0, index.len());
-    ///
-    /// index.put(&0, 10);
-    /// assert_eq!(1, index.len());
-    ///
-    /// index.put(&2, 100);
-    /// assert_eq!(2, index.len());
-    /// ```
-    pub fn len(&self) -> u64 {
-        self.length.get()
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
@@ -423,7 +375,6 @@ where
     /// assert!(index.contains(&1));
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value);
-        self.set_len(self.len() + 1);
     }
 
     /// Removes a key from a map.
@@ -448,9 +399,6 @@ where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,
     {
-        if self.contains(key) {
-            self.set_len(self.len() - 1);
-        }
         self.base.remove(key);
     }
 
@@ -478,11 +426,6 @@ where
     /// assert!(!index.contains(&1));
     pub fn clear(&mut self) {
         self.base.clear();
-        self.set_len(0);
-    }
-
-    fn set_len(&mut self, len: u64) {
-        self.length.set(len)
     }
 }
 
@@ -583,19 +526,15 @@ mod tests {
 
         assert_eq!(map_index.get(&1u8), None);
         assert!(!map_index.contains(&1u8));
-        assert_eq!(map_index.len(), 0);
 
         map_index.put(&1u8, 1u8);
 
         assert_eq!(map_index.get(&1u8), Some(1u8));
         assert!(map_index.contains(&1u8));
-        assert_eq!(map_index.len(), 1);
 
         map_index.remove(&100u8);
-        assert_eq!(map_index.len(), 1);
 
         map_index.remove(&1u8);
-        assert_eq!(map_index.len(), 0);
 
         assert!(!map_index.contains(&1u8));
         assert_eq!(map_index.get(&1u8), None);
@@ -606,7 +545,6 @@ mod tests {
 
         assert!(!map_index.contains(&2u8));
         assert!(!map_index.contains(&3u8));
-        assert_eq!(map_index.len(), 0);
     }
 
     #[test]
