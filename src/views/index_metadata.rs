@@ -136,28 +136,27 @@ where
     T: IndexAccess,
     I: Into<IndexMetadataAddress>,
 {
-    let address = address.into();
-
-    let (index_access, address) = {
-        let metadata_view = IndexMetadataView::new(index_access, address);
+    let medatadata_address = address.into();
+    let (index_access, medatadata_address) = {
+        let metadata_view = IndexMetadataView::new(index_access, medatadata_address);
         if let Some(saved_metadata) = metadata_view.index_metadata() {
             assert_eq!(
                 metadata, &saved_metadata,
                 "Saved metadata doesn't match specified"
-            )
+            );
+            return metadata_view.into_inner().1;
         }
         metadata_view.into_inner()
     };
-
     // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
     #[allow(unsafe_code)]
     unsafe {
         if let Some(index_access_mut) = index_access.fork() {
-            let mut metadata_view = IndexMetadataView::new(index_access_mut, address);
+            let mut metadata_view = IndexMetadataView::new(index_access_mut, medatadata_address);
             metadata_view.set_index_metadata(&metadata);
             metadata_view.into_inner().1
         } else {
-            address
+            medatadata_address
         }
     }
 }
