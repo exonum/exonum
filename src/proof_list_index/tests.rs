@@ -711,18 +711,3 @@ fn assert_proof_of_absence<V: BinaryValue + UniqueHash + Debug>(
         }
     }
 }
-
-#[test]
-fn list_proof_research() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-
-    let mut index = ProofListIndex::new("index", &fork);
-    index.push(1);
-    index.push(2);
-    index.push(3);
-    index.push(4);
-
-    let proof = index.get_range_proof(0..4);
-    dbg!(proof);
-}

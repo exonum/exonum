@@ -16,16 +16,13 @@ use failure::Fail;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
-use exonum_crypto::{Hash, HashStream};
+use exonum_crypto::Hash;
 
 use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crate::{BinaryKey, BinaryValue, UniqueHash};
-use crate::proof_map_index::key::PROOF_PATH_SIZE;
-use exonum_crypto::HASH_SIZE;
-use crate::HashTag;
+use crate::{BinaryKey, BinaryValue, HashTag, UniqueHash};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -326,7 +323,10 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
         1 => {
             if entries[0].path.is_leaf() {
-                Ok(HashTag::hash_map_isolated(&entries[0].path, &entries[0].hash))
+                Ok(HashTag::hash_map_isolated(
+                    &entries[0].path,
+                    &entries[0].hash,
+                ))
             } else {
                 Err(MapProofError::NonTerminalNode(entries[0].path))
             }

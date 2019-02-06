@@ -31,7 +31,7 @@ use self::{
 };
 use crate::{
     views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork, UniqueHash, HashTag
+    BinaryKey, BinaryValue, Fork, HashTag, UniqueHash,
 };
 
 mod key;

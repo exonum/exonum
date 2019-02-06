@@ -21,10 +21,8 @@ use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
-use crate::{
-    BinaryKey, BinaryValue, UniqueHash, HashTag
-};
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
+use crate::{BinaryKey, BinaryValue, HashTag, UniqueHash};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 

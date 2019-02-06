@@ -14,7 +14,7 @@
 
 use crate::{
     views::{IndexAccess, IndexAddress, IndexBuilder, View},
-    Database, Fork, TemporaryDB
+    Database, Fork, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";

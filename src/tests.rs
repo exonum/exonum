@@ -15,8 +15,8 @@
 use exonum_crypto::Hash;
 
 use super::{
-    Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
-    SparseListIndex, ValueSetIndex,
+    Entry, Fork, KeySetIndex, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, SparseListIndex,
+    ValueSetIndex,
 };
 use exonum_crypto::Hash;
 
