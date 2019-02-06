@@ -627,8 +627,6 @@ fn test_build_proof_in_empty_tree() {
     let proof = table.get_proof([244; 32]);
     assert_eq!(proof.proof_unchecked(), vec![]);
     check_map_proof(proof, None, &table);
-
-    proof.check();
 }
 
 #[test]

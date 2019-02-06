@@ -23,6 +23,9 @@ use super::{
     node::{BranchNode, Node},
 };
 use crate::{BinaryKey, BinaryValue, UniqueHash};
+use crate::proof_map_index::key::PROOF_PATH_SIZE;
+use exonum_crypto::HASH_SIZE;
+use crate::HashTag;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -291,14 +294,6 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         x.prefix(x.common_prefix_len(y))
     }
 
-    /// Calculates hash for an isolated node in the Merkle Patricia tree.
-    fn hash_isolated_node(path: &ProofPath, h: &Hash) -> Hash {
-        HashStream::new()
-            .update(path.as_bytes())
-            .update(h.as_ref())
-            .hash()
-    }
-
     fn hash_branch(left_child: &MapProofEntry, right_child: &MapProofEntry) -> Hash {
         let mut branch = BranchNode::empty();
         branch.set_child(ChildKind::Left, &left_child.path, &left_child.hash);
@@ -331,7 +326,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
         1 => {
             if entries[0].path.is_leaf() {
-                Ok(hash_isolated_node(&entries[0].path, &entries[0].hash))
+                Ok(HashTag::hash_map_isolated(&entries[0].path, &entries[0].hash))
             } else {
                 Err(MapProofError::NonTerminalNode(entries[0].path))
             }

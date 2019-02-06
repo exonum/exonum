@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::{
-    views::{IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
-    Database, Fork, TemporaryDB,
+    views::{IndexAccess, IndexAddress, IndexBuilder, View},
+    Database, Fork, TemporaryDB
 };
 
 const IDX_NAME: &str = "idx_name";

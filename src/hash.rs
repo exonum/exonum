@@ -15,6 +15,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use hex::FromHex;
 
 use exonum_crypto::{Hash, HashStream, HASH_SIZE};
+use crate::proof_map_index::ProofPath;
 
 use crate::BinaryValue;
 
@@ -25,15 +26,15 @@ const EMPTY_LIST_HASH: &str = "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825
 /// `MerkleDB` hash prefixes.
 pub enum HashTag {
     /// Hash prefix of a leaf node of the merkle tree.
-    Leaf = 0,
+    ListLeaf = 0,
     /// Hash prefix of a branch node of the merkle tree.
-    Node = 1,
+    ListBranchNode = 1,
     /// Hash prefix of the list object.
     ListNode = 2,
     /// Hash prefix of the map object.
     MapNode = 3,
+    /// Hash prefix of the map branch node object.
     MapBranchNode = 4,
-    MapLeafNode = 5,
 }
 
 /// Calculate hash value with the specified prefix.
@@ -52,7 +53,7 @@ impl HashTag {
 
     /// Convenience method to obtain hashed value of the merkle tree node.
     pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
-        HashTag::Node
+        HashTag::ListBranchNode
             .hash_stream()
             .update(left_hash.as_ref())
             .update(right_hash.as_ref())
@@ -61,12 +62,12 @@ impl HashTag {
 
     /// Convenience method to obtain a hashed value of the merkle tree node with one child.
     pub fn hash_single_node(hash: &Hash) -> Hash {
-        HashTag::Node.hash_stream().update(hash.as_ref()).hash()
+        HashTag::ListBranchNode.hash_stream().update(hash.as_ref()).hash()
     }
 
     /// Convenience method to obtain a hashed value of the merkle tree leaf.
     pub fn hash_leaf(value: &[u8]) -> Hash {
-        HashTag::Leaf.hash_stream().update(value).hash()
+        HashTag::ListLeaf.hash_stream().update(value).hash()
     }
 
     /// Hash of the list object.
@@ -100,10 +101,10 @@ impl HashTag {
         Self::hash_list_node(hashes.len() as u64, root_hash(hashes))
     }
 
-    /// Hash of the list object.
+    /// Hash of the map object.
     ///
     /// ```text
-    /// h = sha-256( HashTag::MapNode || len as u64 || merkle_root )
+    /// h = sha-256( HashTag::MapNode || merkle_root )
     /// ```
     pub fn hash_map_node(root: Hash) -> Hash {
         HashStream::new()
@@ -112,6 +113,11 @@ impl HashTag {
             .hash()
     }
 
+    /// Hash of the map branch node.
+    ///
+    /// ```text
+    /// h = sha-256( HashTag::MapBranchNode || <left_key> || <right_key> || <left_hash> || <right_hash> )
+    /// ```
     pub fn hash_map_branch(branch_node: &[u8]) -> Hash {
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
@@ -119,10 +125,16 @@ impl HashTag {
             .hash()
     }
 
-    pub fn hash_map_leaf(leaf_node: &[u8]) -> Hash {
+    /// Hash of the map isolated node.
+    ///
+    /// ``` text
+    /// h = sha-256( HashTag::MapBranchNode || <key> || <child_hash> )
+    /// ```
+    pub fn hash_map_isolated(path: &ProofPath, h: &Hash) -> Hash {
         HashStream::new()
-            .update(&[HashTag::MapLeafNode as u8])
-            .update(leaf_node.as_ref())
+            .update(&[HashTag::MapBranchNode as u8])
+            .update(path.as_bytes())
+            .update(h.as_ref())
             .hash()
     }
 }

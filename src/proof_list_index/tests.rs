@@ -316,11 +316,11 @@ fn test_randomly_generate_proofs() {
 }
 
 fn hash_leaf_node(value: &[u8]) -> Hash {
-    HashTag::Leaf.hash_stream().update(value).hash()
+    HashTag::ListLeaf.hash_stream().update(value).hash()
 }
 
 fn hash_branch_node(value: &[u8]) -> Hash {
-    HashTag::Node.hash_stream().update(value).hash()
+    HashTag::ListBranchNode.hash_stream().update(value).hash()
 }
 
 #[test]
@@ -710,4 +710,19 @@ fn assert_proof_of_absence<V: BinaryValue + UniqueHash + Debug>(
             panic!("Unexpected proof {:?}", proof);
         }
     }
+}
+
+#[test]
+fn list_proof_research() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+
+    let mut index = ProofListIndex::new("index", &fork);
+    index.push(1);
+    index.push(2);
+    index.push(3);
+    index.push(4);
+
+    let proof = index.get_range_proof(0..4);
+    dbg!(proof);
 }

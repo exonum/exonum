@@ -167,3 +167,6 @@ pub mod proof_list_index;
 pub mod proof_map_index;
 pub mod sparse_list_index;
 pub mod value_set_index;
+
+#[cfg(test)]
+mod tests;

@@ -112,8 +112,6 @@ impl UniqueHash for BranchNode {
         pos += self
             .child_path(ChildKind::Right)
             .write_compressed(&mut bytes[pos..]);
-//        exonum_crypto::hash(&bytes[..pos]);
-
         HashTag::hash_map_branch(&bytes[..pos])
     }
 }
