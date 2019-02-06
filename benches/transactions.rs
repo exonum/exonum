@@ -28,65 +28,101 @@ use exonum_merkledb::{
 };
 
 const SEED: [u8; 16] = [100; 16];
-const USERS_COUNT: usize = 10_000;
 const SAMPLE_SIZE: usize = 10;
 
 #[cfg(all(test, not(feature = "long_benchmarks")))]
-const ITEM_COUNT: [BenchParams; 5] = [
+const ITEM_COUNT: [BenchParams; 10] = [
     BenchParams {
-        blocks_count: 1,
-        txs_in_block_count: 10_000,
+        users: 10_000,
+        blocks: 1,
+        txs_in_block: 10_000,
     },
     BenchParams {
-        blocks_count: 10,
-        txs_in_block_count: 1_000,
+        users: 100,
+        blocks: 1,
+        txs_in_block: 10_000,
     },
     BenchParams {
-        blocks_count: 100,
-        txs_in_block_count: 100,
+        users: 10_000,
+        blocks: 10,
+        txs_in_block: 1_000,
     },
     BenchParams {
-        blocks_count: 1_000,
-        txs_in_block_count: 10,
+        users: 100,
+        blocks: 10,
+        txs_in_block: 1_000,
     },
     BenchParams {
-        blocks_count: 10_000,
-        txs_in_block_count: 1,
+        users: 10_000,
+        blocks: 100,
+        txs_in_block: 100,
+    },
+    BenchParams {
+        users: 100,
+        blocks: 100,
+        txs_in_block: 100,
+    },
+    BenchParams {
+        users: 10_000,
+        blocks: 1_000,
+        txs_in_block: 10,
+    },
+    BenchParams {
+        users: 100,
+        blocks: 1_000,
+        txs_in_block: 10,
+    },
+    BenchParams {
+        users: 10_000,
+        blocks: 10_000,
+        txs_in_block: 1,
+    },
+    BenchParams {
+        users: 100,
+        blocks: 10_000,
+        txs_in_block: 1,
     },
 ];
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 const ITEM_COUNT: [BenchParams; 6] = [
     BenchParams {
-        blocks_count: 1,
-        txs_in_block_count: 10_000,
+        users: 1_000,
+        blocks: 10,
+        txs_in_block: 10_000,
     },
     BenchParams {
-        blocks_count: 10,
-        txs_in_block_count: 1_000,
+        users: 1_000,
+        blocks: 100,
+        txs_in_block: 1_000,
     },
     BenchParams {
-        blocks_count: 100,
-        txs_in_block_count: 100,
+        users: 1_000,
+        blocks: 1_000,
+        txs_in_block: 100,
     },
     BenchParams {
-        blocks_count: 1_000,
-        txs_in_block_count: 10,
+        users: 1_000,
+        blocks: 10_000,
+        txs_in_block: 10,
     },
     BenchParams {
-        blocks_count: 10_000,
-        txs_in_block_count: 1,
+        users: 1_000,
+        blocks: 100_000,
+        txs_in_block: 1,
     },
     BenchParams {
-        blocks_count: 1_000,
-        txs_in_block_count: 1_000,
+        users: 1_000,
+        blocks: 1_000_000,
+        txs_in_block: 1_000,
     },
 ];
 
 #[derive(Clone, Copy, Debug)]
 struct BenchParams {
-    blocks_count: usize,
-    txs_in_block_count: usize,
+    users: usize,
+    blocks: usize,
+    txs_in_block: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -206,7 +242,7 @@ impl Block {
     }
 }
 
-fn gen_random_blocks(blocks_count: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
+fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
     let mut rng = XorShiftRng::from_seed(SEED);
     let users = (0..wallets_count)
         .into_iter()
@@ -222,7 +258,7 @@ fn gen_random_blocks(blocks_count: usize, txs_count: usize, wallets_count: usize
         *users.get(&id).unwrap()
     };
 
-    (0..blocks_count)
+    (0..blocks)
         .into_iter()
         .map(move |_| {
             let transactions = (0..txs_count)
@@ -247,8 +283,7 @@ pub fn bench_transactions(c: &mut Criterion) {
             "currency_like",
             move |b: &mut Bencher, params: &BenchParams| {
                 let db = TemporaryDB::new();
-                let blocks =
-                    gen_random_blocks(params.blocks_count, params.txs_in_block_count, USERS_COUNT);
+                let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
                 b.iter(|| {
                     for block in &blocks {
                         block.execute(&db)
@@ -257,7 +292,7 @@ pub fn bench_transactions(c: &mut Criterion) {
             },
             item_counts,
         )
-        .throughput(|&s| Throughput::Elements((s.txs_in_block_count * s.blocks_count) as u32))
+        .throughput(|&s| Throughput::Elements((s.txs_in_block * s.blocks) as u32))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
         .sample_size(SAMPLE_SIZE),
     );
