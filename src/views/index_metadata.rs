@@ -169,7 +169,7 @@ where
         };
 
         Self {
-            view: View::new(view.index_access.clone(), index_state_address),
+            view: View::new(view.index_access, index_state_address),
             state: Cell::new(None),
         }
     }
