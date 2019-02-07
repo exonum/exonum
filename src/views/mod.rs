@@ -202,7 +202,7 @@ impl IndexAddress {
             name: if self.name.is_empty() {
                 suffix.into_owned()
             } else {
-                format!("{}.{}", self.name, suffix.as_ref())
+                [self.name(), ".", suffix.as_ref()].concat()
             },
 
             bytes: self.bytes.clone(),

@@ -84,7 +84,7 @@ impl<T: IndexAccess> IndexMetadataView<T> {
     /// TODO Add documentation. [ECR-2820]
     fn new(index_access: T, address: &IndexAddress) -> Self {
         let metadata_address = IndexAddress {
-            name: format!("{}.{}", address.name(), INDEX_METADATA_NAME),
+            name: [address.name(), ".", INDEX_METADATA_NAME].concat(),
             bytes: None,
         };
         Self::from_parts(index_access, metadata_address)
@@ -164,7 +164,7 @@ where
     /// TODO Add documentation. [ECR-2820]
     pub fn from_view(view: &View<T>) -> Self {
         let index_state_address = IndexAddress {
-            name: format!("{}.{}", view.address.name, INDEX_STATE_NAME),
+            name: [&view.address.name, ".", INDEX_STATE_NAME].concat(),
             bytes: view.address.bytes.clone(),
         };
 
