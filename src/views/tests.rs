@@ -682,6 +682,13 @@ fn test_metadata_index_family_correct() {
 }
 
 #[test]
+#[should_panic(expected = "Index type should be set")]
+fn test_index_builder_without_type() {
+    let db = TemporaryDB::new();
+    IndexBuilder::new(&db.fork()).index_name("simple").build();
+}
+
+#[test]
 #[should_panic(expected = "Saved metadata doesn't match specified")]
 fn test_metadata_index_usual_incorrect() {
     let db = TemporaryDB::new();

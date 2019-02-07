@@ -140,8 +140,7 @@ where
             base: IndexBuilder::new(view)
                 .index_type(IndexType::SparseList)
                 .index_name(index_name)
-                .build()
-                .0,
+                .build(),
             size: Cell::new(None),
             _v: PhantomData,
         }
@@ -183,8 +182,7 @@ where
                 .index_type(IndexType::SparseList)
                 .index_name(family_name)
                 .family_id(index_id)
-                .build()
-                .0,
+                .build(),
             size: Cell::new(None),
             _v: PhantomData,
         }

@@ -22,9 +22,12 @@ use serde_derive::{Deserialize, Serialize};
 use super::{IndexAccess, IndexAddress, View};
 use crate::{BinaryValue, Fork};
 
+/// TODO Add documentation. [ECR-2820]
 const INDEX_METADATA_NAME: &str = "__INDEX_METADATA__";
+/// TODO Add documentation. [ECR-2820]
+const INDEX_STATE_NAME: &str = "__INDEX_STATE__";
+/// TODO Add documentation. [ECR-2820]
 const INDEX_TYPE_NAME: &str = "index_type";
-const INDEX_STATE_NAME: &str = "index_state";
 
 /// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
@@ -37,6 +40,7 @@ pub enum IndexType {
     SparseList = 6,
     ProofList = 7,
     ProofMap = 8,
+    Unknown = 255,
 }
 
 impl BinaryValue for IndexType {
@@ -58,22 +62,17 @@ impl BinaryValue for IndexType {
     }
 }
 
+impl Default for IndexType {
+    fn default() -> Self {
+        IndexType::Unknown
+    }
+}
+
 /// Metadata for each index that currently stored in the merkledb.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IndexMetadata {
     /// Type of the specified index.
     pub index_type: IndexType,
-}
-
-/// TODO Add documentation. [ECR-2820]
-#[derive(Debug, Clone, PartialEq)]
-pub struct IndexMetadataAddress(IndexAddress);
-
-impl From<&IndexAddress> for IndexMetadataAddress {
-    fn from(address: &IndexAddress) -> Self {
-        let address = address.append_name(INDEX_METADATA_NAME);
-        IndexMetadataAddress(address)
-    }
 }
 
 /// TODO Add documentation. [ECR-2820]
@@ -83,13 +82,16 @@ struct IndexMetadataView<T: IndexAccess> {
 
 impl<T: IndexAccess> IndexMetadataView<T> {
     /// TODO Add documentation. [ECR-2820]
-    fn new<I>(index_access: T, address: I) -> Self
-    where
-        I: Into<IndexMetadataAddress>,
-    {
-        let address = address.into().0;
+    fn new(index_access: T, address: &IndexAddress) -> Self {
+        let metadata_address =
+            IndexAddress::with_root(address.name()).append_name(INDEX_METADATA_NAME);
+        Self::from_parts(index_access, metadata_address)
+    }
+
+    /// TODO Add documentation. [ECR-2820]
+    fn from_parts(index_access: T, metadata_address: IndexAddress) -> Self {
         Self {
-            view: View::new(index_access, address),
+            view: View::new(index_access, metadata_address),
         }
     }
 
@@ -101,25 +103,12 @@ impl<T: IndexAccess> IndexMetadataView<T> {
     }
 
     /// TODO Add documentation. [ECR-2820]
-    fn index_state<V: BinaryValue>(&self) -> Option<V> {
-        self.view.get(INDEX_STATE_NAME)
-    }
-
-    /// TODO Add documentation. [ECR-2820]
-    fn into_inner(self) -> (T, IndexMetadataAddress) {
-        (
-            self.view.index_access,
-            IndexMetadataAddress(self.view.address),
-        )
+    fn into_inner(self) -> (T, IndexAddress) {
+        (self.view.index_access, self.view.address)
     }
 }
 
 impl IndexMetadataView<&Fork> {
-    /// TODO Add documentation. [ECR-2820]
-    fn set_index_state<V: BinaryValue>(&mut self, state: V) {
-        self.view.put(INDEX_STATE_NAME, state);
-    }
-
     /// TODO Add documentation. [ECR-2820]
     fn set_index_metadata(&mut self, metadata: &IndexMetadata) {
         self.view.put(INDEX_TYPE_NAME, metadata.index_type);
@@ -127,24 +116,21 @@ impl IndexMetadataView<&Fork> {
 }
 
 /// TODO Add documentation. [ECR-2820]
-pub fn check_or_create_metadata<T, I>(
+pub fn check_or_create_metadata<T>(
     index_access: T,
-    address: I,
+    address: &IndexAddress,
     metadata: &IndexMetadata,
-) -> IndexMetadataAddress
-where
+) where
     T: IndexAccess,
-    I: Into<IndexMetadataAddress>,
 {
-    let medatadata_address = address.into();
     let (index_access, medatadata_address) = {
-        let metadata_view = IndexMetadataView::new(index_access, medatadata_address);
+        let metadata_view = IndexMetadataView::new(index_access, address);
         if let Some(saved_metadata) = metadata_view.index_metadata() {
             assert_eq!(
                 metadata, &saved_metadata,
                 "Saved metadata doesn't match specified"
             );
-            return metadata_view.into_inner().1;
+            return;
         }
         metadata_view.into_inner()
     };
@@ -152,11 +138,9 @@ where
     #[allow(unsafe_code)]
     unsafe {
         if let Some(index_access_mut) = index_access.fork() {
-            let mut metadata_view = IndexMetadataView::new(index_access_mut, medatadata_address);
+            let mut metadata_view =
+                IndexMetadataView::from_parts(index_access_mut, medatadata_address);
             metadata_view.set_index_metadata(&metadata);
-            metadata_view.into_inner().1
-        } else {
-            medatadata_address
         }
     }
 }
@@ -167,7 +151,7 @@ where
     V: BinaryValue,
     T: IndexAccess,
 {
-    view: IndexMetadataView<T>,
+    view: View<T>,
     state: Cell<Option<V>>,
 }
 
@@ -177,10 +161,10 @@ where
     T: IndexAccess,
 {
     /// TODO Add documentation. [ECR-2820]
-    pub fn new(index_access: T, metadata_address: IndexMetadataAddress) -> Self {
-        let view = IndexMetadataView::new(index_access, metadata_address);
+    pub fn from_view(view: &View<T>) -> Self {
+        let index_state_address = view.address.clone().append_name(INDEX_STATE_NAME);
         Self {
-            view,
+            view: View::new(view.index_access.clone(), index_state_address),
             state: Cell::new(None),
         }
     }
@@ -190,7 +174,7 @@ where
         if let Some(state) = self.state.get() {
             return state;
         }
-        let state = self.view.index_state().unwrap_or_default();
+        let state = self.view.get(&()).unwrap_or_default();
         self.state.set(Some(state));
         state
     }
@@ -203,7 +187,7 @@ where
     /// TODO Add documentation. [ECR-2820]
     pub fn set(&mut self, state: V) {
         self.state.set(Some(state));
-        self.view.set_index_state(state)
+        self.view.put(&(), state)
     }
 }
 
@@ -222,6 +206,16 @@ mod tests {
     use std::borrow::Cow;
     use crate::BinaryValue;
     use super::{IndexType};
+
+    use crate::{
+        views::{IndexAddress, View},
+        BinaryValue, Database, TemporaryDB,
+    };
+
+    use super::{
+        IndexAccess, IndexMetadataView, IndexState, IndexType, INDEX_METADATA_NAME,
+        INDEX_STATE_NAME,
+    };
 
     #[test]
     fn test_index_type_binary_value_correct() {
@@ -242,5 +236,43 @@ mod tests {
     fn test_index_type_binary_value_incorrect_value() {
         let buf = vec![127];
         IndexType::from_bytes(Cow::Owned(buf)).unwrap();
+    }
+
+    #[test]
+    fn test_index_metadata_address() {
+        let db = TemporaryDB::default();
+        let fork = &db.fork();
+
+        let address = IndexAddress::with_root(fork.root())
+            .append_name("foo")
+            .append_bytes("bar");
+        let metadata_view = IndexMetadataView::new(fork, &address);
+
+        assert_eq!(
+            metadata_view.view.address,
+            IndexAddress::with_root(fork.root())
+                .append_name("foo")
+                .append_name(INDEX_METADATA_NAME)
+        );
+    }
+
+    #[test]
+    fn test_index_state_address() {
+        let db = TemporaryDB::default();
+        let fork = &db.fork();
+
+        let address = IndexAddress::with_root(fork.root())
+            .append_name("foo")
+            .append_bytes("bar");;
+        let view = View::new(fork, address);
+        let index_state: IndexState<_, ()> = IndexState::from_view(&view);
+
+        assert_eq!(
+            index_state.view.address,
+            IndexAddress::with_root(fork.root())
+                .append_name("foo")
+                .append_name(INDEX_STATE_NAME)
+                .append_bytes("bar")
+        );
     }
 }

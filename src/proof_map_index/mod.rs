@@ -161,8 +161,7 @@ where
             base: IndexBuilder::new(view)
                 .index_type(IndexType::ProofMap)
                 .index_name(index_name)
-                .build()
-                .0,
+                .build(),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -213,8 +212,7 @@ where
                 .index_type(IndexType::ProofMap)
                 .index_name(family_name)
                 .family_id(index_id)
-                .build()
-                .0,
+                .build(),
             _k: PhantomData,
             _v: PhantomData,
         }

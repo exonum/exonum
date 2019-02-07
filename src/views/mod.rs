@@ -23,7 +23,6 @@ use super::{
     BinaryKey, BinaryValue, Fork, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
-mod index_id_pool;
 mod index_metadata;
 #[cfg(test)]
 mod tests;
@@ -87,17 +86,20 @@ pub trait IndexAccess: Clone {
 pub struct IndexBuilder<T> {
     index_access: T,
     address: IndexAddress,
-    index_type: Option<IndexType>,
+    index_type: IndexType,
 }
 
-impl<T: IndexAccess> IndexBuilder<T> {
+impl<T> IndexBuilder<T>
+where
+    T: IndexAccess,
+{
     /// Create index from `view'.
     pub fn new(index_access: T) -> Self {
-        let address = IndexAddress::new();
+        let address = IndexAddress::with_root(index_access.root());
         Self {
             index_access,
             address,
-            index_type: None,
+            index_type: IndexType::default(),
         }
     }
 
@@ -129,7 +131,7 @@ impl<T: IndexAccess> IndexBuilder<T> {
         Self {
             index_access: self.index_access,
             address: self.address,
-            index_type: Some(index_type),
+            index_type,
         }
     }
 
@@ -138,27 +140,24 @@ impl<T: IndexAccess> IndexBuilder<T> {
     /// # Panics
     ///
     /// Panics if index metadata doesn't match expected.
-    pub fn build(self) -> (View<T>, Option<index_metadata::IndexMetadataAddress>) {
+    pub fn build(self) -> View<T> {
         let index_type = self.index_type;
         let index_access = self.index_access;
 
-        let index_id = index_id_pool::get_index_id(index_access.clone(), self.address);
-        let metadata_address = index_type.map(|index_type| {
-            index_metadata::check_or_create_metadata(
-                index_access.clone(),
-                &index_id,
-                &index_metadata::IndexMetadata { index_type },
-            )
-        });
-        let view = View::new(index_access, index_id);
-        (view, metadata_address)
+        index_metadata::check_or_create_metadata(
+            index_access.clone(),
+            &self.address,
+            &index_metadata::IndexMetadata { index_type },
+        );
+
+        View::new(index_access, self.address)
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct IndexAddress {
-    name: String,
-    bytes: Option<Vec<u8>>,
+    pub(super) name: String,
+    pub(super) bytes: Option<Vec<u8>>,
 }
 
 impl IndexAddress {
