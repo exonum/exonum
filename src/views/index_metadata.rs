@@ -83,8 +83,10 @@ struct IndexMetadataView<T: IndexAccess> {
 impl<T: IndexAccess> IndexMetadataView<T> {
     /// TODO Add documentation. [ECR-2820]
     fn new(index_access: T, address: &IndexAddress) -> Self {
-        let metadata_address =
-            IndexAddress::with_root(address.name()).append_name(INDEX_METADATA_NAME);
+        let metadata_address = IndexAddress {
+            name: format!("{}.{}", address.name(), INDEX_METADATA_NAME),
+            bytes: None,
+        };
         Self::from_parts(index_access, metadata_address)
     }
 
@@ -137,9 +139,8 @@ pub fn check_or_create_metadata<T>(
     // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
     #[allow(unsafe_code)]
     unsafe {
-        if let Some(index_access_mut) = index_access.fork() {
-            let mut metadata_view =
-                IndexMetadataView::from_parts(index_access_mut, medatadata_address);
+        if let Some(fork) = index_access.fork() {
+            let mut metadata_view = IndexMetadataView::from_parts(fork, medatadata_address);
             metadata_view.set_index_metadata(&metadata);
         }
     }
@@ -162,7 +163,11 @@ where
 {
     /// TODO Add documentation. [ECR-2820]
     pub fn from_view(view: &View<T>) -> Self {
-        let index_state_address = view.address.clone().append_name(INDEX_STATE_NAME);
+        let index_state_address = IndexAddress {
+            name: format!("{}.{}", view.address.name, INDEX_STATE_NAME),
+            bytes: view.address.bytes.clone(),
+        };
+
         Self {
             view: View::new(view.index_access.clone(), index_state_address),
             state: Cell::new(None),

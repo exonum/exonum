@@ -682,10 +682,17 @@ fn test_metadata_index_family_correct() {
 }
 
 #[test]
-#[should_panic(expected = "Index type should be set")]
 fn test_index_builder_without_type() {
     let db = TemporaryDB::new();
-    IndexBuilder::new(&db.fork()).index_name("simple").build();
+    // Creates the index metadata.
+    let fork = db.fork();
+    IndexBuilder::new(&fork).index_name("simple").build();
+    db.merge(fork.into_patch()).unwrap();
+    // Checks the index metadata.
+    IndexBuilder::new(&db.snapshot())
+        .index_name("simple")
+        .index_type(IndexType::Unknown)
+        .build();
 }
 
 #[test]
