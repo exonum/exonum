@@ -40,8 +40,15 @@ pub enum HashTag {
 
 /// Calculate hash value with the specified prefix.
 ///
-/// Different hashes for leaf and branch nodes are used to secure merkle tree from
-/// the pre-image attack.
+/// In `MerkleDB`, all data is presented as objects. Objects are divided into blobs
+/// and collections (lists / maps), which in their turn are divided into hashable and
+/// non-hashable. `ProofListIndex` and `ProofMapIndex` relate to hashable collections.
+/// For these collections, one can define a hash, which is used to build proof for
+/// their contents. In the future, these hashes will be used to build proofs for object
+/// hierarchies.
+///
+/// Different hashes for leaf and branch nodes of the list are used to secure merkle tree
+/// from the pre-image attack.
 ///
 /// See more information [here][1].
 ///
@@ -75,6 +82,7 @@ impl HashTag {
     }
 
     /// Hash of the list object.
+
     ///
     /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )

@@ -732,3 +732,40 @@ fn test_metadata_index_family_incorrect() {
         .family_id("family")
         .build();
 }
+
+#[test]
+#[ignore]
+//TODO: fix test [ECR-2869]
+fn multiple_patch() {
+    use crate::ListIndex;
+    let db = TemporaryDB::new();
+    fn list_index<View: IndexAccess>(view: View) -> ListIndex<View, u64> {
+        ListIndex::new("list_index", view)
+    }
+    // create first patch
+    let patch1 = {
+        let fork = db.fork();
+        {
+            let mut index = list_index(&fork);
+            index.push(1);
+            index.push(3);
+            index.push(4);
+        }
+        fork.into_patch()
+    };
+    // create second patch
+    let patch2 = {
+        let fork = db.fork();
+        {
+            let mut index = list_index(&fork);
+            index.push(10);
+        }
+        fork.into_patch()
+    };
+    db.merge(patch1).unwrap();
+    db.merge(patch2).unwrap();
+    let snapshot = db.snapshot();
+    let index = list_index(&snapshot);
+    let iter = index.iter();
+    assert_eq!(index.len() as usize, iter.count());
+}
