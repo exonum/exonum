@@ -28,6 +28,8 @@ const INDEX_METADATA_NAME: &str = "__INDEX_METADATA__";
 const INDEX_STATE_NAME: &str = "__INDEX_STATE__";
 /// TODO Add documentation. [ECR-2820]
 const INDEX_TYPE_NAME: &str = "index_type";
+/// TODO Add documentation. [ECR-2820]
+const HAS_PARENT_NAME: &str = "has_parent";
 
 /// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
@@ -73,6 +75,8 @@ impl Default for IndexType {
 pub struct IndexMetadata {
     /// Type of the specified index.
     pub index_type: IndexType,
+    /// TODO Add documentation. [ECR-2820]
+    pub has_parent: bool,
 }
 
 /// TODO Add documentation. [ECR-2820]
@@ -99,9 +103,13 @@ impl<T: IndexAccess> IndexMetadataView<T> {
 
     /// TODO Add documentation. [ECR-2820]
     fn index_metadata(&self) -> Option<IndexMetadata> {
-        self.view
-            .get(INDEX_TYPE_NAME)
-            .map(|index_type| IndexMetadata { index_type })
+        let index_type = self.view.get(INDEX_TYPE_NAME)?;
+        let has_parent = self.view.get(HAS_PARENT_NAME)?;
+
+        Some(IndexMetadata {
+            index_type,
+            has_parent,
+        })
     }
 
     /// TODO Add documentation. [ECR-2820]
@@ -114,6 +122,7 @@ impl IndexMetadataView<&Fork> {
     /// TODO Add documentation. [ECR-2820]
     fn set_index_metadata(&mut self, metadata: &IndexMetadata) {
         self.view.put(INDEX_TYPE_NAME, metadata.index_type);
+        self.view.put(HAS_PARENT_NAME, metadata.has_parent);
     }
 }
 

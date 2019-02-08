@@ -141,13 +141,17 @@ where
     ///
     /// Panics if index metadata doesn't match expected.
     pub fn build(self) -> View<T> {
+        let has_parent = self.address.bytes().is_some();
         let index_type = self.index_type;
         let index_access = self.index_access;
 
         index_metadata::check_or_create_metadata(
             index_access,
             &self.address,
-            &index_metadata::IndexMetadata { index_type },
+            &index_metadata::IndexMetadata {
+                index_type,
+                has_parent,
+            },
         );
 
         View::new(index_access, self.address)
