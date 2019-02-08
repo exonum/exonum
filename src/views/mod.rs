@@ -148,7 +148,7 @@ where
         index_metadata::check_or_create_metadata(
             index_access,
             &self.address,
-            &index_metadata::IndexMetadata {
+            index_metadata::IndexMetadata {
                 index_type,
                 has_parent,
             },

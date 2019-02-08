@@ -15,7 +15,7 @@
 use std::{borrow::Cow, cell::Cell, fmt};
 
 use enum_primitive_derive::Primitive;
-use failure::{self, ensure, format_err};
+use failure::{self, bail, ensure, format_err};
 use num_traits::{FromPrimitive, ToPrimitive};
 use serde_derive::{Deserialize, Serialize};
 
@@ -27,9 +27,7 @@ const INDEX_METADATA_NAME: &str = "__INDEX_METADATA__";
 /// TODO Add documentation. [ECR-2820]
 const INDEX_STATE_NAME: &str = "__INDEX_STATE__";
 /// TODO Add documentation. [ECR-2820]
-const INDEX_TYPE_NAME: &str = "index_type";
-/// TODO Add documentation. [ECR-2820]
-const HAS_PARENT_NAME: &str = "has_parent";
+const INDEX_TYPE_NAME: &str = "metadata";
 
 /// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
@@ -71,12 +69,44 @@ impl Default for IndexType {
 }
 
 /// Metadata for each index that currently stored in the merkledb.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IndexMetadata {
     /// Type of the specified index.
     pub index_type: IndexType,
     /// TODO Add documentation. [ECR-2820]
     pub has_parent: bool,
+}
+
+impl BinaryValue for IndexMetadata {
+    fn to_bytes(&self) -> Vec<u8> {
+        // `.unwrap()` is safe: IndexType is always in range 1..255
+        vec![
+            self.index_type.to_u8().unwrap(),
+            if self.has_parent { 1 } else { 0 },
+        ]
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let bytes = bytes.as_ref();
+        ensure!(
+            bytes.len() == 2,
+            "Wrong buffer size: actual {}, expected 2",
+            bytes.len()
+        );
+
+        let index_type = IndexType::from_u8(bytes[0])
+            .ok_or_else(|| format_err!("Unknown index_type: {}", bytes[0]))?;
+        let has_parent = match bytes[1] {
+            0 => false,
+            1 => true,
+            i => bail!("Unknown has_parent: {}", i),
+        };
+
+        Ok(Self {
+            index_type,
+            has_parent,
+        })
+    }
 }
 
 /// TODO Add documentation. [ECR-2820]
@@ -103,13 +133,7 @@ impl<T: IndexAccess> IndexMetadataView<T> {
 
     /// TODO Add documentation. [ECR-2820]
     fn index_metadata(&self) -> Option<IndexMetadata> {
-        let index_type = self.view.get(INDEX_TYPE_NAME)?;
-        let has_parent = self.view.get(HAS_PARENT_NAME)?;
-
-        Some(IndexMetadata {
-            index_type,
-            has_parent,
-        })
+        self.view.get(INDEX_TYPE_NAME)
     }
 
     /// TODO Add documentation. [ECR-2820]
@@ -120,25 +144,21 @@ impl<T: IndexAccess> IndexMetadataView<T> {
 
 impl IndexMetadataView<&Fork> {
     /// TODO Add documentation. [ECR-2820]
-    fn set_index_metadata(&mut self, metadata: &IndexMetadata) {
-        self.view.put(INDEX_TYPE_NAME, metadata.index_type);
-        self.view.put(HAS_PARENT_NAME, metadata.has_parent);
+    fn set_index_metadata(&mut self, metadata: IndexMetadata) {
+        self.view.put(INDEX_TYPE_NAME, metadata);
     }
 }
 
 /// TODO Add documentation. [ECR-2820]
-pub fn check_or_create_metadata<T>(
-    index_access: T,
-    address: &IndexAddress,
-    metadata: &IndexMetadata,
-) where
+pub fn check_or_create_metadata<T>(index_access: T, address: &IndexAddress, metadata: IndexMetadata)
+where
     T: IndexAccess,
 {
     let (index_access, medatadata_address) = {
         let metadata_view = IndexMetadataView::new(index_access, address);
         if let Some(saved_metadata) = metadata_view.index_metadata() {
             assert_eq!(
-                metadata, &saved_metadata,
+                metadata, saved_metadata,
                 "Saved metadata doesn't match specified"
             );
             return;
@@ -150,7 +170,7 @@ pub fn check_or_create_metadata<T>(
     unsafe {
         if let Some(fork) = index_access.fork() {
             let mut metadata_view = IndexMetadataView::from_parts(fork, medatadata_address);
-            metadata_view.set_index_metadata(&metadata);
+            metadata_view.set_index_metadata(metadata);
         }
     }
 }
@@ -227,7 +247,7 @@ mod tests {
     };
 
     use super::{
-        IndexAccess, IndexMetadataView, IndexState, IndexType, INDEX_METADATA_NAME,
+        IndexAccess, IndexMetadata, IndexMetadataView, IndexState, IndexType, INDEX_METADATA_NAME,
         INDEX_STATE_NAME,
     };
 
@@ -250,6 +270,33 @@ mod tests {
     fn test_index_type_binary_value_incorrect_value() {
         let buf = vec![127];
         IndexType::from_bytes(Cow::Owned(buf)).unwrap();
+    }
+
+    #[test]
+    fn test_index_metadata_binary_value_correct() {
+        let index_metadata = IndexMetadata {
+            index_type: IndexType::ProofMap,
+            has_parent: true,
+        };
+        let buf = index_metadata.to_bytes();
+        assert_eq!(
+            IndexMetadata::from_bytes(Cow::Owned(buf)).unwrap(),
+            index_metadata
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Wrong buffer size: actual 3, expected 2")]
+    fn test_index_metadata_binary_value_incorrect_buffer_len() {
+        let buf = vec![1, 2, 3];
+        IndexMetadata::from_bytes(Cow::Owned(buf)).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Unknown has_parent: 3")]
+    fn test_index_metadata_binary_value_incorrect_value() {
+        let buf = vec![1, 3];
+        IndexMetadata::from_bytes(Cow::Owned(buf)).unwrap();
     }
 
     #[test]
