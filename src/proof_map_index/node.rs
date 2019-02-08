@@ -169,7 +169,7 @@ mod tests {
         assert_eq!(branch.hash(), branch2.hash());
         assert_eq!(
             branch.hash().to_hex(),
-            "828b8bfd6c1a67981f0bb8202a4d9b3cde30d092bbc2fcba03d64171f54a0676"
+            "2a179b2c4d93c88128a37ad9aae0e749bf9848f9c2a2463ebb6b53b31792a8bb"
         );
     }
 }

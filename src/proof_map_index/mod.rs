@@ -269,6 +269,7 @@ where
     pub fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
             Some((path, Node::Leaf(hash))) => HashStream::new()
+                .update(&[HashTag::MapBranchNode as u8])
                 .update(path.as_bytes())
                 .update(hash.as_ref())
                 .hash(),
@@ -936,7 +937,7 @@ where
         }
 
         if let Some(prefix) = self.get_root_path() {
-            let root_entry = Entry::new(self, self.merkle_root(), prefix);
+            let root_entry = Entry::new(self, self.map_hash(), prefix);
             f.debug_struct("ProofMapIndex")
                 .field("entries", &root_entry)
                 .finish()

@@ -762,6 +762,7 @@ fn multiple_patch() {
         }
         fork.into_patch()
     };
+
     db.merge(patch1).unwrap();
     db.merge(patch2).unwrap();
     let snapshot = db.snapshot();

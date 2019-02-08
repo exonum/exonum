@@ -614,7 +614,7 @@ impl<K, V> CheckedMapProof<K, V> {
 
     /// Returns a hash of the map that this proof is constructed for.
     pub fn merkle_root(&self) -> Hash {
-        self.hash
+        HashTag::hash_map_node(self.hash)
     }
 }
 

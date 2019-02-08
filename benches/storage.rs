@@ -263,7 +263,7 @@ fn proof_map_index_build_proofs(b: &mut Bencher, len: usize) {
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
-    let table_merkle_root = table.merkle_root();
+    let table_merkle_root = table.map_hash();
     let mut proofs = Vec::with_capacity(data.len());
 
     b.iter(|| {
@@ -287,7 +287,7 @@ fn proof_map_index_verify_proofs(b: &mut Bencher, len: usize) {
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
-    let table_merkle_root = table.merkle_root();
+    let table_merkle_root = table.map_hash();
     let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
 
     b.iter(|| {
