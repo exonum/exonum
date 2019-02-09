@@ -128,7 +128,7 @@ fn noise_encrypt_decrypt_max_message_len() {
     let upper_bound = MAX_MESSAGE_LENGTH + 100;
 
     let near_max_sizes = lower_bound..upper_bound;
-    let big_size = vec![130964, 130965];
+    let big_size = vec![130_964, 130_965];
 
     for size in small_sizes.chain(near_max_sizes).chain(big_size) {
         check_encrypt_decrypt_message(size);
@@ -164,13 +164,13 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
 
     initiator
         .encrypt_msg(message.raw(), &mut buffer_msg)
-        .expect(format!("Unable to encrypt message with size {}", msg_size).as_str());
+        .unwrap_or_else(|e| panic!("Unable to encrypt message with size {}: {}", msg_size, e));
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
 
     let res = responder
         .decrypt_msg(len, &mut buffer_msg)
-        .expect(format!("Unable to decrypt message with size {}", msg_size).as_str());
+        .unwrap_or_else(|e| panic!("Unable to decrypt message with size {}: {}", msg_size, e));
     assert_eq!(message.raw(), &res);
 }
 
@@ -218,10 +218,10 @@ enum HandshakeStep {
 }
 
 impl HandshakeStep {
-    fn next(&self) -> Option<HandshakeStep> {
+    fn next(self) -> Option<HandshakeStep> {
         use self::HandshakeStep::*;
 
-        match *self {
+        match self {
             EphemeralKeyExchange => Some(StaticKeyExchange),
             StaticKeyExchange => Some(Done),
             Done => None,
@@ -340,7 +340,6 @@ fn wait_for_handshake_result(
 ) -> (Result<(), failure::Error>, Result<(), failure::Error>) {
     let (err_tx, err_rx) = mpsc::channel::<failure::Error>(0);
 
-    let responder_message = responder_message.clone();
     let remote_params = params.clone();
 
     thread::spawn(move || run_handshake_listener(&addr, &remote_params, err_tx, responder_message));

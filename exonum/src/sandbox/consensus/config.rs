@@ -17,9 +17,7 @@
 use crate::blockchain::Schema;
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, ValidatorId};
-use crate::sandbox::{
-    config_updater::TxConfig, sandbox::timestamping_sandbox, sandbox_tests_helper::*,
-};
+use crate::sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox};
 use crate::storage::StorageValue;
 
 /// - exclude validator from consensus

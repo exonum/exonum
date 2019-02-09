@@ -102,7 +102,7 @@ fn test_signature_wrong_pb_convert() {
 
 #[test]
 fn test_bitvec_pb_convert() {
-    let bv = BitVec::from_bytes(&[0b10100000, 0b00010010]);
+    let bv = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
 
     let pb_bv = bv.to_pb();
     let pb_round_trip: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
@@ -167,7 +167,7 @@ fn test_scalar_struct_round_trip() {
     let scalar_struct = StructWithScalarTypes {
         key: PublicKey::from_slice(&[8; crypto::PUBLIC_KEY_LENGTH]).unwrap(),
         hash: Hash::from_slice(&[7; crypto::HASH_SIZE]).unwrap(),
-        bit_vec: BitVec::from_bytes(&[0b10100000, 0b00010010]),
+        bit_vec: BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]),
         time: Utc.ymd(2018, 1, 26).and_hms_micro(18, 30, 9, 453_829),
         unsigned_32: u32::max_value(),
         unsigned_64: u64::max_value(),

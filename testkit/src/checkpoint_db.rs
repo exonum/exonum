@@ -292,6 +292,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cyclomatic_complexity)]
     fn test_rollback() {
         let db = CheckpointDb::new(MemoryDB::new());
         let handler = db.handler();

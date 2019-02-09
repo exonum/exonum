@@ -601,7 +601,7 @@ mod tests {
 
         use crate::storage::{Database, ListIndex, MemoryDB};
 
-        const IDX_NAME: &'static str = "idx_name";
+        const IDX_NAME: &str = "idx_name";
 
         fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
@@ -623,7 +623,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -643,7 +643,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &mut fork);
             super::list_index_iter(&mut list_index);
         }
 
@@ -665,7 +665,7 @@ mod tests {
 
         use crate::storage::{Database, DbOptions, ListIndex, RocksDB};
 
-        const IDX_NAME: &'static str = "idx_name";
+        const IDX_NAME: &str = "idx_name";
 
         fn create_database(path: &Path) -> Box<dyn Database> {
             let opts = DbOptions::default();
@@ -688,7 +688,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -708,7 +708,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &mut fork);
             super::list_index_iter(&mut list_index);
         }
 

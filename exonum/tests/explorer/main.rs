@@ -39,6 +39,7 @@ use crate::blockchain::{
 mod blockchain;
 
 #[test]
+#[allow(clippy::cyclomatic_complexity)]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
 
@@ -67,7 +68,7 @@ fn test_explorer_basics() {
 
     // Block #1: Alice's transaction.
 
-    create_block(&mut blockchain, vec![tx_alice.clone().into()]);
+    create_block(&mut blockchain, vec![tx_alice.clone()]);
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
@@ -415,15 +416,15 @@ fn test_block_with_transactions() {
     assert!(!block.is_empty());
     assert!(block[1].status().is_ok());
 
-    assert!(block.iter().all(|tx| {
-        if let ExplorerTransactions::CreateWallet(_) =
-            ExplorerTransactions::tx_from_raw(tx.content().raw_transaction()).unwrap()
-        {
+    let all_transactions_create_wallets = block.iter().all(|tx| {
+        let tx = ExplorerTransactions::tx_from_raw(tx.content().raw_transaction()).unwrap();
+        if let ExplorerTransactions::CreateWallet(_) = tx {
             true
         } else {
             false
         }
-    }));
+    });
+    assert!(all_transactions_create_wallets);
 }
 
 #[test]

@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 #[test]
 fn test_queue_message_from_future_round() {

@@ -18,7 +18,7 @@ use super::{
 };
 use crate::crypto::Hash;
 
-const IDX_NAME: &'static str = "idx_name";
+const IDX_NAME: &str = "idx_name";
 
 fn fork_iter<T: Database>(db: T) {
     let mut fork = db.fork();
@@ -124,15 +124,16 @@ fn changelog<T: Database>(db: T) {
     fork.put(IDX_NAME, vec![2], vec![2]);
     fork.put(IDX_NAME, vec![3], vec![3]);
 
-    assert_eq!(fork.get(IDX_NAME, &[1]), Some(vec![1]));
-    assert_eq!(fork.get(IDX_NAME, &[2]), Some(vec![2]));
-    assert_eq!(fork.get(IDX_NAME, &[3]), Some(vec![3]));
+    fn assert_initial_state(fork: &Fork) {
+        assert_eq!(fork.get(IDX_NAME, &[1]), Some(vec![1]));
+        assert_eq!(fork.get(IDX_NAME, &[2]), Some(vec![2]));
+        assert_eq!(fork.get(IDX_NAME, &[3]), Some(vec![3]));
+        assert_eq!(fork.get(IDX_NAME, &[4]), None);
+    }
 
+    assert_initial_state(&fork);
     fork.checkpoint();
-
-    assert_eq!(fork.get(IDX_NAME, &[1]), Some(vec![1]));
-    assert_eq!(fork.get(IDX_NAME, &[2]), Some(vec![2]));
-    assert_eq!(fork.get(IDX_NAME, &[3]), Some(vec![3]));
+    assert_initial_state(&fork);
 
     fork.put(IDX_NAME, vec![1], vec![10]);
     fork.put(IDX_NAME, vec![4], vec![40]);
@@ -144,12 +145,7 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(IDX_NAME, &[4]), Some(vec![40]));
 
     fork.rollback();
-
-    assert_eq!(fork.get(IDX_NAME, &[1]), Some(vec![1]));
-    assert_eq!(fork.get(IDX_NAME, &[2]), Some(vec![2]));
-    assert_eq!(fork.get(IDX_NAME, &[3]), Some(vec![3]));
-    assert_eq!(fork.get(IDX_NAME, &[4]), None);
-
+    assert_initial_state(&fork);
     fork.checkpoint();
 
     fork.put(IDX_NAME, vec![4], vec![40]);
@@ -163,18 +159,11 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(IDX_NAME, &[4]), Some(vec![41]));
 
     fork.rollback();
-
-    assert_eq!(fork.get(IDX_NAME, &[1]), Some(vec![1]));
-    assert_eq!(fork.get(IDX_NAME, &[2]), Some(vec![2]));
-    assert_eq!(fork.get(IDX_NAME, &[3]), Some(vec![3]));
-    assert_eq!(fork.get(IDX_NAME, &[4]), None);
+    assert_initial_state(&fork);
 
     fork.put(IDX_NAME, vec![2], vec![20]);
-
     fork.checkpoint();
-
     fork.put(IDX_NAME, vec![3], vec![30]);
-
     fork.rollback();
 
     assert_eq!(fork.get(IDX_NAME, &[1]), Some(vec![1]));

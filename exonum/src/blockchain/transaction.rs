@@ -520,7 +520,7 @@ mod tests {
 
     #[test]
     fn transaction_error_new() {
-        let values = [
+        let values = vec![
             (TransactionErrorType::Panic, None),
             (TransactionErrorType::Panic, Some("panic")),
             (TransactionErrorType::Code(0), None),
@@ -529,10 +529,10 @@ mod tests {
             (TransactionErrorType::Code(255), Some("error description")),
         ];
 
-        for value in &values {
-            let error = TransactionError::new(value.0, value.1.map(str::to_owned));
-            assert_eq!(value.0, error.error_type());
-            assert_eq!(value.1.as_ref().map(|d| d.as_ref()), error.description());
+        for (err_type, description) in values {
+            let error = TransactionError::new(err_type, description.map(str::to_owned));
+            assert_eq!(err_type, error.error_type());
+            assert_eq!(description, error.description());
         }
     }
 

@@ -20,10 +20,7 @@ use std::time::Duration;
 use crate::crypto::CryptoHash;
 use crate::helpers::{user_agent, Height, Round, ValidatorId};
 use crate::node;
-use crate::sandbox::{
-    sandbox::{timestamping_sandbox, SandboxBuilder},
-    sandbox_tests_helper::*,
-};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
 
 #[test]
 fn test_disable_and_enable() {

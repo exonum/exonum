@@ -285,7 +285,6 @@ fn test_probe_advanced() {
             &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
         );
         assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-
         TxReset::sign(&pubkey, &key)
     };
 
@@ -417,8 +416,20 @@ fn test_snapshot_comparison_panic() {
         });
 }
 
+fn create_sample_block(testkit: &mut TestKit) {
+    let height = testkit.height().next().0;
+    if height == 2 || height == 5 {
+        let tx = {
+            let (pubkey, key) = crypto::gen_keypair();
+            TxIncrement::sign(&pubkey, height as u64, &key)
+        };
+        testkit.api().send(tx.clone());
+    }
+    testkit.create_block();
+}
+
 #[test]
-fn test_explorer_blocks() {
+fn test_explorer_blocks_basic() {
     use exonum::api::node::public::explorer::BlocksRange;
     use exonum::helpers::Height;
 
@@ -449,6 +460,15 @@ fn test_explorer_blocks() {
     assert_eq!(*blocks[1].block.prev_hash(), crypto::Hash::default());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
+}
+
+#[test]
+fn test_explorer_blocks_skip_empty_small() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
+
+    let (mut testkit, api) = init_testkit();
+    create_sample_block(&mut testkit);
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
@@ -458,12 +478,7 @@ fn test_explorer_blocks() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
-    };
-    testkit.api().send(tx.clone());
-    testkit.create_block(); // height == 2
+    create_sample_block(&mut testkit);
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
@@ -473,7 +488,6 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].block.height(), Height(2));
     assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.hash());
     assert_eq!(blocks[0].block.tx_count(), 1);
-    assert_eq!(*blocks[0].block.tx_hash(), tx.hash());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
@@ -486,8 +500,8 @@ fn test_explorer_blocks() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    testkit.create_block(); // height == 3
-    testkit.create_block(); // height == 4
+    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit);
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
@@ -497,24 +511,18 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].block.height(), Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
+}
 
-    // Run a comparable `BlockchainExplorer` method.
-    let heights: Vec<_> = testkit
-        .explorer()
-        .blocks(..)
-        .filter(|block| !block.is_empty())
-        .map(|block| block.height())
-        .collect();
-    assert_eq!(heights, vec![Height(2)]);
+#[test]
+fn test_explorer_blocks_skip_empty() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
-    };
-    testkit.api().send(tx.clone());
-    testkit.create_block(); // height == 5
+    let (mut testkit, api) = init_testkit();
+    for _ in 0..5 {
+        create_sample_block(&mut testkit);
+    }
 
-    // Check block filtering
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=1&skip_empty_blocks=true")
@@ -533,6 +541,17 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[1].block.height(), Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(6));
+}
+
+#[test]
+fn test_explorer_blocks_bounds() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
+
+    let (mut testkit, api) = init_testkit();
+    for _ in 0..5 {
+        create_sample_block(&mut testkit);
+    }
 
     // Check `latest` param
     let BlocksRange { blocks, range } = api

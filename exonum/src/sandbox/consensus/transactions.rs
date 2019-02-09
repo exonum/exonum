@@ -24,9 +24,9 @@ use crate::messages::{RawTransaction, Signed};
 use crate::node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use crate::sandbox::{
     config_updater::TxConfig,
-    sandbox::{timestamping_sandbox, timestamping_sandbox_builder, Sandbox},
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
+    timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;

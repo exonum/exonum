@@ -25,7 +25,7 @@ use crate::messages::{Message, RawTransaction};
 use crate::proto;
 use crate::storage::{Database, Error, Fork, ListIndex, Snapshot};
 
-const IDX_NAME: &'static str = "idx_name";
+const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
 
 struct TestService;
@@ -342,7 +342,7 @@ impl Service for ServicePanicStorageError {
     }
 }
 
-fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
+fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
@@ -351,7 +351,7 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
     assert_eq!(index.get(0), Some(1));
 }
 
-fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<dyn Database>) {
+fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
@@ -414,14 +414,14 @@ mod memorydb_tests {
     fn service_execute() {
         let blockchain = create_blockchain_with_service(Box::new(ServiceGood));
         let mut db = create_database();
-        super::assert_service_execute(&blockchain, &mut db);
+        super::assert_service_execute(&blockchain, db.as_mut());
     }
 
     #[test]
     fn service_execute_panic() {
         let blockchain = create_blockchain_with_service(Box::new(ServicePanic));
         let mut db = create_database();
-        super::assert_service_execute_panic(&blockchain, &mut db);
+        super::assert_service_execute_panic(&blockchain, db.as_mut());
     }
 
     #[test]
@@ -429,7 +429,7 @@ mod memorydb_tests {
     fn service_execute_panic_storage_error() {
         let blockchain = create_blockchain_with_service(Box::new(ServicePanicStorageError));
         let mut db = create_database();
-        super::assert_service_execute(&blockchain, &mut db);
+        super::assert_service_execute(&blockchain, db.as_mut());
     }
 }
 
@@ -502,7 +502,7 @@ mod rocksdb_tests {
         let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServiceGood));
         let dir = create_temp_dir();
         let mut db = create_database(dir.path());
-        super::assert_service_execute(&blockchain, &mut db);
+        super::assert_service_execute(&blockchain, db.as_mut());
     }
 
     #[test]
@@ -511,7 +511,7 @@ mod rocksdb_tests {
         let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanic));
         let dir = create_temp_dir();
         let mut db = create_database(dir.path());
-        super::assert_service_execute_panic(&blockchain, &mut db);
+        super::assert_service_execute_panic(&blockchain, db.as_mut());
     }
 
     #[test]
@@ -522,6 +522,6 @@ mod rocksdb_tests {
             create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
         let dir = create_temp_dir();
         let mut db = create_database(dir.path());
-        super::assert_service_execute(&blockchain, &mut db);
+        super::assert_service_execute(&blockchain, db.as_mut());
     }
 }

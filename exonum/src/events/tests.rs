@@ -317,7 +317,7 @@ fn test_network_big_message() {
     let first = "127.0.0.1:17200".parse().unwrap();
     let second = "127.0.0.1:17201".parse().unwrap();
 
-    let m1 = raw_message(100000);
+    let m1 = raw_message(100_000);
     let m2 = raw_message(400);
 
     let mut connect_list = ConnectList::default();
@@ -475,7 +475,7 @@ fn test_network_multiple_connect() {
     let mut connection_params: Vec<_> = nodes
         .iter()
         .cloned()
-        .map(|addr| ConnectionParams::from_address(addr))
+        .map(ConnectionParams::from_address)
         .collect();
 
     for params in connection_params.iter().cloned() {

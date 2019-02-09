@@ -29,10 +29,7 @@ use crate::messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest};
 use crate::node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
-use crate::sandbox::{
-    sandbox::{self, timestamping_sandbox},
-    sandbox_tests_helper::*,
-};
+use crate::sandbox::{self, sandbox_tests_helper::*, timestamping_sandbox};
 
 /// check scenario:
 /// HANDLE FULL PROPOSE

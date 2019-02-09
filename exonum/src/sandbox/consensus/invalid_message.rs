@@ -17,7 +17,7 @@
 
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Message, Propose};
-use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 /// HANDLE message
 /// - verify signature

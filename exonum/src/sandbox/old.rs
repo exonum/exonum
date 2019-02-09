@@ -15,8 +15,8 @@
 use std::time::Duration;
 
 use super::{
-    sandbox::timestamping_sandbox,
     sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
+    timestamping_sandbox,
 };
 use crate::blockchain::Block;
 use crate::crypto::{CryptoHash, Hash};
