@@ -42,8 +42,9 @@ use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
 use crate::storage::StorageValue;
 
-pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
+pub(crate) use self::helpers::HexStringRepresentation;
 pub use self::{
+    authorization::SignedMessage,
     helpers::{to_hex_string, BinaryForm},
     protocol::*,
 };
