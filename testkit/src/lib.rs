@@ -158,10 +158,12 @@ extern crate serde_derive;
 #[cfg(test)]
 extern crate exonum_derive;
 
-pub use crate::api::{ApiKind, TestKitApi};
-pub use crate::compare::ComparableSnapshot;
-pub use crate::network::{TestNetwork, TestNetworkConfiguration, TestNode};
-
+pub use crate::{
+    api::{ApiKind, TestKitApi},
+    compare::ComparableSnapshot,
+    network::{TestNetwork, TestNetworkConfiguration, TestNode},
+    server::TestKitStatus,
+};
 pub mod compare;
 pub mod proto;
 
