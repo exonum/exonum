@@ -154,7 +154,7 @@ pub fn check_or_create_metadata<T>(index_access: T, address: &IndexAddress, meta
 where
     T: IndexAccess,
 {
-    let (index_access, medatadata_address) = {
+    let (index_access, metadata_address) = {
         let metadata_view = IndexMetadataView::new(index_access, address);
         if let Some(saved_metadata) = metadata_view.index_metadata() {
             assert_eq!(
@@ -169,7 +169,7 @@ where
     #[allow(unsafe_code)]
     unsafe {
         if let Some(fork) = index_access.fork() {
-            let mut metadata_view = IndexMetadataView::from_parts(fork, medatadata_address);
+            let mut metadata_view = IndexMetadataView::from_parts(fork, metadata_address);
             metadata_view.set_index_metadata(metadata);
         }
     }

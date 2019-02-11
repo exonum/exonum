@@ -158,20 +158,19 @@ where
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub struct IndexAddress {
     pub(super) name: String,
     pub(super) bytes: Option<Vec<u8>>,
 }
 
 impl IndexAddress {
+    /// TODO: add documentation [ECR-2820]
     pub fn new() -> Self {
-        Self {
-            name: String::new(),
-            bytes: None,
-        }
+        Self::default()
     }
 
+    /// TODO: add documentation [ECR-2820]
     pub fn with_root<S: Into<String>>(root: S) -> Self {
         Self {
             name: root.into(),
@@ -179,14 +178,17 @@ impl IndexAddress {
         }
     }
 
+    /// TODO: add documentation [ECR-2820]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// TODO: add documentation [ECR-2820]
     pub fn bytes(&self) -> Option<&[u8]> {
         self.bytes.as_ref().map(Vec::as_slice)
     }
 
+    /// TODO: add documentation [ECR-2820]
     pub fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
         (
             &self.name,
@@ -200,6 +202,7 @@ impl IndexAddress {
         )
     }
 
+    /// TODO: add documentation [ECR-2820]
     pub fn append_name<'a, S: Into<Cow<'a, str>>>(&self, suffix: S) -> Self {
         let suffix = suffix.into();
         Self {
@@ -213,6 +216,7 @@ impl IndexAddress {
         }
     }
 
+    /// TODO: add documentation [ECR-2820]
     pub fn append_bytes<K: BinaryKey + ?Sized>(&self, suffix: &K) -> Self {
         let suffix = key_bytes(suffix);
         let (name, bytes) = self.keyed(&suffix);
