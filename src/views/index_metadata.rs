@@ -247,7 +247,7 @@ mod tests {
     };
 
     use super::{
-        IndexAccess, IndexMetadata, IndexMetadataView, IndexState, IndexType, INDEX_METADATA_NAME,
+        IndexMetadata, IndexMetadataView, IndexState, IndexType, INDEX_METADATA_NAME,
         INDEX_STATE_NAME,
     };
 
@@ -304,14 +304,14 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = &db.fork();
 
-        let address = IndexAddress::with_root(fork.root())
+        let address = IndexAddress::default()
             .append_name("foo")
             .append_bytes("bar");
         let metadata_view = IndexMetadataView::new(fork, &address);
 
         assert_eq!(
             metadata_view.view.address,
-            IndexAddress::with_root(fork.root())
+            IndexAddress::default()
                 .append_name("foo")
                 .append_name(INDEX_METADATA_NAME)
         );
@@ -322,7 +322,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = &db.fork();
 
-        let address = IndexAddress::with_root(fork.root())
+        let address = IndexAddress::default()
             .append_name("foo")
             .append_bytes("bar");;
         let view = View::new(fork, address);
@@ -330,7 +330,7 @@ mod tests {
 
         assert_eq!(
             index_state.view.address,
-            IndexAddress::with_root(fork.root())
+            IndexAddress::default()
                 .append_name("foo")
                 .append_name(INDEX_STATE_NAME)
                 .append_bytes("bar")

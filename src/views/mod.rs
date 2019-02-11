@@ -95,7 +95,7 @@ where
 {
     /// Create index from `view'.
     pub fn new(index_access: T) -> Self {
-        let address = IndexAddress::with_root(index_access.root());
+        let address = IndexAddress::default();
         Self {
             index_access,
             address,
