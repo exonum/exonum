@@ -216,7 +216,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// let checked_proof = proof.check().unwrap();
 /// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h1, &100u32)]);
 /// assert_eq!(checked_proof.missing_keys().collect::<Vec<_>>(), vec![&h3]);
-/// assert_eq!(checked_proof.merkle_root(), map.merkle_root());
+/// assert_eq!(checked_proof.root_hash(), map.root_hash());
 /// ```
 ///
 /// # JSON serialization
@@ -549,7 +549,7 @@ where
     /// let proof = map.get_proof(h2);
     /// let checked_proof = proof.check().unwrap();
     /// assert_eq!(checked_proof.entries().collect::<Vec<_>>(), vec![(&h2, &200u32)]);
-    /// assert_eq!(checked_proof.merkle_root(), map.merkle_root());
+    /// assert_eq!(checked_proof.root_hash(), map.root_hash());
     /// ```
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
@@ -613,7 +613,7 @@ impl<K, V> CheckedMapProof<K, V> {
     }
 
     /// Returns a hash of the map that this proof is constructed for.
-    pub fn merkle_root(&self) -> Hash {
+    pub fn root_hash(&self) -> Hash {
         HashTag::hash_map_node(self.hash)
     }
 }

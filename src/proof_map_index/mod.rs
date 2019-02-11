@@ -245,28 +245,7 @@ where
         self.get(key).expect("Value for the given key is absent")
     }
 
-    /// Returns the root hash of the proof map or default hash value if it is empty.
-    /// The default hash consists solely of zeroes.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = ProofMapIndex::new(name, &fork);
-    ///
-    /// let default_hash = index.merkle_root();
-    /// assert_eq!(Hash::default(), default_hash);
-    ///
-    /// index.put(&default_hash, 100);
-    /// let hash = index.merkle_root();
-    /// assert_ne!(hash, default_hash);
-    /// ```
-    pub fn merkle_root(&self) -> Hash {
+    pub(crate) fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
             Some((path, Node::Leaf(hash))) => HashStream::new()
                 .update(&[HashTag::MapBranchNode as u8])
@@ -278,7 +257,27 @@ where
         }
     }
 
-    //TODO: add doc
+    /// Returns the root hash of the proof map or default hash value if it is empty.
+    /// The default hash consists solely of zeroes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex, HashTag};
+    /// use exonum_crypto::Hash;
+    ///
+    /// let db = TemporaryDB::new();
+    /// let name = "name";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, &fork);
+    ///
+    /// let default_hash = index.root_hash();
+    /// assert_eq!(HashTag::empty_map_hash(), default_hash);
+    ///
+    /// index.put(&default_hash, 100);
+    /// let hash = index.root_hash();
+    /// assert_ne!(hash, default_hash);
+    /// ```
     pub fn root_hash(&self) -> Hash {
         HashTag::hash_map_node(self.merkle_root())
     }

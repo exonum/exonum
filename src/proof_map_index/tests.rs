@@ -150,7 +150,7 @@ fn test_insert_trivial() {
     assert_eq!(index2.get(&[255; 32]), Some(vec![1]));
     assert_eq!(index2.get(&[254; 32]), Some(vec![2]));
 
-    assert_ne!(index1.root_hash(), HashTag::hash_map_node(Hash::zero()));
+    assert_ne!(index1.root_hash(), HashTag::empty_map_hash());
     assert_eq!(index1.root_hash(), index2.root_hash());
 }
 
@@ -159,7 +159,7 @@ fn test_insert_same_key() {
     let db = TemporaryDB::default();
     let storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &storage);
-    assert_eq!(table.root_hash(), HashTag::hash_map_node(Hash::zero()));
+    assert_eq!(table.root_hash(), HashTag::empty_map_hash());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
     let hash = HashStream::new()
         .update(&[HashTag::MapBranchNode as u8])
@@ -236,8 +236,8 @@ fn test_remove_trivial() {
     index2.put(&[255; 32], vec![6]);
     index2.remove(&[255; 32]);
 
-    assert_eq!(index1.root_hash(), HashTag::hash_map_node(Hash::zero()));
-    assert_eq!(index2.root_hash(), HashTag::hash_map_node(Hash::zero()));
+    assert_eq!(index1.root_hash(), HashTag::empty_map_hash());
+    assert_eq!(index2.root_hash(), HashTag::empty_map_hash());
 }
 
 #[test]
@@ -356,7 +356,7 @@ fn test_fuzz_insert() {
         assert_eq!(v2.as_ref(), Some(&item.1));
     }
 
-    assert!(index2.root_hash() != Hash::zero());
+    assert!(index2.root_hash() != HashTag::empty_map_hash());
     assert_eq!(index2.root_hash(), index1.root_hash());
 
     // Test same keys
@@ -402,14 +402,14 @@ where
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>()
     );
-    assert_eq!(proof.merkle_root(), table.root_hash());
+    assert_eq!(proof.root_hash(), table.root_hash());
 
     let deserialized_proof = deserialized_proof.check().unwrap();
     assert_eq!(
         deserialized_proof.entries().collect::<Vec<_>>(),
         proof.entries().collect::<Vec<_>>()
     );
-    assert_eq!(deserialized_proof.merkle_root(), proof.merkle_root());
+    assert_eq!(deserialized_proof.root_hash(), proof.root_hash());
 }
 
 fn check_map_multiproof<K, V>(
@@ -445,7 +445,7 @@ fn check_map_multiproof<K, V>(
     };
 
     let proof = proof.check().unwrap();
-    assert_eq!(proof.merkle_root(), table.root_hash());
+    assert_eq!(proof.root_hash(), table.root_hash());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
         actual_keys
@@ -848,7 +848,7 @@ fn test_build_proof_in_complex_tree() {
     );
     check_map_proof(proof, None, &table);
 
-    let subtree_hash = table.root_hash();
+    let subtree_hash = table.merkle_root();
     table.put(&[129; 32], vec![5]);
     // The tree is now as follows:
     // - Bits(0000_0): -> (subtree_hash)
@@ -1450,7 +1450,7 @@ fn test_tree_with_hashed_key() {
         proof.all_entries().collect::<Vec<_>>(),
         vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]
     );
-    assert_eq!(proof.merkle_root(), table.root_hash());
+    assert_eq!(proof.root_hash(), table.root_hash());
 
     let key = Point::new(3, 4);
     let other_key = Point::new(1, 2);

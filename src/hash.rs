@@ -21,6 +21,7 @@ use exonum_crypto::{Hash, HashStream, HASH_SIZE};
 use crate::BinaryValue;
 
 const EMPTY_LIST_HASH: &str = "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9";
+const EMPTY_MAP_HASH: &str = "7324b5c72b51bb5d4c180f1109cfd347b60473882145841c39f3e584576296f9";
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -82,7 +83,6 @@ impl HashTag {
     }
 
     /// Hash of the list object.
-
     ///
     /// ```text
     /// h = sha-256( HashTag::List || len as u64 || merkle_root )
@@ -148,6 +148,16 @@ impl HashTag {
             .update(path.as_bytes())
             .update(h.as_ref())
             .hash()
+    }
+
+    /// Hash of the empty list object.
+    ///
+    /// Empty list hash:
+    /// ```text
+    /// h = sha-256( HashTag::ListNode || 0 || Hash::default() )
+    /// ```
+    pub fn empty_map_hash() -> Hash {
+        Hash::from_hex(EMPTY_MAP_HASH).unwrap()
     }
 }
 
