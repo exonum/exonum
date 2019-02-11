@@ -142,27 +142,27 @@ fn test_list_index_proof() {
     let h22 = HashTag::hash_single_node(&h2);
     let h012 = HashTag::hash_node(&h01, &h22);
 
-    assert_eq!(index.list_hash(), HashTag::empty_list_hash());
+    assert_eq!(index.root_hash(), HashTag::empty_list_hash());
 
     index.push(2u64);
 
-    assert_eq!(index.list_hash(), HashTag::hash_list_node(1, h0));
+    assert_eq!(index.root_hash(), HashTag::hash_list_node(1, h0));
     assert_eq!(index.get_proof(0), Leaf(2));
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(0, &2)]
     );
 
     index.push(4u64);
-    assert_eq!(index.list_hash(), HashTag::hash_list_node(2, h01));
+    assert_eq!(index.root_hash(), HashTag::hash_list_node(2, h01));
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(0, &2)]
     );
@@ -170,7 +170,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_proof(1)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(1, &4)]
     );
@@ -182,13 +182,13 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_range_proof(0..2)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
 
     index.push(6u64);
-    assert_eq!(index.list_hash(), HashTag::hash_list_node(3, h012));
+    assert_eq!(index.root_hash(), HashTag::hash_list_node(3, h012));
     assert_eq!(
         index.get_proof(0),
         Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
@@ -196,7 +196,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(0, &2)]
     );
@@ -207,7 +207,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_proof(1)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(1, &4)]
     );
@@ -218,7 +218,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_proof(2)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(2, &6)]
     );
@@ -233,7 +233,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_range_proof(0..2)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
@@ -248,7 +248,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_range_proof(1..3)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(1, &4), (2, &6)]
     );
@@ -263,7 +263,7 @@ fn test_list_index_proof() {
     assert_eq!(
         index
             .get_range_proof(0..3)
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap(),
         [(0, &2), (1, &4), (2, &6)]
     );
@@ -281,7 +281,7 @@ fn test_randomly_generate_proofs() {
         index.push(value.clone());
     }
     index.get(0);
-    let table_merkle_root = index.list_hash();
+    let table_merkle_root = index.root_hash();
 
     for _ in 0..50 {
         let start_range = rng.gen_range(0, num_values);
@@ -328,7 +328,7 @@ fn test_index_and_proof_roots() {
     let db = TemporaryDB::default();
     let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
-    assert_eq!(index.list_hash(), HashTag::empty_list_hash());
+    assert_eq!(index.root_hash(), HashTag::empty_list_hash());
 
     let h1 = hash_leaf_node(&[1, 2]);
     let h2 = hash_leaf_node(&[2, 3]);
@@ -376,11 +376,11 @@ fn test_index_and_proof_roots() {
     for (inserted, exp_root, proof_ind) in expected_hash_comb {
         index.push(inserted);
 
-        assert_eq!(index.list_hash(), exp_root);
+        assert_eq!(index.root_hash(), exp_root);
         let range_proof = index.get_range_proof(proof_ind..proof_ind + 1);
         assert_eq!(
             range_proof
-                .validate(index.list_hash(), index.len())
+                .validate(index.root_hash(), index.len())
                 .unwrap()
                 .len(),
             1
@@ -391,7 +391,7 @@ fn test_index_and_proof_roots() {
         let range_proof = index.get_range_proof(0..proof_ind + 1);
         assert_eq!(
             range_proof
-                .validate(index.list_hash(), index.len())
+                .validate(index.root_hash(), index.len())
                 .unwrap()
                 .len(),
             (proof_ind + 1) as usize
@@ -402,7 +402,7 @@ fn test_index_and_proof_roots() {
         let range_proof = index.get_range_proof(0..1);
         assert_eq!(
             range_proof
-                .validate(index.list_hash(), index.len())
+                .validate(index.root_hash(), index.len())
                 .unwrap()
                 .len(),
             1
@@ -414,7 +414,7 @@ fn test_index_and_proof_roots() {
 
     let range_proof = index.get_range_proof(0..8);
     let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
-        .validate(index.list_hash(), index.len())
+        .validate(index.root_hash(), index.len())
         .unwrap()
         .into_iter()
         .unzip();
@@ -437,7 +437,7 @@ fn test_index_and_proof_roots() {
     let mut range_proof = index.get_range_proof(3..5);
     assert_eq!(
         range_proof
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap()
             .len(),
         2
@@ -445,7 +445,7 @@ fn test_index_and_proof_roots() {
     range_proof = index.get_range_proof(2..6);
     assert_eq!(
         range_proof
-            .validate(index.list_hash(), index.len())
+            .validate(index.root_hash(), index.len())
             .unwrap()
             .len(),
         4
@@ -460,7 +460,7 @@ fn test_proof_illegal_lower_bound() {
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     let proof = index.get_range_proof(0..1);
 
-    assert_proof_of_absence(proof, index.list_hash(), index.len());
+    assert_proof_of_absence(proof, index.root_hash(), index.len());
     index.push(vec![1]);
 }
 
@@ -473,7 +473,7 @@ fn test_proof_illegal_bound_empty() {
         index.push(vec![i]);
     }
     let proof = index.get_range_proof(8..9);
-    assert_proof_of_absence(proof, index.list_hash(), index.len());
+    assert_proof_of_absence(proof, index.root_hash(), index.len());
 }
 
 #[test]
@@ -493,7 +493,7 @@ fn test_proof_structure() {
     let db = TemporaryDB::default();
     let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
-    assert_eq!(index.list_hash(), HashTag::empty_list_hash());
+    assert_eq!(index.root_hash(), HashTag::empty_list_hash());
 
     // spell-checker:ignore upup
 
@@ -515,7 +515,7 @@ fn test_proof_structure() {
 
     let list_hash = HashTag::hash_list_node(index.len(), h12345);
 
-    assert_eq!(index.list_hash(), list_hash);
+    assert_eq!(index.root_hash(), list_hash);
     let range_proof = index.get_range_proof(4..5);
 
     assert_eq!(
@@ -556,10 +556,10 @@ fn test_simple_merkle_root() {
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
     assert_eq!(index.get(0), None);
     index.push(vec![1]);
-    assert_eq!(index.list_hash(), h1);
+    assert_eq!(index.root_hash(), h1);
 
     index.set(0, vec![2]);
-    assert_eq!(index.list_hash(), h2);
+    assert_eq!(index.root_hash(), h2);
 }
 
 #[test]
@@ -587,7 +587,7 @@ fn test_same_merkle_root() {
     i2.push(vec![5]);
     i2.push(vec![1]);
 
-    assert_eq!(i1.list_hash(), i2.list_hash());
+    assert_eq!(i1.root_hash(), i2.root_hash());
 }
 
 #[derive(Serialize)]
@@ -615,7 +615,7 @@ mod root_hash_tests {
         let fork = db.fork();
         let mut index = ProofListIndex::new("merkle_root", &fork);
         index.extend(hashes.iter().cloned());
-        index.list_hash()
+        index.root_hash()
     }
 
     fn hash_list(bytes: &[&[u8]]) -> Vec<Hash> {

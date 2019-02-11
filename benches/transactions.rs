@@ -208,7 +208,7 @@ impl Schema<&Fork> {
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
         let mut history = self.wallets_history(owner);
         history.push(tx_hash);
-        history.list_hash()
+        history.root_hash()
     }
 }
 

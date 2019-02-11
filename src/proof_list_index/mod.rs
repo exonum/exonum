@@ -333,14 +333,14 @@ where
     /// let fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &fork);
     ///
-    /// let default_hash = index.list_hash();
+    /// let default_hash = index.root_hash();
     /// assert_eq!(HashTag::empty_list_hash(), default_hash);
     ///
     /// index.push(1);
-    /// let hash = index.list_hash();
+    /// let hash = index.root_hash();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn list_hash(&self) -> Hash {
+    pub fn root_hash(&self) -> Hash {
         HashTag::hash_list_node(self.len(), self.merkle_root())
     }
 
