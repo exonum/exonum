@@ -209,6 +209,7 @@ impl IndexAddress {
             name: if self.name.is_empty() {
                 suffix.into_owned()
             } else {
+                // Because `concat` is faster than `format!("...")` in all cases.
                 [self.name(), ".", suffix.as_ref()].concat()
             },
 

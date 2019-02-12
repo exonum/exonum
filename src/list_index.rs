@@ -36,7 +36,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ListIndex<T: IndexAccess, V> {
     base: View<T>,
-    length: IndexState<T, u64>,
+    state: IndexState<T, u64>,
     _v: PhantomData<V>,
 }
 
@@ -82,11 +82,11 @@ where
             .index_type(IndexType::List)
             .index_name(index_name)
             .build();
-        let length = IndexState::from_view(&base);
+        let state = IndexState::from_view(&base);
 
         Self {
             base,
-            length,
+            state,
             _v: PhantomData,
         }
     }
@@ -123,11 +123,11 @@ where
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let length = IndexState::from_view(&base);
+        let state = IndexState::from_view(&base);
 
         Self {
             base,
-            length,
+            state,
             _v: PhantomData,
         }
     }
@@ -216,7 +216,7 @@ where
     /// assert_eq!(2, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.length.get()
+        self.state.get()
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -274,7 +274,7 @@ where
     V: BinaryValue,
 {
     fn set_len(&mut self, len: u64) {
-        self.length.set(len)
+        self.state.set(len)
     }
 
     /// Appends an element to the back of the list.
@@ -358,7 +358,7 @@ where
     /// Shortens the list, keeping the indicated number of first `len` elements
     /// and dropping the rest.
     ///
-    /// If `len` is greater than the current length of the list, this has no effect.
+    /// If `len` is greater than the current state of the list, this has no effect.
     ///
     /// # Examples
     ///
@@ -388,7 +388,7 @@ where
     /// # Panics
     ///
     /// Panics if the indicated position (`index`) is equal to or greater than
-    /// the current length of the list.
+    /// the current state of the list.
     ///
     /// # Examples
     ///

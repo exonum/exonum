@@ -118,6 +118,7 @@ impl<T: IndexAccess> IndexMetadataView<T> {
     /// TODO Add documentation. [ECR-2820]
     fn new(index_access: T, address: &IndexAddress) -> Self {
         let metadata_address = IndexAddress {
+            // Because `concat` is faster than `format!("...")` in all cases.
             name: [address.name(), ".", INDEX_METADATA_NAME].concat(),
             bytes: None,
         };
@@ -182,45 +183,46 @@ where
     T: IndexAccess,
 {
     view: View<T>,
-    state: Cell<Option<V>>,
+    cache: Cell<Option<V>>,
 }
 
 impl<T, V> IndexState<T, V>
 where
-    V: BinaryValue + Clone + Copy + Default,
+    V: BinaryValue + Copy + Default,
     T: IndexAccess,
 {
     /// TODO Add documentation. [ECR-2820]
     pub fn from_view(view: &View<T>) -> Self {
         let index_state_address = IndexAddress {
+            // Because `concat` is faster than `format!("...")` in all cases.
             name: [&view.address.name, ".", INDEX_STATE_NAME].concat(),
             bytes: view.address.bytes.clone(),
         };
 
         Self {
             view: View::new(view.index_access, index_state_address),
-            state: Cell::new(None),
+            cache: Cell::new(None),
         }
     }
 
     /// TODO Add documentation. [ECR-2820]
     pub fn get(&self) -> V {
-        if let Some(state) = self.state.get() {
+        if let Some(state) = self.cache.get() {
             return state;
         }
         let state = self.view.get(&()).unwrap_or_default();
-        self.state.set(Some(state));
+        self.cache.set(Some(state));
         state
     }
 }
 
 impl<V> IndexState<&Fork, V>
 where
-    V: BinaryValue + Clone + Copy + Default,
+    V: BinaryValue + Copy + Default,
 {
     /// TODO Add documentation. [ECR-2820]
     pub fn set(&mut self, state: V) {
-        self.state.set(Some(state));
+        self.cache.set(Some(state));
         self.view.put(&(), state)
     }
 }

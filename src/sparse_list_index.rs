@@ -19,10 +19,10 @@
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 
-use std::{borrow::Cow, cell::Cell, marker::PhantomData};
+use std::{borrow::Cow, marker::PhantomData};
 
 use crate::{
-    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
+    views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, Fork,
 };
 
@@ -71,7 +71,7 @@ impl BinaryValue for SparseListSize {
 #[derive(Debug)]
 pub struct SparseListIndex<T: IndexAccess, V> {
     base: View<T>,
-    size: Cell<Option<SparseListSize>>,
+    state: IndexState<T, SparseListSize>,
     _v: PhantomData<V>,
 }
 
@@ -136,12 +136,15 @@ where
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
+        let base = IndexBuilder::new(view)
+            .index_type(IndexType::SparseList)
+            .index_name(index_name)
+            .build();
+        let state = IndexState::from_view(&base);
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::SparseList)
-                .index_name(index_name)
-                .build(),
-            size: Cell::new(None),
+            base,
+            state,
             _v: PhantomData,
         }
     }
@@ -177,24 +180,22 @@ where
         I: ?Sized,
         S: Into<String>,
     {
+        let base = IndexBuilder::new(view)
+            .index_type(IndexType::SparseList)
+            .index_name(family_name)
+            .family_id(index_id)
+            .build();
+        let state = IndexState::from_view(&base);
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::SparseList)
-                .index_name(family_name)
-                .family_id(index_id)
-                .build(),
-            size: Cell::new(None),
+            base,
+            state,
             _v: PhantomData,
         }
     }
 
     fn size(&self) -> SparseListSize {
-        if let Some(size) = self.size.get() {
-            return size;
-        }
-        let size = self.base.get(&()).unwrap_or_default();
-        self.size.set(Some(size));
-        size
+        self.state.get()
     }
 
     /// Returns an element at the indicated position or `None` if the indicated
@@ -391,8 +392,7 @@ where
     V: BinaryValue,
 {
     fn set_size(&mut self, size: SparseListSize) {
-        self.base.put(&(), size);
-        self.size.set(Some(size));
+        self.state.set(size);
     }
 
     /// Appends an element to the back of the 'SparseListIndex'.
@@ -545,7 +545,7 @@ where
     /// assert!(index.is_empty());
     /// ```
     pub fn clear(&mut self) {
-        self.size.set(Some(SparseListSize::default()));
+        self.state.set(SparseListSize::default());
         self.base.clear()
     }
 

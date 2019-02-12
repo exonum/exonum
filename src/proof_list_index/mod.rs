@@ -46,7 +46,7 @@ mod tests;
 #[derive(Debug)]
 pub struct ProofListIndex<T: IndexAccess, V> {
     base: View<T>,
-    length: IndexState<T, u64>,
+    state: IndexState<T, u64>,
     _v: PhantomData<V>,
 }
 
@@ -96,11 +96,11 @@ where
             .index_type(IndexType::ProofList)
             .index_name(index_name)
             .build();
-        let length = IndexState::from_view(&base);
+        let state = IndexState::from_view(&base);
 
         Self {
             base,
-            length,
+            state,
             _v: PhantomData,
         }
     }
@@ -143,11 +143,11 @@ where
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let length = IndexState::from_view(&base);
+        let state = IndexState::from_view(&base);
 
         Self {
             base,
-            length,
+            state,
             _v: PhantomData,
         }
     }
@@ -284,7 +284,7 @@ where
     /// assert_eq!(1, index.len());
     /// ```
     pub fn len(&self) -> u64 {
-        self.length.get()
+        self.state.get()
     }
 
     /// Returns the height of the proof list.
@@ -375,7 +375,7 @@ where
     /// Returns the proof of existence for the list elements in the specified range.
     ///
     /// Returns a proof of absence for a range of values, if either or both its bounds
-    /// exceed the list length.
+    /// exceed the list state.
     ///
     /// # Panics
     ///
@@ -475,7 +475,7 @@ where
     V: BinaryValue + UniqueHash,
 {
     fn set_len(&mut self, len: u64) {
-        self.length.set(len)
+        self.state.set(len)
     }
 
     fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
@@ -548,7 +548,7 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `index` is equal or greater than the current length of the proof list.
+    /// Panics if `index` is equal or greater than the current state of the proof list.
     ///
     /// # Examples
     ///
