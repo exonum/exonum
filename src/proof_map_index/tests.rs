@@ -32,8 +32,7 @@ use super::{
     proof::MapProofBuilder,
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
-use crate::HashTag;
-use crate::{BinaryKey, BinaryValue, Database, Fork, TemporaryDB, UniqueHash};
+use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, TemporaryDB, UniqueHash};
 
 const IDX_NAME: &'static str = "idx_name";
 
