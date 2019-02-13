@@ -204,20 +204,25 @@ impl WorkingPatch {
 
     /// Returns a mutable reference to the changes corresponding to a certain index.
     fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
-        let changes = self
-            .changes
-            .borrow_mut()
-            .entry(address.clone())
-            .or_insert_with(|| Some(ViewChanges::new()))
-            .take();
+        let view_changes = {
+            let mut changes = self.changes.borrow_mut();
+            let view_changes = changes.get_mut(address).map(Option::take);
+            view_changes.unwrap_or_else(|| {
+                changes
+                    .entry(address.clone())
+                    .or_insert_with(|| Some(ViewChanges::new()))
+                    .take()
+            })
+        };
+
         assert!(
-            changes.is_some(),
+            view_changes.is_some(),
             "multiple mutable borrows of an index at {:?}",
             address
         );
 
         ChangesRef {
-            changes,
+            changes: view_changes,
             key: address.clone(),
             parent: self,
         }
