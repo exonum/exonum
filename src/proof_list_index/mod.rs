@@ -27,7 +27,7 @@ use self::{key::ProofListKey, proof::ProofOfAbsence};
 use crate::{
     hash::HashTag,
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork, UniqueHash,
+    BinaryKey, BinaryValue, UniqueHash,
 };
 
 mod key;
@@ -201,6 +201,16 @@ where
 
     fn merkle_root(&self) -> Hash {
         self.get_branch(self.root_key()).unwrap_or_default()
+    }
+
+    fn set_len(&mut self, len: u64) {
+        self.state.set(len)
+    }
+
+    fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
+        debug_assert!(key.height() > 0);
+
+        self.base.put(&key, hash)
     }
 
     /// Returns the element at the indicated position or `None` if the indicated position
@@ -467,21 +477,6 @@ where
         ProofListIndexIter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
-    }
-}
-
-impl<'a, V> ProofListIndex<&'a Fork, V>
-where
-    V: BinaryValue + UniqueHash,
-{
-    fn set_len(&mut self, len: u64) {
-        self.state.set(len)
-    }
-
-    fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
-        debug_assert!(key.height() > 0);
-
-        self.base.put(&key, hash)
     }
 
     /// Appends an element to the back of the proof list.

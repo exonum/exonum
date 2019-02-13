@@ -23,7 +23,7 @@ use std::{borrow::Cow, marker::PhantomData};
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork,
+    BinaryKey, BinaryValue,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -385,15 +385,6 @@ where
             base_iter: self.base.iter_from(&(), &from),
         }
     }
-}
-
-impl<'a, V> SparseListIndex<&'a Fork, V>
-where
-    V: BinaryValue,
-{
-    fn set_size(&mut self, size: SparseListSize) {
-        self.state.set(size);
-    }
 
     /// Appends an element to the back of the 'SparseListIndex'.
     ///
@@ -576,6 +567,10 @@ where
             return Some(first_elem);
         }
         None
+    }
+
+    fn set_size(&mut self, size: SparseListSize) {
+        self.state.set(size);
     }
 }
 

@@ -617,11 +617,6 @@ impl<'a> IndexAccess for &'a Fork {
         &self.flushed
     }
 
-    #[allow(unsafe_code)]
-    unsafe fn fork(self) -> Option<&'static Fork> {
-        Some(std::mem::transmute(self))
-    }
-
     fn changes(&self, address: &IndexAddress) -> Self::Changes {
         self.working_patch.changes_mut(address)
     }

@@ -30,8 +30,8 @@ use self::{
     proof::{create_multiproof, create_proof},
 };
 use crate::{
-    views::{IndexAccess, IndexBuilder, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork, HashTag, UniqueHash,
+    views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
+    BinaryKey, BinaryValue, UniqueHash,
 };
 
 mod key;
@@ -532,13 +532,7 @@ where
                 .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
         }
     }
-}
 
-impl<'a, K, V> ProofMapIndex<&'a Fork, K, V>
-where
-    K: BinaryKey + UniqueHash,
-    V: BinaryValue + UniqueHash,
-{
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
         let hash = value.hash();
@@ -616,6 +610,57 @@ where
         }
     }
 
+    fn remove_node(
+        &mut self,
+        parent: &BranchNode,
+        proof_path: &ProofPath,
+        key: &K,
+    ) -> RemoveAction {
+        let child_path = parent
+            .child_path(proof_path.bit(0))
+            .start_from(proof_path.start());
+        let i = child_path.common_prefix_len(proof_path);
+
+        if i == child_path.len() {
+            match self.get_node_unchecked(&child_path) {
+                Node::Leaf(_) => {
+                    self.remove_leaf(proof_path, key);
+                    return RemoveAction::Leaf;
+                }
+                Node::Branch(mut branch) => {
+                    let suffix_path = proof_path.suffix(i);
+                    match self.remove_node(&branch, &suffix_path, key) {
+                        RemoveAction::Leaf => {
+                            let child = !suffix_path.bit(0);
+                            let key = branch.child_path(child);
+                            let hash = branch.child_hash(child);
+
+                            self.base.remove(&child_path);
+                            return RemoveAction::Branch((key, hash));
+                        }
+                        RemoveAction::Branch((key, hash)) => {
+                            let new_child_path = key.start_from(suffix_path.start());
+                            branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
+                            let h = branch.hash();
+
+                            self.base.put(&child_path, branch);
+                            return RemoveAction::UpdateHash(h);
+                        }
+                        RemoveAction::UpdateHash(hash) => {
+                            branch.set_child_hash(suffix_path.bit(0), &hash);
+                            let h = branch.hash();
+
+                            self.base.put(&child_path, branch);
+                            return RemoveAction::UpdateHash(h);
+                        }
+                        RemoveAction::KeyNotFound => return RemoveAction::KeyNotFound,
+                    }
+                }
+            }
+        }
+        RemoveAction::KeyNotFound
+    }
+
     /// Inserts the key-value pair into the proof map.
     ///
     /// # Examples
@@ -685,57 +730,6 @@ where
                 self.insert_leaf(&proof_path, key, value);
             }
         }
-    }
-
-    fn remove_node(
-        &mut self,
-        parent: &BranchNode,
-        proof_path: &ProofPath,
-        key: &K,
-    ) -> RemoveAction {
-        let child_path = parent
-            .child_path(proof_path.bit(0))
-            .start_from(proof_path.start());
-        let i = child_path.common_prefix_len(proof_path);
-
-        if i == child_path.len() {
-            match self.get_node_unchecked(&child_path) {
-                Node::Leaf(_) => {
-                    self.remove_leaf(proof_path, key);
-                    return RemoveAction::Leaf;
-                }
-                Node::Branch(mut branch) => {
-                    let suffix_path = proof_path.suffix(i);
-                    match self.remove_node(&branch, &suffix_path, key) {
-                        RemoveAction::Leaf => {
-                            let child = !suffix_path.bit(0);
-                            let key = branch.child_path(child);
-                            let hash = branch.child_hash(child);
-
-                            self.base.remove(&child_path);
-                            return RemoveAction::Branch((key, hash));
-                        }
-                        RemoveAction::Branch((key, hash)) => {
-                            let new_child_path = key.start_from(suffix_path.start());
-                            branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
-                            let h = branch.hash();
-
-                            self.base.put(&child_path, branch);
-                            return RemoveAction::UpdateHash(h);
-                        }
-                        RemoveAction::UpdateHash(hash) => {
-                            branch.set_child_hash(suffix_path.bit(0), &hash);
-                            let h = branch.hash();
-
-                            self.base.put(&child_path, branch);
-                            return RemoveAction::UpdateHash(h);
-                        }
-                        RemoveAction::KeyNotFound => return RemoveAction::KeyNotFound,
-                    }
-                }
-            }
-        }
-        RemoveAction::KeyNotFound
     }
 
     /// Removes a key from the proof map.

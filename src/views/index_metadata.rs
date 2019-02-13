@@ -122,11 +122,6 @@ impl<T: IndexAccess> IndexMetadataView<T> {
             name: [address.name(), ".", INDEX_METADATA_NAME].concat(),
             bytes: None,
         };
-        Self::from_parts(index_access, metadata_address)
-    }
-
-    /// TODO Add documentation. [ECR-2820]
-    fn from_parts(index_access: T, metadata_address: IndexAddress) -> Self {
         Self {
             view: View::new(index_access, metadata_address),
         }
@@ -138,41 +133,26 @@ impl<T: IndexAccess> IndexMetadataView<T> {
     }
 
     /// TODO Add documentation. [ECR-2820]
-    fn into_inner(self) -> (T, IndexAddress) {
-        (self.view.index_access, self.view.address)
-    }
-}
-
-impl IndexMetadataView<&Fork> {
-    /// TODO Add documentation. [ECR-2820]
     fn set_index_metadata(&mut self, metadata: IndexMetadata) {
         self.view.put(INDEX_TYPE_NAME, metadata);
     }
 }
+
+impl IndexMetadataView<&Fork> {}
 
 /// TODO Add documentation. [ECR-2820]
 pub fn check_or_create_metadata<T>(index_access: T, address: &IndexAddress, metadata: IndexMetadata)
 where
     T: IndexAccess,
 {
-    let (index_access, metadata_address) = {
-        let metadata_view = IndexMetadataView::new(index_access, address);
-        if let Some(saved_metadata) = metadata_view.index_metadata() {
-            assert_eq!(
-                metadata, saved_metadata,
-                "Saved metadata doesn't match specified"
-            );
-            return;
-        }
-        metadata_view.into_inner()
-    };
-    // Unsafe method `index_access.fork()` here is safe because we never use fork outside this block.
-    #[allow(unsafe_code)]
-    unsafe {
-        if let Some(fork) = index_access.fork() {
-            let mut metadata_view = IndexMetadataView::from_parts(fork, metadata_address);
-            metadata_view.set_index_metadata(metadata);
-        }
+    let mut view = IndexMetadataView::new(index_access, address);
+    if let Some(saved_metadata) = view.index_metadata() {
+        assert_eq!(
+            metadata, saved_metadata,
+            "Saved metadata doesn't match specified"
+        );
+    } else {
+        view.set_index_metadata(metadata);
     }
 }
 
@@ -214,12 +194,7 @@ where
         self.cache.set(Some(state));
         state
     }
-}
 
-impl<V> IndexState<&Fork, V>
-where
-    V: BinaryValue + Copy + Default,
-{
     /// TODO Add documentation. [ECR-2820]
     pub fn set(&mut self, state: V) {
         self.cache.set(Some(state));

@@ -21,7 +21,7 @@ use std::marker::PhantomData;
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork,
+    BinaryKey, BinaryValue,
 };
 
 /// A list of items where elements are added to the end of the list and are
@@ -267,15 +267,6 @@ where
             base_iter: self.base.iter_from(&(), &from),
         }
     }
-}
-
-impl<'a, V> ListIndex<&'a Fork, V>
-where
-    V: BinaryValue,
-{
-    fn set_len(&mut self, len: u64) {
-        self.state.set(len)
-    }
 
     /// Appends an element to the back of the list.
     ///
@@ -445,6 +436,10 @@ where
     pub fn clear(&mut self) {
         self.base.clear();
         self.set_len(0);
+    }
+
+    fn set_len(&mut self, len: u64) {
+        self.state.set(len)
     }
 }
 

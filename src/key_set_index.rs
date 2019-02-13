@@ -22,7 +22,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
-    BinaryKey, Fork,
+    BinaryKey,
 };
 
 /// A set of key items.
@@ -189,12 +189,7 @@ where
             base_iter: self.base.iter_from(&(), from),
         }
     }
-}
 
-impl<'a, K> KeySetIndex<&'a Fork, K>
-where
-    K: BinaryKey,
-{
     /// Adds a key to the set.
     ///
     /// # Examples

@@ -22,7 +22,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
     views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, Fork,
+    BinaryKey, BinaryValue,
 };
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
@@ -352,13 +352,7 @@ where
             base_iter: self.base.iter_from(&(), from),
         }
     }
-}
 
-impl<'a, K, V> MapIndex<&'a Fork, K, V>
-where
-    K: BinaryKey,
-    V: BinaryValue,
-{
     /// Inserts a key-value pair into a map.
     ///
     /// # Examples
