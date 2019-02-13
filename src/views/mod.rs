@@ -423,11 +423,11 @@ impl<T: IndexAccess> View<T> {
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        self.changes.as_mut().map(|changes| {
+        if let Some(changes) = self.changes.as_mut() {
             changes
                 .data
-                .insert(concat_keys!(key), Change::Put(value.into_bytes()))
-        });
+                .insert(concat_keys!(key), Change::Put(value.into_bytes()));
+        };
     }
 
     /// Removes a key from the view.
@@ -435,14 +435,16 @@ impl<T: IndexAccess> View<T> {
     where
         K: BinaryKey + ?Sized,
     {
-        self.changes
-            .as_mut()
-            .map(|changes| changes.data.insert(concat_keys!(key), Change::Delete));
+        if let Some(changes) = self.changes.as_mut() {
+            changes.data.insert(concat_keys!(key), Change::Delete);
+        };
     }
 
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
-        self.changes.as_mut().map(|changes| changes.clear());
+        if let Some(changes) = self.changes.as_mut() {
+            changes.clear()
+        }
     }
 }
 
