@@ -495,7 +495,7 @@ impl Blockchain {
             {
                 let mut schema = Schema::new(&mut fork);
                 for precommit in precommits {
-                    schema.precommits_mut(&block_hash).push(precommit.clone());
+                    schema.precommits_mut(&block_hash).push(precommit);
                 }
 
                 // Consensus messages cache is useful only during one height, so it should be
@@ -556,8 +556,9 @@ impl Blockchain {
     /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
         let schema = Schema::new(self.snapshot());
+
         let peers_cache = schema.peers_cache();
-        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
+        let it = peers_cache.iter().map(|(k, v)| (k, v));
         it.collect()
     }
 

@@ -645,7 +645,7 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
-        self.send_to_peer(key, connect.clone());
+        self.send_to_peer(key, connect);
     }
 
     /// Add timeout request.
