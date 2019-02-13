@@ -203,7 +203,7 @@ impl IndexAddress {
     }
 
     /// TODO: add documentation [ECR-2820]
-    pub fn append_name<'a, S: Into<Cow<'a, str>>>(&self, suffix: S) -> Self {
+    pub fn append_name<'a, S: Into<Cow<'a, str>>>(self, suffix: S) -> Self {
         let suffix = suffix.into();
         Self {
             name: if self.name.is_empty() {
@@ -213,18 +213,22 @@ impl IndexAddress {
                 [self.name(), ".", suffix.as_ref()].concat()
             },
 
-            bytes: self.bytes.clone(),
+            bytes: self.bytes,
         }
     }
 
     /// TODO: add documentation [ECR-2820]
-    pub fn append_bytes<K: BinaryKey + ?Sized>(&self, suffix: &K) -> Self {
-        let suffix = key_bytes(suffix);
-        let (name, bytes) = self.keyed(&suffix);
+    pub fn append_bytes<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
+        let name = self.name;
+        let bytes = if let Some(bytes) = self.bytes {
+            concat_keys!(bytes, suffix)
+        } else {
+            concat_keys!(suffix)
+        };
 
         Self {
-            name: name.to_owned(),
-            bytes: Some(bytes.into_owned()),
+            name,
+            bytes: Some(bytes),
         }
     }
 }
@@ -282,9 +286,7 @@ impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
 }
 
 fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
-    let mut buffer = vec![0_u8; key.size()];
-    key.write(&mut buffer);
-    buffer
+    concat_keys!(key)
 }
 
 impl<T: IndexAccess> View<T> {
