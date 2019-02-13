@@ -40,7 +40,7 @@
           "vote_type": "yea",
           "tx_hash": "b5089fe219c59c1674eb01f794b31fb7d7cc519b8d16821cda2ec45132a709d4"
       }]
-	}
+  }
     ```
 
 2. <http://127.0.0.1:8000/api/services/configuration/v1/configs/following> -
@@ -84,7 +84,7 @@
           "votes_history_hash": "de9aab8a8e4a5621ea055cd179257cdcb794094fe52fc1f0adf9fe728ab0e63a",
           "num_validators": 2
       }
-	}
+  }
     ```
 
 4. <http://127.0.0.1:8000/api/services/configuration/v1/configs/votes?hash=b206363922a4b5eda51e4f3d1ef64752e82cb71d780082a461f0b22fe8fca40f>
@@ -175,7 +175,7 @@
           }
         ]
       }
-  	]
+    ]
     ```
 
 6. <http://127.0.0.1:8000/api/services/configuration/v1/configs/proposed?previous_cfg_hash=872ebf5d638db401326d754ae639b2ae41087569b84933e2cd06e47e859299ca&actual_from=0>
@@ -192,7 +192,7 @@
             "num_validators": 2
         }
       }
-	]
+  ]
     ```
 
 ### Private endpoints' response samples
@@ -226,7 +226,7 @@
           },
           "cryptocurrency": null
       }
-	}'  http://127.0.0.1:8010/api/v1/configs/postpropose
+    }'  http://127.0.0.1:8010/api/v1/configs/postpropose
     ```
     ```json
     {
