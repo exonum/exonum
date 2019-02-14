@@ -19,7 +19,7 @@ use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
 use crate::crypto::Hash;
 
 /// An enum that represents a proof of existence for a proof list elements.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListProof<V> {
     /// A branch of proof in which both children contain requested elements.
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
@@ -32,7 +32,7 @@ pub enum ListProof<V> {
 }
 
 /// An error that is returned when the list proof is invalid.
-#[derive(Debug, Fail)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Fail)]
 pub enum ListProofError {
     /// The proof is too short and does not correspond to the height of the tree.
     #[fail(display = "proof is too short and does not correspond to the height of the tree")]
