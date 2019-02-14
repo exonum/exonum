@@ -416,8 +416,8 @@ impl BlockResponse {
         &self.to
     }
     /// Block header.
-    pub fn block(&self) -> blockchain::Block {
-        self.block.clone()
+    pub fn block(&self) -> &blockchain::Block {
+        &self.block
     }
     /// List of pre-commits.
     pub fn precommits(&self) -> Vec<Vec<u8>> {
