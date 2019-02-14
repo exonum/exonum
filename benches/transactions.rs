@@ -282,12 +282,15 @@ pub fn bench_transactions(c: &mut Criterion) {
         ParameterizedBenchmark::new(
             "currency_like",
             move |b: &mut Bencher, params: &BenchParams| {
-                let db = TemporaryDB::new();
                 let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
-                b.iter(|| {
+                b.iter_with_setup(TemporaryDB::new, |db| {
                     for block in &blocks {
                         block.execute(&db)
                     }
+                    // Some fast assertions.
+                    let snapshot = db.snapshot();
+                    let schema = Schema::new(&snapshot);
+                    assert_eq!(schema.blocks().len(), params.blocks as u64);
                 })
             },
             item_counts,

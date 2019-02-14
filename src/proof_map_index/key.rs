@@ -861,6 +861,7 @@ mod tests {
         assert_eq!(b.len(), 256);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "self.start() + idx < self.end()")]
     fn test_proof_path_at_overflow() {
@@ -868,6 +869,7 @@ mod tests {
         b.bit(32);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "pos <= self.end()")]
     fn test_proof_path_suffix_overflow() {
@@ -876,6 +878,7 @@ mod tests {
         b.suffix(255).suffix(2);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "self.start() + idx < self.end()")]
     fn test_proof_path_suffix_bit_overflow() {
