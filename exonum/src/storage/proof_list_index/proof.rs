@@ -32,13 +32,16 @@ pub enum ListProof<V> {
 }
 
 /// An error that is returned when the list proof is invalid.
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum ListProofError {
     /// The proof is too short and does not correspond to the height of the tree.
+    #[fail(display = "proof is too short and does not correspond to the height of the tree")]
     UnexpectedLeaf,
     /// The proof is too long and does not correspond to the height of the tree.
+    #[fail(display = "proof is too long and does not correspond to the height of the tree")]
     UnexpectedBranch,
     /// The hash of the proof is not equal to the trusted root hash.
+    #[fail(display = "hash of the proof is not equal to the trusted root hash")]
     UnmatchedRootHash,
 }
 
