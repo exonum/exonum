@@ -557,9 +557,10 @@ impl Blockchain {
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
         let schema = Schema::new(self.snapshot());
 
-        let peers_cache = schema.peers_cache();
-        let it = peers_cache.iter().map(|(k, v)| (k, v));
-        it.collect()
+        let peers_cache_table = schema.peers_cache();
+        let peers_cache = peers_cache_table.iter().collect();
+
+        peers_cache
     }
 
     /// Saves the given raw message to the consensus messages cache.
