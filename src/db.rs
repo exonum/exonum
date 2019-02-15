@@ -26,6 +26,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use failure::ensure;
+
 use crate::{
     views::{IndexAccess, IndexAddress, View},
     Result,
@@ -777,14 +779,13 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
     {
         let mut view = View::new(&fork, address);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
-            if saved_version == DB_VERSION {
-                return Ok(());
-            } else {
-                return Err(crate::Error::new(format!(
-                    "Database version doesn't match: actual {}, expected {}",
-                    saved_version, DB_VERSION
-                )));
-            }
+            ensure!(
+                saved_version == DB_VERSION,
+                "Database version doesn't match: actual {}, expected {}",
+                saved_version,
+                DB_VERSION
+            );
+            return Ok(());
         } else {
             view.put(VERSION_NAME, DB_VERSION);
         }

@@ -18,7 +18,7 @@
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
+use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
 use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
 
@@ -26,12 +26,6 @@ use crate::{
     db::{check_database, Change},
     Database, DbOptions, Iter, Iterator, Patch, Snapshot,
 };
-
-impl From<rocksdb::Error> for crate::Error {
-    fn from(err: rocksdb::Error) -> Self {
-        Self::new(err.description())
-    }
-}
 
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
 /// backend.
