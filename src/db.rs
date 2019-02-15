@@ -27,7 +27,7 @@ use std::{
 };
 
 use crate::{
-    views::{IndexAccess, IndexAddress},
+    views::{IndexAccess, IndexAddress, View},
     Result,
 };
 
@@ -761,4 +761,33 @@ impl<T: Database> From<T> for Box<dyn Database> {
     fn from(db: T) -> Self {
         Box::new(db) as Self
     }
+}
+
+/// The current `MerkleDB` data layout version.
+pub const DB_VERSION: u8 = 0;
+/// Database metadata address.
+pub const DB_METADATA: &str = "__DB_METADATA__";
+/// Version attribute name.
+pub const VERSION_NAME: &str = "version";
+
+/// This function checks that the given database is compatible with the current `MerkleDB` version.
+pub fn check_database(db: &mut dyn Database) -> Result<()> {
+    let address = IndexAddress::with_root(DB_METADATA);
+    let fork = db.fork();
+    {
+        let mut view = View::new(&fork, address);
+        if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
+            if saved_version == DB_VERSION {
+                return Ok(());
+            } else {
+                return Err(crate::Error::new(format!(
+                    "Database version doesn't match: actual {}, expected {}",
+                    saved_version, DB_VERSION
+                )));
+            }
+        } else {
+            view.put(VERSION_NAME, DB_VERSION);
+        }
+    }
+    db.merge(fork.into_patch())
 }

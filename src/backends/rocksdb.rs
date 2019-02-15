@@ -22,7 +22,10 @@ use std::{error::Error, fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
 use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
 
-use crate::{db::Change, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
+use crate::{
+    db::{check_database, Change},
+    Database, DbOptions, Iter, Iterator, Patch, Snapshot,
+};
 
 impl From<rocksdb::Error> for crate::Error {
     fn from(err: rocksdb::Error) -> Self {
@@ -75,7 +78,7 @@ impl RocksDB {
     /// `create_if_missing` is switched on in `DbOptions`, a new database will
     /// be created at the indicated path.
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> crate::Result<Self> {
-        let db = {
+        let inner = {
             if let Ok(names) = rocksdb::DB::list_cf(&RocksDbOptions::default(), &path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
                 rocksdb::DB::open_cf(&options.into(), path, cf_names.as_ref())?
@@ -83,7 +86,11 @@ impl RocksDB {
                 rocksdb::DB::open(&options.into(), path)?
             }
         };
-        Ok(Self { db: Arc::new(db) })
+        let mut db = Self {
+            db: Arc::new(inner),
+        };
+        check_database(&mut db)?;
+        Ok(db)
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {

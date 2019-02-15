@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use crate::{
-    views::{IndexAccess, IndexAddress, IndexBuilder, View},
-    Database, Fork, TemporaryDB,
+    db,
+    views::{IndexAccess, IndexAddress, IndexBuilder, IndexType, View},
+    Database, DbOptions, Fork, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -341,6 +342,35 @@ where
     assert_iter(&view, 0, &[(10, 10), (20, 20), (30, 30)]);
     view.remove(&vec![35]);
     assert_iter(&view, 0, &[(10, 10), (20, 20), (30, 30)]);
+}
+
+#[test]
+fn test_database_check_correct_version() {
+    let db = TemporaryDB::default();
+    let snapshot = db.snapshot();
+
+    let view = View::new(&snapshot, IndexAddress::with_root(db::DB_METADATA));
+    let version: u8 = view.get(db::VERSION_NAME).unwrap();
+    assert_eq!(version, db::DB_VERSION);
+}
+
+#[test]
+#[should_panic(expected = "actual 2, expected 0")]
+fn test_database_check_incorrect_version() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let opts = DbOptions::default();
+    // Writes different version to metadata.
+    {
+        let db = RocksDB::open(&dir, &opts).unwrap();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, IndexAddress::with_root(db::DB_METADATA));
+            view.put(db::VERSION_NAME, 2_u8);
+        }
+        db.merge(fork.into_patch()).unwrap();
+    }
+    // Tries to open modified database.
+    RocksDB::open(&dir, &opts).unwrap();
 }
 
 #[test]
