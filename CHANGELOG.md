@@ -17,7 +17,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Changed `ProofMapIndex` hashing rules for leaf nodes and branch nodes.
   They are hashing now with 0x04 prefix. (#20)
 
-- Rename method `merkle_root` of `ProofMapIndex` and `ProofListIndex` to
+- Renamed method `merkle_root` of `ProofMapIndex` and `ProofListIndex` to
   `root_hash`. (#20)
 
 - Several mutable indexes now can be create from immutable reference to `Fork` (#10)
