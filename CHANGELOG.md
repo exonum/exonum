@@ -5,7 +5,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-- Crate specific error type has been replaced by the `failure::Error`. (#27)
+- A crate-specific error type has been replaced by the `failure::Error`. (#27)
 
 - Changed storage layout (#21)
 
