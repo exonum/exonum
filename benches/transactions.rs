@@ -113,7 +113,7 @@ const ITEM_COUNT: [BenchParams; 6] = [
     },
     BenchParams {
         users: 1_000,
-        blocks: 1_000_000,
+        blocks: 1_000,
         txs_in_block: 1_000,
     },
 ];
