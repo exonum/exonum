@@ -178,13 +178,13 @@ use exonum::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         ApiAccess,
     },
-    blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration},
+    blockchain::{Blockchain, GenesisConfig, Schema as CoreSchema, Service, StoredConfiguration},
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
     messages::{RawTransaction, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
-    storage::{MemoryDB, Patch, Snapshot},
+    storage::{Database, MemoryDB, Patch, Snapshot},
 };
 
 use crate::checkpoint_db::{CheckpointDb, CheckpointDbHandler};
@@ -362,10 +362,11 @@ impl TestKitBuilder {
             exonum::helpers::init_logger().ok();
         }
         crypto::init();
-        TestKit::assemble(
-            self.services,
-            TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1)),
-        )
+
+        let network =
+            TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1));
+        let genesis = network.genesis_config();
+        TestKit::assemble(MemoryDB::new(), self.services, network, genesis)
     }
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by
@@ -411,11 +412,16 @@ impl TestKit {
         TestKitBuilder::validator().with_service(service).create()
     }
 
-    fn assemble(services: Vec<Box<dyn Service>>, network: TestNetwork) -> Self {
+    fn assemble(
+        database: MemoryDB,
+        services: Vec<Box<dyn Service>>,
+        network: TestNetwork,
+        genesis: GenesisConfig,
+    ) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
-        let db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(database);
         let db_handler = db.handler();
 
         let mut blockchain = Blockchain::new(
@@ -426,8 +432,7 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let genesis = network.genesis_config();
-        blockchain.initialize(genesis.clone()).unwrap();
+        blockchain.initialize(genesis).unwrap();
 
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
             let mut blockchain = blockchain.clone();
@@ -1007,6 +1012,132 @@ impl TestKit {
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
     pub fn us(&self) -> &TestNode {
         self.network().us()
+    }
+
+    /// Emulates stopping the node. The stopped node can then be `restart()`ed.
+    ///
+    /// See [`StoppedTestKit`] documentation for more details how to use this method.
+    ///
+    /// [`StoppedTestKit`]: struct.StoppedTestKit.html
+    pub fn stop(self) -> StoppedTestKit {
+        drop(self.blockchain);
+        drop(self.events_stream);
+        // Needed for unwrapping `db_handler` by reducing the `Arc` count for the database.
+
+        StoppedTestKit {
+            network: self.network,
+            cfg_proposal: self.cfg_proposal,
+            db: self
+                .db_handler
+                .try_unwrap()
+                .expect("cannot retrieve database state"),
+        }
+    }
+}
+
+/// Persistent state of an Exonum node allowing to emulate node restart.
+///
+/// The persistent state holds the database (including uncommitted transactions) and
+/// the network configuration, but does not retain the internal state of the services.
+///
+/// This method is useful to test scenarios that may play a different way depending
+/// on node restarts, such as services with dynamic internal state modified in response
+/// to blockchain events (e.g., in `Service::after_commit`).
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::{
+/// #   blockchain::{Service, Transaction, ServiceContext}, storage::{Snapshot, Fork},
+/// #   helpers::Height, messages::RawTransaction, crypto::Hash,
+/// # };
+/// # use exonum_testkit::TestKit;
+/// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+/// // Service with internal state modified by a custom `after_commit` hook.
+/// #[derive(Clone)]
+/// struct AfterCommitService {
+///     counter: Arc<AtomicUsize>,
+/// }
+///
+/// impl AfterCommitService {
+///     pub fn new() -> Self {
+///         AfterCommitService { counter: Arc::new(AtomicUsize::default()) }
+///     }
+///
+///     pub fn counter(&self) -> usize {
+///         self.counter.load(Ordering::SeqCst)
+///     }
+/// }
+///
+/// impl Service for AfterCommitService {
+/// #   fn service_name(&self) -> &str { "after_commit" }
+/// #   fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> { Vec::new() }
+/// #   fn service_id(&self) -> u16 { 100 }
+/// #   fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+/// #       unimplemented!()
+/// #   }
+///     // Other methods...
+///
+///     fn after_commit(&self, context: &ServiceContext) {
+///         self.counter.fetch_add(1, Ordering::SeqCst);
+///     }
+/// }
+///
+/// let service = AfterCommitService::new();
+/// let mut testkit = TestKit::for_service(service.clone());
+/// testkit.create_blocks_until(Height(5));
+/// assert_eq!(service.counter(), 5);
+///
+/// // Stop the testkit.
+/// let stopped = testkit.stop();
+/// assert_eq!(stopped.height(), Height(5));
+///
+/// // Resume with the same single service with a fresh state.
+/// let service = AfterCommitService::new();
+/// let mut testkit = stopped.resume(vec![service.clone().into()]);
+/// testkit.create_blocks_until(Height(8));
+/// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
+/// ```
+#[derive(Debug)]
+pub struct StoppedTestKit {
+    db: MemoryDB,
+    network: TestNetwork,
+    cfg_proposal: Option<ConfigurationProposalState>,
+}
+
+impl StoppedTestKit {
+    /// Returns a snapshot of the database state.
+    pub fn snapshot(&self) -> Box<dyn Snapshot> {
+        self.db.snapshot()
+    }
+
+    /// Returns the height of latest committed block.
+    pub fn height(&self) -> Height {
+        CoreSchema::new(self.snapshot()).height()
+    }
+
+    /// Returns the reference to test network.
+    pub fn network(&self) -> &TestNetwork {
+        &self.network
+    }
+
+    /// Resumes the operation of the testkit.
+    ///
+    /// Note that `services` may differ from the vector of services initially passed to
+    /// the `TestKit` (which is also what may happen with real Exonum apps).
+    pub fn resume(self, services: Vec<Box<dyn Service>>) -> TestKit {
+        let genesis = {
+            let schema = CoreSchema::new(self.db.snapshot());
+            GenesisConfig::new(
+                schema
+                    .configuration_by_height(Height(0))
+                    .validator_keys
+                    .into_iter(),
+            )
+        };
+        let mut testkit = TestKit::assemble(self.db, services, self.network, genesis);
+        testkit.cfg_proposal = self.cfg_proposal;
+        testkit
     }
 }
 

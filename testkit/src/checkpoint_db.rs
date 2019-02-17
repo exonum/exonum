@@ -97,6 +97,16 @@ impl<T: Database> CheckpointDbHandler<T> {
             .expect("Cannot lock CheckpointDb for rollback")
             .rollback();
     }
+
+    /// Tries to unwrap this handler.
+    pub fn try_unwrap(self) -> Result<T, Self> {
+        let lock = Arc::try_unwrap(self.inner).map_err(|inner| {
+            println!("strong: {}", Arc::strong_count(&inner));
+            CheckpointDbHandler { inner }
+        })?;
+        let inner = lock.into_inner().expect("cannot unwrap `RwLock`");
+        Ok(inner.db)
+    }
 }
 
 #[derive(Debug)]
