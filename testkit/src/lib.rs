@@ -807,8 +807,13 @@ impl TestKit {
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Signed<RawTransaction>) {
         let mut fork = self.blockchain.fork();
-        let mut schema = CoreSchema::new(&mut fork);
-        schema.add_transaction_into_pool(transaction)
+        {
+            let mut schema = CoreSchema::new(&mut fork);
+            schema.add_transaction_into_pool(transaction);
+        }
+        self.blockchain
+            .merge(fork.into_patch())
+            .expect("cannot update database");
     }
 
     /// Checks if transaction can be found in pool
