@@ -25,6 +25,11 @@ use exonum::{
     storage::Snapshot,
 };
 
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
+
 pub const SERVICE_ID: u16 = 512;
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq)]
@@ -50,7 +55,22 @@ impl Transaction for TxAfterCommit {
     }
 }
 
-pub struct AfterCommitService;
+#[derive(Clone)]
+pub struct AfterCommitService {
+    counter: Arc<AtomicUsize>,
+}
+
+impl AfterCommitService {
+    pub fn new() -> Self {
+        AfterCommitService {
+            counter: Arc::new(AtomicUsize::default()),
+        }
+    }
+
+    pub fn counter(&self) -> usize {
+        self.counter.load(Ordering::SeqCst)
+    }
+}
 
 impl Service for AfterCommitService {
     fn service_name(&self) -> &str {
@@ -71,6 +91,7 @@ impl Service for AfterCommitService {
     }
 
     fn after_commit(&self, context: &ServiceContext) {
+        self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);
     }
