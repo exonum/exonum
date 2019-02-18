@@ -99,10 +99,10 @@ where
         S: Into<String>,
     {
         let (base, _state) = IndexBuilder::new(view)
-                .index_type(IndexType::Entry)
-                .index_name(family_name)
-                .family_id(index_id)
-                .build::<()>();
+            .index_type(IndexType::Entry)
+            .index_name(family_name)
+            .family_id(index_id)
+            .build::<()>();
 
         Self {
             base,

@@ -20,7 +20,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},

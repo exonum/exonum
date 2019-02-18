@@ -722,10 +722,7 @@ fn test_metadata_index_identifiers() {
             .family_id("family")
             .index_type(IndexType::ProofMap)
             .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::with_root("indexes").append_bytes(&0_u64)
-        );
+        assert_eq!(view.address, IndexAddress::new().append_bytes(&0_u64));
     }
 
     // Creates the second index metadata.
@@ -735,10 +732,7 @@ fn test_metadata_index_identifiers() {
             .family_id("family")
             .index_type(IndexType::ProofMap)
             .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::with_root("indexes").append_bytes(&1_u64)
-        );
+        assert_eq!(view.address, IndexAddress::new().append_bytes(&1_u64));
     }
 
     // Tries to create the first index instance.
@@ -748,10 +742,7 @@ fn test_metadata_index_identifiers() {
             .family_id("family")
             .index_type(IndexType::ProofMap)
             .build::<()>();
-        assert_eq!(
-            view.address,
-            IndexAddress::with_root("indexes").append_bytes(&0_u64)
-        );
+        assert_eq!(view.address, IndexAddress::new().append_bytes(&0_u64));
     }
 }
 

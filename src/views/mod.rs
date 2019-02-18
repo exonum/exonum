@@ -14,7 +14,7 @@
 
 #![warn(missing_docs)]
 
-pub use self::{index_metadata::IndexType, indexes_pool::IndexState};
+pub use self::{metadata::IndexState, metadata::IndexType};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
@@ -25,8 +25,7 @@ use super::{
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
-mod index_metadata;
-mod indexes_pool;
+mod metadata;
 #[cfg(test)]
 mod tests;
 
@@ -148,7 +147,7 @@ where
         V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
     {
         let (index_address, index_state) =
-            indexes_pool::index_metadata(self.index_access, &self.address, self.index_type);
+            metadata::index_metadata(self.index_access, &self.address, self.index_type);
         let index_view = View::new(self.index_access, index_address);
         (index_view, index_state)
     }
