@@ -208,8 +208,6 @@ where
     pub fn set(&mut self, state: V) {
         let mut cache = self.cache.get_mut();
         cache.state = state;
-        View::new(self.index_access, IndexAddress::from(INDEXES_POOL_NAME))
-            .put(&self.index_name, *cache);
     }
 }
 
@@ -223,15 +221,16 @@ where
     }
 }
 
-// impl<T, V> Drop for IndexState<T, V>
-// where
-//     V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
-//     T: IndexAccess,
-// {
-//     fn drop(&mut self) {
-//         self.view.put(&self.index_name, self.cache.get());
-//     }
-// }
+impl<T, V> Drop for IndexState<T, V>
+where
+    V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+    T: IndexAccess,
+{
+    fn drop(&mut self) {
+        View::new(self.index_access, IndexAddress::from(INDEXES_POOL_NAME))
+            .put(&self.index_name, self.cache.get());
+    }
+}
 
 #[cfg(test)]
 mod tests {
