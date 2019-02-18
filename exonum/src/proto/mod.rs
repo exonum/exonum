@@ -60,7 +60,7 @@
 //! ```
 
 pub use self::schema::blockchain::{Block, ConfigReference, TransactionResult, TxLocation};
-pub use self::schema::helpers::{BitVec, Hash, PublicKey};
+pub use self::schema::helpers::{BitVec, Hash, PublicKey, Signature};
 pub use self::schema::protocol::{
     BlockRequest, BlockResponse, Connect, PeersRequest, Precommit, Prevote, PrevotesRequest,
     Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
@@ -141,6 +141,26 @@ impl ProtobufConvert for crypto::PublicKey {
         );
         crypto::PublicKey::from_slice(data)
             .ok_or_else(|| format_err!("Cannot convert PublicKey from bytes"))
+    }
+}
+
+impl ProtobufConvert for crypto::Signature {
+    type ProtoStruct = Signature;
+
+    fn to_pb(&self) -> Signature {
+        let mut sign = Signature::new();
+        sign.set_data(self.as_ref().to_vec());
+        sign
+    }
+
+    fn from_pb(pb: Signature) -> Result<Self, Error> {
+        let data = pb.get_data();
+        ensure!(
+            data.len() == crypto::SIGNATURE_LENGTH,
+            "Wrong Signature size"
+        );
+        crypto::Signature::from_slice(data)
+            .ok_or_else(|| format_err!("Cannot convert Signature from bytes"))
     }
 }
 
