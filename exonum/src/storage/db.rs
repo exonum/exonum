@@ -600,7 +600,7 @@ impl<'a> Iterator for ForkIter<'a> {
                                 Change::Delete => unreachable!(),
                             },
                         )
-                    })
+                    });
                 }
                 NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();
@@ -627,7 +627,7 @@ impl<'a> Iterator for ForkIter<'a> {
                                 Change::Delete => unreachable!(),
                             },
                         )
-                    })
+                    });
                 }
                 NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();

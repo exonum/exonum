@@ -396,7 +396,7 @@ impl NetworkHandler {
                                         "Couldn't take peer addr from socket = {}",
                                         e
                                     )))
-                                        as Box<dyn Future<Error = failure::Error, Item = ()>>
+                                        as Box<dyn Future<Error = failure::Error, Item = ()>>;
                                 }
                             };
                             let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
