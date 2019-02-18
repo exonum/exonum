@@ -684,12 +684,12 @@ fn test_metadata_index_usual_correct() {
     IndexBuilder::new(&db.fork())
         .index_name("simple")
         .index_type(IndexType::ProofMap)
-        .build();
+        .build::<()>();
     // Checks the index metadata.
     IndexBuilder::new(&db.snapshot())
         .index_name("simple")
         .index_type(IndexType::ProofMap)
-        .build();
+        .build::<()>();
 }
 
 #[test]
@@ -701,14 +701,58 @@ fn test_metadata_index_family_correct() {
         .index_name("simple")
         .family_id("family")
         .index_type(IndexType::ProofMap)
-        .build();
+        .build::<()>();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
     IndexBuilder::new(&db.snapshot())
         .index_name("simple")
         .family_id("family")
         .index_type(IndexType::ProofMap)
-        .build();
+        .build::<()>();
+}
+
+#[test]
+fn test_metadata_index_identifiers() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    // Creates the first index metadata.
+    {
+        let (view, _state) = IndexBuilder::new(&fork)
+            .index_name("simple")
+            .family_id("family")
+            .index_type(IndexType::ProofMap)
+            .build::<()>();
+        assert_eq!(
+            view.address,
+            IndexAddress::with_root("indexes").append_bytes(&0_u64)
+        );
+    }
+
+    // Creates the second index metadata.
+    {
+        let (view, _state) = IndexBuilder::new(&fork)
+            .index_name("second")
+            .family_id("family")
+            .index_type(IndexType::ProofMap)
+            .build::<()>();
+        assert_eq!(
+            view.address,
+            IndexAddress::with_root("indexes").append_bytes(&1_u64)
+        );
+    }
+
+    // Tries to create the first index instance.
+    {
+        let (view, _state) = IndexBuilder::new(&fork)
+            .index_name("simple")
+            .family_id("family")
+            .index_type(IndexType::ProofMap)
+            .build::<()>();
+        assert_eq!(
+            view.address,
+            IndexAddress::with_root("indexes").append_bytes(&0_u64)
+        );
+    }
 }
 
 #[test]
@@ -716,17 +760,17 @@ fn test_index_builder_without_type() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::new(&fork).index_name("simple").build();
+    IndexBuilder::new(&fork).index_name("simple").build::<()>();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
     IndexBuilder::new(&db.snapshot())
         .index_name("simple")
         .index_type(IndexType::Unknown)
-        .build();
+        .build::<()>();
 }
 
 #[test]
-#[should_panic(expected = "Saved metadata doesn't match specified")]
+#[should_panic(expected = "Index type doesn't match specified")]
 fn test_metadata_index_usual_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
@@ -734,17 +778,17 @@ fn test_metadata_index_usual_incorrect() {
     IndexBuilder::new(&fork)
         .index_type(IndexType::ProofMap)
         .index_name("simple")
-        .build();
+        .build::<()>();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
     IndexBuilder::new(&db.snapshot())
         .index_type(IndexType::ProofList)
         .index_name("simple")
-        .build();
+        .build::<()>();
 }
 
 #[test]
-#[should_panic(expected = "Saved metadata doesn't match specified")]
+#[should_panic(expected = "Index type doesn't match specified")]
 fn test_metadata_index_family_incorrect() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
@@ -753,14 +797,14 @@ fn test_metadata_index_family_incorrect() {
         .index_type(IndexType::ProofMap)
         .index_name("simple")
         .family_id("family")
-        .build();
+        .build::<()>();
     db.merge(fork.into_patch()).unwrap();
     // Checks the index metadata.
     IndexBuilder::new(&db.snapshot())
         .index_type(IndexType::Map)
         .index_name("simple")
         .family_id("family")
-        .build();
+        .build::<()>();
 }
 
 #[test]

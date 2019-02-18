@@ -60,11 +60,13 @@ where
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::Entry)
+            .index_name(index_name)
+            .build::<()>();
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::Entry)
-                .index_name(index_name)
-                .build(),
+            base,
             _v: PhantomData,
         }
     }
@@ -96,12 +98,14 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        Self {
-            base: IndexBuilder::new(view)
+        let (base, _state) = IndexBuilder::new(view)
                 .index_type(IndexType::Entry)
                 .index_name(family_name)
                 .family_id(index_id)
-                .build(),
+                .build::<()>();
+
+        Self {
+            base,
             _v: PhantomData,
         }
     }

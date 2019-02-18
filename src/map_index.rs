@@ -104,10 +104,10 @@ where
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let base = IndexBuilder::new(index_access)
+        let (base, _state) = IndexBuilder::new(index_access)
             .index_type(IndexType::Map)
             .index_name(index_name)
-            .build();
+            .build::<()>();
 
         Self {
             base,
@@ -144,11 +144,11 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let base = IndexBuilder::new(index_access)
+        let (base, _state) = IndexBuilder::new(index_access)
             .index_type(IndexType::Map)
             .index_name(family_name)
             .family_id(index_id)
-            .build();
+            .build::<()>();
 
         Self {
             base,

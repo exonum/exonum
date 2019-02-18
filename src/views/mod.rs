@@ -14,9 +14,11 @@
 
 #![warn(missing_docs)]
 
-pub use self::index_metadata::{IndexState, IndexType};
+pub use self::{index_metadata::IndexType, indexes_pool::IndexState};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
+
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::{
     db::{Change, ChangesRef, ForkIter, ViewChanges},
@@ -24,6 +26,7 @@ use super::{
 };
 
 mod index_metadata;
+mod indexes_pool;
 #[cfg(test)]
 mod tests;
 
@@ -140,21 +143,14 @@ where
     /// # Panics
     ///
     /// Panics if index metadata doesn't match expected.
-    pub fn build(self) -> View<T> {
-        let has_parent = self.address.bytes().is_some();
-        let index_type = self.index_type;
-        let index_access = self.index_access;
-
-        index_metadata::check_or_create_metadata(
-            index_access,
-            &self.address,
-            index_metadata::IndexMetadata {
-                index_type,
-                has_parent,
-            },
-        );
-
-        View::new(index_access, self.address)
+    pub fn build<V>(self) -> (View<T>, IndexState<T, V>)
+    where
+        V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+    {
+        let (index_address, index_state) =
+            indexes_pool::index_metadata(self.index_access, &self.address, self.index_type);
+        let index_view = View::new(self.index_access, index_address);
+        (index_view, index_state)
     }
 }
 

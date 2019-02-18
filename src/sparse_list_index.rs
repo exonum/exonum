@@ -17,16 +17,17 @@
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-
 use std::{borrow::Cow, marker::PhantomData};
+
+use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
+use serde_derive::{Serialize, Deserialize};
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue,
 };
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 struct SparseListSize {
     /// Total list's length including spaces. In fact points to the next index for a new element.
     capacity: u64,
@@ -136,11 +137,10 @@ where
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let base = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::SparseList)
             .index_name(index_name)
             .build();
-        let state = IndexState::from_view(&base);
 
         Self {
             base,
@@ -180,12 +180,11 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let base = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::SparseList)
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let state = IndexState::from_view(&base);
 
         Self {
             base,

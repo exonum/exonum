@@ -75,11 +75,13 @@ where
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::KeySet)
+            .index_name(index_name)
+            .build::<()>();
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::KeySet)
-                .index_name(index_name)
-                .build(),
+            base,
             _k: PhantomData,
         }
     }
@@ -111,12 +113,14 @@ where
         I: ?Sized,
         S: Into<String>,
     {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::KeySet)
+            .index_name(family_name)
+            .family_id(index_id)
+            .build::<()>();
+
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::KeySet)
-                .index_name(family_name)
-                .family_id(index_id)
-                .build(),
+            base,
             _k: PhantomData,
         }
     }

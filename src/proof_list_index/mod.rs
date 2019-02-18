@@ -92,12 +92,10 @@ where
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &fork);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
-        let base = IndexBuilder::new(index_access)
+        let (base, state) = IndexBuilder::new(index_access)
             .index_type(IndexType::ProofList)
             .index_name(index_name)
             .build();
-        let state = IndexState::from_view(&base);
-
         Self {
             base,
             state,
@@ -138,13 +136,11 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let base = IndexBuilder::new(index_access)
+        let (base, state) = IndexBuilder::new(index_access)
             .index_type(IndexType::ProofList)
             .index_name(family_name)
             .family_id(index_id)
             .build();
-        let state = IndexState::from_view(&base);
-
         Self {
             base,
             state,

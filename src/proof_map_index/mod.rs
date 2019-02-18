@@ -157,11 +157,12 @@ where
     /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &fork);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::ProofMap)
+            .index_name(index_name)
+            .build::<()>();
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::ProofMap)
-                .index_name(index_name)
-                .build(),
+            base,
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -207,12 +208,13 @@ where
         I: ?Sized,
         S: Into<String>,
     {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::ProofMap)
+            .index_name(family_name)
+            .family_id(index_id)
+            .build::<()>();
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::ProofMap)
-                .index_name(family_name)
-                .family_id(index_id)
-                .build(),
+            base,
             _k: PhantomData,
             _v: PhantomData,
         }

@@ -90,11 +90,12 @@ where
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::ValueSet)
+            .index_name(index_name)
+            .build::<()>();
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::ValueSet)
-                .index_name(index_name)
-                .build(),
+            base,
             _v: PhantomData,
         }
     }
@@ -126,12 +127,13 @@ where
         I: ?Sized,
         S: Into<String>,
     {
+        let (base, _state) = IndexBuilder::new(view)
+            .index_type(IndexType::ValueSet)
+            .index_name(family_name)
+            .family_id(index_id)
+            .build::<()>();
         Self {
-            base: IndexBuilder::new(view)
-                .index_type(IndexType::ValueSet)
-                .index_name(family_name)
-                .family_id(index_id)
-                .build(),
+            base,
             _v: PhantomData,
         }
     }
