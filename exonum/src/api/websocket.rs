@@ -118,9 +118,7 @@ impl Actor for Session {
     fn started(&mut self, ctx: &mut Self::Context) {
         let address: Recipient<_> = ctx.address().recipient();
         self.server_address
-            .send(Subscribe {
-                address,
-            })
+            .send(Subscribe { address })
             .into_actor(self)
             .then(|response, actor, context| {
                 match response {

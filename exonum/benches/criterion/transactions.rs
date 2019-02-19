@@ -203,11 +203,14 @@ impl MessageVerifier {
 
 fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
-    b.iter_with_setup(|| messages.clone(), |messages| {
-        for message in messages {
-            let _ = Message::from_raw_buffer(message).unwrap();
-        }
-    })
+    b.iter_with_setup(
+        || messages.clone(),
+        |messages| {
+            for message in messages {
+                let _ = Message::from_raw_buffer(message).unwrap();
+            }
+        },
+    )
 }
 
 fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
@@ -216,9 +219,12 @@ fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
     let verifier = MessageVerifier::new();
     let mut core = Core::new().unwrap();
 
-    b.iter_with_setup(|| messages.clone(), |messages| {
-        core.run(verifier.send_all(messages)).unwrap();
-    });
+    b.iter_with_setup(
+        || messages.clone(),
+        |messages| {
+            core.run(verifier.send_all(messages)).unwrap();
+        },
+    );
     verifier.join();
 }
 
