@@ -85,7 +85,7 @@ impl HashTag {
     /// Hash of the list object.
     ///
     /// ```text
-    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// h = sha-256( HashTag::ListNode || len as u64 || merkle_root )
     /// ```
     pub fn hash_list_node(len: u64, root: Hash) -> Hash {
         let mut len_bytes = [0; 8];
@@ -137,12 +137,12 @@ impl HashTag {
             .hash()
     }
 
-    /// Hash of the map isolated node.
+    /// Hash of the map with single entry.
     ///
     /// ``` text
     /// h = sha-256( HashTag::MapBranchNode || <key> || <child_hash> )
     /// ```
-    pub fn hash_map_isolated(path: &ProofPath, h: &Hash) -> Hash {
+    pub fn hash_single_entry_map(path: &ProofPath, h: &Hash) -> Hash {
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
             .update(path.as_bytes())
@@ -150,11 +150,11 @@ impl HashTag {
             .hash()
     }
 
-    /// Hash of the empty list object.
+    /// Hash of the empty map object.
     ///
-    /// Empty list hash:
+    /// Empty map hash:
     /// ```text
-    /// h = sha-256( HashTag::ListNode || 0 || Hash::default() )
+    /// sha-256( HashTag::MapNode || Hash::default() )
     /// ```
     pub fn empty_map_hash() -> Hash {
         Hash::from_hex(EMPTY_MAP_HASH).unwrap()
@@ -218,4 +218,45 @@ impl UniqueHash for Hash {
     fn hash(&self) -> Hash {
         *self
     }
+}
+
+/// Just returns the origin array.
+impl UniqueHash for [u8; HASH_SIZE] {
+    fn hash(&self) -> Hash {
+        Hash::new(*self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use exonum_crypto::{Hash, HashStream};
+
+    use super::HashTag;
+
+    #[test]
+    fn empty_list_hash() {
+        let len_bytes = [0; 8];
+        let tag = 2;
+
+        let empty_list_hash = HashStream::new()
+            .update(&[tag])
+            .update(&len_bytes)
+            .update(Hash::default().as_ref())
+            .hash();
+
+        assert_eq!(empty_list_hash, HashTag::empty_list_hash());
+    }
+
+    #[test]
+    fn empty_map_hash() {
+        let tag = 3;
+
+        let empty_map_hash = HashStream::new()
+            .update(&[tag])
+            .update(Hash::default().as_ref())
+            .hash();
+
+        assert_eq!(empty_map_hash, HashTag::empty_map_hash());
+    }
+
 }

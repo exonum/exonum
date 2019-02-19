@@ -323,7 +323,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
         1 => {
             if entries[0].path.is_leaf() {
-                Ok(HashTag::hash_map_isolated(
+                Ok(HashTag::hash_single_entry_map(
                     &entries[0].path,
                     &entries[0].hash,
                 ))
@@ -584,7 +584,7 @@ where
 
         collect(&proof).map(|h| CheckedMapProof {
             entries: entries.into_iter().map(OptionalEntry::into).collect(),
-            hash: h,
+            hash: HashTag::hash_map_node(h),
         })
     }
 }
@@ -614,7 +614,7 @@ impl<K, V> CheckedMapProof<K, V> {
 
     /// Returns a hash of the map that this proof is constructed for.
     pub fn root_hash(&self) -> Hash {
-        HashTag::hash_map_node(self.hash)
+        self.hash
     }
 }
 

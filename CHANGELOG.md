@@ -14,11 +14,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Introduced a generic `IndexState` structure that can be used to store global
     index properties like total number of items.
 
-- Changed `ProofMapIndex` hashing rules for leaf nodes and branch nodes.
-  They are hashing now with 0x04 prefix. (#20)
+- Changed `ProofMapIndex` hashing rules for branch nodes and root node.
+  Branch nodes is hashing now with 0x04 prefix, root node with 0x03. (#20)
 
 - Renamed method `merkle_root` of `ProofMapIndex` and `ProofListIndex` to
-  `root_hash`. (#20)
+  `object_hash`. (#20)
 
 - Several mutable indexes now can be create from immutable reference to `Fork` (#10)
 

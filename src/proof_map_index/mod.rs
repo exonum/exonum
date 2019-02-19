@@ -23,7 +23,7 @@ pub use self::{
 
 use std::{fmt, marker::PhantomData};
 
-use exonum_crypto::{Hash, HashStream};
+use exonum_crypto::Hash;
 
 use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
@@ -249,18 +249,14 @@ where
 
     pub(crate) fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
-            Some((path, Node::Leaf(hash))) => HashStream::new()
-                .update(&[HashTag::MapBranchNode as u8])
-                .update(path.as_bytes())
-                .update(hash.as_ref())
-                .hash(),
+            Some((path, Node::Leaf(hash))) => HashTag::hash_single_entry_map(&path, &hash),
             Some((_, Node::Branch(branch))) => branch.hash(),
             None => Hash::zero(),
         }
     }
 
-    /// Returns the root hash of the proof map or default hash value if it is empty.
-    /// The default hash consists solely of zeroes.
+    /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
+    /// For hash of the empty map see [`HashTag::empty_map_hash`].
     ///
     /// # Examples
     ///
@@ -273,14 +269,17 @@ where
     /// let fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &fork);
     ///
-    /// let default_hash = index.root_hash();
+    /// let default_hash = index.object_hash();
     /// assert_eq!(HashTag::empty_map_hash(), default_hash);
     ///
     /// index.put(&default_hash, 100);
-    /// let hash = index.root_hash();
+    /// let hash = index.object_hash();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn root_hash(&self) -> Hash {
+    ///
+    /// [`HashTag::hash_map_node`]: ../enum.HashTag.html#method.hash_map_node
+    /// [`HashTag::empty_map_hash`]: ../enum.HashTag.html#method.empty_map_hash
+    pub fn object_hash(&self) -> Hash {
         HashTag::hash_map_node(self.merkle_root())
     }
 
@@ -933,7 +932,7 @@ where
         }
 
         if let Some(prefix) = self.get_root_path() {
-            let root_entry = Entry::new(self, self.root_hash(), prefix);
+            let root_entry = Entry::new(self, self.object_hash(), prefix);
             f.debug_struct("ProofMapIndex")
                 .field("entries", &root_entry)
                 .finish()
