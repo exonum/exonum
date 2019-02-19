@@ -84,6 +84,7 @@ pub mod api;
 pub mod events;
 pub mod explorer;
 pub mod node;
+pub mod runtime;
 pub mod storage;
 
 #[cfg(test)]
