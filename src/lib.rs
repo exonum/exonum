@@ -137,7 +137,7 @@ pub use self::{
     map_index::MapIndex,
     options::DbOptions,
     proof_list_index::{ListProof, ProofListIndex},
-    sparse_list_index::SparseListIndex,
+    // sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
     views::{IndexAccess, IndexBuilder},
@@ -163,7 +163,7 @@ pub mod list_index;
 pub mod map_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
-pub mod sparse_list_index;
+// pub mod sparse_list_index;
 pub mod value_set_index;
 
 #[cfg(test)]

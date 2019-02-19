@@ -14,7 +14,7 @@
 
 #![warn(missing_docs)]
 
-pub use self::{metadata::IndexState, metadata::IndexType};
+pub use self::metadata::{IndexState, IndexType, BinaryAttribute};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
@@ -142,7 +142,7 @@ where
     /// Panics if index metadata doesn't match expected.
     pub fn build<V>(self) -> (View<T>, IndexState<T, V>)
     where
-        V: BinaryValue + Default + Copy,
+        V: BinaryAttribute + Default + Copy,
     {
         let (index_address, index_state) =
             metadata::index_metadata(self.index_access, &self.address, self.index_type);

@@ -44,6 +44,43 @@ pub enum IndexType {
     Unknown = 255,
 }
 
+pub trait BinaryAttribute {
+    fn tag() -> Option<u32> {
+        None
+    }
+
+    fn size(&self) -> usize;
+
+    fn write<W: std::io::Write>(&self, buffer: &mut W);
+
+    fn read<R: std::io::Read>(buffer: &mut R) -> Self;
+}
+
+/// No-op implementation.
+impl BinaryAttribute for () {
+    fn size(&self) -> usize {
+        0
+    }
+
+    fn write<W: std::io::Write>(&self, _buffer: &mut W) {}
+
+    fn read<R: std::io::Read>(_buffer: &mut R) -> Self {}
+}
+
+impl BinaryAttribute for u64 {
+    fn size(&self) -> usize {
+        std::mem::size_of::<Self>()
+    }
+
+    fn write<W: std::io::Write>(&self, buffer: &mut W) {
+        buffer.write_u64::<LittleEndian>(*self).unwrap()
+    }
+
+    fn read<R: std::io::Read>(buffer: &mut R) -> Self {
+        buffer.read_u64::<LittleEndian>().unwrap()
+    }
+}
+
 impl Default for IndexType {
     fn default() -> Self {
         IndexType::Unknown
@@ -60,18 +97,18 @@ pub struct IndexMetadata<V> {
 
 impl<V> BinaryValue for IndexMetadata<V>
 where
-    V: BinaryValue,
+    V: BinaryAttribute,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        let state_bytes = self.state.to_bytes();
+        let state_len = self.state.size();
+        let mut buf = Vec::with_capacity(20 + state_len);
 
-        let mut buf = Vec::with_capacity(20);
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
-        buf.write_u32::<LittleEndian>(state_bytes.len() as u32)
+        buf.write_u32::<LittleEndian>(state_len as u32)
             .unwrap();
-        buf.extend(state_bytes);
+        self.state.write(&mut buf);
         buf
     }
 
@@ -83,7 +120,7 @@ where
         let state_len = bytes.read_u32::<LittleEndian>()? as usize;
 
         ensure!(bytes.len() >= state_len, "Index state is too short");
-        let state = V::from_bytes(bytes[0..state_len].into())?;
+        let state = V::read(&mut bytes);
 
         Ok(Self {
             identifier,
@@ -118,7 +155,7 @@ pub fn index_metadata<T, V>(
 ) -> (IndexAddress, IndexState<T, V>)
 where
     T: IndexAccess,
-    V: BinaryValue + Copy + Default,
+    V: BinaryAttribute + Copy + Default,
 {
     let index_name = index_address.index_name();
 
@@ -149,7 +186,7 @@ impl<T: IndexAccess> IndexesPool<T> {
 
     fn index_metadata<V>(&self, index_name: &[u8]) -> Option<IndexMetadata<V>>
     where
-        V: BinaryValue + Default + Copy,
+        V: BinaryAttribute + Default + Copy,
     {
         self.0.get(index_name)
     }
@@ -160,7 +197,7 @@ impl<T: IndexAccess> IndexesPool<T> {
         index_type: IndexType,
     ) -> IndexMetadata<V>
     where
-        V: BinaryValue + Default + Copy,
+        V: BinaryAttribute + Default + Copy,
     {
         let mut pool_len = View::new(
             self.0.index_access,
@@ -183,7 +220,7 @@ impl<T: IndexAccess> IndexesPool<T> {
 /// TODO Add documentation. [ECR-2820]
 pub struct IndexState<T, V>
 where
-    V: BinaryValue + Default + Copy,
+    V: BinaryAttribute + Default + Copy,
     T: IndexAccess,
 {
     index_access: T,
@@ -193,7 +230,7 @@ where
 
 impl<T, V> IndexState<T, V>
 where
-    V: BinaryValue + Default + Copy,
+    V: BinaryAttribute + Default + Copy,
     T: IndexAccess,
 {
     pub fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>) -> Self {
@@ -221,7 +258,7 @@ where
 impl<T, V> std::fmt::Debug for IndexState<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + Default + Copy,
+    V: BinaryAttribute + Default + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("IndexState").finish()
