@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, cell::Cell};
+use std::{borrow::Cow, cell::Cell, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
@@ -44,6 +44,7 @@ pub enum IndexType {
     Unknown = 255,
 }
 
+/// TODO Add documentation. [ECR-2820]
 pub trait BinaryAttribute {
     /// TODO Add documentation. [ECR-2820]
     fn size(&self) -> usize;
@@ -66,7 +67,7 @@ impl BinaryAttribute for () {
 
 impl BinaryAttribute for u64 {
     fn size(&self) -> usize {
-        std::mem::size_of::<Self>()
+        mem::size_of_val(self)
     }
 
     fn write<W: std::io::Write>(&self, buffer: &mut W) {
@@ -98,7 +99,12 @@ where
 {
     fn to_bytes(&self) -> Vec<u8> {
         let state_len = self.state.size();
-        let mut buf = Vec::with_capacity(20 + state_len);
+        let mut buf = Vec::with_capacity(
+            mem::size_of_val(&self.identifier)
+                + mem::size_of_val(&self.index_type)
+                + mem::size_of::<u32>()
+                + state_len,
+        );
 
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
@@ -116,7 +122,9 @@ where
         let state_len = bytes.read_u32::<LittleEndian>()? as usize;
 
         ensure!(bytes.len() >= state_len, "Index state is too short");
-        let state = V::read(&mut bytes);
+
+        let mut state_bytes = &bytes[0..state_len];
+        let state = V::read(&mut state_bytes);
 
         Ok(Self {
             identifier,
