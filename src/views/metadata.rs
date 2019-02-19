@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, cell::Cell, mem};
+use std::{borrow::Cow, cell::RefCell, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
@@ -86,7 +86,7 @@ impl Default for IndexType {
 }
 
 /// TODO Add documentation. [ECR-2820]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IndexMetadata<V> {
     identifier: u64,
     index_type: IndexType,
@@ -215,7 +215,7 @@ impl<T: IndexAccess> IndexesPool<T> {
             state: V::default(),
         };
 
-        self.0.put(index_name, metadata);
+        self.0.put(index_name, metadata.to_bytes());
         pool_len.put(&(), len + 1);
         metadata
     }
@@ -229,7 +229,7 @@ where
 {
     index_access: T,
     index_name: Vec<u8>,
-    cache: Cell<IndexMetadata<V>>,
+    cache: RefCell<IndexMetadata<V>>,
 }
 
 impl<T, V> IndexState<T, V>
@@ -241,13 +241,13 @@ where
         Self {
             index_access,
             index_name,
-            cache: Cell::new(metadata),
+            cache: RefCell::new(metadata),
         }
     }
 
     /// TODO Add documentation. [ECR-2820]
     pub fn get(&self) -> V {
-        self.cache.get().state
+        self.cache.borrow().state
     }
 
     /// TODO Add documentation. [ECR-2820]
@@ -255,7 +255,7 @@ where
         let mut cache = self.cache.get_mut();
         cache.state = state;
         View::new(self.index_access, IndexAddress::from(INDEXES_POOL_NAME))
-            .put(&self.index_name, *cache);
+            .put(&self.index_name, cache.to_bytes());
     }
 }
 
