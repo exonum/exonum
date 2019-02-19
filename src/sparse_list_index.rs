@@ -20,14 +20,13 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue,
 };
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
     /// Total list's length including spaces. In fact points to the next index for a new element.
     capacity: u64,

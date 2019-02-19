@@ -14,10 +14,10 @@
 
 use std::{borrow::Cow, cell::Cell};
 
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
 use failure::{self, ensure, format_err};
-use num_traits::{FromPrimitive, ToPrimitive};
-use serde::{de::DeserializeOwned, Serialize};
+use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::{BinaryKey, BinaryValue};
@@ -31,6 +31,7 @@ const INDEXES_POOL_LEN_NAME: &str = "INDEXES_POOL_LEN";
 
 /// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
+#[repr(u32)]
 pub enum IndexType {
     Map = 1,
     List = 2,
@@ -43,25 +44,6 @@ pub enum IndexType {
     Unknown = 255,
 }
 
-impl BinaryValue for IndexType {
-    fn to_bytes(&self) -> Vec<u8> {
-        // `.unwrap()` is safe: IndexType is always in range 1..255
-        vec![self.to_u8().unwrap()]
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let bytes = bytes.as_ref();
-        ensure!(
-            bytes.len() == 1,
-            "Wrong buffer size: actual {}, expected 1",
-            bytes.len()
-        );
-
-        let value = bytes[0];
-        Self::from_u8(value).ok_or_else(|| format_err!("Unknown value: {}", value))
-    }
-}
-
 impl Default for IndexType {
     fn default() -> Self {
         IndexType::Unknown
@@ -69,23 +51,46 @@ impl Default for IndexType {
 }
 
 /// TODO Add documentation. [ECR-2820]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V> {
-    index_type: IndexType,
     identifier: u64,
+    index_type: IndexType,
     state: V,
 }
 
 impl<V> BinaryValue for IndexMetadata<V>
 where
-    V: Serialize + DeserializeOwned,
+    V: BinaryValue,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+        let state_bytes = self.state.to_bytes();
+
+        let mut buf = Vec::with_capacity(20);
+        buf.write_u64::<LittleEndian>(self.identifier).unwrap();
+        buf.write_u32::<LittleEndian>(self.index_type as u32)
+            .unwrap();
+        buf.write_u32::<LittleEndian>(state_bytes.len() as u32)
+            .unwrap();
+        buf.extend(state_bytes);
+        buf
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
+        let mut bytes = bytes.as_ref();
+
+        let identifier = bytes.read_u64::<LittleEndian>()?;
+        let index_type = bytes.read_u32::<LittleEndian>()?;
+        let state_len = bytes.read_u32::<LittleEndian>()? as usize;
+
+        ensure!(bytes.len() >= state_len, "Index state is too short");
+        let state = V::from_bytes(bytes[0..state_len].into())?;
+
+        Ok(Self {
+            identifier,
+            index_type: IndexType::from_u32(index_type)
+                .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?,
+            state,
+        })
     }
 }
 
@@ -113,7 +118,7 @@ pub fn index_metadata<T, V>(
 ) -> (IndexAddress, IndexState<T, V>)
 where
     T: IndexAccess,
-    V: BinaryValue + Copy + Serialize + DeserializeOwned + Default,
+    V: BinaryValue + Copy + Default,
 {
     let index_name = index_address.index_name();
 
@@ -144,7 +149,7 @@ impl<T: IndexAccess> IndexesPool<T> {
 
     fn index_metadata<V>(&self, index_name: &[u8]) -> Option<IndexMetadata<V>>
     where
-        V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+        V: BinaryValue + Default + Copy,
     {
         self.0.get(index_name)
     }
@@ -155,7 +160,7 @@ impl<T: IndexAccess> IndexesPool<T> {
         index_type: IndexType,
     ) -> IndexMetadata<V>
     where
-        V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+        V: BinaryValue + Default + Copy,
     {
         let mut pool_len = View::new(
             self.0.index_access,
@@ -178,7 +183,7 @@ impl<T: IndexAccess> IndexesPool<T> {
 /// TODO Add documentation. [ECR-2820]
 pub struct IndexState<T, V>
 where
-    V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+    V: BinaryValue + Default + Copy,
     T: IndexAccess,
 {
     index_access: T,
@@ -188,7 +193,7 @@ where
 
 impl<T, V> IndexState<T, V>
 where
-    V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+    V: BinaryValue + Default + Copy,
     T: IndexAccess,
 {
     pub fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>) -> Self {
@@ -216,7 +221,7 @@ where
 impl<T, V> std::fmt::Debug for IndexState<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + Serialize + DeserializeOwned + Default + Copy,
+    V: BinaryValue + Default + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("IndexState").finish()
@@ -225,30 +230,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
-
     use crate::BinaryValue;
 
-    use super::IndexType;
+    use super::{IndexMetadata, IndexType};
 
     #[test]
-    fn test_index_type_binary_value_correct() {
-        let index_type = IndexType::ProofMap;
-        let buf = index_type.to_bytes();
-        assert_eq!(IndexType::from_bytes(Cow::Owned(buf)).unwrap(), index_type);
-    }
+    fn test_index_metadata_binary_value() {
+        let metadata = IndexMetadata {
+            identifier: 12,
+            index_type: IndexType::ProofList,
+            state: 0_u64,
+        };
 
-    #[test]
-    #[should_panic(expected = "Wrong buffer size: actual 2, expected 1")]
-    fn test_index_type_binary_value_incorrect_buffer_len() {
-        let buf = vec![1, 2];
-        IndexType::from_bytes(Cow::Owned(buf)).unwrap();
-    }
-
-    #[test]
-    #[should_panic(expected = "Unknown value: 127")]
-    fn test_index_type_binary_value_incorrect_value() {
-        let buf = vec![127];
-        IndexType::from_bytes(Cow::Owned(buf)).unwrap();
+        let bytes = metadata.to_bytes();
+        assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
     }
 }
