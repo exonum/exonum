@@ -45,14 +45,11 @@ pub enum IndexType {
 }
 
 pub trait BinaryAttribute {
-    fn tag() -> Option<u32> {
-        None
-    }
-
+    /// TODO Add documentation. [ECR-2820]
     fn size(&self) -> usize;
-
+    /// TODO Add documentation. [ECR-2820]
     fn write<W: std::io::Write>(&self, buffer: &mut W);
-
+    /// TODO Add documentation. [ECR-2820]
     fn read<R: std::io::Read>(buffer: &mut R) -> Self;
 }
 
@@ -106,8 +103,7 @@ where
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
-        buf.write_u32::<LittleEndian>(state_len as u32)
-            .unwrap();
+        buf.write_u32::<LittleEndian>(state_len as u32).unwrap();
         self.state.write(&mut buf);
         buf
     }
@@ -276,7 +272,7 @@ mod tests {
         let metadata = IndexMetadata {
             identifier: 12,
             index_type: IndexType::ProofList,
-            state: 0_u64,
+            state: 16_u64,
         };
 
         let bytes = metadata.to_bytes();
