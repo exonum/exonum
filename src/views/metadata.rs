@@ -271,9 +271,25 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use crate::BinaryValue;
 
-    use super::{IndexMetadata, IndexType};
+    use super::{IndexMetadata, IndexType, BinaryAttribute};
+
+    #[test]
+    fn test_binary_attribute_read_write() {
+        let mut buf = Vec::new();
+        11_u64.write(&mut buf);
+        12_u64.write(&mut buf);
+        assert_eq!(buf.len(), 16);
+
+        let mut reader = Cursor::new(buf);
+        let a = u64::read(&mut reader);
+        let b = u64::read(&mut reader);
+        assert_eq!(a, 11);
+        assert_eq!(b, 12);
+    }
 
     #[test]
     fn test_index_metadata_binary_value() {
