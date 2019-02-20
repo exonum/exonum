@@ -14,11 +14,10 @@
 
 use std::{collections::HashMap, sync::RwLock};
 
-use crate::blockchain::ExecutionError;
-
 use super::{
-    ArtifactSpec, DeployError, DispatchInfo, EnvContext, InitError, InstanceInitData, InterfaceId,
-    RuntimeEnvironment, ServiceInstanceId, DeployStatus
+    ArtifactSpec, DispatchInfo, EnvContext, InstanceInitData, InterfaceId,
+    RuntimeEnvironment, ServiceInstanceId, DeployStatus,
+    error::{ DeployError, InitError, ExecutionError }
 };
 
 #[derive(Default)]
@@ -40,7 +39,7 @@ struct RustRuntimeInner {
     initialized: HashMap<ServiceInstanceId, RustArtifactData>,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactSpec {
     name: String,
     version: (usize, usize, usize),
@@ -76,7 +75,7 @@ impl RuntimeEnvironment for RustRuntime {
             return Err(DeployError::WrongArtifact);
         };
 
-        let mut inner = self.inner.read().expect("rust runtime read");
+        let inner = self.inner.read().expect("rust runtime read");
 
         if inner.deployed.get(&artifact).is_some() {
             Ok(DeployStatus::Deployed)
@@ -115,7 +114,7 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) {
+    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) -> Result<(), ExecutionError> {
         let inner = self.inner.read().unwrap();
         let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
         let interface = instance.interfaces.get(&dispatch.interface_id).unwrap();
@@ -123,7 +122,7 @@ impl RuntimeEnvironment for RustRuntime {
 
         let mut ctx = TransactionContext::from_env_ctx(context);
 
-        (handler.fun_untyped)(&mut ctx, payload);
+        (handler.fun_untyped)(&mut ctx, payload)
     }
 }
 
@@ -158,8 +157,8 @@ mod tests {
 
     /// Test service description: method, interface constructor, artifact builder.
     fn example_method(
-        ctx: &mut TransactionContext,
-        tx: &TimestampTx,
+        _ctx: &mut TransactionContext,
+        _tx: &TimestampTx,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
@@ -234,7 +233,7 @@ mod tests {
         {
             let mut fork = db.fork();
             let mut context = EnvContext::from_fork(&mut fork);
-            runtime.execute(&mut context, dispatch_info, &payload);
+            runtime.execute(&mut context, dispatch_info, &payload).unwrap();
         }
     }
 }

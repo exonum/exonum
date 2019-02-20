@@ -14,31 +14,19 @@
 
 use protobuf::well_known_types::Any;
 
-use crate::blockchain::ExecutionError;
 use crate::storage::Fork;
 
 mod rust;
 pub mod dispatcher;
+pub mod error;
 
-#[derive(Debug)]
-pub enum DeployError {
-    WrongArtifact,
-    FailedToDeploy,
-    AlreadyDeployed,
-}
+use error::{DeployError, InitError, ExecutionError};
 
 #[derive(Debug)]
 pub enum DeployStatus {
     DeployInProgress,
     Deployed,
     DeployErrored(DeployError)
-}
-
-#[derive(Debug)]
-pub enum InitError {
-    WrongArtifact,
-    NotDeployed,
-    ServiceIdExists,
 }
 
 type ServiceInstanceId = u32;
@@ -80,7 +68,7 @@ pub trait RuntimeEnvironment {
     ) -> Result<(), InitError>;
 
     /// Execute transaction.
-    fn execute(&self, ctx: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]);
+    fn execute(&self, ctx: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) -> Result<(), ExecutionError>;
 }
 
 pub struct EnvContext<'a> {

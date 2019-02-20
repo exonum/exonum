@@ -13,13 +13,34 @@
 // limitations under the License.
 
 use super::{
-    ArtifactSpec, DeployError, DispatchInfo, EnvContext, InitError, InstanceInitData, InterfaceId,
-    RuntimeEnvironment, ServiceInstanceId, DeployStatus
+    ArtifactSpec, DispatchInfo, EnvContext, InstanceInitData, RuntimeEnvironment, DeployStatus,
+    error::{DeployError, InitError, ExecutionError}
 };
+
+#[derive(Default)]
+struct DispatcherBuilder {
+    // runtimes: HashMap
+}
+
+impl DispatcherBuilder {
+    pub fn with_runtime(self) -> Self
+    {
+        self
+    }
+
+    pub fn finalize(self) -> Dispatcher
+    {
+        Dispatcher::default()
+    }
+}
 
 #[derive(Default)]
 struct Dispatcher {
     // TODO add runtimes
+}
+
+impl Dispatcher {
+    
 }
 
 impl RuntimeEnvironment for Dispatcher {
@@ -40,6 +61,7 @@ impl RuntimeEnvironment for Dispatcher {
         Ok(())
     }
 
-    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) {
+    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) -> Result<(), ExecutionError> {
+        Ok(())
     }
 }
