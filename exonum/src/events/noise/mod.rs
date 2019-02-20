@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 // limitations under the License.
 
 // spell-checker:ignore uint
-use failure;
 
 #[cfg(feature = "sodiumoxide-crypto")]
 #[doc(inline)]
@@ -33,7 +32,7 @@ use tokio_io::{
     AsyncRead, AsyncWrite,
 };
 
-use events::{codec::MessagesCodec, error::into_failure};
+use crate::events::{codec::MessagesCodec, error::into_failure};
 
 pub mod error;
 pub mod wrappers;
@@ -68,7 +67,8 @@ impl HandshakeRawMessage {
             .and_then(|(stream, msg)| {
                 let len = LittleEndian::read_uint(&msg, HANDSHAKE_HEADER_LENGTH);
                 read_exact(stream, vec![0_u8; len as usize])
-            }).map_err(into_failure)
+            })
+            .map_err(into_failure)
             .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
     }
 

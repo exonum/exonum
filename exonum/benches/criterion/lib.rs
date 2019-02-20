@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,25 +15,18 @@
 #[macro_use]
 extern crate criterion;
 #[macro_use]
-extern crate exonum;
+extern crate exonum_derive;
 #[macro_use]
 extern crate serde_derive;
-extern crate futures;
-extern crate log;
-extern crate num;
-extern crate rand;
-extern crate tempdir;
-extern crate tokio_core;
-extern crate tokio_threadpool;
 
-use block::bench_block;
-use criterion::Criterion;
-use crypto::bench_crypto;
-use storage::bench_storage;
-use transactions::bench_verify_transactions;
+use crate::block::bench_block;
+use crate::crypto::bench_crypto;
+use crate::storage::bench_storage;
+use crate::transactions::bench_verify_transactions;
 
 mod block;
 mod crypto;
+mod proto;
 mod storage;
 mod transactions;
 

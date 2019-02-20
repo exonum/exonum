@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 
 use exonum::{api, blockchain::Schema, crypto::PublicKey};
 
-use TimeSchema;
+use crate::TimeSchema;
 
 /// Structure for saving public key of the validator and last known local time.
 #[derive(Debug, Serialize, Deserialize)]
@@ -72,7 +72,8 @@ impl PrivateApi {
             .map(|(public_key, time)| ValidatorTime {
                 public_key,
                 time: Some(time),
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         Ok(validators_times)
     }
 
@@ -93,7 +94,8 @@ impl PrivateApi {
             .map(|validator| ValidatorTime {
                 public_key: validator.service_key,
                 time: idx.get(&validator.service_key),
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         Ok(validators_times)
     }
 

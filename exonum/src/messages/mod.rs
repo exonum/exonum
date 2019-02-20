@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,12 +34,13 @@
 use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 use hex::{FromHex, ToHex};
+use serde::de::{self, Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
-use encoding;
-use storage::StorageValue;
+use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
+use crate::storage::StorageValue;
 
 pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
 pub use self::{
@@ -47,8 +48,6 @@ pub use self::{
     protocol::*,
 };
 
-#[macro_use]
-mod compatibility;
 mod authorization;
 mod helpers;
 mod protocol;
@@ -68,7 +67,7 @@ pub struct RawTransaction {
 }
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
-/// This type used inner inside `transactions!`
+/// This type is used inside `#[derive(TransactionSet)]`
 /// to return raw transaction payload as part of service transaction set.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ServiceTransaction {
@@ -113,7 +112,7 @@ impl RawTransaction {
 }
 
 impl BinaryForm for RawTransaction {
-    fn encode(&self) -> Result<Vec<u8>, encoding::Error> {
+    fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
         let value = self.service_transaction.encode()?;
@@ -122,10 +121,11 @@ impl BinaryForm for RawTransaction {
     }
 
     /// Converts a serialized byte array into a transaction.
-    fn decode(buffer: &[u8]) -> Result<Self, encoding::Error> {
-        if buffer.len() < mem::size_of::<u16>() {
-            Err("Buffer too short in RawTransaction deserialization.")?
-        }
+    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+        ensure!(
+            buffer.len() >= mem::size_of::<u16>(),
+            "Buffer too short in RawTransaction deserialization."
+        );
         let service_id = LittleEndian::read_u16(&buffer[0..2]);
         let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
         Ok(RawTransaction {
@@ -136,17 +136,18 @@ impl BinaryForm for RawTransaction {
 }
 
 impl BinaryForm for ServiceTransaction {
-    fn encode(&self) -> Result<Vec<u8>, encoding::Error> {
+    fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
         buffer.extend_from_slice(&self.payload);
         Ok(buffer)
     }
 
-    fn decode(buffer: &[u8]) -> Result<Self, encoding::Error> {
-        if buffer.len() < mem::size_of::<u16>() {
-            Err("Buffer too short in ServiceTransaction deserialization.")?
-        }
+    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+        ensure!(
+            buffer.len() >= mem::size_of::<u16>(),
+            "Buffer too short in ServiceTransaction deserialization."
+        );
         let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
         let payload = buffer[2..].to_vec();
         Ok(ServiceTransaction {
@@ -164,18 +165,17 @@ impl BinaryForm for ServiceTransaction {
 /// payload may have different binary representation (thus invalidating the message signature).
 ///
 /// So we use `Signed` to keep the original byte buffer around with the parsed `Payload`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Signed<T> {
     // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    //if our serialization format allows us (ECR-2315).
+    // if our serialization format allows us (ECR-2315).
     payload: T,
-    #[serde(with = "HexStringRepresentation")]
     message: SignedMessage,
 }
 
 impl<T: ProtocolMessage> Signed<T> {
     /// Creates a new instance of the message.
-    pub(in messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
+    pub(in crate::messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
         Signed { payload, message }
     }
 
@@ -282,5 +282,36 @@ impl<T: ProtocolMessage> CryptoHash for Signed<T> {
 impl PartialEq<Signed<RawTransaction>> for SignedMessage {
     fn eq(&self, other: &Signed<RawTransaction>) -> bool {
         self.eq(other.signed_message())
+    }
+}
+
+impl<T> Serialize for Signed<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        HexStringRepresentation::serialize(&self.message, serializer)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for Signed<T>
+where
+    T: ProtocolMessage,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let signed_message: SignedMessage = HexStringRepresentation::deserialize(deserializer)?;
+        Message::deserialize(signed_message)
+            .map_err(|e| de::Error::custom(format!("Unable to deserialize signed message: {}", e)))
+            .and_then(|msg| {
+                T::try_from(msg).map_err(|e| {
+                    de::Error::custom(format!(
+                        "Unable to decode signed message into payload: {:?}",
+                        e
+                    ))
+                })
+            })
     }
 }

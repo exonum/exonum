@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ use super::{
     key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crypto::{CryptoHash, Hash, HashStream};
-use storage::StorageValue;
+use crate::crypto::{CryptoHash, Hash, HashStream};
+use crate::storage::StorageValue;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -906,6 +906,7 @@ where
             .into_iter()
             .fold(MapProofBuilder::new(), |builder, key| {
                 builder.add_missing(key)
-            }).create(),
+            })
+            .create(),
     }
 }

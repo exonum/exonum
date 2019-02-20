@@ -8,6 +8,7 @@
   },
   "private": true,
   "scripts": {
+    "proto": "pbjs -t static-module ../../exonum/src/proto/schema/exonum/protocol.proto  ../../examples/cryptocurrency/src/proto/cryptocurrency.proto -o ./test/stubs.js",
     "lint": "standard",
     "pretest:unix": "npm run posttest:unix && cargo run & sleep 30",
     "test": "mocha test/index.js",
@@ -23,9 +24,10 @@
   "homepage": "https://github.com/exonum/exonum-testkit/tree/master/examples/server#readme",
   "dependencies": {
     "chai": "^4.1.2",
-    "exonum-client": "^0.12.3",
+    "exonum-client": "^0.16.4",
     "mocha": "^4.0.1",
-    "node-fetch": "^1.7.3"
+    "node-fetch": "^1.7.3",
+    "protobufjs": "6.8.8"
   },
   "devDependencies": {
     "standard": "^10.0.3"

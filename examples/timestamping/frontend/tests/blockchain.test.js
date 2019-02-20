@@ -8,21 +8,21 @@ import txAccepted from './data/accepted.json'
 import proof from './data/proof.json'
 
 const mock = new MockAdapter(axios)
-const hexRegex = /[0-9A-Fa-f]+/i;
+const hexRegex = /[0-9A-Fa-f]+/i
 
 Vue.use(Blockchain)
 
 mock.onPost('/api/explorer/v1/transactions', {
-  tx_body: '727b3af198eccbc76f4b942640f1f32c67731f1dd410859f191956ea3789b628000082000000080000002c000000504d270ff8e300b8b48aeb1b61e7f96f6a369fc93321187d678c06b4ac5b8d4f2800000004000000746573747ca84d8ddf5c7f1efcb3f96f6710208c4b590fc3fd6b6396d3fa9bc7dad4ade40e3b7b793b00e5311de945143da8c2537c946c6ada9eccfa0d01f4f185caaa04'
+  tx_body: '25f7aad8046db3ce0cbbb8aa5444383305b4e2003fae578f57243a926148c5ae0000820000000a330a220a200cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9120d536f6d6520636f6e74726163740ad40aa875ae16524bd2ba51acbd804776e174efcb934dfb602aa9981a6361883c57571de141f8028e8f009c23f6567b985064c5e5b42a64c613ded2b1a89a0d'
 }).reply(200)
 
-mock.onGet('/api/explorer/v1/transactions?hash=05d621b1a62163e132e74430afe8d01ed873e68bb8e9f7abd9b7c72e1c7dbdc2').replyOnce(200, txNotAccepted)
+mock.onGet('/api/explorer/v1/transactions?hash=ce0743cff6bdef0afa2f3af68b77612aa8f22190d3e94534268e3b784cfd7805').replyOnce(200, txNotAccepted)
 
-mock.onGet('/api/explorer/v1/transactions?hash=05d621b1a62163e132e74430afe8d01ed873e68bb8e9f7abd9b7c72e1c7dbdc2').replyOnce(200, txAccepted)
+mock.onGet('/api/explorer/v1/transactions?hash=ce0743cff6bdef0afa2f3af68b77612aa8f22190d3e94534268e3b784cfd7805').replyOnce(200, txAccepted)
 
 mock.onGet('/api/services/configuration/v1/configs/actual').reply(200, actual)
 
-mock.onGet('/api/services/timestamping/v1/timestamps/proof?hash=504d270ff8e300b8b48aeb1b61e7f96f6a369fc93321187d678c06b4ac5b8d4f').reply(200, proof)
+mock.onGet('/api/services/timestamping/v1/timestamps/proof?hash=0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9').reply(200, proof)
 
 describe('Interaction with blockchain', () => {
   it('should generate new signing key pair', () => {
@@ -36,28 +36,28 @@ describe('Interaction with blockchain', () => {
 
   it('should create new timestamp', async () => {
     const keyPair = {
-      publicKey: '727b3af198eccbc76f4b942640f1f32c67731f1dd410859f191956ea3789b628',
-      secretKey: '658f5106aecfa46129ada041dd080d7ae3007f78300cdc1411f5bb11cda0bfab727b3af198eccbc76f4b942640f1f32c67731f1dd410859f191956ea3789b628'
+      publicKey: '25f7aad8046db3ce0cbbb8aa5444383305b4e2003fae578f57243a926148c5ae',
+      secretKey: '16d47606dedbfec4cd44cea14cb43b2fdb2e0abe5f5c9c6e594a33b0e5bdf59125f7aad8046db3ce0cbbb8aa5444383305b4e2003fae578f57243a926148c5ae'
     }
-    const hash = '504d270ff8e300b8b48aeb1b61e7f96f6a369fc93321187d678c06b4ac5b8d4f'
-    const metadata = 'test'
+    const hash = '0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9'
+    const metadata = 'Some contract'
 
     await expect(Vue.prototype.$blockchain.createTimestamp(keyPair, hash, metadata)).resolves
   })
 
   it('should get timestamp proof and verify it', async () => {
-    const hash = '504d270ff8e300b8b48aeb1b61e7f96f6a369fc93321187d678c06b4ac5b8d4f'
+    const hash = '0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9'
 
     await expect(Vue.prototype.$blockchain.getTimestampProof(hash)).resolves.toEqual({
       'time': {
-        'nanos': 660266000,
-        'secs': '1538746046'
+        'nanos': 599417000,
+        'seconds': 1544625292
       },
       'timestamp': {
-        'content_hash': hash,
-        'metadata': 'test'
+        'content_hash': '0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9',
+        'metadata': 'Some contract'
       },
-      'tx_hash': '05d621b1a62163e132e74430afe8d01ed873e68bb8e9f7abd9b7c72e1c7dbdc2'
+      'tx_hash': 'ce0743cff6bdef0afa2f3af68b77612aa8f22190d3e94534268e3b784cfd7805'
     })
   })
 })

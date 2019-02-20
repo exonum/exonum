@@ -3,7 +3,68 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
+
+### Breaking Changes
+
+#### exonum
+
+- Node secret keys are now stored in separate files in a secure way.
+  CLI for generating node configs and starting nodes has been extended
+  in order to reflect these changes. (#1222, #1096, #1235)
+
+#### exonum-crypto
+
+- Renamed `create_keys_file` function to `generate_keys_file`
+  in `utils` module. (#1222, #1096)
+
+### Internal improvements
+
+- All Exonum crates have been updated to Rust 2018 edition. This means that
+  it is required to use Rust 1.31 or newer for compilation. (#1230)
+
+#### exonum
+
+- Added `allow-origin` for `localhost` for public and private api in
+  development mode by default. (#1234)
+
+- Added `ProtobufConvert` implementation for `Signature`. (#1241)
+
+## 0.10.3 - 2019-01-22
+
+### Internal Improvements
+
+#### exonum
+
+- Unpin versions of dependencies. (#1237)
+
+## 0.10.2 - 2019-01-14
+
+### New Features
+
+#### exonum
+
+- Added i128/u128 support for `StorageKey`, `StorageValue`. (#1179)
+
+#### exonum-crypto
+
+- Added i128/u128 support for `CryptoHash`. (#1179)
+
+## 0.10.1 - 2019-01-04
+
+### Internal Improvements
+
+#### exonum
+
+- Dependencies have been updated. (#1111, #1162, #1167, #1168)
+
+- `ctrl+c` handler has been added for correct node stopping. (#1163)
+
+#### exonum-crypto
+
+- `pwbox` dependency has been updated. (#1164)
+
+## 0.10.0 - 2018-12-14
 
 ### Breaking Changes
 
@@ -12,7 +73,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Transaction::execute` now accepts `TransactionContext` as the second
    parameter. `TransactionContext` provides the public key of transaction
-   author, ID of current service, and transaction hash (#943)
+   author, ID of current service, and transaction hash. (#943)
+
+- `Transaction::verify` method has been removed. (#1085)
 
 - Every transaction that contains the public key of the author was refactored
    to use the author indicated in `TransactionContext`. (#984 #980 #979 #975 #971)
@@ -26,7 +89,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Removed obsolete `enable_blockchain_explorer` option from `NodeApiConfig`. (#891)
 
+- Consensus messages and inner structs are now serialized with protobuf. (#1028)
+
 - `tx_pool_capacity` parameter has been removed from `MemoryPoolConfig`. (#1036)
+
+- Custom serialization has been removed. (#1088)
 
 #### exonum
 
@@ -53,27 +120,66 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Config parameter `external_address` is now a required value. (#826)
 
 - Config parameter `round_timeout` has been renamed to `first_round_timeout`.
-  Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`
-  where `round_timeout_increase` is determined as a some percentage of
-  `first_round_timeout`. Value of this percentage is defined in
+  Now timeout for round r is `first_round_timeout + (r-1)*round_timeout_increase`,
+  where `round_timeout_increase` is determined as a certain percentage of
+  `first_round_timeout`. The value of this percentage is defined in
   `ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT` constant (10%). (#848)
 
 - `missing_keys`, `entries`, `all_entries` methods of `CheckedMapProof` and
   `MapProof::missing_keys_unchecked` method now return `impl Iterator` instead
   of `Vec`. (#918)
 
-- `Connect` message field `addr` with `SocketAddr` is removed, `pub_addr` with
-   `str` of unresolved external address of the peer is used instead. (#942)
+- `Connect` message field `addr` with `SocketAddr` has been removed, `pub_addr`
+   with `str` of unresolved external address of the peer is used instead. (#942)
 
 - Endpoint `v1/peers` now returns `ConnectInfo` in incoming connections instead
   of single IP-addresses. (#959)
+
+- `Fork::remove_by_prefix()` method now specifies prefix as `Option<&[u8]>` instead
+  of `Option<&Vec<u8>>`. (#1042)
+
+- `TransactionResult` is now serialized using protobuf. Empty description
+  of the result is now the equivalent of there being no description
+  of the result. (#1075)
+
+- `Service::tx_from_raw` now uses `failure::Error` as an error type. (#1088)
+
+- `transactions!` macro has been removed, `TransactionSet` derive macro
+  from `exonum-derive` should be used instead. (#1088)
+
+- `encoding_struct!` macro has been removed, protobuf
+  should be used instead. (#1088)
+
+#### exonum-testkit
+
+- Structures in tests and examples are serialized using protobuf now. (#1078)
+
+#### exonum-timestamping
+
+- Structures in tests and examples are serialized using protobuf now. (#1081)
+
+#### exonum-cryptocurrency
+
+- Structures in tests and examples are serialized using protobuf now. (#1081)
 
 #### exonum-configuration
 
 - The `Vote` and `VoteAgainst` now save the transaction hash instead of
   full transaction message. (#984)
 
+- Structures are serialized using protobuf now. (#1086)
+
+#### exonum-time
+
+- Structures are serialized using protobuf now. (#1086)
+
 ### New Features
+
+#### exonum-crypto
+
+- Added `utils` module with functions `create_keys_file` for creating
+  and `read_keys_from_file` for reading files that contain a
+  public key and encrypted secret key. (#1056)
 
 #### exonum
 
@@ -81,7 +187,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   addresses. (#826)
 
 - Added `v1/rebroadcast` endpoint that can be used to broadcast all transactions
-  from the pool to the other nodes. (#859)
+  from the pool to other nodes. (#859)
 
 - Now each consecutive round is longer than previous by some constant percentage
   of `first_round_timeout`. (#848)
@@ -101,6 +207,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Now peers require only one connection to exchange messages between
   them. (#945)
 
+#### exonum-build
+
+- `exonum-build` crate has been added to simplify writing `build.rs` files
+  for services that use protobuf code generation. (#1076)
+
+#### exonum-derive
+
+- `exonum-derive` crate has been added with custom derives for `ProtobufConvert`
+  and `TransactionSet`. (#1055)
+
 ### Bug Fixes
 
 #### exonum
@@ -119,6 +235,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Bug with incorrect EOF handling while decoding network messages has been
   fixed. (#917)
+
+- Bug leading to deletion of excessive data when `clear`ing an index belonging
+  to an index family has been fixed. (#1042)
 
 ### API Improvements
 
@@ -167,6 +286,23 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `system/v1/peers` endpoint now properly returns
   incoming and outgoing connections of the node. (#942)
+
+## 0.9.5 - 2018-12-18
+
+### Internal Improvements
+
+#### exonum
+
+- A version of `snow` dependency has been updated.
+
+## 0.9.4 - 2018-10-24
+
+### New Features
+
+#### exonum
+
+- SegmentField implementation for Option has been added, allowing to
+  store optional values inside of transactions. (#1004)
 
 ## 0.9.3 - 2018-10-04
 

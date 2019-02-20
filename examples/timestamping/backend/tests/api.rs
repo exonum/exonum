@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,8 @@
 
 #[macro_use]
 extern crate serde_json;
-
 #[macro_use]
 extern crate exonum_testkit;
-
-extern crate exonum;
-extern crate exonum_time;
-extern crate exonum_timestamping;
 
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
@@ -144,8 +139,8 @@ fn test_api_get_timestamp_entry() {
         .unwrap();
 
     let entry = entry.unwrap();
-    assert_eq!(entry.timestamp(), info);
-    assert_eq!(entry.tx_hash(), &tx.hash());
+    assert_eq!(entry.timestamp, info);
+    assert_eq!(entry.tx_hash, tx.hash());
 }
 
 #[test]

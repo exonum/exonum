@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@
 
 //! Common widely used type definitions.
 
-use std::{fmt, num::ParseIntError, str::FromStr};
+use std::{fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 
-use crypto::{CryptoHash, Hash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use zeroize::Zeroize;
+
+use crate::crypto::{CryptoHash, Hash};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -113,7 +115,7 @@ impl Height {
 }
 
 /// Consensus round index.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -357,5 +359,29 @@ impl Iterator for RoundRangeIter {
         } else {
             None
         }
+    }
+}
+
+/// Struct used to call zeroize on inner type on drop.
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct ZeroizeOnDrop<T: Zeroize>(pub T);
+
+impl<T: Zeroize> Drop for ZeroizeOnDrop<T> {
+    fn drop(&mut self) {
+        self.0.zeroize()
+    }
+}
+
+impl<T: Zeroize> Deref for ZeroizeOnDrop<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T: Zeroize> DerefMut for ZeroizeOnDrop<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
     }
 }

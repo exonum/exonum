@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 
 use std::time::Duration;
 
-use crypto::CryptoHash;
-use helpers::{Height, Round, ValidatorId};
-use node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
-use sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::crypto::CryptoHash;
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
+use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
 
 /// HANDLE block response
 

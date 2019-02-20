@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use blockchain::Blockchain;
-use crypto::{PublicKey, SecretKey};
-use node::ApiSender;
-use storage::Snapshot;
+use crate::blockchain::Blockchain;
+use crate::crypto::{PublicKey, SecretKey};
+use crate::node::ApiSender;
+use crate::storage::Snapshot;
 
 /// Provides the current blockchain state to API handlers.
 ///

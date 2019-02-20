@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-use blockchain::Schema;
-use events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
+use crate::blockchain::Schema;
+use crate::events::{
+    error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
+};
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
@@ -29,16 +31,13 @@ impl EventHandler for NodeHandler {
 impl NodeHandler {
     // clippy sure that `InternalEvent` is not consumed in the body
     // this is because of internal `Copy` types in `JumpToRound`.
-    #![cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::needless_pass_by_value)
-    )]
+    #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     fn handle_internal_event(&mut self, event: InternalEvent) {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
-            InternalEvent::MessageVerified(msg) => self.handle_message(msg),
+            InternalEvent::MessageVerified(msg) => self.handle_message(*msg),
         }
     }
 

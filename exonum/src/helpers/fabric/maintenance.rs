@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@ use super::{
     internal::{CollectedCommand, Command, Feedback},
     Argument, CommandName, Context,
 };
-use blockchain::Schema;
-use helpers::config::ConfigFile;
-use node::NodeConfig;
-use storage::{Database, DbOptions, RocksDB};
+use crate::blockchain::Schema;
+use crate::helpers::config::ConfigFile;
+use crate::node::NodeConfig;
+use crate::storage::{Database, DbOptions, RocksDB};
 
 // Context entry for the path to the node config.
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";

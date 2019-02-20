@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,21 +23,13 @@ use exonum::{
     storage::{ListProof, MapProof},
 };
 
-use wallet::Wallet;
-use {Schema, CRYPTOCURRENCY_SERVICE_ID};
+use crate::{wallet::Wallet, Schema, CRYPTOCURRENCY_SERVICE_ID};
 
 /// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct WalletQuery {
     /// Public key of the queried wallet.
     pub pub_key: PublicKey,
-}
-
-/// Response to an incoming transaction returned by the REST API.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransactionResponse {
-    /// Hash of the transaction.
-    pub tx_hash: Hash,
 }
 
 /// Proof of existence for specific wallet.

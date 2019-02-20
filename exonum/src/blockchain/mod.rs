@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,15 +19,14 @@
 //! your service on top of Exonum blockchain you need to perform the following steps:
 //!
 //! - Define your own information schema.
-//! - Create one or more transaction types using the [`transactions!`] macro and
-//!   implement the [`Transaction`] trait for them.
+//! - Create one or more transaction types using the `TransactionSet` auto derive macro from
+//!   `exonum_derive` and implement the [`Transaction`] trait for them.
 //! - Create a data structure implementing the [`Service`] trait.
 //! - Write API handlers for the service, if required.
 //!
 //! You may consult [the service creation tutorial][doc:create-service] for a detailed
 //! instruction on how to create services.
 //!
-//! [`transactions!`]: ../macro.transactions.html
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
@@ -47,21 +46,18 @@ pub use self::{
 pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
-use failure;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    error::Error as StdError,
     fmt, iter, mem, panic,
     sync::Arc,
 };
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use encoding::Error as MessageError;
-use helpers::{Height, Round, ValidatorId};
-use messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
-use node::ApiSender;
-use storage::{self, Database, Error, Fork, Patch, Snapshot};
+use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
+use crate::node::ApiSender;
+use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
 
 mod block;
 mod genesis;
@@ -148,11 +144,11 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let service = self
             .service_map
             .get(&raw.service_id())
-            .ok_or_else(|| MessageError::from("Service not found."))?;
+            .ok_or_else(|| format_err!("Service not found."))?;
         service.tx_from_raw(raw)
     }
 
@@ -286,6 +282,25 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
+    #[doc(hidden)]
+    pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
+        let service_id = tx.service_id();
+        if !self.service_map.contains_key(&service_id) {
+            return Err(format_err!(
+                "Unable to broadcast transaction: no service with ID={} found",
+                service_id
+            ));
+        }
+        let msg = Message::sign_transaction(
+            tx.service_transaction(),
+            service_id,
+            self.service_keypair.0,
+            &self.service_keypair.1,
+        );
+
+        self.api_sender.broadcast_transaction(msg)
+    }
+
     /// Executes the given transactions from the pool.
     /// Then collects the resulting changes from the current storage state and returns them
     /// with the hash of the resulting block.
@@ -406,15 +421,11 @@ impl Blockchain {
                         "Service not found. Service id: {}",
                         raw.service_id()
                     ))
-                })?.service_name();
+                })?
+                .service_name();
 
-            let tx = self.tx_from_raw(raw.payload().clone()).or_else(|error| {
-                Err(failure::err_msg(format!(
-                    "Service <{}>: {}, tx: {:?}",
-                    service_name,
-                    error.description(),
-                    tx_hash
-                )))
+            let tx = self.tx_from_raw(raw.payload().clone()).map_err(|error| {
+                format_err!("Service <{}>: {}, tx: {:?}", service_name, error, tx_hash)
             })?;
             (tx, raw, service_name)
         };
@@ -484,7 +495,7 @@ impl Blockchain {
             {
                 let mut schema = Schema::new(&mut fork);
                 for precommit in precommits {
-                    schema.precommits_mut(&block_hash).push(precommit.clone());
+                    schema.precommits_mut(&block_hash).push(precommit);
                 }
 
                 // Consensus messages cache is useful only during one height, so it should be
@@ -545,9 +556,9 @@ impl Blockchain {
     /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
         let schema = Schema::new(self.snapshot());
-        let peers_cache = schema.peers_cache();
-        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
-        it.collect()
+
+        let peers_cache_table = schema.peers_cache();
+        peers_cache_table.iter().collect()
     }
 
     /// Saves the given raw message to the consensus messages cache.

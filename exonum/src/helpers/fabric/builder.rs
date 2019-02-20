@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ use std::{
     ffi::OsString,
     fmt,
     panic::{self, PanicInfo},
+    str::FromStr,
 };
 
 use super::{
@@ -26,10 +27,12 @@ use super::{
     internal::{CollectedCommand, Command, Feedback},
     keys,
     maintenance::Maintenance,
-    CommandName, ServiceFactory,
+    password::{PassInputMethod, SecretKeyType},
+    CommandName, Context, ServiceFactory,
 };
-use blockchain::Service;
-use node::Node;
+
+use crate::blockchain::Service;
+use crate::node::{ExternalMessage, Node};
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -66,6 +69,9 @@ impl NodeBuilder {
         T: Into<OsString> + Clone,
     {
         let feedback = ClapBackend::execute_cmd_string(&self.commands, cmd_line);
+        if let Feedback::RunNode(ref ctx) = feedback {
+            self.node_from_run_context(ctx);
+        }
         feedback != Feedback::None
     }
 
@@ -73,17 +79,7 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
-                let config_file_path = ctx.get(keys::NODE_CONFIG_PATH).ok();
-                let config = ctx
-                    .get(keys::NODE_CONFIG)
-                    .expect("could not find node_config");
-                let db = Run::db_helper(ctx, &config.database);
-                let services: Vec<Box<dyn Service>> = self
-                    .service_factories
-                    .into_iter()
-                    .map(|mut factory| factory.make_service(ctx))
-                    .collect();
-                let node = Node::new(db, services, config, config_file_path);
+                let node = self.node_from_run_context(ctx);
                 Some(node)
             }
             _ => None,
@@ -122,6 +118,13 @@ impl NodeBuilder {
         panic::set_hook(old_hook);
 
         if let Some(node) = feedback {
+            let channel = node.channel();
+            ctrlc::set_handler(move || {
+                println!("Shutting down...");
+                let _ = channel.send_external_message(ExternalMessage::Shutdown);
+            })
+            .expect("Cannot set CTRL+C handler");
+
             node.run().expect("Node return error")
         }
     }
@@ -135,9 +138,42 @@ impl NodeBuilder {
             Box::new(GenerateCommonConfig),
             Box::new(Finalize),
             Box::new(Maintenance),
-        ].into_iter()
+        ]
+        .into_iter()
         .map(|c| (c.name(), CollectedCommand::new(c)))
         .collect()
+    }
+
+    fn node_from_run_context(self, ctx: &Context) -> Node {
+        let config_file_path = ctx
+            .get(keys::NODE_CONFIG_PATH)
+            .expect("Could not find node_config_path");
+        let config = ctx
+            .get(keys::NODE_CONFIG)
+            .expect("could not find node_config");
+        let db = Run::db_helper(ctx, &config.database);
+        let services: Vec<Box<dyn Service>> = self
+            .service_factories
+            .into_iter()
+            .map(|mut factory| factory.make_service(ctx))
+            .collect();
+
+        let config = {
+            let run_config = ctx.get(keys::RUN_CONFIG).unwrap();
+            let consensus_passphrase = PassInputMethod::from_str(&run_config.consensus_pass_method)
+                .expect("Incorrect passphrase input method for consensus key.")
+                .get_passphrase(SecretKeyType::Consensus, true);
+            let service_passphrase = PassInputMethod::from_str(&run_config.service_pass_method)
+                .expect("Incorrect passphrase input method for service key.")
+                .get_passphrase(SecretKeyType::Service, true);
+
+            config.read_secret_keys(
+                &config_file_path,
+                consensus_passphrase.as_bytes(),
+                service_passphrase.as_bytes(),
+            )
+        };
+        Node::new(db, services, config, Some(config_file_path))
     }
 }
 

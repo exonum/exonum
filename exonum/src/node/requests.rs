@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use super::NodeHandler;
-use blockchain::Schema;
-use messages::{
+use crate::blockchain::Schema;
+use crate::messages::{
     BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
     TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
     TRANSACTION_RESPONSE_EMPTY_SIZE,

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,16 +17,13 @@
 //! on each block. Correspondingly, the initial wallet balance is set to 0.
 
 #[macro_use]
-extern crate exonum;
+extern crate exonum_derive;
 #[macro_use]
 extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
-extern crate rand;
 #[macro_use]
 extern crate serde_derive;
-extern crate hex;
-
 #[macro_use]
 extern crate serde_json;
 
@@ -39,9 +36,10 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 
-use inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
+use crate::inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
 
 mod inflating_cryptocurrency;
+mod proto;
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
@@ -168,7 +166,8 @@ fn test_fuzz_transfers() {
             let (pubkey, key) = crypto::gen_keypair();
             let tx = TxCreateWallet::sign(&format!("User #{}", i), &pubkey, &key);
             (key, tx)
-        }).collect();
+        })
+        .collect();
     let pubkeys: Vec<_> = keys_and_txs
         .iter()
         .map(|&(_, ref tx)| tx.author())

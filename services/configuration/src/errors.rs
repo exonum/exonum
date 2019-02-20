@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,15 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
+use serde_json::error::Error as JsonError;
+
 use exonum::{
     blockchain::{ExecutionError, StoredConfiguration},
     crypto::Hash,
-    encoding::serialize::json::reexport::Error as JsonError,
     helpers::Height,
 };
 
-use transactions::Propose;
+use crate::transactions::Propose;
 
 /// Error codes emitted by `Propose` and/or `Vote` transactions during execution.
 #[derive(Debug)]
@@ -73,10 +74,7 @@ pub enum ErrorCode {
 // Common error types for `Propose` and `Vote`.
 #[derive(Debug, Fail)]
 pub(crate) enum Error {
-    #[fail(
-        display = "Next configuration is already scheduled: {:?}",
-        _0
-    )]
+    #[fail(display = "Next configuration is already scheduled: {:?}", _0)]
     AlreadyScheduled(StoredConfiguration),
 
     #[fail(display = "Not authored by a validator")]
@@ -99,9 +97,7 @@ pub(crate) enum Error {
 
     #[fail(
         display = "Invalid majority count: {}, it should be >= {} and <= {}",
-        proposed,
-        min,
-        max
+        proposed, min, max
     )]
     InvalidMajorityCount {
         min: usize,
@@ -109,10 +105,7 @@ pub(crate) enum Error {
         proposed: usize,
     },
 
-    #[fail(
-        display = "Does not reference known config with hash {:?}",
-        _0
-    )]
+    #[fail(display = "Does not reference known config with hash {:?}", _0)]
     UnknownConfigRef(Hash),
 
     #[fail(display = "Validator already voted for a referenced proposal")]

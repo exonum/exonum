@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{RngCore, SeedableRng, XorShiftRng};
+pub use crate::proto::schema::tests::TimestampTx;
 
-use blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet};
-use crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use encoding::Error as MessageError;
-use messages::{Message, RawTransaction, Signed};
-use storage::Snapshot;
+use rand::{RngCore, SeedableRng};
+use rand_xorshift::XorShiftRng;
+
+use crate::blockchain::{
+    ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
+};
+use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
+use crate::messages::{Message, RawTransaction, Signed};
+use crate::storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
 
-transactions! {
-    pub TimestampingTransactions {
-
-        struct TimestampTx {
-            data: &[u8],
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+#[exonum(crate = "crate")]
+pub enum TimestampingTransactions {
+    TimestampTx(TimestampTx),
 }
 
 impl Transaction for TimestampTx {
@@ -75,7 +76,8 @@ impl Iterator for TimestampingTxGenerator {
     fn next(&mut self) -> Option<Signed<RawTransaction>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        let buf = TimestampTx::new(&data);
+        let mut buf = TimestampTx::new();
+        buf.set_data(data);
         Some(Message::sign_transaction(
             buf,
             TIMESTAMPING_SERVICE,
@@ -104,7 +106,7 @@ impl Service for TimestampingService {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimestampingTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

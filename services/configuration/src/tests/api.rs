@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,11 +25,11 @@ use super::{
     new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
     ConfigurationTestKit,
 };
-use api::{
+use crate::api::{
     ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
     VoteResponse, VotesInfo,
 };
-use SERVICE_NAME;
+use crate::SERVICE_NAME;
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;
@@ -88,7 +88,8 @@ impl ConfigurationApiTest for TestKitApi {
             .query(&FilterQuery {
                 previous_cfg_hash,
                 actual_from,
-            }).get("v1/configs/proposed")
+            })
+            .get("v1/configs/proposed")
             .unwrap()
     }
 
@@ -108,7 +109,8 @@ impl ConfigurationApiTest for TestKitApi {
             .query(&FilterQuery {
                 previous_cfg_hash,
                 actual_from,
-            }).get("v1/configs/committed")
+            })
+            .get("v1/configs/committed")
             .unwrap()
     }
 
@@ -290,7 +292,7 @@ fn test_votes_for_propose() {
 
 #[test]
 fn test_dissenting_votes_for_propose() {
-    use schema::VotingDecision;
+    use crate::schema::VotingDecision;
 
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();

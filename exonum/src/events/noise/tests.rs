@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure;
 use futures::{
     future::Either,
     sync::{mpsc, mpsc::Sender},
@@ -29,8 +28,8 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::{net::SocketAddr, thread, time::Duration};
 
-use crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
-use events::{
+use crate::crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
+use crate::events::{
     error::into_failure,
     noise::{
         wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
@@ -43,7 +42,7 @@ use events::{
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
 fn noise_convert_ed_to_curve_dh() {
-    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+    use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     // Generate Ed25519 keys for initiator and responder.
     let (public_key_i, secret_key_i) = gen_keypair();
@@ -70,7 +69,7 @@ fn noise_convert_ed_to_curve_dh() {
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
 fn noise_converted_keys_handshake() {
-    use crypto::{gen_keypair, x25519::into_x25519_keypair};
+    use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
     static PATTERN: &'static str = "Noise_XK_25519_ChaChaPoly_SHA256";
@@ -387,7 +386,8 @@ fn run_handshake_listener(
                         .map_err(|e| panic!("{:?}", e))
                 });
                 Ok(())
-            }).map_err(into_failure),
+            })
+            .map_err(into_failure),
     )
 }
 
@@ -404,7 +404,8 @@ fn send_handshake(
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params, addr).send(sock),
             Some(message) => NoiseErrorHandshake::initiator(&params, addr, message).send(sock),
-        }).map(|_| ());
+        })
+        .map(|_| ());
 
     core.run(stream)
 }

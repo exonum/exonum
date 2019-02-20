@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,12 +13,15 @@
 // limitations under the License.
 
 use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
-use crypto::{CryptoHash, Hash, PublicKey};
-use helpers::{Height, Round};
-use messages::{Connect, Message, Precommit, RawTransaction, Signed};
-use storage::{
-    Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
-    Snapshot,
+use crate::{
+    crypto::{CryptoHash, Hash, PublicKey},
+    helpers::{Height, Round},
+    messages::{Connect, Message, Precommit, RawTransaction, Signed},
+    proto,
+    storage::{
+        Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
+        Snapshot,
+    },
 };
 
 /// Defines `&str` constants with given name and value.
@@ -50,25 +53,64 @@ define_names!(
     CONSENSUS_ROUND => "consensus_round";
 );
 
-encoding_struct! {
-    /// Configuration index.
-    struct ConfigReference {
-        /// Height since which this configuration becomes actual.
-        actual_from: Height,
-        /// Hash of the configuration contents that serialized as raw bytes vec.
-        cfg_hash: &Hash,
+/// Configuration index.
+#[derive(Debug, Serialize, Deserialize, ProtobufConvert)]
+#[exonum(pb = "proto::ConfigReference", crate = "crate")]
+pub struct ConfigReference {
+    /// Height since which this configuration becomes actual.
+    actual_from: Height,
+    /// Hash of the configuration contents that serialized as raw bytes vec.
+    cfg_hash: Hash,
+}
+
+impl ConfigReference {
+    /// New ConfigReference
+    pub fn new(actual_from: Height, cfg_hash: &Hash) -> Self {
+        Self {
+            actual_from,
+            cfg_hash: *cfg_hash,
+        }
+    }
+
+    /// Height since which this configuration becomes actual.
+    pub fn actual_from(&self) -> Height {
+        self.actual_from
+    }
+
+    /// Hash of the configuration contents that serialized as raw bytes vec.
+    pub fn cfg_hash(&self) -> &Hash {
+        &self.cfg_hash
     }
 }
 
-encoding_struct! {
-    /// Transaction location in a block.
-    /// The given entity defines the block where the transaction was
-    /// included and the position of this transaction in that block.
-    struct TxLocation {
-        /// Height of the block where the transaction was included.
-        block_height: Height,
-        /// Zero-based position of this transaction in the block.
-        position_in_block: u64,
+/// Transaction location in a block.
+/// The given entity defines the block where the transaction was
+/// included and the position of this transaction in that block.
+#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::TxLocation", crate = "crate")]
+pub struct TxLocation {
+    /// Height of the block where the transaction was included.
+    block_height: Height,
+    /// Zero-based position of this transaction in the block.
+    position_in_block: u64,
+}
+
+impl TxLocation {
+    /// New tx_location
+    pub fn new(block_height: Height, position_in_block: u64) -> Self {
+        Self {
+            block_height,
+            position_in_block,
+        }
+    }
+
+    /// Height of the block where the transaction was included.
+    pub fn block_height(&self) -> Height {
+        self.block_height
+    }
+    /// Zero-based position of this transaction in the block.
+    pub fn position_in_block(&self) -> u64 {
+        self.position_in_block
     }
 }
 

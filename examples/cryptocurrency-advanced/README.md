@@ -1,7 +1,12 @@
-# Cryptocurrency demo
+# Cryptocurrency Advanced: Service with Data Proofs
 
-This project demonstrates how to bootstrap own cryptocurrency
-with [Exonum blockchain](https://github.com/exonum/exonum).
+The extended version of the
+[Cryptocurrency Service](https://github.com/exonum/exonum/tree/master/examples/cryptocurrency)
+implementing data proofs. This project demonstrates how to bootstrap your own
+cryptocurrency with [Exonum blockchain](https://github.com/exonum/exonum).
+
+See [the documentation](https://exonum.com/doc/get-started/data-proofs/)
+for a detailed step-by-step guide how to approach this example.
 
 ![Cryptocurrency demo](Screenshot.png)
 
@@ -18,13 +23,11 @@ It implements most basic operations:
 
 ### Using docker
 
-<!-- spell-checker:ignore serhiioryshych -->
-
 Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 serhiioryshych/exonum-cryptocurrency-advanced-example
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:demo
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).

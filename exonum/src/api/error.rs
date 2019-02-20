@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,10 +18,9 @@
 
 //! The set of errors for the Exonum API module.
 
-use failure;
 use std::io;
 
-use storage;
+use crate::storage;
 
 /// List of possible API errors.
 #[derive(Fail, Debug)]

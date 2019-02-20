@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use futures::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
@@ -23,7 +22,6 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
 use tokio_core::reactor::Handle;
 
-use tokio_dns;
 use tokio_retry::{
     strategy::{jitter, FixedInterval},
     Retry,
@@ -32,15 +30,17 @@ use tokio_retry::{
 use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
 
 use super::{error::log_error, to_box};
-use crypto::PublicKey;
-use events::{
-    codec::MessagesCodec,
-    error::into_failure,
-    noise::{Handshake, HandshakeParams, NoiseHandshake},
+use crate::{
+    crypto::PublicKey,
+    events::{
+        codec::MessagesCodec,
+        error::into_failure,
+        noise::{Handshake, HandshakeParams, NoiseHandshake},
+    },
+    helpers::Milliseconds,
+    messages::{Connect, Message, Service, Signed, SignedMessage},
+    node::state::SharedConnectList,
 };
-use helpers::Milliseconds;
-use messages::{Connect, Message, Service, Signed, SignedMessage};
-use node::state::SharedConnectList;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -185,7 +185,8 @@ impl ConnectionPool {
                         log_error(e);
                         write_pool.remove(&address);
                         Ok(())
-                    }).map(drop),
+                    })
+                    .map(drop),
             )
         } else {
             Either::B(future::ok(()))
@@ -395,7 +396,7 @@ impl NetworkHandler {
                                         "Couldn't take peer addr from socket = {}",
                                         e
                                     )))
-                                        as Box<dyn Future<Error = failure::Error, Item = ()>>
+                                        as Box<dyn Future<Error = failure::Error, Item = ()>>;
                                 }
                             };
                             let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
@@ -540,7 +541,8 @@ impl NetworkHandler {
                         .ok_or_else(|| format_err!("shutdown twice"))
                         .into_future(),
                 ),
-            }.map_err(log_error);
+            }
+            .map_err(log_error);
 
             handle.spawn(fut);
             Ok(())

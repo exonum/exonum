@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,12 +22,10 @@ pub use actix_web::middleware::cors::Cors;
 use actix::{Addr, System};
 use actix_net::server::Server;
 use actix_web::{
-    self,
     error::ResponseError,
     server::{HttpServer, StopServer},
     AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
 };
-use failure;
 use futures::{Future, IntoFuture};
 use serde::{
     de::{self, DeserializeOwned},
@@ -43,7 +41,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use api::{
+use crate::api::{
     error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
     Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
@@ -117,7 +115,7 @@ impl ExtendApiBackend for actix_web::Scope<ServiceApiState> {
     where
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>,
     {
-        for mut item in items {
+        for item in items {
             self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
         }
         self
@@ -149,7 +147,7 @@ where
         let handler = f.inner.handler;
         let index = move |request: HttpRequest| -> FutureResponse {
             let context = request.state();
-            let future = Query::from_request(&request, &())
+            let future = Query::from_request(&request, &Default::default())
                 .map(|query: Query<Q>| query.into_inner())
                 .and_then(|query| handler(context, query).map_err(From::from))
                 .and_then(|value| Ok(HttpResponse::Ok().json(value)))
@@ -183,7 +181,8 @@ where
                     handler(&context, query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
-                }).responder()
+                })
+                .responder()
         };
 
         Self {
@@ -205,7 +204,7 @@ where
         let index = move |request: HttpRequest| -> FutureResponse {
             let context = request.state().clone();
             let handler = handler.clone();
-            Query::from_request(&request, &())
+            Query::from_request(&request, &Default::default())
                 .map(move |query: Query<Q>| query.into_inner())
                 .into_future()
                 .and_then(move |query| handler(&context, query).map_err(From::from))
@@ -239,7 +238,8 @@ where
                     handler(&context, query)
                         .map(|value| HttpResponse::Ok().json(value))
                         .map_err(From::from)
-                }).responder()
+                })
+                .responder()
         };
 
         Self {

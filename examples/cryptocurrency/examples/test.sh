@@ -8,6 +8,7 @@ set -e
 
 # Base URL for demo service endpoints
 BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
+TRANSACTION_URL=http://127.0.0.1:8000/api/explorer/v1/transactions
 
 # Exit status
 STATUS=0
@@ -42,7 +43,7 @@ function kill-server {
 # Arguments:
 # - $1: filename with the transaction data
 function create-wallet {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/wallets 2>/dev/null`
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $TRANSACTION_URL 2>/dev/null`
 }
 
 # Performs a transfer in the cryptocurrency demo.
@@ -50,7 +51,7 @@ function create-wallet {
 # Arguments:
 # - $1: filename with the transaction data
 function transfer {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/wallets/transfer 2>/dev/null`
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $TRANSACTION_URL 2>/dev/null`
 }
 
 # Checks a response to an Exonum transaction.
@@ -73,7 +74,7 @@ function check-transaction {
 # - $2: expected user balance
 # - $3: response JSON that encodes user's wallet information
 function check-request {
-    if [[ ( `echo $3 | jq .name` == "\"$1\"" ) && ( `echo $3 | jq .balance` == "\"$2\"" ) ]]; then
+    if [[ ( `echo $3 | jq .name` == "\"$1\"" ) && ( `echo $3 | jq .balance` == $2 ) ]]; then
         echo "OK, got expected transaction balance $2 for user $1"
     else
         # $RESP here is intentional; we want to output the entire incorrect response
@@ -86,13 +87,13 @@ function check-request {
 #
 # Arguments:
 # - $1: expected user name
-# - $2: expected transaction JSON
+# - $2: expected transaction in HEX
 # - $3: response JSON
 function check-create-tx {
     if [[ \
       ( `echo $3 | jq .type` == \"committed\" ) && \
-      ( `echo $3 | jq .content.body.name` == "\"$1\"" ) && \
-      ( `echo $3 | jq ".content == $2"` == "true" ) \
+      ( `echo $3 | jq .content.debug.name` == "\"$1\"" ) && \
+      ( `echo $3 | jq ".content.message == $2"` == "true") \
     ]]; then
         echo "OK, got expected TxCreateWallet for user $1"
     else
@@ -104,12 +105,12 @@ function check-create-tx {
 # Checks a `TxCreateWallet` transaction in the blockchain explorer.
 #
 # Arguments:
-# - $1: expected transaction JSON
+# - $1: expected transaction in HEX
 # - $2: response JSON
 function check-transfer-tx {
     if [[ \
       ( `echo $2 | jq .type` == \"committed\" ) && \
-      ( `echo $2 | jq ".content == $1"` == "true" ) \
+      ( `echo $2 | jq ".content.message == $1"` == "true" ) \
     ]]; then
         echo "OK, got expected TxTransfer between wallets"
     else
@@ -123,16 +124,14 @@ launch-server
 
 echo "Creating a wallet for Alice..."
 create-wallet create-wallet-1.json
-check-transaction 099d455a
+check-transaction 75a9d956
 
 echo "Creating a wallet for Bob..."
 create-wallet create-wallet-2.json
-check-transaction 2fb289b9
-
+check-transaction 7a09053a
 echo "Transferring funds from Alice to Bob"
 transfer transfer-funds.json
-check-transaction 4d6de957
-
+check-transaction ae3afbe3
 echo "Waiting until transactions are committed..."
 sleep 7
 
@@ -145,19 +144,19 @@ check-request "Alice" 85 "`echo $RESP | jq .[0]`"
 check-request "Bob" 115 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallet?pub_key=6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85 2>/dev/null`
+RESP=`curl $BASE_URL/wallet?pub_key=114e49a764813f2e92609d103d90f23dc5b7e94e74b3e08134c1272441614bd9 2>/dev/null`
 check-request "Alice" 85 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
-TXID=099d455ab563505cad55b7c6ec02e8a52bca86b0c4446d9879af70f5ceca5dd8
+TXID=75a9d95694f22823ae01a6feafb3d4e27b55b83bd6897aa581456ea5da382dde
 RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
-EXP=`cat create-wallet-1.json`
+EXP=`cat create-wallet-1.json | jq ".tx_body"`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
-TXID=4d6de957f58c894db2dca577d4fdd0da1249a8dff1df5eb69d23458e43320ee2
+TXID=ae3afbe35f1bfd102daea2f3f72884f04784a10aabe9d726749b1188a6b9fe9b
 RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
-EXP=`cat transfer-funds.json`
+EXP=`cat transfer-funds.json | jq ".tx_body"`
 check-transfer-tx "$EXP" "$RESP"
 
 kill-server

@@ -1,0 +1,43 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum;
+
+import "helpers.proto";
+
+message Block {
+  uint32 proposer_id = 1;
+  uint64 height = 2;
+  uint32 tx_count = 3;
+  exonum.Hash prev_hash = 4;
+  exonum.Hash tx_hash = 5;
+  exonum.Hash state_hash = 6;
+}
+
+message ConfigReference {
+  uint64 actual_from = 1;
+  exonum.Hash cfg_hash = 2;
+}
+
+message TxLocation {
+  uint64 block_height = 1;
+  uint64 position_in_block = 2;
+}
+
+message TransactionResult {
+  uint32 status = 1;
+  string description = 2;
+}

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ use serde::{de::Error, ser::SerializeStruct, Deserialize, Deserializer, Serializ
 use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use super::{super::StorageValue, hash_one, hash_pair, key::ProofListKey};
-use crypto::Hash;
+use crate::crypto::Hash;
 
 /// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]
@@ -157,7 +157,7 @@ where
                             "Invalid json: Key {} not found. \
                              Value: {:?}",
                             "left", json
-                        )))
+                        )));
                     }
                     Some(left) => left,
                 };
@@ -167,7 +167,7 @@ where
                             "Invalid json: Key {} not found. \
                              Value: {:?}",
                             "right", json
-                        )))
+                        )));
                     }
                     Some(right) => right,
                 };
@@ -224,7 +224,7 @@ where
                     "Invalid json: Number of keys should be \
                      either 1 or 2. json: {:?}",
                     json
-                )))
+                )));
             }
         };
         Ok(res)

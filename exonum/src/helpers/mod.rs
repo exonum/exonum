@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,22 @@
 
 //! Different assorted utilities.
 
-pub use self::types::{Height, Milliseconds, Round, ValidatorId};
+pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
 pub mod fabric;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
-use crypto::gen_keypair;
+
 use env_logger::Builder;
 use log::SetLoggerError;
 
-use blockchain::{GenesisConfig, ValidatorKeys};
-use node::{ConnectListConfig, NodeConfig};
+use std::path::{Component, Path, PathBuf};
+
+use crate::blockchain::{GenesisConfig, ValidatorKeys};
+use crate::crypto::gen_keypair;
+use crate::node::{ConnectListConfig, NodeConfig};
 
 mod types;
 
@@ -75,5 +78,68 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
             services_configs: Default::default(),
             database: Default::default(),
             thread_pool_size: Default::default(),
-        }).collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+}
+
+/// This routine is adapted from the *old* Path's `path_relative_from`
+/// function, which works differently from the new `relative_from` function.
+/// In particular, this handles the case on unix where both paths are
+/// absolute but with only the root as the common directory.
+///
+/// @see https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
+pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Option<PathBuf> {
+    let path = path.as_ref();
+    let base = base.as_ref();
+
+    if path.is_absolute() != base.is_absolute() {
+        if path.is_absolute() {
+            Some(PathBuf::from(path))
+        } else {
+            None
+        }
+    } else {
+        let mut ita = path.components();
+        let mut itb = base.components();
+        let mut comps: Vec<Component> = vec![];
+        loop {
+            match (ita.next(), itb.next()) {
+                (None, None) => break,
+                (Some(a), None) => {
+                    comps.push(a);
+                    comps.extend(ita.by_ref());
+                    break;
+                }
+                (None, _) => comps.push(Component::ParentDir),
+                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
+                (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
+                (Some(_), Some(b)) if b == Component::ParentDir => return None,
+                (Some(a), Some(_)) => {
+                    comps.push(Component::ParentDir);
+                    for _ in itb {
+                        comps.push(Component::ParentDir);
+                    }
+                    comps.push(a);
+                    comps.extend(ita.by_ref());
+                    break;
+                }
+            }
+        }
+        Some(comps.iter().map(|c| c.as_os_str()).collect())
+    }
+}
+
+#[test]
+fn test_path_relative_from() {
+    let cases = vec![
+        ("/b", "/c", Some("../b".into())),
+        ("/a/b", "/a/c", Some("../b".into())),
+        ("/a", "/a/c", Some("../".into())),
+        ("/a/b/c", "/a/b", Some("c".into())),
+        ("/a/b/c", "/a/b/d", Some("../c".into())),
+        ("./a/b", "./a/c", Some("../b".into())),
+    ];
+    for c in cases {
+        assert_eq!(path_relative_from(c.0, c.1), c.2);
+    }
 }

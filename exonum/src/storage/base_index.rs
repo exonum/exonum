@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use super::{Fork, Iter, Snapshot, StorageKey, StorageValue};
-use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
+use crate::storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -269,8 +269,8 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// in the index.
     pub fn clear(&mut self) {
         self.set_index_type();
-        self.view
-            .remove_by_prefix(&self.name, self.index_id.as_ref());
+        let prefix = self.index_id.as_ref().map(Vec::as_slice);
+        self.view.remove_by_prefix(&self.name, prefix);
     }
 }
 
@@ -308,7 +308,7 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
 /// and underscores.
 fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref().as_bytes().iter().all(|c| match *c {
-        48...57 | 65...90 | 97...122 | 95 | 46 => true,
+        48..=57 | 65..=90 | 97..=122 | 95 | 46 => true,
         _ => false,
     })
 }

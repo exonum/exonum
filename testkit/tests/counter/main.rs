@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,35 +15,35 @@
 #[macro_use]
 extern crate assert_matches;
 #[macro_use]
-extern crate exonum;
-#[macro_use]
 extern crate exonum_testkit;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate pretty_assertions;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate exonum_derive;
 
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::TransactionErrorType as ErrorType,
     crypto::{self, CryptoHash, PublicKey},
-    encoding::serialize::FromHex,
     helpers::Height,
     messages::{self, RawTransaction, Signed},
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use hex::FromHex;
 use serde_json::Value;
 
-use counter::{
+use crate::counter::{
     CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY,
 };
 
 mod counter;
+mod proto;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let testkit = TestKit::for_service(CounterService);
@@ -658,14 +658,13 @@ fn test_explorer_transaction_info() {
 
     let explorer = BlockchainExplorer::new(testkit.blockchain());
     let block = explorer.block(Height(1)).unwrap();
-    assert!(
-        committed
-            .location_proof()
-            .validate(
-                *block.header().tx_hash(),
-                u64::from(block.header().tx_count())
-            ).is_ok()
-    );
+    assert!(committed
+        .location_proof()
+        .validate(
+            *block.header().tx_hash(),
+            u64::from(block.header().tx_count())
+        )
+        .is_ok());
 }
 
 #[test]
@@ -726,7 +725,8 @@ fn test_explorer_transaction_statuses() {
                 .get("v1/transactions")
                 .unwrap();
             TransactionResult(info.as_committed().unwrap().status().map_err(Clone::clone))
-        }).collect();
+        })
+        .collect();
     check_statuses(&statuses);
 }
 

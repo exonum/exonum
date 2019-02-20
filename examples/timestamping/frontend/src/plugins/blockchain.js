@@ -1,29 +1,12 @@
 import * as Exonum from 'exonum-client'
 import axios from 'axios'
+import * as proto from '../../proto/stubs.js'
 
 const PER_PAGE = 10
 const SERVICE_ID = 130
 const TX_ID = 0
 const TABLE_INDEX = 0
-const SystemTime = Exonum.newType({
-  fields: [
-    { name: 'secs', type: Exonum.Uint64 },
-    { name: 'nanos', type: Exonum.Uint32 }
-  ]
-})
-const Timestamp = Exonum.newType({
-  fields: [
-    { name: 'content_hash', type: Exonum.Hash },
-    { name: 'metadata', type: Exonum.String }
-  ]
-})
-const TimestampEntry = Exonum.newType({
-  fields: [
-    { name: 'timestamp', type: Timestamp },
-    { name: 'tx_hash', type: Exonum.Hash },
-    { name: 'time', type: SystemTime }
-  ]
-})
+const TimestampEntry = Exonum.newType(proto.exonum.examples.timestamping.TimestampEntry)
 
 module.exports = {
   install(Vue) {
@@ -38,15 +21,13 @@ module.exports = {
           author: keyPair.publicKey,
           service_id: SERVICE_ID,
           message_id: TX_ID,
-          fields: [
-            { name: 'content', type: Timestamp }
-          ]
+          schema: proto.exonum.examples.timestamping.TxTimestamp
         })
 
         // Transaction data
         const data = {
           content: {
-            content_hash: hash,
+            content_hash: { data: Exonum.hexadecimalToUint8Array(hash) },
             metadata: metadata
           }
         }
@@ -67,24 +48,29 @@ module.exports = {
           return axios.get(`/api/services/timestamping/v1/timestamps/proof?hash=${hash}`)
             .then(response => response.data)
             .then(data => {
-              if (!Exonum.verifyBlock(data.block_info, validators)) {
-                throw new Error('Block can not be verified')
-              }
+              return Exonum.verifyBlock(data.block_info, validators).then(() => {
+                // verify table timestamps in the root tree
+                const tableRootHash = Exonum.verifyTable(data.state_proof, data.block_info.block.state_hash, SERVICE_ID, TABLE_INDEX)
 
-              // verify table timestamps in the root tree
-              const tableRootHash = Exonum.verifyTable(data.state_proof, data.block_info.block.state_hash, SERVICE_ID, TABLE_INDEX)
+                // find timestamp in the tree of all timestamps
+                const timestampProof = new Exonum.MapProof(data.timestamp_proof, Exonum.Hash, TimestampEntry)
+                if (timestampProof.merkleRoot !== tableRootHash) {
+                  throw new Error('Timestamp proof is corrupted')
+                }
+                const timestampEntry = timestampProof.entries.get(hash)
+                if (typeof timestampEntry === 'undefined') {
+                  throw new Error('Timestamp not found')
+                }
 
-              // find timestamp in the tree of all timestamps
-              const timestampProof = new Exonum.MapProof(data.timestamp_proof, Exonum.Hash, TimestampEntry)
-              if (timestampProof.merkleRoot !== tableRootHash) {
-                throw new Error('Timestamp proof is corrupted')
-              }
-              const timestamp = timestampProof.entries.get(hash)
-              if (typeof timestamp === 'undefined') {
-                throw new Error('Timestamp not found')
-              }
-
-              return timestamp
+                return {
+                  timestamp: {
+                    content_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.timestamp.content_hash.data)),
+                    metadata: timestampEntry.timestamp.metadata
+                  },
+                  tx_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.tx_hash.data)),
+                  time: timestampEntry.time
+                }
+              })
             })
         })
       },

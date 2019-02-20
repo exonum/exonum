@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@
 //! etc.
 
 use serde::de::Error;
-use serde_json::{self, Error as JsonError};
+use serde_json::Error as JsonError;
 
 use std::collections::{BTreeMap, HashSet};
 
-use crypto::{hash, CryptoHash, Hash, PublicKey};
-use helpers::{Height, Milliseconds};
-use messages::EMPTY_SIGNED_MESSAGE_SIZE;
-use storage::StorageValue;
+use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
+use crate::helpers::{Height, Milliseconds};
+use crate::messages::EMPTY_SIGNED_MESSAGE_SIZE;
+use crate::storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -264,10 +264,8 @@ impl StorageValue for StoredConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use toml;
-
     use super::*;
-    use crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+    use crate::crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
@@ -370,7 +368,8 @@ mod tests {
             .map(|i| ValidatorKeys {
                 consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
                 service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
-            }).collect();
+            })
+            .collect();
 
         StoredConfiguration {
             previous_cfg_hash: Hash::zero(),

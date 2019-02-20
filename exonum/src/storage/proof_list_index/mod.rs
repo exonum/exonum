@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ use super::{
     indexes_metadata::IndexType,
     Fork, Snapshot, StorageKey, StorageValue,
 };
-use crypto::{hash, Hash, HashStream};
+use crate::crypto::{hash, Hash, HashStream};
 
 mod key;
 mod proof;
@@ -645,5 +645,6 @@ fn combine_hash_list(hashes: &[Hash]) -> Vec<Hash> {
             [first, second] => hash_pair(first, second),
             [single] => hash_one(single),
             _ => unreachable!(),
-        }).collect()
+        })
+        .collect()
 }

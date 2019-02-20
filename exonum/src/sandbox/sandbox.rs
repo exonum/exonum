@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,12 +15,9 @@
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 use bit_vec::BitVec;
-use chrono;
-use env_logger;
-use futures::{self, sync::mpsc, Async, Future, Sink, Stream};
+use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
-    self,
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
     iter::FromIterator,
@@ -34,27 +31,29 @@ use super::{
     config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
     timestamping::TimestampingService,
 };
-use blockchain::{
-    Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-    SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+use crate::{
+    blockchain::{
+        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+        SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+    },
+    crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    events::{
+        network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
+        NetworkEvent, NetworkRequest, TimeoutRequest,
+    },
+    helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
+    messages::{
+        BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
+        SignedMessage, Status, TransactionsRequest, TransactionsResponse,
+    },
+    node::{
+        ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
+        ListenerConfig, NodeHandler, NodeSender, PeerAddress, ServiceConfig, State,
+        SystemStateProvider,
+    },
+    storage::{MapProof, MemoryDB},
 };
-use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use events::{
-    network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
-    NetworkEvent, NetworkRequest, TimeoutRequest,
-};
-use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use messages::{
-    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
-    SignedMessage, Status, TransactionsRequest, TransactionsResponse,
-};
-use node::ConnectInfo;
-use node::{
-    ApiSender, Configuration, ConnectList, ConnectListConfig, ExternalMessage, ListenerConfig,
-    NodeHandler, NodeSender, PeerAddress, ServiceConfig, State, SystemStateProvider,
-};
-use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -131,8 +130,9 @@ impl SandboxInner {
                         let protocol =
                             Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
                                 .unwrap();
-                        self.handler
-                            .handle_event(InternalEvent::MessageVerified(protocol).into());
+                        self.handler.handle_event(
+                            InternalEvent::MessageVerified(Box::new(protocol)).into(),
+                        );
                     }
                 }
             }
@@ -644,7 +644,8 @@ impl Sandbox {
                     return false;
                 }
                 true
-            }).cloned()
+            })
+            .cloned()
             .collect()
     }
 
@@ -1049,7 +1050,8 @@ fn sandbox_with_services_uninitialized(
         .map(|(p, a)| ConnectInfo {
             address: a.clone(),
             public_key: *p,
-        }).collect();
+        })
+        .collect();
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
@@ -1158,33 +1160,27 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
-    use crypto::{gen_keypair_from_seed, Seed};
-    use encoding;
-    use messages::RawTransaction;
-    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use storage::Snapshot;
+    use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
+    use crate::crypto::{gen_keypair_from_seed, Seed};
+    use crate::messages::RawTransaction;
+    use crate::proto::schema::tests::TxAfterCommit;
+    use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
+    use crate::storage::Snapshot;
 
     const SERVICE_ID: u16 = 1;
 
-    transactions! {
-        HandleCommitTransactions {
-
-            struct TxAfterCommit {
-                height: Height,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
+    enum HandleCommitTransactions {
+        TxAfterCommit(TxAfterCommit),
     }
 
     impl TxAfterCommit {
         pub fn new_with_height(height: Height) -> Signed<RawTransaction> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            Message::sign_transaction(
-                TxAfterCommit::new(height),
-                SERVICE_ID,
-                keypair.0,
-                &keypair.1,
-            )
+            let mut payload_tx = TxAfterCommit::new();
+            payload_tx.set_height(height.0);
+            Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
         }
     }
 
@@ -1209,10 +1205,7 @@ mod tests {
             Vec::new()
         }
 
-        fn tx_from_raw(
-            &self,
-            raw: RawTransaction,
-        ) -> Result<Box<dyn Transaction>, encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }
@@ -1401,7 +1394,8 @@ mod tests {
             .with_services(vec![
                 Box::new(AfterCommitService),
                 Box::new(TimestampingService::new()),
-            ]).build();
+            ])
+            .build();
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));

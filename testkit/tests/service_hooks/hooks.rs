@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,12 @@
 
 //! A special service which generates transactions on `after_commit` events.
 
+use super::proto;
 use exonum::{
     blockchain::{
         ExecutionResult, Service, ServiceContext, Transaction, TransactionContext, TransactionSet,
     },
     crypto::Hash,
-    encoding,
     helpers::Height,
     messages::RawTransaction,
     storage::Snapshot,
@@ -27,13 +27,21 @@ use exonum::{
 
 pub const SERVICE_ID: u16 = 512;
 
-transactions! {
-    pub HandleCommitTransactions {
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, PartialEq)]
+#[exonum(pb = "proto::TxAfterCommit")]
+pub struct TxAfterCommit {
+    pub height: Height,
+}
 
-        struct TxAfterCommit {
-            height: Height,
-        }
+impl TxAfterCommit {
+    pub fn new(height: Height) -> Self {
+        Self { height }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum HandleCommitTransactions {
+    TxAfterCommit(TxAfterCommit),
 }
 
 impl Transaction for TxAfterCommit {
@@ -49,7 +57,7 @@ impl Service for AfterCommitService {
         "after_commit"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -57,7 +65,7 @@ impl Service for AfterCommitService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = HandleCommitTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

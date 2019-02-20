@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +21,10 @@ use exonum::{
     storage::MapProof,
 };
 
-use schema::{Schema, TimestampEntry};
-use TIMESTAMPING_SERVICE;
+use crate::{
+    schema::{Schema, TimestampEntry},
+    TIMESTAMPING_SERVICE,
+};
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

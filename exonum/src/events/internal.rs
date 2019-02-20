@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use messages::{Message, SignedMessage};
+use crate::messages::{Message, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -53,7 +53,7 @@ impl InternalPart {
         future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Message::deserialize))
             .map_err(drop)
             .and_then(|protocol| {
-                let event = future::ok(InternalEvent::MessageVerified(protocol));
+                let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
                 Self::send_event(event, internal_tx)
             })
     }
@@ -104,7 +104,8 @@ impl InternalPart {
 
                 let send_event = Self::send_event(event, internal_tx.clone());
                 handle.spawn(send_event);
-            }).for_each(Ok)
+            })
+            .for_each(Ok)
     }
 }
 
@@ -115,7 +116,7 @@ mod tests {
     use std::thread;
 
     use super::*;
-    use crypto::{gen_keypair, Signature};
+    use crate::crypto::{gen_keypair, Signature};
 
     fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);
@@ -150,7 +151,7 @@ mod tests {
         let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
 
         let expected_event =
-            InternalEvent::MessageVerified(Message::deserialize(tx.clone()).unwrap());
+            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
         let event = verify_message(tx.raw().to_vec());
         assert_eq!(event, Some(expected_event));
     }

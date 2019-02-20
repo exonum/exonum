@@ -9,7 +9,8 @@
 Simply run the following command to configure and launch testnet with 4 nodes:
 
 ```bash
-docker run -p 8000-8007:8000-8007 vitvakatu/exonum-configuration-example 4
+docker run -p 8000-8007:8000-8007 \
+exonumhub/exonum-configuration-service:example 4
 ```
 
 Docker will automatically pull image from the repository and run 4 nodes with

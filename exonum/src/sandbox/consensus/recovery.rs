@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,10 @@
 
 use std::time::Duration;
 
-use crypto::CryptoHash;
-use helpers::{user_agent, Height, Round, ValidatorId};
-use node;
-
-use sandbox::{
+use crate::crypto::CryptoHash;
+use crate::helpers::{user_agent, Height, Round, ValidatorId};
+use crate::node;
+use crate::sandbox::{
     sandbox::{timestamping_sandbox, SandboxBuilder},
     sandbox_tests_helper::*,
 };

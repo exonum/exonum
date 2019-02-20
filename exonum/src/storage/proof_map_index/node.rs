@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ use super::{
     super::{StorageKey, StorageValue},
     key::{ChildKind, ProofPath, PROOF_PATH_SIZE},
 };
-use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+use crate::crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 

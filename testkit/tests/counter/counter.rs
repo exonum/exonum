@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,10 +19,11 @@ use exonum::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey},
-    encoding,
     messages::{Message, RawTransaction, Signed},
     storage::{Entry, Fork, Snapshot},
 };
+
+use super::proto;
 
 pub const SERVICE_ID: u16 = 1;
 
@@ -35,12 +36,12 @@ pub struct CounterSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<Snapshot>> CounterSchema<T> {
+impl<T: AsRef<dyn Snapshot>> CounterSchema<T> {
     pub fn new(view: T) -> Self {
         CounterSchema { view }
     }
 
-    fn entry(&self) -> Entry<&Snapshot, u64> {
+    fn entry(&self) -> Entry<&dyn Snapshot, u64> {
         Entry::new("counter.count", self.view.as_ref())
     }
 
@@ -71,21 +72,29 @@ impl<'a> CounterSchema<&'a mut Fork> {
 
 // // // // Transactions // // // //
 
-transactions! {
-    pub CounterTransactions {
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxReset")]
+pub struct TxReset {}
 
-        struct TxIncrement {
-            by: u64,
-        }
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxIncrement")]
+pub struct TxIncrement {
+    by: u64,
+}
 
-        struct TxReset {
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum CounterTransactions {
+    Increment(TxIncrement),
+    Reset(TxReset),
 }
 
 impl TxIncrement {
+    pub fn new(by: u64) -> Self {
+        Self { by }
+    }
+
     pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxIncrement::new(by), SERVICE_ID, *author, key)
+        Message::sign_transaction(Self::new(by), SERVICE_ID, *author, key)
     }
 }
 
@@ -93,7 +102,7 @@ impl Transaction for TxIncrement {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        if self.by() == 0 {
+        if self.by == 0 {
             Err(ExecutionError::with_description(
                 0,
                 "Adding zero does nothing!".to_string(),
@@ -101,14 +110,14 @@ impl Transaction for TxIncrement {
         }
 
         let mut schema = CounterSchema::new(tc.fork());
-        schema.inc_count(self.by());
+        schema.inc_count(self.by);
         Ok(())
     }
 }
 
 impl TxReset {
     pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxReset::new(), SERVICE_ID, *author, key)
+        Message::sign_transaction(Self {}, SERVICE_ID, *author, key)
     }
 }
 
@@ -180,7 +189,7 @@ impl Service for CounterService {
         "counter"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -189,7 +198,7 @@ impl Service for CounterService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = CounterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

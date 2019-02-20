@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,15 +16,14 @@
 
 use actix::*;
 use actix_web::ws;
-use serde_json;
 
-use rand::{self, Rng, ThreadRng};
+use rand::{rngs::ThreadRng, Rng};
 
 use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
-use api::ServiceApiState;
-use blockchain::Schema;
-use crypto::Hash;
+use crate::api::ServiceApiState;
+use crate::blockchain::Schema;
+use crate::crypto::Hash;
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]
@@ -117,11 +116,10 @@ impl Actor for Session {
     type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let address: Addr<_> = ctx.address();
+        let address: Recipient<_> = ctx.address().recipient();
         self.server_address
-            .send(Subscribe {
-                address: address.clone().recipient(),
-            }).into_actor(self)
+            .send(Subscribe { address })
+            .into_actor(self)
             .then(|response, actor, context| {
                 match response {
                     Ok(result) => {
@@ -130,7 +128,8 @@ impl Actor for Session {
                     _ => context.stop(),
                 }
                 fut::ok(())
-            }).wait(ctx);
+            })
+            .wait(ctx);
     }
 
     fn stopping(&mut self, _ctx: &mut <Self as Actor>::Context) -> Running {

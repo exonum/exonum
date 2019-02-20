@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@
 // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
-// Suppress a warning in `transactions!` macro call:
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::redundant_field_names))]
 
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
@@ -27,8 +25,11 @@ use exonum::{
 };
 use exonum_time::schema::TimeSchema;
 
-use schema::{Schema, Timestamp, TimestampEntry};
-use TIMESTAMPING_SERVICE;
+use super::proto;
+use crate::{
+    schema::{Schema, Timestamp, TimestampEntry},
+    TIMESTAMPING_SERVICE,
+};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -46,27 +47,25 @@ impl From<Error> for ExecutionError {
     }
 }
 
-transactions! {
-    /// Transaction group.
-    pub TimeTransactions {
+/// Timestamping transaction.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxTimestamp")]
+pub struct TxTimestamp {
+    /// Timestamp content.
+    pub content: Timestamp,
+}
 
-        /// A timestamp transaction.
-        struct TxTimestamp {
-            /// Timestamp content.
-            content: Timestamp,
-        }
-    }
+/// Transaction group.
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub enum TimeTransactions {
+    /// A timestamp transaction.
+    TxTimestamp(TxTimestamp),
 }
 
 impl TxTimestamp {
     #[doc(hidden)]
     pub fn sign(author: &PublicKey, content: Timestamp, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            TxTimestamp::new(content),
-            TIMESTAMPING_SERVICE,
-            *author,
-            key,
-        )
+        Message::sign_transaction(Self { content }, TIMESTAMPING_SERVICE, *author, key)
     }
 }
 
@@ -78,8 +77,7 @@ impl Transaction for TxTimestamp {
             .get()
             .expect("Can't get the time");
 
-        let content = self.content();
-        let hash = content.content_hash();
+        let hash = &self.content.content_hash;
 
         let mut schema = Schema::new(context.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
@@ -87,7 +85,7 @@ impl Transaction for TxTimestamp {
         }
 
         trace!("Timestamp added: {:?}", self);
-        let entry = TimestampEntry::new(self.content(), &tx_hash, time);
+        let entry = TimestampEntry::new(self.content.clone(), &tx_hash, time);
         schema.add_timestamp(entry);
         Ok(())
     }

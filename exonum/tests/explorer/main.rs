@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +15,11 @@
 //! Tests for the blockchain explorer functionality.
 
 #[macro_use]
-extern crate exonum;
+extern crate exonum_derive;
 #[macro_use]
 extern crate serde_json;
-
 #[macro_use]
 extern crate serde_derive;
-
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
@@ -34,7 +32,7 @@ use exonum::{
     messages::{self, Message, RawTransaction, Signed},
 };
 
-use blockchain::{
+use crate::blockchain::{
     create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
 };
 
@@ -105,8 +103,8 @@ fn test_explorer_basics() {
                     "message": messages::to_hex_string(&tx_alice)
                 },
                 "location": {
-                    "block_height": "1",
-                    "position_in_block": "0",
+                    "block_height": 1,
+                    "position_in_block": 0,
                 },
                 "location_proof": tx_info.location_proof(), // too complicated to check
                 "status": { "type": "success" },
@@ -135,8 +133,8 @@ fn test_explorer_basics() {
                     "message": messages::to_hex_string(&tx_bob)
             },
             "location": {
-                "block_height": "2",
-                "position_in_block": "0",
+                "block_height": 2,
+                "position_in_block": 0,
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
@@ -159,8 +157,8 @@ fn test_explorer_basics() {
                     "message": messages::to_hex_string(&tx_transfer)
             },
             "location": {
-                "block_height": "2",
-                "position_in_block": "1",
+                "block_height": 2,
+                "position_in_block": 1,
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
@@ -203,7 +201,7 @@ fn test_explorer_pool_transaction() {
     assert_eq!(tx_info.content().signed_message(), &tx_alice);
 }
 
-fn tx_generator() -> Box<Iterator<Item = Signed<RawTransaction>>> {
+fn tx_generator() -> Box<dyn Iterator<Item = Signed<RawTransaction>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
         Message::sign_transaction(
@@ -261,11 +259,9 @@ fn test_explorer_block_iter() {
         .flat_map(|info| info.with_transactions().transactions)
         .collect();
     assert_eq!(transactions.len(), 12);
-    assert!(
-        transactions
-            .iter()
-            .all(|tx| tx.location().block_height() < Height(10))
-    );
+    assert!(transactions
+        .iter()
+        .all(|tx| tx.location().block_height() < Height(10)));
 
     let heights: Vec<_> = explorer
         .blocks(..)
@@ -347,7 +343,7 @@ fn test_transaction_iterator() {
             let tx = ExplorerTransactions::tx_from_raw(raw_tx).unwrap();
             match tx {
                 ExplorerTransactions::CreateWallet(parsed_tx) => {
-                    assert_eq!(parsed_tx.name(), &format!("Alice #{}", i))
+                    assert_eq!(parsed_tx.name, format!("Alice #{}", i))
                 }
                 _ => panic!("Transaction couldn't be parsed."),
             }
@@ -401,7 +397,8 @@ fn test_transaction_iterator() {
             } else {
                 false
             }
-        }).map(|tx| tx.location().position_in_block())
+        })
+        .map(|tx| tx.location().position_in_block())
         .collect();
     assert_eq!(create_wallet_positions, vec![0, 1]);
 }

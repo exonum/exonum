@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,6 @@
 
 #[macro_use]
 extern crate assert_matches;
-extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
-extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
@@ -34,13 +31,15 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::api::WalletQuery;
-use cryptocurrency::schema::Wallet;
-use cryptocurrency::service::CurrencyService;
-use cryptocurrency::transactions::{TxCreateWallet, TxTransfer};
+use exonum_cryptocurrency::{
+    api::WalletQuery,
+    schema::Wallet,
+    service::CurrencyService,
+    transactions::{TxCreateWallet, TxTransfer},
+};
 
 // Imports shared test constants.
-use constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME};
 
 mod constants;
 
@@ -55,9 +54,9 @@ fn test_create_wallet() {
 
     // Check that the user indeed is persisted by the service.
     let wallet = api.get_wallet(tx.author());
-    assert_eq!(wallet.pub_key(), &tx.author());
-    assert_eq!(wallet.name(), ALICE_NAME);
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.pub_key, tx.author());
+    assert_eq!(wallet.name, ALICE_NAME);
+    assert_eq!(wallet.balance, 100);
 }
 
 /// Check that the transfer transaction works as intended.
@@ -73,9 +72,9 @@ fn test_transfer() {
 
     // Check that the initial Alice's and Bob's balances persisted by the service.
     let wallet = api.get_wallet(tx_alice.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
     let wallet = api.get_wallet(tx_bob.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 
     // Transfer funds by invoking the corresponding API method.
     let tx = TxTransfer::sign(
@@ -92,9 +91,9 @@ fn test_transfer() {
     // After the transfer transaction is included into a block, we may check new wallet
     // balances.
     let wallet = api.get_wallet(tx_alice.author());
-    assert_eq!(wallet.balance(), 90);
+    assert_eq!(wallet.balance, 90);
     let wallet = api.get_wallet(tx_bob.author());
-    assert_eq!(wallet.balance(), 110);
+    assert_eq!(wallet.balance, 110);
 }
 
 /// Check that a transfer from a non-existing wallet fails as expected.
@@ -110,7 +109,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
     api.assert_no_wallet(tx_alice.author());
     let wallet = api.get_wallet(tx_bob.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 
     let tx = TxTransfer::sign(
         &tx_bob.author(),
@@ -128,7 +127,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
     // Check that Bob's balance doesn't change.
     let wallet = api.get_wallet(tx_bob.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 }
 
 /// Check that a transfer to a non-existing wallet fails as expected.
@@ -143,7 +142,7 @@ fn test_transfer_to_nonexisting_wallet() {
     testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
 
     let wallet = api.get_wallet(tx_alice.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
     api.assert_no_wallet(tx_bob.author());
 
     let tx = TxTransfer::sign(
@@ -162,7 +161,7 @@ fn test_transfer_to_nonexisting_wallet() {
 
     // Check that Alice's balance doesn't change.
     let wallet = api.get_wallet(tx_alice.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 }
 
 /// Check that an overcharge does not lead to changes in sender's and receiver's balances.
@@ -190,9 +189,9 @@ fn test_transfer_overcharge() {
     );
 
     let wallet = api.get_wallet(tx_alice.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
     let wallet = api.get_wallet(tx_bob.author());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.balance, 100);
 }
 
 #[test]
@@ -207,7 +206,8 @@ fn test_unknown_wallet_request() {
         .public(ApiKind::Service("cryptocurrency"))
         .query(&WalletQuery {
             pub_key: tx.author(),
-        }).get::<Wallet>("v1/wallet")
+        })
+        .get::<Wallet>("v1/wallet")
         .unwrap_err();
 
     assert_matches!(

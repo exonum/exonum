@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,20 +18,18 @@ pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
 use reqwest::{Client, Response, StatusCode};
-use serde_json;
-use serde_urlencoded;
+use serde::{de::DeserializeOwned, Serialize};
 
 use std::fmt::{self, Display};
 
 use exonum::{
     api::{self, ApiAggregator, ServiceApiState},
     blockchain::SharedNodeState,
-    encoding::serialize::reexport::{DeserializeOwned, Serialize},
     messages::{RawTransaction, Signed},
     node::ApiSender,
 };
 
-use TestKit;
+use crate::TestKit;
 
 /// Kind of public or private REST API of an Exonum node.
 ///
@@ -48,7 +46,7 @@ pub enum ApiKind {
     Service(&'static str),
 }
 
-impl ::fmt::Display for ApiKind {
+impl fmt::Display for ApiKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ApiKind::System => write!(f, "api/system"),
@@ -192,7 +190,8 @@ where
                     "?{}",
                     serde_urlencoded::to_string(query).expect("Unable to serialize query.")
                 )
-            }).unwrap_or_default();
+            })
+            .unwrap_or_default();
         let url = format!(
             "{url}{access}/{prefix}/{endpoint}{query}",
             url = self.test_server_url,
@@ -288,7 +287,8 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
             .scope("public/api", |scope| {
                 trace!("Create public/api");
                 aggregator.extend_backend(ApiAccess::Public, scope)
-            }).scope("private/api", |scope| {
+            })
+            .scope("private/api", |scope| {
                 trace!("Create private/api");
                 aggregator.extend_backend(ApiAccess::Private, scope)
             })

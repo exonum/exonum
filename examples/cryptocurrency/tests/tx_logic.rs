@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,8 @@
 //! Note how business logic tests use `TestKit::create_block*` methods to send transactions,
 //! the service schema to make assertions about the storage state.
 
-extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate rand;
 
 use exonum::{
     crypto::{self, PublicKey, SecretKey},
@@ -31,14 +28,14 @@ use exonum::{
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::{
+use exonum_cryptocurrency::{
     schema::{CurrencySchema, Wallet},
     service::CurrencyService,
     transactions::{TxCreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
-use constants::{ALICE_NAME, BOB_NAME};
+use crate::constants::{ALICE_NAME, BOB_NAME};
 
 mod constants;
 
@@ -49,9 +46,9 @@ fn test_create_wallet() {
 
     // Check that the user indeed is persisted by the service
     let wallet = get_wallet(&testkit, &tx.author());
-    assert_eq!(wallet.pub_key(), &tx.author());
-    assert_eq!(wallet.name(), ALICE_NAME);
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(wallet.pub_key, tx.author());
+    assert_eq!(wallet.name, ALICE_NAME);
+    assert_eq!(wallet.balance, 100);
 }
 
 #[test]
@@ -72,10 +69,10 @@ fn test_transfer() {
     ]);
 
     let alice_wallet = get_wallet(&testkit, &alice_pubkey);
-    assert_eq!(alice_wallet.balance(), 90);
+    assert_eq!(alice_wallet.balance, 90);
 
     let bob_wallet = get_wallet(&testkit, &bob_pubkey);
-    assert_eq!(bob_wallet.balance(), 110);
+    assert_eq!(bob_wallet.balance, 110);
 }
 
 #[test]
@@ -97,7 +94,7 @@ fn test_transfer_from_nonexisting_wallet() {
     assert!(try_get_wallet(&testkit, &alice_pubkey).is_none());
 
     let bob_wallet = get_wallet(&testkit, &bob_pubkey);
-    assert_eq!(bob_wallet.balance(), 100);
+    assert_eq!(bob_wallet.balance, 100);
 }
 
 #[test]
@@ -119,10 +116,10 @@ fn test_transfer_to_nonexisting_wallet() {
     ]);
 
     let alice_wallet = get_wallet(&testkit, &alice_pubkey);
-    assert_eq!(alice_wallet.balance(), 100);
+    assert_eq!(alice_wallet.balance, 100);
 
     let bob_wallet = get_wallet(&testkit, &bob_pubkey);
-    assert_eq!(bob_wallet.balance(), 100);
+    assert_eq!(bob_wallet.balance, 100);
 }
 
 #[test]
@@ -145,10 +142,10 @@ fn test_transfer_overcharge() {
     // The transfer amount is greater than what Alice has at her disposal, so
     // the transfer should fail.
     let alice_wallet = get_wallet(&testkit, &alice_pubkey);
-    assert_eq!(alice_wallet.balance(), 100);
+    assert_eq!(alice_wallet.balance, 100);
 
     let bob_wallet = get_wallet(&testkit, &bob_pubkey);
-    assert_eq!(bob_wallet.balance(), 100);
+    assert_eq!(bob_wallet.balance, 100);
 }
 
 #[test]
@@ -182,17 +179,17 @@ fn test_transfers_in_single_block() {
 
         let snapshot = testkit.probe_all(txvec![tx_b_to_a.clone(), tx_a_to_b.clone()]);
         let schema = CurrencySchema::new(&snapshot);
-        assert_eq!(schema.wallet(&alice_pubkey).map(|w| w.balance()), Some(10));
-        assert_eq!(schema.wallet(&bob_pubkey).map(|w| w.balance()), Some(190));
+        assert_eq!(schema.wallet(&alice_pubkey).map(|w| w.balance), Some(10));
+        assert_eq!(schema.wallet(&bob_pubkey).map(|w| w.balance), Some(190));
     }
 
     testkit.create_block_with_transactions(txvec![tx_a_to_b, tx_b_to_a]);
 
     let alice_wallet = get_wallet(&testkit, &alice_pubkey);
-    assert_eq!(alice_wallet.balance(), 130);
+    assert_eq!(alice_wallet.balance, 130);
 
     let bob_wallet = get_wallet(&testkit, &bob_pubkey);
-    assert_eq!(bob_wallet.balance(), 70);
+    assert_eq!(bob_wallet.balance, 70);
 }
 
 /// Generate random transactions to perform [fuzz testing][fuzz] of the service. The service
@@ -202,7 +199,7 @@ fn test_transfers_in_single_block() {
 /// [fuzz]: https://en.wikipedia.org/wiki/Fuzzing
 #[test]
 fn test_fuzz_transfers() {
-    use rand::Rng;
+    use rand::{seq::SliceRandom, Rng};
     use std::collections::BTreeSet;
     use std::iter::FromIterator;
 
@@ -225,10 +222,14 @@ fn test_fuzz_transfers() {
 
         let txs: Vec<Signed<RawTransaction>> = (0..n_txs)
             .map(|_| {
-                let (sender, receiver) = (rng.choose(keys).unwrap(), rng.choose(keys).unwrap());
+                let (sender, receiver) = (
+                    keys.choose(&mut rng).unwrap(),
+                    keys.choose(&mut rng).unwrap(),
+                );
                 let amount = rng.gen_range(0, 250);
                 TxTransfer::sign(&receiver.0, amount, rng.gen::<u64>(), &sender.0, &sender.1)
-            }).collect();
+            })
+            .collect();
 
         testkit.create_block_with_transactions(txs);
 
@@ -240,11 +241,11 @@ fn test_fuzz_transfers() {
         assert_eq!(wallets.len(), 2);
         // These wallets should belong to Alice and Bob.
         assert_eq!(
-            BTreeSet::from_iter(wallets.iter().map(Wallet::pub_key)),
+            BTreeSet::from_iter(wallets.iter().map(|w| &w.pub_key)),
             BTreeSet::from_iter(vec![&alice_keys.0, &bob_keys.0])
         );
         // The total amount of funds should equal 200, no matter which transactions were executed.
-        assert_eq!(wallets.iter().map(|w| w.balance()).sum::<u64>(), 200);
+        assert_eq!(wallets.iter().map(|w| w.balance).sum::<u64>(), 200);
     }
 }
 

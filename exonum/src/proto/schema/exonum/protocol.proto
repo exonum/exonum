@@ -1,0 +1,95 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.consensus;
+
+import "helpers.proto";
+import "blockchain.proto";
+import "google/protobuf/timestamp.proto";
+
+message Connect {
+  string pub_addr = 1;
+  google.protobuf.Timestamp time = 2;
+  string user_agent = 3;
+}
+
+message Status {
+  uint64 height = 1;
+  exonum.Hash last_hash = 2;
+}
+
+message Propose {
+  uint32 validator = 1;
+  uint64 height = 2;
+  uint32 round = 3;
+  exonum.Hash prev_hash = 4;
+  repeated exonum.Hash transactions = 5;
+}
+
+message Prevote {
+  uint32 validator = 1;
+  uint64 height = 2;
+  uint32 round = 3;
+  exonum.Hash propose_hash = 4;
+  uint32 locked_round = 5;
+}
+
+message Precommit {
+  uint32 validator = 1;
+  uint64 height = 2;
+  uint32 round = 3;
+  exonum.Hash propose_hash = 4;
+  exonum.Hash block_hash = 5;
+  google.protobuf.Timestamp time = 6;
+}
+
+message BlockResponse {
+  exonum.PublicKey to = 1;
+  exonum.Block block = 2;
+  repeated bytes precommits = 3;
+  repeated exonum.Hash transactions = 4;
+}
+
+message TransactionsResponse {
+  exonum.PublicKey to = 1;
+  repeated bytes transactions = 2;
+}
+
+message ProposeRequest {
+  exonum.PublicKey to = 1;
+  uint64 height = 2;
+  exonum.Hash propose_hash = 3;
+}
+
+message TransactionsRequest {
+  exonum.PublicKey to = 1;
+  repeated exonum.Hash txs = 2;
+}
+
+message PrevotesRequest {
+  exonum.PublicKey to = 1;
+  uint64 height = 2;
+  uint32 round = 3;
+  exonum.Hash propose_hash = 4;
+  exonum.BitVec validators = 5;
+}
+
+message PeersRequest { exonum.PublicKey to = 1; }
+
+message BlockRequest {
+  exonum.PublicKey to = 1;
+  uint64 height = 2;
+}

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use crate::crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
@@ -169,9 +169,10 @@ macro_rules! storage_key_for_ints {
     };
 }
 
-storage_key_for_ints!{u16, i16, 2, read_u16, write_u16}
-storage_key_for_ints!{u32, i32, 4, read_u32, write_u32}
-storage_key_for_ints!{u64, i64, 8, read_u64, write_u64}
+storage_key_for_ints! {u16, i16, 2, read_u16, write_u16}
+storage_key_for_ints! {u32, i32, 4, read_u32, write_u32}
+storage_key_for_ints! {u64, i64, 8, read_u64, write_u64}
+storage_key_for_ints! {u128, i128, 16, read_u128, write_u128}
 
 macro_rules! storage_key_for_crypto_types {
     ($type:ident, $size:expr) => {
@@ -191,9 +192,9 @@ macro_rules! storage_key_for_crypto_types {
     };
 }
 
-storage_key_for_crypto_types!{Hash, HASH_SIZE}
-storage_key_for_crypto_types!{PublicKey, PUBLIC_KEY_LENGTH}
-storage_key_for_crypto_types!{Signature, SIGNATURE_LENGTH}
+storage_key_for_crypto_types! {Hash, HASH_SIZE}
+storage_key_for_crypto_types! {PublicKey, PUBLIC_KEY_LENGTH}
+storage_key_for_crypto_types! {Signature, SIGNATURE_LENGTH}
 
 impl StorageKey for Vec<u8> {
     fn size(&self) -> usize {
@@ -312,7 +313,9 @@ mod tests {
     use std::{fmt::Debug, str::FromStr};
 
     use chrono::{Duration, TimeZone};
-    use encoding::serialize::FromHex;
+    use hex::FromHex;
+
+    use crate::storage::{Database, MapIndex, MemoryDB};
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -379,19 +382,19 @@ mod tests {
         };
     }
 
-    test_storage_key_for_int_type!{full  u8, 1 => test_storage_key_for_u8}
-    test_storage_key_for_int_type!{full  i8, 1 => test_storage_key_for_i8}
-    test_storage_key_for_int_type!{full u16, 2 => test_storage_key_for_u16}
-    test_storage_key_for_int_type!{full i16, 2 => test_storage_key_for_i16}
-    test_storage_key_for_int_type!{fuzz u32, 4 => test_storage_key_for_u32}
-    test_storage_key_for_int_type!{fuzz i32, 4 => test_storage_key_for_i32}
-    test_storage_key_for_int_type!{fuzz u64, 8 => test_storage_key_for_u64}
-    test_storage_key_for_int_type!{fuzz i64, 8 => test_storage_key_for_i64}
+    test_storage_key_for_int_type! {full  u8, 1 => test_storage_key_for_u8}
+    test_storage_key_for_int_type! {full  i8, 1 => test_storage_key_for_i8}
+    test_storage_key_for_int_type! {full u16, 2 => test_storage_key_for_u16}
+    test_storage_key_for_int_type! {full i16, 2 => test_storage_key_for_i16}
+    test_storage_key_for_int_type! {fuzz u32, 4 => test_storage_key_for_u32}
+    test_storage_key_for_int_type! {fuzz i32, 4 => test_storage_key_for_i32}
+    test_storage_key_for_int_type! {fuzz u64, 8 => test_storage_key_for_u64}
+    test_storage_key_for_int_type! {fuzz i64, 8 => test_storage_key_for_i64}
+    test_storage_key_for_int_type! {fuzz u128, 16 => test_storage_key_for_u128}
+    test_storage_key_for_int_type! {fuzz i128, 16 => test_storage_key_for_i128}
 
     #[test]
     fn signed_int_key_in_index() {
-        use storage::{Database, MapIndex, MemoryDB};
-
         let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let mut fork = db.fork();
         {
@@ -421,8 +424,6 @@ mod tests {
     // for signed integers.
     #[test]
     fn old_signed_int_key_in_index() {
-        use storage::{Database, MapIndex, MemoryDB};
-
         // Simple wrapper around a signed integer type with the `StorageKey` implementation,
         // which was used in Exonum <= 0.5.
         #[derive(Debug, PartialEq, Clone)]
@@ -516,8 +517,6 @@ mod tests {
 
     #[test]
     fn system_time_key_in_index() {
-        use storage::{Database, MapIndex, MemoryDB};
-
         let db: Box<dyn Database> = Box::new(MemoryDB::new());
         let x1 = Utc.timestamp(80, 0);
         let x2 = Utc.timestamp(10, 0);
@@ -594,7 +593,8 @@ mod tests {
     fn public_key_round_trip() {
         let hashes = [PublicKey::from_hex(
             "1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84",
-        ).unwrap()];
+        )
+        .unwrap()];
         assert_round_trip_eq(&hashes);
     }
 

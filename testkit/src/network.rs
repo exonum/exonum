@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use exonum::{
     blockchain::{ConsensusConfig, GenesisConfig, StoredConfiguration, ValidatorKeys},
@@ -84,7 +83,8 @@ impl TestNetwork {
                     us.change_role(Some(validator_id));
                 }
                 validator
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         self.validators = validators;
         self.us.clone_from(&us);
     }
@@ -307,7 +307,8 @@ impl TestNetworkConfiguration {
             .map(|(idx, mut node)| {
                 node.change_role(Some(ValidatorId(idx as u16)));
                 node
-            }).collect();
+            })
+            .collect();
         self.stored_configuration.validator_keys = self
             .validators
             .iter()

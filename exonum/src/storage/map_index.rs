@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -606,9 +606,11 @@ mod tests {
     }
 
     mod memorydb_tests {
-        use std::path::Path;
-        use storage::{Database, MemoryDB};
         use tempdir::TempDir;
+
+        use std::path::Path;
+
+        use crate::storage::{Database, MemoryDB};
 
         fn create_database(_: &Path) -> Box<dyn Database> {
             Box::new(MemoryDB::new())
@@ -632,12 +634,13 @@ mod tests {
     }
 
     mod rocksdb_tests {
-        use std::path::Path;
-        use storage::Database;
         use tempdir::TempDir;
 
+        use std::path::Path;
+
+        use crate::storage::{Database, DbOptions, RocksDB};
+
         fn create_database(path: &Path) -> Box<dyn Database> {
-            use storage::{DbOptions, RocksDB};
             let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }

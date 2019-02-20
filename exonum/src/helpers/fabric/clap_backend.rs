@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,8 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-use clap;
 
 use std::{collections::HashMap, ffi::OsString};
 
@@ -95,11 +93,14 @@ impl ClapBackend {
                         if let Some(short) = detail.short_name {
                             clap_arg = clap_arg.short(short);
                         }
-                        clap_arg.multiple(detail.multiple).takes_value(true)
+                        clap_arg
+                            .multiple(detail.multiple)
+                            .takes_value(arg.takes_value)
                     }
                 };
                 clap_arg.help(arg.help).required(arg.required)
-            }).collect();
+            })
+            .collect();
 
         let mut subcommand = clap::SubCommand::with_name(command.name()).about(command.about());
 

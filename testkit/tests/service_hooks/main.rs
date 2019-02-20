@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,20 +13,18 @@
 // limitations under the License.
 
 #[macro_use]
-extern crate exonum;
-extern crate exonum_testkit;
-extern crate serde;
-extern crate serde_json;
-#[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate exonum_derive;
 
 // HACK: Silent "dead_code" warning.
-pub use hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
+pub use crate::hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
 
 use exonum::{blockchain::TransactionSet, helpers::Height, messages::Message};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
+mod proto;
 
 #[test]
 fn test_after_commit() {

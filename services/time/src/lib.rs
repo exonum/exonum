@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,18 +26,17 @@
     bare_trait_objects
 )]
 
-extern crate chrono;
-#[macro_use]
-extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
+#[macro_use]
+extern crate exonum_derive;
 
 /// Node API.
 pub mod api;
+/// Protobuf generated structs.
+pub mod proto;
 /// Database schema.
 pub mod schema;
 /// System time provider.
@@ -49,15 +48,17 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::{self, serialize::json::reexport::Value},
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
     storage::{Fork, Snapshot},
 };
-use schema::TimeSchema;
+use serde_json::Value;
 
-use time_provider::{SystemTimeProvider, TimeProvider};
-use transactions::*;
+use crate::{
+    schema::TimeSchema,
+    time_provider::{SystemTimeProvider, TimeProvider},
+    transactions::*,
+};
 
 /// Time service id.
 pub const SERVICE_ID: u16 = 4;
@@ -107,7 +108,7 @@ impl Service for TimeService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 

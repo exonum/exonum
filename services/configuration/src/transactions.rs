@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
 
 //! Transaction definitions for the configuration service.
 
-extern crate serde_json;
-
 use exonum::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
@@ -26,68 +24,82 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
-use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
-use SERVICE_ID;
-use SERVICE_NAME;
+use crate::{
+    config::ConfigurationServiceConfig,
+    errors::Error as ServiceError,
+    proto,
+    schema::{MaybeVote, ProposeData, Schema, VotingDecision},
+    SERVICE_ID, SERVICE_NAME,
+};
 
-transactions! {
-    /// Configuration Service transactions.
-    pub ConfigurationTransactions {
-        /// Propose a new configuration.
-        ///
-        /// # Notes
-        ///
-        /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
-        /// method.
-        ///
-        /// [`ErrorCode`]: enum.ErrorCode.html
-        struct Propose {
-            /// Configuration in JSON format.
-            ///
-            /// Should be convertible into `StoredConfiguration`.
-            cfg: &str,
-        }
+/// Propose a new configuration.
+///
+/// # Notes
+///
+/// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
+/// method.
+///
+/// [`ErrorCode`]: enum.ErrorCode.html
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::Propose")]
+pub struct Propose {
+    /// Configuration in JSON format.
+    ///
+    /// Should be convertible into `StoredConfiguration`.
+    pub cfg: String,
+}
 
-        /// Vote for the new configuration.
-        ///
-        /// # Notes
-        ///
-        /// The stored version of the transaction has a special variant corresponding to absence
-        /// of a vote. See [`MaybeVote`] for details.
-        ///
-        /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
-        /// method.
-        ///
-        /// [`MaybeVote`]: struct.MaybeVote.html
-        /// [`ErrorCode`]: enum.ErrorCode.html
-        struct Vote {
-            /// Hash of the configuration that this vote is for.
-            ///
-            /// See [crate docs](index.html) for more details on how the hash is calculated.
-            cfg_hash: &Hash,
-        }
+/// Vote for the new configuration.
+///
+/// # Notes
+///
+/// The stored version of the transaction has a special variant corresponding to absence
+/// of a vote. See [`MaybeVote`] for details.
+///
+/// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
+/// method.
+///
+/// [`MaybeVote`]: struct.MaybeVote.html
+/// [`ErrorCode`]: enum.ErrorCode.html
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::Vote")]
+pub struct Vote {
+    /// Hash of the configuration that this vote is for.
+    ///
+    /// See [crate docs](index.html) for more details on how the hash is calculated.
+    pub cfg_hash: Hash,
+}
 
-        /// VoteAgainst for the new configuration.
-        ///
-        /// # Notes
-        ///
-        /// The stored version of the transaction has a special variant corresponding to absence
-        /// of a vote. See [`MaybeVote`] for details.
-        ///
-        /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
-        /// method.
-        ///
-        /// [`MaybeVote`]: struct.MaybeVote.html
-        /// [`ErrorCode`]: enum.ErrorCode.html
-        struct VoteAgainst {
-            /// Hash of the configuration that this vote is for.
-            ///
-            /// See [crate docs](index.html) for more details on how the hash is calculated.
-            cfg_hash: &Hash,
-        }
-    }
+/// VoteAgainst for the new configuration.
+///
+/// # Notes
+///
+/// The stored version of the transaction has a special variant corresponding to absence
+/// of a vote. See [`MaybeVote`] for details.
+///
+/// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
+/// method.
+///
+/// [`MaybeVote`]: struct.MaybeVote.html
+/// [`ErrorCode`]: enum.ErrorCode.html
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::VoteAgainst")]
+pub struct VoteAgainst {
+    /// Hash of the configuration that this vote is for.
+    ///
+    /// See [crate docs](index.html) for more details on how the hash is calculated.
+    pub cfg_hash: Hash,
+}
+
+/// Configuration Service transactions.
+#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+pub enum ConfigurationTransactions {
+    /// Propose transaction.
+    Propose(Propose),
+    /// Vote transaction.
+    Vote(Vote),
+    /// VoteAgainst transaction.
+    VoteAgainst(VoteAgainst),
 }
 
 impl ConfigurationTransactions {
@@ -102,22 +114,29 @@ impl ConfigurationTransactions {
 
 impl VoteAgainst {
     /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(VoteAgainst::new(cfg_hash), SERVICE_ID, *author, key)
+    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
     }
 }
 
 impl Vote {
     /// Create `Signed` for `Vote` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(Vote::new(cfg_hash), SERVICE_ID, *author, key)
+    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+        Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
     }
 }
 
 impl Propose {
     /// Create `Signed` for `Propose` transaction, signed by provided keys.
     pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(Propose::new(cfg), SERVICE_ID, *author, key)
+        Message::sign_transaction(
+            Self {
+                cfg: cfg.to_owned(),
+            },
+            SERVICE_ID,
+            *author,
+            key,
+        )
     }
 }
 
@@ -182,10 +201,10 @@ impl Propose {
         }
 
         let config_candidate =
-            StoredConfiguration::try_deserialize(self.cfg().as_bytes()).map_err(InvalidConfig)?;
+            StoredConfiguration::try_deserialize(self.cfg.as_bytes()).map_err(InvalidConfig)?;
         self.check_config_candidate(&config_candidate, snapshot)?;
 
-        let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
+        let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into());
         let cfg_hash = CryptoHash::hash(&cfg);
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             return Err(AlreadyProposed(old_propose));
@@ -331,7 +350,7 @@ impl VotingContext {
             return Err(UnknownSender);
         }
 
-        let parsed = StoredConfiguration::try_deserialize(propose.cfg().as_bytes()).unwrap();
+        let parsed = StoredConfiguration::try_deserialize(propose.cfg.as_bytes()).unwrap();
         propose.check_config_candidate(&parsed, snapshot)?;
         Ok(parsed)
     }
@@ -345,9 +364,9 @@ impl VotingContext {
             .get(&self.cfg_hash)
             .unwrap();
 
-        let propose = propose_data.tx_propose();
+        let propose = propose_data.tx_propose.clone();
         let prev_cfg_hash =
-            StoredConfiguration::from_bytes(propose.cfg().as_bytes().into()).previous_cfg_hash;
+            StoredConfiguration::from_bytes(propose.cfg.as_bytes().into()).previous_cfg_hash;
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
             .get(&prev_cfg_hash)
@@ -367,9 +386,9 @@ impl VotingContext {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
             votes.set(validator_id as u64, self.decision.into());
             ProposeData::new(
-                propose_data.tx_propose(),
+                propose_data.tx_propose,
                 &votes.merkle_root(),
-                propose_data.num_validators(),
+                propose_data.num_validators,
             )
         };
 
@@ -386,7 +405,7 @@ impl Transaction for Vote {
         let fork = context.fork();
         let decision = VotingDecision::Yea(tx_hash);
 
-        let vote = VotingContext::new(decision, author, *self.cfg_hash());
+        let vote = VotingContext::new(decision, author, self.cfg_hash);
         let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote {:?}: {}", self, err);
             err
@@ -398,7 +417,7 @@ impl Transaction for Vote {
             self
         );
 
-        if enough_votes_to_commit(fork.as_ref(), self.cfg_hash()) {
+        if enough_votes_to_commit(fork.as_ref(), &self.cfg_hash) {
             CoreSchema::new(fork).commit_configuration(parsed_config);
         }
         Ok(())
@@ -412,7 +431,7 @@ impl Transaction for VoteAgainst {
         let fork = context.fork();
         let decision = VotingDecision::Nay(tx_hash);
 
-        let vote_against = VotingContext::new(decision, author, *self.cfg_hash());
+        let vote_against = VotingContext::new(decision, author, self.cfg_hash);
         vote_against.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote against {:?}: {}", self, err);
             err
@@ -433,11 +452,13 @@ mod tests {
     use exonum_testkit::{TestKit, TestKitBuilder};
 
     use super::{Hash, VotingContext};
-    use config::ConfigurationServiceConfig;
-    use errors::Error as ServiceError;
-    use schema::VotingDecision;
-    use tests::{new_tx_config_vote, new_tx_config_vote_against};
-    use Service as ConfigurationService;
+    use crate::{
+        config::ConfigurationServiceConfig,
+        errors::Error as ServiceError,
+        schema::VotingDecision,
+        tests::{new_tx_config_vote, new_tx_config_vote_against},
+        Service as ConfigurationService,
+    };
 
     #[test]
     fn test_vote_without_propose() {
@@ -445,7 +466,8 @@ mod tests {
             .with_validators(4)
             .with_service(ConfigurationService {
                 config: ConfigurationServiceConfig::default(),
-            }).create();
+            })
+            .create();
 
         let hash = Hash::default();
 

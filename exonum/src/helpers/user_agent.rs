@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,8 +13,6 @@
 // limitations under the License.
 
 //! Information about current node including Exonum, Rust and OS versions.
-
-use os_info;
 
 static USER_AGENT: &str = include_str!(concat!(env!("OUT_DIR"), "/user_agent"));
 

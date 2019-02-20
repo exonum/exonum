@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -155,30 +155,39 @@ mod tests {
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
     use exonum::crypto::{gen_keypair, Hash};
-    use exonum::encoding::Error as EncodingError;
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction, Signed};
     use exonum::storage::Snapshot;
 
-    use super::*;
-    use {TestKitApi, TestKitBuilder};
+    use super::{super::proto, *};
+    use crate::{TestKitApi, TestKitBuilder};
 
     type DeBlock = BlockWithTransactions;
     const TIMESTAMP_SERVICE_ID: u16 = 0;
-    transactions! {
-        Any {
 
-            struct TxTimestamp {
-                msg: &str,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::examples::TxTimestamp")]
+    struct TxTimestamp {
+        message: String,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    enum Any {
+        TxTimestamp(TxTimestamp),
     }
 
     impl TxTimestamp {
         fn for_str(s: &str) -> Signed<RawTransaction> {
             let (pubkey, key) = gen_keypair();
-            Message::sign_transaction(TxTimestamp::new(s), TIMESTAMP_SERVICE_ID, pubkey, &key)
+            Message::sign_transaction(
+                Self {
+                    message: s.to_owned(),
+                },
+                TIMESTAMP_SERVICE_ID,
+                pubkey,
+                &key,
+            )
         }
     }
 
@@ -209,7 +218,7 @@ mod tests {
             fn tx_from_raw(
                 &self,
                 raw: RawTransaction,
-            ) -> Result<Box<dyn Transaction>, EncodingError> {
+            ) -> Result<Box<dyn Transaction>, failure::Error> {
                 use exonum::blockchain::TransactionSet;
 
                 Any::tx_from_raw(raw).map(Any::into)

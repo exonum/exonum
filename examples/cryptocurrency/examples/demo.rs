@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate exonum_cryptocurrency as cryptocurrency;
-
-use exonum::blockchain::{GenesisConfig, ValidatorKeys};
-use exonum::node::{Node, NodeApiConfig, NodeConfig};
-use exonum::storage::MemoryDB;
-
-use cryptocurrency::service::CurrencyService;
+use exonum::{
+    blockchain::{GenesisConfig, ValidatorKeys},
+    node::{Node, NodeApiConfig, NodeConfig},
+    storage::MemoryDB,
+};
+use exonum_cryptocurrency::service::CurrencyService;
 
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();

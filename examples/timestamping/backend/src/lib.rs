@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,20 +23,17 @@
     bare_trait_objects
 )]
 
-extern crate chrono;
 #[macro_use]
-extern crate exonum;
-extern crate exonum_time;
+extern crate exonum_derive;
 #[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 
 pub mod api;
+pub mod proto;
 pub mod schema;
 pub mod transactions;
 
@@ -44,15 +41,12 @@ use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    encoding::Error as StreamStructError,
     helpers::fabric,
     messages::RawTransaction,
     storage::Snapshot,
 };
 
-use api::PublicApi;
-use schema::Schema;
-use transactions::TimeTransactions;
+use crate::{api::PublicApi, schema::Schema, transactions::TimeTransactions};
 
 const TIMESTAMPING_SERVICE: u16 = 130;
 const SERVICE_NAME: &str = "timestamping";
@@ -75,7 +69,7 @@ impl blockchain::Service for Service {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, StreamStructError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimeTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

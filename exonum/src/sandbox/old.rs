@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,9 +18,9 @@ use super::{
     sandbox::timestamping_sandbox,
     sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
 };
-use blockchain::Block;
-use crypto::{CryptoHash, Hash};
-use helpers::{Height, Round, ValidatorId};
+use crate::blockchain::Block;
+use crate::crypto::{CryptoHash, Hash};
+use crate::helpers::{Height, Round, ValidatorId};
 
 #[test]
 fn test_send_propose_and_prevote() {

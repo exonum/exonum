@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -92,7 +92,8 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
                 &s,
             );
             msg.into_bytes()
-        }).collect()
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -183,7 +184,8 @@ impl MessageVerifier {
                 messages
                     .into_iter()
                     .map(|message| InternalRequest::VerifyMessage(message)),
-            )).map(drop)
+            ))
+            .map(drop)
             .map_err(drop)
             .and_then(|()| finish_signal.map_err(drop))
     }
@@ -201,11 +203,14 @@ impl MessageVerifier {
 
 fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
-    b.iter(|| {
-        for message in messages.clone() {
-            let _ = Message::from_raw_buffer(message).unwrap();
-        }
-    })
+    b.iter_with_setup(
+        || messages.clone(),
+        |messages| {
+            for message in messages {
+                let _ = Message::from_raw_buffer(message).unwrap();
+            }
+        },
+    )
 }
 
 fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
@@ -214,9 +219,12 @@ fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
     let verifier = MessageVerifier::new();
     let mut core = Core::new().unwrap();
 
-    b.iter(|| {
-        core.run(verifier.send_all(messages.clone())).unwrap();
-    });
+    b.iter_with_setup(
+        || messages.clone(),
+        |messages| {
+            core.run(verifier.send_all(messages)).unwrap();
+        },
+    );
     verifier.join();
 }
 

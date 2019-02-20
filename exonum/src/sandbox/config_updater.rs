@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use blockchain::{
+pub use crate::proto::schema::tests::TxConfig;
+
+use crate::blockchain::{
     ExecutionResult, Schema, Service, StoredConfiguration, Transaction, TransactionContext,
     TransactionSet,
 };
-use crypto::{Hash, PublicKey, SecretKey};
-use encoding::Error as MessageError;
-use helpers::Height;
-use messages::{Message, RawTransaction, Signed};
-use storage::Snapshot;
+use crate::crypto::{Hash, PublicKey, SecretKey};
+use crate::helpers::Height;
+use crate::messages::{Message, RawTransaction, Signed};
+use crate::proto::ProtobufConvert;
+use crate::storage::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
 
-transactions! {
-    ConfigUpdaterTransactions {
-
-        struct TxConfig {
-            from: &PublicKey,
-            config: &[u8],
-            actual_from: Height,
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+#[exonum(crate = "crate")]
+enum ConfigUpdaterTransactions {
+    TxConfig(TxConfig),
 }
 
 impl TxConfig {
@@ -42,12 +39,12 @@ impl TxConfig {
         actual_from: Height,
         signer: &SecretKey,
     ) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            TxConfig::new(from, config, actual_from),
-            CONFIG_SERVICE,
-            *from,
-            signer,
-        )
+        let mut msg = TxConfig::new();
+        msg.set_from(from.to_pb());
+        msg.set_config(config.to_vec());
+        msg.set_actual_from(actual_from.0);
+
+        Message::sign_transaction(msg, CONFIG_SERVICE, *from, signer)
     }
 }
 #[derive(Default)]
@@ -62,7 +59,8 @@ impl ConfigUpdateService {
 impl Transaction for TxConfig {
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let mut schema = Schema::new(tc.fork());
-        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
+        schema
+            .commit_configuration(StoredConfiguration::try_deserialize(self.get_config()).unwrap());
         Ok(())
     }
 }
@@ -80,7 +78,7 @@ impl Service for ConfigUpdateService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

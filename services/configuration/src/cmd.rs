@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use toml::Value;
 
 use exonum::{
@@ -25,8 +24,7 @@ use exonum::{
 
 use std::collections::BTreeMap;
 
-use config::ConfigurationServiceConfig;
-use errors::Error as ServiceError;
+use crate::{config::ConfigurationServiceConfig, errors::Error as ServiceError};
 
 pub struct GenerateCommonConfig;
 
@@ -65,7 +63,8 @@ impl CommandExtension for GenerateCommonConfig {
                 vec![(
                     "majority_count".to_owned(),
                     Value::try_from(majority_count).unwrap(),
-                )].into_iter(),
+                )]
+                .into_iter(),
             );
         };
 
@@ -82,7 +81,7 @@ impl CommandExtension for Finalize {
     }
 
     fn execute(&self, mut context: Context) -> Result<Context, failure::Error> {
-        let mut node_config: NodeConfig = context.get(keys::NODE_CONFIG).unwrap();
+        let mut node_config = context.get(keys::NODE_CONFIG).unwrap();
         let common_config = context.get(keys::COMMON_CONFIG).unwrap();
 
         // Local config section
@@ -211,5 +210,6 @@ pub fn generate_testnet_config(
             services_configs: service_config.clone(),
             database: Default::default(),
             thread_pool_size: Default::default(),
-        }).collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
 }

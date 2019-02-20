@@ -3,7 +3,8 @@
 **Status:**
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.com/exonum/exonum)
 [![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum/master.svg?label=MacOS)](https://circleci.com/gh/exonum/exonum/tree/master)
-[![Appveyor Build Status](https://img.shields.io/appveyor/ci/exonum-org/exonum/master.svg?label=Windows)](https://ci.appveyor.com/project/exonum-org/exonum)
+[![Appveyor Build Status](https://ci.appveyor.com/api/projects/status/6i9x2msmgwieqs8f/branch/master?svg=true)](https://ci.appveyor.com/project/aleksuss/exonum/branch/master)
+
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
 [![codecov](https://codecov.io/gh/exonum/exonum/branch/master/graph/badge.svg)](https://codecov.io/gh/exonum/exonum)
 
@@ -11,7 +12,7 @@
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](LICENSE.md)
 [![LoC](https://tokei.rs/b1/github/exonum/exonum)](https://github.com/exonum/exonum)
-![rust 1.27.2+ required](https://img.shields.io/badge/rust-1.27.2+-blue.svg?label=Required%20Rust)
+![rust 1.31.1+ required](https://img.shields.io/badge/rust-1.31.1+-blue.svg?label=Required%20Rust)
 
 **Community:**
 [![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)

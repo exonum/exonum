@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -129,12 +129,14 @@ impl PublicApi {
                 });
 
                 (cfg_hash, propose_data)
-            }).filter(|&(_, ref propose_data)| {
+            })
+            .filter(|&(_, ref propose_data)| {
                 let cfg = <StoredConfiguration as StorageValue>::from_bytes(
-                    propose_data.tx_propose().cfg().as_bytes().into(),
+                    propose_data.tx_propose.cfg.as_bytes().into(),
                 );
                 filter.matches(&cfg)
-            }).map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
+            })
+            .map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
             .collect();
         proposes
     }
@@ -155,7 +157,8 @@ impl PublicApi {
                         config_hash
                     )
                 })
-            }).filter(|config| filter.matches(config))
+            })
+            .filter(|config| filter.matches(config))
             .map(|config| Self::config_with_proofs(state, config))
             .collect();
         committed_configs

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{self, Rng};
+use rand::Rng;
 
 use super::{NodeHandler, NodeRole, RequestData};
-use crypto::PublicKey;
-use events::error::LogError;
-use events::network::ConnectedPeerAddr;
-use helpers::Height;
-use messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
+use crate::crypto::PublicKey;
+use crate::events::error::LogError;
+use crate::events::network::ConnectedPeerAddr;
+use crate::helpers::Height;
+use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Signed, Status};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -127,7 +127,7 @@ impl NodeHandler {
         }
         self.state.add_peer(public_key, message.clone());
         info!(
-            "Received Connect message from {}, {}",
+            "Received Connect message from {}. Need to connect: {}",
             address, need_connect,
         );
         self.blockchain.save_peer(&public_key, message);
@@ -208,10 +208,9 @@ impl NodeHandler {
                 .state
                 .peers()
                 .iter()
-                .map(|x| x.1.clone())
                 .nth(gen_peer_id())
+                .map(|x| x.1.clone())
                 .unwrap();
-            let peer = peer.clone();
             let msg = PeersRequest::new(&peer.author());
             trace!("Request peers from peer with addr {:?}", peer.pub_addr());
             let message = self.sign_message(msg);

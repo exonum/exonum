@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,15 +13,13 @@
 // limitations under the License.
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng, RngCore};
+use serde::Serialize;
+use serde_json::{from_str, to_string};
 
 use self::ListProof::*;
 use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
-use crypto::{hash, CryptoHash, Hash};
-use encoding::serialize::{
-    json::reexport::{from_str, to_string},
-    reexport::Serialize,
-};
-use storage::Database;
+use crate::crypto::{hash, CryptoHash, Hash};
+use crate::storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -546,7 +544,7 @@ fn same_merkle_root(db1: Box<dyn Database>, db2: Box<dyn Database>) {
 }
 
 #[derive(Serialize)]
-struct ProofInfo<'a, V: Serialize + 'a> {
+struct ProofInfo<'a, V: Serialize> {
     merkle_root: Hash,
     list_length: u64,
     proof: &'a ListProof<V>,
@@ -555,9 +553,11 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 }
 
 mod memorydb_tests {
-    use std::path::Path;
-    use storage::{Database, MemoryDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::storage::{Database, MemoryDB};
 
     fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
@@ -667,9 +667,11 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
-    use std::path::Path;
-    use storage::{Database, DbOptions, RocksDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::storage::{Database, DbOptions, RocksDB};
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
@@ -780,8 +782,8 @@ mod rocksdb_tests {
 }
 
 mod root_hash_tests {
-    use crypto::{self, Hash};
-    use storage::{Database, MemoryDB, ProofListIndex};
+    use crate::crypto::{self, Hash};
+    use crate::storage::{Database, MemoryDB, ProofListIndex};
 
     /// Cross-verify `root_hash()` with `ProofListIndex` against expected root hash value.
     fn assert_root_hash_correct(hashes: &[Hash]) {

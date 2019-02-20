@@ -1,0 +1,57 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.examples.cryptocurrency_advanced;
+
+import "helpers.proto";
+
+/// Transfer `amount` of the currency from one wallet to another.
+message Transfer {
+  // `PublicKey` of receiver's wallet.
+  exonum.PublicKey to = 1;
+  // Amount of currency to transfer.
+  uint64 amount = 2;
+  // Auxiliary number to guarantee non-idempotence of transactions.
+  uint64 seed = 3;
+}
+
+// Issue `amount` of the currency to the `wallet`.
+message Issue {
+  // Issued amount of currency.
+  uint64 amount = 1;
+  // Auxiliary number to guarantee non-idempotence of transactions.
+  uint64 seed = 2;
+}
+
+// Create wallet with the given `name`.
+message CreateWallet {
+  // Name of the new wallet.
+  string name = 1;
+}
+
+// Wallet information stored in the database.
+message Wallet {
+  // `PublicKey` of the wallet.
+  exonum.PublicKey pub_key = 1;
+  // Name of the wallet.
+  string name = 2;
+  // Current balance of the wallet.
+  uint64 balance = 3;
+  // Length of the transactions history.
+  uint64 history_len = 4;
+  // `Hash` of the transactions history.
+  exonum.Hash history_hash = 5;
+}

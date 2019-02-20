@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,9 +31,9 @@ use futures::{
 
 use std::{cmp::Ordering, time::SystemTime};
 
-use helpers::{Height, Round};
-use messages::Message;
-use node::{ExternalMessage, NodeTimeout};
+use crate::helpers::{Height, Round};
+use crate::messages::Message;
+use crate::node::{ExternalMessage, NodeTimeout};
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
@@ -53,7 +53,8 @@ pub enum InternalEvent {
     /// Shutdown the node.
     Shutdown,
     /// Message has been successfully verified.
-    MessageVerified(Message),
+    /// Message is boxed here so that enum variants have similar size.
+    MessageVerified(Box<Message>),
 }
 
 #[derive(Debug)]

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,18 +14,16 @@
 
 #![allow(dead_code, unsafe_code)]
 
-use chrono::{DateTime, TimeZone, Utc};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use serde_json;
 
-use blockchain::{
+use crate::blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
-use crypto::{gen_keypair, Hash};
-use encoding::Error as MessageError;
-use helpers::{Height, ValidatorId};
-use messages::{Message, RawTransaction};
-use storage::{Database, Error, Fork, ListIndex, Snapshot};
+use crate::crypto::{gen_keypair, Hash};
+use crate::helpers::{Height, ValidatorId};
+use crate::messages::{Message, RawTransaction};
+use crate::proto;
+use crate::storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -45,122 +43,39 @@ impl Service for TestService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         Ok(TestServiceTxs::tx_from_raw(raw)?.into())
     }
 }
 
-transactions! {
-    TestServiceTxs {
-        struct Tx {
-            value: u64,
-        }
+#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
+#[exonum(pb = "proto::schema::tests::TestServiceTx", crate = "crate")]
+struct Tx {
+    value: u64,
+}
+
+impl Tx {
+    fn new(value: u64) -> Self {
+        Self { value }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, TransactionSet, Debug)]
+#[exonum(crate = "crate")]
+enum TestServiceTxs {
+    Tx(Tx),
 }
 
 impl Transaction for Tx {
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
-        if self.value() == 42 {
+        if self.value == 42 {
             panic!(Error::new("42"))
         }
         let mut index = ListIndex::new(IDX_NAME, tc.fork());
-        index.push(self.value());
-        index.push(42 / self.value());
+        index.push(self.value);
+        index.push(42 / self.value);
         Ok(())
     }
-}
-
-#[test]
-fn encode_decode() {
-    encoding_struct! {
-        struct Parent {
-            child: Child,
-        }
-    }
-
-    encoding_struct! {
-        struct Child {
-            child: &Hash,
-        }
-    }
-    let content = Child::new(&Hash::zero());
-    let par = Parent::new(content);
-    let par_json = serde_json::to_value(par.clone()).unwrap();
-    assert_eq!(serde_json::from_value::<Parent>(par_json).unwrap(), par);
-}
-
-#[test]
-fn u64_json_serialization() {
-    encoding_struct! {
-        struct Test {
-            some_test: u64,
-        }
-    }
-    let test_data = r##"{"some_test":"1234"}"##;
-    let test = Test::new(1234);
-    let data = serde_json::to_string(&test).unwrap();
-    assert_eq!(data, test_data);
-}
-
-#[test]
-fn date_time_json_serialization() {
-    encoding_struct! {
-        struct Test {
-            some_test: DateTime<Utc>,
-        }
-    }
-
-    let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
-
-    let test = Test::new(Utc.timestamp(0, 0));
-    let data = serde_json::to_string(&test).unwrap();
-    assert_eq!(data, test_data);
-}
-
-use encoding::Field;
-
-encoding_struct! {
-    struct StructWithTwoSegments {
-        first: &[u8],
-        second: &[u8],
-    }
-}
-
-#[test]
-fn correct_encoding_struct() {
-    let dat: Vec<u8> = vec![
-        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2,
-    ];
-    let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
-    let mut buffer = vec![0; 8];
-    test.write(&mut buffer, 0, 8);
-    assert_eq!(buffer, dat);
-    <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into(), 8.into()).unwrap();
-    let struct_ = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
-    assert_eq!(struct_.first(), &[1u8]);
-    assert_eq!(struct_.second(), &[2u8]);
-}
-
-#[test]
-#[should_panic(expected = "OverlappingSegment")]
-fn overlap_segments() {
-    let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 1, 2];
-    let mut buffer = vec![0; 8];
-    test.write(&mut buffer, 0, 8);
-    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "SpaceBetweenSegments")]
-fn segments_has_spaces_between() {
-    let test = vec![
-        16u8, 0, 0, 0, 1, 0, 0, 0, 18, 0, 0, 0, 1, 0, 0, 0, // <-- link after space
-        1, 0, // <-- this is space one
-        2,
-    ];
-    let mut buffer = vec![0; 8];
-    test.write(&mut buffer, 0, 8);
-    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
 
 fn gen_tempdir_name() -> String {
@@ -248,26 +163,51 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 
 mod transactions_tests {
     use super::TEST_SERVICE_ID;
-    use blockchain::{ExecutionResult, Transaction, TransactionContext};
-    use crypto::gen_keypair;
-    use messages::Message;
-    use serde_json;
+    use crate::blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
+    use crate::crypto::gen_keypair;
+    use crate::messages::Message;
+    use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
 
-    transactions! {
-        MyTransactions {
-            struct A {
-                a: u32
-            }
-
-            struct B {
-                b: u32,
-                c: u8
-            }
-
-            struct C {
-                a: u32
-            }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
+    struct A {
+        a: u64,
+    }
+    impl A {
+        fn new(a: u64) -> Self {
+            Self { a }
         }
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "BlockchainTestTxB", crate = "crate")]
+    struct B {
+        b: u64,
+        c: u32,
+    }
+    impl B {
+        fn new(b: u64, c: u32) -> Self {
+            Self { b, c }
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
+    struct C {
+        a: u64,
+    }
+    impl C {
+        fn new(a: u64) -> Self {
+            Self { a }
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
+    enum MyTransactions {
+        A(A),
+        B(B),
+        C(C),
     }
 
     impl Transaction for A {
@@ -309,8 +249,6 @@ mod transactions_tests {
 
     #[test]
     fn deserialize_from_raw() {
-        use blockchain::TransactionSet;
-
         fn round_trip<T: Into<MyTransactions>>(t: T) {
             let (pk, sec_key) = gen_keypair();
             use std::ops::Deref;
@@ -346,7 +284,7 @@ impl Service for ServiceGood {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -371,7 +309,7 @@ impl Service for ServicePanic {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -395,7 +333,7 @@ impl Service for ServicePanicStorageError {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -422,11 +360,12 @@ fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<dyn Databa
 }
 
 mod memorydb_tests {
-    use blockchain::{Blockchain, Service};
-    use crypto::gen_keypair;
     use futures::sync::mpsc;
-    use node::ApiSender;
-    use storage::{Database, MemoryDB};
+
+    use crate::blockchain::{Blockchain, Service};
+    use crate::crypto::gen_keypair;
+    use crate::node::ApiSender;
+    use crate::storage::{Database, MemoryDB};
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 
@@ -495,13 +434,15 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
-    use blockchain::{Blockchain, Service};
-    use crypto::gen_keypair;
     use futures::sync::mpsc;
-    use node::ApiSender;
-    use std::path::Path;
-    use storage::{Database, DbOptions, RocksDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::blockchain::{Blockchain, Service};
+    use crate::crypto::gen_keypair;
+    use crate::node::ApiSender;
+    use crate::storage::{Database, DbOptions, RocksDB};
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 

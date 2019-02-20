@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,13 +19,13 @@ use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
 use super::timestamping::DATA_SIZE;
 use super::{sandbox::Sandbox, timestamping::TimestampingTxGenerator};
-use blockchain::Block;
-use crypto::{CryptoHash, Hash, HASH_SIZE};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{
+use crate::blockchain::Block;
+use crate::crypto::{CryptoHash, Hash, HASH_SIZE};
+use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
+use crate::messages::{
     Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed,
 };
-use storage::Database;
+use crate::storage::{Database, MemoryDB, ProofListIndex};
 
 pub type TimestampingSandbox = Sandbox;
 
@@ -202,8 +202,6 @@ pub fn empty_hash() -> Hash {
 }
 
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
-    use storage::{MemoryDB, ProofListIndex};
-
     let mut fork = MemoryDB::new().fork();
     let mut hashes = ProofListIndex::new("name", &mut fork);
     hashes.extend(txs.iter().cloned());

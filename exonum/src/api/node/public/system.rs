@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
 
 //! Public system API.
 
-use api::{ServiceApiScope, ServiceApiState};
-use blockchain::{Schema, SharedNodeState};
-use helpers::user_agent;
+use crate::api::{ServiceApiScope, ServiceApiState};
+use crate::blockchain::{Schema, SharedNodeState};
+use crate::helpers::user_agent;
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]

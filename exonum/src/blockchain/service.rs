@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,15 +26,14 @@ use std::{
 };
 
 use super::transaction::Transaction;
-use api::{websocket, ServiceApiBuilder};
-use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
-use crypto::{Hash, PublicKey, SecretKey};
-use encoding::Error as MessageError;
-use events::network::ConnectedPeerAddr;
-use helpers::{Height, Milliseconds, ValidatorId};
-use messages::{Message, RawTransaction, ServiceTransaction, Signed};
-use node::{ApiSender, ConnectInfo, NodeRole, State};
-use storage::{Fork, Snapshot};
+use crate::api::{websocket, ServiceApiBuilder};
+use crate::blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use crate::crypto::{Hash, PublicKey, SecretKey};
+use crate::events::network::ConnectedPeerAddr;
+use crate::helpers::{Height, Milliseconds, ValidatorId};
+use crate::messages::{Message, RawTransaction, ServiceTransaction, Signed};
+use crate::node::{ApiSender, ConnectInfo, NodeRole, State};
+use crate::storage::{Fork, Snapshot};
 
 /// A trait that describes the business logic of a certain service.
 ///
@@ -49,14 +48,15 @@ use storage::{Fork, Snapshot};
 /// The example below provides a bare-bones foundation for implementing a service.
 ///
 /// ```
-/// #[macro_use] extern crate exonum;
+/// # extern crate exonum;
+/// #[macro_use] extern crate exonum_derive;
 /// #[macro_use] extern crate serde_derive;
+/// # extern crate failure;
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
 /// # use exonum::messages::{Signed, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
-/// use exonum::encoding::Error as EncError;
 ///
 /// // Reused constants
 /// const SERVICE_ID: u16 = 8000;
@@ -82,17 +82,22 @@ use storage::{Fork, Snapshot};
 ///     // Additional read-write methods
 /// }
 ///
-/// // Transaction definitions
-/// transactions! {
-///     MyTransactions {
-///         struct TxA {
-///             // Transaction fields
-///         }
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::TxA")]
+/// struct TxA {
+///     // Transaction fields
+/// }
 ///
-///         struct TxB {
-///             // ...
-///         }
-///     }
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::TxB")]
+/// struct TxB {
+///     // ...
+/// }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+/// enum MyTransactions {
+///     TxA(TxA),
+///     TxB(TxB),
 /// }
 ///
 /// impl Transaction for TxA {
@@ -120,7 +125,7 @@ use storage::{Fork, Snapshot};
 ///         MyServiceSchema::new(snapshot).state_hash()
 ///     }
 ///
-///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
+///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
 ///         let tx = MyTransactions::tx_from_raw(raw)?;
 ///         Ok(tx.into())
 ///     }
@@ -167,9 +172,9 @@ pub trait Service: Send + Sync + 'static {
     /// these operations should be performed in the `Transaction::verify` and
     /// `Transaction::execute` methods.
     ///
-    /// `transactions!` macro generates code that allows simple implementation, see
+    /// `#[derive(TransactionSet)]` attribute generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError>;
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>;
 
     /// Invoked for all deployed services during the blockchain initialization
     /// on genesis block creation each time a node is started.
@@ -463,7 +468,8 @@ impl SharedNodeState {
                 lock.validators
                     .iter()
                     .any(|v| v.consensus_key == ci.public_key)
-            }).count();
+            })
+            .count();
 
         if lock.node_role.is_validator() {
             // Peers list doesn't include current node address, so we have to increment its length.

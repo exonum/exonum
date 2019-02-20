@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
-use super::SERVICE_ID;
-use schema::TimeSchema;
+use super::{proto, SERVICE_ID};
+use crate::schema::TimeSchema;
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
@@ -47,16 +47,26 @@ impl From<Error> for ExecutionError {
     }
 }
 
-transactions! {
-    /// Define TimeService transaction.
-    pub TimeTransactions {
+/// Transaction that is sent by the validator after the commit of the block.
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::TxTime")]
+pub struct TxTime {
+    /// Time of the validator.
+    pub time: DateTime<Utc>,
+}
 
-        /// Transaction that is sent by the validator after the commit of the block.
-        struct TxTime {
-            /// Time of the validator.
-            time: DateTime<Utc>,
-        }
+impl TxTime {
+    /// New TxTime transaction.
+    pub fn new(time: DateTime<Utc>) -> Self {
+        Self { time }
     }
+}
+
+/// Define TimeService transaction.
+#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+pub enum TimeTransactions {
+    /// TxTime transaction.
+    TxTime(TxTime),
 }
 
 impl TxTime {
@@ -87,10 +97,10 @@ impl TxTime {
         let mut schema = TimeSchema::new(fork);
         match schema.validators_times().get(author) {
             // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsGreater)?,
+            Some(time) if time >= self.time => Err(Error::ValidatorTimeIsGreater)?,
             // Write the time for the validator.
             _ => {
-                schema.validators_times_mut().put(author, self.time());
+                schema.validators_times_mut().put(author, self.time);
                 Ok(())
             }
         }
@@ -109,7 +119,8 @@ impl TxTime {
                     keys.iter()
                         .find(|validator| validator.service_key == public_key)
                         .map(|_| time)
-                }).collect::<Vec<_>>();
+                })
+                .collect::<Vec<_>>();
             // Ordering time from highest to lowest.
             times.sort_by(|a, b| b.cmp(a));
             times

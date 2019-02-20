@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,10 @@
 
 //! This module is used to collect structures that is shared into `CommandExtension` from `Command`.
 
-use toml;
+use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
 
-use std::{collections::BTreeMap, net::SocketAddr};
-
-use blockchain::config::{ConsensusConfig, ValidatorKeys};
-use crypto::{PublicKey, SecretKey};
+use crate::blockchain::config::{ConsensusConfig, ValidatorKeys};
+use crate::crypto::PublicKey;
 
 /// Abstract configuration.
 pub type AbstractConfig = BTreeMap<String, toml::Value>;
@@ -78,13 +76,20 @@ pub struct NodePrivateConfig {
     pub external_address: String,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
-    /// Consensus secret key.
-    pub consensus_secret_key: SecretKey,
+    /// Path to the consensus secret key file.
+    pub consensus_secret_key: PathBuf,
     /// Service public key.
     pub service_public_key: PublicKey,
-    /// Service secret key.
-    pub service_secret_key: SecretKey,
+    /// Path to the service secret key file.
+    pub service_secret_key: PathBuf,
     /// Additional service secret config.
     #[serde(default)]
     pub services_secret_configs: AbstractConfig,
+}
+
+/// Used for passing configuration for starting node from the command line that is not in the `NodeConfig`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeRunConfig {
+    pub consensus_pass_method: String,
+    pub service_pass_method: String,
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 use std::collections::BTreeMap;
 
-use crypto::PublicKey;
-use node::{ConnectInfo, ConnectListConfig};
+use crate::crypto::PublicKey;
+use crate::node::{ConnectInfo, ConnectListConfig};
 
 /// Network address of the peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,11 +82,12 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
-    use rand::{RngCore, SeedableRng, XorShiftRng};
+    use rand::{RngCore, SeedableRng};
+    use rand_xorshift::XorShiftRng;
 
     use super::*;
-    use crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
-    use node::ConnectInfo;
+    use crate::crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
+    use crate::node::ConnectInfo;
 
     static VALIDATORS: [[u8; 16]; 2] = [[1; 16], [2; 16]];
     static REGULAR_PEERS: [u8; 16] = [3; 16];
@@ -99,7 +100,8 @@ mod test {
                 let mut key = [0; PUBLIC_KEY_LENGTH];
                 rng.fill_bytes(&mut key);
                 PublicKey::from_slice(&key).unwrap()
-            }).collect()
+            })
+            .collect()
     }
 
     fn check_in_connect_list(

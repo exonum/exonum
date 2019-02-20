@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure;
 use futures::future::{done, Future};
 use tokio_codec::{Decoder, Framed};
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -20,17 +19,19 @@ use tokio_io::{AsyncRead, AsyncWrite};
 use std::net::SocketAddr;
 
 use super::wrapper::NoiseWrapper;
-use crypto::{
-    x25519::{self, into_x25519_keypair, into_x25519_public_key},
-    PublicKey, SecretKey,
+use crate::{
+    crypto::{
+        x25519::{self, into_x25519_keypair, into_x25519_public_key},
+        PublicKey, SecretKey,
+    },
+    events::{
+        codec::MessagesCodec,
+        noise::{Handshake, HandshakeRawMessage, HandshakeResult},
+    },
+    messages::{Connect, Signed},
+    node::state::SharedConnectList,
+    storage::StorageValue,
 };
-use events::{
-    codec::MessagesCodec,
-    noise::{Handshake, HandshakeRawMessage, HandshakeResult},
-};
-use messages::{Connect, Signed};
-use node::state::SharedConnectList;
-use storage::StorageValue;
 
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
@@ -166,7 +167,8 @@ impl Handshake for NoiseHandshake {
             .read_handshake_msg(stream)
             .and_then(|(stream, handshake, _)| {
                 handshake.write_handshake_msg(stream, &connect.into_bytes())
-            }).and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            })
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake, message)| handshake.finalize(stream, message))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
@@ -189,7 +191,8 @@ impl Handshake for NoiseHandshake {
                     handshake.write_handshake_msg(stream, &connect.into_bytes()),
                     Ok(message),
                 )
-            }).and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
+            })
+            .and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
             .map_err(move |e| {
                 e.context(format!("peer {} disconnected", peer_address))
                     .into()

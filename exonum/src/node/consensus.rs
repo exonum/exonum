@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,18 +14,17 @@
 
 use std::collections::HashSet;
 
-use blockchain::Schema;
-use crypto::{CryptoHash, Hash, PublicKey};
-use events::InternalRequest;
-use failure;
-use helpers::{Height, Round, ValidatorId};
-use messages::{
+use crate::blockchain::Schema;
+use crate::crypto::{CryptoHash, Hash, PublicKey};
+use crate::events::InternalRequest;
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{
     BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
     PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
     TransactionsRequest, TransactionsResponse,
 };
-use node::{NodeHandler, RequestData};
-use storage::Patch;
+use crate::node::{NodeHandler, RequestData};
+use crate::storage::Patch;
 
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
@@ -412,9 +411,8 @@ impl NodeHandler {
                 let raw_messages = self
                     .state
                     .prevotes(prevote_round, propose_hash)
-                    .into_iter()
-                    .map(|p| p.clone().into())
-                    .collect::<Vec<_>>();
+                    .iter()
+                    .map(|p| p.clone().into());
                 self.blockchain.save_messages(round, raw_messages);
 
                 self.state.lock(round, propose_hash);
@@ -600,10 +598,7 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(clippy::needless_pass_by_value)
-    )]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
@@ -737,7 +732,8 @@ impl NodeHandler {
                         &peer,
                         self.state.height(),
                         propose_hash,
-                    )).into(),
+                    ))
+                    .into(),
                 RequestData::ProposeTransactions(ref propose_hash) => {
                     let txs: Vec<_> = self
                         .state
@@ -767,7 +763,8 @@ impl NodeHandler {
                         round,
                         propose_hash,
                         self.state.known_prevotes(round, propose_hash),
-                    )).into(),
+                    ))
+                    .into(),
                 RequestData::Block(height) => {
                     self.sign_message(BlockRequest::new(&peer, height)).into()
                 }
@@ -828,7 +825,7 @@ impl NodeHandler {
             }
         };
 
-        if let Some(data) = requested_data.clone() {
+        if let Some(data) = requested_data {
             self.request(data, key);
             false
         } else {

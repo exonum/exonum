@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,17 +22,12 @@
 
 // cspell:ignore proptest
 
-extern crate exonum;
 #[macro_use]
 extern crate proptest;
 
 use exonum::storage::{
     proof_map_index::{ProofMapKey, ProofPath},
     Database, MapProof, MemoryDB, ProofMapIndex, Snapshot, StorageValue,
-};
-use prop::{
-    array,
-    collection::{btree_map, vec},
 };
 use proptest::{prelude::*, test_runner::Config};
 
@@ -42,11 +37,16 @@ use std::{
     ops::Range,
 };
 
+use crate::prop::{
+    array,
+    collection::{btree_map, vec},
+};
+
 const INDEX_NAME: &str = "index";
 
 fn check_map_proof<T, K, V>(proof: MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
 where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey + PartialEq + Debug,
     V: StorageValue + PartialEq + Debug,
 {
@@ -71,7 +71,7 @@ fn check_map_multiproof<T, K, V>(
     keys: BTreeSet<K>,
     table: &ProofMapIndex<T, K, V>,
 ) where
-    T: AsRef<Snapshot>,
+    T: AsRef<dyn Snapshot>,
     K: ProofMapKey + Clone + PartialEq + Debug,
     V: StorageValue + Clone + PartialEq + Debug,
 {

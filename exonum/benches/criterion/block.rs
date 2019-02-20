@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,8 @@ use exonum::{
     storage::{Database, DbOptions, Patch, RocksDB},
 };
 use futures::sync::mpsc;
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
 use tempdir::TempDir;
 
 use std::iter;
@@ -76,7 +77,7 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
     RocksDB::open(tempdir.path(), &options).unwrap()
 }
 
-fn create_blockchain(db: impl Database, services: Vec<Box<Service>>) -> Blockchain {
+fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Blockchain {
     use exonum::{
         blockchain::{GenesisConfig, ValidatorKeys},
         crypto,
@@ -109,10 +110,10 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 
 mod timestamping {
     use super::{gen_keypair_from_rng, BoxedTx};
+    use crate::proto;
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-        encoding::Error as EncodingError,
         messages::{Message, RawTransaction, Signed},
         storage::Snapshot,
     };
@@ -131,59 +132,60 @@ mod timestamping {
             "timestamping"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, failure::Error> {
             use exonum::blockchain::TransactionSet;
             Ok(TimestampingTransactions::tx_from_raw(raw)?.into())
         }
     }
 
-    transactions! {
-        TimestampingTransactions {
-            struct Tx {
-                data: &Hash,
-            }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TimestampTx")]
+    struct Tx {
+        data: Hash,
+    }
 
-            struct PanickingTx {
-                data: &Hash,
-            }
-        }
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::TimestampTx")]
+    struct PanickingTx {
+        data: Hash,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    enum TimestampingTransactions {
+        Tx(Tx),
+        PanickingTx(PanickingTx),
     }
 
     impl Tx {
         #[doc(hidden)]
-        pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
-            Message::sign_transaction(Tx::new(data), TIMESTAMPING_SERVICE_ID, *pk, sk)
+        pub fn sign(pk: &PublicKey, &data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
+            Message::sign_transaction(Tx { data }, TIMESTAMPING_SERVICE_ID, *pk, sk)
         }
     }
 
     impl PanickingTx {
         #[doc(hidden)]
         pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
-            Message::sign_transaction(PanickingTx::new(data), TIMESTAMPING_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(
+                PanickingTx { data: *data },
+                TIMESTAMPING_SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 
     impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            // We don't verify transactions within the benchmark, so in this
-            // and following transaction types the verification code is trivial.
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
     }
 
     impl Transaction for PanickingTx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             panic!("panic text");
         }
@@ -208,14 +210,14 @@ mod timestamping {
 
 mod cryptocurrency {
     use super::{gen_keypair_from_rng, BoxedTx};
+    use crate::proto;
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{Hash, PublicKey, SecretKey},
-        encoding::Error as EncodingError,
         messages::{Message, RawTransaction, Signed},
         storage::{MapIndex, ProofMapIndex, Snapshot},
     };
-    use rand::{seq::sample_slice_ref, Rng};
+    use rand::{seq::SliceRandom, Rng};
 
     const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 
@@ -235,36 +237,45 @@ mod cryptocurrency {
             "cryptocurrency"
         }
 
-        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, EncodingError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, failure::Error> {
             use exonum::blockchain::TransactionSet;
             Ok(CryptocurrencyTransactions::tx_from_raw(raw)?.into())
         }
     }
 
-    transactions! {
-        CryptocurrencyTransactions {
-            /// Transfers one unit of currency from `from` to `to`.
-            struct Tx {
-                to: &PublicKey,
-                seed: u32,
-            }
+    /// Transfers one unit of currency from `from` to `to`.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::CurrencyTx")]
+    struct Tx {
+        to: PublicKey,
+        seed: u32,
+    }
 
-            /// Same as `Tx`, but without cryptographic proofs in `execute`.
-            struct SimpleTx {
-                to: &PublicKey,
-                seed: u32,
-            }
+    /// Same as `Tx`, but without cryptographic proofs in `execute`.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::CurrencyTx")]
+    struct SimpleTx {
+        to: PublicKey,
+        seed: u32,
+    }
 
-            /// Same as `SimpleTx`, but signals an error 50% of the time.
-            struct RollbackTx {
-                to: &PublicKey,
-                seed: u32,
-            }
-        }
+    /// Same as `SimpleTx`, but signals an error 50% of the time.
+    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+    #[exonum(pb = "proto::CurrencyTx")]
+    struct RollbackTx {
+        to: PublicKey,
+        seed: u32,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    enum CryptocurrencyTransactions {
+        Tx(Tx),
+        SimpleTx(SimpleTx),
+        RollbackTx(RollbackTx),
     }
 
     impl Tx {
@@ -275,7 +286,7 @@ mod cryptocurrency {
             seed: u32,
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
-            Message::sign_transaction(Tx::new(to, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(Tx { to: *to, seed }, CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
         }
     }
 
@@ -287,7 +298,12 @@ mod cryptocurrency {
             seed: u32,
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
-            Message::sign_transaction(SimpleTx::new(to, seed), CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
+            Message::sign_transaction(
+                SimpleTx { to: *to, seed },
+                CRYPTOCURRENCY_SERVICE_ID,
+                *pk,
+                sk,
+            )
         }
     }
 
@@ -300,7 +316,7 @@ mod cryptocurrency {
             sk: &SecretKey,
         ) -> Signed<RawTransaction> {
             Message::sign_transaction(
-                RollbackTx::new(to, seed),
+                RollbackTx { to: *to, seed },
                 CRYPTOCURRENCY_SERVICE_ID,
                 *pk,
                 sk,
@@ -309,60 +325,48 @@ mod cryptocurrency {
     }
 
     impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let from = context.author();
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
-            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(&self.to).unwrap_or(INITIAL_BALANCE);
             index.put(&from, from_balance - 1);
-            index.put(self.to(), to_balance + 1);
+            index.put(&self.to, to_balance + 1);
 
             Ok(())
         }
     }
 
     impl Transaction for SimpleTx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let from = context.author();
 
             let mut index = MapIndex::new("balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
-            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(&self.to).unwrap_or(INITIAL_BALANCE);
             index.put(&from, from_balance - 1);
-            index.put(self.to(), to_balance + 1);
+            index.put(&self.to, to_balance + 1);
 
             Ok(())
         }
     }
 
     impl Transaction for RollbackTx {
-        fn verify(&self) -> bool {
-            unimplemented!("never used in benchmark")
-        }
-
         fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
             let from = context.author();
 
             let mut index = MapIndex::new("balances", context.fork());
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
-            let to_balance = index.get(self.to()).unwrap_or(INITIAL_BALANCE);
+            let to_balance = index.get(&self.to).unwrap_or(INITIAL_BALANCE);
             index.put(&from, from_balance - 1);
-            index.put(self.to(), to_balance + 1);
+            index.put(&self.to, to_balance + 1);
 
             // We deliberately perform the check *after* reads/writes in order
             // to check efficiency of rolling the changes back.
-            if self.seed() % 2 == 0 {
+            if self.seed % 2 == 0 {
                 Ok(())
             } else {
                 Err(ExecutionError::new(1))
@@ -377,10 +381,12 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => Tx::sign(from, to, i, from_sk).into(),
-            _ => unreachable!(),
-        })
+        (0..).map(
+            move |i| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
+                [(ref from, ref from_sk), (ref to, ..)] => Tx::sign(from, to, i, from_sk).into(),
+                _ => unreachable!(),
+            },
+        )
     }
 
     pub fn unprovable_transactions(
@@ -390,10 +396,12 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::sign(from, to, i, from_sk),
-            _ => unreachable!(),
-        })
+        (0..).map(
+            move |i| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
+                [(ref from, ref from_sk), (ref to, ..)] => SimpleTx::sign(from, to, i, from_sk),
+                _ => unreachable!(),
+            },
+        )
     }
 
     pub fn rollback_transactions(
@@ -403,10 +411,12 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(move |i| match *sample_slice_ref(&mut rng, &keys, 2) {
-            [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::sign(from, to, i, from_sk),
-            _ => unreachable!(),
-        })
+        (0..).map(
+            move |i| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
+                [(ref from, ref from_sk), (ref to, ..)] => RollbackTx::sign(from, to, i, from_sk),
+                _ => unreachable!(),
+            },
+        )
     }
 }
 
@@ -425,9 +435,11 @@ fn prepare_txs(
         transactions
             .into_iter()
             .map(|tx| {
-                schema.add_transaction_into_pool(tx.clone());
-                tx.hash()
-            }).collect()
+                let hash = tx.hash();
+                schema.add_transaction_into_pool(tx);
+                hash
+            })
+            .collect()
     };
 
     blockchain.merge(fork.into_patch()).unwrap();
@@ -442,12 +454,10 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
 
-    assert!(
-        tx_hashes
-            .iter()
-            .all(|hash| schema.transactions_pool().contains(&hash)
-                && !schema.transactions_locations().contains(&hash))
-    );
+    assert!(tx_hashes
+        .iter()
+        .all(|hash| schema.transactions_pool().contains(&hash)
+            && !schema.transactions_locations().contains(&hash)));
     assert_eq!(tx_hashes.len() as u64, schema.transactions_pool_len());
 }
 
@@ -498,7 +508,7 @@ fn execute_block_rocksdb(
         .take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1])
         .collect();
 
-    let tx_hashes = prepare_txs(&mut blockchain, txs.clone());
+    let tx_hashes = prepare_txs(&mut blockchain, txs);
     assert_transactions_in_pool(&blockchain, &tx_hashes);
 
     // Because execute_block is not really "micro benchmark"
@@ -516,13 +526,14 @@ fn execute_block_rocksdb(
                 });
             },
             TXS_IN_BLOCK,
-        ).sample_size(50)
+        )
+        .sample_size(50)
         .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u32)),
     );
 }
 
 pub fn bench_block(criterion: &mut Criterion) {
-    use log::{self, LevelFilter};
+    use log::LevelFilter;
     use std::panic;
 
     log::set_max_level(LevelFilter::Off);

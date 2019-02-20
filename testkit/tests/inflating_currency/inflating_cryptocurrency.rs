@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate serde;
-extern crate serde_json;
-
 use exonum::{
     api,
     blockchain::{
@@ -22,11 +19,12 @@ use exonum::{
         TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey},
-    encoding,
     helpers::Height,
     messages::{Message, RawTransaction, Signed},
     storage::{Fork, MapIndex, Snapshot},
 };
+
+use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -37,29 +35,38 @@ pub const INIT_BALANCE: u64 = 0;
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
-encoding_struct! {
-    struct Wallet {
-        pub_key: &PublicKey,
-        name: &str,
-        balance: u64,
-        last_update_height: u64,
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::Wallet")]
+pub struct Wallet {
+    pub pub_key: PublicKey,
+    pub name: String,
+    pub balance: u64,
+    pub last_update_height: u64,
 }
 
 impl Wallet {
+    pub fn new(&pub_key: &PublicKey, name: &str, balance: u64, last_update_height: u64) -> Self {
+        Self {
+            pub_key,
+            name: name.to_owned(),
+            balance,
+            last_update_height,
+        }
+    }
+
     pub fn actual_balance(&self, height: Height) -> u64 {
-        assert!(height.0 >= self.last_update_height());
-        self.balance() + height.0 - self.last_update_height()
+        assert!(height.0 >= self.last_update_height);
+        self.balance + height.0 - self.last_update_height
     }
 
     pub fn increase(self, amount: u64, height: Height) -> Self {
         let balance = self.actual_balance(height) + amount;
-        Self::new(self.pub_key(), self.name(), balance, height.0)
+        Self::new(&self.pub_key, &self.name, balance, height.0)
     }
 
     pub fn decrease(self, amount: u64, height: Height) -> Self {
         let balance = self.actual_balance(height) - amount;
-        Self::new(self.pub_key(), self.name(), balance, height.0)
+        Self::new(&self.pub_key, &self.name, balance, height.0)
     }
 }
 
@@ -69,12 +76,12 @@ pub struct CurrencySchema<S> {
     view: S,
 }
 
-impl<S: AsRef<Snapshot>> CurrencySchema<S> {
+impl<S: AsRef<dyn Snapshot>> CurrencySchema<S> {
     pub fn new(view: S) -> Self {
         CurrencySchema { view }
     }
 
-    pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+    pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
         MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
     }
 
@@ -92,40 +99,52 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
-transactions! {
-    pub(in inflating_cryptocurrency) CurrencyTransactions {
+/// Create a new wallet.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxCreateWallet")]
+pub struct TxCreateWallet {
+    name: String,
+}
 
-        /// Create a new wallet.
-        struct TxCreateWallet {
-            name: &str,
-        }
+/// Transfer coins between the wallets.
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::TxTransfer")]
+pub struct TxTransfer {
+    to: PublicKey,
+    amount: u64,
+    seed: u64,
+}
 
-        /// Transfer coins between the wallets.
-        struct TxTransfer {
-            to: &PublicKey,
-            amount: u64,
-            seed: u64,
-        }
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+pub(in crate::inflating_cryptocurrency) enum CurrencyTransactions {
+    TxCreateWallet(TxCreateWallet),
+    TxTransfer(TxTransfer),
 }
 
 impl TxCreateWallet {
     #[doc(hidden)]
     pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxCreateWallet::new(name), SERVICE_ID, *pk, sk)
+        Message::sign_transaction(
+            Self {
+                name: name.to_owned(),
+            },
+            SERVICE_ID,
+            *pk,
+            sk,
+        )
     }
 }
 
 impl TxTransfer {
     #[doc(hidden)]
     pub fn sign(
-        to: &PublicKey,
+        &to: &PublicKey,
         amount: u64,
         seed: u64,
         pk: &PublicKey,
         sc: &SecretKey,
     ) -> Signed<RawTransaction> {
-        Message::sign_transaction(TxTransfer::new(to, amount, seed), SERVICE_ID, *pk, sc)
+        Message::sign_transaction(Self { to, amount, seed }, SERVICE_ID, *pk, sc)
     }
 }
 
@@ -139,7 +158,7 @@ impl Transaction for TxCreateWallet {
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
         if schema.wallet(&author).is_none() {
-            let wallet = Wallet::new(&author, self.name(), INIT_BALANCE, height.0);
+            let wallet = Wallet::new(&author, &self.name, INIT_BALANCE, height.0);
             schema.wallets_mut().put(&author, wallet);
         }
         Ok(())
@@ -151,22 +170,22 @@ impl Transaction for TxTransfer {
     /// balance and apply changes to the balances of the wallets.
     fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
         let author = tc.author();
-        if &author == self.to() {
+        if author == self.to {
             Err(ExecutionError::new(0))?
         }
         let view = tc.fork();
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
         let sender = schema.wallet(&author);
-        let receiver = schema.wallet(self.to());
+        let receiver = schema.wallet(&self.to);
         if let (Some(sender), Some(receiver)) = (sender, receiver) {
-            let amount = self.amount();
+            let amount = self.amount;
             if sender.actual_balance(height) >= amount {
                 let sender = sender.decrease(amount, height);
                 let receiver = receiver.increase(amount, height);
                 let mut wallets = schema.wallets_mut();
                 wallets.put(&author, sender);
-                wallets.put(self.to(), receiver);
+                wallets.put(&self.to, receiver);
             }
         }
         Ok(())
@@ -193,7 +212,8 @@ impl CryptocurrencyApi {
             .map(|wallet| {
                 let height = CoreSchema::new(&snapshot).height();
                 wallet.actual_balance(height)
-            }).ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
+            })
+            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
     fn wire(builder: &mut api::ServiceApiBuilder) {
@@ -212,7 +232,7 @@ impl Service for CurrencyService {
         "cryptocurrency"
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -221,7 +241,7 @@ impl Service for CurrencyService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = CurrencyTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,18 +16,17 @@
 
 use failure::{Error, ResultExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use toml;
 
 use std::{
     fs::{self, File},
     io::{Read, Write},
     mem::drop,
-    path::Path,
+    path::{Path, PathBuf},
     sync::mpsc,
     thread,
 };
 
-use node::{ConnectListConfig, NodeConfig};
+use crate::node::{ConnectListConfig, NodeConfig};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
@@ -136,7 +135,7 @@ impl ConfigManager {
     where
         P: AsRef<Path>,
     {
-        let mut current_config: NodeConfig = ConfigFile::load(path)?;
+        let mut current_config: NodeConfig<PathBuf> = ConfigFile::load(path)?;
         current_config.connect_list = connect_list;
         ConfigFile::save(&current_config, path)?;
 

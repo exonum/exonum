@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use failure::{self, Error};
+use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
@@ -35,33 +35,34 @@ use std::{
     collections::{BTreeMap, HashSet},
     fmt,
     net::SocketAddr,
+    path::{Path, PathBuf},
     sync::Arc,
     thread,
     time::{Duration, SystemTime},
 };
 
-use api::{
+use crate::api::{
     backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
     ApiAccess, ApiAggregator,
 };
-use blockchain::{
+use crate::blockchain::{
     Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
 };
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use events::{
+use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
     HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
     NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
-use helpers::{
+use crate::helpers::{
     config::ConfigManager,
     fabric::{NodePrivateConfig, NodePublicConfig},
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
-use messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
-use node::state::SharedConnectList;
-use storage::{Database, DbOptions};
+use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
+use crate::node::state::SharedConnectList;
+use crate::storage::{Database, DbOptions};
 
 mod basic;
 mod connect_list;
@@ -235,7 +236,7 @@ impl Default for MemoryPoolConfig {
 
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NodeConfig {
+pub struct NodeConfig<T = SecretKey> {
     /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
     /// Network listening address.
@@ -247,11 +248,11 @@ pub struct NodeConfig {
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
     /// Consensus secret key.
-    pub consensus_secret_key: SecretKey,
+    pub consensus_secret_key: T,
     /// Service public key.
     pub service_public_key: PublicKey,
     /// Service secret key.
-    pub service_secret_key: SecretKey,
+    pub service_secret_key: T,
     /// Api configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
@@ -266,6 +267,51 @@ pub struct NodeConfig {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
+}
+
+impl NodeConfig<PathBuf> {
+    /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
+    pub fn read_secret_keys(
+        self,
+        config_file_path: impl AsRef<Path>,
+        consensus_passphrase: &[u8],
+        service_passphrase: &[u8],
+    ) -> NodeConfig {
+        let config_folder = config_file_path.as_ref().parent().unwrap();
+        let consensus_key_path = if self.consensus_secret_key.is_absolute() {
+            self.consensus_secret_key
+        } else {
+            config_folder.join(&self.consensus_secret_key)
+        };
+        let service_key_path = if self.service_secret_key.is_absolute() {
+            self.service_secret_key
+        } else {
+            config_folder.join(&self.service_secret_key)
+        };
+
+        let consensus_secret_key = read_keys_from_file(&consensus_key_path, consensus_passphrase)
+            .expect("Could not read consensus_secret_key from file")
+            .1;
+        let service_secret_key = read_keys_from_file(&service_key_path, service_passphrase)
+            .expect("Could not read service_secret_key from file")
+            .1;
+        NodeConfig {
+            consensus_secret_key,
+            service_secret_key,
+            genesis: self.genesis,
+            listen_address: self.listen_address,
+            external_address: self.external_address,
+            network: self.network,
+            consensus_public_key: self.consensus_public_key,
+            service_public_key: self.service_public_key,
+            api: self.api,
+            mempool: self.mempool,
+            services_configs: self.services_configs,
+            database: self.database,
+            connect_list: self.connect_list,
+            thread_pool_size: self.thread_pool_size,
+        }
+    }
 }
 
 /// Configuration for the `NodeHandler`.
@@ -351,7 +397,8 @@ impl ConnectListConfig {
             .map(|config| ConnectInfo {
                 public_key: config.validator_keys.consensus_key,
                 address: config.address.clone(),
-            }).collect();
+            })
+            .collect();
 
         ConnectListConfig { peers }
     }
@@ -364,7 +411,8 @@ impl ConnectListConfig {
             .map(|(a, v)| ConnectInfo {
                 address: a.clone(),
                 public_key: v.consensus_key,
-            }).collect();
+            })
+            .collect();
 
         ConnectListConfig { peers }
     }
@@ -586,7 +634,8 @@ impl NodeHandler {
                 } else {
                     None
                 }
-            }).collect();
+            })
+            .collect();
         let message = message.into();
         for address in peers {
             self.send_to_peer(address, message.clone());
@@ -596,7 +645,7 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
-        self.send_to_peer(key, connect.clone());
+        self.send_to_peer(key, connect);
     }
 
     /// Add timeout request.
@@ -961,7 +1010,8 @@ impl Node {
                             .public_allow_origin
                             .clone()
                             .map(into_app_config),
-                    }).into_iter();
+                    })
+                    .into_iter();
                 let private_api_handler = self
                     .api_options
                     .private_api_address
@@ -973,7 +1023,8 @@ impl Node {
                             .private_allow_origin
                             .clone()
                             .map(into_app_config),
-                    }).into_iter();
+                    })
+                    .into_iter();
                 // Collects API handlers.
                 public_api_handler
                     .chain(private_api_handler)
@@ -983,7 +1034,8 @@ impl Node {
                 self.handler.blockchain.clone(),
                 self.handler.api_state.clone(),
             ),
-        }.start()?;
+        }
+        .start()?;
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
@@ -1056,28 +1108,34 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{
+    use crate::blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     };
-    use crypto::gen_keypair;
-    use encoding::Error as MessageError;
-    use events::EventHandler;
-    use helpers;
-    use storage::{Database, MemoryDB, Snapshot};
+    use crate::crypto::gen_keypair;
+    use crate::events::EventHandler;
+    use crate::helpers;
+    use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
+    use crate::storage::{Database, MemoryDB, Snapshot};
+
     const SERVICE_ID: u16 = 0;
-    transactions! {
-        SimpleTransactions {
-            struct TxSimple {
-                public_key: &PublicKey,
-                msg: &str,
-            }
-        }
+
+    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    #[exonum(crate = "crate")]
+    enum SimpleTransactions {
+        TxSimple(TxSimple),
     }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {
             Ok(())
         }
+    }
+
+    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<RawTransaction> {
+        let mut msg = TxSimple::new();
+        msg.set_public_key(p_key.to_pb());
+        msg.set_msg("Hello, World!".to_owned());
+        Message::sign_transaction(msg, SERVICE_ID, p_key, s_key)
     }
 
     struct TestService;
@@ -1095,7 +1153,7 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, MessageError> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(SimpleTransactions::tx_from_raw(raw)?.into())
         }
     }
@@ -1110,12 +1168,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Message::sign_transaction(
-            TxSimple::new(&p_key, "Hello, World!"),
-            SERVICE_ID,
-            p_key,
-            &s_key,
-        );
+        let tx = create_simple_tx(p_key, &s_key);
 
         // Create original transaction.
         let tx_orig = tx.clone();
@@ -1148,12 +1201,7 @@ mod tests {
 
         let mut node = Node::new(db, services, node_cfg, None);
 
-        let tx = Message::sign_transaction(
-            TxSimple::new(&p_key, "Hello, World!"),
-            SERVICE_ID,
-            p_key,
-            &s_key,
-        );
+        let tx = create_simple_tx(p_key, &s_key);
 
         // Send transaction to node.
         let event = ExternalMessage::Transaction(tx);

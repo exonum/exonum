@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
-use blockchain::{Service, SharedNodeState};
-use crypto::PublicKey;
-use messages::PROTOCOL_MAJOR_VERSION;
-use node::{ConnectInfo, ExternalMessage};
+use crate::api::{Error as ApiError, ServiceApiScope, ServiceApiState};
+use crate::blockchain::{Service, SharedNodeState};
+use crate::crypto::PublicKey;
+use crate::messages::PROTOCOL_MAJOR_VERSION;
+use crate::node::{ConnectInfo, ExternalMessage};
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -60,7 +60,8 @@ impl NodeInfo {
                 .map(|s| ServiceInfo {
                     name: s.service_name().to_owned(),
                     id: s.service_id(),
-                }).collect(),
+                })
+                .collect(),
         }
     }
 }
@@ -142,11 +143,6 @@ impl SystemApi {
                     },
                 );
             }
-
-            info!(
-                "shared_api_state.reconnects_timeout() {:?}",
-                self.shared_api_state.reconnects_timeout()
-            );
 
             for (s, delay) in self.shared_api_state.reconnects_timeout() {
                 outgoing_connections

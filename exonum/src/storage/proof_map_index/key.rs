@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 use std::cmp::{min, Ordering};
 use std::ops;
 
-use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
-use storage::StorageKey;
+use crate::crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
+use crate::storage::StorageKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
@@ -57,10 +57,10 @@ where
     /// The buffer is guaranteed to have size [`PROOF_MAP_KEY_SIZE`].
     ///
     /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-    fn write_key(&self, &mut [u8]);
+    fn write_key(&self, key: &mut [u8]);
 
     /// Reads this key from the buffer.
-    fn read_key(&[u8]) -> Self::Output;
+    fn read_key(key: &[u8]) -> Self::Output;
 }
 
 /// A trait denoting that a certain storage value is suitable for use as a key for
@@ -72,12 +72,20 @@ where
 /// # Example
 ///
 /// ```
-/// # #[macro_use] extern crate exonum;
+/// # extern crate exonum;
+/// # #[macro_use] extern crate exonum_derive;
 /// # use exonum::storage::{MemoryDB, Database, ProofMapIndex, HashedKey};
-/// encoding_struct!{
-///     struct Point {
-///         x: i32,
-///         y: i32,
+///
+/// #[derive(ProtobufConvert)]
+/// #[exonum(pb = "exonum::proto::schema::doc_tests::Point")]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
+///
+/// impl Point {
+///     fn new(x: i32, y: i32) -> Self {
+///         Self { x, y }
 ///     }
 /// }
 ///
@@ -464,8 +472,8 @@ impl PartialOrd for ProofPath {
 
 #[cfg(test)]
 mod tests {
-    use rand::{self, Rng};
-    use serde_json::{self, Value};
+    use rand::Rng;
+    use serde_json::Value;
 
     use super::*;
 
@@ -475,7 +483,8 @@ mod tests {
             let mut buf = [0; 32];
             rng.fill_bytes(&mut buf);
             buf
-        }).prefix(1 + rng.gen::<u16>() % 255)
+        })
+        .prefix(1 + rng.gen::<u16>() % 255)
     }
 
     #[test]

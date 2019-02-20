@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use exonum::{
 
 use std::{borrow::Cow, ops::Deref};
 
-use transactions::Propose;
+use crate::{proto, transactions::Propose};
 
 const YEA_TAG: u8 = 1;
 const NAY_TAG: u8 = 2;
@@ -39,15 +39,26 @@ define_names! {
     VOTES => "votes";
 }
 
-encoding_struct! {
-    /// Extended information about a proposal used for the storage.
-    struct ProposeData {
-        /// Proposal transaction.
-        tx_propose: Propose,
-        /// Merkle root of all votes for the proposal.
-        votes_history_hash: &Hash,
-        /// Number of eligible voting validators.
-        num_validators: u64,
+/// Extended information about a proposal used for the storage.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::ProposeData")]
+pub struct ProposeData {
+    /// Proposal transaction.
+    pub tx_propose: Propose,
+    /// Merkle root of all votes for the proposal.
+    pub votes_history_hash: Hash,
+    /// Number of eligible voting validators.
+    pub num_validators: u64,
+}
+
+impl ProposeData {
+    /// New ProposeData.
+    pub fn new(tx_propose: Propose, votes_history_hash: &Hash, num_validators: u64) -> Self {
+        Self {
+            tx_propose,
+            votes_history_hash: *votes_history_hash,
+            num_validators,
+        }
     }
 }
 
@@ -57,11 +68,7 @@ lazy_static! {
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
-#[serde(
-    rename_all = "lowercase",
-    tag = "vote_type",
-    content = "tx_hash"
-)]
+#[serde(rename_all = "lowercase", tag = "vote_type", content = "tx_hash")]
 pub enum VotingDecision {
     /// `Vote` transaction `Hash` variant.
     Yea(Hash),
@@ -225,7 +232,7 @@ where
     pub fn propose(&self, cfg_hash: &Hash) -> Option<Propose> {
         self.propose_data_by_config_hash()
             .get(cfg_hash)?
-            .tx_propose()
+            .tx_propose
             .into()
     }
 

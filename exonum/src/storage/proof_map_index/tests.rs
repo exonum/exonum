@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,9 +13,12 @@
 // limitations under the License.
 
 use rand::{
-    self, distributions::Alphanumeric, seq::sample_iter, Rng, RngCore, SeedableRng, XorShiftRng,
+    distributions::Alphanumeric,
+    seq::{IteratorRandom, SliceRandom},
+    Rng, RngCore, SeedableRng,
 };
-use serde_json;
+use rand_xorshift::XorShiftRng;
+use serde::{de::DeserializeOwned, Serialize};
 
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
@@ -25,9 +28,9 @@ use super::{
     proof::MapProofBuilder,
     HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath,
 };
-use crypto::{hash, CryptoHash, Hash, HashStream};
-use encoding::serialize::reexport::{DeserializeOwned, Serialize};
-use storage::{Database, Fork, StorageValue};
+use crate::crypto::{hash, CryptoHash, Hash, HashStream};
+use crate::proto;
+use crate::storage::{Database, Fork, StorageValue};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -282,7 +285,7 @@ fn fuzz_insert(db1: Box<dyn Database>, db2: Box<dyn Database>) {
 
     let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(IDX_NAME, &mut storage2);
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, item.1.clone());
     }
@@ -298,11 +301,11 @@ fn fuzz_insert(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 
     // Test same keys
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index1.put(&item.0, vec![1]);
     }
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, vec![1]);
     }
@@ -426,7 +429,7 @@ where
         (0..batch_size).collect()
     } else {
         let mut rng = XorShiftRng::from_seed(rand::random());
-        sample_iter(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS).unwrap()
+        (0..batch_size).choose_multiple(&mut rng, MAX_CHECKED_ELEMENTS)
     };
 
     for i in indexes {
@@ -463,13 +466,22 @@ fn check_multiproofs_for_data<K, V>(
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
         // Check the multiproof only for existing keys
-        let keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
+        let keys = data
+            .iter()
+            .map(|&(k, _)| k)
+            .choose_multiple(&mut rng, proof_size);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
 
         // Check the multiproof for the equal number of existing and non-existing keys
-        let mut keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
-        let non_keys = sample_iter(&mut rng, &nonexisting_keys, proof_size).unwrap();
+        let mut keys = data
+            .iter()
+            .map(|&(k, _)| k)
+            .choose_multiple(&mut rng, proof_size);
+        let non_keys = nonexisting_keys
+            .iter()
+            .cloned()
+            .choose_multiple(&mut rng, proof_size);
         keys.extend(non_keys);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
@@ -1053,12 +1065,11 @@ fn fuzz_delete_build_proofs(db: Box<dyn Database>) {
     }
 
     let (keys_to_remove, keys_to_remove_seq) = {
-        let mut keys = sample_iter(
-            &mut rng,
-            data.iter().map(|item| item.0.clone()),
-            SAMPLE_SIZE / 5,
-        ).unwrap();
-        rng.shuffle(&mut keys);
+        let mut keys = data
+            .iter()
+            .map(|item| item.0.clone())
+            .choose_multiple(&mut rng, SAMPLE_SIZE / 5);
+        keys.shuffle(&mut rng);
         let seq_keys = keys.split_off(SAMPLE_SIZE / 10);
         (keys, seq_keys)
     };
@@ -1092,7 +1103,7 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
 
     let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(IDX_NAME, &mut storage2);
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
 
     for item in &data {
         index2.put(&item.0, item.1.clone());
@@ -1106,11 +1117,11 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
         .map(|item| item.0.clone())
         .collect::<Vec<_>>();
 
-    rng.shuffle(&mut keys_to_remove);
+    keys_to_remove.shuffle(&mut rng);
     for key in &keys_to_remove {
         index1.remove(key);
     }
-    rng.shuffle(&mut keys_to_remove);
+    keys_to_remove.shuffle(&mut rng);
     for key in &keys_to_remove {
         index2.remove(key);
     }
@@ -1126,7 +1137,7 @@ fn fuzz_delete(db1: Box<dyn Database>, db2: Box<dyn Database>) {
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
-    rng.shuffle(&mut data);
+    data.shuffle(&mut rng);
     for item in &data {
         index2.put(&item.0, item.1.clone());
     }
@@ -1244,15 +1255,21 @@ fn iter(db: Box<dyn Database>) {
     );
 }
 
+#[derive(Debug, PartialEq, ProtobufConvert)]
+#[exonum(pb = "proto::schema::tests::Point", crate = "crate")]
+struct Point {
+    x: u16,
+    y: u16,
+}
+
+impl Point {
+    fn new(x: u16, y: u16) -> Self {
+        Self { x, y }
+    }
+}
+
 fn tree_with_hashed_key(db: Box<dyn Database>) {
     use std::iter::FromIterator;
-
-    encoding_struct! {
-        struct Point {
-            x: u16,
-            y: u16,
-        }
-    }
 
     impl HashedKey for Point {}
 
@@ -1374,26 +1391,30 @@ macro_rules! common_tests {
 }
 
 mod memorydb_tests {
-    use std::path::Path;
-    use storage::{Database, MemoryDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::storage::{Database, MemoryDB};
 
     fn create_database(_: &Path) -> Box<dyn Database> {
         Box::new(MemoryDB::new())
     }
 
-    common_tests!{}
+    common_tests! {}
 }
 
 mod rocksdb_tests {
-    use std::path::Path;
-    use storage::{Database, DbOptions, RocksDB};
     use tempdir::TempDir;
+
+    use std::path::Path;
+
+    use crate::storage::{Database, DbOptions, RocksDB};
 
     fn create_database(path: &Path) -> Box<dyn Database> {
         let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
-    common_tests!{}
+    common_tests! {}
 }

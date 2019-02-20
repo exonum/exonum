@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ use bit_vec::BitVec;
 
 use std::time::Duration;
 
-use crypto::CryptoHash;
-use helpers::{Height, Round, ValidatorId};
-use messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest};
-use node::state::{
+use crate::crypto::CryptoHash;
+use crate::helpers::{Height, Round, ValidatorId};
+use crate::messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest};
+use crate::node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
-use sandbox::{
+use crate::sandbox::{
     sandbox::{self, timestamping_sandbox},
     sandbox_tests_helper::*,
 };

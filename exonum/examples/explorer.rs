@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 //! Examples of usage of a blockchain explorer.
 
 #[macro_use]
-extern crate exonum;
+extern crate exonum_derive;
 #[macro_use]
 extern crate serde_json;
 #[macro_use]
@@ -29,11 +29,11 @@ use exonum::{
     messages::{Message, RawTransaction, Signed},
 };
 
-use blockchain::{
+use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
 };
 
-#[path = "../tests/explorer/blockchain.rs"]
+#[path = "../tests/explorer/blockchain/mod.rs"]
 mod blockchain;
 
 /// Creates a transaction for the mempool.
@@ -153,8 +153,8 @@ fn main() {
             "content": serde_json::to_value(tx.content()).unwrap(),
             // Position in block
             "location": {
-                "block_height": "1",
-                "position_in_block": "0",
+                "block_height": 1,
+                "position_in_block": 0,
             },
             // `ListProof` of the transaction inclusion in block
             "location_proof": tx.location_proof(),
