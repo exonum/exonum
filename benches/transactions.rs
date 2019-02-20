@@ -23,8 +23,8 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    BinaryValue, Database, Fork, IndexAccess, ListIndex, MapIndex, ProofListIndex, ProofMapIndex,
-    TemporaryDB, UniqueHash,
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, IndexAccess, ListIndex,
+    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 16] = [100; 16];
@@ -142,8 +142,6 @@ impl BinaryValue for Wallet {
     }
 }
 
-impl UniqueHash for Wallet {}
-
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 struct Transaction {
     sender: PublicKey,
@@ -161,7 +159,9 @@ impl BinaryValue for Transaction {
     }
 }
 
-impl UniqueHash for Transaction {}
+impl_object_hash_for_binary_value! { Transaction }
+impl_object_hash_for_binary_value! { Block }
+impl_object_hash_for_binary_value! { Wallet }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct Block {
@@ -177,8 +177,6 @@ impl BinaryValue for Block {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
-
-impl UniqueHash for Block {}
 
 struct Schema<T: IndexAccess>(T);
 
@@ -208,16 +206,16 @@ impl Schema<&Fork> {
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
         let mut history = self.wallets_history(owner);
         history.push(tx_hash);
-        history.root_hash()
+        history.object_hash()
     }
 }
 
 impl Transaction {
     fn execute(&self, fork: &Fork) {
-        let tx_hash = self.hash();
+        let tx_hash = self.object_hash();
 
         let schema = Schema::new(fork);
-        schema.transactions().put(&self.hash(), *self);
+        schema.transactions().put(&self.object_hash(), *self);
 
         let mut owner_wallet = schema.wallets().get(&self.sender).unwrap_or_default();
         owner_wallet.outgoing += self.amount;
@@ -237,7 +235,7 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        Schema::new(&fork).blocks().push(self.hash());
+        Schema::new(&fork).blocks().push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }

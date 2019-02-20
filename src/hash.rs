@@ -201,42 +201,24 @@ fn root_hash(hashes: &[Hash]) -> Hash {
 
 /// A common trait for the ability to compute a unique hash.
 ///
-/// Unlike `CryptoHash`, the hash value returned by the `UniqueHash::hash()`
+/// Unlike `CryptoHash`, the hash value returned by the `ObjectHash::hash()`
 /// method isn't always irreversible. This hash is used, for example, in the
 /// storage as a key, as uniqueness is important in this case.
-pub trait UniqueHash: BinaryValue {
+pub trait ObjectHash {
     /// Returns a hash of the value.
     ///
     /// Hash must be unique, but not necessary cryptographic.
-    fn hash(&self) -> Hash {
-        exonum_crypto::hash(&self.to_bytes())
-    }
-}
-
-/// Just returns the origin hash.
-impl UniqueHash for Hash {
-    fn hash(&self) -> Hash {
-        *self
-    }
-}
-
-/// Just returns the origin array.
-impl UniqueHash for [u8; HASH_SIZE] {
-    fn hash(&self) -> Hash {
-        Hash::new(*self)
-    }
-}
-
-pub trait ObjectHash {
     fn object_hash(&self) -> Hash;
 }
 
+/// Just returns the origin hash.
 impl ObjectHash for Hash {
     fn object_hash(&self) -> Hash {
         *self
     }
 }
 
+/// Just returns the origin array.
 impl ObjectHash for [u8; HASH_SIZE] {
     fn object_hash(&self) -> Hash {
         Hash::new(*self)

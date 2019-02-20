@@ -24,7 +24,7 @@ use exonum_crypto::Hash;
 
 use super::{
     views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, UniqueHash,
+    BinaryKey, BinaryValue, ObjectHash,
 };
 
 /// A set of value items.
@@ -68,7 +68,7 @@ pub struct ValueSetIndexHashes<'a> {
 impl<T, V> ValueSetIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -155,7 +155,7 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn contains(&self, item: &V) -> bool {
-        self.contains_by_hash(&item.hash())
+        self.contains_by_hash(&item.object_hash())
     }
 
     /// Returns `true` if the set contains a value with the specified hash.
@@ -294,7 +294,7 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn insert(&mut self, item: V) {
-        self.base.put(&item.hash(), item)
+        self.base.put(&item.object_hash(), item)
     }
 
     /// Removes a value from the set.
@@ -316,7 +316,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn remove(&mut self, item: &V) {
-        self.remove_by_hash(&item.hash())
+        self.remove_by_hash(&item.object_hash())
     }
 
     /// Removes a value corresponding to the specified hash from the set.
@@ -374,7 +374,7 @@ where
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     type Item = (Hash, V);
     type IntoIter = ValueSetIndexIter<'a, V>;
@@ -386,7 +386,7 @@ where
 
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
 where
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     type Item = (Hash, V);
 

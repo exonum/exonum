@@ -32,8 +32,7 @@ use super::{
     proof::MapProofBuilder,
     MapProof, MapProofError, ProofMapIndex, ProofPath,
 };
-use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, TemporaryDB, UniqueHash};
-use crate::hash::ObjectHash;
+use crate::{BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -324,7 +323,7 @@ fn test_merkle_root_leaf() {
     let merkle_root = HashStream::new()
         .update(&[HashTag::MapBranchNode as u8])
         .update(ProofPath::new(&key).as_bytes())
-        .update(UniqueHash::hash(&value).as_ref())
+        .update(ObjectHash::object_hash(&value).as_ref())
         .hash();
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());
 }
@@ -381,7 +380,7 @@ fn test_fuzz_insert() {
 fn check_map_proof<K, V>(proof: MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<&Fork, K, V>)
 where
     K: BinaryKey + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
-    V: BinaryValue + UniqueHash + PartialEq + Debug + Serialize + DeserializeOwned,
+    V: BinaryValue + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
     let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
@@ -418,7 +417,7 @@ fn check_map_multiproof<K, V>(
     table: &ProofMapIndex<&Fork, K, V>,
 ) where
     K: BinaryKey + ObjectHash + PartialEq + Debug,
-    V: BinaryValue + UniqueHash + PartialEq + Debug,
+    V: BinaryValue + ObjectHash + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -472,7 +471,7 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 fn check_proofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
     K: BinaryKey + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
-    V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
+    V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &storage);
@@ -506,7 +505,7 @@ where
 fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
     K: BinaryKey + ObjectHash + Clone + Ord + PartialEq + StdHash + Debug + Serialize,
-    V: BinaryValue + UniqueHash + Clone + PartialEq + Debug + Serialize,
+    V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize,
 {
     let storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &storage);
@@ -746,7 +745,7 @@ fn test_build_proof_in_complex_tree() {
             &ProofPath::new(&[128; 32]),
             &hash(&vec![1]),
         );
-        node.hash()
+        node.object_hash()
     };
 
     let proof = table.get_proof([128; 32]);
@@ -804,7 +803,7 @@ fn test_build_proof_in_complex_tree() {
             &ProofPath::new(&right_key),
             &hash(&vec![4]),
         );
-        node.hash()
+        node.object_hash()
     };
 
     let proof = table.get_proof([128; 32]);
@@ -988,7 +987,7 @@ fn test_build_multiproof_simple() {
             &ProofPath::new(&[128; 32]),
             &hash(&vec![1]),
         );
-        node.hash()
+        node.object_hash()
     };
 
     let proof = table.get_multiproof(vec![[0; 32]]);

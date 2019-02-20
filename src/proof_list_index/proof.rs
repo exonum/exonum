@@ -17,11 +17,7 @@ use serde_json::{from_value, Error as SerdeJsonError, Value};
 
 use exonum_crypto::Hash;
 
-use super::{
-    super::BinaryValue,
-    key::ProofListKey,
-    HashTag,
-};
+use super::{super::BinaryValue, key::ProofListKey, HashTag};
 
 /// Encapsulates a proof of absence for `ProofListIndex`.
 ///

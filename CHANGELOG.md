@@ -39,7 +39,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Added `to_bytes` method to the `BinaryValue` trait which doesn't consume
     original value instead of the `into_bytes`.
   - `BinaryKey::write` now returns total number of written bytes.
-  - `CryptoHash` has been replaced by the `UniqueHash`.
+  - `CryptoHash` has been replaced by the `ObjectHash`.
 
 - Changed the hash algorithm of the intermediate nodes in `ProofMapIndex`. (#1)
 

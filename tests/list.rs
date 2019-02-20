@@ -22,7 +22,7 @@ use proptest::{
     test_runner::TestCaseResult,
 };
 
-use exonum_merkledb::{BinaryValue, Fork, ListIndex, ProofListIndex, UniqueHash};
+use exonum_merkledb::{BinaryValue, Fork, ListIndex, ObjectHash, ProofListIndex};
 
 use crate::common::ACTIONS_MAX_LEN;
 
@@ -139,7 +139,7 @@ mod proof_list_index {
 
     impl<'a, V> Modifier<ProofListIndex<&'a Fork, V>> for ListAction<V>
     where
-        V: BinaryValue + UniqueHash,
+        V: BinaryValue + ObjectHash,
     {
         fn modify(self, list: &mut ProofListIndex<&Fork, V>) {
             match self {

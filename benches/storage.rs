@@ -21,7 +21,7 @@ use rand::{Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
-use exonum_merkledb::{Database, MapIndex, ProofListIndex, ProofMapIndex, TemporaryDB};
+use exonum_merkledb::{Database, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB};
 
 const NAME: &str = "name";
 const FAMILY: &str = "index_family";

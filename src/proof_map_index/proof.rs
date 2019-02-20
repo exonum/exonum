@@ -22,8 +22,7 @@ use super::{
     key::{BitsRange, ChildKind, ProofPath, KEY_SIZE},
     node::{BranchNode, Node},
 };
-use crate::{BinaryKey, BinaryValue, HashTag, UniqueHash};
-use crate::hash::ObjectHash;
+use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -202,7 +201,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// to obtain information about the proof.
 ///
 /// ```
-/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex};
+/// # use exonum_merkledb::{Database, TemporaryDB, BinaryValue, MapProof, ProofMapIndex, ObjectHash};
 /// # use exonum_crypto::hash;
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &fork);
@@ -296,7 +295,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         let mut branch = BranchNode::empty();
         branch.set_child(ChildKind::Left, &left_child.path, &left_child.hash);
         branch.set_child(ChildKind::Right, &right_child.path, &right_child.hash);
-        branch.hash()
+        branch.object_hash()
     }
 
     /// Folds two last entries in a contour and replaces them with the folded entry.
@@ -472,7 +471,7 @@ impl<K, V> MapProof<K, V> {
 impl<K, V> MapProof<K, V>
 where
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use self::MapProofError::*;
@@ -539,7 +538,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use exonum_merkledb::{Database, TemporaryDB, ProofMapIndex};
+    /// # use exonum_merkledb::{Database, TemporaryDB, ProofMapIndex, ObjectHash};
     /// # use exonum_crypto::hash;
     /// let fork = { let db = TemporaryDB::new(); db.fork() };
     /// let mut map = ProofMapIndex::new("index", &fork);
@@ -561,7 +560,7 @@ where
         proof.extend(entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| MapProofEntry {
                 path: ProofPath::new(k),
-                hash: v.hash(),
+                hash: v.object_hash(),
             })
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
@@ -628,7 +627,7 @@ pub fn create_proof<K, V, F, M>(
 ) -> MapProof<K, V>
 where
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
     F: Fn(&ProofPath) -> Node,
     M: Fn(&K) -> V,
 {
@@ -768,7 +767,7 @@ fn process_key<K, V, F, M>(
     get_value: &M,
 ) -> MapProofBuilder<K, V>
 where
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
     F: Fn(&ProofPath) -> Node,
     M: Fn(&K) -> V,
 {
@@ -841,7 +840,7 @@ pub fn create_multiproof<K, V, KI, F, M>(
 ) -> MapProof<K, V>
 where
     K: BinaryKey + ObjectHash,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
     KI: IntoIterator<Item = K>,
     F: Fn(&ProofPath) -> Node,
     M: Fn(&K) -> V,

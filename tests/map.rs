@@ -24,7 +24,7 @@ use proptest::{
     test_runner::TestCaseResult,
 };
 
-use exonum_merkledb::{BinaryValue, Fork, MapIndex, ProofMapIndex, UniqueHash};
+use exonum_merkledb::{BinaryValue, Fork, MapIndex, ObjectHash, ProofMapIndex};
 
 use crate::common::ACTIONS_MAX_LEN;
 
@@ -113,7 +113,7 @@ mod proof_map_index {
 
     impl<'a, V> Modifier<ProofMapIndex<&'a Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
     where
-        V: BinaryValue + UniqueHash,
+        V: BinaryValue + ObjectHash,
     {
         fn modify(self, map: &mut ProofMapIndex<&Fork, [u8; 32], V>) {
             match self {

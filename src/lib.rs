@@ -131,7 +131,7 @@ pub use self::{
     },
     entry::Entry,
     error::Error,
-    hash::{HashTag, UniqueHash, ObjectHash},
+    hash::{HashTag, ObjectHash},
     key_set_index::KeySetIndex,
     keys::BinaryKey,
     list_index::ListIndex,
@@ -149,7 +149,6 @@ pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
 #[macro_use]
 mod macros;
-
 mod backends;
 mod db;
 mod entry;

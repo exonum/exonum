@@ -27,7 +27,7 @@ use self::{key::ProofListKey, proof::ProofOfAbsence};
 use crate::{
     hash::HashTag,
     views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, UniqueHash,
+    BinaryKey, BinaryValue, ObjectHash,
 };
 
 mod key;
@@ -316,40 +316,6 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns a list hash of the proof list or a hash value of the empty list.
-    ///
-    /// List hash is calculated as follows:
-    /// ```text
-    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
-    /// ```
-    /// Empty list hash:
-    /// ```text
-    /// h = sha-256( HashTag::List || 0 || Hash::default() )
-    /// ```
-    ///
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex, HashTag};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = ProofListIndex::new(name, &fork);
-    ///
-    /// let default_hash = index.root_hash();
-    /// assert_eq!(HashTag::empty_list_hash(), default_hash);
-    ///
-    /// index.push(1);
-    /// let hash = index.root_hash();
-    /// assert_ne!(hash, default_hash);
-    /// ```
-    pub fn root_hash(&self) -> Hash {
-        HashTag::hash_list_node(self.len(), self.merkle_root())
-    }
-
     /// Returns a proof of existence for the list element at the specified position.
     ///
     /// Returns a proof of absence if the list doesn't contain an element with the specified `index`.
@@ -613,10 +579,50 @@ where
     }
 }
 
+impl<T, V> ObjectHash for ProofListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue + ObjectHash,
+{
+    /// Returns a list hash of the proof list or a hash value of the empty list.
+    ///
+    /// List hash is calculated as follows:
+    /// ```text
+    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
+    /// ```
+    /// Empty list hash:
+    /// ```text
+    /// h = sha-256( HashTag::List || 0 || Hash::default() )
+    /// ```
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
+    /// use exonum_crypto::Hash;
+    ///
+    /// let db = TemporaryDB::new();
+    /// let name = "name";
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new(name, &fork);
+    ///
+    /// let default_hash = index.object_hash();
+    /// assert_eq!(HashTag::empty_list_hash(), default_hash);
+    ///
+    /// index.push(1);
+    /// let hash = index.object_hash();
+    /// assert_ne!(hash, default_hash);
+    /// ```
+    fn object_hash(&self) -> Hash {
+        HashTag::hash_list_node(self.len(), self.merkle_root())
+    }
+}
+
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     type Item = V;
     type IntoIter = ProofListIndexIter<'a, V>;
@@ -628,7 +634,7 @@ where
 
 impl<'a, V> Iterator for ProofListIndexIter<'a, V>
 where
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     type Item = V;
 

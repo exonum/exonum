@@ -20,7 +20,7 @@ use exonum_crypto::Hash;
 
 use crate::{
     views::{IndexAccess, IndexBuilder, IndexType, View},
-    BinaryKey, BinaryValue, UniqueHash,
+    BinaryKey, BinaryValue, ObjectHash,
 };
 
 /// An index that may only contain one element.
@@ -38,7 +38,7 @@ pub struct Entry<T: IndexAccess, V> {
 impl<T, V> Entry<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue + ObjectHash,
 {
     /// Creates a new index representation based on the name and storage view.
     ///
@@ -171,7 +171,7 @@ where
     pub fn hash(&self) -> Hash {
         self.base
             .get::<(), V>(&())
-            .map(|v| v.hash())
+            .map(|v| v.object_hash())
             .unwrap_or_default()
     }
 

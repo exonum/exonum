@@ -22,8 +22,9 @@ use failure::{self, format_err};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use super::UniqueHash;
-use crate::hash::ObjectHash;
+use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
+
+use super::ObjectHash;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -76,6 +77,15 @@ pub trait BinaryValue: Sized {
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error>;
 }
 
+impl_object_hash_for_binary_value! { () }
+impl_object_hash_for_binary_value! { bool }
+impl_object_hash_for_binary_value! { Vec<u8> }
+impl_object_hash_for_binary_value! { String }
+impl_object_hash_for_binary_value! { PublicKey }
+impl_object_hash_for_binary_value! { DateTime<Utc> }
+impl_object_hash_for_binary_value! { Uuid }
+impl_object_hash_for_binary_value! { Decimal }
+
 macro_rules! impl_binary_form_scalar {
     ($type:tt, $read:ident) => {
         impl BinaryValue for $type {
@@ -89,7 +99,7 @@ macro_rules! impl_binary_form_scalar {
             }
         }
 
-        impl UniqueHash for $type {}
+        impl_object_hash_for_binary_value! { $type }
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
         impl BinaryValue for $type {
@@ -105,7 +115,7 @@ macro_rules! impl_binary_form_scalar {
             }
         }
 
-        impl UniqueHash for $type {}
+        impl_object_hash_for_binary_value! { $type }
     };
 }
 
@@ -131,8 +141,6 @@ impl BinaryValue for () {
     }
 }
 
-impl UniqueHash for () {}
-
 impl BinaryValue for bool {
     fn to_bytes(&self) -> Vec<u8> {
         vec![*self as u8]
@@ -150,27 +158,6 @@ impl BinaryValue for bool {
     }
 }
 
-impl UniqueHash for bool {}
-
-macro_rules! impl_object_hash_for_binary_value {
-     ($type:ty) => {
-        impl ObjectHash for $type {
-           fn object_hash(&self) -> Hash {
-                exonum_crypto::hash(&self.to_bytes())
-           }
-        }
-    };
-}
-
-impl_object_hash_for_binary_value! { () }
-impl_object_hash_for_binary_value! { bool }
-impl_object_hash_for_binary_value! { Vec<u8> }
-impl_object_hash_for_binary_value! { String }
-impl_object_hash_for_binary_value! { PublicKey }
-impl_object_hash_for_binary_value! { DateTime<Utc> }
-impl_object_hash_for_binary_value! { Uuid }
-impl_object_hash_for_binary_value! { Decimal }
-
 impl BinaryValue for Vec<u8> {
     fn to_bytes(&self) -> Vec<u8> {
         self.clone()
@@ -185,9 +172,6 @@ impl BinaryValue for Vec<u8> {
     }
 }
 
-impl UniqueHash for Vec<u8> {}
-
-
 impl BinaryValue for String {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_bytes().to_owned()
@@ -201,8 +185,6 @@ impl BinaryValue for String {
         Self::from_utf8(bytes.into_owned()).map_err(From::from)
     }
 }
-
-impl UniqueHash for String {}
 
 impl BinaryValue for Hash {
     fn to_bytes(&self) -> Vec<u8> {
@@ -228,8 +210,6 @@ impl BinaryValue for PublicKey {
     }
 }
 
-impl UniqueHash for PublicKey {}
-
 // FIXME Maybe we should remove this implementations. [ECR-2775]
 
 impl BinaryValue for DateTime<Utc> {
@@ -254,8 +234,6 @@ impl BinaryValue for DateTime<Utc> {
     }
 }
 
-impl UniqueHash for DateTime<Utc> {}
-
 impl BinaryValue for Uuid {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
@@ -265,8 +243,6 @@ impl BinaryValue for Uuid {
         Self::from_slice(bytes.as_ref()).map_err(From::from)
     }
 }
-
-impl UniqueHash for Uuid {}
 
 impl BinaryValue for Decimal {
     fn to_bytes(&self) -> Vec<u8> {
@@ -281,7 +257,22 @@ impl BinaryValue for Decimal {
     }
 }
 
-impl UniqueHash for Decimal {}
+impl BinaryValue for [u8; HASH_SIZE] {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.to_vec()
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let bytes = bytes.as_ref();
+        ensure!(
+            bytes.len() == HASH_SIZE,
+            "Unable to decode array from bytes: buffer size does not match"
+        );
+        let mut value = [0_u8; HASH_SIZE];
+        value.copy_from_slice(bytes);
+        Ok(value)
+    }
+}
 
 #[cfg(test)]
 mod tests {
