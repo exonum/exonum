@@ -12,56 +12,149 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use super::{
-    ArtifactSpec, DispatchInfo, EnvContext, InstanceInitData, RuntimeEnvironment, DeployStatus,
-    error::{DeployError, InitError, ExecutionError}
+    error::{DeployError, ExecutionError, InitError},
+    ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, RuntimeEnvironment,
 };
 
 #[derive(Default)]
 struct DispatcherBuilder {
-    // runtimes: HashMap
+    runtimes: HashMap<String, Box<dyn RuntimeEnvironment>>,
 }
 
 impl DispatcherBuilder {
-    pub fn with_runtime(self) -> Self
-    {
+    pub fn with_runtime(
+        mut self,
+        runtime_name: String,
+        runtime: Box<dyn RuntimeEnvironment>,
+    ) -> Self {
+        self.runtimes.insert(runtime_name, runtime);
+
         self
     }
 
-    pub fn finalize(self) -> Dispatcher
-    {
-        Dispatcher::default()
+    pub fn finalize(self) -> Dispatcher {
+        Dispatcher {
+            runtimes: self.runtimes,
+        }
     }
 }
 
 #[derive(Default)]
 struct Dispatcher {
-    // TODO add runtimes
+    runtimes: HashMap<String, Box<dyn RuntimeEnvironment>>,
 }
 
-impl Dispatcher {
-    
-}
+impl Dispatcher {}
 
 impl RuntimeEnvironment for Dispatcher {
-    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    fn start_deploy(&self, _artifact: ArtifactSpec) -> Result<(), DeployError> {
         Ok(())
     }
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>
-    {
+    fn check_deploy_status(&self, _artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
         Ok(DeployStatus::Deployed)
     }
 
     fn init_service(
         &self,
         _: &mut EnvContext,
-        artifact: ArtifactSpec,
-        init: &InstanceInitData,
+        _artifact: ArtifactSpec,
+        _init: &InstanceInitData,
     ) -> Result<(), InitError> {
         Ok(())
     }
 
-    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) -> Result<(), ExecutionError> {
+    fn execute(
+        &self,
+        _context: &mut EnvContext,
+        _dispatch: DispatchInfo,
+        _payload: &[u8],
+    ) -> Result<(), ExecutionError> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct SampleRuntimeA {}
+
+    impl RuntimeEnvironment for SampleRuntimeA {
+        fn start_deploy(&self, _: ArtifactSpec) -> Result<(), DeployError> {
+            Ok(())
+        }
+        fn check_deploy_status(&self, _: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+            Ok(DeployStatus::Deployed)
+        }
+
+        fn init_service(
+            &self,
+            _: &mut EnvContext,
+            _: ArtifactSpec,
+            _: &InstanceInitData,
+        ) -> Result<(), InitError> {
+            Ok(())
+        }
+
+        fn execute(
+            &self,
+            _: &mut EnvContext,
+            _: DispatchInfo,
+            _: &[u8],
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct SampleRuntimeB {}
+
+    impl RuntimeEnvironment for SampleRuntimeB {
+        fn start_deploy(&self, _: ArtifactSpec) -> Result<(), DeployError> {
+            Ok(())
+        }
+        fn check_deploy_status(&self, _: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+            Ok(DeployStatus::Deployed)
+        }
+
+        fn init_service(
+            &self,
+            _: &mut EnvContext,
+            _: ArtifactSpec,
+            _: &InstanceInitData,
+        ) -> Result<(), InitError> {
+            Ok(())
+        }
+
+        fn execute(
+            &self,
+            _: &mut EnvContext,
+            _: DispatchInfo,
+            _: &[u8],
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_builder() {
+        let runtime_a_name = String::from("Runtime_A");
+        let runtime_a = Box::new(SampleRuntimeA::default());
+
+        let runtime_b_name = String::from("Runtime_B");
+        let runtime_b = Box::new(SampleRuntimeB::default());
+
+        let dispatcher = DispatcherBuilder::default()
+            .with_runtime(runtime_a_name, runtime_a)
+            .with_runtime(runtime_b_name, runtime_b)
+            .finalize();
+
+        assert!(dispatcher.runtimes.get("Runtime_A").is_some());
+        assert!(dispatcher.runtimes.get("Runtime_B").is_some());
+        assert!(dispatcher.runtimes.get("Runtime_C").is_none());
     }
 }

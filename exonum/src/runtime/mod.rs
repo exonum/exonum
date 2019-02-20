@@ -16,17 +16,17 @@ use protobuf::well_known_types::Any;
 
 use crate::storage::Fork;
 
-mod rust;
 pub mod dispatcher;
 pub mod error;
+mod rust;
 
-use error::{DeployError, InitError, ExecutionError};
+use error::{DeployError, ExecutionError, InitError};
 
 #[derive(Debug)]
 pub enum DeployStatus {
     DeployInProgress,
     Deployed,
-    DeployErrored(DeployError)
+    DeployErrored(DeployError),
 }
 
 type ServiceInstanceId = u32;
@@ -45,6 +45,7 @@ pub struct DispatchInfo {
     pub method_id: u32,
 }
 
+#[derive(Debug)]
 pub enum ArtifactSpec {
     Rust(rust::RustArtifactSpec),
     Java,
@@ -68,9 +69,15 @@ pub trait RuntimeEnvironment {
     ) -> Result<(), InitError>;
 
     /// Execute transaction.
-    fn execute(&self, ctx: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) -> Result<(), ExecutionError>;
+    fn execute(
+        &self,
+        ctx: &mut EnvContext,
+        dispatch: DispatchInfo,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError>;
 }
 
+#[derive(Debug)]
 pub struct EnvContext<'a> {
     fork: &'a mut Fork,
     error: Option<ExecutionError>,

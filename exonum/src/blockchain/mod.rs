@@ -108,40 +108,43 @@ impl StaticServiceDispatcher {
     }
 
     // TODO clarify if we need this method
-    pub fn services(&self) -> Arc<HashMap<u16, Box<dyn Service>>>
-    {
+    pub fn services(&self) -> Arc<HashMap<u16, Box<dyn Service>>> {
         self.service_map.clone()
     }
 
-    fn service(&self, service_id: u16) -> Result<&Box<dyn Service>, failure::Error>
-    {
-        self.service_map.get(&service_id)
-            .ok_or_else(|| {
-                failure::err_msg(format!(
-                    "Service not found. Service id: {}",
-                    service_id
-                ))
-            })
+    fn service(&self, service_id: u16) -> Result<&Box<dyn Service>, failure::Error> {
+        self.service_map.get(&service_id).ok_or_else(|| {
+            failure::err_msg(format!("Service not found. Service id: {}", service_id))
+        })
     }
 
     // TODO Do we need this method? It's only used in `struct Blockchain`.
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>
-    {
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         // TODO getting service twice? in execute_transaction and here
         let service = self.service(raw.service_id())?;
         service.tx_from_raw(raw)
     }
 
-    pub fn execute_transaction(&self, raw: Signed<RawTransaction>, fork: &mut Fork) -> Result<TransactionResult, failure::Error>
-    {
+    pub fn execute_transaction(
+        &self,
+        raw: Signed<RawTransaction>,
+        fork: &mut Fork,
+    ) -> Result<TransactionResult, failure::Error> {
         let (tx, raw, service_name) = {
             let service = self.service(raw.service_id())?;
-            
+
             let service_name = service.service_name();
 
-            let tx = service.tx_from_raw(raw.payload().clone()).map_err(|error| {
-                format_err!("Service <{}>: {}, tx: {:?}", service_name, error, raw.hash())
-            })?;
+            let tx = service
+                .tx_from_raw(raw.payload().clone())
+                .map_err(|error| {
+                    format_err!(
+                        "Service <{}>: {}, tx: {:?}",
+                        service_name,
+                        error,
+                        raw.hash()
+                    )
+                })?;
             (tx, raw, service_name)
         };
 
@@ -163,7 +166,9 @@ impl StaticServiceDispatcher {
                         // whole transaction body is an overkill: it can be relatively big.
                         info!(
                             "Service <{}>: {:?} transaction execution failed: {:?}",
-                            service_name, raw.hash(), e
+                            service_name,
+                            raw.hash(),
+                            e
                         );
                         fork.rollback();
                     }
@@ -186,7 +191,6 @@ impl StaticServiceDispatcher {
 
         Ok(tx_result)
     }
-
 }
 
 impl Blockchain {
@@ -489,7 +493,8 @@ impl Blockchain {
         (block_hash, fork.into_patch())
     }
 
-    fn execute_transaction(&self, 
+    fn execute_transaction(
+        &self,
         tx_hash: Hash,
         height: Height,
         index: usize,

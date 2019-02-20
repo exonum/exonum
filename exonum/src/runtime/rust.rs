@@ -15,9 +15,9 @@
 use std::{collections::HashMap, sync::RwLock};
 
 use super::{
-    ArtifactSpec, DispatchInfo, EnvContext, InstanceInitData, InterfaceId,
-    RuntimeEnvironment, ServiceInstanceId, DeployStatus,
-    error::{ DeployError, InitError, ExecutionError }
+    error::{DeployError, ExecutionError, InitError},
+    ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, InterfaceId,
+    RuntimeEnvironment, ServiceInstanceId,
 };
 
 #[derive(Default)]
@@ -67,8 +67,7 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>
-    {
+    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
         let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
             artifact
         } else {
@@ -114,7 +113,12 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) -> Result<(), ExecutionError> {
+    fn execute(
+        &self,
+        context: &mut EnvContext,
+        dispatch: DispatchInfo,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError> {
         let inner = self.inner.read().unwrap();
         let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
         let interface = instance.interfaces.get(&dispatch.interface_id).unwrap();
@@ -127,12 +131,14 @@ impl RuntimeEnvironment for RustRuntime {
 }
 
 struct TransactionContext<'a> {
-    env_context: &'a EnvContext<'a>,
+    _env_context: &'a EnvContext<'a>,
 }
 
 impl<'a> TransactionContext<'a> {
     fn from_env_ctx(env_context: &'a EnvContext<'a>) -> Self {
-        Self { env_context }
+        Self {
+            _env_context: env_context,
+        }
     }
 }
 
@@ -233,7 +239,9 @@ mod tests {
         {
             let mut fork = db.fork();
             let mut context = EnvContext::from_fork(&mut fork);
-            runtime.execute(&mut context, dispatch_info, &payload).unwrap();
+            runtime
+                .execute(&mut context, dispatch_info, &payload)
+                .unwrap();
         }
     }
 }
