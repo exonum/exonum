@@ -27,7 +27,7 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb
+    - librocksdb5.17
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
