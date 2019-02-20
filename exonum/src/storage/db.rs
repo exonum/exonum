@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -600,7 +600,7 @@ impl<'a> Iterator for ForkIter<'a> {
                                 Change::Delete => unreachable!(),
                             },
                         )
-                    })
+                    });
                 }
                 NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();
@@ -627,7 +627,7 @@ impl<'a> Iterator for ForkIter<'a> {
                                 Change::Delete => unreachable!(),
                             },
                         )
-                    })
+                    });
                 }
                 NextIterValue::Deleted => {
                     self.changes.as_mut().unwrap().next();

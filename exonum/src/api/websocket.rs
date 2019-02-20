@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -116,11 +116,9 @@ impl Actor for Session {
     type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let address: Addr<_> = ctx.address();
+        let address: Recipient<_> = ctx.address().recipient();
         self.server_address
-            .send(Subscribe {
-                address: address.clone().recipient(),
-            })
+            .send(Subscribe { address })
             .into_actor(self)
             .then(|response, actor, context| {
                 match response {

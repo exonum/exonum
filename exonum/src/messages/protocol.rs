@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -416,8 +416,8 @@ impl BlockResponse {
         &self.to
     }
     /// Block header.
-    pub fn block(&self) -> blockchain::Block {
-        self.block.clone()
+    pub fn block(&self) -> &blockchain::Block {
+        &self.block
     }
     /// List of pre-commits.
     pub fn precommits(&self) -> Vec<Vec<u8>> {
