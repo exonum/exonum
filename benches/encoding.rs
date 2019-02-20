@@ -86,12 +86,12 @@ impl BinaryValue for CursorData {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let mut bytes = bytes.as_ref();
-        let id = bytes.read_u16::<LittleEndian>()?;
-        let class = bytes.read_i16::<LittleEndian>()?;
-        let value = bytes.read_i32::<LittleEndian>()?;
+        let mut cursor = bytes.as_ref();
+        let id = cursor.read_u16::<LittleEndian>()?;
+        let class = cursor.read_i16::<LittleEndian>()?;
+        let value = cursor.read_i32::<LittleEndian>()?;
         let hash =
-            Hash::from_slice(bytes).ok_or_else(|| format_err!("Unable to decode hash value"))?;
+            Hash::from_slice(cursor).ok_or_else(|| format_err!("Unable to decode hash value"))?;
         Ok(Self {
             id,
             class,
@@ -108,22 +108,31 @@ fn gen_bytes_data() -> Vec<u8> {
     v
 }
 
+fn check_binary_value<T>(data: T) -> T
+where
+    T: BinaryValue + Debug + PartialEq,
+{
+    let bytes = data.to_bytes();
+    assert_eq!(T::from_bytes(bytes.into()).unwrap(), data);
+    data
+}
+
 fn gen_sample_data() -> SimpleData {
-    SimpleData {
+    check_binary_value(SimpleData {
         id: 1,
         class: -5,
-        value: 127,
+        value: 2127,
         hash: exonum_crypto::hash(&[1, 2, 3]),
-    }
+    })
 }
 
 fn gen_cursor_data() -> CursorData {
-    CursorData {
+    check_binary_value(CursorData {
         id: 1,
         class: -5,
-        value: 127,
+        value: 2127,
         hash: exonum_crypto::hash(&[1, 2, 3]),
-    }
+    })
 }
 
 fn gen_branch_node_data() -> BranchNode {
@@ -159,9 +168,9 @@ where
             b.iter_with_setup(
                 || {
                     let val = f();
-                    val.into_bytes()
+                    val.to_bytes().into()
                 },
-                |bytes| black_box(V::from_bytes(bytes.into()).unwrap()),
+                |bytes| black_box(V::from_bytes(bytes).unwrap()),
             );
         },
     );
