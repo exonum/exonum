@@ -116,11 +116,9 @@ impl Actor for Session {
     type Context = ws::WebsocketContext<Self, ServiceApiState>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        let address: Addr<_> = ctx.address();
+        let address: Recipient<_> = ctx.address().recipient();
         self.server_address
-            .send(Subscribe {
-                address: address.clone().recipient(),
-            })
+            .send(Subscribe { address })
             .into_actor(self)
             .then(|response, actor, context| {
                 match response {

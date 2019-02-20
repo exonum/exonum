@@ -145,7 +145,7 @@ fn test_block() {
 
     assert_eq!(block.author(), pub_key);
     assert_eq!(block.to(), &pub_key);
-    assert_eq!(block.block(), content);
+    assert_eq!(block.block(), &content);
     assert_eq!(block.precommits(), precommits_buf);
     assert_eq!(block.transactions().to_vec(), transactions);
 
@@ -156,7 +156,7 @@ fn test_block() {
 
     assert_eq!(block2.author(), pub_key);
     assert_eq!(block2.to(), &pub_key);
-    assert_eq!(block2.block(), content);
+    assert_eq!(block2.block(), &content);
     assert_eq!(block2.precommits(), precommits_buf);
     assert_eq!(block2.transactions().to_vec(), transactions);
     let block_proof = BlockProof {

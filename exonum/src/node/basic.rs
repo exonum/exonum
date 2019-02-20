@@ -208,10 +208,9 @@ impl NodeHandler {
                 .state
                 .peers()
                 .iter()
-                .map(|x| x.1.clone())
                 .nth(gen_peer_id())
+                .map(|x| x.1.clone())
                 .unwrap();
-            let peer = peer.clone();
             let msg = PeersRequest::new(&peer.author());
             trace!("Request peers from peer with addr {:?}", peer.pub_addr());
             let message = self.sign_message(msg);
