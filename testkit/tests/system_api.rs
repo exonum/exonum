@@ -38,7 +38,7 @@ fn healthcheck() {
     let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
     let expected = HealthCheckInfo {
         consensus_status: ConsensusStatus::Enabled,
-        connectivity: ConnectivityStatus::NotConnected,
+        connectivity: ConnectivityStatus::not_connected(),
     };
     assert_eq!(info, expected);
 }

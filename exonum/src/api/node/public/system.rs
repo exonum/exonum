@@ -25,20 +25,31 @@ pub struct MemPoolInfo {
     pub size: u64,
 }
 
-/// Information about the amount of peers connected to the node.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct PeersAmount {
-    /// Amount of connected peers.
-    pub amount: usize,
-}
-
 /// Information about whether the node is connected to other peers.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub enum ConnectivityStatus {
+pub struct ConnectivityStatus {
     /// The node has no connected peers.
-    NotConnected,
+    connected: bool,
     /// The node has connected peers. Amount of connected peers is stored within this variant.
-    Connected(PeersAmount),
+    connected_peers: usize,
+}
+
+impl ConnectivityStatus {
+    /// Creates `ConnectivityStatus` instance for not connected status.
+    pub fn not_connected() -> Self {
+        Self {
+            connected: false,
+            connected_peers: 0,
+        }
+    }
+
+    /// Creates `ConnectivityStatus` instance for connected status with peers count.
+    pub fn connected(connected_peers: usize) -> Self {
+        Self {
+            connected: true,
+            connected_peers,
+        }
+    }
 }
 
 /// Information about whether it is possible to achieve the consensus between
@@ -109,11 +120,9 @@ impl SystemApi {
         let out_conn = self.shared_api_state.outgoing_connections().len();
 
         if in_conn == 0 && out_conn == 0 {
-            ConnectivityStatus::NotConnected
+            ConnectivityStatus::not_connected()
         } else {
-            ConnectivityStatus::Connected(PeersAmount {
-                amount: in_conn + out_conn,
-            })
+            ConnectivityStatus::connected(in_conn + out_conn)
         }
     }
 
