@@ -18,7 +18,7 @@ use serde_json::{from_value, Error as SerdeJsonError, Value};
 use exonum_crypto::Hash;
 
 use super::{
-    super::{BinaryValue, UniqueHash},
+    super::BinaryValue,
     key::ProofListKey,
     HashTag,
 };
@@ -88,7 +88,7 @@ pub enum ListProofError {
 
 impl<V> ListProof<V>
 where
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue,
 {
     fn collect<'a>(
         &'a self,

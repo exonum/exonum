@@ -66,7 +66,7 @@ pub struct ProofListIndexIter<'a, V> {
 impl<T, V> ProofListIndex<T, V>
 where
     T: IndexAccess,
-    V: BinaryValue + UniqueHash,
+    V: BinaryValue,
 {
     /// Creates a new index representation based on the name and storage view.
     ///

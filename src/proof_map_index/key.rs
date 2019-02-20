@@ -20,7 +20,7 @@ use leb128;
 
 use exonum_crypto::HASH_SIZE;
 
-use crate::{BinaryKey, UniqueHash};
+use crate::{BinaryKey, ObjectHash};
 
 /// This prefix defines a node as a branch.
 pub const BRANCH_KEY_PREFIX: u8 = 0;
@@ -222,8 +222,8 @@ pub struct ProofPath {
 
 impl ProofPath {
     /// Creates a path from the given key.
-    pub fn new(key: &impl UniqueHash) -> Self {
-        Self::from_bytes(key.hash())
+    pub fn new(key: &impl ObjectHash) -> Self {
+        Self::from_bytes(key.object_hash())
     }
 
     /// Checks if this is a path to a leaf `ProofMapIndex` node.

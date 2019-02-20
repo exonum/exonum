@@ -227,6 +227,22 @@ impl UniqueHash for [u8; HASH_SIZE] {
     }
 }
 
+pub trait ObjectHash {
+    fn object_hash(&self) -> Hash;
+}
+
+impl ObjectHash for Hash {
+    fn object_hash(&self) -> Hash {
+        *self
+    }
+}
+
+impl ObjectHash for [u8; HASH_SIZE] {
+    fn object_hash(&self) -> Hash {
+        Hash::new(*self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use exonum_crypto::{Hash, HashStream};
