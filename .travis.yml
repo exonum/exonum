@@ -55,7 +55,7 @@ env:
   global:
   - DEADLINKS_VERS=0.3.0
   - RUSTFLAGS="-D warnings"
-  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
   - FEATURE=test
