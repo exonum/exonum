@@ -18,12 +18,20 @@ use crate::blockchain::ExecutionError;
 use crate::storage::Fork;
 
 mod rust;
+pub mod dispatcher;
 
 #[derive(Debug)]
 pub enum DeployError {
     WrongArtifact,
     FailedToDeploy,
     AlreadyDeployed,
+}
+
+#[derive(Debug)]
+pub enum DeployStatus {
+    DeployInProgress,
+    Deployed,
+    DeployErrored(DeployError)
 }
 
 #[derive(Debug)]
@@ -57,19 +65,19 @@ pub enum ArtifactSpec {
 /// Service runtime environment.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait RuntimeEnvironment {
-    /// Deploy artifact.
-    fn deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    /// Start artifact deploy.
+    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+
+    /// Check deployment status.
+    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>;
 
     /// Init artifact with given ID and constructor parameters.
-    fn start_init(
+    fn init_service(
         &self,
         ctx: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError>;
-
-    /// Finalize artifact initialization.
-    fn finish_init(&self, ctx: &mut EnvContext, instance_id: ServiceInstanceId, abort: bool);
 
     /// Execute transaction.
     fn execute(&self, ctx: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]);

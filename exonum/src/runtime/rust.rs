@@ -18,7 +18,7 @@ use crate::blockchain::ExecutionError;
 
 use super::{
     ArtifactSpec, DeployError, DispatchInfo, EnvContext, InitError, InstanceInitData, InterfaceId,
-    RuntimeEnvironment, ServiceInstanceId,
+    RuntimeEnvironment, ServiceInstanceId, DeployStatus
 };
 
 #[derive(Default)]
@@ -47,7 +47,7 @@ pub struct RustArtifactSpec {
 }
 
 impl RuntimeEnvironment for RustRuntime {
-    fn deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
             artifact
         } else {
@@ -68,7 +68,24 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn start_init(
+    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>
+    {
+        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
+            artifact
+        } else {
+            return Err(DeployError::WrongArtifact);
+        };
+
+        let mut inner = self.inner.read().expect("rust runtime read");
+
+        if inner.deployed.get(&artifact).is_some() {
+            Ok(DeployStatus::Deployed)
+        } else {
+            Err(DeployError::FailedToDeploy)
+        }
+    }
+
+    fn init_service(
         &self,
         _: &mut EnvContext,
         artifact: ArtifactSpec,
@@ -96,12 +113,6 @@ impl RuntimeEnvironment for RustRuntime {
             return Err(InitError::ServiceIdExists);
         }
         Ok(())
-    }
-
-    fn finish_init(&self, _: &mut EnvContext, _: ServiceInstanceId, abort: bool) {
-        if abort {
-            unimplemented!()
-        }
     }
 
     fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) {
@@ -185,12 +196,12 @@ mod tests {
     fn test_rust_runtime_env() {
         let db = MemoryDB::new();
 
-        let mut runtime = RustRuntime::default();
+        let runtime = RustRuntime::default();
         let (serv_spec, serv_impl) = get_test_service_artifact();
         runtime.add_artifact(serv_spec.clone(), serv_impl);
 
         runtime
-            .deploy(ArtifactSpec::Rust(serv_spec.clone()))
+            .start_deploy(ArtifactSpec::Rust(serv_spec.clone()))
             .unwrap();
 
         let init_data = InstanceInitData {
@@ -202,13 +213,12 @@ mod tests {
             let mut fork = db.fork();
             let mut context = EnvContext::from_fork(&mut fork);
             runtime
-                .start_init(
+                .init_service(
                     &mut context,
                     ArtifactSpec::Rust(serv_spec.clone()),
                     &init_data,
                 )
                 .unwrap();
-            runtime.finish_init(&mut context, 2, false);
         }
 
         let dispatch_info = DispatchInfo {
