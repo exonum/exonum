@@ -96,6 +96,7 @@ pub struct ProofMapIndexValues<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
 }
 
+/// TODO Clarify documentation. [ECR-2820]
 enum RemoveAction {
     KeyNotFound,
     Leaf,
@@ -739,14 +740,12 @@ where
     /// ```
     pub fn remove(&mut self, key: &K) {
         let proof_path = ProofPath::new(key);
-        let root_path = match self.get_root_node() {
+        match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
                 if proof_path == prefix {
                     self.remove_leaf(&proof_path, key);
-                    None
-                } else {
-                    return;
+                    self.update_root_path(None);
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
@@ -756,19 +755,18 @@ where
                     let suffix_path = proof_path.suffix(i);
                     match self.remove_node(&branch, &suffix_path, key) {
                         RemoveAction::Leaf => {
+                            // After removing one of leaves second child becomes a new root.
                             self.base.remove(&prefix);
-                            Some(branch.child_path(!suffix_path.bit(0)))
+                            self.update_root_path(Some(branch.child_path(!suffix_path.bit(0))));
                         }
                         RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             self.base.put(&prefix, branch);
-                            Some(prefix)
                         }
                         RemoveAction::UpdateHash(hash) => {
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             self.base.put(&prefix, branch);
-                            Some(prefix)
                         }
                         RemoveAction::KeyNotFound => return,
                     }
@@ -777,8 +775,7 @@ where
                 }
             }
             None => return,
-        };
-        self.update_root_path(root_path);
+        }
     }
 
     /// Clears the proof map, removing all entries.

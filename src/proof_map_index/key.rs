@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use std::{
+    borrow::Cow,
     cmp::{min, Ordering},
     io::{Cursor, Write},
     ops,
-    borrow::Cow,
 };
 
 use leb128;
