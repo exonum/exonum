@@ -14,9 +14,10 @@
 
 use std::{collections::HashMap, sync::RwLock};
 
+use crate::proto::{self, ProtobufConvert};
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, InterfaceId,
+    ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, MethodId,
     RuntimeEnvironment, ServiceInstanceId,
 };
 
@@ -39,10 +40,11 @@ struct RustRuntimeInner {
     initialized: HashMap<ServiceInstanceId, RustArtifactData>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "proto::schema::runtime::RustArtifactSpec", crate = "crate")]
 pub struct RustArtifactSpec {
     name: String,
-    version: (usize, usize, usize),
+    version: String,
 }
 
 impl RuntimeEnvironment for RustRuntime {
@@ -121,8 +123,7 @@ impl RuntimeEnvironment for RustRuntime {
     ) -> Result<(), ExecutionError> {
         let inner = self.inner.read().unwrap();
         let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
-        let interface = instance.interfaces.get(&dispatch.interface_id).unwrap();
-        let handler = interface.methods.get(dispatch.method_id as usize).unwrap();
+        let handler = instance.methods.get(&dispatch.method_id).unwrap();
 
         let mut ctx = TransactionContext::from_env_ctx(context);
 
@@ -146,12 +147,8 @@ struct Handler {
     pub fun_untyped: Box<dyn Fn(&mut TransactionContext, &[u8]) -> Result<(), ExecutionError>>,
 }
 
-struct ServiceInterface {
-    methods: Vec<Handler>,
-}
-
 struct RustArtifactData {
-    interfaces: HashMap<InterfaceId, ServiceInterface>,
+    methods: HashMap<MethodId, Handler>,
 }
 
 #[cfg(test)]
@@ -168,7 +165,8 @@ mod tests {
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
-    fn get_example_interface() -> ServiceInterface {
+
+    fn get_example_interface() -> RustArtifactData {
         let handler = Handler {
             fun_untyped: Box::new(
                 |ctx: &mut TransactionContext, payload: &[u8]| -> Result<(), ExecutionError> {
@@ -178,21 +176,19 @@ mod tests {
                 },
             ),
         };
-        ServiceInterface {
-            methods: vec![handler],
+        let mut methods = HashMap::new();
+        methods.insert("method".to_owned(), handler);
+        RustArtifactData {
+            methods,
         }
     }
     fn get_test_service_artifact() -> (RustArtifactSpec, RustArtifactData) {
         let spec = RustArtifactSpec {
             name: "service.zero".to_owned(),
-            version: (1, 0, 0),
+            version: "1.0.0".to_owned(),
         };
 
-        let interface_id = 4;
-        let interfaces = vec![(interface_id, get_example_interface())]
-            .into_iter()
-            .collect();
-        let data = RustArtifactData { interfaces };
+        let data = get_example_interface();
 
         (spec, data)
     }
@@ -228,8 +224,7 @@ mod tests {
 
         let dispatch_info = DispatchInfo {
             instance_id: 2,
-            interface_id: 4,
-            method_id: 0,
+            method_id: "method".to_string(),
         };
         let payload = {
             let mut tx = TimestampTx::new();

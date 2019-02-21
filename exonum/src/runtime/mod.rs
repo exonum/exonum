@@ -30,7 +30,7 @@ pub enum DeployStatus {
 }
 
 type ServiceInstanceId = u32;
-type InterfaceId = u32;
+type MethodId = String;
 
 #[derive(Debug)]
 pub struct InstanceInitData {
@@ -41,8 +41,13 @@ pub struct InstanceInitData {
 #[derive(Debug)]
 pub struct DispatchInfo {
     pub instance_id: ServiceInstanceId,
-    pub interface_id: InterfaceId,
-    pub method_id: u32,
+    pub method_id: MethodId,
+}
+
+#[derive(Debug)]
+pub enum RuntimeIdentifier {
+    Rust,
+    Java
 }
 
 #[derive(Debug)]
