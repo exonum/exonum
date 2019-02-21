@@ -221,10 +221,7 @@ where
     }
 
     fn get_root_path(&self) -> Option<ProofPath> {
-        self.base
-            .iter::<_, ProofPath, _>(&())
-            .next()
-            .map(|(k, _): (ProofPath, ())| k)
+        self.base.get(&())
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node)> {
@@ -519,6 +516,14 @@ where
         self.base.remove(&key.to_value_path());
     }
 
+    fn update_root_path(&mut self, path: Option<ProofPath>) {
+        if let Some(path) = path {
+            self.base.put(&(), path);
+        } else {
+            self.base.remove(&());
+        }
+    }
+
     // Inserts a new node of the current branch and returns the updated hash
     // or, if a new node has a shorter key, returns a new key length.
     fn insert_branch(
@@ -653,7 +658,7 @@ where
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
         let proof_path = ProofPath::new(key);
-        match self.get_root_node() {
+        let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_path = prefix;
                 let i = prefix_path.common_prefix_len(&proof_path);
@@ -669,6 +674,9 @@ where
                     );
                     let new_prefix = proof_path.prefix(i);
                     self.base.put(&new_prefix, branch);
+                    new_prefix
+                } else {
+                    proof_path
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
@@ -684,6 +692,7 @@ where
                         None => branch.set_child_hash(suffix_path.bit(0), &h),
                     };
                     self.base.put(&prefix_path, branch);
+                    prefix_path
                 } else {
                     // Inserts a new branch and adds current branch as its child
                     let hash = self.insert_leaf(&proof_path, key, value);
@@ -697,12 +706,15 @@ where
                     // Saves a new branch
                     let new_prefix = prefix_path.prefix(i);
                     self.base.put(&new_prefix, new_branch);
+                    new_prefix
                 }
             }
             None => {
                 self.insert_leaf(&proof_path, key, value);
+                proof_path
             }
-        }
+        };
+        self.update_root_path(Some(root_path));
     }
 
     /// Removes a key from the proof map.
@@ -727,11 +739,14 @@ where
     /// ```
     pub fn remove(&mut self, key: &K) {
         let proof_path = ProofPath::new(key);
-        match self.get_root_node() {
+        let root_path = match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
                 if proof_path == prefix {
                     self.remove_leaf(&proof_path, key);
+                    None
+                } else {
+                    return;
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
@@ -740,22 +755,30 @@ where
                 if i == prefix.len() {
                     let suffix_path = proof_path.suffix(i);
                     match self.remove_node(&branch, &suffix_path, key) {
-                        RemoveAction::Leaf => self.base.remove(&prefix),
+                        RemoveAction::Leaf => {
+                            self.base.remove(&prefix);
+                            Some(branch.child_path(!suffix_path.bit(0)))
+                        }
                         RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             self.base.put(&prefix, branch);
+                            Some(prefix)
                         }
                         RemoveAction::UpdateHash(hash) => {
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             self.base.put(&prefix, branch);
+                            Some(prefix)
                         }
                         RemoveAction::KeyNotFound => return,
                     }
+                } else {
+                    return;
                 }
             }
-            None => (),
-        }
+            None => return,
+        };
+        self.update_root_path(root_path);
     }
 
     /// Clears the proof map, removing all entries.
