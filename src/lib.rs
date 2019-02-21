@@ -138,7 +138,7 @@ pub use self::{
     map_index::MapIndex,
     options::DbOptions,
     proof_list_index::{ListProof, ProofListIndex},
-    // sparse_list_index::SparseListIndex,
+    sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
     views::{IndexAccess, IndexBuilder},

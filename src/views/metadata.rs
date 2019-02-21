@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, cell::RefCell, mem};
+use std::{borrow::Cow, cell::Cell, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
@@ -86,7 +86,7 @@ impl Default for IndexType {
 }
 
 /// TODO Add documentation. [ECR-2820]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V> {
     identifier: u64,
     index_type: IndexType,
@@ -144,7 +144,7 @@ impl<V> IndexMetadata<V> {
 impl IndexAddress {
     fn index_name(&self) -> Vec<u8> {
         if let Some(bytes) = self.bytes() {
-            concat_keys!(self.name(), bytes)
+            concat_keys!(self.name(), &[0], bytes)
         } else {
             concat_keys!(self.name())
         }
@@ -171,7 +171,7 @@ where
         );
         metadata
     } else {
-        pool.set_index_metadata(&index_name, index_type)
+        pool.create_index_metadata(&index_name, index_type)
     };
 
     let index_address = metadata.index_address();
@@ -195,7 +195,7 @@ impl<T: IndexAccess> IndexesPool<T> {
         self.0.get(index_name)
     }
 
-    fn set_index_metadata<V>(
+    fn create_index_metadata<V>(
         &mut self,
         index_name: &[u8],
         index_type: IndexType,
@@ -229,7 +229,7 @@ where
 {
     index_access: T,
     index_name: Vec<u8>,
-    cache: RefCell<IndexMetadata<V>>,
+    cache: Cell<IndexMetadata<V>>,
 }
 
 impl<T, V> IndexState<T, V>
@@ -237,17 +237,17 @@ where
     V: BinaryAttribute + Default + Copy,
     T: IndexAccess,
 {
-    pub fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>) -> Self {
+    fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>) -> Self {
         Self {
             index_access,
             index_name,
-            cache: RefCell::new(metadata),
+            cache: Cell::new(metadata),
         }
     }
 
     /// TODO Add documentation. [ECR-2820]
     pub fn get(&self) -> V {
-        self.cache.borrow().state
+        self.cache.get().state
     }
 
     /// TODO Add documentation. [ECR-2820]
@@ -275,7 +275,7 @@ mod tests {
 
     use crate::BinaryValue;
 
-    use super::{IndexMetadata, IndexType, BinaryAttribute};
+    use super::{BinaryAttribute, IndexMetadata, IndexType};
 
     #[test]
     fn test_binary_attribute_read_write() {
