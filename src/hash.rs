@@ -37,6 +37,7 @@ pub enum HashTag {
     MapNode = 3,
     /// Hash prefix of the map branch node object.
     MapBranchNode = 4,
+    MapLeafNode = 5,
 }
 
 /// Calculate hash value with the specified prefix.
@@ -134,6 +135,13 @@ impl HashTag {
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
             .update(branch_node)
+            .hash()
+    }
+
+    pub fn hash_map_leaf(leaf: &[u8]) -> Hash {
+        HashStream::new()
+            .update(&[HashTag::MapLeafNode as u8])
+            .update(leaf)
             .hash()
     }
 
