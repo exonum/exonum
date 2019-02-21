@@ -26,8 +26,6 @@ use super::{IndexAccess, IndexAddress, View};
 
 /// TODO Add documentation. [ECR-2820]
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
-/// TODO Add documentation. [ECR-2820]
-const INDEXES_POOL_LEN_NAME: &str = "INDEXES_POOL_LEN";
 
 /// TODO Add documentation. [ECR-2820]
 #[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
@@ -188,6 +186,14 @@ impl<T: IndexAccess> IndexesPool<T> {
         Self(View::new(index_access, pool_address))
     }
 
+    fn len(&self) -> u64 {
+        self.0.get(&()).unwrap_or_default()
+    }
+
+    fn set_len(&mut self, len: u64) {
+        self.0.put(&(), len)
+    }
+
     fn index_metadata<V>(&self, index_name: &[u8]) -> Option<IndexMetadata<V>>
     where
         V: BinaryAttribute + Default + Copy,
@@ -203,11 +209,7 @@ impl<T: IndexAccess> IndexesPool<T> {
     where
         V: BinaryAttribute + Default + Copy,
     {
-        let mut pool_len = View::new(
-            self.0.index_access,
-            IndexAddress::from(INDEXES_POOL_LEN_NAME),
-        );
-        let len: u64 = pool_len.get(&()).unwrap_or_default();
+        let len = self.len();
 
         let metadata = IndexMetadata {
             index_type,
@@ -216,7 +218,7 @@ impl<T: IndexAccess> IndexesPool<T> {
         };
 
         self.0.put(index_name, metadata.to_bytes());
-        pool_len.put(&(), len + 1);
+        self.set_len(len + 1);
         metadata
     }
 }

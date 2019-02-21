@@ -761,6 +761,15 @@ fn test_index_builder_without_type() {
 }
 
 #[test]
+#[should_panic(expected = "Index name must not be empty")]
+fn test_index_builder_without_name() {
+    let db = TemporaryDB::new();
+    // Creates the index metadata.
+    let fork = db.fork();
+    IndexBuilder::new(&fork).build::<()>();    
+}
+
+#[test]
 #[should_panic(expected = "Index type doesn't match specified")]
 fn test_metadata_index_usual_incorrect() {
     let db = TemporaryDB::new();
