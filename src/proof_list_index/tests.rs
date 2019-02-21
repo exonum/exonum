@@ -316,7 +316,7 @@ fn test_randomly_generate_proofs() {
 }
 
 fn hash_leaf_node(value: &[u8]) -> Hash {
-    HashTag::ListLeaf.hash_stream().update(value).hash()
+    HashTag::Blob.hash_stream().update(value).hash()
 }
 
 fn hash_branch_node(value: &[u8]) -> Hash {

@@ -27,8 +27,8 @@ const EMPTY_MAP_HASH: &str = "7324b5c72b51bb5d4c180f1109cfd347b60473882145841c39
 #[derive(Copy, Clone, Debug)]
 /// `MerkleDB` hash prefixes.
 pub enum HashTag {
-    /// Hash prefix of a leaf node of the merkle tree.
-    ListLeaf = 0,
+    /// Hash prefix of a blob.
+    Blob = 0,
     /// Hash prefix of a branch node of the merkle tree.
     ListBranchNode = 1,
     /// Hash prefix of the list object.
@@ -37,7 +37,6 @@ pub enum HashTag {
     MapNode = 3,
     /// Hash prefix of the map branch node object.
     MapBranchNode = 4,
-    MapLeafNode = 5,
 }
 
 /// Calculate hash value with the specified prefix.
@@ -80,7 +79,7 @@ impl HashTag {
 
     /// Convenience method to obtain a hashed value of the merkle tree leaf.
     pub fn hash_leaf(value: &[u8]) -> Hash {
-        HashTag::ListLeaf.hash_stream().update(value).hash()
+        HashTag::Blob.hash_stream().update(value).hash()
     }
 
     /// Hash of the list object.
@@ -140,7 +139,7 @@ impl HashTag {
 
     pub fn hash_map_leaf(leaf: &[u8]) -> Hash {
         HashStream::new()
-            .update(&[HashTag::MapLeafNode as u8])
+            .update(&[HashTag::Blob as u8])
             .update(leaf)
             .hash()
     }
