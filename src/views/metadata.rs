@@ -42,6 +42,11 @@ pub enum IndexType {
     Unknown = 255,
 }
 
+/// Index state attribute tag.
+const INDEX_STATE_TAG: u32 = 0;
+/// Separator between the name and the additional bytes in family indexes.
+const INDEX_NAME_SEPARATOR: &[u8] = &[0];
+
 /// TODO Add documentation. [ECR-2820]
 pub trait BinaryAttribute {
     /// TODO Add documentation. [ECR-2820]
@@ -101,12 +106,15 @@ where
             mem::size_of_val(&self.identifier)
                 + mem::size_of_val(&self.index_type)
                 + mem::size_of::<u32>()
+                + mem::size_of_val(&INDEX_STATE_TAG)
                 + state_len,
         );
 
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
+        // Writes indes state in TLV (tag, lenght, value) form.
+        buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
         buf.write_u32::<LittleEndian>(state_len as u32).unwrap();
         self.state.write(&mut buf);
         buf
@@ -117,8 +125,15 @@ where
 
         let identifier = bytes.read_u64::<LittleEndian>()?;
         let index_type = bytes.read_u32::<LittleEndian>()?;
+        // Reads index state in TLV (tag, lenght, value) form.
+        let state_tag = bytes.read_u32::<LittleEndian>()?;
         let state_len = bytes.read_u32::<LittleEndian>()? as usize;
 
+        ensure!(
+            state_tag == INDEX_STATE_TAG,
+            "Attribute with unknown tag: {}",
+            state_tag
+        );
         ensure!(bytes.len() >= state_len, "Index state is too short");
 
         let mut state_bytes = &bytes[0..state_len];
@@ -140,9 +155,9 @@ impl<V> IndexMetadata<V> {
 }
 
 impl IndexAddress {
-    fn index_name(&self) -> Vec<u8> {
+    fn fully_qualified_name(&self) -> Vec<u8> {
         if let Some(bytes) = self.bytes() {
-            concat_keys!(self.name(), &[0], bytes)
+            concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
         } else {
             concat_keys!(self.name())
         }
@@ -159,7 +174,7 @@ where
     T: IndexAccess,
     V: BinaryAttribute + Copy + Default,
 {
-    let index_name = index_address.index_name();
+    let index_name = index_address.fully_qualified_name();
 
     let mut pool = IndexesPool::new(index_access);
     let metadata = if let Some(metadata) = pool.index_metadata(&index_name) {
@@ -302,6 +317,20 @@ mod tests {
         };
 
         let bytes = metadata.to_bytes();
+        assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
+    }
+
+    #[test]
+    #[should_panic(expected = "Attribute with unknown tag")]
+    fn test_index_metadata_unknown_tag() {
+        let metadata = IndexMetadata {
+            identifier: 12,
+            index_type: IndexType::ProofList,
+            state: 16_u64,
+        };
+
+        let mut bytes = metadata.to_bytes();
+        bytes[13] = 1; // Modifies index state tag.
         assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
     }
 }

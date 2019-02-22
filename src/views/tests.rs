@@ -766,7 +766,7 @@ fn test_index_builder_without_name() {
     let db = TemporaryDB::new();
     // Creates the index metadata.
     let fork = db.fork();
-    IndexBuilder::new(&fork).build::<()>();    
+    IndexBuilder::new(&fork).build::<()>();
 }
 
 #[test]
