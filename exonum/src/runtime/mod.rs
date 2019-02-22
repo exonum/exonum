@@ -39,7 +39,7 @@ pub struct InstanceInitData {
 }
 
 #[derive(Debug)]
-pub struct DispatchInfo {
+pub struct CallInfo {
     pub instance_id: ServiceInstanceId,
     pub method_id: MethodId,
 }
@@ -77,7 +77,7 @@ pub trait RuntimeEnvironment {
     fn execute(
         &self,
         ctx: &mut EnvContext,
-        dispatch: DispatchInfo,
+        dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 }

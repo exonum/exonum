@@ -16,7 +16,7 @@ use std::{collections::HashMap, sync::RwLock};
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, MethodId,
+    ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, MethodId,
     RuntimeEnvironment, ServiceInstanceId,
 };
 
@@ -116,7 +116,7 @@ impl RuntimeEnvironment for RustRuntime {
     fn execute(
         &self,
         context: &mut EnvContext,
-        dispatch: DispatchInfo,
+        dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let inner = self.inner.read().unwrap();
@@ -195,14 +195,17 @@ mod tests {
     fn test_rust_runtime_env() {
         let db = MemoryDB::new();
 
+        // Add service to deployable.
         let runtime = RustRuntime::default();
         let (serv_spec, serv_impl) = get_test_service_artifact();
         runtime.add_artifact(serv_spec.clone(), serv_impl);
 
+        // Deploy service.
         runtime
             .start_deploy(ArtifactSpec::Rust(serv_spec.clone()))
             .unwrap();
 
+        // Init service.
         let init_data = InstanceInitData {
             instance_id: 2,
             constructor_data: None,
@@ -220,7 +223,8 @@ mod tests {
                 .unwrap();
         }
 
-        let dispatch_info = DispatchInfo {
+        // Execute transaction.
+        let dispatch_info = CallInfo {
             instance_id: 2,
             method_id: "method".to_string(),
         };

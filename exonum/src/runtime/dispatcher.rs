@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, RuntimeEnvironment,
 };
 
 #[derive(Default)]
@@ -69,7 +69,7 @@ impl RuntimeEnvironment for Dispatcher {
     fn execute(
         &self,
         _context: &mut EnvContext,
-        _dispatch: DispatchInfo,
+        _dispatch: CallInfo,
         _payload: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -103,7 +103,7 @@ mod tests {
         fn execute(
             &self,
             _: &mut EnvContext,
-            _: DispatchInfo,
+            _: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
             Ok(())
@@ -133,7 +133,7 @@ mod tests {
         fn execute(
             &self,
             _: &mut EnvContext,
-            _: DispatchInfo,
+            _: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
             Ok(())
