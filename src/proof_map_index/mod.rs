@@ -17,11 +17,15 @@
 #[doc(hidden)]
 pub use self::node::{BranchNode, Node};
 pub use self::{
-    key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE},
+    key::{ProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError},
 };
 
-use std::{fmt, marker::PhantomData};
+use std::{
+    fmt,
+    io::{Read, Write},
+    marker::PhantomData,
+};
 
 use exonum_crypto::Hash;
 
@@ -30,8 +34,10 @@ use self::{
     proof::{create_multiproof, create_proof},
 };
 use crate::{
-    views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue, HashTag, ObjectHash,
+    views::{
+        BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
+    },
+    BinaryKey, BinaryValue, UniqueHash,
 };
 
 mod key;
@@ -51,6 +57,7 @@ mod tests;
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 pub struct ProofMapIndex<T: IndexAccess, K, V> {
     base: View<T>,
+    state: IndexState<T, Option<ProofPath>>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -128,6 +135,32 @@ impl<T: BinaryKey> ValuePath for T {
     }
 }
 
+impl BinaryAttribute for Option<ProofPath> {
+    fn size(&self) -> usize {
+        match self {
+            Some(path) => path.size(),
+            None => 0,
+        }
+    }
+
+    fn write<W: Write>(&self, buffer: &mut W) {
+        if let Some(path) = self {
+            let mut tmp = [0_u8; PROOF_PATH_SIZE];
+            path.write(&mut tmp);
+            buffer.write_all(&tmp).unwrap();
+        }
+    }
+
+    fn read<R: Read>(buffer: &mut R) -> Self {
+        let mut tmp = [0_u8; PROOF_PATH_SIZE];
+        match buffer.read(&mut tmp).unwrap() {
+            0 => None,
+            PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
+            other => panic!("Unexpected attribute lenght: {}", other),
+        }
+    }
+}
+
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
@@ -158,12 +191,13 @@ where
     /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &fork);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, _state) = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::ProofMap)
             .index_name(index_name)
-            .build::<()>();
+            .build();
         Self {
             base,
+            state,
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -209,20 +243,21 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let (base, _state) = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::ProofMap)
             .index_name(family_name)
             .family_id(index_id)
-            .build::<()>();
+            .build();
         Self {
             base,
+            state,
             _k: PhantomData,
             _v: PhantomData,
         }
     }
 
     fn get_root_path(&self) -> Option<ProofPath> {
-        self.base.get(&())
+        self.state.get()
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node)> {
@@ -518,11 +553,7 @@ where
     }
 
     fn update_root_path(&mut self, path: Option<ProofPath>) {
-        if let Some(path) = path {
-            self.base.put(&(), path);
-        } else {
-            self.base.remove(&());
-        }
+        self.state.set(path)
     }
 
     // Inserts a new node of the current branch and returns the updated hash
@@ -805,7 +836,8 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn clear(&mut self) {
-        self.base.clear()
+        self.base.clear();
+        self.state.clear();
     }
 }
 

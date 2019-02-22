@@ -274,6 +274,11 @@ where
         View::new(self.index_access, IndexAddress::from(INDEXES_POOL_NAME))
             .put(&self.index_name, cache.to_bytes());
     }
+
+    /// TODO Add documentation. [ECR-2820]
+    pub fn clear(&mut self) {
+        self.set(V::default());
+    }
 }
 
 impl<T, V> std::fmt::Debug for IndexState<T, V>

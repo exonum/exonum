@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::{
-    borrow::Cow,
     cmp::{min, Ordering},
     io::{Cursor, Write},
     ops,
@@ -23,7 +22,7 @@ use leb128;
 
 use exonum_crypto::HASH_SIZE;
 
-use crate::{BinaryKey, BinaryValue, UniqueHash};
+use crate::{BinaryKey, UniqueHash};
 
 /// This prefix defines a node as a branch.
 pub const BRANCH_KEY_PREFIX: u8 = 0;
@@ -440,17 +439,6 @@ impl ::std::fmt::Debug for ProofPath {
             .field("end", &self.end())
             .field("bits", &bits)
             .finish()
-    }
-}
-
-impl BinaryValue for ProofPath {
-    fn to_bytes(&self) -> Vec<u8> {
-        concat_keys!(self)
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> crate::Result<Self> {
-        let bytes = bytes.as_ref();
-        Ok(Self::read(bytes))
     }
 }
 
