@@ -412,8 +412,7 @@ impl NodeHandler {
                     .state
                     .prevotes(prevote_round, propose_hash)
                     .iter()
-                    .map(|p| p.clone().into())
-                    .collect::<Vec<_>>();
+                    .map(|p| p.clone().into());
                 self.blockchain.save_messages(round, raw_messages);
 
                 self.state.lock(round, propose_hash);
@@ -826,7 +825,7 @@ impl NodeHandler {
             }
         };
 
-        if let Some(data) = requested_data.clone() {
+        if let Some(data) = requested_data {
             self.request(data, key);
             false
         } else {
