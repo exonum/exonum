@@ -14,7 +14,6 @@
 
 use std::{collections::HashMap, sync::RwLock};
 
-use crate::proto::{self, ProtobufConvert};
 use super::{
     error::{DeployError, ExecutionError, InitError},
     ArtifactSpec, DeployStatus, DispatchInfo, EnvContext, InstanceInitData, MethodId,
@@ -40,11 +39,10 @@ struct RustRuntimeInner {
     initialized: HashMap<ServiceInstanceId, RustArtifactData>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
-#[exonum(pb = "proto::schema::runtime::RustArtifactSpec", crate = "crate")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactSpec {
     name: String,
-    version: String,
+    version: (u32, u32, u32),
 }
 
 impl RuntimeEnvironment for RustRuntime {
@@ -185,7 +183,7 @@ mod tests {
     fn get_test_service_artifact() -> (RustArtifactSpec, RustArtifactData) {
         let spec = RustArtifactSpec {
             name: "service.zero".to_owned(),
-            version: "1.0.0".to_owned(),
+            version: (1, 0, 0),
         };
 
         let data = get_example_interface();
