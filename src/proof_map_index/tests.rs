@@ -311,6 +311,22 @@ fn test_remove_reverse() {
 }
 
 #[test]
+fn test_clear() {
+    let db = TemporaryDB::default();
+    let fork = db.fork();
+
+    let mut index = ProofMapIndex::new(IDX_NAME, &fork);
+    index.put(&[1; 32], 1);
+    let root_hash = index.merkle_root();
+
+    index.clear();
+    assert_eq!(index.merkle_root(), Hash::zero());
+
+    index.put(&[1; 32], 1);
+    assert_eq!(index.merkle_root(), root_hash);
+}
+
+#[test]
 fn test_merkle_root_leaf() {
     let db = TemporaryDB::default();
     let storage = db.fork();

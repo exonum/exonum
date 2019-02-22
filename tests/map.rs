@@ -125,6 +125,7 @@ mod proof_map_index {
                 }
                 MapAction::Clear => {
                     map.clear();
+                    assert_eq!(map.merkle_root(), exonum_crypto::Hash::zero());
                 }
                 _ => unreachable!(),
             }
