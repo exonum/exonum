@@ -13,7 +13,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   CLI for generating node configs and starting nodes has been extended
   in order to reflect these changes. (#1222, #1096, #1235)
 
-- Changed a response for `/healthcheck` end-point. (#1252)
+- Changed a response for `/healthcheck` endpoint. (#1252)
 
 #### exonum-crypto
 

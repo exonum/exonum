@@ -25,33 +25,6 @@ pub struct MemPoolInfo {
     pub size: u64,
 }
 
-/// Information about whether the node is connected to other peers.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-pub struct ConnectivityStatus {
-    /// The node has no connected peers.
-    connected: bool,
-    /// The node has connected peers. Amount of connected peers is stored within this variant.
-    connected_peers: usize,
-}
-
-impl ConnectivityStatus {
-    /// Creates `ConnectivityStatus` instance for not connected status.
-    pub fn not_connected() -> Self {
-        Self {
-            connected: false,
-            connected_peers: 0,
-        }
-    }
-
-    /// Creates `ConnectivityStatus` instance for connected status with peers count.
-    pub fn connected(connected_peers: usize) -> Self {
-        Self {
-            connected: true,
-            connected_peers,
-        }
-    }
-}
-
 /// Information about whether it is possible to achieve the consensus between
 /// validators in the current state.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -70,8 +43,8 @@ pub enum ConsensusStatus {
 pub struct HealthCheckInfo {
     /// Consensus status.
     pub consensus_status: ConsensusStatus,
-    /// Connectivity status.
-    pub connectivity: ConnectivityStatus,
+    /// The number of connected peers to the node.
+    pub connected_peers: usize,
 }
 
 /// Public system API.
@@ -109,21 +82,18 @@ impl SystemApi {
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(HealthCheckInfo {
                 consensus_status: self.get_consensus_status(),
-                connectivity: self.get_connectivity_status(),
+                connected_peers: self.get_number_of_connected_peers(),
             })
         });
         self_
     }
 
-    fn get_connectivity_status(&self) -> ConnectivityStatus {
+    fn get_number_of_connected_peers(&self) -> usize {
         let in_conn = self.shared_api_state.incoming_connections().len();
         let out_conn = self.shared_api_state.outgoing_connections().len();
-
-        if in_conn == 0 && out_conn == 0 {
-            ConnectivityStatus::not_connected()
-        } else {
-            ConnectivityStatus::connected(in_conn + out_conn)
-        }
+        // We sum incoming and outgoing connections here because we keep only one connection
+        // between nodes. A connection could be incoming or outgoing but only one.
+        in_conn + out_conn
     }
 
     fn get_consensus_status(&self) -> ConsensusStatus {
