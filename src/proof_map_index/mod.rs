@@ -156,7 +156,7 @@ impl BinaryAttribute for Option<ProofPath> {
         match buffer.read(&mut tmp).unwrap() {
             0 => None,
             PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
-            other => panic!("Unexpected attribute lenght: {}", other),
+            other => panic!("Unexpected attribute length: {}", other),
         }
     }
 }
