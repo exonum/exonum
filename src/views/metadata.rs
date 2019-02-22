@@ -113,7 +113,7 @@ where
         buf.write_u64::<LittleEndian>(self.identifier).unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
-        // Writes indes state in TLV (tag, lenght, value) form.
+        // Writes index state in TLV (tag, length, value) form.
         buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
         buf.write_u32::<LittleEndian>(state_len as u32).unwrap();
         self.state.write(&mut buf);
@@ -125,7 +125,7 @@ where
 
         let identifier = bytes.read_u64::<LittleEndian>()?;
         let index_type = bytes.read_u32::<LittleEndian>()?;
-        // Reads index state in TLV (tag, lenght, value) form.
+        // Reads index state in TLV (tag, length, value) form.
         let state_tag = bytes.read_u32::<LittleEndian>()?;
         let state_len = bytes.read_u32::<LittleEndian>()? as usize;
 
