@@ -14,10 +14,9 @@
 
 use std::{collections::HashMap, sync::RwLock};
 
-use crate::blockchain::ExecutionError;
-
 use super::{
-    ArtifactSpec, DeployError, DispatchInfo, EnvContext, InitError, InstanceInitData, InterfaceId,
+    error::{DeployError, ExecutionError, InitError},
+    ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, MethodId,
     RuntimeEnvironment, ServiceInstanceId,
 };
 
@@ -40,14 +39,14 @@ struct RustRuntimeInner {
     initialized: HashMap<ServiceInstanceId, RustArtifactData>,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactSpec {
     name: String,
-    version: (usize, usize, usize),
+    version: (u32, u32, u32),
 }
 
 impl RuntimeEnvironment for RustRuntime {
-    fn deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
             artifact
         } else {
@@ -68,7 +67,23 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn start_init(
+    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
+            artifact
+        } else {
+            return Err(DeployError::WrongArtifact);
+        };
+
+        let inner = self.inner.read().expect("rust runtime read");
+
+        if inner.deployed.get(&artifact).is_some() {
+            Ok(DeployStatus::Deployed)
+        } else {
+            Err(DeployError::FailedToDeploy)
+        }
+    }
+
+    fn init_service(
         &self,
         _: &mut EnvContext,
         artifact: ArtifactSpec,
@@ -98,44 +113,40 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn finish_init(&self, _: &mut EnvContext, _: ServiceInstanceId, abort: bool) {
-        if abort {
-            unimplemented!()
-        }
-    }
-
-    fn execute(&self, context: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]) {
+    fn execute(
+        &self,
+        context: &mut EnvContext,
+        dispatch: CallInfo,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError> {
         let inner = self.inner.read().unwrap();
         let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
-        let interface = instance.interfaces.get(&dispatch.interface_id).unwrap();
-        let handler = interface.methods.get(dispatch.method_id as usize).unwrap();
+        let handler = instance.methods.get(&dispatch.method_id).unwrap();
 
         let mut ctx = TransactionContext::from_env_ctx(context);
 
-        (handler.fun_untyped)(&mut ctx, payload);
+        (handler.fn_untyped)(&mut ctx, payload)
     }
 }
 
 struct TransactionContext<'a> {
-    env_context: &'a EnvContext<'a>,
+    _env_context: &'a EnvContext<'a>,
 }
 
 impl<'a> TransactionContext<'a> {
     fn from_env_ctx(env_context: &'a EnvContext<'a>) -> Self {
-        Self { env_context }
+        Self {
+            _env_context: env_context,
+        }
     }
 }
 
 struct Handler {
-    pub fun_untyped: Box<dyn Fn(&mut TransactionContext, &[u8]) -> Result<(), ExecutionError>>,
-}
-
-struct ServiceInterface {
-    methods: Vec<Handler>,
+    pub fn_untyped: Box<dyn Fn(&mut TransactionContext, &[u8]) -> Result<(), ExecutionError>>,
 }
 
 struct RustArtifactData {
-    interfaces: HashMap<InterfaceId, ServiceInterface>,
+    methods: HashMap<MethodId, Handler>,
 }
 
 #[cfg(test)]
@@ -147,14 +158,15 @@ mod tests {
 
     /// Test service description: method, interface constructor, artifact builder.
     fn example_method(
-        ctx: &mut TransactionContext,
-        tx: &TimestampTx,
+        _ctx: &mut TransactionContext,
+        _tx: &TimestampTx,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
-    fn get_example_interface() -> ServiceInterface {
+
+    fn get_example_interface() -> RustArtifactData {
         let handler = Handler {
-            fun_untyped: Box::new(
+            fn_untyped: Box::new(
                 |ctx: &mut TransactionContext, payload: &[u8]| -> Result<(), ExecutionError> {
                     let mut tx = TimestampTx::new();
                     tx.merge_from_bytes(payload).unwrap();
@@ -162,8 +174,10 @@ mod tests {
                 },
             ),
         };
-        ServiceInterface {
-            methods: vec![handler],
+        let mut methods = HashMap::new();
+        methods.insert("method".to_owned(), handler);
+        RustArtifactData {
+            methods,
         }
     }
     fn get_test_service_artifact() -> (RustArtifactSpec, RustArtifactData) {
@@ -172,11 +186,7 @@ mod tests {
             version: (1, 0, 0),
         };
 
-        let interface_id = 4;
-        let interfaces = vec![(interface_id, get_example_interface())]
-            .into_iter()
-            .collect();
-        let data = RustArtifactData { interfaces };
+        let data = get_example_interface();
 
         (spec, data)
     }
@@ -185,14 +195,17 @@ mod tests {
     fn test_rust_runtime_env() {
         let db = MemoryDB::new();
 
-        let mut runtime = RustRuntime::default();
+        // Add service to deployable.
+        let runtime = RustRuntime::default();
         let (serv_spec, serv_impl) = get_test_service_artifact();
         runtime.add_artifact(serv_spec.clone(), serv_impl);
 
+        // Deploy service.
         runtime
-            .deploy(ArtifactSpec::Rust(serv_spec.clone()))
+            .start_deploy(ArtifactSpec::Rust(serv_spec.clone()))
             .unwrap();
 
+        // Init service.
         let init_data = InstanceInitData {
             instance_id: 2,
             constructor_data: None,
@@ -202,19 +215,18 @@ mod tests {
             let mut fork = db.fork();
             let mut context = EnvContext::from_fork(&mut fork);
             runtime
-                .start_init(
+                .init_service(
                     &mut context,
                     ArtifactSpec::Rust(serv_spec.clone()),
                     &init_data,
                 )
                 .unwrap();
-            runtime.finish_init(&mut context, 2, false);
         }
 
-        let dispatch_info = DispatchInfo {
+        // Execute transaction.
+        let dispatch_info = CallInfo {
             instance_id: 2,
-            interface_id: 4,
-            method_id: 0,
+            method_id: "method".to_string(),
         };
         let payload = {
             let mut tx = TimestampTx::new();
@@ -224,7 +236,9 @@ mod tests {
         {
             let mut fork = db.fork();
             let mut context = EnvContext::from_fork(&mut fork);
-            runtime.execute(&mut context, dispatch_info, &payload);
+            runtime
+                .execute(&mut context, dispatch_info, &payload)
+                .unwrap();
         }
     }
 }

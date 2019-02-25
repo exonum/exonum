@@ -14,27 +14,22 @@
 
 use protobuf::well_known_types::Any;
 
-use crate::blockchain::ExecutionError;
 use crate::storage::Fork;
 
+pub mod dispatcher;
+pub mod error;
 mod rust;
 
-#[derive(Debug)]
-pub enum DeployError {
-    WrongArtifact,
-    FailedToDeploy,
-    AlreadyDeployed,
-}
+use error::{DeployError, ExecutionError, InitError};
 
 #[derive(Debug)]
-pub enum InitError {
-    WrongArtifact,
-    NotDeployed,
-    ServiceIdExists,
+pub enum DeployStatus {
+    DeployInProgress,
+    Deployed,
 }
 
 type ServiceInstanceId = u32;
-type InterfaceId = u32;
+type MethodId = String;
 
 #[derive(Debug)]
 pub struct InstanceInitData {
@@ -43,12 +38,18 @@ pub struct InstanceInitData {
 }
 
 #[derive(Debug)]
-pub struct DispatchInfo {
+pub struct CallInfo {
     pub instance_id: ServiceInstanceId,
-    pub interface_id: InterfaceId,
-    pub method_id: u32,
+    pub method_id: MethodId,
 }
 
+#[derive(Debug)]
+pub enum RuntimeIdentifier {
+    Rust,
+    Java
+}
+
+#[derive(Debug)]
 pub enum ArtifactSpec {
     Rust(rust::RustArtifactSpec),
     Java,
@@ -57,24 +58,30 @@ pub enum ArtifactSpec {
 /// Service runtime environment.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait RuntimeEnvironment {
-    /// Deploy artifact.
-    fn deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    /// Start artifact deploy.
+    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+
+    /// Check deployment status.
+    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>;
 
     /// Init artifact with given ID and constructor parameters.
-    fn start_init(
+    fn init_service(
         &self,
         ctx: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError>;
 
-    /// Finalize artifact initialization.
-    fn finish_init(&self, ctx: &mut EnvContext, instance_id: ServiceInstanceId, abort: bool);
-
     /// Execute transaction.
-    fn execute(&self, ctx: &mut EnvContext, dispatch: DispatchInfo, payload: &[u8]);
+    fn execute(
+        &self,
+        ctx: &mut EnvContext,
+        dispatch: CallInfo,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError>;
 }
 
+#[derive(Debug)]
 pub struct EnvContext<'a> {
     fork: &'a mut Fork,
     error: Option<ExecutionError>,
