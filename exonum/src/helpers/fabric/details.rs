@@ -38,12 +38,11 @@ use super::{
 use crate::api::backends::actix::AllowOrigin;
 use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::crypto::{generate_keys_file, PublicKey};
-use crate::helpers::{config::ConfigFile, generate_testnet_config, ZeroizeOnDrop};
+use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use crate::storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
-const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
 const LISTEN_ADDRESS: &str = "LISTEN_ADDRESS";
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
@@ -859,104 +858,6 @@ impl Command for Finalize {
             .get(keys::NODE_CONFIG)
             .expect("Could not create config from template, services return error");
         ConfigFile::save(&config, output_config_path).expect("Could not write config file.");
-
-        Feedback::None
-    }
-}
-
-/// Command for the testnet generation.
-pub struct GenerateTestnet;
-
-impl Command for GenerateTestnet {
-    fn args(&self) -> Vec<Argument> {
-        vec![
-            Argument::new_named(
-                OUTPUT_DIR,
-                true,
-                "Path to directory where save configs.",
-                "o",
-                "output-dir",
-                false,
-            ),
-            Argument::new_named(
-                "START_PORT",
-                false,
-                "Port number started from which should validators listen.",
-                "p",
-                "start",
-                false,
-            ),
-            Argument::new_positional("COUNT", true, "Count of validators in testnet."),
-        ]
-    }
-
-    fn name(&self) -> CommandName {
-        "generate-testnet"
-    }
-
-    fn about(&self) -> &str {
-        "Generates genesis configuration for testnet"
-    }
-
-    fn execute(
-        &self,
-        _commands: &HashMap<CommandName, CollectedCommand>,
-        mut context: Context,
-        exts: &dyn Fn(Context) -> Context,
-    ) -> Feedback {
-        let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
-        let validators_count: u16 = context.arg("COUNT").expect("count as int");
-        let start_port = context
-            .arg::<u16>("START_PORT")
-            .unwrap_or(DEFAULT_EXONUM_LISTEN_PORT);
-
-        if validators_count == 0 {
-            panic!("Can't generate testnet with zero nodes count.");
-        }
-
-        let dir = Path::new(&dir);
-        let dir = dir.join("validators");
-        if !dir.exists() {
-            fs::create_dir_all(&dir).unwrap();
-        }
-
-        let configs = generate_testnet_config(validators_count, start_port);
-        context.set(keys::CONFIGS, configs);
-        let new_context = exts(context);
-        let configs = new_context
-            .get(keys::CONFIGS)
-            .expect("Couldn't read testnet configs after exts call.");
-
-        for (idx, cfg) in configs.into_iter().enumerate() {
-            let cfg_filename = format!("{}.toml", idx);
-            let consensus_key_filename = format!("consensus{}.toml", idx);
-            let service_key_filename = format!("service{}.toml", idx);
-
-            let consensus_secret_key_path = dir.join(&consensus_key_filename);
-            let service_secret_key_path = dir.join(&service_key_filename);
-            let consensus_public_key = create_secret_key_file(&consensus_secret_key_path, &[]);
-            let service_public_key = create_secret_key_file(&service_secret_key_path, &[]);
-
-            let config_file_path = dir.join(cfg_filename);
-            let config: NodeConfig<PathBuf> = NodeConfig {
-                consensus_secret_key: consensus_key_filename.into(),
-                service_secret_key: service_key_filename.into(),
-                consensus_public_key,
-                service_public_key,
-                genesis: cfg.genesis,
-                listen_address: cfg.listen_address,
-                external_address: cfg.external_address,
-                network: cfg.network,
-                api: cfg.api,
-                mempool: cfg.mempool,
-                services_configs: cfg.services_configs,
-                database: cfg.database,
-                connect_list: cfg.connect_list,
-                thread_pool_size: cfg.thread_pool_size,
-            };
-
-            ConfigFile::save(&config, &config_file_path).unwrap();
-        }
 
         Feedback::None
     }

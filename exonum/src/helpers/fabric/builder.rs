@@ -22,7 +22,7 @@ use std::{
 
 use super::{
     clap_backend::ClapBackend,
-    details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run, RunDev},
+    details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, Run, RunDev},
     info::Info,
     internal::{CollectedCommand, Command, Feedback},
     keys,
@@ -131,8 +131,7 @@ impl NodeBuilder {
 
     fn commands() -> HashMap<CommandName, CollectedCommand> {
         vec![
-            Box::new(GenerateTestnet) as Box<dyn Command>,
-            Box::new(Run),
+            Box::new(Run) as Box<dyn Command>,
             Box::new(RunDev),
             Box::new(GenerateNodeConfig),
             Box::new(GenerateCommonConfig),
