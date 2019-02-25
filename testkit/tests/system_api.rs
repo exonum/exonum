@@ -18,7 +18,7 @@ extern crate pretty_assertions;
 use exonum::{
     api::node::{
         private::NodeInfo,
-        public::system::{ConnectivityStatus, ConsensusStatus, HealthCheckInfo},
+        public::system::{ConsensusStatus, HealthCheckInfo},
     },
     helpers::user_agent,
     messages::PROTOCOL_MAJOR_VERSION,
@@ -38,7 +38,7 @@ fn healthcheck() {
     let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
     let expected = HealthCheckInfo {
         consensus_status: ConsensusStatus::Enabled,
-        connectivity: ConnectivityStatus::NotConnected,
+        connected_peers: 0,
     };
     assert_eq!(info, expected);
 }
