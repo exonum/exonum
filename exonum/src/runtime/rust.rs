@@ -125,7 +125,7 @@ impl RuntimeEnvironment for RustRuntime {
 
         let mut ctx = TransactionContext::from_env_ctx(context);
 
-        (handler.fun_untyped)(&mut ctx, payload)
+        (handler.fn_untyped)(&mut ctx, payload)
     }
 }
 
@@ -142,7 +142,7 @@ impl<'a> TransactionContext<'a> {
 }
 
 struct Handler {
-    pub fun_untyped: Box<dyn Fn(&mut TransactionContext, &[u8]) -> Result<(), ExecutionError>>,
+    pub fn_untyped: Box<dyn Fn(&mut TransactionContext, &[u8]) -> Result<(), ExecutionError>>,
 }
 
 struct RustArtifactData {
@@ -166,7 +166,7 @@ mod tests {
 
     fn get_example_interface() -> RustArtifactData {
         let handler = Handler {
-            fun_untyped: Box::new(
+            fn_untyped: Box::new(
                 |ctx: &mut TransactionContext, payload: &[u8]| -> Result<(), ExecutionError> {
                     let mut tx = TimestampTx::new();
                     tx.merge_from_bytes(payload).unwrap();
