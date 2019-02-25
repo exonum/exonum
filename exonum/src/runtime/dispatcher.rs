@@ -47,8 +47,6 @@ struct Dispatcher {
     runtimes: HashMap<String, Box<dyn RuntimeEnvironment>>,
 }
 
-impl Dispatcher {}
-
 impl RuntimeEnvironment for Dispatcher {
     fn start_deploy(&self, _artifact: ArtifactSpec) -> Result<(), DeployError> {
         Ok(())
