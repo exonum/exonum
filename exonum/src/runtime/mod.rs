@@ -26,7 +26,6 @@ use error::{DeployError, ExecutionError, InitError};
 pub enum DeployStatus {
     DeployInProgress,
     Deployed,
-    DeployErrored(DeployError),
 }
 
 type ServiceInstanceId = u32;
