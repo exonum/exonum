@@ -60,6 +60,11 @@ impl HashTag {
         HashStream::new().update(&[self as u8])
     }
 
+    /// Convenience method to obtain a hashed value of the merkle tree leaf.
+    pub fn hash_leaf(value: &[u8]) -> Hash {
+        HashTag::Blob.hash_stream().update(value).hash()
+    }
+
     /// Convenience method to obtain hashed value of the merkle tree node.
     pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
         HashTag::ListBranchNode
@@ -75,11 +80,6 @@ impl HashTag {
             .hash_stream()
             .update(hash.as_ref())
             .hash()
-    }
-
-    /// Convenience method to obtain a hashed value of the merkle tree leaf.
-    pub fn hash_leaf(value: &[u8]) -> Hash {
-        HashTag::Blob.hash_stream().update(value).hash()
     }
 
     /// Hash of the list object.
@@ -134,13 +134,6 @@ impl HashTag {
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
             .update(branch_node)
-            .hash()
-    }
-
-    pub fn hash_map_leaf(leaf: &[u8]) -> Hash {
-        HashStream::new()
-            .update(&[HashTag::Blob as u8])
-            .update(leaf)
             .hash()
     }
 

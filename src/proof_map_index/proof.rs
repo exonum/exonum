@@ -238,7 +238,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &fork);
-/// let (h1, h2) = (HashTag::hash_map_leaf(&[1]), HashTag::hash_map_leaf(&[2]));
+/// let (h1, h2) = (HashTag::hash_leaf(&[1]), HashTag::hash_leaf(&[2]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
 ///
@@ -246,7 +246,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// assert_eq!(
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
-///         "proof": [ { "path": ProofPath::new(&h1), "hash": HashTag::hash_map_leaf(&100u32.to_bytes()) } ],
+///         "proof": [ { "path": ProofPath::new(&h1), "hash": HashTag::hash_leaf(&100u32.to_bytes()) } ],
 ///         "entries": [ { "key": h2, "value": 200 } ]
 ///     })
 /// );
@@ -560,7 +560,7 @@ where
         proof.extend(entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| MapProofEntry {
                 path: ProofPath::new(k),
-                hash: HashTag::hash_map_leaf(&v.to_bytes()),
+                hash: HashTag::hash_leaf(&v.to_bytes()),
             })
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted

@@ -541,7 +541,7 @@ where
 
     fn insert_leaf(&mut self, proof_path: &ProofPath, key: &K, value: V) -> Hash {
         debug_assert!(proof_path.is_leaf());
-        let hash = HashTag::hash_map_leaf(&value.to_bytes());
+        let hash = HashTag::hash_leaf(&value.to_bytes());
         self.base.put(proof_path, hash);
         self.base.put(&key.to_value_path(), value);
         hash
