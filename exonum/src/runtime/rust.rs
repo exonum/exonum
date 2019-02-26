@@ -16,7 +16,7 @@ use std::{collections::HashMap, sync::RwLock};
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, MethodId,
+    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, MethodId,
     RuntimeEnvironment, ServiceInstanceId,
 };
 
@@ -176,9 +176,7 @@ mod tests {
         };
         let mut methods = HashMap::new();
         methods.insert("method".to_owned(), handler);
-        RustArtifactData {
-            methods,
-        }
+        RustArtifactData { methods }
     }
     fn get_test_service_artifact() -> (RustArtifactSpec, RustArtifactData) {
         let spec = RustArtifactSpec {

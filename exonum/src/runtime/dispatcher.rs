@@ -16,7 +16,8 @@ use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ServiceInstanceId,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -51,15 +52,33 @@ impl DispatcherBuilder {
     }
 
     pub fn finalize(self) -> Dispatcher {
-        Dispatcher {
-            runtimes: self.runtimes,
-        }
+        Dispatcher::new(self.runtimes)
     }
 }
 
 #[derive(Default)]
 struct Dispatcher {
     runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
+    runtime_lookup: HashMap<ServiceInstanceId, RuntimeIdentifier>,
+}
+
+impl Dispatcher {
+    pub fn new(runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>) -> Self {
+        Self {
+            runtimes,
+            runtime_lookup: Default::default(),
+        }
+    }
+
+    pub fn notify_service_started(
+        &mut self,
+        service_id: ServiceInstanceId,
+        artifact: ArtifactSpec,
+    ) {
+        let runtime_id = artifact.into();
+
+        self.runtime_lookup.insert(service_id, runtime_id);
+    }
 }
 
 impl RuntimeEnvironment for Dispatcher {
@@ -104,15 +123,14 @@ impl RuntimeEnvironment for Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        // let runtime_id = artifact.clone().into();
+        let runtime_id = self.runtime_lookup.get(&call_info.instance_id).unwrap();
 
-        // if let Some(runtime) = self.runtimes.get(&runtime_id) {
-        //     runtime.execute(context, call_info, payload)
-        // } else {
-        //     Err(DeployError::WrongRuntime)
-        // }
-
-        Ok(())
+        if let Some(runtime) = self.runtimes.get(&runtime_id) {
+            runtime.execute(context, call_info, payload)
+        } else {
+            // TODO: Execution error code should be determined.
+            Err(ExecutionError::with_description(0x00, "Wrong runtime"))
+        }
     }
 }
 
@@ -140,12 +158,7 @@ mod tests {
             Ok(())
         }
 
-        fn execute(
-            &self,
-            _: &mut EnvContext,
-            _: CallInfo,
-            _: &[u8],
-        ) -> Result<(), ExecutionError> {
+        fn execute(&self, _: &mut EnvContext, _: CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
@@ -170,12 +183,7 @@ mod tests {
             Ok(())
         }
 
-        fn execute(
-            &self,
-            _: &mut EnvContext,
-            _: CallInfo,
-            _: &[u8],
-        ) -> Result<(), ExecutionError> {
+        fn execute(&self, _: &mut EnvContext, _: CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
             Ok(())
         }
     }

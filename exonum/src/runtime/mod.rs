@@ -46,7 +46,7 @@ pub struct CallInfo {
 #[derive(Debug)]
 pub enum RuntimeIdentifier {
     Rust,
-    Java
+    Java,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
