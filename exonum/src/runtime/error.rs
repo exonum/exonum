@@ -18,6 +18,7 @@ pub type ExecutionError = blockchain::ExecutionError;
 
 #[derive(Debug)]
 pub enum DeployError {
+    WrongRuntime,
     WrongArtifact,
     FailedToDeploy,
     AlreadyDeployed,
@@ -25,6 +26,7 @@ pub enum DeployError {
 
 #[derive(Debug)]
 pub enum InitError {
+    WrongRuntime,
     WrongArtifact,
     NotDeployed,
     ServiceIdExists,

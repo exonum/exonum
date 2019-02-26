@@ -19,18 +19,33 @@ use super::{
     ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, RuntimeEnvironment,
 };
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum RuntimeIdentifier {
+    Rust,
+    Java,
+}
+
+impl From<ArtifactSpec> for RuntimeIdentifier {
+    fn from(spec: ArtifactSpec) -> Self {
+        match spec {
+            ArtifactSpec::Rust(..) => RuntimeIdentifier::Rust,
+            ArtifactSpec::Java => RuntimeIdentifier::Java,
+        }
+    }
+}
+
 #[derive(Default)]
 struct DispatcherBuilder {
-    runtimes: HashMap<String, Box<dyn RuntimeEnvironment>>,
+    runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
 }
 
 impl DispatcherBuilder {
     pub fn with_runtime(
         mut self,
-        runtime_name: String,
+        runtime_id: RuntimeIdentifier,
         runtime: Box<dyn RuntimeEnvironment>,
     ) -> Self {
-        self.runtimes.insert(runtime_name, runtime);
+        self.runtimes.insert(runtime_id, runtime);
 
         self
     }
@@ -44,32 +59,59 @@ impl DispatcherBuilder {
 
 #[derive(Default)]
 struct Dispatcher {
-    runtimes: HashMap<String, Box<dyn RuntimeEnvironment>>,
+    runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
 }
 
 impl RuntimeEnvironment for Dispatcher {
-    fn start_deploy(&self, _artifact: ArtifactSpec) -> Result<(), DeployError> {
-        Ok(())
+    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        let runtime_id = artifact.clone().into();
+
+        if let Some(runtime) = self.runtimes.get(&runtime_id) {
+            runtime.start_deploy(artifact)
+        } else {
+            Err(DeployError::WrongRuntime)
+        }
     }
-    fn check_deploy_status(&self, _artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-        Ok(DeployStatus::Deployed)
+
+    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+        let runtime_id = artifact.clone().into();
+
+        if let Some(runtime) = self.runtimes.get(&runtime_id) {
+            runtime.check_deploy_status(artifact)
+        } else {
+            Err(DeployError::WrongRuntime)
+        }
     }
 
     fn init_service(
         &self,
-        _: &mut EnvContext,
-        _artifact: ArtifactSpec,
-        _init: &InstanceInitData,
+        ctx: &mut EnvContext,
+        artifact: ArtifactSpec,
+        init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        Ok(())
+        let runtime_id = artifact.clone().into();
+
+        if let Some(runtime) = self.runtimes.get(&runtime_id) {
+            runtime.init_service(ctx, artifact, init)
+        } else {
+            Err(InitError::WrongRuntime)
+        }
     }
 
     fn execute(
         &self,
-        _context: &mut EnvContext,
-        _dispatch: CallInfo,
-        _payload: &[u8],
+        context: &mut EnvContext,
+        call_info: CallInfo,
+        payload: &[u8],
     ) -> Result<(), ExecutionError> {
+        // let runtime_id = artifact.clone().into();
+
+        // if let Some(runtime) = self.runtimes.get(&runtime_id) {
+        //     runtime.execute(context, call_info, payload)
+        // } else {
+        //     Err(DeployError::WrongRuntime)
+        // }
+
         Ok(())
     }
 }
@@ -140,19 +182,16 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let runtime_a_name = String::from("Runtime_A");
         let runtime_a = Box::new(SampleRuntimeA::default());
 
-        let runtime_b_name = String::from("Runtime_B");
         let runtime_b = Box::new(SampleRuntimeB::default());
 
         let dispatcher = DispatcherBuilder::default()
-            .with_runtime(runtime_a_name, runtime_a)
-            .with_runtime(runtime_b_name, runtime_b)
+            .with_runtime(RuntimeIdentifier::Rust, runtime_a)
+            .with_runtime(RuntimeIdentifier::Java, runtime_b)
             .finalize();
 
-        assert!(dispatcher.runtimes.get("Runtime_A").is_some());
-        assert!(dispatcher.runtimes.get("Runtime_B").is_some());
-        assert!(dispatcher.runtimes.get("Runtime_C").is_none());
+        assert!(dispatcher.runtimes.get(&RuntimeIdentifier::Rust).is_some());
+        assert!(dispatcher.runtimes.get(&RuntimeIdentifier::Java).is_some());
     }
 }

@@ -49,7 +49,7 @@ pub enum RuntimeIdentifier {
     Java
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ArtifactSpec {
     Rust(rust::RustArtifactSpec),
     Java,
