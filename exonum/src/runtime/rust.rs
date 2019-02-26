@@ -41,8 +41,8 @@ struct RustRuntimeInner {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactSpec {
-    name: String,
-    version: (u32, u32, u32),
+    pub name: String,
+    pub version: (u32, u32, u32),
 }
 
 impl RuntimeEnvironment for RustRuntime {

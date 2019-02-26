@@ -20,7 +20,7 @@ use super::{
     ServiceInstanceId,
 };
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuntimeIdentifier {
     Rust,
     Java,
@@ -70,7 +70,7 @@ impl Dispatcher {
         }
     }
 
-    pub fn notify_service_started(
+    fn notify_service_started(
         &mut self,
         service_id: ServiceInstanceId,
         artifact: ArtifactSpec,
@@ -137,69 +137,122 @@ impl RuntimeEnvironment for Dispatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::{ MethodId, rust::RustArtifactSpec };
+    use crate::storage::{Database, MemoryDB};
 
-    #[derive(Default)]
-    struct SampleRuntimeA {}
+    struct SampleRuntime {
+        pub runtime_type: RuntimeIdentifier, 
+        pub instance_id: ServiceInstanceId,
+        pub method_id: MethodId,
+    }
 
-    impl RuntimeEnvironment for SampleRuntimeA {
-        fn start_deploy(&self, _: ArtifactSpec) -> Result<(), DeployError> {
-            Ok(())
-        }
-        fn check_deploy_status(&self, _: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-            Ok(DeployStatus::Deployed)
-        }
-
-        fn init_service(
-            &self,
-            _: &mut EnvContext,
-            _: ArtifactSpec,
-            _: &InstanceInitData,
-        ) -> Result<(), InitError> {
-            Ok(())
-        }
-
-        fn execute(&self, _: &mut EnvContext, _: CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
-            Ok(())
+    impl SampleRuntime {
+        pub fn new(runtime_type: RuntimeIdentifier, instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+            Self {
+                runtime_type,
+                instance_id,
+                method_id,
+            }
         }
     }
 
-    #[derive(Default)]
-    struct SampleRuntimeB {}
-
-    impl RuntimeEnvironment for SampleRuntimeB {
-        fn start_deploy(&self, _: ArtifactSpec) -> Result<(), DeployError> {
-            Ok(())
+    impl RuntimeEnvironment for SampleRuntime {
+        fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+            let runtime_type: RuntimeIdentifier = artifact.into();
+            if runtime_type == self.runtime_type {
+                Ok(())
+            } else {
+                Err(DeployError::WrongRuntime)
+            }
         }
-        fn check_deploy_status(&self, _: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-            Ok(DeployStatus::Deployed)
+        fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+            let runtime_type: RuntimeIdentifier = artifact.into();
+            if runtime_type == self.runtime_type {
+                Ok(DeployStatus::Deployed)
+            } else {
+                Err(DeployError::WrongRuntime)
+            }
         }
 
         fn init_service(
             &self,
             _: &mut EnvContext,
-            _: ArtifactSpec,
+            artifact: ArtifactSpec,
             _: &InstanceInitData,
         ) -> Result<(), InitError> {
-            Ok(())
+            let runtime_type: RuntimeIdentifier = artifact.into();
+            if runtime_type == self.runtime_type {
+                Ok(())
+            } else {
+                Err(InitError::WrongRuntime)
+            }
         }
 
-        fn execute(&self, _: &mut EnvContext, _: CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
-            Ok(())
+        fn execute(&self, _: &mut EnvContext, call_info: CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
+            if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
+                Ok(())
+            } else {
+                Err(ExecutionError::new(0xFF_u8))
+            }
         }
     }
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntimeA::default());
+        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, "".to_owned()));
 
-        let runtime_b = Box::new(SampleRuntimeB::default());
+        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, "".to_owned()));
 
         let dispatcher = DispatcherBuilder::default()
-            .with_runtime(RuntimeIdentifier::Rust, runtime_a)
-            .with_runtime(RuntimeIdentifier::Java, runtime_b)
+            .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
+            .with_runtime(runtime_b.runtime_type.clone(), runtime_b)
             .finalize();
 
         assert!(dispatcher.runtimes.get(&RuntimeIdentifier::Rust).is_some());
         assert!(dispatcher.runtimes.get(&RuntimeIdentifier::Java).is_some());
+    }
+
+    #[test]
+    fn test_dispatcher() {
+        let db = MemoryDB::new();
+
+        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, "a".to_owned()));
+
+        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, "b".to_owned()));
+
+        let dispatcher = DispatcherBuilder::default()
+            .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
+            .with_runtime(runtime_b.runtime_type.clone(), runtime_b)
+            .finalize();
+
+        let sample_rust_spec = ArtifactSpec::Rust( RustArtifactSpec { name: "artifact".to_owned(), version: (0, 1, 0)} );
+        let sample_java_spec = ArtifactSpec::Java;
+
+        assert!(dispatcher.start_deploy(sample_rust_spec.clone()).is_ok());
+        assert!(dispatcher.start_deploy(sample_java_spec.clone()).is_ok());
+
+        assert!(dispatcher.check_deploy_status(sample_rust_spec.clone()).is_ok());
+        assert!(dispatcher.check_deploy_status(sample_java_spec.clone()).is_ok());
+
+        {
+
+            let init_data = InstanceInitData {
+                instance_id: 0,
+                constructor_data: None,
+            };
+            let mut fork = db.fork();
+            let mut context = EnvContext::from_fork(&mut fork);
+            assert!(dispatcher.init_service(&mut context, sample_rust_spec.clone(), &init_data).is_ok());
+        }
+        {
+
+            let init_data = InstanceInitData {
+                instance_id: 1,
+                constructor_data: None,
+            };
+            let mut fork = db.fork();
+            let mut context = EnvContext::from_fork(&mut fork);
+            assert!(dispatcher.init_service(&mut context, sample_java_spec.clone(), &init_data).is_ok());   
+        }
     }
 }
