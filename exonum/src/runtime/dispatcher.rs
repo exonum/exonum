@@ -70,11 +70,7 @@ impl Dispatcher {
         }
     }
 
-    fn notify_service_started(
-        &mut self,
-        service_id: ServiceInstanceId,
-        artifact: ArtifactSpec,
-    ) {
+    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
         let runtime_id = artifact.into();
 
         self.runtime_lookup.insert(service_id, runtime_id);
@@ -140,18 +136,22 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{rust::RustArtifactSpec, MethodId};
     use super::*;
-    use super::super::{ MethodId, rust::RustArtifactSpec };
     use crate::storage::{Database, MemoryDB};
 
     struct SampleRuntime {
-        pub runtime_type: RuntimeIdentifier, 
+        pub runtime_type: RuntimeIdentifier,
         pub instance_id: ServiceInstanceId,
         pub method_id: MethodId,
     }
 
     impl SampleRuntime {
-        pub fn new(runtime_type: RuntimeIdentifier, instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+        pub fn new(
+            runtime_type: RuntimeIdentifier,
+            instance_id: ServiceInstanceId,
+            method_id: MethodId,
+        ) -> Self {
             Self {
                 runtime_type,
                 instance_id,
@@ -192,7 +192,12 @@ mod tests {
             }
         }
 
-        fn execute(&self, _: &mut EnvContext, call_info: CallInfo, _: &[u8]) -> Result<(), ExecutionError> {
+        fn execute(
+            &self,
+            _: &mut EnvContext,
+            call_info: CallInfo,
+            _: &[u8],
+        ) -> Result<(), ExecutionError> {
             if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
                 Ok(())
             } else {
@@ -203,9 +208,17 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, "".to_owned()));
+        let runtime_a = Box::new(SampleRuntime::new(
+            RuntimeIdentifier::Rust,
+            0,
+            "".to_owned(),
+        ));
 
-        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, "".to_owned()));
+        let runtime_b = Box::new(SampleRuntime::new(
+            RuntimeIdentifier::Java,
+            1,
+            "".to_owned(),
+        ));
 
         let dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
@@ -226,15 +239,26 @@ mod tests {
         // Create dispatcher and test data.
         let db = MemoryDB::new();
 
-        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()));
-        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()));
+        let runtime_a = Box::new(SampleRuntime::new(
+            RuntimeIdentifier::Rust,
+            RUST_SERVICE_ID,
+            RUST_METHOD_NAME.to_owned(),
+        ));
+        let runtime_b = Box::new(SampleRuntime::new(
+            RuntimeIdentifier::Java,
+            JAVA_SERVICE_ID,
+            JAVA_METHOD_NAME.to_owned(),
+        ));
 
         let mut dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
             .with_runtime(runtime_b.runtime_type.clone(), runtime_b)
             .finalize();
 
-        let sample_rust_spec = ArtifactSpec::Rust( RustArtifactSpec { name: "artifact".to_owned(), version: (0, 1, 0)} );
+        let sample_rust_spec = ArtifactSpec::Rust(RustArtifactSpec {
+            name: "artifact".to_owned(),
+            version: (0, 1, 0),
+        });
         let sample_java_spec = ArtifactSpec::Java;
 
         // Check deploy.
@@ -242,8 +266,18 @@ mod tests {
         assert!(dispatcher.start_deploy(sample_java_spec.clone()).is_ok());
 
         // Check deploy status
-        assert_eq!(dispatcher.check_deploy_status(sample_rust_spec.clone()).unwrap(), DeployStatus::Deployed);
-        assert_eq!(dispatcher.check_deploy_status(sample_java_spec.clone()).unwrap(), DeployStatus::Deployed);
+        assert_eq!(
+            dispatcher
+                .check_deploy_status(sample_rust_spec.clone())
+                .unwrap(),
+            DeployStatus::Deployed
+        );
+        assert_eq!(
+            dispatcher
+                .check_deploy_status(sample_java_spec.clone())
+                .unwrap(),
+            DeployStatus::Deployed
+        );
 
         // Check if we can init services.
         let mut fork = db.fork();
@@ -253,23 +287,51 @@ mod tests {
             instance_id: RUST_SERVICE_ID,
             constructor_data: None,
         };
-        assert!(dispatcher.init_service(&mut context, sample_rust_spec.clone(), &rust_init_data).is_ok());
+        assert!(dispatcher
+            .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
+            .is_ok());
 
         let java_init_data = InstanceInitData {
             instance_id: JAVA_SERVICE_ID,
             constructor_data: None,
         };
-        assert!(dispatcher.init_service(&mut context, sample_java_spec.clone(), &java_init_data).is_ok());
+        assert!(dispatcher
+            .init_service(&mut context, sample_java_spec.clone(), &java_init_data)
+            .is_ok());
 
         // Check if we can execute transactions.
         let tx_payload = [0x00_u8; 1];
 
-        dispatcher.execute(&mut context, CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()), &tx_payload).expect("Correct tx rust");
-        
-        dispatcher.execute(&mut context, CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_NAME.to_owned()), &tx_payload).expect_err("Incorrect tx rust");
+        dispatcher
+            .execute(
+                &mut context,
+                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                &tx_payload,
+            )
+            .expect("Correct tx rust");
 
-        dispatcher.execute(&mut context, CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()), &tx_payload).expect("Correct tx java");
+        dispatcher
+            .execute(
+                &mut context,
+                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_NAME.to_owned()),
+                &tx_payload,
+            )
+            .expect_err("Incorrect tx rust");
 
-        dispatcher.execute(&mut context, CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_NAME.to_owned()), &tx_payload).expect_err("Incorrect tx java");
+        dispatcher
+            .execute(
+                &mut context,
+                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()),
+                &tx_payload,
+            )
+            .expect("Correct tx java");
+
+        dispatcher
+            .execute(
+                &mut context,
+                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                &tx_payload,
+            )
+            .expect_err("Incorrect tx java");
     }
 }

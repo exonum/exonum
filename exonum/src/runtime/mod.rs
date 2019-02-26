@@ -47,7 +47,7 @@ impl CallInfo {
     pub fn new(instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
         Self {
             instance_id,
-            method_id
+            method_id,
         }
     }
 }
