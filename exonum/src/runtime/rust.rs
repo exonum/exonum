@@ -84,7 +84,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn init_service(
-        &self,
+        &mut self,
         _: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
@@ -194,7 +194,7 @@ mod tests {
         let db = MemoryDB::new();
 
         // Add service to deployable.
-        let runtime = RustRuntime::default();
+        let mut runtime = RustRuntime::default();
         let (serv_spec, serv_impl) = get_test_service_artifact();
         runtime.add_artifact(serv_spec.clone(), serv_impl);
 

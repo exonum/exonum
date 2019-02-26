@@ -22,7 +22,7 @@ mod rust;
 
 use error::{DeployError, ExecutionError, InitError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeployStatus {
     DeployInProgress,
     Deployed,
@@ -41,6 +41,15 @@ pub struct InstanceInitData {
 pub struct CallInfo {
     pub instance_id: ServiceInstanceId,
     pub method_id: MethodId,
+}
+
+impl CallInfo {
+    pub fn new(instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+        Self {
+            instance_id,
+            method_id
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -66,7 +75,7 @@ pub trait RuntimeEnvironment {
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,

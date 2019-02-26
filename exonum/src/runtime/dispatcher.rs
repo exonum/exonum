@@ -103,15 +103,19 @@ impl RuntimeEnvironment for Dispatcher {
     }
 
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
         let runtime_id = artifact.clone().into();
 
-        if let Some(runtime) = self.runtimes.get(&runtime_id) {
-            runtime.init_service(ctx, artifact, init)
+        if let Some(runtime) = self.runtimes.get_mut(&runtime_id) {
+            let result = runtime.init_service(ctx, artifact.clone(), init);
+            if result.is_ok() {
+                self.notify_service_started(init.instance_id.clone(), artifact);
+            }
+            result
         } else {
             Err(InitError::WrongRuntime)
         }
@@ -175,7 +179,7 @@ mod tests {
         }
 
         fn init_service(
-            &self,
+            &mut self,
             _: &mut EnvContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
@@ -214,13 +218,18 @@ mod tests {
 
     #[test]
     fn test_dispatcher() {
+        const RUST_SERVICE_ID: ServiceInstanceId = 0;
+        const JAVA_SERVICE_ID: ServiceInstanceId = 1;
+        const RUST_METHOD_NAME: &str = "a";
+        const JAVA_METHOD_NAME: &str = "b";
+
+        // Create dispatcher and test data.
         let db = MemoryDB::new();
 
-        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, "a".to_owned()));
+        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()));
+        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()));
 
-        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, "b".to_owned()));
-
-        let dispatcher = DispatcherBuilder::default()
+        let mut dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
             .with_runtime(runtime_b.runtime_type.clone(), runtime_b)
             .finalize();
@@ -228,31 +237,39 @@ mod tests {
         let sample_rust_spec = ArtifactSpec::Rust( RustArtifactSpec { name: "artifact".to_owned(), version: (0, 1, 0)} );
         let sample_java_spec = ArtifactSpec::Java;
 
+        // Check deploy.
         assert!(dispatcher.start_deploy(sample_rust_spec.clone()).is_ok());
         assert!(dispatcher.start_deploy(sample_java_spec.clone()).is_ok());
 
-        assert!(dispatcher.check_deploy_status(sample_rust_spec.clone()).is_ok());
-        assert!(dispatcher.check_deploy_status(sample_java_spec.clone()).is_ok());
+        // Check deploy status
+        assert_eq!(dispatcher.check_deploy_status(sample_rust_spec.clone()).unwrap(), DeployStatus::Deployed);
+        assert_eq!(dispatcher.check_deploy_status(sample_java_spec.clone()).unwrap(), DeployStatus::Deployed);
 
-        {
+        // Check if we can init services.
+        let mut fork = db.fork();
+        let mut context = EnvContext::from_fork(&mut fork);
 
-            let init_data = InstanceInitData {
-                instance_id: 0,
-                constructor_data: None,
-            };
-            let mut fork = db.fork();
-            let mut context = EnvContext::from_fork(&mut fork);
-            assert!(dispatcher.init_service(&mut context, sample_rust_spec.clone(), &init_data).is_ok());
-        }
-        {
+        let rust_init_data = InstanceInitData {
+            instance_id: RUST_SERVICE_ID,
+            constructor_data: None,
+        };
+        assert!(dispatcher.init_service(&mut context, sample_rust_spec.clone(), &rust_init_data).is_ok());
 
-            let init_data = InstanceInitData {
-                instance_id: 1,
-                constructor_data: None,
-            };
-            let mut fork = db.fork();
-            let mut context = EnvContext::from_fork(&mut fork);
-            assert!(dispatcher.init_service(&mut context, sample_java_spec.clone(), &init_data).is_ok());   
-        }
+        let java_init_data = InstanceInitData {
+            instance_id: JAVA_SERVICE_ID,
+            constructor_data: None,
+        };
+        assert!(dispatcher.init_service(&mut context, sample_java_spec.clone(), &java_init_data).is_ok());
+
+        // Check if we can execute transactions.
+        let tx_payload = [0x00_u8; 1];
+
+        dispatcher.execute(&mut context, CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()), &tx_payload).expect("Correct tx rust");
+        
+        dispatcher.execute(&mut context, CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_NAME.to_owned()), &tx_payload).expect_err("Incorrect tx rust");
+
+        dispatcher.execute(&mut context, CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()), &tx_payload).expect("Correct tx java");
+
+        dispatcher.execute(&mut context, CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_NAME.to_owned()), &tx_payload).expect_err("Incorrect tx java");
     }
 }
