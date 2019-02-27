@@ -215,13 +215,13 @@ mod tests {
         let runtime_a = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Rust,
             0,
-            "".to_owned(),
+            0,
         ));
 
         let runtime_b = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Java,
             1,
-            "".to_owned(),
+            0,
         ));
 
         let dispatcher = DispatcherBuilder::default()
@@ -237,8 +237,8 @@ mod tests {
     fn test_dispatcher() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
         const JAVA_SERVICE_ID: ServiceInstanceId = 1;
-        const RUST_METHOD_NAME: &str = "a";
-        const JAVA_METHOD_NAME: &str = "b";
+        const RUST_METHOD_ID: MethodId = 0;
+        const JAVA_METHOD_ID: MethodId = 1;
 
         // Create dispatcher and test data.
         let db = MemoryDB::new();
@@ -246,12 +246,12 @@ mod tests {
         let runtime_a = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Rust,
             RUST_SERVICE_ID,
-            RUST_METHOD_NAME.to_owned(),
+            RUST_METHOD_ID,
         ));
         let runtime_b = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Java,
             JAVA_SERVICE_ID,
-            JAVA_METHOD_NAME.to_owned(),
+            JAVA_METHOD_ID,
         ));
 
         let mut dispatcher = DispatcherBuilder::default()
@@ -313,7 +313,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx rust");
@@ -321,7 +321,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_NAME.to_owned()),
+                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx rust");
@@ -329,7 +329,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()),
+                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx java");
@@ -337,7 +337,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx java");
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn test_dispatcher_no_service() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
-        const RUST_METHOD_NAME: &str = "a";
+        const RUST_METHOD_ID: MethodId = 0;
 
         // Create dispatcher and test data.
         let db = MemoryDB::new();
@@ -394,7 +394,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("execute succeed");

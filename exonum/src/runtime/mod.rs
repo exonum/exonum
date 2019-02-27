@@ -18,7 +18,7 @@ use crate::storage::Fork;
 
 pub mod dispatcher;
 pub mod error;
-mod rust;
+pub mod rust;
 
 use error::{DeployError, ExecutionError, InitError};
 
@@ -29,7 +29,7 @@ pub enum DeployStatus {
 }
 
 type ServiceInstanceId = u32;
-type MethodId = String;
+type MethodId = u32;
 
 #[derive(Debug)]
 pub struct InstanceInitData {
