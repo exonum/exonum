@@ -15,6 +15,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Changed a response for `/healthcheck` endpoint. (#1252)
 
+- Changed a response code for the `/block` endpoint for the case when
+  the requested block doesn't exist. (#1262)
+
 #### exonum-crypto
 
 - Renamed `create_keys_file` function to `generate_keys_file`
