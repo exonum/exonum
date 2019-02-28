@@ -225,9 +225,14 @@ impl TestNode {
         self.validator_id = role;
     }
 
-    /// Returns the service keypair.
+    /// Returns the service keypair of the node.
     pub fn service_keypair(&self) -> (&PublicKey, &SecretKey) {
         (&self.service_public_key, &self.service_secret_key)
+    }
+
+    /// Returns the consensus keypair of the node.
+    pub fn consensus_keypair(&self) -> (&PublicKey, &SecretKey) {
+        (&self.consensus_public_key, &self.consensus_secret_key)
     }
 }
 
