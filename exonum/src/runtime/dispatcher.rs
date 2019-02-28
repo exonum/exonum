@@ -262,8 +262,12 @@ mod tests {
         let sample_java_spec = ArtifactSpec::Java;
 
         // Check deploy.
-        assert!(dispatcher.start_deploy(sample_rust_spec.clone()).is_ok());
-        assert!(dispatcher.start_deploy(sample_java_spec.clone()).is_ok());
+        dispatcher
+            .start_deploy(sample_rust_spec.clone())
+            .expect("start_deploy failed for rust");
+        dispatcher
+            .start_deploy(sample_java_spec.clone())
+            .expect("start_deploy failed for java");
 
         // Check deploy status
         assert_eq!(
@@ -287,17 +291,17 @@ mod tests {
             instance_id: RUST_SERVICE_ID,
             constructor_data: None,
         };
-        assert!(dispatcher
+        dispatcher
             .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
-            .is_ok());
+            .expect("init_service failed for rust");
 
         let java_init_data = InstanceInitData {
             instance_id: JAVA_SERVICE_ID,
             constructor_data: None,
         };
-        assert!(dispatcher
+        dispatcher
             .init_service(&mut context, sample_java_spec.clone(), &java_init_data)
-            .is_ok());
+            .expect("init_service failed for java");
 
         // Check if we can execute transactions.
         let tx_payload = [0x00_u8; 1];
