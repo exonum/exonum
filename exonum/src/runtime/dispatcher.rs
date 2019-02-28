@@ -123,9 +123,13 @@ impl RuntimeEnvironment for Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let runtime_id = self.runtime_lookup.get(&call_info.instance_id).unwrap();
+        let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
 
-        if let Some(runtime) = self.runtimes.get(&runtime_id) {
+        if runtime_id.is_none() {
+            return Err(ExecutionError::with_description(0x00, "Wrong runtime"));
+        }
+
+        if let Some(runtime) = self.runtimes.get(&runtime_id.unwrap()) {
             runtime.execute(context, call_info, payload)
         } else {
             // TODO: Execution error code should be determined.
@@ -337,5 +341,62 @@ mod tests {
                 &tx_payload,
             )
             .expect_err("Incorrect tx java");
+    }
+
+    #[test]
+    fn test_dispatcher_no_service() {
+        const RUST_SERVICE_ID: ServiceInstanceId = 0;
+        const RUST_METHOD_NAME: &str = "a";
+
+        // Create dispatcher and test data.
+        let db = MemoryDB::new();
+
+        let mut dispatcher = DispatcherBuilder::default().finalize();
+
+        let sample_rust_spec = ArtifactSpec::Rust(RustArtifactSpec {
+            name: "artifact".to_owned(),
+            version: (0, 1, 0),
+        });
+
+        // Check deploy.
+        assert_eq!(
+            dispatcher
+                .start_deploy(sample_rust_spec.clone())
+                .expect_err("start_deploy succeed"),
+            DeployError::WrongRuntime
+        );
+
+        assert_eq!(
+            dispatcher
+                .check_deploy_status(sample_rust_spec.clone())
+                .expect_err("check_deploy_status succeed"),
+            DeployError::WrongRuntime
+        );
+
+        // Check if we can init services.
+        let mut fork = db.fork();
+        let mut context = EnvContext::from_fork(&mut fork);
+
+        let rust_init_data = InstanceInitData {
+            instance_id: RUST_SERVICE_ID,
+            constructor_data: None,
+        };
+        assert_eq!(
+            dispatcher
+                .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
+                .expect_err("init_service succeed"),
+            InitError::WrongRuntime
+        );
+
+        // Check if we can execute transactions.
+        let tx_payload = [0x00_u8; 1];
+
+        dispatcher
+            .execute(
+                &mut context,
+                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                &tx_payload,
+            )
+            .expect_err("execute succeed");
     }
 }
