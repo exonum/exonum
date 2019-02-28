@@ -159,9 +159,7 @@ impl BinaryValue for Transaction {
     }
 }
 
-impl_object_hash_for_binary_value! { Transaction }
-impl_object_hash_for_binary_value! { Block }
-impl_object_hash_for_binary_value! { Wallet }
+impl_object_hash_for_binary_value! { Transaction, Block, Wallet }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct Block {

@@ -15,8 +15,7 @@
 // cspell:ignore oneof
 
 //! Property testing for map index and proof map index as a rust collection.
-use std::collections::HashMap;
-use std::hash::Hash;
+use std::{collections::HashMap, hash::Hash};
 
 use modifier::Modifier;
 use proptest::{
@@ -24,7 +23,7 @@ use proptest::{
     test_runner::TestCaseResult,
 };
 
-use exonum_merkledb::{BinaryValue, Fork, MapIndex, ObjectHash, ProofMapIndex};
+use exonum_merkledb::{BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex};
 
 use crate::common::ACTIONS_MAX_LEN;
 
@@ -125,7 +124,7 @@ mod proof_map_index {
                 }
                 MapAction::Clear => {
                     map.clear();
-                    assert_eq!(map.merkle_root(), exonum_crypto::Hash::zero());
+                    assert_eq!(map.object_hash(), HashTag::empty_map_hash());
                 }
                 _ => unreachable!(),
             }

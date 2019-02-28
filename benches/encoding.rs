@@ -63,8 +63,7 @@ impl BinaryValue for SimpleData {
     }
 }
 
-impl_object_hash_for_binary_value! { SimpleData }
-impl_object_hash_for_binary_value! { CursorData }
+impl_object_hash_for_binary_value! { SimpleData, CursorData }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct CursorData {

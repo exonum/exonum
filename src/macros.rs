@@ -38,11 +38,13 @@ macro_rules! concat_keys {
 
 #[macro_export]
 macro_rules! impl_object_hash_for_binary_value {
-    ($type:ty) => {
-        impl ObjectHash for $type {
-            fn object_hash(&self) -> Hash {
-                exonum_crypto::hash(&self.to_bytes())
+    ($( $type:ty ),*) => {
+        $(
+            impl ObjectHash for $type {
+                fn object_hash(&self) -> Hash {
+                    exonum_crypto::hash(&self.to_bytes())
+                }
             }
-        }
+        )*
     };
 }

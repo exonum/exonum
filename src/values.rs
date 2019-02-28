@@ -77,14 +77,7 @@ pub trait BinaryValue: Sized {
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error>;
 }
 
-impl_object_hash_for_binary_value! { () }
-impl_object_hash_for_binary_value! { bool }
-impl_object_hash_for_binary_value! { Vec<u8> }
-impl_object_hash_for_binary_value! { String }
-impl_object_hash_for_binary_value! { PublicKey }
-impl_object_hash_for_binary_value! { DateTime<Utc> }
-impl_object_hash_for_binary_value! { Uuid }
-impl_object_hash_for_binary_value! { Decimal }
+impl_object_hash_for_binary_value! { (), bool, Vec<u8>, String, PublicKey, DateTime<Utc>, Uuid, Decimal }
 
 macro_rules! impl_binary_form_scalar {
     ($type:tt, $read:ident) => {
