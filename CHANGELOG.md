@@ -15,6 +15,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Changed a response for `/healthcheck` endpoint. (#1252)
 
+- Changed a response code for the `/block` endpoint for the case when
+  the requested block doesn't exist. (#1262)
+
 - Removed a sub-command `generate-testnet` from CLI. (#1264)
 
 #### exonum-crypto

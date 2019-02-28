@@ -21,6 +21,7 @@ use futures::IntoFuture;
 
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
+use std::time::UNIX_EPOCH;
 
 use crate::{
     api::{
@@ -182,13 +183,13 @@ impl ExplorerApi {
     }
 
     /// Returns the content for a block at a specific height.
-    pub fn block(
-        state: &ServiceApiState,
-        query: BlockQuery,
-    ) -> Result<Option<BlockInfo>, ApiError> {
-        Ok(BlockchainExplorer::new(state.blockchain())
+    pub fn block(state: &ServiceApiState, query: BlockQuery) -> Result<BlockInfo, ApiError> {
+        BlockchainExplorer::new(state.blockchain())
             .block(query.height)
-            .map(From::from))
+            .map(From::from)
+            .ok_or_else(|| {
+                ApiError::NotFound(format!("Block for height: {} not found", query.height))
+            })
     }
 
     /// Searches for a transaction, either committed or uncommitted, by the hash.
@@ -286,8 +287,11 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
 }
 
 fn median_precommits_time(precommits: &[Signed<Precommit>]) -> DateTime<Utc> {
-    debug_assert!(!precommits.is_empty(), "Precommits cannot be empty");
-    let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
-    times.sort();
-    times[times.len() / 2]
+    if precommits.is_empty() {
+        UNIX_EPOCH.into()
+    } else {
+        let mut times: Vec<_> = precommits.iter().map(|p| p.time()).collect();
+        times.sort();
+        times[times.len() / 2]
+    }
 }
