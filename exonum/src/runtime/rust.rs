@@ -16,7 +16,7 @@ use std::{collections::HashMap, sync::RwLock};
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, DeployStatus, CallInfo, EnvContext, InstanceInitData, MethodId,
+    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, MethodId,
     RuntimeEnvironment, ServiceInstanceId,
 };
 
@@ -41,8 +41,8 @@ struct RustRuntimeInner {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactSpec {
-    name: String,
-    version: (u32, u32, u32),
+    pub name: String,
+    pub version: (u32, u32, u32),
 }
 
 impl RuntimeEnvironment for RustRuntime {
@@ -84,7 +84,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn init_service(
-        &self,
+        &mut self,
         _: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
@@ -176,9 +176,7 @@ mod tests {
         };
         let mut methods = HashMap::new();
         methods.insert("method".to_owned(), handler);
-        RustArtifactData {
-            methods,
-        }
+        RustArtifactData { methods }
     }
     fn get_test_service_artifact() -> (RustArtifactSpec, RustArtifactData) {
         let spec = RustArtifactSpec {
@@ -196,7 +194,7 @@ mod tests {
         let db = MemoryDB::new();
 
         // Add service to deployable.
-        let runtime = RustRuntime::default();
+        let mut runtime = RustRuntime::default();
         let (serv_spec, serv_impl) = get_test_service_artifact();
         runtime.add_artifact(serv_spec.clone(), serv_impl);
 

@@ -16,15 +16,17 @@ use crate::blockchain;
 
 pub type ExecutionError = blockchain::ExecutionError;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeployError {
+    WrongRuntime,
     WrongArtifact,
     FailedToDeploy,
     AlreadyDeployed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum InitError {
+    WrongRuntime,
     WrongArtifact,
     NotDeployed,
     ServiceIdExists,

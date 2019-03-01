@@ -22,7 +22,7 @@ mod rust;
 
 use error::{DeployError, ExecutionError, InitError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeployStatus {
     DeployInProgress,
     Deployed,
@@ -43,13 +43,22 @@ pub struct CallInfo {
     pub method_id: MethodId,
 }
 
-#[derive(Debug)]
-pub enum RuntimeIdentifier {
-    Rust,
-    Java
+impl CallInfo {
+    pub fn new(instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+        Self {
+            instance_id,
+            method_id,
+        }
+    }
 }
 
 #[derive(Debug)]
+pub enum RuntimeIdentifier {
+    Rust,
+    Java,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum ArtifactSpec {
     Rust(rust::RustArtifactSpec),
     Java,
@@ -66,7 +75,7 @@ pub trait RuntimeEnvironment {
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut EnvContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
