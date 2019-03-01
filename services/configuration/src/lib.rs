@@ -99,7 +99,7 @@ use exonum::{
 };
 
 use crate::{
-    cmd::{Finalize, GenerateCommonConfig, GenerateTestnet},
+    cmd::{Finalize, GenerateCommonConfig},
     config::ConfigurationServiceConfig,
 };
 
@@ -125,12 +125,12 @@ pub struct Service {
 }
 
 impl blockchain::Service for Service {
-    fn service_name(&self) -> &'static str {
-        SERVICE_NAME
-    }
-
     fn service_id(&self) -> u16 {
         SERVICE_ID
+    }
+
+    fn service_name(&self) -> &'static str {
+        SERVICE_NAME
     }
 
     fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
@@ -142,13 +142,13 @@ impl blockchain::Service for Service {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 
+    fn initialize(&self, _fork: &mut Fork) -> Value {
+        to_value(self.config.clone()).unwrap()
+    }
+
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
-    }
-
-    fn initialize(&self, _fork: &mut Fork) -> Value {
-        to_value(self.config.clone()).unwrap()
     }
 }
 
@@ -166,7 +166,6 @@ impl fabric::ServiceFactory for ServiceFactory {
         Some(match command {
             v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
             v if v == fabric::Finalize.name() => Box::new(Finalize),
-            v if v == fabric::GenerateTestnet.name() => Box::new(GenerateTestnet),
             _ => return None,
         })
     }

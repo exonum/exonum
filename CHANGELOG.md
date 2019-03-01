@@ -18,6 +18,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Changed a response code for the `/block` endpoint for the case when
   the requested block doesn't exist. (#1262)
 
+- Removed a sub-command `generate-testnet` from CLI. (#1264)
+
 #### exonum-crypto
 
 - Renamed `create_keys_file` function to `generate_keys_file`

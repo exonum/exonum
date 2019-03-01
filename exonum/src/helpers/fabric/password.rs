@@ -100,7 +100,7 @@ impl FromStr for PassInputMethod {
             )));
         }
 
-        bail!("Failed to parse passphrase input method");
+        bail!("Failed to parse passphrase input method")
     }
 }
 
