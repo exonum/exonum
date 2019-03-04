@@ -29,7 +29,7 @@
 //!
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
-//! [doc:create-service]: https://exonum.com/doc/get-started/create-service
+//! [doc:create-service]: https://exonum.com/doc/version/latest/get-started/create-service
 
 pub use self::{
     block::{Block, BlockProof},

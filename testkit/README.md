@@ -31,4 +31,4 @@ of building a service and then testing it with the testkit.
 
 Licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
 
-[documentation]: https://exonum.com/doc/advanced/service-testing/
+[documentation]: https://exonum.com/doc/version/latest/advanced/service-testing/

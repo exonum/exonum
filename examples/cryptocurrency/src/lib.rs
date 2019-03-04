@@ -20,7 +20,7 @@
 //! for use in production.
 //!
 //! [exonum]: https://github.com/exonum/exonum
-//! [docs]: https://exonum.com/doc/get-started/create-service
+//! [docs]: https://exonum.com/doc/version/latest/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
 #![deny(
@@ -51,7 +51,7 @@ pub mod schema {
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
     //
-    // [1]: https://exonum.com/doc/architecture/serialization
+    // [1]: https://exonum.com/doc/version/latest/architecture/serialization
     /// Wallet struct used to persist data within the service.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "proto::Wallet")]
@@ -98,7 +98,7 @@ pub mod schema {
     /// Declare the layout of data managed by the service. An instance of [`MapIndex`] is used
     /// to keep wallets in the storage. Index values are serialized [`Wallet`] structs.
     ///
-    /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
+    /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
     impl<T: AsRef<dyn Snapshot>> CurrencySchema<T> {
         /// Creates a new schema instance.
@@ -459,7 +459,7 @@ pub mod service {
         // To simplify things, we don't have [Merkelized tables][merkle] in the service storage
         // for now, so we return an empty vector.
         //
-        // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
+        // [merkle]: https://exonum.com/doc/version/latest/architecture/storage/#merklized-indices
         fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }

@@ -35,7 +35,7 @@
 //! 3. Use `exonum::crypto::hash()` on the obtained bytes.
 //!
 //! [sc]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
-//! [docs:config]: https://exonum.com/doc/advanced/configuration-updater/
+//! [docs:config]: https://exonum.com/doc/version/latest/advanced/configuration-updater/
 //!
 //! # Examples
 //!
