@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
 
@@ -100,7 +100,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn init_service(
         &mut self,
-        ctx: &mut EnvContext,
+        ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -119,7 +119,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn execute(
         &self,
-        context: &mut EnvContext,
+        context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -184,7 +184,7 @@ mod tests {
 
         fn init_service(
             &mut self,
-            _: &mut EnvContext,
+            _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
         ) -> Result<(), InitError> {
@@ -198,7 +198,7 @@ mod tests {
 
         fn execute(
             &self,
-            _: &mut EnvContext,
+            _: &mut RuntimeContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -212,17 +212,9 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntime::new(
-            RuntimeIdentifier::Rust,
-            0,
-            "".to_owned(),
-        ));
+        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, 0));
 
-        let runtime_b = Box::new(SampleRuntime::new(
-            RuntimeIdentifier::Java,
-            1,
-            "".to_owned(),
-        ));
+        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, 0));
 
         let dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
@@ -237,8 +229,8 @@ mod tests {
     fn test_dispatcher() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
         const JAVA_SERVICE_ID: ServiceInstanceId = 1;
-        const RUST_METHOD_NAME: &str = "a";
-        const JAVA_METHOD_NAME: &str = "b";
+        const RUST_METHOD_ID: MethodId = 0;
+        const JAVA_METHOD_ID: MethodId = 1;
 
         // Create dispatcher and test data.
         let db = MemoryDB::new();
@@ -246,12 +238,12 @@ mod tests {
         let runtime_a = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Rust,
             RUST_SERVICE_ID,
-            RUST_METHOD_NAME.to_owned(),
+            RUST_METHOD_ID,
         ));
         let runtime_b = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Java,
             JAVA_SERVICE_ID,
-            JAVA_METHOD_NAME.to_owned(),
+            JAVA_METHOD_ID,
         ));
 
         let mut dispatcher = DispatcherBuilder::default()
@@ -289,7 +281,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = EnvContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::from_fork(&mut fork);
 
         let rust_init_data = InstanceInitData {
             instance_id: RUST_SERVICE_ID,
@@ -313,7 +305,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx rust");
@@ -321,7 +313,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_NAME.to_owned()),
+                CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx rust");
@@ -329,7 +321,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_NAME.to_owned()),
+                CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
                 &tx_payload,
             )
             .expect("Correct tx java");
@@ -337,7 +329,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("Incorrect tx java");
@@ -346,7 +338,7 @@ mod tests {
     #[test]
     fn test_dispatcher_no_service() {
         const RUST_SERVICE_ID: ServiceInstanceId = 0;
-        const RUST_METHOD_NAME: &str = "a";
+        const RUST_METHOD_ID: MethodId = 0;
 
         // Create dispatcher and test data.
         let db = MemoryDB::new();
@@ -375,7 +367,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = EnvContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::from_fork(&mut fork);
 
         let rust_init_data = InstanceInitData {
             instance_id: RUST_SERVICE_ID,
@@ -394,7 +386,7 @@ mod tests {
         dispatcher
             .execute(
                 &mut context,
-                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_NAME.to_owned()),
+                CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
                 &tx_payload,
             )
             .expect_err("execute succeed");

@@ -14,11 +14,12 @@
 
 use protobuf::well_known_types::Any;
 
+use crate::crypto::{Hash, PublicKey};
 use crate::storage::Fork;
 
 pub mod dispatcher;
 pub mod error;
-mod rust;
+pub mod rust;
 
 use error::{DeployError, ExecutionError, InitError};
 
@@ -29,7 +30,7 @@ pub enum DeployStatus {
 }
 
 type ServiceInstanceId = u32;
-type MethodId = String;
+type MethodId = u32;
 
 #[derive(Debug)]
 pub struct InstanceInitData {
@@ -76,7 +77,7 @@ pub trait RuntimeEnvironment {
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
         &mut self,
-        ctx: &mut EnvContext,
+        ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError>;
@@ -84,20 +85,29 @@ pub trait RuntimeEnvironment {
     /// Execute transaction.
     fn execute(
         &self,
-        ctx: &mut EnvContext,
+        ctx: &mut RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]
-pub struct EnvContext<'a> {
+pub struct RuntimeContext<'a> {
     fork: &'a mut Fork,
-    error: Option<ExecutionError>,
+    author: PublicKey,
+    tx_hash: Hash,
 }
 
-impl<'a> EnvContext<'a> {
+impl<'a> RuntimeContext<'a> {
+    fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+        Self {
+            fork,
+            author,
+            tx_hash,
+        }
+    }
+
     fn from_fork(fork: &'a mut Fork) -> Self {
-        Self { fork, error: None }
+        Self::new(fork, &PublicKey::zero(), &Hash::zero())
     }
 }
