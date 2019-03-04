@@ -212,17 +212,9 @@ mod tests {
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntime::new(
-            RuntimeIdentifier::Rust,
-            0,
-            0,
-        ));
+        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, 0));
 
-        let runtime_b = Box::new(SampleRuntime::new(
-            RuntimeIdentifier::Java,
-            1,
-            0,
-        ));
+        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, 0));
 
         let dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
