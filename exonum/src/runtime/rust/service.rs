@@ -26,10 +26,12 @@ pub trait ServiceDispatcher {
 }
 
 pub trait Service: ServiceDispatcher + std::fmt::Debug {
+    // TODO:
     // constructor method
     // other hooks such as "on node startup"
 }
 
+// TODO document OR document + rewrite as proc macro on usual trait declaration.
 #[macro_export]
 macro_rules! service_interface {
     (

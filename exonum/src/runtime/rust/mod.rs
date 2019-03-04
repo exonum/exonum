@@ -36,6 +36,7 @@ use self::service::Service;
 
 #[derive(Debug, Default)]
 struct RustRuntime {
+    // TODO: think about ways to share runtime.
     inner: RefCell<RustRuntimeInner>,
 }
 
@@ -47,6 +48,7 @@ impl RustRuntime {
 
 #[derive(Debug, Default)]
 struct RustRuntimeInner {
+    // TODO: Add link to dispatcher
     services: HashMap<RustArtifactSpec, Box<dyn Service>>,
     deployed: HashSet<RustArtifactSpec>,
     initialized: HashMap<ServiceInstanceId, Box<dyn Service>>,
