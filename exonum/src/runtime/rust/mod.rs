@@ -25,14 +25,14 @@ pub mod tests;
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
 
 use crate::crypto::{Hash, PublicKey};
 use crate::storage::Fork;
 
-use self::service::SystemService;
+use self::service::Service;
 
 #[derive(Debug, Default)]
 struct RustRuntime {
@@ -40,16 +40,16 @@ struct RustRuntime {
 }
 
 impl RustRuntime {
-    fn add_service(&self, artifact: RustArtifactSpec, service: Box<dyn SystemService>) {
+    fn add_service(&self, artifact: RustArtifactSpec, service: Box<dyn Service>) {
         self.inner.borrow_mut().services.insert(artifact, service);
     }
 }
 
 #[derive(Debug, Default)]
 struct RustRuntimeInner {
-    services: HashMap<RustArtifactSpec, Box<dyn SystemService>>,
+    services: HashMap<RustArtifactSpec, Box<dyn Service>>,
     deployed: HashSet<RustArtifactSpec>,
-    initialized: HashMap<ServiceInstanceId, Box<dyn SystemService>>,
+    initialized: HashMap<ServiceInstanceId, Box<dyn Service>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -96,7 +96,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn init_service(
         &mut self,
-        _: &mut EnvContext,
+        _: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -123,7 +123,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn execute(
         &self,
-        context: &mut EnvContext,
+        context: &mut RuntimeContext,
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -140,12 +140,12 @@ impl RuntimeEnvironment for RustRuntime {
 
 #[derive(Debug)]
 pub struct TransactionContext<'a, 'c> {
-    env_context: &'a mut EnvContext<'c>,
+    env_context: &'a mut RuntimeContext<'c>,
     runtime: &'a RustRuntime,
 }
 
 impl<'a, 'c> TransactionContext<'a, 'c> {
-    fn new(env_context: &'a mut EnvContext<'c>, runtime: &'a RustRuntime) -> Self {
+    fn new(env_context: &'a mut RuntimeContext<'c>, runtime: &'a RustRuntime) -> Self {
         Self {
             env_context,
             runtime,

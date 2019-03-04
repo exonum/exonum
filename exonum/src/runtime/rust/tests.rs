@@ -14,12 +14,11 @@
 
 use crate::proto::schema::tests::TimestampTx;
 
-use super::{
-    service::SystemService, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext,
-};
+use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext};
 use crate::crypto::{Hash, PublicKey};
 use crate::runtime::{
-    error::ExecutionError, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
+    error::ExecutionError, CallInfo, DeployStatus, InstanceInitData, RuntimeContext,
+    RuntimeEnvironment,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::Message;
@@ -70,7 +69,7 @@ impl TestService for TestServiceImpl {
 }
 
 impl_service_dispatcher!(TestServiceImpl, TestService);
-impl SystemService for TestServiceImpl {}
+impl Service for TestServiceImpl {}
 
 #[test]
 fn test_basic_rust_runtime() {
@@ -103,7 +102,7 @@ fn test_basic_rust_runtime() {
         let mut fork = db.fork();
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
-        let mut context = EnvContext::new(&mut fork, &address, &tx_hash);
+        let mut context = RuntimeContext::new(&mut fork, &address, &tx_hash);
         runtime
             .init_service(&mut context, artifact.clone(), &init_data)
             .unwrap();
@@ -123,7 +122,7 @@ fn test_basic_rust_runtime() {
         let mut fork = db.fork();
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
-        let mut context = EnvContext::new(&mut fork, &address, &tx_hash);
+        let mut context = RuntimeContext::new(&mut fork, &address, &tx_hash);
         runtime
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();

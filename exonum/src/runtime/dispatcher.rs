@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
 
@@ -100,7 +100,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn init_service(
         &mut self,
-        ctx: &mut EnvContext,
+        ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -119,7 +119,7 @@ impl RuntimeEnvironment for Dispatcher {
 
     fn execute(
         &self,
-        context: &mut EnvContext,
+        context: &mut RuntimeContext,
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -184,7 +184,7 @@ mod tests {
 
         fn init_service(
             &mut self,
-            _: &mut EnvContext,
+            _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
         ) -> Result<(), InitError> {
@@ -198,7 +198,7 @@ mod tests {
 
         fn execute(
             &self,
-            _: &mut EnvContext,
+            _: &mut RuntimeContext,
             call_info: CallInfo,
             _: &[u8],
         ) -> Result<(), ExecutionError> {
@@ -281,7 +281,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = EnvContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::from_fork(&mut fork);
 
         let rust_init_data = InstanceInitData {
             instance_id: RUST_SERVICE_ID,
@@ -367,7 +367,7 @@ mod tests {
 
         // Check if we can init services.
         let mut fork = db.fork();
-        let mut context = EnvContext::from_fork(&mut fork);
+        let mut context = RuntimeContext::from_fork(&mut fork);
 
         let rust_init_data = InstanceInitData {
             instance_id: RUST_SERVICE_ID,
