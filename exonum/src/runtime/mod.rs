@@ -14,6 +14,7 @@
 
 use protobuf::well_known_types::Any;
 
+use crate::crypto::{Hash, PublicKey};
 use crate::storage::Fork;
 
 pub mod dispatcher;
@@ -93,11 +94,16 @@ pub trait RuntimeEnvironment {
 #[derive(Debug)]
 pub struct EnvContext<'a> {
     fork: &'a mut Fork,
-    error: Option<ExecutionError>,
+    author: PublicKey,
+    tx_hash: Hash,
 }
 
 impl<'a> EnvContext<'a> {
-    fn from_fork(fork: &'a mut Fork) -> Self {
-        Self { fork, error: None }
+    fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+        Self {
+            fork,
+            author,
+            tx_hash,
+        }
     }
 }

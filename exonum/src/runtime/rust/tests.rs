@@ -17,11 +17,11 @@ use crate::proto::schema::tests::TimestampTx;
 use super::{
     service::SystemService, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext,
 };
-use crate::blockchain::ExecutionResult;
+use crate::crypto::{Hash, PublicKey};
 use crate::runtime::{
     error::ExecutionError, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
 };
-use crate::storage::{Database, MemoryDB};
+use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::Message;
 
 service_interface! {
@@ -35,10 +35,36 @@ service_interface! {
 pub struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
-    fn method_a(&self, _ctx: TransactionContext, _arg: TimestampTx) -> Result<(), ExecutionError> {
+    fn method_a(
+        &self,
+        mut ctx: TransactionContext,
+        _arg: TimestampTx,
+    ) -> Result<(), ExecutionError> {
+        let fork = ctx.fork();
+        let mut entry = Entry::new("method_a_entry", fork);
+        entry.set(1);
+
+        let dispatch_info = CallInfo {
+            instance_id: 2,
+            method_id: 1,
+        };
+        let payload = {
+            let mut tx = TimestampTx::new();
+            tx.set_data(vec![0]);
+            tx.write_to_bytes().unwrap()
+        };
+        ctx.dispatch_call(dispatch_info, &payload)
+            .expect("Failed to dispatch call");
         Ok(())
     }
-    fn method_b(&self, _ctx: TransactionContext, _arg: TimestampTx) -> Result<(), ExecutionError> {
+    fn method_b(
+        &self,
+        mut ctx: TransactionContext,
+        _arg: TimestampTx,
+    ) -> Result<(), ExecutionError> {
+        let fork = ctx.fork();
+        let mut entry = Entry::new("method_b_entry", fork);
+        entry.set(2);
         Ok(())
     }
 }
@@ -75,7 +101,9 @@ fn test_basic_rust_runtime() {
 
     {
         let mut fork = db.fork();
-        let mut context = EnvContext::from_fork(&mut fork);
+        let address = PublicKey::zero();
+        let tx_hash = Hash::zero();
+        let mut context = EnvContext::new(&mut fork, &address, &tx_hash);
         runtime
             .init_service(&mut context, artifact.clone(), &init_data)
             .unwrap();
@@ -93,9 +121,16 @@ fn test_basic_rust_runtime() {
     };
     {
         let mut fork = db.fork();
-        let mut context = EnvContext::from_fork(&mut fork);
+        let address = PublicKey::zero();
+        let tx_hash = Hash::zero();
+        let mut context = EnvContext::new(&mut fork, &address, &tx_hash);
         runtime
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();
+
+        let entry = Entry::new("method_a_entry", &fork);
+        assert_eq!(entry.get(), Some(1));
+        let entry = Entry::new("method_b_entry", &fork);
+        assert_eq!(entry.get(), Some(2));
     }
 }

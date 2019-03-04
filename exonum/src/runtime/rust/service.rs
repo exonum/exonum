@@ -25,7 +25,7 @@ pub trait ServiceDispatcher {
     ) -> Result<Result<(), ExecutionError>, Error>;
 }
 
-pub trait SystemService: ServiceDispatcher {
+pub trait SystemService: ServiceDispatcher + std::fmt::Debug {
     // constructor method
     // other hooks such as "on node startup"
 }

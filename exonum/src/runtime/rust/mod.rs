@@ -25,13 +25,16 @@ pub mod tests;
 
 use super::{
     error::{DeployError, ExecutionError, InitError},
-    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, MethodId,
-    RuntimeEnvironment, ServiceInstanceId,
+    ArtifactSpec, CallInfo, DeployStatus, EnvContext, InstanceInitData, RuntimeEnvironment,
+    ServiceInstanceId,
 };
 
-use self::service::{ServiceDispatcher, SystemService};
+use crate::crypto::{Hash, PublicKey};
+use crate::storage::Fork;
 
-#[derive(Default)]
+use self::service::SystemService;
+
+#[derive(Debug, Default)]
 struct RustRuntime {
     inner: RefCell<RustRuntimeInner>,
 }
@@ -42,7 +45,7 @@ impl RustRuntime {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct RustRuntimeInner {
     services: HashMap<RustArtifactSpec, Box<dyn SystemService>>,
     deployed: HashSet<RustArtifactSpec>,
@@ -127,7 +130,7 @@ impl RuntimeEnvironment for RustRuntime {
         let inner = self.inner.borrow();
         let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
 
-        let mut ctx = TransactionContext::from_env_ctx(context);
+        let ctx = TransactionContext::new(context, self);
 
         instance
             .call(dispatch.method_id, ctx, payload)
@@ -135,14 +138,37 @@ impl RuntimeEnvironment for RustRuntime {
     }
 }
 
-pub struct TransactionContext<'a> {
-    _env_context: &'a EnvContext<'a>,
+#[derive(Debug)]
+pub struct TransactionContext<'a, 'c> {
+    env_context: &'a mut EnvContext<'c>,
+    runtime: &'a RustRuntime,
 }
 
-impl<'a> TransactionContext<'a> {
-    fn from_env_ctx(env_context: &'a EnvContext<'a>) -> Self {
+impl<'a, 'c> TransactionContext<'a, 'c> {
+    fn new(env_context: &'a mut EnvContext<'c>, runtime: &'a RustRuntime) -> Self {
         Self {
-            _env_context: env_context,
+            env_context,
+            runtime,
         }
+    }
+
+    pub fn fork(&mut self) -> &mut Fork {
+        self.env_context.fork
+    }
+
+    pub fn tx_hash(&self) -> Hash {
+        self.env_context.tx_hash
+    }
+
+    pub fn author(&self) -> PublicKey {
+        self.env_context.author
+    }
+
+    pub fn dispatch_call(
+        &mut self,
+        dispatch: CallInfo,
+        payload: &[u8],
+    ) -> Result<(), ExecutionError> {
+        self.runtime.execute(self.env_context, dispatch, payload)
     }
 }
