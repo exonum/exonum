@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@
 //!
 //! 1. Parse a `StoredConfiguration` from JSON string if necessary.
 //! 2. Convert a `StoredConfiguration` into bytes as per its `StorageValue` implementation.
-//! 3. Use `exonum::crypto::hash()` on the obtained bytes.
+//! 3. Use `crate::crypto::hash()` on the obtained bytes.
 //!
 //! [sc]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
 //! [docs:config]: https://exonum.com/doc/advanced/configuration-updater/
@@ -43,10 +43,10 @@
 //! extern crate exonum;
 //! extern crate exonum_configuration as configuration;
 //!
-//! use exonum::helpers::fabric::NodeBuilder;
+//! use crate::helpers::fabric::NodeBuilder;
 //!
 //! fn main() {
-//!     exonum::helpers::init_logger().unwrap();
+//!     crate::helpers::init_logger().unwrap();
 //!     NodeBuilder::new()
 //!         .with_service(Box::new(configuration::ServiceFactory))
 //!         .run();
@@ -60,35 +60,13 @@
     bare_trait_objects
 )]
 
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
-#[cfg(test)]
-#[macro_use]
-extern crate exonum_testkit;
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-
-pub use crate::{
-    errors::ErrorCode,
-    schema::{MaybeVote, ProposeData, Schema, VotingDecision},
-    transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst},
-};
+pub use errors::ErrorCode;
+pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use serde_json::{to_value, Value};
 
-use exonum::{
+use crate::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
@@ -98,16 +76,13 @@ use exonum::{
     storage::{Fork, Snapshot},
 };
 
-use crate::{
-    cmd::{Finalize, GenerateCommonConfig, GenerateTestnet},
-    config::ConfigurationServiceConfig,
-};
+use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
+use config::ConfigurationServiceConfig;
 
 mod api;
 mod cmd;
 mod config;
 mod errors;
-mod proto;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -162,7 +137,7 @@ impl fabric::ServiceFactory for ServiceFactory {
     }
 
     fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
-        use exonum::helpers::fabric;
+        use crate::helpers::fabric;
         Some(match command {
             v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
             v if v == fabric::Finalize.name() => Box::new(Finalize),

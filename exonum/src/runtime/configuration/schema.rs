@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,14 +14,15 @@
 
 //! Storage schema for the configuration service.
 
-use exonum::{
+use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
     storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
+    proto,
 };
 
 use std::{borrow::Cow, ops::Deref};
 
-use crate::{proto, transactions::Propose};
+use super::{transactions::Propose};
 
 const YEA_TAG: u8 = 1;
 const NAY_TAG: u8 = 2;
@@ -41,7 +42,7 @@ define_names! {
 
 /// Extended information about a proposal used for the storage.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::ProposeData")]
+#[exonum(pb = "proto::schema::configuration::ProposeData", crate = "crate")]
 pub struct ProposeData {
     /// Proposal transaction.
     pub tx_propose: Propose,

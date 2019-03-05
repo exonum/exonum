@@ -60,11 +60,10 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-
-// Test dependencies.
-#[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
+
+// Test dependencies.
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
 

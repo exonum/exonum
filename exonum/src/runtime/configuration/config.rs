@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::fabric::NodeBuilder;
-use exonum_configuration as configuration;
+/// Config for Configuration service.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigurationServiceConfig {
+    /// Number of votes required to commit the new configuration.
+    /// This value should be greater than 2/3 and less or equal to the
+    /// validators count.
+    pub majority_count: Option<u16>,
+}
 
-fn main() {
-    exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_service(Box::new(configuration::ServiceFactory))
-        .run();
+impl Default for ConfigurationServiceConfig {
+    fn default() -> Self {
+        Self {
+            majority_count: None,
+        }
+    }
 }

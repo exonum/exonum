@@ -20,6 +20,7 @@ use crate::storage::Fork;
 pub mod dispatcher;
 pub mod error;
 pub mod rust;
+pub mod configuration;
 
 use error::{DeployError, ExecutionError, InitError};
 

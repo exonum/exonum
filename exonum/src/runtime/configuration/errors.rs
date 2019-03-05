@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,13 +18,13 @@
 
 use serde_json::error::Error as JsonError;
 
-use exonum::{
+use crate::{
     blockchain::{ExecutionError, StoredConfiguration},
     crypto::Hash,
     helpers::Height,
 };
 
-use crate::transactions::Propose;
+use super::transactions::Propose;
 
 /// Error codes emitted by `Propose` and/or `Vote` transactions during execution.
 #[derive(Debug)]

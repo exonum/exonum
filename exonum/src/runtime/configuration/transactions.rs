@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,20 +14,20 @@
 
 //! Transaction definitions for the configuration service.
 
-use exonum::{
+use crate::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
     },
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
     node::State,
+    proto,
     storage::{Fork, Snapshot},
 };
 
-use crate::{
+use super::{
     config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
-    proto,
     schema::{MaybeVote, ProposeData, Schema, VotingDecision},
     SERVICE_ID, SERVICE_NAME,
 };
@@ -41,7 +41,7 @@ use crate::{
 ///
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::Propose")]
+#[exonum(pb = "proto::schema::configuration::Propose", crate = "crate")]
 pub struct Propose {
     /// Configuration in JSON format.
     ///
@@ -62,7 +62,7 @@ pub struct Propose {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::Vote")]
+#[exonum(pb = "proto::schema::configuration::Vote",  crate = "crate")]
 pub struct Vote {
     /// Hash of the configuration that this vote is for.
     ///
@@ -83,7 +83,7 @@ pub struct Vote {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::VoteAgainst")]
+#[exonum(pb = "proto::schema::configuration::VoteAgainst",  crate = "crate")]
 pub struct VoteAgainst {
     /// Hash of the configuration that this vote is for.
     ///
@@ -93,6 +93,7 @@ pub struct VoteAgainst {
 
 /// Configuration Service transactions.
 #[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+#[exonum(crate = "crate")]
 pub enum ConfigurationTransactions {
     /// Propose transaction.
     Propose(Propose),
@@ -106,7 +107,7 @@ impl ConfigurationTransactions {
     #[doc(hidden)]
     #[cfg(test)]
     pub fn from_raw(message: Signed<RawTransaction>) -> ConfigurationTransactions {
-        use exonum::blockchain::TransactionSet;
+        use crate::blockchain::TransactionSet;
         use std::ops::Deref;
         ConfigurationTransactions::tx_from_raw(message.deref().clone()).unwrap()
     }
@@ -190,7 +191,7 @@ impl Propose {
         author: PublicKey,
     ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
-        use exonum::storage::StorageValue;
+        use crate::storage::StorageValue;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
@@ -356,7 +357,7 @@ impl VotingContext {
     }
 
     fn save(&self, fork: &mut Fork) {
-        use exonum::storage::StorageValue;
+        use crate::storage::StorageValue;
 
         let cfg_hash = &self.cfg_hash;
         let propose_data: ProposeData = Schema::new(fork.as_ref())

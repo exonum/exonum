@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 use toml::Value;
 
-use exonum::{
+use crate::{
     blockchain::{GenesisConfig, ValidatorKeys},
     crypto::gen_keypair,
     helpers::fabric::{keys, Argument, CommandExtension, Context, DEFAULT_EXONUM_LISTEN_PORT},
@@ -24,7 +24,7 @@ use exonum::{
 
 use std::collections::BTreeMap;
 
-use crate::{config::ConfigurationServiceConfig, errors::Error as ServiceError};
+use super::{config::ConfigurationServiceConfig, errors::Error as ServiceError};
 
 pub struct GenerateCommonConfig;
 
