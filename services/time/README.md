@@ -88,7 +88,7 @@ let validators_time = time_schema.validators_time();
 let validator_time = time_schema.validators_time().get(&public_key);
 ```
 
-## Further reading
+## Further Reading
 
 Consult [the crate docs](https://docs.rs/exonum-time) for more details about
 the service Rust API, and the [service description in Exonum docs](https://exonum.com/doc/version/latest/advanced/time)

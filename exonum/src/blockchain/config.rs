@@ -76,7 +76,7 @@ pub struct StoredConfiguration {
 /// which can later be edited as required.
 /// The parameters in this configuration should be the same for all nodes in the network and can
 /// be changed using the
-/// [configuration updater service](https://exonum.com/doc/version/latest/advanced/configuration-updater/).
+/// [configuration update service](https://exonum.com/doc/version/latest/advanced/configuration-updater/).
 ///
 /// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
 /// to slow down block generation,hence consume less disk space, these values can be increased.

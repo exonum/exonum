@@ -184,7 +184,7 @@ pub trait Service: Send + Sync + 'static {
     /// format, if service has global configuration parameters. This configuration is used
     /// to create a genesis block.
     ///
-    /// [doc:global_cfg]: https://exonum.com/doc/version/latest/architecture/services/#global-configuration.
+    /// [doc:global_cfg]: https://exonum.com/doc/version/latest/architecture/services/#global-configuration
     /// [`&mut Fork`]: https://exonum.com/doc/version/latest/architecture/storage/#forks
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null

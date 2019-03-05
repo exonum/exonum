@@ -459,7 +459,7 @@ pub mod service {
         // To simplify things, we don't have [Merkelized tables][merkle] in the service storage
         // for now, so we return an empty vector.
         //
-        // [merkle]: https://exonum.com/doc/version/latest/architecture/storage/#merklized-indices
+        // [merkle]: https://exonum.com/doc/version/latest/architecture/storage/#merkelized-indices
         fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
             vec![]
         }
