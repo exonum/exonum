@@ -20,6 +20,7 @@ use crate::{
 use std::ops::{Deref, DerefMut};
 
 trait ObjectAccess<V: BinaryValue>: IndexAccess {
+
     fn create_list<I: Into<IndexAddress>>(&self, address: I) -> ListIndex<Self, V>;
 
     fn get_object<K: ObjectGetter<K, Self, V>>(&self, address: IndexAddress) -> Ref<K>;
@@ -35,7 +36,7 @@ where
     T: IndexAccess,
     V: BinaryValue,
 {
-    fn get<I:Into<IndexAddress>>(index_access: T, address: I) -> K;
+    fn get<I: Into<IndexAddress>>(index_access: T, address: I) -> K;
 }
 
 impl<T, V> ObjectGetter<Self, T, V> for ListIndex<T, V>
@@ -43,7 +44,7 @@ where
     T: IndexAccess,
     V: BinaryValue,
 {
-    fn get<I:Into<IndexAddress>>(index_access: T, address: I) -> Self {
+    fn get<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
         ListIndex::new("index", index_access)
     }
 }
@@ -76,9 +77,9 @@ impl<T> DerefMut for RefMut<T> {
 }
 
 impl<'a, V: BinaryValue> ObjectAccess<V> for &'a Box<dyn Snapshot> {
+
     fn create_list<I: Into<IndexAddress>>(&self, address: I) -> ListIndex<Self, V> {
         let address = address.into();
-
         ListIndex::new(address.name, *self)
     }
 
