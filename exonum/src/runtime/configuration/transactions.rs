@@ -62,7 +62,7 @@ pub struct Propose {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::schema::configuration::Vote",  crate = "crate")]
+#[exonum(pb = "proto::schema::configuration::Vote", crate = "crate")]
 pub struct Vote {
     /// Hash of the configuration that this vote is for.
     ///
@@ -83,7 +83,7 @@ pub struct Vote {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::schema::configuration::VoteAgainst",  crate = "crate")]
+#[exonum(pb = "proto::schema::configuration::VoteAgainst", crate = "crate")]
 pub struct VoteAgainst {
     /// Hash of the configuration that this vote is for.
     ///

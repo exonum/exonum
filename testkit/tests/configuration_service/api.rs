@@ -25,11 +25,12 @@ use super::{
     new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
     ConfigurationTestKit,
 };
-use exonum::runtime::configuration::{SERVICE_NAME, 
+use exonum::runtime::configuration::{
     api::{
         ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
         VoteResponse, VotesInfo,
-    }
+    },
+    SERVICE_NAME,
 };
 
 trait ConfigurationApiTest {

@@ -93,9 +93,7 @@ pub struct Service {
 impl Service {
     /// Create new instance of configuration service.
     pub fn new(config: ConfigurationServiceConfig) -> Self {
-        Self {
-            config
-        }
+        Self { config }
     }
 }
 

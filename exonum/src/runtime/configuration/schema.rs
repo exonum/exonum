@@ -16,13 +16,13 @@
 
 use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
-    storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
     proto,
+    storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 
 use std::{borrow::Cow, ops::Deref};
 
-use super::{transactions::Propose};
+use super::transactions::Propose;
 
 const YEA_TAG: u8 = 1;
 const NAY_TAG: u8 = 2;
