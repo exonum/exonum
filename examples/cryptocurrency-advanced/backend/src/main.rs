@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum::helpers::fabric::NodeBuilder;
-use exonum_configuration as configuration;
 use exonum_cryptocurrency_advanced as cryptocurrency;
 
 fn main() {
@@ -21,7 +20,6 @@ fn main() {
     exonum::helpers::init_logger().unwrap();
 
     let node = NodeBuilder::new()
-        .with_service(Box::new(configuration::ServiceFactory))
         .with_service(Box::new(cryptocurrency::ServiceFactory));
     node.run();
 }
