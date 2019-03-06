@@ -73,7 +73,7 @@ pub enum ErrorCode {
 
 // Common error types for `Propose` and `Vote`.
 #[derive(Debug, Fail)]
-pub(crate) enum Error {
+pub enum Error {
     #[fail(display = "Next configuration is already scheduled: {:?}", _0)]
     AlreadyScheduled(StoredConfiguration),
 

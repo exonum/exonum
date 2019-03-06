@@ -53,13 +53,6 @@
 //! }
 //! ```
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
-
 pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
@@ -79,14 +72,12 @@ use crate::{
 use cmd::{Finalize, GenerateCommonConfig, GenerateTestnet};
 use config::ConfigurationServiceConfig;
 
-mod api;
+pub mod api; // TODO: pub only for testing.
 mod cmd;
-mod config;
-mod errors;
-mod schema;
-#[cfg(test)]
-mod tests;
-mod transactions;
+pub mod config; // TODO: pub only for testing.
+pub mod errors; // TODO: pub only for testing.
+pub mod schema; // TODO: pub only for testing.
+pub mod transactions; // TODO: pub only for testing.
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -97,6 +88,15 @@ pub const SERVICE_NAME: &str = "configuration";
 #[derive(Debug, Default)]
 pub struct Service {
     config: ConfigurationServiceConfig,
+}
+
+impl Service {
+    /// Create new instance of configuration service.
+    pub fn new(config: ConfigurationServiceConfig) -> Self {
+        Self {
+            config
+        }
+    }
 }
 
 impl blockchain::Service for Service {

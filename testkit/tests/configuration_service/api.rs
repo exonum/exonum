@@ -14,7 +14,7 @@
 
 // spell-checker:ignore postpropose, postvote
 
-use crate::{
+use exonum::{
     blockchain::{Schema, StoredConfiguration},
     crypto::{CryptoHash, Hash},
     helpers::{Height, ValidatorId},
@@ -25,11 +25,12 @@ use super::{
     new_tx_config_propose, new_tx_config_vote, new_tx_config_vote_against, ConfigurationSchema,
     ConfigurationTestKit,
 };
-use super::super::api::{
-    ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
-    VoteResponse, VotesInfo,
+use exonum::runtime::configuration::{SERVICE_NAME, 
+    api::{
+        ConfigHashInfo, ConfigInfo, FilterQuery, HashQuery, ProposeHashInfo, ProposeResponse,
+        VoteResponse, VotesInfo,
+    }
 };
-use super::super::SERVICE_NAME;
 
 trait ConfigurationApiTest {
     fn actual_config(&self) -> ConfigHashInfo;
@@ -292,7 +293,7 @@ fn test_votes_for_propose() {
 
 #[test]
 fn test_dissenting_votes_for_propose() {
-    use crate::schema::VotingDecision;
+    use exonum::runtime::configuration::schema::VotingDecision;
 
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
