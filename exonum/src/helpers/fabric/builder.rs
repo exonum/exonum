@@ -33,6 +33,7 @@ use super::{
 
 use crate::blockchain::Service;
 use crate::node::{ExternalMessage, Node};
+use crate::runtime::configuration;
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -47,7 +48,7 @@ impl NodeBuilder {
     pub fn new() -> Self {
         Self {
             commands: Self::commands(),
-            service_factories: Vec::new(),
+            service_factories: vec![Box::new(configuration::ServiceFactory)],
         }
     }
 
