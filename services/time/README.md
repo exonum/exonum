@@ -95,6 +95,10 @@ the service Rust API, and the [service description in Exonum docs](https://exonu
 for a more high-level perspective, in particular, the design rationale
 and the proof of correctness.
 
+## Other languages support
+
+* [Java Time Oracle](https://github.com/exonum/exonum-java-binding/tree/master/exonum-java-binding/time-oracle)
+
 ## License
 
 `exonum-time` is licensed under the Apache License (Version 2.0).
