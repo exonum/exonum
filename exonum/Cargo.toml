@@ -56,7 +56,6 @@ protobuf = { version = "2.2.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "2.1.0"
 zeroize = "0.5.2"
-lazy_static = "1.0.1"
 
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }
@@ -70,6 +69,7 @@ proptest = "0.8.7"
 modifier = "0.1.0"
 criterion = "0.2.8"
 num = "0.2.0"
+lazy_static = "1.0.1"
 
 [[bench]]
 name = "criterion"

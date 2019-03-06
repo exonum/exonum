@@ -46,6 +46,9 @@
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 #[macro_use]
@@ -60,8 +63,6 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate lazy_static;
 
 // Test dependencies.
 #[cfg(all(test, feature = "long_benchmarks"))]

@@ -63,9 +63,7 @@ impl ProposeData {
     }
 }
 
-lazy_static! {
-    static ref NO_VOTE_BYTES: Vec<u8> = vec![0u8];
-}
+static NO_VOTE_BYTES: [u8; 1] = [0u8];
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
@@ -178,12 +176,12 @@ impl StorageValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
             Some(v) => v.into_bytes(),
-            None => NO_VOTE_BYTES.clone(),
+            None => NO_VOTE_BYTES.to_vec(),
         }
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
+        if NO_VOTE_BYTES.eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
             MaybeVote::some(VotingDecision::from_bytes(bytes))
