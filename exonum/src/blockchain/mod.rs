@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -540,7 +540,7 @@ impl Blockchain {
             {
                 let mut schema = Schema::new(&mut fork);
                 for precommit in precommits {
-                    schema.precommits_mut(&block_hash).push(precommit.clone());
+                    schema.precommits_mut(&block_hash).push(precommit);
                 }
 
                 // Consensus messages cache is useful only during one height, so it should be
@@ -601,9 +601,9 @@ impl Blockchain {
     /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Signed<Connect>> {
         let schema = Schema::new(self.snapshot());
-        let peers_cache = schema.peers_cache();
-        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
-        it.collect()
+
+        let peers_cache_table = schema.peers_cache();
+        peers_cache_table.iter().collect()
     }
 
     /// Saves the given raw message to the consensus messages cache.

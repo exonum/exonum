@@ -1,4 +1,4 @@
-// Copyright 2018 The Exonum Team
+// Copyright 2019 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -435,8 +435,9 @@ fn prepare_txs(
         transactions
             .into_iter()
             .map(|tx| {
-                schema.add_transaction_into_pool(tx.clone());
-                tx.hash()
+                let hash = tx.hash();
+                schema.add_transaction_into_pool(tx);
+                hash
             })
             .collect()
     };
@@ -507,7 +508,7 @@ fn execute_block_rocksdb(
         .take(TXS_IN_BLOCK[TXS_IN_BLOCK.len() - 1])
         .collect();
 
-    let tx_hashes = prepare_txs(&mut blockchain, txs.clone());
+    let tx_hashes = prepare_txs(&mut blockchain, txs);
     assert_transactions_in_pool(&blockchain, &tx_hashes);
 
     // Because execute_block is not really "micro benchmark"
