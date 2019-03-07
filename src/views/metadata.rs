@@ -16,7 +16,7 @@ use std::{borrow::Cow, cell::Cell, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
-use failure::{self, ensure, format_err};
+use failure::{self, ensure, format_err, bail};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
@@ -177,18 +177,18 @@ where
     let index_name = index_address.fully_qualified_name();
 
     let mut pool = IndexesPool::new(index_access);
-    let metadata = if let Some(metadata) = pool.index_metadata(&index_name) {
+    let (metadata, new) = if let Some(metadata) = pool.index_metadata(&index_name) {
         assert_eq!(
             metadata.index_type, index_type,
             "Index type doesn't match specified"
         );
-        metadata
+        (metadata, false)
     } else {
-        pool.create_index_metadata(&index_name, index_type)
+        (pool.create_index_metadata(&index_name, index_type), true)
     };
 
     let index_address = metadata.index_address();
-    let index_state = IndexState::new(index_access, index_name, metadata);
+    let index_state = IndexState::new(index_access, index_name, metadata, new);
     (index_address, index_state)
 }
 
@@ -247,6 +247,7 @@ where
     index_access: T,
     index_name: Vec<u8>,
     cache: Cell<IndexMetadata<V>>,
+    new: bool,
 }
 
 impl<T, V> IndexState<T, V>
@@ -254,11 +255,12 @@ where
     V: BinaryAttribute + Default + Copy,
     T: IndexAccess,
 {
-    fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>) -> Self {
+    fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>, new: bool) -> Self {
         Self {
             index_access,
             index_name,
             cache: Cell::new(metadata),
+            new,
         }
     }
 
@@ -273,6 +275,10 @@ where
         cache.state = state;
         View::new(self.index_access, IndexAddress::from(INDEXES_POOL_NAME))
             .put(&self.index_name, cache.to_bytes());
+    }
+
+    pub fn is_new(&self) -> bool {
+        self.new
     }
 
     /// TODO Add documentation. [ECR-2820]

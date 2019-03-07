@@ -104,6 +104,14 @@ where
         }
     }
 
+    pub fn from_address<I:Into<IndexAddress>>(address: I, index_access: T, ) -> Self {
+        Self {
+            index_access,
+            address: address.into(),
+            index_type: IndexType::default(),
+        }
+    }
+
     /// Provides first part of the index address.
     pub fn index_name<S: Into<String>>(self, index_name: S) -> Self {
         let address = self.address.append_name(index_name.into());
