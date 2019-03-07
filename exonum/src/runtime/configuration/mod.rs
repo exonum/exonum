@@ -89,9 +89,9 @@ impl Service {
     /// Create new instance of configuration service.
     pub fn new(validators_count: usize, majority_count: Option<u16>) -> Self {
         if let Some(majority_count) = majority_count {
-            let byzantine_majority_count =
-                State::byzantine_majority_count(validators_count) as u16;
-            if majority_count > validators_count as u16 || majority_count < byzantine_majority_count {
+            let byzantine_majority_count = State::byzantine_majority_count(validators_count) as u16;
+            if majority_count > validators_count as u16 || majority_count < byzantine_majority_count
+            {
                 panic!(
                     "Invalid majority count: {}, it should be >= {} and <= {}",
                     majority_count, byzantine_majority_count, validators_count
@@ -102,7 +102,7 @@ impl Service {
         Service {
             config: ConfigurationServiceConfig { majority_count },
         }
-    } 
+    }
 }
 
 impl blockchain::Service for Service {

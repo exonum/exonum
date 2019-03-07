@@ -78,9 +78,7 @@ impl ConfigurationTestKit for TestKit {
         let validators_count = 4;
         TestKitBuilder::validator()
             .with_validators(validators_count)
-            .with_service(ConfigurationService::new(
-                validators_count as usize, None
-            ))
+            .with_service(ConfigurationService::new(validators_count as usize, None))
             .create()
     }
 
@@ -127,9 +125,7 @@ impl ConfigurationTestKit for TestKit {
 fn test_full_node_to_validator() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(3)
-        .with_service(ConfigurationService::new(
-            3, None
-        ))
+        .with_service(ConfigurationService::new(3, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -148,9 +144,7 @@ fn test_full_node_to_validator() {
 fn test_add_validators_to_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService::new(
-            3, None,
-        ))
+        .with_service(ConfigurationService::new(3, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -169,9 +163,7 @@ fn test_add_validators_to_config() {
 fn test_exclude_sandbox_node_from_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService::new(
-            4, None,
-        ))
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -190,9 +182,7 @@ fn test_exclude_sandbox_node_from_config() {
 fn test_apply_second_configuration() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService::new(
-            3, None,
-        ))
+        .with_service(ConfigurationService::new(3, None))
         .create();
     // First configuration.
     let cfg_change_height = Height(5);
@@ -222,9 +212,7 @@ fn test_apply_second_configuration() {
 fn test_apply_with_increased_majority() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(6)
-        .with_service(ConfigurationService::new(
-            6, None,
-        ))
+        .with_service(ConfigurationService::new(6, None))
         .create();
 
     // Applying the first configuration with custom majority count.
@@ -288,9 +276,7 @@ fn test_apply_with_increased_majority() {
 fn test_discard_proposes_with_too_big_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService::new(
-            4, None,
-        ))
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -316,9 +302,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
 fn test_discard_proposes_with_too_small_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService::new(
-            4, None,
-        ))
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -755,9 +739,7 @@ fn test_voting_decision_serialize() {
 fn test_vote_without_propose() {
     let testkit: TestKit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService::new(
-            4, None,
-        ))
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let hash = Hash::default();

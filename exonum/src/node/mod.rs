@@ -62,8 +62,8 @@ use crate::helpers::{
 };
 use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
-use crate::storage::{Database, DbOptions};
 use crate::runtime::configuration::Service as ConfigurationService;
+use crate::storage::{Database, DbOptions};
 
 mod basic;
 mod connect_list;
@@ -902,7 +902,10 @@ impl Node {
         crypto::init();
 
         // Init configuration service.
-        let configuration_service = ConfigurationService::new(node_cfg.genesis.validator_keys.len(), node_cfg.configuration_service_majority_count);
+        let configuration_service = ConfigurationService::new(
+            node_cfg.genesis.validator_keys.len(),
+            node_cfg.configuration_service_majority_count,
+        );
         let mut services = services;
         services.push(Box::new(configuration_service));
 

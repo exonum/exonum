@@ -43,11 +43,11 @@ pub struct NodeBuilder {
 }
 
 impl NodeBuilder {
-    /// Creates a new `NodeBuilder` with Configuration Service.
+    /// Creates a new empty `NodeBuilder`.
     pub fn new() -> Self {
         Self {
             commands: Self::commands(),
-            service_factories: vec![],
+            service_factories: Vec::new(),
         }
     }
 
