@@ -61,17 +61,14 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction,
     node::State,
     storage::{Fork, Snapshot},
 };
 
-use cmd::{Finalize, GenerateCommonConfig};
 use config::ConfigurationServiceConfig;
 
 pub mod api; // TODO: pub only for testing.
-mod cmd;
 pub mod config; // TODO: pub only for testing.
 pub mod errors; // TODO: pub only for testing.
 pub mod schema; // TODO: pub only for testing.
@@ -90,9 +87,22 @@ pub struct Service {
 
 impl Service {
     /// Create new instance of configuration service.
-    pub fn new(config: ConfigurationServiceConfig) -> Self {
-        Self { config }
-    }
+    pub fn new(validators_count: usize, majority_count: Option<u16>) -> Self {
+        if let Some(majority_count) = majority_count {
+            let byzantine_majority_count =
+                State::byzantine_majority_count(validators_count) as u16;
+            if majority_count > validators_count as u16 || majority_count < byzantine_majority_count {
+                panic!(
+                    "Invalid majority count: {}, it should be >= {} and <= {}",
+                    majority_count, byzantine_majority_count, validators_count
+                );
+            }
+        }
+
+        Service {
+            config: ConfigurationServiceConfig { majority_count },
+        }
+    } 
 }
 
 impl blockchain::Service for Service {
@@ -120,53 +130,5 @@ impl blockchain::Service for Service {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         api::PublicApi::wire(builder);
         api::PrivateApi::wire(builder);
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct ServiceFactory;
-
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
-        use crate::helpers::fabric;
-        Some(match command {
-            v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
-            v if v == fabric::Finalize.name() => Box::new(Finalize),
-            _ => return None,
-        })
-    }
-
-    fn make_service(&mut self, context: &Context) -> Box<dyn blockchain::Service> {
-        let service_config: ConfigurationServiceConfig =
-            context.get(keys::NODE_CONFIG).unwrap().services_configs["configuration_service"]
-                .clone()
-                .try_into()
-                .unwrap();
-
-        if let Some(majority_count) = service_config.majority_count {
-            let validators_count = context
-                .get(keys::NODE_CONFIG)
-                .unwrap()
-                .genesis
-                .validator_keys
-                .len() as u16;
-            let byzantine_majority_count =
-                State::byzantine_majority_count(validators_count as usize) as u16;
-            if majority_count > validators_count || majority_count < byzantine_majority_count {
-                panic!(
-                    "Invalid majority count: {}, it should be >= {} and <= {}",
-                    majority_count, byzantine_majority_count, validators_count
-                );
-            }
-        }
-
-        Box::new(Service {
-            config: service_config,
-        })
     }
 }

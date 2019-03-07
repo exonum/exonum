@@ -75,10 +75,11 @@ pub trait ConfigurationTestKit {
 
 impl ConfigurationTestKit for TestKit {
     fn configuration_default() -> Self {
+        let validators_count = 4;
         TestKitBuilder::validator()
-            .with_validators(4)
+            .with_validators(validators_count)
             .with_service(ConfigurationService::new(
-                ConfigurationServiceConfig::default(),
+                validators_count as usize, None
             ))
             .create()
     }
@@ -127,7 +128,7 @@ fn test_full_node_to_validator() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(3)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            3, None
         ))
         .create();
 
@@ -148,7 +149,7 @@ fn test_add_validators_to_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            3, None,
         ))
         .create();
 
@@ -169,7 +170,7 @@ fn test_exclude_sandbox_node_from_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            4, None,
         ))
         .create();
 
@@ -190,7 +191,7 @@ fn test_apply_second_configuration() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            3, None,
         ))
         .create();
     // First configuration.
@@ -222,7 +223,7 @@ fn test_apply_with_increased_majority() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(6)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            6, None,
         ))
         .create();
 
@@ -288,7 +289,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            4, None,
         ))
         .create();
 
@@ -316,7 +317,7 @@ fn test_discard_proposes_with_too_small_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            4, None,
         ))
         .create();
 
@@ -755,7 +756,7 @@ fn test_vote_without_propose() {
     let testkit: TestKit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(ConfigurationService::new(
-            ConfigurationServiceConfig::default(),
+            4, None,
         ))
         .create();
 
