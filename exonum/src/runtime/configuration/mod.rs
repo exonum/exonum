@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate implements a *configuration service* for Exonum blockchain framework.
+//! This module implements a *configuration service* for Exonum blockchain framework.
 //!
 //! Upon being plugged in, the service allows to modify Exonum blockchain configuration
 //! using [proposals](struct.Propose.html) and [voting for proposal](struct.Vote.html),
@@ -34,21 +34,19 @@
 //! 2. Convert a `StoredConfiguration` into bytes as per its `StorageValue` implementation.
 //! 3. Use `crate::crypto::hash()` on the obtained bytes.
 //!
-//! [sc]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
+//! [sc]: https://docs.rs/exonum/0.10.3/exonum/blockchain/config/struct.StoredConfiguration.html
 //! [docs:config]: https://exonum.com/doc/advanced/configuration-updater/
 //!
 //! # Examples
 //!
 //! ```rust,no_run
 //! extern crate exonum;
-//! extern crate exonum_configuration as configuration;
 //!
-//! use crate::helpers::fabric::NodeBuilder;
+//! use exonum::helpers::fabric::NodeBuilder;
 //!
 //! fn main() {
-//!     crate::helpers::init_logger().unwrap();
+//!     exonum::helpers::init_logger().unwrap();
 //!     NodeBuilder::new()
-//!         .with_service(Box::new(configuration::ServiceFactory))
 //!         .run();
 //! }
 //! ```

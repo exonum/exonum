@@ -37,18 +37,31 @@ use crate::runtime::configuration;
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
-#[derive(Default)]
 pub struct NodeBuilder {
     commands: HashMap<CommandName, CollectedCommand>,
     service_factories: Vec<Box<dyn ServiceFactory>>,
 }
 
+impl Default for NodeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeBuilder {
-    /// Creates a new empty `NodeBuilder`.
+    /// Creates a new `NodeBuilder` with Configuration Service.
     pub fn new() -> Self {
         Self {
             commands: Self::commands(),
             service_factories: vec![Box::new(configuration::ServiceFactory)],
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn empty() -> Self {
+        Self {
+            commands: Self::commands(),
+            service_factories: vec![],
         }
     }
 

@@ -108,7 +108,7 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    let builder = NodeBuilder::new();
+    let builder = NodeBuilder::empty();
     builder.parse_cmd_string(iter)
 }
 
