@@ -45,6 +45,16 @@ matrix:
   - env: FEATURE=non-fatal-checks
   fast_finish: true
 
+before_cache:
+  # The build artifacts for tests take a huge amount of space (~1.5 GB), so we trim
+  # them a bit before caching.
+  - |
+    cd $TRAVIS_BUILD_DIR/target/debug
+    rm -rf incremental examples
+    find . -maxdepth 1 -type f -executable -delete
+    find deps -type f -size +20M -delete
+    du -h -d 1 .
+
 cache:
   cargo: true
   directories:
