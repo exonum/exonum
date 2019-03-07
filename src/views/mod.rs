@@ -24,7 +24,8 @@ use super::{
 };
 
 mod metadata;
-mod refs;
+//mod refs;
+mod refs_new;
 #[cfg(test)]
 mod tests;
 
@@ -104,7 +105,7 @@ where
         }
     }
 
-    pub fn from_address<I:Into<IndexAddress>>(address: I, index_access: T, ) -> Self {
+    pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
         Self {
             index_access,
             address: address.into(),

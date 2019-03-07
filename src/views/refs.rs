@@ -29,24 +29,6 @@ struct Ref<T> {
     view: T,
 }
 
-trait ObjectGetter<K, T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn get<I: Into<IndexAddress>>(index_access: T, address: I) -> Result<K, failure::Error>;
-}
-
-impl<T, V> ObjectGetter<Self, T, V> for ListIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn get<I: Into<IndexAddress>>(index_access: T, address: I) -> Result<Self, failure::Error> {
-        ListIndex::get_from_address(address, index_access)
-    }
-}
-
 #[derive(Debug)]
 struct RefMut<T> {
     view_mut: T,
@@ -71,6 +53,24 @@ impl<T> Deref for RefMut<T> {
 impl<T> DerefMut for RefMut<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.view_mut
+    }
+}
+
+trait ObjectGetter<K, T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn get<I: Into<IndexAddress>>(index_access: T, address: I) -> Result<K, failure::Error>;
+}
+
+impl<T, V> ObjectGetter<Self, T, V> for ListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn get<I: Into<IndexAddress>>(index_access: T, address: I) -> Result<Self, failure::Error> {
+        ListIndex::get_from_address(address, index_access)
     }
 }
 
