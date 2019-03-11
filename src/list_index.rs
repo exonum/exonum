@@ -27,6 +27,7 @@ use crate::{
     },
     BinaryKey, BinaryValue,
 };
+use std::fmt;
 
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
@@ -140,12 +141,13 @@ where
         address: I,
         index_access: T,
     ) -> Result<Self, failure::Error> {
-        let (base, state) = IndexBuilder::from_address(address, index_access)
+        let address = address.into();
+        let (base, state) = IndexBuilder::from_address(address.clone(), index_access)
             .index_type(IndexType::List)
             .build();
 
         if !state.is_new() {
-            bail!("Index already existed")
+            bail!("Index with address {:?} already exist", address)
         }
 
         Ok(Self {
@@ -159,12 +161,13 @@ where
         address: I,
         index_access: T,
     ) -> Result<Self, failure::Error> {
-        let (base, state) = IndexBuilder::from_address(address, index_access)
+        let address = address.into();
+        let (base, state) = IndexBuilder::from_address(address.clone(), index_access)
             .index_type(IndexType::List)
             .build();
 
         if state.is_new() {
-            bail!("Index not found")
+            bail!("Index with address {:?} is not found", address)
         }
 
         Ok(Self {
