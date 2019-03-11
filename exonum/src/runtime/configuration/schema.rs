@@ -14,14 +14,15 @@
 
 //! Storage schema for the configuration service.
 
-use exonum::{
+use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
+    proto,
     storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 
 use std::{borrow::Cow, ops::Deref};
 
-use crate::{proto, transactions::Propose};
+use super::transactions::Propose;
 
 const YEA_TAG: u8 = 1;
 const NAY_TAG: u8 = 2;
@@ -41,7 +42,7 @@ define_names! {
 
 /// Extended information about a proposal used for the storage.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::ProposeData")]
+#[exonum(pb = "proto::schema::configuration::ProposeData", crate = "crate")]
 pub struct ProposeData {
     /// Proposal transaction.
     pub tx_propose: Propose,
@@ -62,9 +63,7 @@ impl ProposeData {
     }
 }
 
-lazy_static! {
-    static ref NO_VOTE_BYTES: Vec<u8> = vec![0u8];
-}
+static NO_VOTE_BYTES: [u8; 1] = [0u8];
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Copy)]
@@ -177,12 +176,12 @@ impl StorageValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
             Some(v) => v.into_bytes(),
-            None => NO_VOTE_BYTES.clone(),
+            None => NO_VOTE_BYTES.to_vec(),
         }
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
+        if NO_VOTE_BYTES.eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
             MaybeVote::some(VotingDecision::from_bytes(bytes))

@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate assert_matches;
+#[macro_use]
+extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
+
 use exonum::{
     blockchain::{Schema, StoredConfiguration},
     crypto::{hash, CryptoHash, Hash, HASH_SIZE},
@@ -23,10 +30,10 @@ use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
 use std::str;
 
-use crate::{
-    config::ConfigurationServiceConfig, ConfigurationTransactions, Propose,
-    Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
-    VotingDecision, SERVICE_NAME,
+use exonum::runtime::configuration::{
+    config::ConfigurationServiceConfig, errors::Error as ServiceError, transactions::VotingContext,
+    ConfigurationTransactions, Propose, Schema as ConfigurationSchema,
+    Service as ConfigurationService, Vote, VoteAgainst, VotingDecision, SERVICE_NAME,
 };
 
 mod api;
@@ -68,11 +75,10 @@ pub trait ConfigurationTestKit {
 
 impl ConfigurationTestKit for TestKit {
     fn configuration_default() -> Self {
+        let validators_count = 4;
         TestKitBuilder::validator()
-            .with_validators(4)
-            .with_service(ConfigurationService {
-                config: ConfigurationServiceConfig::default(),
-            })
+            .with_validators(validators_count)
+            .with_service(ConfigurationService::new(validators_count as usize, None))
             .create()
     }
 
@@ -119,9 +125,7 @@ impl ConfigurationTestKit for TestKit {
 fn test_full_node_to_validator() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(3)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(3, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -140,9 +144,7 @@ fn test_full_node_to_validator() {
 fn test_add_validators_to_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(3, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -161,9 +163,7 @@ fn test_add_validators_to_config() {
 fn test_exclude_sandbox_node_from_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -182,9 +182,7 @@ fn test_exclude_sandbox_node_from_config() {
 fn test_apply_second_configuration() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(3, None))
         .create();
     // First configuration.
     let cfg_change_height = Height(5);
@@ -214,9 +212,7 @@ fn test_apply_second_configuration() {
 fn test_apply_with_increased_majority() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(6)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(6, None))
         .create();
 
     // Applying the first configuration with custom majority count.
@@ -280,9 +276,7 @@ fn test_apply_with_increased_majority() {
 fn test_discard_proposes_with_too_big_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -308,9 +302,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
 fn test_discard_proposes_with_too_small_majority_count() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService {
-            config: ConfigurationServiceConfig::default(),
-        })
+        .with_service(ConfigurationService::new(4, None))
         .create();
 
     let cfg_change_height = Height(5);
@@ -741,4 +733,31 @@ fn test_voting_decision_serialize() {
     );
     assert_eq!("{\"tx_hash\":\
     \"0000000000000000000000000000000000000000000000000000000000000000\",\"vote_type\":\"yea\"}", vote)
+}
+
+#[test]
+fn test_vote_without_propose() {
+    let testkit: TestKit = TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(ConfigurationService::new(4, None))
+        .create();
+
+    let hash = Hash::default();
+
+    let illegal_vote = new_tx_config_vote(&testkit.network().validators()[3], hash);
+
+    let decision = VotingDecision::Yea(illegal_vote.hash());
+    let author = illegal_vote.author();
+    let vote = VotingContext::new(decision, author, hash);
+
+    let vote_result = vote.precheck(testkit.snapshot().as_ref());
+
+    let illegal_vote_against = new_tx_config_vote_against(&testkit.network().validators()[3], hash);
+    let decision = VotingDecision::Yea(illegal_vote_against.hash());
+    let author = illegal_vote_against.author();
+    let vote_against = VotingContext::new(decision, author, hash);
+    let vote_against_result = vote_against.precheck(testkit.snapshot().as_ref());
+
+    assert_matches!(vote_result, Err(ServiceError::UnknownConfigRef(_)));
+    assert_matches!(vote_against_result, Err(ServiceError::UnknownConfigRef(_)));
 }

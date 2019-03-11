@@ -17,6 +17,7 @@ use protobuf::well_known_types::Any;
 use crate::crypto::{Hash, PublicKey};
 use crate::storage::Fork;
 
+pub mod configuration;
 pub mod dispatcher;
 pub mod error;
 pub mod rust;

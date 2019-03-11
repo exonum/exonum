@@ -14,20 +14,20 @@
 
 //! Transaction definitions for the configuration service.
 
-use exonum::{
+use crate::{
     blockchain::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
     },
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
     node::State,
+    proto,
     storage::{Fork, Snapshot},
 };
 
-use crate::{
+use super::{
     config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
-    proto,
     schema::{MaybeVote, ProposeData, Schema, VotingDecision},
     SERVICE_ID, SERVICE_NAME,
 };
@@ -41,7 +41,7 @@ use crate::{
 ///
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::Propose")]
+#[exonum(pb = "proto::schema::configuration::Propose", crate = "crate")]
 pub struct Propose {
     /// Configuration in JSON format.
     ///
@@ -62,7 +62,7 @@ pub struct Propose {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::Vote")]
+#[exonum(pb = "proto::schema::configuration::Vote", crate = "crate")]
 pub struct Vote {
     /// Hash of the configuration that this vote is for.
     ///
@@ -83,7 +83,7 @@ pub struct Vote {
 /// [`MaybeVote`]: struct.MaybeVote.html
 /// [`ErrorCode`]: enum.ErrorCode.html
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::VoteAgainst")]
+#[exonum(pb = "proto::schema::configuration::VoteAgainst", crate = "crate")]
 pub struct VoteAgainst {
     /// Hash of the configuration that this vote is for.
     ///
@@ -93,6 +93,7 @@ pub struct VoteAgainst {
 
 /// Configuration Service transactions.
 #[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
+#[exonum(crate = "crate")]
 pub enum ConfigurationTransactions {
     /// Propose transaction.
     Propose(Propose),
@@ -104,9 +105,9 @@ pub enum ConfigurationTransactions {
 
 impl ConfigurationTransactions {
     #[doc(hidden)]
-    #[cfg(test)]
+    // TODO: pub only for testing.
     pub fn from_raw(message: Signed<RawTransaction>) -> ConfigurationTransactions {
-        use exonum::blockchain::TransactionSet;
+        use crate::blockchain::TransactionSet;
         use std::ops::Deref;
         ConfigurationTransactions::tx_from_raw(message.deref().clone()).unwrap()
     }
@@ -190,7 +191,7 @@ impl Propose {
         author: PublicKey,
     ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
-        use exonum::storage::StorageValue;
+        use crate::storage::StorageValue;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
@@ -303,7 +304,9 @@ impl Transaction for Propose {
     }
 }
 
-struct VotingContext {
+// TODO: Public only for testing.
+#[derive(Debug)]
+pub struct VotingContext {
     decision: VotingDecision,
     author: PublicKey,
     cfg_hash: Hash,
@@ -311,7 +314,7 @@ struct VotingContext {
 
 impl VotingContext {
     /// Creates new `VotingContext` from `VotingDecision` and author key.
-    fn new(decision: VotingDecision, author: PublicKey, cfg_hash: Hash) -> Self {
+    pub fn new(decision: VotingDecision, author: PublicKey, cfg_hash: Hash) -> Self {
         VotingContext {
             author,
             decision,
@@ -324,7 +327,7 @@ impl VotingContext {
     /// # Return value
     ///
     /// Returns a configuration this transaction is for on success, or an error (if any).
-    fn precheck(&self, snapshot: &dyn Snapshot) -> Result<StoredConfiguration, ServiceError> {
+    pub fn precheck(&self, snapshot: &dyn Snapshot) -> Result<StoredConfiguration, ServiceError> {
         use self::ServiceError::*;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
@@ -356,7 +359,7 @@ impl VotingContext {
     }
 
     fn save(&self, fork: &mut Fork) {
-        use exonum::storage::StorageValue;
+        use crate::storage::StorageValue;
 
         let cfg_hash = &self.cfg_hash;
         let propose_data: ProposeData = Schema::new(fork.as_ref())
@@ -444,49 +447,5 @@ impl Transaction for VoteAgainst {
         );
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use exonum_testkit::{TestKit, TestKitBuilder};
-
-    use super::{Hash, VotingContext};
-    use crate::{
-        config::ConfigurationServiceConfig,
-        errors::Error as ServiceError,
-        schema::VotingDecision,
-        tests::{new_tx_config_vote, new_tx_config_vote_against},
-        Service as ConfigurationService,
-    };
-
-    #[test]
-    fn test_vote_without_propose() {
-        let testkit: TestKit = TestKitBuilder::validator()
-            .with_validators(4)
-            .with_service(ConfigurationService {
-                config: ConfigurationServiceConfig::default(),
-            })
-            .create();
-
-        let hash = Hash::default();
-
-        let illegal_vote = new_tx_config_vote(&testkit.network().validators()[3], hash);
-
-        let decision = VotingDecision::Yea(illegal_vote.hash());
-        let author = illegal_vote.author();
-        let vote = VotingContext::new(decision, author, hash);
-
-        let vote_result = vote.precheck(testkit.snapshot().as_ref());
-
-        let illegal_vote_against =
-            new_tx_config_vote_against(&testkit.network().validators()[3], hash);
-        let decision = VotingDecision::Yea(illegal_vote_against.hash());
-        let author = illegal_vote_against.author();
-        let vote_against = VotingContext::new(decision, author, hash);
-        let vote_against_result = vote_against.precheck(testkit.snapshot().as_ref());
-
-        assert_matches!(vote_result, Err(ServiceError::UnknownConfigRef(_)));
-        assert_matches!(vote_against_result, Err(ServiceError::UnknownConfigRef(_)));
     }
 }

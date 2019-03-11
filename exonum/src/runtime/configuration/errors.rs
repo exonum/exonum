@@ -18,13 +18,13 @@
 
 use serde_json::error::Error as JsonError;
 
-use exonum::{
+use crate::{
     blockchain::{ExecutionError, StoredConfiguration},
     crypto::Hash,
     helpers::Height,
 };
 
-use crate::transactions::Propose;
+use super::transactions::Propose;
 
 /// Error codes emitted by `Propose` and/or `Vote` transactions during execution.
 #[derive(Debug)]
@@ -73,7 +73,7 @@ pub enum ErrorCode {
 
 // Common error types for `Propose` and `Vote`.
 #[derive(Debug, Fail)]
-pub(crate) enum Error {
+pub enum Error {
     #[fail(display = "Next configuration is already scheduled: {:?}", _0)]
     AlreadyScheduled(StoredConfiguration),
 
