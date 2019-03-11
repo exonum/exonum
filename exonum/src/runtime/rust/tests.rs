@@ -14,21 +14,36 @@
 
 use semver::Version;
 
-use crate::proto::schema::tests::TimestampTx;
+use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
 
 use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext};
 use crate::crypto::{Hash, PublicKey};
+use crate::messages::BinaryForm;
 use crate::runtime::{
     error::ExecutionError, CallInfo, DeployStatus, InstanceInitData, RuntimeContext,
-    RuntimeEnvironment,
+    RuntimeEnvironment, ServiceInstanceId,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::{well_known_types::Any, Message};
 
+const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
+
+#[derive(Debug, ProtobufConvert)]
+#[exonum(pb = "TestServiceTx", crate = "crate")]
+struct TxA {
+    value: u64,
+}
+
+#[derive(Debug, ProtobufConvert)]
+#[exonum(pb = "TestServiceTx", crate = "crate")]
+struct TxB {
+    value: u64,
+}
+
 service_interface! {
-    pub trait TestService {
-        fn method_a(&self, ctx: TransactionContext, arg: TimestampTx) -> Result<(), ExecutionError>;
-        fn method_b(&self, ctx: TransactionContext, arg: TimestampTx) -> Result<(), ExecutionError>;
+    trait TestService {
+        fn method_a(&self, ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
+        fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
     }
 }
 
@@ -36,38 +51,27 @@ service_interface! {
 pub struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
-    fn method_a(
-        &self,
-        mut ctx: TransactionContext,
-        _arg: TimestampTx,
-    ) -> Result<(), ExecutionError> {
+    fn method_a(&self, mut ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
         let fork = ctx.fork();
         let mut entry = Entry::new("method_a_entry", fork);
-        entry.set(1);
+        entry.set(arg.value);
 
         // Test calling one service from another.
-        // It should be improved to support service auth in the future.
+        // TODO: It should be improved to support service auth in the future.
         let dispatch_info = CallInfo {
-            instance_id: 2,
+            instance_id: SERVICE_INSTANCE_ID,
             method_id: 1,
         };
-        let payload = {
-            let mut tx = TimestampTx::new();
-            tx.set_data(vec![0]);
-            tx.write_to_bytes().unwrap()
-        };
+        let payload = TxB { value: arg.value }.encode().unwrap();
         ctx.dispatch_call(dispatch_info, &payload)
             .expect("Failed to dispatch call");
         Ok(())
     }
-    fn method_b(
-        &self,
-        mut ctx: TransactionContext,
-        _arg: TimestampTx,
-    ) -> Result<(), ExecutionError> {
+
+    fn method_b(&self, mut ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
         let fork = ctx.fork();
         let mut entry = Entry::new("method_b_entry", fork);
-        entry.set(2);
+        entry.set(arg.value);
         Ok(())
     }
 }
@@ -75,10 +79,20 @@ impl TestService for TestServiceImpl {
 impl_service_dispatcher!(TestServiceImpl, TestService);
 impl Service for TestServiceImpl {
     fn initialize(&self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+        let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value())
+            .map_err(|e| ExecutionError::with_description(201, format!("Wrong argument: {}", e)))?;
+
         let fork = ctx.fork();
         let mut entry = Entry::new("constructor_entry", fork);
-        entry.set(3);
+        entry.set(arg.take_msg());
         Ok(())
+    }
+}
+
+fn get_artifact_spec() -> RustArtifactSpec {
+    RustArtifactSpec {
+        name: "test_service".to_owned(),
+        version: Version::new(0, 1, 0),
     }
 }
 
@@ -86,30 +100,35 @@ impl Service for TestServiceImpl {
 fn test_basic_rust_runtime() {
     let db = MemoryDB::new();
 
-    let rust_artifact = RustArtifactSpec {
-        name: "test_service".to_owned(),
-        version: Version::new(0, 1, 0),
-    };
+    // Create runtime and service.
+    let rust_artifact = get_artifact_spec();
     let artifact = ArtifactSpec::Rust(rust_artifact.clone());
     let service = Box::new(TestServiceImpl);
 
     let mut runtime = RustRuntime::default();
-
     runtime.add_service(rust_artifact.clone(), service);
 
+    // Deploy service
     assert!(runtime.start_deploy(artifact.clone()).is_ok());
-
     assert_eq!(
         runtime.check_deploy_status(artifact.clone()).unwrap(),
         DeployStatus::Deployed
     );
 
-    let init_data = InstanceInitData {
-        instance_id: 2,
-        constructor_data: Default::default(),
-    };
-
+    // Init service
     {
+        let init_data = InstanceInitData {
+            instance_id: SERVICE_INSTANCE_ID,
+            constructor_data: {
+                let mut arg = TestServiceInit::new();
+                arg.set_msg("constructor_message".to_owned());
+
+                let mut pb_any = Any::new();
+                pb_any.set_value(arg.write_to_bytes().unwrap());
+                pb_any
+            },
+        };
+
         let mut fork = db.fork();
         let address = PublicKey::zero();
         let tx_hash = Hash::zero();
@@ -117,37 +136,51 @@ fn test_basic_rust_runtime() {
         runtime
             .init_service(&mut context, artifact.clone(), &init_data)
             .unwrap();
-        db.merge(fork.into_patch());
+
+        let entry = Entry::new("constructor_entry", &fork);
+        assert_eq!(entry.get(), Some("constructor_message".to_owned()));
+
+        db.merge(fork.into_patch()).unwrap();
     }
 
-    // Execute transaction.
-    let dispatch_info = CallInfo {
-        instance_id: 2,
-        method_id: 0,
-    };
-    let payload = {
-        let mut tx = TimestampTx::new();
-        tx.set_data(vec![0]);
-        tx.write_to_bytes().unwrap()
-    };
+    // Execute transaction method A.
     {
+        const ARG_A_VALUE: u64 = 11;
+        let dispatch_info = CallInfo {
+            instance_id: SERVICE_INSTANCE_ID,
+            method_id: 0,
+        };
+        let payload = TxA { value: ARG_A_VALUE }.encode().unwrap();
         let mut fork = db.fork();
-        let address = PublicKey::zero();
-        let tx_hash = Hash::zero();
-        let mut context = RuntimeContext::new(&mut fork, &address, &tx_hash);
+        let mut context = RuntimeContext::from_fork(&mut fork);
         runtime
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();
-        db.merge(fork.into_patch());
-    }
 
+        let entry = Entry::new("method_a_entry", &fork);
+        assert_eq!(entry.get(), Some(ARG_A_VALUE));
+        let entry = Entry::new("method_b_entry", &fork);
+        assert_eq!(entry.get(), Some(ARG_A_VALUE));
+
+        db.merge(fork.into_patch()).unwrap();
+    }
+    // Execute transaction method B.
     {
-        let snap = db.snapshot();
-        let entry = Entry::new("method_a_entry", &snap);
-        assert_eq!(entry.get(), Some(1));
-        let entry = Entry::new("method_b_entry", &snap);
-        assert_eq!(entry.get(), Some(2));
-        let entry = Entry::new("constructor_entry", &snap);
-        assert_eq!(entry.get(), Some(3));
+        const ARG_B_VALUE: u64 = 22;
+        let dispatch_info = CallInfo {
+            instance_id: SERVICE_INSTANCE_ID,
+            method_id: 1,
+        };
+        let payload = TxB { value: ARG_B_VALUE }.encode().unwrap();
+        let mut fork = db.fork();
+        let mut context = RuntimeContext::from_fork(&mut fork);
+        runtime
+            .execute(&mut context, dispatch_info, &payload)
+            .unwrap();
+
+        let entry = Entry::new("method_b_entry", &fork);
+        assert_eq!(entry.get(), Some(ARG_B_VALUE));
+
+        db.merge(fork.into_patch()).unwrap();
     }
 }
