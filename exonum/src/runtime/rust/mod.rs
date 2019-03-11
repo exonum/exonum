@@ -26,7 +26,7 @@ pub mod service;
 pub mod tests;
 
 use super::{
-    error::{DeployError, ExecutionError, InitError},
+    error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
@@ -147,7 +147,9 @@ impl RuntimeEnvironment for RustRuntime {
 
         instance
             .call(dispatch.method_id, ctx, payload)
-            .map_err(|e| ExecutionError::with_description(200, format!("Dispatch error: {}", e)))?
+            .map_err(|e| {
+                ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
+            })?
     }
 }
 

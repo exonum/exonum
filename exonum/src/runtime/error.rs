@@ -16,6 +16,11 @@ use crate::blockchain;
 
 pub type ExecutionError = blockchain::ExecutionError;
 
+// TODO: summarize error codes/simplify error creation
+pub const DISPATCH_ERROR: u8 = 255;
+pub const WRONG_ARG_ERROR: u8 = 254;
+pub const WRONG_RUNTIME: u8 = 253;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum DeployError {
     WrongRuntime,

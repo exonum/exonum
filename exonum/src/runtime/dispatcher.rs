@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use super::{
-    error::{DeployError, ExecutionError, InitError},
+    error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
@@ -126,14 +126,19 @@ impl RuntimeEnvironment for Dispatcher {
         let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
 
         if runtime_id.is_none() {
-            return Err(ExecutionError::with_description(0x00, "Wrong runtime"));
+            return Err(ExecutionError::with_description(
+                WRONG_RUNTIME,
+                "Wrong runtime",
+            ));
         }
 
         if let Some(runtime) = self.runtimes.get(&runtime_id.unwrap()) {
             runtime.execute(context, call_info, payload)
         } else {
-            // TODO: Execution error code should be determined.
-            Err(ExecutionError::with_description(0x00, "Wrong runtime"))
+            Err(ExecutionError::with_description(
+                WRONG_RUNTIME,
+                "Wrong runtime",
+            ))
         }
     }
 }

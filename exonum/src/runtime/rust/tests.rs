@@ -20,8 +20,9 @@ use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, Trans
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::BinaryForm;
 use crate::runtime::{
-    error::ExecutionError, CallInfo, DeployStatus, InstanceInitData, RuntimeContext,
-    RuntimeEnvironment, ServiceInstanceId,
+    error::{ExecutionError, WRONG_ARG_ERROR},
+    CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    ServiceInstanceId,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::{well_known_types::Any, Message};
@@ -79,8 +80,9 @@ impl TestService for TestServiceImpl {
 impl_service_dispatcher!(TestServiceImpl, TestService);
 impl Service for TestServiceImpl {
     fn initialize(&self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
-        let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value())
-            .map_err(|e| ExecutionError::with_description(201, format!("Wrong argument: {}", e)))?;
+        let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
+            ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
+        })?;
 
         let fork = ctx.fork();
         let mut entry = Entry::new("constructor_entry", fork);
