@@ -59,8 +59,8 @@ pub struct RocksDBSnapshot {
 }
 
 /// An iterator over the entries of a `RocksDB`.
-struct RocksDBIterator {
-    iter: Peekable<DBIterator>,
+struct RocksDBIterator<'a> {
+    iter: Peekable<DBIterator<'a>>,
     key: Option<Box<[u8]>>,
     value: Option<Box<[u8]>>,
 }
@@ -75,7 +75,7 @@ impl RocksDB {
         let inner = {
             if let Ok(names) = rocksdb::DB::list_cf(&RocksDbOptions::default(), &path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                rocksdb::DB::open_cf(&options.into(), path, cf_names.as_ref())?
+                rocksdb::DB::open_cf(&options.into(), path, cf_names)?
             } else {
                 rocksdb::DB::open(&options.into(), path)?
             }
@@ -104,7 +104,7 @@ impl RocksDB {
 
             for (key, change) in changes {
                 match change {
-                    Change::Put(ref value) => batch.put_cf(cf, key.as_ref(), value)?,
+                    Change::Put(ref value) => batch.put_cf(cf, key, value)?,
                     Change::Delete => batch.delete_cf(cf, &key)?,
                 }
             }
@@ -183,23 +183,21 @@ impl Snapshot for RocksDBSnapshot {
     }
 }
 
-impl Iterator for RocksDBIterator {
+impl<'a> Iterator for RocksDBIterator<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         if let Some((key, value)) = self.iter.next() {
             self.key = Some(key);
             self.value = Some(value);
-            Some((self.key.as_ref().unwrap(), self.value.as_ref().unwrap()))
+            Some((self.key.as_ref()?.as_ref(), self.value.as_ref()?.as_ref()))
         } else {
             None
         }
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        if let Some(&(ref key, ref value)) = self.iter.peek() {
-            Some((key, value))
-        } else {
-            None
-        }
+        self.iter
+            .peek()
+            .map(|(key, value)| (key.as_ref(), value.as_ref()))
     }
 }
 
