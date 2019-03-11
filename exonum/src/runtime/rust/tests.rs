@@ -43,6 +43,8 @@ impl TestService for TestServiceImpl {
         let mut entry = Entry::new("method_a_entry", fork);
         entry.set(1);
 
+        // Test calling one service from another.
+        // It should be improved to support service auth in the future.
         let dispatch_info = CallInfo {
             instance_id: 2,
             method_id: 1,
