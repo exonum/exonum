@@ -30,4 +30,5 @@ pub enum InitError {
     WrongArtifact,
     NotDeployed,
     ServiceIdExists,
+    ExecutionError(ExecutionError),
 }

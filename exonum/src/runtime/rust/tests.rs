@@ -23,7 +23,7 @@ use crate::runtime::{
     RuntimeEnvironment,
 };
 use crate::storage::{Database, Entry, MemoryDB};
-use protobuf::Message;
+use protobuf::{well_known_types::Any, Message};
 
 service_interface! {
     pub trait TestService {
@@ -73,7 +73,14 @@ impl TestService for TestServiceImpl {
 }
 
 impl_service_dispatcher!(TestServiceImpl, TestService);
-impl Service for TestServiceImpl {}
+impl Service for TestServiceImpl {
+    fn initialize(&self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+        let fork = ctx.fork();
+        let mut entry = Entry::new("constructor_entry", fork);
+        entry.set(3);
+        Ok(())
+    }
+}
 
 #[test]
 fn test_basic_rust_runtime() {
@@ -99,7 +106,7 @@ fn test_basic_rust_runtime() {
 
     let init_data = InstanceInitData {
         instance_id: 2,
-        constructor_data: None,
+        constructor_data: Default::default(),
     };
 
     {
@@ -110,6 +117,7 @@ fn test_basic_rust_runtime() {
         runtime
             .init_service(&mut context, artifact.clone(), &init_data)
             .unwrap();
+        db.merge(fork.into_patch());
     }
 
     // Execute transaction.
@@ -130,10 +138,16 @@ fn test_basic_rust_runtime() {
         runtime
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();
+        db.merge(fork.into_patch());
+    }
 
-        let entry = Entry::new("method_a_entry", &fork);
+    {
+        let snap = db.snapshot();
+        let entry = Entry::new("method_a_entry", &snap);
         assert_eq!(entry.get(), Some(1));
-        let entry = Entry::new("method_b_entry", &fork);
+        let entry = Entry::new("method_b_entry", &snap);
         assert_eq!(entry.get(), Some(2));
+        let entry = Entry::new("constructor_entry", &snap);
+        assert_eq!(entry.get(), Some(3));
     }
 }

@@ -36,7 +36,7 @@ type MethodId = u32;
 #[derive(Debug)]
 pub struct InstanceInitData {
     instance_id: ServiceInstanceId,
-    constructor_data: Option<Any>,
+    constructor_data: Any,
 }
 
 #[derive(Debug, ProtobufConvert)]

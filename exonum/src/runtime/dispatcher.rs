@@ -286,7 +286,7 @@ mod tests {
 
         let rust_init_data = InstanceInitData {
             instance_id: RUST_SERVICE_ID,
-            constructor_data: None,
+            constructor_data: Default::default(),
         };
         dispatcher
             .init_service(&mut context, sample_rust_spec.clone(), &rust_init_data)
@@ -294,7 +294,7 @@ mod tests {
 
         let java_init_data = InstanceInitData {
             instance_id: JAVA_SERVICE_ID,
-            constructor_data: None,
+            constructor_data: Default::default(),
         };
         dispatcher
             .init_service(&mut context, sample_java_spec.clone(), &java_init_data)
@@ -372,7 +372,7 @@ mod tests {
 
         let rust_init_data = InstanceInitData {
             instance_id: RUST_SERVICE_ID,
-            constructor_data: None,
+            constructor_data: Default::default(),
         };
         assert_eq!(
             dispatcher

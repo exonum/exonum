@@ -15,6 +15,7 @@
 use crate::runtime::{error::ExecutionError, rust::TransactionContext, MethodId};
 
 use failure::Error;
+use protobuf::well_known_types::Any;
 
 pub trait ServiceDispatcher {
     fn call(
@@ -26,9 +27,10 @@ pub trait ServiceDispatcher {
 }
 
 pub trait Service: ServiceDispatcher + std::fmt::Debug {
-    // TODO:
-    // constructor method
-    // other hooks such as "on node startup"
+    fn initialize(&self, _ctx: TransactionContext, _arg: Any) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+    // TODO: add other hooks such as "on node startup", etc.
 }
 
 // TODO document OR document + rewrite as proc macro on usual trait declaration.

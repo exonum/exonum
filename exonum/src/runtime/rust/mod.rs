@@ -102,7 +102,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn init_service(
         &mut self,
-        _: &mut RuntimeContext,
+        context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -124,7 +124,14 @@ impl RuntimeEnvironment for RustRuntime {
 
         let service = inner.services.remove(&artifact).unwrap();
         inner.initialized.insert(init.instance_id, service);
-        Ok(())
+
+        let ctx = TransactionContext::new(context, self);
+        inner
+            .initialized
+            .get(&init.instance_id)
+            .unwrap()
+            .initialize(ctx, init.constructor_data.clone())
+            .map_err(|e| InitError::ExecutionError(e))
     }
 
     fn execute(
@@ -140,7 +147,7 @@ impl RuntimeEnvironment for RustRuntime {
 
         instance
             .call(dispatch.method_id, ctx, payload)
-            .expect("Dispatch error")
+            .map_err(|e| ExecutionError::with_description(200, format!("Dispatch error: {}", e)))?
     }
 }
 
