@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use semver::Version;
+
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -30,6 +32,7 @@ use super::{
 };
 
 use crate::crypto::{Hash, PublicKey};
+use crate::proto::schema;
 use crate::storage::Fork;
 
 use self::service::Service;
@@ -54,10 +57,11 @@ struct RustRuntimeInner {
     initialized: HashMap<ServiceInstanceId, Box<dyn Service>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::RustArtifactSpec", crate = "crate")]
 pub struct RustArtifactSpec {
     pub name: String,
-    pub version: (u32, u32, u32),
+    pub version: Version,
 }
 
 impl RuntimeEnvironment for RustRuntime {

@@ -73,6 +73,7 @@ mod tests;
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
 use protobuf::{well_known_types, Message};
+use semver::Version;
 
 use std::collections::HashMap;
 
@@ -338,3 +339,15 @@ impl_protobuf_convert_scalar!(i32);
 impl_protobuf_convert_scalar!(i64);
 impl_protobuf_convert_scalar!(f32);
 impl_protobuf_convert_scalar!(f64);
+
+impl ProtobufConvert for Version {
+    type ProtoStruct = self::schema::runtime::Version;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        pb.set_data(format!("{}", self));
+        pb
+    }
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(pb.take_data().parse()?)
+    }
+}

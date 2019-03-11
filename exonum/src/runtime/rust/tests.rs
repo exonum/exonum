@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use semver::Version;
+
 use crate::proto::schema::tests::TimestampTx;
 
 use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext};
@@ -79,7 +81,7 @@ fn test_basic_rust_runtime() {
 
     let rust_artifact = RustArtifactSpec {
         name: "test_service".to_owned(),
-        version: (0, 1, 0),
+        version: Version::new(0, 1, 0),
     };
     let artifact = ArtifactSpec::Rust(rust_artifact.clone());
     let service = Box::new(TestServiceImpl);

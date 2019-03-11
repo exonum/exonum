@@ -143,6 +143,7 @@ mod tests {
     use super::super::{rust::RustArtifactSpec, MethodId};
     use super::*;
     use crate::storage::{Database, MemoryDB};
+    use semver::Version;
 
     struct SampleRuntime {
         pub runtime_type: RuntimeIdentifier,
@@ -253,7 +254,7 @@ mod tests {
 
         let sample_rust_spec = ArtifactSpec::Rust(RustArtifactSpec {
             name: "artifact".to_owned(),
-            version: (0, 1, 0),
+            version: Version::new(0, 1, 0),
         });
         let sample_java_spec = ArtifactSpec::Java;
 
@@ -347,7 +348,7 @@ mod tests {
 
         let sample_rust_spec = ArtifactSpec::Rust(RustArtifactSpec {
             name: "artifact".to_owned(),
-            version: (0, 1, 0),
+            version: Version::new(0, 1, 0),
         });
 
         // Check deploy.
