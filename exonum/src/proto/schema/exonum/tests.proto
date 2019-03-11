@@ -36,6 +36,8 @@ message TxSimple {
 
 message TestServiceTx { uint64 value = 1; }
 
+message TestServiceInit { string msg = 1; }
+
 message BlockchainTestTxA { uint64 a = 1; }
 
 message BlockchainTestTxB {

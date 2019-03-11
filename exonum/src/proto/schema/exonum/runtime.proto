@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::blockchain;
+syntax = "proto3";
 
-pub type ExecutionError = blockchain::ExecutionError;
+package exonum.runtime;
 
-// TODO: summarize error codes/simplify error creation
-pub const DISPATCH_ERROR: u8 = 255;
-pub const WRONG_ARG_ERROR: u8 = 254;
-pub const WRONG_RUNTIME: u8 = 253;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum DeployError {
-    WrongRuntime,
-    WrongArtifact,
-    FailedToDeploy,
-    AlreadyDeployed,
+message CallInfo {
+  uint32 instance_id = 1;
+  uint32 method_id = 2;
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum InitError {
-    WrongRuntime,
-    WrongArtifact,
-    NotDeployed,
-    ServiceIdExists,
-    ExecutionError(ExecutionError),
+message AnyTx {
+  CallInfo dispatch = 1;
+  bytes payload = 2;
+}
+
+// Semver version
+message Version { string data = 1; }
+
+message RustArtifactSpec {
+  string name = 1;
+  Version version = 2;
 }

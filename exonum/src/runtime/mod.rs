@@ -15,6 +15,7 @@
 use protobuf::well_known_types::Any;
 
 use crate::crypto::{Hash, PublicKey};
+use crate::proto::schema;
 use crate::storage::Fork;
 
 pub mod configuration;
@@ -36,10 +37,11 @@ type MethodId = u32;
 #[derive(Debug)]
 pub struct InstanceInitData {
     instance_id: ServiceInstanceId,
-    constructor_data: Option<Any>,
+    constructor_data: Any,
 }
 
-#[derive(Debug)]
+#[derive(Debug, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::CallInfo", crate = "crate")]
 pub struct CallInfo {
     pub instance_id: ServiceInstanceId,
     pub method_id: MethodId,

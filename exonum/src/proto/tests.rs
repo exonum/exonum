@@ -14,6 +14,7 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
+use semver::Version;
 
 use std::collections::HashMap;
 
@@ -265,4 +266,15 @@ fn test_struct_with_maps_roundtrip() {
     let bytes = map_struct.encode().unwrap();
     let struct_encode_round_trip = StructWithMaps::decode(&bytes).unwrap();
     assert_eq!(struct_encode_round_trip, map_struct);
+}
+
+#[test]
+fn test_version_pb_convert() {
+    let version = Version::parse("1.2.3-alpha2").unwrap();
+
+    let pb_version = version.to_pb();
+    assert_eq!(pb_version.get_data(), "1.2.3-alpha2");
+
+    let version_round_trip: Version = ProtobufConvert::from_pb(pb_version).unwrap();
+    assert_eq!(version_round_trip, version);
 }

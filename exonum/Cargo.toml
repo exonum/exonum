@@ -56,6 +56,7 @@ protobuf = { version = "2.2.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "2.1.0"
 zeroize = "0.5.2"
+semver = "0.9.0"
 
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.20", optional = true }

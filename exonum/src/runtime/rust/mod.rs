@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use semver::Version;
+
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -24,12 +26,13 @@ pub mod service;
 pub mod tests;
 
 use super::{
-    error::{DeployError, ExecutionError, InitError},
+    error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
 
 use crate::crypto::{Hash, PublicKey};
+use crate::proto::schema;
 use crate::storage::Fork;
 
 use self::service::Service;
@@ -54,10 +57,11 @@ struct RustRuntimeInner {
     initialized: HashMap<ServiceInstanceId, Box<dyn Service>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
+#[exonum(pb = "schema::runtime::RustArtifactSpec", crate = "crate")]
 pub struct RustArtifactSpec {
     pub name: String,
-    pub version: (u32, u32, u32),
+    pub version: Version,
 }
 
 impl RuntimeEnvironment for RustRuntime {
@@ -98,7 +102,7 @@ impl RuntimeEnvironment for RustRuntime {
 
     fn init_service(
         &mut self,
-        _: &mut RuntimeContext,
+        context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
@@ -120,7 +124,14 @@ impl RuntimeEnvironment for RustRuntime {
 
         let service = inner.services.remove(&artifact).unwrap();
         inner.initialized.insert(init.instance_id, service);
-        Ok(())
+
+        let ctx = TransactionContext::new(context, self);
+        inner
+            .initialized
+            .get(&init.instance_id)
+            .unwrap()
+            .initialize(ctx, init.constructor_data.clone())
+            .map_err(|e| InitError::ExecutionError(e))
     }
 
     fn execute(
@@ -136,7 +147,9 @@ impl RuntimeEnvironment for RustRuntime {
 
         instance
             .call(dispatch.method_id, ctx, payload)
-            .expect("Dispatch error")
+            .map_err(|e| {
+                ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
+            })?
     }
 }
 
