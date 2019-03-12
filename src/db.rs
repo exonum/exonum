@@ -387,11 +387,11 @@ pub enum Change {
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
 pub struct Fork {
-    pub flushed: FlushedFork,
-    pub working_patch: WorkingPatch,
+    flushed: FlushedFork,
+    working_patch: WorkingPatch,
 }
 
-pub struct FlushedFork {
+struct FlushedFork {
     snapshot: Box<dyn Snapshot>,
     patch: Patch,
 }

@@ -106,6 +106,7 @@ where
         }
     }
 
+    ///TODO: add docs
     pub fn from_view(view: View<T>) -> Self {
         Self {
             address: view.address,
@@ -114,6 +115,7 @@ where
         }
     }
 
+    ///TODO: add docs
     pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
         Self {
             index_access,
@@ -184,26 +186,28 @@ where
         self.create_state()
     }
 
+    ///TODO: add docs
     pub fn build_new<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
     where
         V: BinaryAttribute + Default + Copy,
     {
         let (index_view, index_state) = self.create_state();
 
-        if (!index_state.is_new()) {
+        if !index_state.is_new() {
             bail!("Index is already exists!");
         }
 
         Ok((index_view, index_state))
     }
 
+    ///TODO: add docs
     pub fn build_existed<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
     where
         V: BinaryAttribute + Default + Copy,
     {
         let (index_view, index_state) = self.create_state();
 
-        if (index_state.is_new()) {
+        if index_state.is_new() {
             bail!("Index is not found!");
         }
 

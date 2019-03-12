@@ -16,7 +16,7 @@ use std::{borrow::Cow, cell::Cell, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
-use failure::{self, bail, ensure, format_err};
+use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 

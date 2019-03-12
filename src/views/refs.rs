@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::db::Database;
-use crate::views::{IndexAddress, View};
-use crate::{
-    BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofListIndex, ProofMapIndex, Snapshot, TemporaryDB,
-};
-use std::fmt;
 use std::ops::{Deref, DerefMut};
+
+use crate::{
+    views::{IndexAddress, View},
+    BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
+    ProofListIndex, ProofMapIndex, Snapshot,
+};
 
 //TODO: rewrite this trait to use with other indexes. And maybe it need to be renamed.
 trait ObjectCreator<'a, T, V>
@@ -36,7 +35,7 @@ where
     fn create_list(&'a self) -> RefMut<ListIndex<T, V>>;
 }
 
-impl<'a, V> ObjectCreator<'a, &'a Self,V> for Fork
+impl<'a, V> ObjectCreator<'a, &'a Self, V> for Fork
 where
     V: BinaryValue,
 {
@@ -49,7 +48,7 @@ where
         }
     }
 
-    fn create_list(&'a self) -> RefMut<ListIndex<&Fork, V>> {
+    fn create_list(&'a self) -> RefMut<ListIndex<&Self, V>> {
         RefMut {
             value: ListIndex::create(self).unwrap(),
         }
@@ -60,6 +59,7 @@ pub trait FromView<T: IndexAccess>
 where
     Self: Sized,
 {
+    ///TODO: add docs
     fn from_view(view: View<T>) -> Result<Self, failure::Error>;
 }
 
@@ -69,7 +69,7 @@ where
     V: BinaryValue,
 {
     fn from_view(view: View<T>) -> Result<Self, failure::Error> {
-        ListIndex::get_from_view(view)
+        Self::get_from_view(view)
     }
 }
 
@@ -79,7 +79,7 @@ where
     V: BinaryValue + ObjectHash,
 {
     fn from_view(view: View<T>) -> Result<Self, failure::Error> {
-        Entry::get_from_view(view)
+        Self::get_from_view(view)
     }
 }
 
@@ -89,7 +89,7 @@ where
     K: BinaryKey,
 {
     fn from_view(view: View<T>) -> Result<Self, failure::Error> {
-        KeySetIndex::get_from_view(view)
+        Self::get_from_view(view)
     }
 }
 
@@ -99,7 +99,7 @@ where
     V: BinaryValue + ObjectHash,
 {
     fn from_view(view: View<T>) -> Result<Self, failure::Error> {
-        ProofListIndex::get_from_view(view)
+        Self::get_from_view(view)
     }
 }
 
@@ -110,7 +110,7 @@ where
     V: BinaryValue + ObjectHash,
 {
     fn from_view(view: View<T>) -> Result<Self, failure::Error> {
-        ProofMapIndex::get_from_view(view)
+        Self::get_from_view(view)
     }
 }
 
@@ -121,14 +121,14 @@ where
     V: BinaryValue,
 {
     fn from_view(view: View<T>) -> Result<Self, failure::Error> {
-        MapIndex::get_from_view(view)
+        Self::get_from_view(view)
     }
 }
 
 pub trait ObjectAccess: IndexAccess {
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self>;
 
-    fn get_object<'a, I, T>(&'a self, address: I) -> Result<Ref<T>, failure::Error>
+    fn get_object<I, T>(&self, address: I) -> Result<Ref<T>, failure::Error>
     where
         I: Into<IndexAddress>,
         T: FromView<Self>,
@@ -147,11 +147,15 @@ impl ObjectAccess for &Box<dyn Snapshot> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
+//TODO: remove dead_code
+///TODO: add documentation
 pub struct Ref<T> {
     value: T,
 }
 
 #[derive(Debug)]
+///TODO: add documentation
 pub struct RefMut<T> {
     value: T,
 }
@@ -178,60 +182,72 @@ impl<T> DerefMut for RefMut<T> {
     }
 }
 
-#[test]
-fn basic_object_refs() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    {
-        let mut index: RefMut<ListIndex<_, u32>> = fork.create_list_with_root(("index"));
-        index.push(1);
-    }
-
-    db.merge(fork.into_patch());
-
-    let snapshot = &db.snapshot();
-    let index: Ref<ListIndex<_, u32>> = snapshot
-        //TODO: fix `From` implementation for `IndexAddress`
-        .get_object(IndexAddress::with_root("index"))
-        .unwrap();
-
-    assert_eq!(index.get(0), Some(1));
-}
-
-#[test]
-#[should_panic(expected = "already exist")]
-fn create_index_already_existed() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    {
-        let mut index: RefMut<ListIndex<_, u32>> = fork.create_list_with_root(("index", &3));
-    }
-    {
-        let mut index: RefMut<ListIndex<_, u32>> = fork.create_list_with_root(("index", &3));
-    }
-}
-
-#[test]
-#[should_panic(expected = "is not found")]
-fn get_non_existent_index() {
-    let db = TemporaryDB::new();
-    let snapshot = &db.snapshot();
-    let index: Ref<ListIndex<_, u32>> = snapshot
-        .get_object(IndexAddress::with_root("index"))
-        .unwrap();
-}
-
-#[test]
-fn create_list() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    let address = {
-        let mut index: RefMut<ListIndex<_, u32>> = fork.create_list();
-        index.push(1);
-        index.address().clone()
+#[cfg(test)]
+mod tests {
+    use crate::{
+        db::Database,
+        views::{
+            refs::{ObjectAccess, ObjectCreator, Ref, RefMut},
+            IndexAddress,
+        },
+        ListIndex, TemporaryDB,
     };
-    db.merge(fork.into_patch());
 
-    let snapshot = &db.snapshot();
-    let index: Ref<ListIndex<_, u32>> = snapshot.get_object(address).unwrap();
+    #[test]
+    fn basic_object_refs() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut index: RefMut<ListIndex<_, u32>> = fork.create_list_with_root("index");
+            index.push(1);
+        }
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = &db.snapshot();
+        let index: Ref<ListIndex<_, u32>> = snapshot
+            //TODO: fix `From` implementation for `IndexAddress`
+            .get_object(IndexAddress::with_root("index"))
+            .unwrap();
+
+        assert_eq!(index.get(0), Some(1));
+    }
+
+    #[test]
+    #[should_panic(expected = "already exist")]
+    fn create_index_already_existed() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut _index: RefMut<ListIndex<_, u32>> = fork.create_list_with_root(("index", &3));
+        }
+        {
+            let mut _index: RefMut<ListIndex<_, u32>> = fork.create_list_with_root(("index", &3));
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "is not found")]
+    fn get_non_existent_index() {
+        let db = TemporaryDB::new();
+        let snapshot = &db.snapshot();
+        let _index: Ref<ListIndex<_, u32>> = snapshot
+            .get_object(IndexAddress::with_root("index"))
+            .unwrap();
+    }
+
+    #[test]
+    fn create_list() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let address = {
+            let mut index: RefMut<ListIndex<_, u32>> = fork.create_list();
+            index.push(1);
+            index.address().clone()
+        };
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = &db.snapshot();
+        let _index: Ref<ListIndex<_, u32>> = snapshot.get_object(address).unwrap();
+    }
 }

@@ -18,8 +18,6 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use failure::bail;
-
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
@@ -161,7 +159,7 @@ where
     }
 
     pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
-        let (base, state) = IndexBuilder::from_view(view)
+        let (base, _state) = IndexBuilder::from_view(view)
             .index_type(IndexType::Map)
             .build_existed::<()>()?;
 

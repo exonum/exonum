@@ -17,8 +17,6 @@
 //! The given section contains methods related to `ListIndex` and the iterator
 //! over the items of this list.
 
-use failure::bail;
-
 use std::marker::PhantomData;
 
 use crate::{
@@ -27,7 +25,6 @@ use crate::{
     },
     BinaryKey, BinaryValue,
 };
-use std::fmt;
 
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
@@ -82,7 +79,6 @@ where
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// ```
-    #[deprecated(note = "please use `create_from_address` instead")]
     pub fn new<S: Into<String>>(index_name: S, index_access: T) -> Self {
         let (base, state) = IndexBuilder::new(index_access)
             .index_type(IndexType::List)
@@ -117,7 +113,6 @@ where
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    #[deprecated(note = "please use `create_from_address` instead")]
     pub fn new_in_family<S, I>(family_name: S, index_id: &I, index_access: T) -> Self
     where
         I: BinaryKey,
@@ -159,7 +154,6 @@ where
     }
 
     pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
-        let address = view.address.clone();
         let (base, state) = IndexBuilder::from_view(view)
             .index_type(IndexType::List)
             .build_existed()?;
