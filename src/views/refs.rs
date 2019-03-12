@@ -21,6 +21,7 @@ use crate::{
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
+//TODO: rewrite this trait to use with other indexes. And maybe it need to be renamed.
 trait ObjectCreator<'a, T, V>
 where
     T: IndexAccess,
@@ -31,6 +32,7 @@ where
         address: I,
     ) -> RefMut<ListIndex<T, V>>;
 
+    //TODO: allow to create indexes without predefined address.
     fn create_list(&'a self) -> RefMut<ListIndex<T, V>>;
 }
 
@@ -137,6 +139,7 @@ pub trait ObjectAccess: IndexAccess {
 }
 
 impl ObjectAccess for &Box<dyn Snapshot> {
+    //TODO: check if view creation here is redundant
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self> {
         let address = address.into();
         View::new(&self, address)
@@ -188,6 +191,7 @@ fn basic_object_refs() {
 
     let snapshot = &db.snapshot();
     let index: Ref<ListIndex<_, u32>> = snapshot
+        //TODO: fix `From` implementation for `IndexAddress`
         .get_object(IndexAddress::with_root("index"))
         .unwrap();
 

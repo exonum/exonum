@@ -153,6 +153,7 @@ where
         })
     }
 
+    //TODO: allow to create indexes without address.
     pub fn create(index_access: T) -> Result<Self, failure::Error> {
         Self::create_from_address(IndexAddress::default(), index_access)
     }
