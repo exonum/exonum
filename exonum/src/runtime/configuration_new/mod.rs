@@ -34,6 +34,7 @@ mod transactions;
 use errors::Error as ServiceError;
 use schema::VotingDecision;
 use transactions::{enough_votes_to_commit, VotingContext};
+use config::ConfigurationServiceConfig;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -50,7 +51,7 @@ service_interface! {
 
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceImpl {
-    pub majority_count: Option<u32>,
+    config: ConfigurationServiceConfig,
 }
 
 impl ConfigurationService for ConfigurationServiceImpl {
@@ -138,19 +139,20 @@ impl Service for ConfigurationServiceImpl {
             // Assuming that Service::initialize is called after genesis block is created.
             let actual_config = CoreSchema::new(&fork).actual_configuration();
             let validators_count = actual_config.validator_keys.len();
+            let majority_count = arg.majority_count as u16;
 
             let byzantine_majority_count = State::byzantine_majority_count(validators_count);
-            if (arg.majority_count as usize) > validators_count
-                || (arg.majority_count as usize) < byzantine_majority_count
+            if (majority_count as usize) > validators_count
+                || (majority_count as usize) < byzantine_majority_count
             {
                 return Err(ServiceError::InvalidMajorityCount {
                     min: byzantine_majority_count,
                     max: validators_count,
-                    proposed: arg.majority_count as usize,
+                    proposed: majority_count as usize,
                 })?;
             }
 
-            self.majority_count = Some(arg.majority_count);
+            self.config.majority_count = Some(majority_count);
         }
 
         Ok(())
