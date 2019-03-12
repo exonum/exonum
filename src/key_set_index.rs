@@ -125,6 +125,17 @@ where
         }
     }
 
+    pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, _state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::KeySet)
+            .build_existed::<()>()?;
+
+        Ok(Self {
+            base,
+            _k: PhantomData,
+        })
+    }
+
     /// Returns `true` if the set contains the indicated value.
     ///
     /// # Examples

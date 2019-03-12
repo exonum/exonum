@@ -14,6 +14,8 @@
 
 #![warn(missing_docs)]
 
+use failure::bail;
+
 pub use self::metadata::{BinaryAttribute, IndexState, IndexType};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
@@ -24,7 +26,6 @@ use super::{
 };
 
 mod metadata;
-//mod refs;
 mod refs;
 #[cfg(test)]
 mod tests;
@@ -105,6 +106,14 @@ where
         }
     }
 
+    pub fn from_view(view: View<T>) -> Self {
+        Self {
+            address: view.address,
+            index_access: view.index_access,
+            index_type: IndexType::default(),
+        }
+    }
+
     pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
         Self {
             index_access,
@@ -145,13 +154,7 @@ where
         }
     }
 
-    /// Returns index that builds upon specified `view` and `address`.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if index metadata doesn't match expected.
-    /// - Panics if index name is empty.
-    pub fn build<V>(self) -> (View<T>, IndexState<T, V>)
+    fn create_state<V>(self) -> (View<T>, IndexState<T, V>)
     where
         V: BinaryAttribute + Default + Copy,
     {
@@ -164,7 +167,47 @@ where
         let (index_address, index_state) =
             metadata::index_metadata(self.index_access, &self.address, self.index_type);
         let index_view = View::new(self.index_access, index_address);
+
         (index_view, index_state)
+    }
+
+    /// Returns index that builds upon specified `view` and `address`.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if index metadata doesn't match expected.
+    /// - Panics if index name is empty.
+    pub fn build<V>(self) -> (View<T>, IndexState<T, V>)
+    where
+        V: BinaryAttribute + Default + Copy,
+    {
+        self.create_state()
+    }
+
+    pub fn build_new<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
+    where
+        V: BinaryAttribute + Default + Copy,
+    {
+        let (index_view, index_state) = self.create_state();
+
+        if (!index_state.is_new()) {
+            bail!("Index is already exists!");
+        }
+
+        Ok((index_view, index_state))
+    }
+
+    pub fn build_existed<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
+    where
+        V: BinaryAttribute + Default + Copy,
+    {
+        let (index_view, index_state) = self.create_state();
+
+        if (index_state.is_new()) {
+            bail!("Index is not found!");
+        }
+
+        Ok((index_view, index_state))
     }
 }
 

@@ -144,11 +144,7 @@ where
         let address = address.into();
         let (base, state) = IndexBuilder::from_address(address.clone(), index_access)
             .index_type(IndexType::List)
-            .build();
-
-        if !state.is_new() {
-            bail!("Index with address {:?} already exist", address)
-        }
+            .build_new()?;
 
         Ok(Self {
             base,
@@ -157,24 +153,25 @@ where
         })
     }
 
-    pub fn get_from_address<I: Into<IndexAddress>>(
-        address: I,
-        index_access: T,
-    ) -> Result<Self, failure::Error> {
-        let address = address.into();
-        let (base, state) = IndexBuilder::from_address(address.clone(), index_access)
-            .index_type(IndexType::List)
-            .build();
+    pub fn create(index_access: T) -> Result<Self, failure::Error> {
+        Self::create_from_address(IndexAddress::default(), index_access)
+    }
 
-        if state.is_new() {
-            bail!("Index with address {:?} is not found", address)
-        }
+    pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let address = view.address.clone();
+        let (base, state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::List)
+            .build_existed()?;
 
         Ok(Self {
             base,
             state,
             _v: PhantomData,
         })
+    }
+
+    pub fn address(&self) -> &IndexAddress {
+        &self.base.address
     }
 
     /// Returns an element at the indicated position or `None` if the indicated

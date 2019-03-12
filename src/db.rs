@@ -205,7 +205,7 @@ impl WorkingPatch {
     }
 
     /// Returns a mutable reference to the changes corresponding to a certain index.
-    fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
+    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesRef {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
@@ -387,11 +387,11 @@ pub enum Change {
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
 pub struct Fork {
-    flushed: FlushedFork,
-    working_patch: WorkingPatch,
+    pub flushed: FlushedFork,
+    pub working_patch: WorkingPatch,
 }
 
-struct FlushedFork {
+pub struct FlushedFork {
     snapshot: Box<dyn Snapshot>,
     patch: Patch,
 }

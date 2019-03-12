@@ -18,12 +18,15 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
+use failure::bail;
+
 use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
     views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue,
 };
+use crate::views::IndexAddress;
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -155,6 +158,38 @@ where
             _v: PhantomData,
             _k: PhantomData,
         }
+    }
+
+    pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::Map)
+            .build_existed::<()>()?;
+
+        Ok(Self {
+            base,
+            _k: PhantomData,
+            _v: PhantomData,
+        })
+    }
+
+    pub fn create_from_address<I: Into<IndexAddress>>(
+        address: I,
+        index_access: T,
+    ) -> Result<Self, failure::Error> {
+        let address = address.into();
+        let (base, _state) = IndexBuilder::from_address(address.clone(), index_access)
+            .index_type(IndexType::Map)
+            .build_new::<()>()?;
+
+        Ok(Self {
+            base,
+            _k: PhantomData,
+            _v: PhantomData,
+        })
+    }
+
+    pub fn create(index_access: T) -> Result<Self, failure::Error> {
+        Self::create_from_address(IndexAddress::default(), index_access)
     }
 
     /// Returns a value corresponding to the key.

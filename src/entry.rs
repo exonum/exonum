@@ -110,6 +110,17 @@ where
         }
     }
 
+    pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, _state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::Entry)
+            .build_existed::<()>()?;
+
+        Ok(Self {
+            base,
+            _v: PhantomData,
+        })
+    }
+
     /// Returns a value of the entry or `None` if does not exist.
     ///
     /// # Examples
