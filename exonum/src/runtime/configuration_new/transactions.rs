@@ -15,9 +15,7 @@
 //! Transaction definitions for the configuration service.
 
 use crate::{
-    blockchain::{
-        Schema as CoreSchema, StoredConfiguration,
-    },
+    blockchain::{Schema as CoreSchema, StoredConfiguration},
     crypto::{CryptoHash, Hash, PublicKey},
     node::State,
     proto,

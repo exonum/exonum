@@ -17,23 +17,23 @@
 use crate::{
     blockchain::Schema as CoreSchema,
     messages::BinaryForm,
+    node::State,
+    proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
     },
-    node::State,
-    proto::schema::configuration::ConfigurationServiceInit,
 };
-use protobuf::{well_known_types::Any};
+use protobuf::well_known_types::Any;
 
-mod transactions;
 mod config;
 mod errors;
 mod schema;
+mod transactions;
 
-use transactions::{VotingContext, enough_votes_to_commit};
-use schema::VotingDecision;
 use errors::Error as ServiceError;
+use schema::VotingDecision;
+use transactions::{enough_votes_to_commit, VotingContext};
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -53,9 +53,12 @@ pub struct ConfigurationServiceImpl {
     pub majority_count: Option<u32>,
 }
 
-
 impl ConfigurationService for ConfigurationServiceImpl {
-    fn propose(&self, mut ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>  {
+    fn propose(
+        &self,
+        mut ctx: TransactionContext,
+        tx: transactions::Propose,
+    ) -> Result<(), ExecutionError> {
         let author = ctx.author();
         let fork = ctx.fork();
         let (cfg, cfg_hash) = tx.precheck(fork.as_ref(), author).map_err(|err| {
@@ -68,8 +71,11 @@ impl ConfigurationService for ConfigurationServiceImpl {
         Ok(())
     }
 
-
-    fn vote(&self, mut ctx: TransactionContext, tx: transactions::Vote) -> Result<(), ExecutionError> {
+    fn vote(
+        &self,
+        mut ctx: TransactionContext,
+        tx: transactions::Vote,
+    ) -> Result<(), ExecutionError> {
         let author = ctx.author();
         let tx_hash = ctx.tx_hash();
         let fork = ctx.fork();
@@ -93,7 +99,11 @@ impl ConfigurationService for ConfigurationServiceImpl {
         Ok(())
     }
 
-    fn vote_against(&self, mut ctx: TransactionContext, tx: transactions::VoteAgainst) -> Result<(), ExecutionError> {
+    fn vote_against(
+        &self,
+        mut ctx: TransactionContext,
+        tx: transactions::VoteAgainst,
+    ) -> Result<(), ExecutionError> {
         let author = ctx.author();
         let tx_hash = ctx.tx_hash();
         let fork = ctx.fork();
@@ -128,9 +138,10 @@ impl Service for ConfigurationServiceImpl {
             // Assuming that Service::initialize is called after genesis block is created.
             let actual_config = CoreSchema::new(&fork).actual_configuration();
             let validators_count = actual_config.validator_keys.len();
-            
+
             let byzantine_majority_count = State::byzantine_majority_count(validators_count);
-            if (arg.majority_count as usize) > validators_count || (arg.majority_count as usize) < byzantine_majority_count
+            if (arg.majority_count as usize) > validators_count
+                || (arg.majority_count as usize) < byzantine_majority_count
             {
                 return Err(ServiceError::InvalidMajorityCount {
                     min: byzantine_majority_count,
