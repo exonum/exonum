@@ -47,3 +47,11 @@ message ProposeData {
   // Number of eligible voting validators.
   uint64 num_validators = 3;
 }
+
+// Init data for Configuration service.
+message ConfigurationServiceInit {
+  // Check whether we want to use a custom majority count.
+  bool is_custom_majority_count = 1;
+  // Custom majority count.
+  uint32 majority_count = 2;
+}

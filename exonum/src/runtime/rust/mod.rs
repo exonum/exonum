@@ -128,7 +128,7 @@ impl RuntimeEnvironment for RustRuntime {
         let ctx = TransactionContext::new(context, self);
         inner
             .initialized
-            .get(&init.instance_id)
+            .get_mut(&init.instance_id)
             .unwrap()
             .initialize(ctx, init.constructor_data.clone())
             .map_err(|e| InitError::ExecutionError(e))

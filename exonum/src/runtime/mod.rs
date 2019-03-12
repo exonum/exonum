@@ -18,10 +18,13 @@ use crate::crypto::{Hash, PublicKey};
 use crate::proto::schema;
 use crate::storage::Fork;
 
+#[macro_use]
+pub mod rust;
+
 pub mod configuration;
+pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
-pub mod rust;
 
 use error::{DeployError, ExecutionError, InitError};
 

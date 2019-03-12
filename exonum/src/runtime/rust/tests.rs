@@ -79,7 +79,7 @@ impl TestService for TestServiceImpl {
 
 impl_service_dispatcher!(TestServiceImpl, TestService);
 impl Service for TestServiceImpl {
-    fn initialize(&self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
         let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
