@@ -15,6 +15,7 @@
 // use semver::Version;
 
 use crate::{
+    blockchain::Schema as CoreSchema,
     // crypto::{Hash, PublicKey},
     messages::BinaryForm,
     runtime::{
@@ -34,6 +35,9 @@ mod config;
 mod errors;
 mod schema;
 
+use transactions::{VotingContext, enough_votes_to_commit};
+use schema::VotingDecision;
+
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
 /// Configuration service name.
@@ -41,8 +45,9 @@ pub const SERVICE_NAME: &str = "configuration";
 
 service_interface! {
     trait ConfigurationService {
-        fn method_a(&self, ctx: TransactionContext, arg: transactions::Propose) -> Result<(), ExecutionError>;
-        fn method_b(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
+        fn propose(&self, ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>;
+        fn vote(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
+        fn vote_against(&self, ctx: TransactionContext, arg: transactions::VoteAgainst) -> Result<(), ExecutionError>;
     }
 }
 
@@ -52,11 +57,62 @@ pub struct ConfigurationServiceImpl {
 }
 
 impl ConfigurationService for ConfigurationServiceImpl {
-    fn method_a(&self, mut _ctx: TransactionContext, _arg: transactions::Propose) -> Result<(), ExecutionError> {
+    fn propose(&self, mut ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>  {
+        let author = ctx.author();
+        let fork = ctx.fork();
+        let (cfg, cfg_hash) = tx.precheck(fork.as_ref(), author).map_err(|err| {
+            error!("Discarding propose {:?}: {}", self, err);
+            err
+        })?;
+
+        tx.save(fork, &cfg, cfg_hash);
+        trace!("Put propose {:?} to config_proposes table", self);
         Ok(())
     }
 
-    fn method_b(&self, mut _ctx: TransactionContext, _arg: transactions::Vote) -> Result<(), ExecutionError> {
+
+    fn vote(&self, mut ctx: TransactionContext, tx: transactions::Vote) -> Result<(), ExecutionError> {
+        let author = ctx.author();
+        let tx_hash = ctx.tx_hash();
+        let fork = ctx.fork();
+        let decision = VotingDecision::Yea(tx_hash);
+
+        let vote = VotingContext::new(decision, author, tx.cfg_hash);
+        let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
+            error!("Discarding vote {:?}: {}", tx, err);
+            err
+        })?;
+
+        vote.save(fork);
+        trace!(
+            "Put Vote:{:?} to corresponding cfg votes_by_config_hash table",
+            tx
+        );
+
+        if enough_votes_to_commit(fork.as_ref(), &tx.cfg_hash) {
+            CoreSchema::new(fork).commit_configuration(parsed_config);
+        }
+        Ok(())
+    }
+
+    fn vote_against(&self, mut ctx: TransactionContext, tx: transactions::VoteAgainst) -> Result<(), ExecutionError> {
+        let author = ctx.author();
+        let tx_hash = ctx.tx_hash();
+        let fork = ctx.fork();
+        let decision = VotingDecision::Nay(tx_hash);
+
+        let vote_against = VotingContext::new(decision, author, tx.cfg_hash);
+        vote_against.precheck(fork.as_ref()).map_err(|err| {
+            error!("Discarding vote against {:?}: {}", tx, err);
+            err
+        })?;
+
+        vote_against.save(fork);
+        trace!(
+            "Put VoteAgainst:{:?} to corresponding cfg votes_by_config_hash table",
+            tx
+        );
+
         Ok(())
     }
 }
@@ -69,7 +125,9 @@ impl Service for ConfigurationServiceImpl {
         })?;
 
         if arg.is_custom_majority_count {
-            self.majority_count = Some(arg.majority_count)
+            self.majority_count = Some(arg.majority_count);
+            
+            // TODO check byzantine majority count.
         }
 
         Ok(())

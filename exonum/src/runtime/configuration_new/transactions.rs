@@ -154,7 +154,7 @@ fn validator_index(snapshot: &dyn Snapshot, key: &PublicKey) -> Option<usize> {
 }
 
 /// Checks if there is enough votes for a particular configuration hash.
-fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool {
+pub fn enough_votes_to_commit(snapshot: &dyn Snapshot, cfg_hash: &Hash) -> bool {
     let actual_config = CoreSchema::new(snapshot).actual_configuration();
 
     let schema = Schema::new(snapshot);
@@ -185,7 +185,7 @@ impl Propose {
     /// # Return value
     ///
     /// Configuration parsed from the transaction together with its hash.
-    fn precheck(
+    pub fn precheck(
         &self,
         snapshot: &dyn Snapshot,
         author: PublicKey,
@@ -252,7 +252,7 @@ impl Propose {
     }
 
     /// Saves this proposal to the service schema.
-    fn save(&self, fork: &mut Fork, cfg: &StoredConfiguration, cfg_hash: Hash) {
+    pub fn save(&self, fork: &mut Fork, cfg: &StoredConfiguration, cfg_hash: Hash) {
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
             .get(&cfg.previous_cfg_hash)
@@ -358,7 +358,7 @@ impl VotingContext {
         Ok(parsed)
     }
 
-    fn save(&self, fork: &mut Fork) {
+    pub fn save(&self, fork: &mut Fork) {
         use crate::storage::StorageValue;
 
         let cfg_hash = &self.cfg_hash;
