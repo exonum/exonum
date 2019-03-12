@@ -16,18 +16,14 @@
 
 use crate::{
     blockchain::Schema as CoreSchema,
-    // crypto::{Hash, PublicKey},
     messages::BinaryForm,
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
-        // CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-        // ServiceInstanceId,
         rust::{service::Service, TransactionContext},
     },
-    // storage::{Database, Entry, MemoryDB},
+    node::State,
     proto::schema::configuration::ConfigurationServiceInit,
 };
-// use protobuf::{well_known_types::Any, Message};
 use protobuf::{well_known_types::Any};
 
 mod transactions;
@@ -37,6 +33,7 @@ mod schema;
 
 use transactions::{VotingContext, enough_votes_to_commit};
 use schema::VotingDecision;
+use errors::Error as ServiceError;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -55,6 +52,7 @@ service_interface! {
 pub struct ConfigurationServiceImpl {
     pub majority_count: Option<u32>,
 }
+
 
 impl ConfigurationService for ConfigurationServiceImpl {
     fn propose(&self, mut ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>  {
@@ -118,16 +116,30 @@ impl ConfigurationService for ConfigurationServiceImpl {
 }
 
 impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
+
 impl Service for ConfigurationServiceImpl {
-    fn initialize(&mut self, mut _ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
         let arg: ConfigurationServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
 
         if arg.is_custom_majority_count {
-            self.majority_count = Some(arg.majority_count);
+            let fork = ctx.fork();
+            // Assuming that Service::initialize is called after genesis block is created.
+            let actual_config = CoreSchema::new(&fork).actual_configuration();
+            let validators_count = actual_config.validator_keys.len();
             
-            // TODO check byzantine majority count.
+            let byzantine_majority_count = State::byzantine_majority_count(validators_count);
+            if (arg.majority_count as usize) > validators_count || (arg.majority_count as usize) < byzantine_majority_count
+            {
+                return Err(ServiceError::InvalidMajorityCount {
+                    min: byzantine_majority_count,
+                    max: validators_count,
+                    proposed: arg.majority_count as usize,
+                })?;
+            }
+
+            self.majority_count = Some(arg.majority_count);
         }
 
         Ok(())
