@@ -16,10 +16,9 @@
 
 use crate::{
     blockchain::{
-        ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
+        Schema as CoreSchema, StoredConfiguration,
     },
-    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    crypto::{CryptoHash, Hash, PublicKey},
     node::State,
     proto,
     storage::{Fork, Snapshot},
@@ -29,7 +28,7 @@ use super::{
     config::ConfigurationServiceConfig,
     errors::Error as ServiceError,
     schema::{MaybeVote, ProposeData, Schema, VotingDecision},
-    SERVICE_ID, SERVICE_NAME,
+    SERVICE_NAME,
 };
 
 /// Propose a new configuration.
@@ -91,55 +90,25 @@ pub struct VoteAgainst {
     pub cfg_hash: Hash,
 }
 
-/// Configuration Service transactions.
-#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
-#[exonum(crate = "crate")]
-pub enum ConfigurationTransactions {
-    /// Propose transaction.
-    Propose(Propose),
-    /// Vote transaction.
-    Vote(Vote),
-    /// VoteAgainst transaction.
-    VoteAgainst(VoteAgainst),
-}
-
-impl ConfigurationTransactions {
-    #[doc(hidden)]
-    // TODO: pub only for testing.
-    pub fn from_raw(message: Signed<RawTransaction>) -> ConfigurationTransactions {
-        use crate::blockchain::TransactionSet;
-        use std::ops::Deref;
-        ConfigurationTransactions::tx_from_raw(message.deref().clone()).unwrap()
-    }
-}
-
-impl VoteAgainst {
-    /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
-    }
-}
-
-impl Vote {
-    /// Create `Signed` for `Vote` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
-    }
-}
-
-impl Propose {
-    /// Create `Signed` for `Propose` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(
-            Self {
-                cfg: cfg.to_owned(),
-            },
-            SERVICE_ID,
-            *author,
-            key,
-        )
-    }
-}
+// TODO implement sign for transactions
+// impl VoteAgainst {
+//     /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
+//     pub fn sign(_author: &PublicKey, _cfg_hash: &Hash, _key: &SecretKey) -> Signed<RawTransaction> {
+//         unimplemented!()
+//     }
+// }
+// impl Vote {
+//     /// Create `Signed` for `Vote` transaction, signed by provided keys.
+//     pub fn sign(_author: &PublicKey, _cfg_hash: &Hash, _key: &SecretKey) -> Signed<RawTransaction> {
+//         unimplemented!()
+//     }
+// }
+// impl Propose {
+//     /// Create `Signed` for `Propose` transaction, signed by provided keys.
+//     pub fn sign(_author: &PublicKey, _cfg: &str, _key: &SecretKey) -> Signed<RawTransaction> {
+//         unimplemented!()
+//     }
+// }
 
 /// Checks if a specified key belongs to one of the current validators.
 ///
@@ -289,21 +258,6 @@ impl Propose {
     }
 }
 
-impl Transaction for Propose {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let author = context.author();
-        let fork = context.fork();
-        let (cfg, cfg_hash) = self.precheck(fork.as_ref(), author).map_err(|err| {
-            error!("Discarding propose {:?}: {}", self, err);
-            err
-        })?;
-
-        self.save(fork, &cfg, cfg_hash);
-        trace!("Put propose {:?} to config_proposes table", self);
-        Ok(())
-    }
-}
-
 // TODO: Public only for testing.
 #[derive(Debug)]
 pub struct VotingContext {
@@ -398,54 +352,5 @@ impl VotingContext {
         schema
             .propose_data_by_config_hash_mut()
             .put(cfg_hash, propose_data);
-    }
-}
-
-impl Transaction for Vote {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let author = context.author();
-        let tx_hash = context.tx_hash();
-        let fork = context.fork();
-        let decision = VotingDecision::Yea(tx_hash);
-
-        let vote = VotingContext::new(decision, author, self.cfg_hash);
-        let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
-            error!("Discarding vote {:?}: {}", self, err);
-            err
-        })?;
-
-        vote.save(fork);
-        trace!(
-            "Put Vote:{:?} to corresponding cfg votes_by_config_hash table",
-            self
-        );
-
-        if enough_votes_to_commit(fork.as_ref(), &self.cfg_hash) {
-            CoreSchema::new(fork).commit_configuration(parsed_config);
-        }
-        Ok(())
-    }
-}
-
-impl Transaction for VoteAgainst {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let author = context.author();
-        let tx_hash = context.tx_hash();
-        let fork = context.fork();
-        let decision = VotingDecision::Nay(tx_hash);
-
-        let vote_against = VotingContext::new(decision, author, self.cfg_hash);
-        vote_against.precheck(fork.as_ref()).map_err(|err| {
-            error!("Discarding vote against {:?}: {}", self, err);
-            err
-        })?;
-
-        vote_against.save(fork);
-        trace!(
-            "Put VoteAgainst:{:?} to corresponding cfg votes_by_config_hash table",
-            self
-        );
-
-        Ok(())
     }
 }
