@@ -160,6 +160,18 @@ where
         })
     }
 
+    pub fn create_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::ProofList)
+            .build_new()?;
+
+        Ok(Self {
+            base,
+            state,
+            _v: PhantomData,
+        })
+    }
+
     fn has_branch(&self, key: ProofListKey) -> bool {
         debug_assert!(key.height() > 0);
 

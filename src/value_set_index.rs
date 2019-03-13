@@ -149,6 +149,17 @@ where
         })
     }
 
+    pub fn create_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, _state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::ValueSet)
+            .build_new::<()>()?;
+
+        Ok(Self {
+            base,
+            _v: PhantomData,
+        })
+    }
+
     /// Returns `true` if the set contains the indicated value.
     ///
     /// # Examples

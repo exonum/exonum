@@ -170,12 +170,8 @@ where
         })
     }
 
-    pub fn create_from_address<I: Into<IndexAddress>>(
-        address: I,
-        index_access: T,
-    ) -> Result<Self, failure::Error> {
-        let address = address.into();
-        let (base, _state) = IndexBuilder::from_address(address.clone(), index_access)
+    pub fn create_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, _state) = IndexBuilder::from_view(view)
             .index_type(IndexType::Map)
             .build_new::<()>()?;
 
@@ -184,10 +180,6 @@ where
             _k: PhantomData,
             _v: PhantomData,
         })
-    }
-
-    pub fn create(index_access: T) -> Result<Self, failure::Error> {
-        Self::create_from_address(IndexAddress::default(), index_access)
     }
 
     /// Returns a value corresponding to the key.

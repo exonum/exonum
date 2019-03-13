@@ -269,6 +269,19 @@ where
         })
     }
 
+    pub fn create_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, state) = IndexBuilder::from_view(view)
+            .index_type(IndexType::ProofMap)
+            .build_new()?;
+
+        Ok(Self {
+            base,
+            state,
+            _k: PhantomData,
+            _v: PhantomData,
+        })
+    }
+
     fn get_root_path(&self) -> Option<ProofPath> {
         self.state.get()
     }

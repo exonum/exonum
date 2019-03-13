@@ -132,12 +132,8 @@ where
         }
     }
 
-    pub fn create_from_address<I: Into<IndexAddress>>(
-        address: I,
-        index_access: T,
-    ) -> Result<Self, failure::Error> {
-        let address = address.into();
-        let (base, state) = IndexBuilder::from_address(address.clone(), index_access)
+    pub fn create_from_view(view: View<T>) -> Result<Self, failure::Error> {
+        let (base, state) = IndexBuilder::from_view(view)
             .index_type(IndexType::List)
             .build_new()?;
 
@@ -146,11 +142,6 @@ where
             state,
             _v: PhantomData,
         })
-    }
-
-    //TODO: allow to create indexes without address.
-    pub fn create(index_access: T) -> Result<Self, failure::Error> {
-        Self::create_from_address(IndexAddress::default(), index_access)
     }
 
     pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
