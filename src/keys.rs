@@ -161,13 +161,12 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, self.wrapping_add($itype::min_value()) as $utype);
+                BigEndian::$write_method(buffer, self.wrapping_add(Self::min_value()) as $utype);
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer).wrapping_sub($itype::min_value() as $utype)
-                    as $itype
+                BigEndian::$read_method(buffer).wrapping_sub(Self::min_value() as $utype) as Self
             }
         }
     };
@@ -190,7 +189,7 @@ macro_rules! storage_key_for_crypto_types {
             }
 
             fn read(buffer: &[u8]) -> Self {
-                $type::from_slice(buffer).unwrap()
+                Self::from_slice(buffer).unwrap()
             }
         }
     };

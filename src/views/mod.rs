@@ -187,20 +187,6 @@ where
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn build_new<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
-    where
-        V: BinaryAttribute + Default + Copy,
-    {
-        let (index_view, index_state) = self.create_state();
-
-        if !index_state.is_new() {
-            bail!("Index is already exists!");
-        }
-
-        Ok((index_view, index_state))
-    }
-
-    ///TODO: add documentation [ECR-2820]
     pub fn build_existed<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
     where
         V: BinaryAttribute + Default + Copy,

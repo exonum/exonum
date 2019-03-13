@@ -169,16 +169,16 @@ where
         })
     }
 
-    pub fn create_from_view(view: View<T>) -> Result<Self, failure::Error> {
+    pub fn create_from_view(view: View<T>) -> Self {
         let (base, _state) = IndexBuilder::from_view(view)
             .index_type(IndexType::Map)
-            .build_new::<()>()?;
+            .build::<()>();
 
-        Ok(Self {
+        Self {
             base,
             _k: PhantomData,
             _v: PhantomData,
-        })
+        }
     }
 
     /// Returns a value corresponding to the key.

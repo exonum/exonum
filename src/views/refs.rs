@@ -28,7 +28,7 @@ where
     fn get(view: View<T>) -> Result<Self, failure::Error>;
 
     ///TODO: add documentation [ECR-2820]
-    fn create(view: View<T>) -> Result<Self, failure::Error>;
+    fn create(view: View<T>) -> Self;
 }
 
 impl<T, V> FromView<T> for ListIndex<T, V>
@@ -40,7 +40,7 @@ where
         Self::get_from_view(view)
     }
 
-    fn create(view: View<T>) -> Result<Self, failure::Error> {
+    fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
 }
@@ -54,7 +54,7 @@ where
         Self::get_from_view(view)
     }
 
-    fn create(view: View<T>) -> Result<Self, failure::Error> {
+    fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
 }
@@ -68,7 +68,7 @@ where
         Self::get_from_view(view)
     }
 
-    fn create(view: View<T>) -> Result<Self, failure::Error> {
+    fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
 }
@@ -82,7 +82,7 @@ where
         Self::get_from_view(view)
     }
 
-    fn create(view: View<T>) -> Result<Self, failure::Error> {
+    fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
 }
@@ -97,7 +97,7 @@ where
         Self::get_from_view(view)
     }
 
-    fn create(view: View<T>) -> Result<Self, failure::Error> {
+    fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
 }
@@ -112,7 +112,7 @@ where
         Self::get_from_view(view)
     }
 
-    fn create(view: View<T>) -> Result<Self, failure::Error> {
+    fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
 }
@@ -120,7 +120,7 @@ where
 pub trait ObjectAccess: IndexAccess {
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self>;
 
-    fn get_object<I, T>(&self, address: I) -> Result<Ref<T>, failure::Error>
+    fn get<I, T>(&self, address: I) -> Result<Ref<T>, failure::Error>
     where
         I: Into<IndexAddress>,
         T: FromView<Self>,
@@ -134,35 +134,54 @@ impl ObjectAccess for &Box<dyn Snapshot> {
     //TODO: check if view creation here is redundant
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self> {
         let address = address.into();
-        View::new(&self, address)
+        View::new(self, address)
     }
 }
 
 impl Fork {
     ///TODO: add documentation [ECR-2820]
-    pub fn create_object<'a, T>(&'a self) -> Result<RefMut<T>, failure::Error>
+    pub fn create_object<'a, T>(&'a self) -> T
     where
         T: FromView<&'a Self>,
     {
         let view = View::new(self, IndexAddress::default());
-        let object = T::create(view)?;
-
-        Ok(RefMut { value: object })
+        T::create(view)
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn create_object_with_root<'a, T, I>(
-        &'a self,
-        address: I,
-    ) -> Result<RefMut<T>, failure::Error>
+    pub fn create_object_with_root<'a, T, I>(&'a self, address: I) -> T
     where
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
     {
         let view = View::new(self, address);
-        let object = T::create(view)?;
+        T::create(view)
+    }
 
-        Ok(RefMut { value: object })
+    ///TODO: add documentation [ECR-2820]
+    pub fn get<'a, T, I>(&'a self, address: I) -> Option<Ref<T>>
+    where
+        T: FromView<&'a Self>,
+        I: Into<IndexAddress>,
+    {
+        let view = View::new(self, address);
+        //TODO: remove unwrap
+        let object = T::get(view).unwrap();
+
+        Some(Ref { value: object })
+    }
+
+    ///TODO: add documentation [ECR-2820]
+    pub fn get_mut<'a, T, I>(&'a self, address: I) -> Option<RefMut<T>>
+    where
+        T: FromView<&'a Self>,
+        I: Into<IndexAddress>,
+    {
+        let view = View::new(self, address);
+        //TODO: remove unwrap
+        let object = T::get(view).unwrap();
+
+        Some(RefMut { value: object })
     }
 }
 
@@ -218,8 +237,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut index: RefMut<ListIndex<_, u32>> =
-                fork.create_object_with_root("index").unwrap();
+            let mut index: ListIndex<_, u32> = fork.create_object_with_root("index");
             index.push(1);
         }
 
@@ -228,7 +246,7 @@ mod tests {
         let snapshot = &db.snapshot();
         let index: Ref<ListIndex<_, u32>> = snapshot
             //TODO: fix `From` implementation for `IndexAddress`
-            .get_object(IndexAddress::with_root("index"))
+            .get(IndexAddress::with_root("index"))
             .unwrap();
 
         assert_eq!(index.get(0), Some(1));
@@ -240,12 +258,10 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut _index: RefMut<ListIndex<_, u32>> =
-                fork.create_object_with_root(("index", &3)).unwrap();
+            let mut _index: ListIndex<_, u32> = fork.create_object_with_root(("index", &3));
         }
         {
-            let mut _index: RefMut<ListIndex<_, u32>> =
-                fork.create_object_with_root(("index", &3)).unwrap();
+            let mut _index: ListIndex<_, u32> = fork.create_object_with_root(("index", &3));
         }
     }
 
@@ -254,9 +270,8 @@ mod tests {
     fn get_non_existent_index() {
         let db = TemporaryDB::new();
         let snapshot = &db.snapshot();
-        let _index: Ref<ListIndex<_, u32>> = snapshot
-            .get_object(IndexAddress::with_root("index"))
-            .unwrap();
+        let _index: Ref<ListIndex<_, u32>> =
+            snapshot.get(IndexAddress::with_root("index")).unwrap();
     }
 
     #[test]
@@ -264,21 +279,29 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         let address = {
-            let mut index: RefMut<ListIndex<_, u32>> = fork.create_object().unwrap();
+            let mut index: ListIndex<_, u32> = fork.create_object();
             index.push(1);
             index.address().clone()
         };
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let _index: Ref<ListIndex<_, u32>> = snapshot.get_object(address).unwrap();
+        let _index: Ref<ListIndex<_, u32>> = snapshot.get(address).unwrap();
     }
 
     #[test]
-    fn create_object() {
+    fn fork_get_mut() {
         let db = TemporaryDB::new();
         let fork = db.fork();
+        {
+            let _list: ListIndex<_, u32> = fork.create_object_with_root("index");
+        }
 
-        let list: RefMut<ListIndex<_, u32>> = fork.create_object_with_root("index").unwrap();
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        let mut list: RefMut<ListIndex<_, u32>> = fork.get_mut("index").unwrap();
+
+        list.push(1);
     }
 }
