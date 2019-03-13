@@ -115,7 +115,7 @@ where
         }
     }
 
-    ///TODO: add docs
+    ///TODO: add documentation [ECR-2820]
     pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
         Self {
             index_access,
@@ -186,7 +186,7 @@ where
         self.create_state()
     }
 
-    ///TODO: add docs
+    ///TODO: add documentation [ECR-2820]
     pub fn build_new<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
     where
         V: BinaryAttribute + Default + Copy,
@@ -200,7 +200,7 @@ where
         Ok((index_view, index_state))
     }
 
-    ///TODO: add docs
+    ///TODO: add documentation [ECR-2820]
     pub fn build_existed<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
     where
         V: BinaryAttribute + Default + Copy,

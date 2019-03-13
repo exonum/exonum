@@ -24,7 +24,6 @@ use super::{
     views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue,
 };
-use crate::views::IndexAddress;
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///

@@ -24,9 +24,10 @@ pub trait FromView<T: IndexAccess>
 where
     Self: Sized,
 {
-    ///TODO: add docs
+    ///TODO: add documentation [ECR-2820]
     fn get(view: View<T>) -> Result<Self, failure::Error>;
 
+    ///TODO: add documentation [ECR-2820]
     fn create(view: View<T>) -> Result<Self, failure::Error>;
 }
 
@@ -138,42 +139,43 @@ impl ObjectAccess for &Box<dyn Snapshot> {
 }
 
 impl Fork {
-    fn create_object<'a, T>(&'a self) -> Result<RefMut<T>, failure::Error>
+    ///TODO: add documentation [ECR-2820]
+    pub fn create_object<'a, T>(&'a self) -> Result<RefMut<T>, failure::Error>
     where
         T: FromView<&'a Self>,
     {
         let view = View::new(self, IndexAddress::default());
         let object = T::create(view)?;
 
-        Ok(RefMut {
-            value: object
-        })
+        Ok(RefMut { value: object })
     }
 
-    fn create_object_with_root<'a, T, I>(&'a self, address: I) -> Result<RefMut<T>, failure::Error>
-        where
-            T: FromView<&'a Self>,
-            I: Into<IndexAddress>,
+    ///TODO: add documentation [ECR-2820]
+    pub fn create_object_with_root<'a, T, I>(
+        &'a self,
+        address: I,
+    ) -> Result<RefMut<T>, failure::Error>
+    where
+        T: FromView<&'a Self>,
+        I: Into<IndexAddress>,
     {
         let view = View::new(self, address);
         let object = T::create(view)?;
 
-        Ok(RefMut {
-            value: object
-        })
+        Ok(RefMut { value: object })
     }
 }
 
 #[derive(Debug)]
 #[allow(dead_code)]
 //TODO: remove dead_code
-///TODO: add documentation
+///TODO: add documentation [ECR-2820]
 pub struct Ref<T> {
     value: T,
 }
 
 #[derive(Debug)]
-///TODO: add documentation
+///TODO: add documentation [ECR-2820]
 pub struct RefMut<T> {
     value: T,
 }
@@ -216,7 +218,8 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut index: RefMut<ListIndex<_, u32>> = fork.create_object_with_root("index").unwrap();
+            let mut index: RefMut<ListIndex<_, u32>> =
+                fork.create_object_with_root("index").unwrap();
             index.push(1);
         }
 
@@ -237,10 +240,12 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut _index: RefMut<ListIndex<_, u32>> = fork.create_object_with_root(("index", &3)).unwrap();
+            let mut _index: RefMut<ListIndex<_, u32>> =
+                fork.create_object_with_root(("index", &3)).unwrap();
         }
         {
-            let mut _index: RefMut<ListIndex<_, u32>> = fork.create_object_with_root(("index", &3)).unwrap();
+            let mut _index: RefMut<ListIndex<_, u32>> =
+                fork.create_object_with_root(("index", &3)).unwrap();
         }
     }
 
@@ -270,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn create_object2() {
+    fn create_object() {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
