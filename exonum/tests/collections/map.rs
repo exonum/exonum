@@ -17,7 +17,9 @@
 //! Property testing for map index and proof map index as a rust collection.
 
 use modifier::Modifier;
-use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
+use proptest::{
+    collection::vec, num, prelude::*, strategy, strategy::Strategy, test_runner::TestCaseResult,
+};
 
 use std::collections::HashMap;
 use std::hash::Hash;

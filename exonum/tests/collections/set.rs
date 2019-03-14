@@ -17,7 +17,9 @@
 //! Property testing for key set index and value set index as a rust collection.
 
 use modifier::Modifier;
-use proptest::{collection::vec, strategy, strategy::Strategy, test_runner::TestCaseResult};
+use proptest::{
+    collection::vec, prelude::*, strategy, strategy::Strategy, test_runner::TestCaseResult,
+};
 
 use std::collections::HashSet;
 use std::hash::Hash;

@@ -14,9 +14,6 @@
 
 //! Tests that compare exonum collections and corresponding rust types using proptest.
 
-#[macro_use]
-extern crate proptest;
-
 macro_rules! proptest_compare_collections {
     ($name:ident, $collection:ident, $reference:ident, $action:ident) => {
         proptest! {
