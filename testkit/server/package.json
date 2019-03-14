@@ -10,7 +10,7 @@
   "scripts": {
     "proto": "pbjs -t static-module ../../exonum/src/proto/schema/exonum/protocol.proto  ../../examples/cryptocurrency/src/proto/cryptocurrency.proto -o ./test/stubs.js",
     "lint": "standard",
-    "pretest:unix": "npm run posttest:unix && cargo run & sleep 30",
+    "pretest:unix": "npm run posttest:unix && cargo build; (cargo run > /dev/null 2>&1) & sleep 5",
     "test": "mocha test/index.js",
     "test:unix": "mocha test/index.js",
     "posttest:unix": "lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == \"*:8000\") { print $2 } }' | xargs -r kill -KILL"
