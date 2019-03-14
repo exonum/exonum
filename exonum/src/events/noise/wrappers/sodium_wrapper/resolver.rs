@@ -90,20 +90,19 @@ impl CryptoRng for SodiumRandom {}
 
 impl RngCore for SodiumRandom {
     fn next_u32(&mut self) -> u32 {
-        unimplemented!()
+        unreachable!()
     }
 
     fn next_u64(&mut self) -> u64 {
-        unimplemented!()
+        unreachable!()
     }
 
     fn fill_bytes(&mut self, out: &mut [u8]) {
         thread_rng().fill_bytes(out);
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        self.fill_bytes(dest);
-        Ok(())
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
+        unreachable!()
     }
 }
 
@@ -297,11 +296,11 @@ mod tests {
 
     impl RngCore for MockRandom {
         fn next_u32(&mut self) -> u32 {
-            unimplemented!()
+            unreachable!()
         }
 
         fn next_u64(&mut self) -> u64 {
-            unimplemented!()
+            unreachable!()
         }
 
         fn fill_bytes(&mut self, out: &mut [u8]) {
@@ -310,9 +309,8 @@ mod tests {
             out.copy_from_slice(bytes.as_slice());
         }
 
-        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-            self.fill_bytes(dest);
-            Ok(())
+        fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
+            unreachable!()
         }
     }
 
