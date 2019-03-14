@@ -199,16 +199,15 @@ where
         }
     }
 
-    pub fn get_from_view(view: View<T>) -> Result<Self, failure::Error> {
-        let (base, state) = IndexBuilder::from_view(view)
+    pub fn get_from_view(view: View<T>) -> Option<Self> {
+        IndexBuilder::from_view(view)
             .index_type(IndexType::SparseList)
-            .build_existed()?;
-
-        Ok(Self {
-            base,
-            state,
-            _v: PhantomData,
-        })
+            .build_existed()
+            .map(|(base, state)| Self {
+                base,
+                state,
+                _v: PhantomData,
+            })
     }
 
     pub fn create_from_view(view: View<T>) -> Self {

@@ -119,9 +119,6 @@
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
-    // 'use_self` false positive in macros
-    clippy::use_self,
-
 )]
 
 #[doc(no_inline)]

@@ -14,8 +14,6 @@
 
 #![warn(missing_docs)]
 
-use failure::bail;
-
 pub use self::metadata::{BinaryAttribute, IndexState, IndexType};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
@@ -187,17 +185,16 @@ where
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn build_existed<V>(self) -> Result<(View<T>, IndexState<T, V>), failure::Error>
+    pub fn build_existed<V>(self) -> Option<(View<T>, IndexState<T, V>)>
     where
         V: BinaryAttribute + Default + Copy,
     {
         let (index_view, index_state) = self.create_state();
-
         if index_state.is_new() {
-            bail!("Index is not found!");
+            return None;
         }
 
-        Ok((index_view, index_state))
+        Some((index_view, index_state))
     }
 }
 

@@ -81,6 +81,7 @@ impl_object_hash_for_binary_value! { (), bool, Vec<u8>, String, PublicKey, DateT
 
 macro_rules! impl_binary_form_scalar {
     ($type:tt, $read:ident) => {
+        #[allow(clippy::use_self)]
         impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
                 vec![*self as u8]
