@@ -171,8 +171,6 @@ impl Fork {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
-//TODO: remove dead_code
 ///TODO: add documentation [ECR-2820]
 pub struct Ref<T> {
     value: T,
@@ -210,10 +208,7 @@ impl<T> DerefMut for RefMut<T> {
 mod tests {
     use crate::{
         db::Database,
-        views::{
-            refs::{ObjectAccess, Ref, RefMut},
-            IndexAddress,
-        },
+        views::refs::{ObjectAccess, Ref, RefMut},
         ListIndex, TemporaryDB,
     };
 
@@ -229,10 +224,7 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let index: Ref<ListIndex<_, u32>> = snapshot
-            //TODO: fix `From` implementation for `IndexAddress`
-            .get(IndexAddress::with_root("index"))
-            .unwrap();
+        let index: Ref<ListIndex<_, u32>> = snapshot.get("index").unwrap();
 
         assert_eq!(index.get(0), Some(1));
     }
@@ -241,7 +233,7 @@ mod tests {
     fn get_non_existent_index() {
         let db = TemporaryDB::new();
         let snapshot = &db.snapshot();
-        let index: Option<Ref<ListIndex<_, u32>>> = snapshot.get(IndexAddress::with_root("index"));
+        let index: Option<Ref<ListIndex<_, u32>>> = snapshot.get("index");
 
         assert!(index.is_none());
     }
@@ -257,8 +249,16 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
 
         let fork = db.fork();
-        let mut list: RefMut<ListIndex<_, u32>> = fork.get_mut("index").unwrap();
+        {
+            let mut list: RefMut<ListIndex<_, u32>> = fork.get_mut("index").unwrap();
+            list.push(1);
+        }
 
-        list.push(1);
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = &db.snapshot();
+        let list: Ref<ListIndex<_, u32>> = snapshot.get("index").unwrap();
+
+        assert_eq!(list.get(0), Some(1));
     }
 }
