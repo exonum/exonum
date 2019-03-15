@@ -33,7 +33,7 @@ protobuf = "2.2.0"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.10.1", path = "../../testkit" }
-pretty_assertions = "0.5.1"
+pretty_assertions = "0.6.1"
 assert_matches = "1.2.0"
 
 [build-dependencies]

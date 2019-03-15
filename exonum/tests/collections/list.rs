@@ -17,7 +17,9 @@
 //! Property testing for list index and proof list index as a rust collection.
 
 use modifier::Modifier;
-use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
+use proptest::{
+    collection::vec, num, prelude::*, strategy, strategy::Strategy, test_runner::TestCaseResult,
+};
 
 use super::ACTIONS_MAX_LEN;
 use exonum::storage::{Fork, ListIndex, ProofListIndex, StorageValue};

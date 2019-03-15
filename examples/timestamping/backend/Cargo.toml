@@ -27,7 +27,7 @@ protobuf = "2.2.0"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.10.1", path = "../../../testkit" }
-pretty_assertions = "0.5.1"
+pretty_assertions = "0.6.1"
 
 [build-dependencies]
 exonum-build = { version = "0.10.0", path = "../../../components/build" }

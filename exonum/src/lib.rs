@@ -33,7 +33,7 @@
           // `filter(..).map(..)` often looks more shorter and readable.
           clippy::filter_map,
           // Next lints produce too much noise/false positives.
-          clippy::stutter, clippy::similar_names,
+          clippy::module_name_repetitions, clippy::similar_names,
           // Variant name ends with the enum name. Similar behavior to similar_names.
           clippy::pub_enum_variant_names,
           // Next lints allowed due to false positive.

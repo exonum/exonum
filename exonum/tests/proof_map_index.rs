@@ -22,9 +22,6 @@
 
 // cspell:ignore proptest
 
-#[macro_use]
-extern crate proptest;
-
 use exonum::storage::{
     proof_map_index::{ProofMapKey, ProofPath},
     Database, MapProof, MemoryDB, ProofMapIndex, Snapshot, StorageValue,

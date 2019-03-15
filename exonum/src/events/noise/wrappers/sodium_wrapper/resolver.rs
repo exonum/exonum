@@ -15,7 +15,7 @@
 // spell-checker:ignore chacha, privkey, authtext, ciphertext
 
 use byteorder::{ByteOrder, LittleEndian};
-use rand::{thread_rng, RngCore};
+use rand::{thread_rng, CryptoRng, Error, RngCore};
 use snow::{
     params::{CipherChoice, DHChoice, HashChoice},
     resolvers::{CryptoResolver, DefaultResolver},
@@ -84,9 +84,25 @@ impl Default for SodiumRandom {
     }
 }
 
-impl Random for SodiumRandom {
+impl Random for SodiumRandom {}
+
+impl CryptoRng for SodiumRandom {}
+
+impl RngCore for SodiumRandom {
+    fn next_u32(&mut self) -> u32 {
+        unreachable!()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        unreachable!()
+    }
+
     fn fill_bytes(&mut self, out: &mut [u8]) {
         thread_rng().fill_bytes(out);
+    }
+
+    fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
+        unreachable!()
     }
 }
 
@@ -274,17 +290,33 @@ mod tests {
     // Random data generator.
     struct MockRandom(u8);
 
-    impl Default for MockRandom {
-        fn default() -> MockRandom {
-            MockRandom(0)
-        }
-    }
+    impl Random for MockRandom {}
 
-    impl Random for MockRandom {
+    impl CryptoRng for MockRandom {}
+
+    impl RngCore for MockRandom {
+        fn next_u32(&mut self) -> u32 {
+            unreachable!()
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            unreachable!()
+        }
+
         fn fill_bytes(&mut self, out: &mut [u8]) {
             let bytes = vec![self.0; out.len()];
             self.0 += 1;
             out.copy_from_slice(bytes.as_slice());
+        }
+
+        fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
+            unreachable!()
+        }
+    }
+
+    impl Default for MockRandom {
+        fn default() -> MockRandom {
+            MockRandom(0)
         }
     }
 
