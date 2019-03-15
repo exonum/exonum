@@ -27,7 +27,7 @@ pub trait ServiceDispatcher {
 }
 
 pub trait Service: ServiceDispatcher + std::fmt::Debug {
-    fn initialize(&self, _ctx: TransactionContext, _arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, _ctx: TransactionContext, _arg: Any) -> Result<(), ExecutionError> {
         Ok(())
     }
     // TODO: add other hooks such as "on node startup", etc.
