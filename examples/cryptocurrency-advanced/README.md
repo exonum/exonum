@@ -1,4 +1,4 @@
-    # Cryptocurrency Advanced: Service with Data Proofs
+# Cryptocurrency Advanced: Service with Data Proofs
 
 The extended version of the
 [Cryptocurrency Service](https://github.com/exonum/exonum/tree/master/examples/cryptocurrency)
