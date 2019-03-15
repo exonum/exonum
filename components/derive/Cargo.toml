@@ -1,6 +1,6 @@
 [package]
 name = "exonum-derive"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"

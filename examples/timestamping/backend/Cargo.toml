@@ -13,24 +13,24 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.10.2", path = "../../../exonum" }
-exonum-derive = { version = "0.10.0", path = "../../../components/derive" }
-exonum-configuration = { version = "0.10.1", path = "../../../services/configuration" }
-exonum-time = { version = "0.10.0", path = "../../../services/time" }
+exonum = { version = "0.11.0", path = "../../../exonum" }
+exonum-derive = { version = "0.11.0", path = "../../../components/derive" }
+exonum-configuration = { version = "0.11.0", path = "../../../services/configuration" }
+exonum-time = { version = "0.11.0", path = "../../../services/time" }
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"
 failure = "0.1.5"
 log = "0.4.6"
 chrono = { version = "0.4.6", features = ["serde"] }
-protobuf = "2.2.0"
+protobuf = "2.4.0"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.10.1", path = "../../../testkit" }
+exonum-testkit = { version = "0.11.0", path = "../../../testkit" }
 pretty_assertions = "0.6.1"
 
 [build-dependencies]
-exonum-build = { version = "0.10.0", path = "../../../components/build" }
+exonum-build = { version = "0.11.0", path = "../../../components/build" }
 
 [features]
 default = ["with-serde"]
