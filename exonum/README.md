@@ -13,11 +13,11 @@ GovTech, and LegalTech. The Exonum framework is oriented towards creating
 permissioned blockchains, that is, blockchains with the known set of blockchain
 infrastructure providers.
 
-* [What is Exonum?](https://exonum.com/doc/get-started/what-is-exonum/)
-* [Design Overview](https://exonum.com/doc/get-started/design-overview/)
-* [Installation guide](https://exonum.com/doc/get-started/install/)
-* [Tutorial](https://exonum.com/doc/get-started/create-service/)
-* [Roadmap](https://exonum.com/doc/roadmap/)
+* [What is Exonum?](https://exonum.com/doc/version/latest/get-started/what-is-exonum/)
+* [Design Overview](https://exonum.com/doc/version/latest/get-started/design-overview/)
+* [Installation guide](https://exonum.com/doc/version/latest/get-started/install/)
+* [Tutorial](https://exonum.com/doc/version/latest/get-started/create-service/)
+* [Roadmap](https://exonum.com/doc/version/latest/roadmap/)
 * [Full Specification](https://exonum.com/doc/)
 * [Reference documentation](https://docs.rs/exonum)
 * [Contributing guide](https://github.com/exonum/exonum/blob/master/CONTRIBUTING.md)

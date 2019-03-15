@@ -100,7 +100,7 @@ but we have several additional conventions:
 [documentation]: https://exonum.com/doc/
 [gitter]: https://gitter.im/exonum/exonum
 [gitter-ru]: https://gitter.im/exonum/ruExonum
-[installation guide]: https://exonum.com/doc/get-started/install/
+[installation guide]: https://exonum.com/doc/version/latest/get-started/install/
 [good first issue :heart:]: https://github.com/exonum/exonum/labels/good%20first%20issue%20%3Aheart%3A
 [clippy]: https://github.com/rust-lang-nursery/rust-clippy
 [cargo audit]: https://github.com/RustSec/cargo-audit

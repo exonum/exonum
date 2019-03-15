@@ -37,7 +37,7 @@ cargo install --example configuration
 ```
 
 `exonum` crate system dependencies and rust toolchain configuration -
-[exonum install instructions](https://exonum.com/doc/get-started/install/).
+[exonum install instructions](https://exonum.com/doc/version/latest/get-started/install/).
 
 #### Generate configs
 
