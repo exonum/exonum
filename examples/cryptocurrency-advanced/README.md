@@ -5,7 +5,7 @@ The extended version of the
 implementing data proofs. This project demonstrates how to bootstrap your own
 cryptocurrency with [Exonum blockchain](https://github.com/exonum/exonum).
 
-See [the documentation](https://exonum.com/doc/get-started/data-proofs/)
+See [the documentation](https://exonum.com/doc/version/latest/get-started/data-proofs/)
 for a detailed step-by-step guide how to approach this example.
 
 ![Cryptocurrency demo](Screenshot.png)

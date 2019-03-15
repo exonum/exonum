@@ -118,7 +118,7 @@ impl ::serde::Serialize for dyn Transaction {
 ///
 /// See also [the documentation page on transactions][doc:transactions].
 ///
-/// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
+/// [doc:transactions]: https://exonum.com/doc/version/latest/architecture/transactions/
 pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Serialize {
     /// Receives a `TransactionContext` witch contain fork
     /// of the current blockchain state and can modify it depending on the contents

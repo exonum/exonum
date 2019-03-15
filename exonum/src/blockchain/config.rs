@@ -76,13 +76,13 @@ pub struct StoredConfiguration {
 /// which can later be edited as required.
 /// The parameters in this configuration should be the same for all nodes in the network and can
 /// be changed using the
-/// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
+/// [configuration update service](https://exonum.com/doc/version/latest/advanced/configuration-updater/).
 ///
 /// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
 /// to slow down block generation,hence consume less disk space, these values can be increased.
 ///
 /// For additional information on the Exonum consensus algorithm, refer to
-/// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
+/// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
     /// Interval between first two rounds. This interval defines the time that passes
