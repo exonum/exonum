@@ -39,38 +39,50 @@ cargo install --example configuration
 `exonum` crate system dependencies and rust toolchain configuration -
 [exonum install instructions](https://exonum.com/doc/get-started/install/).
 
-#### Generate testnet directory and config
+#### Generate configs
 
-`4` is a required indexed parameter and stands for the number of nodes in
-testnet:
+Generate template:
 
-```bash
-mkdir -p testnet/configuration_service
-cd testnet/configuration_service
-configuration generate-testnet --start 5400 4 --output-dir .
-cd ..
+```sh
+mkdir example
+configuration generate-template example/common.toml --validators-count 4
 ```
 
-This should create the following config for testnet:
-
-```bash
-$ tree configuration_service/
-configuration_service/
-└── validators
-  ├── 0.toml
-  ├── 1.toml
-  ├── 2.toml
-  └── 3.toml
-```
-
-#### Run `4` nodes
-
+Generate templates of nodes configurations:
 <!-- markdownlint-disable MD013 -->
 
-```bash
-configuration run --node-config configuration_service/validators/0.toml --db-path configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
-...
-configuration run --node-config configuration_service/validators/3.toml --db-path configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
+```sh
+configuration generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331 -c example/consensus_1.toml -s example/service_1.toml -n
+
+configuration generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332 -c example/consensus_2.toml -s example/service_2.toml -n
+
+configuration generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333 -c example/consensus_3.toml -s example/service_3.toml -n
+
+configuration generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334 -c example/consensus_4.toml -s example/service_4.toml -n
+```
+
+Finalize generation of nodes configurations:
+
+```sh
+configuration finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+
+configuration finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+
+configuration finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+
+configuration finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+```
+
+#### Run nodes
+
+```sh
+configuration run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
+
+configuration run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201 --consensus-key-pass pass --service-key-pass pass
+
+configuration run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202 --consensus-key-pass pass --service-key-pass pass
+
+configuration run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203 --consensus-key-pass pass --service-key-pass pass
 ```
 
 <!-- markdownlint-enable MD013 -->

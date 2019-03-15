@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.11.0 - 2019-03-15
 
 ### Breaking Changes
 

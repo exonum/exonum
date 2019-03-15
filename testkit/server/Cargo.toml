@@ -18,6 +18,6 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.10.2", path = "../../exonum" }
-exonum-testkit = { version = "0.10.1", path = ".." }
+exonum = { version = "0.11.0", path = "../../exonum" }
+exonum-testkit = { version = "0.11.0", path = ".." }
 exonum-cryptocurrency = { version = "0.0.0", path = "../../examples/cryptocurrency" }

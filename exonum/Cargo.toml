@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.10.2"
+version = "0.11.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -52,15 +52,15 @@ chrono = { version = "0.4.6", features = ["serde"] }
 uuid = { version = "0.7.1", features = ["serde"] }
 snow = "0.5.2"
 rust_decimal = "0.11.2"
-protobuf = { version = "2.2.0", features = ["with-serde"] }
+protobuf = { version = "2.4.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "2.1.0"
 zeroize = "0.5.2"
 
 exonum_rocksdb = "0.7.4"
 exonum_sodiumoxide = { version = "0.0.21", optional = true }
-exonum-crypto = { version = "0.10.3", path = "../components/crypto" }
-exonum-derive = { version = "0.10.0", path = "../components/derive" }
+exonum-crypto = { version = "0.11.0", path = "../components/crypto" }
+exonum-derive = { version = "0.11.0", path = "../components/derive" }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
@@ -85,7 +85,7 @@ sodiumoxide-crypto = ["exonum_sodiumoxide"]
 with-serde = []
 
 [build-dependencies]
-exonum-build = { version = "0.10.0", path = "../components/build" }
+exonum-build = { version = "0.11.0", path = "../components/build" }
 
 [package.metadata.docs.rs]
 dependencies = [ "protobuf-compiler" ]
