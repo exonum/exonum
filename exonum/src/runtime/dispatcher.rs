@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId, RuntimeIdentifier
+    RuntimeIdentifier, ServiceInstanceId,
 };
 
 #[derive(Default)]
@@ -26,11 +26,7 @@ pub struct DispatcherBuilder {
 }
 
 impl DispatcherBuilder {
-    pub fn with_runtime(
-        mut self,
-        runtime_id: u32,
-        runtime: Box<dyn RuntimeEnvironment>,
-    ) -> Self {
+    pub fn with_runtime(mut self, runtime_id: u32, runtime: Box<dyn RuntimeEnvironment>) -> Self {
         self.runtimes.insert(runtime_id, runtime);
 
         self
@@ -140,11 +136,7 @@ mod tests {
     }
 
     impl SampleRuntime {
-        pub fn new(
-            runtime_type: u32,
-            instance_id: ServiceInstanceId,
-            method_id: MethodId,
-        ) -> Self {
+        pub fn new(runtime_type: u32, instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
             Self {
                 runtime_type,
                 instance_id,
@@ -208,8 +200,14 @@ mod tests {
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
-        assert!(dispatcher.runtimes.get(&(RuntimeIdentifier::Rust as u32)).is_some());
-        assert!(dispatcher.runtimes.get(&(RuntimeIdentifier::Java as u32)).is_some());
+        assert!(dispatcher
+            .runtimes
+            .get(&(RuntimeIdentifier::Rust as u32))
+            .is_some());
+        assert!(dispatcher
+            .runtimes
+            .get(&(RuntimeIdentifier::Java as u32))
+            .is_some());
     }
 
     #[test]
@@ -240,11 +238,11 @@ mod tests {
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
-            raw_spec: Default::default()
+            raw_spec: Default::default(),
         };
         let sample_java_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Java as u32,
-            raw_spec: Default::default()
+            raw_spec: Default::default(),
         };
 
         // Check deploy.
@@ -337,7 +335,7 @@ mod tests {
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
-            raw_spec: Default::default()
+            raw_spec: Default::default(),
         };
 
         // Check deploy.

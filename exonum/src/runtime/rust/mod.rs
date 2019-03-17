@@ -28,13 +28,13 @@ pub mod tests;
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId, RuntimeIdentifier,
+    RuntimeIdentifier, ServiceInstanceId,
 };
 
 use crate::crypto::{Hash, PublicKey};
+use crate::messages::BinaryForm;
 use crate::proto::schema;
 use crate::storage::Fork;
-use crate::messages::BinaryForm;
 
 use self::service::Service;
 
@@ -77,7 +77,9 @@ pub struct RustArtifactSpec {
 
 impl RuntimeEnvironment for RustRuntime {
     fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        let artifact = self.get_artifact_spec(artifact).ok_or(DeployError::WrongArtifact)?;
+        let artifact = self
+            .get_artifact_spec(artifact)
+            .ok_or(DeployError::WrongArtifact)?;
 
         let mut inner = self.inner.borrow_mut();
 
@@ -92,7 +94,9 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-        let artifact = self.get_artifact_spec(artifact).ok_or(DeployError::WrongArtifact)?;
+        let artifact = self
+            .get_artifact_spec(artifact)
+            .ok_or(DeployError::WrongArtifact)?;
 
         let inner = self.inner.borrow();
 
@@ -109,7 +113,9 @@ impl RuntimeEnvironment for RustRuntime {
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        let artifact = self.get_artifact_spec(artifact).ok_or(InitError::WrongArtifact)?;
+        let artifact = self
+            .get_artifact_spec(artifact)
+            .ok_or(InitError::WrongArtifact)?;
 
         let mut inner = self.inner.borrow_mut();
 

@@ -20,9 +20,9 @@ use crate::{
     node::State,
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
+        dispatcher::Dispatcher,
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
-        dispatcher::Dispatcher,
     },
 };
 use protobuf::well_known_types::Any;
@@ -32,10 +32,10 @@ mod errors;
 mod schema;
 mod transactions;
 
+use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
 use schema::VotingDecision;
 use transactions::{enough_votes_to_commit, VotingContext};
-use config::ConfigurationServiceConfig;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
@@ -132,19 +132,23 @@ impl ConfigurationService for ConfigurationServiceImpl {
         Ok(())
     }
 
-
-    fn deploy(&self, ctx: TransactionContext, arg: transactions::Deploy) -> Result<(), ExecutionError>
-    {
+    fn deploy(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::Deploy,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>
-    {
+    fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn deploy_and_init(&self, ctx: TransactionContext, arg: transactions::DeployInit) -> Result<(), ExecutionError>
-    {
+    fn deploy_and_init(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::DeployInit,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 }

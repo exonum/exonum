@@ -22,7 +22,7 @@ use crate::messages::BinaryForm;
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId, RuntimeIdentifier
+    RuntimeIdentifier, ServiceInstanceId,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::{well_known_types::Any, Message};
@@ -106,7 +106,7 @@ fn test_basic_rust_runtime() {
     let rust_artifact = get_artifact_spec();
     let artifact = ArtifactSpec {
         runtime_id: RuntimeIdentifier::Rust as u32,
-        raw_spec: BinaryForm::encode(&rust_artifact).expect("Can't encode rust artifact")
+        raw_spec: BinaryForm::encode(&rust_artifact).expect("Can't encode rust artifact"),
     };
 
     let service = Box::new(TestServiceImpl);

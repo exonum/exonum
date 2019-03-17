@@ -21,8 +21,8 @@ use crate::{
     crypto::{CryptoHash, Hash, PublicKey},
     node::State,
     proto,
+    runtime::{rust::RustArtifactSpec, ArtifactSpec, RuntimeIdentifier},
     storage::{Fork, Snapshot},
-    runtime::{ArtifactSpec, RuntimeIdentifier, rust::RustArtifactSpec},
 };
 
 use super::{
