@@ -47,12 +47,17 @@ service_interface! {
         fn propose(&self, ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>;
         fn vote(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
         fn vote_against(&self, ctx: TransactionContext, arg: transactions::VoteAgainst) -> Result<(), ExecutionError>;
+
+        fn deploy(&self, ctx: TransactionContext, arg: transactions::Deploy) -> Result<(), ExecutionError>;
+        fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>;
+        fn deploy_and_init(&self, ctx: TransactionContext, arg: transactions::DeployInit) -> Result<(), ExecutionError>;
     }
 }
 
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceImpl {
     config: ConfigurationServiceConfig,
+    // TODO: Change RefCell to something safer.
     dispatcher: RefCell<Dispatcher>,
 }
 
@@ -124,6 +129,22 @@ impl ConfigurationService for ConfigurationServiceImpl {
             tx
         );
 
+        Ok(())
+    }
+
+
+    fn deploy(&self, ctx: TransactionContext, arg: transactions::Deploy) -> Result<(), ExecutionError>
+    {
+        Ok(())
+    }
+
+    fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>
+    {
+        Ok(())
+    }
+
+    fn deploy_and_init(&self, ctx: TransactionContext, arg: transactions::DeployInit) -> Result<(), ExecutionError>
+    {
         Ok(())
     }
 }

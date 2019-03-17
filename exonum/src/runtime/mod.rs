@@ -61,8 +61,8 @@ impl CallInfo {
 
 #[derive(Debug)]
 pub enum RuntimeIdentifier {
-    Rust,
-    Java,
+    Rust = 0,
+    Java = 1,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

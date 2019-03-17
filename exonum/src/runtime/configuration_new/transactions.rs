@@ -22,6 +22,7 @@ use crate::{
     node::State,
     proto,
     storage::{Fork, Snapshot},
+    runtime::{ArtifactSpec, RuntimeIdentifier, rust::RustArtifactSpec},
 };
 
 use super::{
@@ -360,14 +361,41 @@ impl VotingContext {
 pub struct Deploy {
     pub runtime_id: u32,
     pub activation_height: u64,
-    pub arfifact_spec: Any,
+    pub artifact_spec: Any,
+}
+
+fn artifact_spec_from_any(runtime_id: u32, artifact_spec: &Any) -> ArtifactSpec {
+    match runtime_id {
+        runtime_id if runtime_id == RuntimeIdentifier::Rust as u32 => {
+            ArtifactSpec::Java
+        },
+        runtime_id if runtime_id == RuntimeIdentifier::Java as u32 => {
+            ArtifactSpec::Java
+        },
+        _ => {
+            unimplemented!();
+        }
+    }
+}
+
+impl Deploy {
+    pub fn get_artifact_spec(&self) -> ArtifactSpec {
+        artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
 #[exonum(pb = "proto::schema::configuration::InitTx", crate = "crate")]
 pub struct Init {
     pub runtime_id: u32,
+    pub artifact_spec: Any,
     pub init_data: Any,
+}
+
+impl Init {
+    pub fn get_artifact_spec(&self) -> ArtifactSpec {
+        artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]

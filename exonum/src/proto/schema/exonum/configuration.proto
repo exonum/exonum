@@ -61,13 +61,14 @@ message ConfigurationServiceInit {
 message DeployTx {
   uint32 runtime_id = 1;
   uint64 activation_height = 2;
-  google.protobuf.Any arfifact_spec = 3;
+  google.protobuf.Any artifact_spec = 3;
 }
 
 // Transaction for service instance initialization.
 message InitTx {
   uint32 runtime_id = 1;
-  google.protobuf.Any init_data = 2; 
+  google.protobuf.Any artifact_spec = 2;
+  google.protobuf.Any init_data = 3;
 }
 
 // Transaction for instant deploy and initialization of service.
