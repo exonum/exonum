@@ -365,16 +365,9 @@ pub struct Deploy {
 }
 
 fn artifact_spec_from_any(runtime_id: u32, artifact_spec: &Any) -> ArtifactSpec {
-    match runtime_id {
-        runtime_id if runtime_id == RuntimeIdentifier::Rust as u32 => {
-            ArtifactSpec::Java
-        },
-        runtime_id if runtime_id == RuntimeIdentifier::Java as u32 => {
-            ArtifactSpec::Java
-        },
-        _ => {
-            unimplemented!();
-        }
+    ArtifactSpec {
+        runtime_id,
+        raw_spec: artifact_spec.get_value().to_vec(),
     }
 }
 

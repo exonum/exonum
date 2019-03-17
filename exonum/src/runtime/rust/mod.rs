@@ -28,12 +28,13 @@ pub mod tests;
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId,
+    ServiceInstanceId, RuntimeIdentifier,
 };
 
 use crate::crypto::{Hash, PublicKey};
 use crate::proto::schema;
 use crate::storage::Fork;
+use crate::messages::BinaryForm;
 
 use self::service::Service;
 
@@ -44,6 +45,16 @@ struct RustRuntime {
 }
 
 impl RustRuntime {
+    fn get_artifact_spec(&self, artifact: ArtifactSpec) -> Option<RustArtifactSpec> {
+        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
+            return None;
+        }
+
+        let rust_artifact_spec: RustArtifactSpec = BinaryForm::decode(&artifact.raw_spec).ok()?;
+
+        Some(rust_artifact_spec)
+    }
+
     fn add_service(&self, artifact: RustArtifactSpec, service: Box<dyn Service>) {
         self.inner.borrow_mut().services.insert(artifact, service);
     }
@@ -66,11 +77,7 @@ pub struct RustArtifactSpec {
 
 impl RuntimeEnvironment for RustRuntime {
     fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
-            artifact
-        } else {
-            return Err(DeployError::WrongArtifact);
-        };
+        let artifact = self.get_artifact_spec(artifact).ok_or(DeployError::WrongArtifact)?;
 
         let mut inner = self.inner.borrow_mut();
 
@@ -85,11 +92,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
-            artifact
-        } else {
-            return Err(DeployError::WrongArtifact);
-        };
+        let artifact = self.get_artifact_spec(artifact).ok_or(DeployError::WrongArtifact)?;
 
         let inner = self.inner.borrow();
 
@@ -106,11 +109,7 @@ impl RuntimeEnvironment for RustRuntime {
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
-            artifact
-        } else {
-            return Err(InitError::WrongArtifact);
-        };
+        let artifact = self.get_artifact_spec(artifact).ok_or(InitError::WrongArtifact)?;
 
         let mut inner = self.inner.borrow_mut();
 

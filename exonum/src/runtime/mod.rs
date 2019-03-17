@@ -59,16 +59,16 @@ impl CallInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum RuntimeIdentifier {
     Rust = 0,
     Java = 1,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum ArtifactSpec {
-    Rust(rust::RustArtifactSpec),
-    Java,
+pub struct ArtifactSpec {
+    runtime_id: u32,
+    raw_spec: Vec<u8>,
 }
 
 /// Service runtime environment.
