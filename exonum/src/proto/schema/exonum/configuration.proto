@@ -17,6 +17,7 @@ syntax = "proto3";
 package exonum.service.configuration;
 
 import "helpers.proto";
+import "google/protobuf/any.proto";
 
 // Propose a new configuration.
 message Propose {
@@ -54,4 +55,23 @@ message ConfigurationServiceInit {
   bool is_custom_majority_count = 1;
   // Custom majority count.
   uint32 majority_count = 2;
+}
+
+// Transaction for service artifact deployment.
+message DeployTx {
+  uint32 runtime_id = 1;
+  uint64 activation_height = 2;
+  google.protobuf.Any arfifact_spec = 3;
+}
+
+// Transaction for service instance initialization.
+message InitTx {
+  uint32 runtime_id = 1;
+  google.protobuf.Any init_data = 2; 
+}
+
+// Transaction for instant deploy and initialization of service.
+message DeployInitTx {
+  DeployTx deploy_tx = 1;
+  InitTx init_tx = 2;
 }

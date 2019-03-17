@@ -14,6 +14,8 @@
 
 //! Transaction definitions for the configuration service.
 
+use protobuf::well_known_types::Any;
+
 use crate::{
     blockchain::{Schema as CoreSchema, StoredConfiguration},
     crypto::{CryptoHash, Hash, PublicKey},
@@ -351,4 +353,26 @@ impl VotingContext {
             .propose_data_by_config_hash_mut()
             .put(cfg_hash, propose_data);
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::DeployTx", crate = "crate")]
+pub struct Deploy {
+    pub runtime_id: u32,
+    pub activation_height: u64,
+    pub arfifact_spec: Any,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::InitTx", crate = "crate")]
+pub struct Init {
+    pub runtime_id: u32,
+    pub init_data: Any,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::DeployInitTx", crate = "crate")]
+pub struct DeployInit {
+    pub deploy_tx: Deploy,
+    pub init_tx: Init,
 }

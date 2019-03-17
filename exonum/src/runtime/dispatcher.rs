@@ -36,7 +36,7 @@ impl From<ArtifactSpec> for RuntimeIdentifier {
 }
 
 #[derive(Default)]
-struct DispatcherBuilder {
+pub struct DispatcherBuilder {
     runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
 }
 
@@ -57,9 +57,15 @@ impl DispatcherBuilder {
 }
 
 #[derive(Default)]
-struct Dispatcher {
+pub struct Dispatcher {
     runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
     runtime_lookup: HashMap<ServiceInstanceId, RuntimeIdentifier>,
+}
+
+impl std::fmt::Debug for Dispatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Dispatcher entity")
+    }
 }
 
 impl Dispatcher {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// use semver::Version;
+use std::cell::RefCell;
 
 use crate::{
     blockchain::Schema as CoreSchema,
@@ -22,6 +22,7 @@ use crate::{
     runtime::{
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
+        dispatcher::Dispatcher,
     },
 };
 use protobuf::well_known_types::Any;
@@ -52,6 +53,7 @@ service_interface! {
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceImpl {
     config: ConfigurationServiceConfig,
+    dispatcher: RefCell<Dispatcher>,
 }
 
 impl ConfigurationService for ConfigurationServiceImpl {
