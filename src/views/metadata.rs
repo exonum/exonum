@@ -197,8 +197,7 @@ struct IndexesPool<T: IndexAccess>(View<T>);
 
 impl<T: IndexAccess> IndexesPool<T> {
     fn new(index_access: T) -> Self {
-        let pool_address = IndexAddress::from(INDEXES_POOL_NAME);
-        Self(View::new(index_access, pool_address))
+        Self(View::new(index_access, INDEXES_POOL_NAME))
     }
 
     fn len(&self) -> u64 {
@@ -273,7 +272,7 @@ where
     pub fn set(&mut self, state: V) {
         let mut cache = self.cache.get_mut();
         cache.state = state;
-        View::new(self.index_access, IndexAddress::from(INDEXES_POOL_NAME))
+        View::new(self.index_access, INDEXES_POOL_NAME)
             .put(&self.index_name, cache.to_bytes());
     }
 

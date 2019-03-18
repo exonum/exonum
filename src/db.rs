@@ -774,10 +774,9 @@ pub const VERSION_NAME: &str = "version";
 
 /// This function checks that the given database is compatible with the current `MerkleDB` version.
 pub fn check_database(db: &mut dyn Database) -> Result<()> {
-    let address = IndexAddress::with_root(DB_METADATA);
     let fork = db.fork();
     {
-        let mut view = View::new(&fork, address);
+        let mut view = View::new(&fork, DB_METADATA);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
             ensure!(
                 saved_version == DB_VERSION,
