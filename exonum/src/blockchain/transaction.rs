@@ -179,32 +179,47 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
 pub struct TransactionContext<'a> {
     fork: &'a mut Fork,
     service_id: u16,
+    service_name: &'a str,
     tx_hash: Hash,
     author: PublicKey,
 }
 
 impl<'a> TransactionContext<'a> {
     #[doc(hidden)]
-    pub fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
+    pub fn new(
+        fork: &'a mut Fork,
+        service_name: &'a str,
+        raw_message: &Signed<RawTransaction>,
+    ) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
+            service_name,
             tx_hash: raw_message.hash(),
             author: raw_message.author(),
         }
     }
+
     /// Returns fork of current blockchain state.
     pub fn fork(&mut self) -> &mut Fork {
         self.fork
     }
-    /// Returns id of service that own this transaction.
+
+    /// Returns an id of the service that own this transaction.
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
+
+    /// Returns a name of the service that own this transaction.
+    pub fn service_name(&self) -> &str {
+        self.service_name
+    }
+
     /// Returns transaction author public key
     pub fn author(&self) -> PublicKey {
         self.author
     }
+
     /// Returns current transaction message hash.
     /// This hash could be used to link some data in storage for external usage.
     pub fn tx_hash(&self) -> Hash {
