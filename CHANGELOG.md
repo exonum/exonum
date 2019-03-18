@@ -9,7 +9,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- Added `service_name` getter to the `TransactionContext`. (#????)
+- Added `service_name` getter to the `TransactionContext`. (#1274)
 
 ## 0.11.0 - 2019-03-15
 

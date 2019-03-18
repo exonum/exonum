@@ -186,7 +186,11 @@ pub struct TransactionContext<'a> {
 
 impl<'a> TransactionContext<'a> {
     #[doc(hidden)]
-    pub fn new(fork: &'a mut Fork, service_name: &'a str, raw_message: &Signed<RawTransaction>) -> Self {
+    pub fn new(
+        fork: &'a mut Fork,
+        service_name: &'a str,
+        raw_message: &Signed<RawTransaction>,
+    ) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
@@ -195,18 +199,18 @@ impl<'a> TransactionContext<'a> {
             author: raw_message.author(),
         }
     }
-    
+
     /// Returns fork of current blockchain state.
     pub fn fork(&mut self) -> &mut Fork {
         self.fork
     }
 
-    /// Returns id of service that own this transaction.
+    /// Returns an id of the service that own this transaction.
     pub fn service_id(&self) -> u16 {
         self.service_id
     }
 
-    /// Returns name of service that own this transaction.
+    /// Returns a name of the service that own this transaction.
     pub fn service_name(&self) -> &str {
         self.service_name
     }
