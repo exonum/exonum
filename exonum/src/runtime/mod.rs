@@ -39,8 +39,8 @@ type MethodId = u32;
 
 #[derive(Debug)]
 pub struct InstanceInitData {
-    instance_id: ServiceInstanceId,
-    constructor_data: Any,
+    pub instance_id: ServiceInstanceId,
+    pub constructor_data: Any,
 }
 
 #[derive(Debug, ProtobufConvert)]
@@ -105,7 +105,7 @@ pub struct RuntimeContext<'a> {
 }
 
 impl<'a> RuntimeContext<'a> {
-    fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+    pub fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
         Self {
             fork,
             author,

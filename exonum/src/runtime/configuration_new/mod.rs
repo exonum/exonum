@@ -21,6 +21,7 @@ use crate::{
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
         dispatcher::Dispatcher,
+        RuntimeEnvironment, RuntimeContext, InstanceInitData, 
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
     },
@@ -134,21 +135,75 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
     fn deploy(
         &self,
-        ctx: TransactionContext,
+        _ctx: TransactionContext,
         arg: transactions::Deploy,
     ) -> Result<(), ExecutionError> {
+        let artifact_spec = arg.get_artifact_spec();
+
+        let dispatcher = self.dispatcher.borrow();
+        let _result = dispatcher.start_deploy(artifact_spec);
+
+        // TODO add result into deployable (to check deploy status in before_commit).
+        // TODO return result.
+
         Ok(())
     }
 
-    fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError> {
+    fn init(&self, mut ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError> {
+        let artifact_spec = arg.get_artifact_spec();
+
+        let mut dispatcher = self.dispatcher.borrow_mut();
+
+        let author = ctx.author();
+        let tx_hash = ctx.tx_hash();
+        let mut runtime_ctx = RuntimeContext::new(ctx.fork(), &author, &tx_hash);
+
+        let TEMP_SERVICE_ID = 0;
+        let init_data = InstanceInitData {
+            instance_id: TEMP_SERVICE_ID,
+            constructor_data: arg.init_data,
+        };
+
+        let _result = dispatcher.init_service(&mut runtime_ctx, artifact_spec, &init_data);
+
+        // TODO return result.
+
         Ok(())
     }
 
     fn deploy_and_init(
         &self,
-        ctx: TransactionContext,
+        mut ctx: TransactionContext,
         arg: transactions::DeployInit,
     ) -> Result<(), ExecutionError> {
+
+        // Deploy
+        {
+            let artifact_spec = arg.deploy_tx.get_artifact_spec();
+
+            let dispatcher = self.dispatcher.borrow();
+            let _result = dispatcher.start_deploy(artifact_spec);
+        }
+
+        // Init
+        {
+            let artifact_spec = arg.init_tx.get_artifact_spec();
+
+            let mut dispatcher = self.dispatcher.borrow_mut();
+
+            let author = ctx.author();
+            let tx_hash = ctx.tx_hash();
+            let mut runtime_ctx = RuntimeContext::new(ctx.fork(), &author, &tx_hash);
+
+            let TEMP_SERVICE_ID = 0;
+            let init_data = InstanceInitData {
+                instance_id: TEMP_SERVICE_ID,
+                constructor_data: arg.init_tx.init_data,
+            };
+
+            let _result = dispatcher.init_service(&mut runtime_ctx, artifact_spec, &init_data);
+        }
+
         Ok(())
     }
 }

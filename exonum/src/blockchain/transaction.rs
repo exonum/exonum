@@ -193,6 +193,7 @@ impl<'a> TransactionContext<'a> {
             author: raw_message.author(),
         }
     }
+
     /// Returns fork of current blockchain state.
     pub fn fork(&mut self) -> &mut Fork {
         self.fork
