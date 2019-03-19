@@ -55,16 +55,14 @@ impl Transaction for TxAfterCommit {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
 
 impl AfterCommitService {
     pub fn new() -> Self {
-        AfterCommitService {
-            counter: Arc::new(AtomicUsize::default()),
-        }
+        Self::default()
     }
 
     pub fn counter(&self) -> usize {
@@ -73,16 +71,16 @@ impl AfterCommitService {
 }
 
 impl Service for AfterCommitService {
+    fn service_id(&self) -> u16 {
+        SERVICE_ID
+    }
+
     fn service_name(&self) -> &str {
         "after_commit"
     }
 
     fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
         Vec::new()
-    }
-
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
