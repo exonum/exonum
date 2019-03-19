@@ -135,7 +135,7 @@ jobs:
     - rustup component add clippy
     - cargo clippy --version
     script:
-    - cargo clippy --all --tests -- -D warnings
+    - cargo clippy --all --tests --examples -- -D warnings
 
   # Benchmarks (compilation only).
   - name: benchmarks
