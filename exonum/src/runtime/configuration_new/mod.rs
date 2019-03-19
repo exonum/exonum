@@ -21,10 +21,11 @@ use crate::{
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
         dispatcher::Dispatcher,
-        RuntimeEnvironment, RuntimeContext, InstanceInitData, 
+        RuntimeEnvironment, ArtifactSpec, InstanceInitData, 
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
     },
+    storage::Fork,
 };
 use protobuf::well_known_types::Any;
 
@@ -60,6 +61,13 @@ pub struct ConfigurationServiceImpl {
     config: ConfigurationServiceConfig,
     // TODO: Change RefCell to something safer.
     dispatcher: RefCell<Dispatcher>,
+}
+
+impl ConfigurationServiceImpl {
+    pub fn get_service_id(&self, fork: &mut Fork, artifact_spec: &ArtifactSpec) -> u32 {
+        // TODO
+        0
+    }
 }
 
 impl ConfigurationService for ConfigurationServiceImpl {
@@ -154,17 +162,14 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
         let mut dispatcher = self.dispatcher.borrow_mut();
 
-        let author = ctx.author();
-        let tx_hash = ctx.tx_hash();
-        let mut runtime_ctx = RuntimeContext::new(ctx.fork(), &author, &tx_hash);
+        let instance_id = self.get_service_id(ctx.fork(), &artifact_spec);
 
-        let TEMP_SERVICE_ID = 0;
         let init_data = InstanceInitData {
-            instance_id: TEMP_SERVICE_ID,
+            instance_id,
             constructor_data: arg.init_data,
         };
 
-        let _result = dispatcher.init_service(&mut runtime_ctx, artifact_spec, &init_data);
+        let _result = dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data);
 
         // TODO return result.
 
@@ -191,17 +196,14 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
             let mut dispatcher = self.dispatcher.borrow_mut();
 
-            let author = ctx.author();
-            let tx_hash = ctx.tx_hash();
-            let mut runtime_ctx = RuntimeContext::new(ctx.fork(), &author, &tx_hash);
+            let instance_id = self.get_service_id(ctx.fork(), &artifact_spec);
 
-            let TEMP_SERVICE_ID = 0;
             let init_data = InstanceInitData {
-                instance_id: TEMP_SERVICE_ID,
+                instance_id,
                 constructor_data: arg.init_tx.init_data,
             };
 
-            let _result = dispatcher.init_service(&mut runtime_ctx, artifact_spec, &init_data);
+            let _result = dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data);
         }
 
         Ok(())

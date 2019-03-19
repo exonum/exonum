@@ -172,6 +172,10 @@ impl<'a, 'c> TransactionContext<'a, 'c> {
         }
     }
 
+    pub fn env_context(&mut self) -> &mut RuntimeContext<'c> {
+        self.env_context
+    }
+
     pub fn fork(&mut self) -> &mut Fork {
         self.env_context.fork
     }
