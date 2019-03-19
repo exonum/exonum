@@ -165,10 +165,12 @@ impl ConfigurationService for ConfigurationServiceImpl {
         let artifact_spec = arg.get_artifact_spec();
 
         let dispatcher = self.dispatcher.borrow();
-        let _result = dispatcher.start_deploy(artifact_spec);
+        dispatcher.start_deploy(artifact_spec).map_err(|err| {
+            error!("Service instance deploy failed: {:?}", err);
+            ServiceError::DeployError(err)
+        })?;
 
         // TODO add result into deployable (to check deploy status in before_commit).
-        // TODO return result.
 
         Ok(())
     }
@@ -178,21 +180,17 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
         let mut dispatcher = self.dispatcher.borrow_mut();
 
-        let instance_id = self.assign_service_id(ctx.fork(), &arg.instance_name);
-
-        if instance_id.is_none() {
-            // TODO return error
-            error!("Already assigned ID");
-        }
+        let instance_id = self.assign_service_id(ctx.fork(), &arg.instance_name).ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
         let init_data = InstanceInitData {
-            instance_id: instance_id.unwrap(),
+            instance_id,
             constructor_data: arg.constructor_data,
         };
 
-        let _result = dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data);
-
-        // TODO return result.
+        dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data).map_err(|err| {
+            error!("Service instance initialization failed: {:?}", err);
+            ServiceError::InitError(err)
+        })?;
 
         Ok(())
     }
@@ -203,13 +201,20 @@ impl ConfigurationService for ConfigurationServiceImpl {
         arg: transactions::DeployInit,
     ) -> Result<(), ExecutionError> {
 
+        // TODO reduce copy-paste.
+
         // Deploy
         {
             let artifact_spec = arg.deploy_tx.get_artifact_spec();
 
             let dispatcher = self.dispatcher.borrow();
-            let _result = dispatcher.start_deploy(artifact_spec);
+            dispatcher.start_deploy(artifact_spec).map_err(|err| {
+                error!("Service instance deploy failed: {:?}", err);
+                ServiceError::DeployError(err)
+            })?;
         }
+
+        // TODO check if artifact is deployed instantly.
 
         // Init
         {
@@ -217,19 +222,17 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
             let mut dispatcher = self.dispatcher.borrow_mut();
 
-            let instance_id = self.assign_service_id(ctx.fork(), &arg.init_tx.instance_name);
-
-            if instance_id.is_none() {
-                // TODO return error
-                error!("Already assigned ID");
-            }
+            let instance_id = self.assign_service_id(ctx.fork(), &arg.init_tx.instance_name).ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
             let init_data = InstanceInitData {
-                instance_id: instance_id.unwrap(),
+                instance_id,
                 constructor_data: arg.init_tx.constructor_data,
             };
 
-            let _result = dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data);
+            dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data).map_err(|err| {
+                error!("Service instance initialization failed: {:?}", err);
+                ServiceError::InitError(err)
+            })?;
         }
 
         Ok(())
