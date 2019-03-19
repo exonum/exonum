@@ -21,9 +21,9 @@ use crate::{
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
         dispatcher::Dispatcher,
-        error::{ExecutionError, WRONG_ARG_ERROR},
+        error::{ExecutionError, InitError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
-        InstanceInitData, RuntimeEnvironment,
+        DeployStatus, InstanceInitData, RuntimeEnvironment,
     },
     storage::{Fork, Snapshot},
 };
@@ -219,9 +219,15 @@ impl ConfigurationService for ConfigurationServiceImpl {
                 error!("Service instance deploy failed: {:?}", err);
                 ServiceError::DeployError(err)
             })?;
-        }
 
-        // TODO check if artifact is deployed instantly.
+            // Check if service is deployed.
+            let cancel_if_incomplete = true;
+            if dispatcher.check_deploy_status(artifact_spec, cancel_if_incomplete)?
+                != DeployStatus::Deployed
+            {
+                return Err(ServiceError::InitError(InitError::NotDeployed));
+            }
+        }
 
         // Init
         {

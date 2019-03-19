@@ -71,9 +71,13 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+    fn check_deploy_status(
+        &self,
+        artifact: ArtifactSpec,
+        cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError> {
         if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
-            runtime.check_deploy_status(artifact)
+            runtime.check_deploy_status(artifact, cancel_if_not_complete)
         } else {
             Err(DeployError::WrongRuntime)
         }

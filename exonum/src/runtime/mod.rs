@@ -78,7 +78,11 @@ pub trait RuntimeEnvironment {
     fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
     /// Check deployment status.
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>;
+    fn check_deploy_status(
+        &self,
+        artifact: ArtifactSpec,
+        cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError>;
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(

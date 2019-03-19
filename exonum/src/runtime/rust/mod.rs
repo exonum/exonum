@@ -93,7 +93,11 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+    fn check_deploy_status(
+        &self,
+        artifact: ArtifactSpec,
+        _cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError> {
         let artifact = self
             .get_artifact_spec(artifact)
             .ok_or(DeployError::WrongArtifact)?;
