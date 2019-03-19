@@ -28,6 +28,7 @@ counterintuitive
 cryptocurrency
 cryptographically
 ctrlc
+cyclomatic
 deadlinks
 deque
 deref
