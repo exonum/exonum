@@ -21,11 +21,11 @@ use crate::{
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
         dispatcher::Dispatcher,
-        RuntimeEnvironment, ArtifactSpec, InstanceInitData, 
+        RuntimeEnvironment, InstanceInitData, 
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
     },
-    storage::Fork,
+    storage::{Fork, Snapshot},
 };
 use protobuf::well_known_types::Any;
 
@@ -36,7 +36,7 @@ mod transactions;
 
 use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
-use schema::VotingDecision;
+use schema::{Schema as ConfigurationSchema, VotingDecision};
 use transactions::{enough_votes_to_commit, VotingContext};
 
 /// Service identifier for the configuration service.
@@ -64,9 +64,25 @@ pub struct ConfigurationServiceImpl {
 }
 
 impl ConfigurationServiceImpl {
-    pub fn get_service_id(&self, fork: &mut Fork, artifact_spec: &ArtifactSpec) -> u32 {
-        // TODO
-        0
+    fn assign_service_id(&self, fork: &mut Fork, instance_name: &String) -> Option<u32> {
+        let mut schema = ConfigurationSchema::new(fork);
+        let mut service_ids = schema.service_ids_mut();
+
+        if service_ids.contains(instance_name) {
+            return None;
+        }
+
+        let id = service_ids.iter().count() as u32; // TODO O(n) optimize
+        service_ids.put(instance_name, id);
+
+        Some(id)
+    }
+
+    pub fn get_id_for(&self, snapshot: &dyn Snapshot, instance_name: &String) -> Option<u32> {
+        let schema = ConfigurationSchema::new(snapshot);
+        let service_ids = schema.service_ids();
+
+        service_ids.get(instance_name)
     }
 }
 
@@ -162,11 +178,16 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
         let mut dispatcher = self.dispatcher.borrow_mut();
 
-        let instance_id = self.get_service_id(ctx.fork(), &artifact_spec);
+        let instance_id = self.assign_service_id(ctx.fork(), &arg.instance_name);
+
+        if instance_id.is_none() {
+            // TODO return error
+            error!("Already assigned ID");
+        }
 
         let init_data = InstanceInitData {
-            instance_id,
-            constructor_data: arg.init_data,
+            instance_id: instance_id.unwrap(),
+            constructor_data: arg.constructor_data,
         };
 
         let _result = dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data);
@@ -196,11 +217,16 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
             let mut dispatcher = self.dispatcher.borrow_mut();
 
-            let instance_id = self.get_service_id(ctx.fork(), &artifact_spec);
+            let instance_id = self.assign_service_id(ctx.fork(), &arg.init_tx.instance_name);
+
+            if instance_id.is_none() {
+                // TODO return error
+                error!("Already assigned ID");
+            }
 
             let init_data = InstanceInitData {
-                instance_id,
-                constructor_data: arg.init_tx.init_data,
+                instance_id: instance_id.unwrap(),
+                constructor_data: arg.init_tx.constructor_data,
             };
 
             let _result = dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data);

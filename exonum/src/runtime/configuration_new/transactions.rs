@@ -382,7 +382,8 @@ impl Deploy {
 pub struct Init {
     pub runtime_id: u32,
     pub artifact_spec: Any,
-    pub init_data: Any,
+    pub instance_name: String,
+    pub constructor_data: Any,
 }
 
 impl Init {

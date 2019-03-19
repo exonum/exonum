@@ -68,7 +68,8 @@ message DeployTx {
 message InitTx {
   uint32 runtime_id = 1;
   google.protobuf.Any artifact_spec = 2;
-  google.protobuf.Any init_data = 3;
+  string instance_name = 3;
+  google.protobuf.Any constructor_data = 4;
 }
 
 // Transaction for instant deploy and initialization of service.
