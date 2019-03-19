@@ -82,7 +82,7 @@ pub enum ErrorCode {
     /// Service instance name is already in use.
     ///
     /// Can be emitted by `Init` or `DeployInit`.
-    ServiceInstanceNameInUse = 98
+    ServiceInstanceNameInUse = 98,
 }
 
 // Common error types for `Propose` and `Vote`.

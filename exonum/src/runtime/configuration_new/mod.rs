@@ -21,9 +21,9 @@ use crate::{
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
         dispatcher::Dispatcher,
-        RuntimeEnvironment, InstanceInitData, 
         error::{ExecutionError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
+        InstanceInitData, RuntimeEnvironment,
     },
     storage::{Fork, Snapshot},
 };
@@ -175,22 +175,30 @@ impl ConfigurationService for ConfigurationServiceImpl {
         Ok(())
     }
 
-    fn init(&self, mut ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError> {
+    fn init(
+        &self,
+        mut ctx: TransactionContext,
+        arg: transactions::Init,
+    ) -> Result<(), ExecutionError> {
         let artifact_spec = arg.get_artifact_spec();
 
         let mut dispatcher = self.dispatcher.borrow_mut();
 
-        let instance_id = self.assign_service_id(ctx.fork(), &arg.instance_name).ok_or(ServiceError::ServiceInstanceNameInUse)?;
+        let instance_id = self
+            .assign_service_id(ctx.fork(), &arg.instance_name)
+            .ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
         let init_data = InstanceInitData {
             instance_id,
             constructor_data: arg.constructor_data,
         };
 
-        dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data).map_err(|err| {
-            error!("Service instance initialization failed: {:?}", err);
-            ServiceError::InitError(err)
-        })?;
+        dispatcher
+            .init_service(ctx.env_context(), artifact_spec, &init_data)
+            .map_err(|err| {
+                error!("Service instance initialization failed: {:?}", err);
+                ServiceError::InitError(err)
+            })?;
 
         Ok(())
     }
@@ -200,7 +208,6 @@ impl ConfigurationService for ConfigurationServiceImpl {
         mut ctx: TransactionContext,
         arg: transactions::DeployInit,
     ) -> Result<(), ExecutionError> {
-
         // TODO reduce copy-paste.
 
         // Deploy
@@ -222,17 +229,21 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
             let mut dispatcher = self.dispatcher.borrow_mut();
 
-            let instance_id = self.assign_service_id(ctx.fork(), &arg.init_tx.instance_name).ok_or(ServiceError::ServiceInstanceNameInUse)?;
+            let instance_id = self
+                .assign_service_id(ctx.fork(), &arg.init_tx.instance_name)
+                .ok_or(ServiceError::ServiceInstanceNameInUse)?;
 
             let init_data = InstanceInitData {
                 instance_id,
                 constructor_data: arg.init_tx.constructor_data,
             };
 
-            dispatcher.init_service(ctx.env_context(), artifact_spec, &init_data).map_err(|err| {
-                error!("Service instance initialization failed: {:?}", err);
-                ServiceError::InitError(err)
-            })?;
+            dispatcher
+                .init_service(ctx.env_context(), artifact_spec, &init_data)
+                .map_err(|err| {
+                    error!("Service instance initialization failed: {:?}", err);
+                    ServiceError::InitError(err)
+                })?;
         }
 
         Ok(())
