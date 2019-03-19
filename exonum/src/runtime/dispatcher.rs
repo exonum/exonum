@@ -17,12 +17,18 @@ use std::collections::HashMap;
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    RuntimeIdentifier, ServiceInstanceId,
+    ServiceInstanceId,
 };
 
 #[derive(Default)]
 pub struct DispatcherBuilder {
     runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+}
+
+impl std::fmt::Debug for DispatcherBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "DispatcherBuilder entity")
+    }
 }
 
 impl DispatcherBuilder {
@@ -128,10 +134,9 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{rust::RustArtifactSpec, MethodId};
     use super::*;
+    use crate::runtime::{MethodId, RuntimeIdentifier};
     use crate::storage::{Database, MemoryDB};
-    use semver::Version;
 
     struct SampleRuntime {
         pub runtime_type: u32,
@@ -158,7 +163,7 @@ mod tests {
             }
         }
 
-        fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
+        fn check_deploy_status(&self, artifact: ArtifactSpec, _: bool) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(DeployStatus::Deployed)
             } else {
@@ -260,13 +265,13 @@ mod tests {
         // Check deploy status
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone())
+                .check_deploy_status(sample_rust_spec.clone(), false)
                 .unwrap(),
             DeployStatus::Deployed
         );
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_java_spec.clone())
+                .check_deploy_status(sample_java_spec.clone(), false)
                 .unwrap(),
             DeployStatus::Deployed
         );
@@ -352,7 +357,7 @@ mod tests {
 
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone())
+                .check_deploy_status(sample_rust_spec.clone(), false)
                 .expect_err("check_deploy_status succeed"),
             DeployError::WrongRuntime
         );

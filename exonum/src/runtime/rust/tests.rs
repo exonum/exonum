@@ -117,7 +117,7 @@ fn test_basic_rust_runtime() {
     // Deploy service
     assert!(runtime.start_deploy(artifact.clone()).is_ok());
     assert_eq!(
-        runtime.check_deploy_status(artifact.clone()).unwrap(),
+        runtime.check_deploy_status(artifact.clone(), false).unwrap(),
         DeployStatus::Deployed
     );
 

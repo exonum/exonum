@@ -215,17 +215,17 @@ impl ConfigurationService for ConfigurationServiceImpl {
             let artifact_spec = arg.deploy_tx.get_artifact_spec();
 
             let dispatcher = self.dispatcher.borrow();
-            dispatcher.start_deploy(artifact_spec).map_err(|err| {
+            dispatcher.start_deploy(artifact_spec.clone()).map_err(|err| {
                 error!("Service instance deploy failed: {:?}", err);
                 ServiceError::DeployError(err)
             })?;
 
             // Check if service is deployed.
             let cancel_if_incomplete = true;
-            if dispatcher.check_deploy_status(artifact_spec, cancel_if_incomplete)?
+            if dispatcher.check_deploy_status(artifact_spec, cancel_if_incomplete).map_err(|err| ServiceError::DeployError(err))?
                 != DeployStatus::Deployed
             {
-                return Err(ServiceError::InitError(InitError::NotDeployed));
+                return Err(ServiceError::InitError(InitError::NotDeployed))?;
             }
         }
 
