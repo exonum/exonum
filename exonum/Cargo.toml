@@ -50,7 +50,7 @@ failure = "0.1.5"
 os_info = "1.0.1"
 chrono = { version = "0.4.6", features = ["serde"] }
 uuid = { version = "0.7.1", features = ["serde"] }
-snow = "0.5.2"
+snow = { version = "0.5.2", default-features = false }
 rust_decimal = "0.11.2"
 protobuf = { version = "2.4.0", features = ["with-serde"] }
 ctrlc = "3.1.1"

@@ -18,7 +18,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use rand::{thread_rng, CryptoRng, Error, RngCore};
 use snow::{
     params::{CipherChoice, DHChoice, HashChoice},
-    resolvers::{CryptoResolver, DefaultResolver},
+    resolvers::CryptoResolver,
     types::{Cipher, Dh, Hash, Random},
 };
 
@@ -30,21 +30,12 @@ use crate::sodiumoxide::crypto::{
     aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
-pub struct SodiumResolver {
-    parent: DefaultResolver,
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SodiumResolver;
 
 impl SodiumResolver {
     pub fn new() -> Self {
-        Self {
-            parent: DefaultResolver,
-        }
-    }
-}
-
-impl Default for SodiumResolver {
-    fn default() -> Self {
-        Self::new()
+        Self::default()
     }
 }
 
@@ -56,21 +47,21 @@ impl CryptoResolver for SodiumResolver {
     fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
-            _ => self.parent.resolve_dh(choice),
+            _ => None,
         }
     }
 
     fn resolve_hash(&self, choice: &HashChoice) -> Option<Box<dyn Hash>> {
         match *choice {
             HashChoice::SHA256 => Some(Box::new(SodiumSha256::default())),
-            _ => self.parent.resolve_hash(choice),
+            _ => None,
         }
     }
 
     fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher>> {
         match *choice {
             CipherChoice::ChaChaPoly => Some(Box::new(SodiumChaChaPoly::default())),
-            _ => self.parent.resolve_cipher(choice),
+            _ => None,
         }
     }
 }

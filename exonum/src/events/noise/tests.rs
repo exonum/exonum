@@ -32,9 +32,9 @@ use crate::crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH}
 use crate::events::{
     error::into_failure,
     noise::{
-        wrappers::sodium_wrapper::resolver::SodiumDh25519, Handshake, HandshakeParams,
-        HandshakeRawMessage, HandshakeResult, NoiseHandshake, NoiseWrapper, HEADER_LENGTH,
-        MAX_MESSAGE_LENGTH,
+        wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
+        Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+        NoiseWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
     },
     tests::raw_message,
 };
@@ -83,13 +83,13 @@ fn noise_converted_keys_handshake() {
     let (_, secret_key_i) = into_x25519_keypair(public_key_i, secret_key_i).unwrap();
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
-    let mut h_i = Builder::new(PATTERN.parse().unwrap())
+    let mut h_i = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
         .local_private_key(secret_key_i.as_ref())
         .remote_public_key(public_key_r.as_ref())
         .build_initiator()
         .expect("Unable to create initiator");
 
-    let mut h_r = Builder::new(PATTERN.parse().unwrap())
+    let mut h_r = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
         .local_private_key(secret_key_r.as_ref())
         .build_responder()
         .expect("Unable to create responder");
