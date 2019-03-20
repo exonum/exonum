@@ -230,6 +230,13 @@ impl WorkingPatch {
         }
     }
 
+    pub fn clear(&self, address: &IndexAddress) {
+        let mut changes = self.changes.borrow_mut();
+        let change = changes.entry(address.clone());
+
+        change.and_modify(|v| *v = None);
+    }
+
     // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
@@ -388,7 +395,8 @@ pub enum Change {
 /// [`rollback`]: #method.rollback
 pub struct Fork {
     flushed: FlushedFork,
-    working_patch: WorkingPatch,
+    pub working_patch: WorkingPatch,
+    pub pool_length: RefCell<u16>,
 }
 
 struct FlushedFork {
@@ -456,6 +464,7 @@ pub trait Database: Send + Sync + 'static {
                 patch: Patch::new(),
             },
             working_patch: WorkingPatch::new(),
+            pool_length: RefCell::new(0),
         }
     }
 

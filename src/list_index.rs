@@ -37,7 +37,8 @@ use crate::{
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ListIndex<T: IndexAccess, V> {
-    base: View<T>,
+    //TODO: revert to private
+    pub base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
 }
@@ -133,7 +134,7 @@ where
     }
 
     pub fn create_from_view(view: View<T>) -> Self {
-        let (base, state) = IndexBuilder::from_view(view)
+        let (base, state) = IndexBuilder::for_view(view)
             .index_type(IndexType::List)
             .build();
 
@@ -145,7 +146,7 @@ where
     }
 
     pub fn get_from_view(view: View<T>) -> Option<Self> {
-        IndexBuilder::from_view(view)
+        IndexBuilder::for_view(view)
             .index_type(IndexType::List)
             .build_existed()
             .map(|(base, state)| Self {

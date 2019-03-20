@@ -105,7 +105,7 @@ where
     }
 
     ///TODO: add docs
-    pub fn from_view(view: View<T>) -> Self {
+    pub fn for_view(view: View<T>) -> Self {
         Self {
             address: view.address,
             index_access: view.index_access,
@@ -314,12 +314,6 @@ impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
 
     fn changes(&self, _: &IndexAddress) -> Self::Changes {}
 }
-
-//impl fmt::Debug for IndexAddress {
-//    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//        f.debug_tuple("IndexAddress").field(&self.name).field(&self.bytes).finish()
-//    }
-//}
 
 fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)

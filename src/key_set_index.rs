@@ -33,7 +33,7 @@ use crate::{
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T: IndexAccess, K> {
-    base: View<T>,
+    pub base: View<T>,
     _k: PhantomData<K>,
 }
 
@@ -126,7 +126,7 @@ where
     }
 
     pub fn get_from_view(view: View<T>) -> Option<Self> {
-        IndexBuilder::from_view(view)
+        IndexBuilder::for_view(view)
             .index_type(IndexType::KeySet)
             .build_existed::<()>()
             .map(|(base, _state)| Self {
@@ -136,12 +136,8 @@ where
     }
 
     pub fn create_from_view(view: View<T>) -> Self {
-        let (base, _state) = IndexBuilder::from_view(view)
-            .index_type(IndexType::KeySet)
-            .build::<()>();
-
         Self {
-            base,
+            base: view,
             _k: PhantomData,
         }
     }

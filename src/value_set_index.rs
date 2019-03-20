@@ -139,7 +139,7 @@ where
     }
 
     pub fn get_from_view(view: View<T>) -> Option<Self> {
-        IndexBuilder::from_view(view)
+        IndexBuilder::for_view(view)
             .index_type(IndexType::ValueSet)
             .build_existed::<()>()
             .map(|(base, _state)| Self {
@@ -149,7 +149,7 @@ where
     }
 
     pub fn create_from_view(view: View<T>) -> Self {
-        let (base, _state) = IndexBuilder::from_view(view)
+        let (base, _state) = IndexBuilder::for_view(view)
             .index_type(IndexType::ValueSet)
             .build::<()>();
 

@@ -167,12 +167,8 @@ impl IndexAddress {
     }
 }
 
-/// Returns index metadata based on provided `index_address` and `index_type`.
-///
-/// Creates new metadata if it doesn't exists.
-///
-/// Input `index_address` is replaced by output `index_address` based on value
-/// taken from indexes pool.
+/// TODO Add documentation. [ECR-2820]
+//TODO: revert to private
 pub fn index_metadata<T, V>(
     index_access: T,
     index_address: &IndexAddress,
@@ -185,7 +181,7 @@ where
     let index_name = index_address.fully_qualified_name();
 
     let mut pool = IndexesPool::new(index_access);
-    let (metadata, new) = if let Some(metadata) = pool.index_metadata(&index_name) {
+    let (metadata, is_new) = if let Some(metadata) = pool.index_metadata(&index_name) {
         assert_eq!(
             metadata.index_type, index_type,
             "Index type doesn't match specified"
@@ -196,7 +192,7 @@ where
     };
 
     let index_address = metadata.index_address();
-    let index_state = IndexState::new(index_access, index_name, metadata, new);
+    let index_state = IndexState::new(index_access, index_name, metadata, is_new);
     (index_address, index_state)
 }
 
@@ -256,7 +252,7 @@ where
     index_access: T,
     index_name: Vec<u8>,
     cache: Cell<IndexMetadata<V>>,
-    new: bool,
+    is_new: bool,
 }
 
 impl<T, V> IndexState<T, V>
@@ -264,12 +260,12 @@ where
     V: BinaryAttribute + Default + Copy,
     T: IndexAccess,
 {
-    fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>, new: bool) -> Self {
+    fn new(index_access: T, index_name: Vec<u8>, metadata: IndexMetadata<V>, is_new: bool) -> Self {
         Self {
             index_access,
             index_name,
             cache: Cell::new(metadata),
-            new,
+            is_new,
         }
     }
 
@@ -286,7 +282,11 @@ where
             .put(&self.index_name, cache.to_bytes());
     }
 
-    /// Clear stored index metadata.
+    pub fn is_new(&self) -> bool {
+        self.is_new
+    }
+
+    /// TODO Add documentation. [ECR-2820]
     pub fn clear(&mut self) {
         self.set(V::default());
     }

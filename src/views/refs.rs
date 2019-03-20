@@ -15,10 +15,43 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    views::{IndexAddress, View},
+    views::{ChangeSet, IndexAddress, View, IndexType, metadata::index_metadata},
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, Snapshot,
 };
+
+pub trait AnyObject<T: IndexAccess> {
+    fn view(self) -> View<T>;
+    fn object_type(&self) -> IndexType;
+}
+
+impl<T, V> AnyObject<T> for ListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::List
+    }
+}
+
+impl<T, K> AnyObject<T> for KeySetIndex<T, K>
+where
+    T: IndexAccess,
+    K: BinaryKey,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::KeySet
+    }
+}
 
 pub trait FromView<T: IndexAccess>
 where
@@ -120,7 +153,7 @@ where
 pub trait ObjectAccess: IndexAccess {
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self>;
 
-    fn get<I, T>(&self, address: I) -> Option<Ref<T>>
+    fn get_object<I, T>(&self, address: I) -> Option<Ref<T>>
     where
         I: Into<IndexAddress>,
         T: FromView<Self>,
@@ -139,17 +172,20 @@ impl ObjectAccess for &Box<dyn Snapshot> {
 
 impl Fork {
     ///TODO: add documentation [ECR-2820]
-    pub fn create_root_object<'a, T, I>(&'a self, address: I) -> T
+    pub fn create_object<'a, T>(&'a self) -> T
     where
         T: FromView<&'a Self>,
-        I: Into<IndexAddress>,
     {
+        let mut pool_length = self.pool_length.borrow_mut();
+        let address = IndexAddress::with_root("temp").append_bytes(&pool_length.clone());
+        *pool_length += 1;
         let view = View::new(self, address);
+        //TODO: don't create redundant metadata
         T::create(view)
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn get<'a, T, I>(&'a self, address: I) -> Option<Ref<T>>
+    pub fn get_object<'a, T, I>(&'a self, address: I) -> Option<Ref<T>>
     where
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
@@ -159,14 +195,29 @@ impl Fork {
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn get_mut<'a, T, I>(&'a self, address: I) -> Option<RefMut<T>>
+    pub fn get_object_mut<'a, T, I>(&'a self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
     {
         let view = View::new(self, address);
-        //TODO: remove unwrap
         T::get(view).map(|value| RefMut { value })
+    }
+
+    pub fn insert<I: Into<IndexAddress>, T: IndexAccess, A: AnyObject<T>>(
+        &self,
+        address: I,
+        object: A,
+    ) {
+        let index_type = object.object_type();
+        let view = object.view();
+        let (new_address, _state) = index_metadata::<_, u64>(self, &address.into(), index_type);
+        self.working_patch.clear(&view.address);
+
+        let mut changes = self.working_patch.changes_mut(&new_address);
+        let view_changes = view.changes.as_ref().unwrap().clone();
+
+        changes.data.extend(view_changes.data);
     }
 }
 
@@ -209,7 +260,7 @@ mod tests {
     use crate::{
         db::Database,
         views::refs::{ObjectAccess, Ref, RefMut},
-        ListIndex, TemporaryDB,
+        KeySetIndex, ListIndex, TemporaryDB,
     };
 
     #[test]
@@ -217,14 +268,15 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut index: ListIndex<_, u32> = fork.create_root_object("index");
+            let mut index: ListIndex<_, u32> = fork.create_object();
             index.push(1);
+            fork.insert("index", index);
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let index: Ref<ListIndex<_, u32>> = snapshot.get("index").unwrap();
+        let index: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
 
         assert_eq!(index.get(0), Some(1));
     }
@@ -233,7 +285,7 @@ mod tests {
     fn get_non_existent_index() {
         let db = TemporaryDB::new();
         let snapshot = &db.snapshot();
-        let index: Option<Ref<ListIndex<_, u32>>> = snapshot.get("index");
+        let index: Option<Ref<ListIndex<_, u32>>> = snapshot.get_object("index");
 
         assert!(index.is_none());
     }
@@ -243,22 +295,46 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let _list: ListIndex<_, u32> = fork.create_root_object("index");
+            let list: ListIndex<_, u32> = fork.create_object();
+            fork.insert("index", list);
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let fork = db.fork();
         {
-            let mut list: RefMut<ListIndex<_, u32>> = fork.get_mut("index").unwrap();
+            let mut list: RefMut<ListIndex<_, u32>> = fork.get_object_mut("index").unwrap();
             list.push(1);
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let list: Ref<ListIndex<_, u32>> = snapshot.get("index").unwrap();
+        let list: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
 
         assert_eq!(list.get(0), Some(1));
     }
+
+    #[test]
+    fn fork_multiple_insert() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut index1: KeySetIndex<_, u32> = fork.create_object();
+            let mut index2: KeySetIndex<_, u32> = fork.create_object();
+            index1.insert(1);
+            index2.insert(2);
+            fork.insert("index1", index1);
+            fork.insert("index2", index2);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = &db.snapshot();
+        let index1: Ref<KeySetIndex<_, u32>> = snapshot.get_object("index1").unwrap();
+        let index2: Ref<KeySetIndex<_, u32>> = snapshot.get_object("index2").unwrap();
+
+        dbg!(index1.contains(&1));
+        dbg!(index2.contains(&2));
+    }
+
 }

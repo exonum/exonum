@@ -257,7 +257,7 @@ where
     }
 
     pub fn get_from_view(view: View<T>) -> Option<Self> {
-        IndexBuilder::from_view(view)
+        IndexBuilder::for_view(view)
             .index_type(IndexType::ProofMap)
             .build_existed()
             .map(|(base, state)| Self {
@@ -269,7 +269,7 @@ where
     }
 
     pub fn create_from_view(view: View<T>) -> Self {
-        let (base, state) = IndexBuilder::from_view(view)
+        let (base, state) = IndexBuilder::for_view(view)
             .index_type(IndexType::ProofMap)
             .build();
 
