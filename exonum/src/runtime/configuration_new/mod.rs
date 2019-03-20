@@ -182,7 +182,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
     ) -> Result<(), ExecutionError> {
         let artifact_spec = arg.get_artifact_spec();
 
-        let mut dispatcher = self.dispatcher.borrow_mut();
+        let dispatcher = self.dispatcher.borrow();
 
         let instance_id = self
             .assign_service_id(ctx.fork(), &arg.instance_name)
@@ -233,7 +233,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         {
             let artifact_spec = arg.init_tx.get_artifact_spec();
 
-            let mut dispatcher = self.dispatcher.borrow_mut();
+            let dispatcher = self.dispatcher.borrow();
 
             let instance_id = self
                 .assign_service_id(ctx.fork(), &arg.init_tx.instance_name)

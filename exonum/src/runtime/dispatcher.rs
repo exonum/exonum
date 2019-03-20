@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::cell::RefCell;
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
@@ -46,7 +47,8 @@ impl DispatcherBuilder {
 #[derive(Default)]
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
-    runtime_lookup: HashMap<ServiceInstanceId, u32>,
+    // TODO Is RefCell enough here?
+    runtime_lookup: RefCell<HashMap<ServiceInstanceId, u32>>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -59,12 +61,12 @@ impl Dispatcher {
     pub fn new(runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>) -> Self {
         Self {
             runtimes,
-            runtime_lookup: Default::default(),
+            runtime_lookup: RefCell::new(Default::default()),
         }
     }
 
-    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
-        self.runtime_lookup.insert(service_id, artifact.runtime_id);
+    fn notify_service_started(&self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
+        self.runtime_lookup.borrow_mut().insert(service_id, artifact.runtime_id);
     }
 }
 
@@ -90,12 +92,12 @@ impl RuntimeEnvironment for Dispatcher {
     }
 
     fn init_service(
-        &mut self,
+        &self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
+        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
             let result = runtime.init_service(ctx, artifact.clone(), init);
             if result.is_ok() {
                 self.notify_service_started(init.instance_id.clone(), artifact);
@@ -112,7 +114,8 @@ impl RuntimeEnvironment for Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
+        let lookup = self.runtime_lookup.borrow();
+        let runtime_id = lookup.get(&call_info.instance_id);
 
         if runtime_id.is_none() {
             return Err(ExecutionError::with_description(
@@ -172,7 +175,7 @@ mod tests {
         }
 
         fn init_service(
-            &mut self,
+            &self,
             _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
@@ -240,7 +243,7 @@ mod tests {
             JAVA_METHOD_ID,
         ));
 
-        let mut dispatcher = DispatcherBuilder::default()
+        let dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
@@ -340,7 +343,7 @@ mod tests {
         // Create dispatcher and test data.
         let db = MemoryDB::new();
 
-        let mut dispatcher = DispatcherBuilder::default().finalize();
+        let dispatcher = DispatcherBuilder::default().finalize();
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,

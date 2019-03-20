@@ -111,7 +111,7 @@ fn test_basic_rust_runtime() {
 
     let service = Box::new(TestServiceImpl);
 
-    let mut runtime = RustRuntime::default();
+    let runtime = RustRuntime::default();
     runtime.add_service(rust_artifact.clone(), service);
 
     // Deploy service

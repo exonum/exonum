@@ -112,7 +112,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn init_service(
-        &mut self,
+        &self,
         context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,

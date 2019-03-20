@@ -86,7 +86,7 @@ pub trait RuntimeEnvironment {
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
-        &mut self,
+        &self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
