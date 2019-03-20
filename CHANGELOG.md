@@ -10,7 +10,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - Added `service_name` getter to the `TransactionContext`. (#1274)
-- Allowed to use symbol `-` in index names. (#1275)
+- Allowed to use symbol `-` in index names. (#1277)
 
 ## 0.11.0 - 2019-03-15
 

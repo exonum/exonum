@@ -348,8 +348,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
+    #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _-")]
     fn check_invalid_name() {
-        assert_valid_name("invalid-name");
+        assert_valid_name("invalid name");
     }
 }
