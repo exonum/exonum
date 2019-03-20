@@ -308,7 +308,7 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
 /// and underscores.
 fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref().as_bytes().iter().all(|c| match *c {
-        48..=57 | 65..=90 | 97..=122 | 95 | 46 => true,
+        48..=57 | 65..=90 | 97..=122 | 95 | 45 | 46 => true,
         _ => false,
     })
 }
@@ -316,7 +316,7 @@ fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
 /// Calls the `is_valid_name` function with the given name and panics if it returns `false`.
 fn assert_valid_name<S: AsRef<str>>(name: S) {
     if !is_valid_name(name) {
-        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
+        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _-");
     }
 }
 
@@ -333,13 +333,13 @@ mod tests {
         assert!(is_valid_name("core.index_name1Z"));
         assert!(is_valid_name("configuration.indeX_1namE"));
         assert!(is_valid_name("1index_Namez"));
+        assert!(is_valid_name("index-name"));
+        assert!(is_valid_name("_index-name"));
 
-        assert!(!is_valid_name("index-name"));
-        assert!(!is_valid_name("_index-name"));
         assert!(!is_valid_name("индекс_name_"));
-        assert!(!is_valid_name("core.index_имя3"));
-        assert!(!is_valid_name("indeX_1namE-"));
-        assert!(!is_valid_name("1in!dex_Namez"));
+        assert!(!is_valid_name(";core.index_имя3"));
+        assert!(!is_valid_name("*indeX_1namE-"));
+        assert!(!is_valid_name("(1in!dex_Namez"));
     }
 
     #[test]
@@ -348,8 +348,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
+    #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _-")]
     fn check_invalid_name() {
-        assert_valid_name("invalid-name");
+        assert_valid_name("invalid name");
     }
 }
