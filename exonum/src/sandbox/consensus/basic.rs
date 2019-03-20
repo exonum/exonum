@@ -67,10 +67,10 @@ fn test_check_leader() {
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(1),
         &sandbox.last_block().hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 
     sandbox.send_peers_request();
@@ -119,7 +119,7 @@ fn test_reach_actual_round() {
         Round(4),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.assert_state(Height(1), Round(1));
@@ -131,7 +131,7 @@ fn test_reach_actual_round() {
         Round(4),
         &block_at_first_height.clone().hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
 
     sandbox.assert_state(Height(1), Round(4));

@@ -173,23 +173,23 @@ impl Sandbox {
         end_index: usize,
     ) {
         let connect = self.create_connect(
-            &self.p(ValidatorId(0)),
-            self.a(ValidatorId(0)),
+            &self.public_key(ValidatorId(0)),
+            self.address(ValidatorId(0)),
             connect_message_time.into(),
             &user_agent::get(),
-            self.s(ValidatorId(0)),
+            self.secret_key(ValidatorId(0)),
         );
 
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
             self.recv(&self.create_connect(
-                &self.p(validator),
-                self.a(validator),
+                &self.public_key(validator),
+                self.address(validator),
                 self.time().into(),
                 &user_agent::get(),
-                self.s(validator),
+                self.secret_key(validator),
             ));
-            self.send(self.p(validator), &connect);
+            self.send(self.public_key(validator), &connect);
         }
 
         self.check_unexpected_message();
@@ -197,21 +197,21 @@ impl Sandbox {
     }
 
     fn check_unexpected_message(&self) {
-        if let Some((addr, msg)) = self.pop_sent() {
+        if let Some((addr, msg)) = self.pop_sent_message() {
             panic!("Send unexpected message {:?} to {}", msg, addr);
         }
     }
 
-    pub fn p(&self, id: ValidatorId) -> PublicKey {
+    pub fn public_key(&self, id: ValidatorId) -> PublicKey {
         self.validators()[id.0 as usize]
     }
 
-    pub fn s(&self, id: ValidatorId) -> &SecretKey {
-        let p = self.p(id);
+    pub fn secret_key(&self, id: ValidatorId) -> &SecretKey {
+        let p = self.public_key(id);
         &self.validators_map[&p]
     }
 
-    pub fn a(&self, id: ValidatorId) -> String {
+    pub fn address(&self, id: ValidatorId) -> String {
         let id: usize = id.into();
         self.addresses[id].address.clone()
     }
@@ -298,7 +298,7 @@ impl Sandbox {
     ) -> Signed<Propose> {
         Message::concrete(
             Propose::new(validator_id, height, round, last_hash, tx_hashes),
-            self.p(validator_id),
+            self.public_key(validator_id),
             secret_key,
         )
     }
@@ -324,7 +324,7 @@ impl Sandbox {
                 block_hash,
                 system_time,
             ),
-            self.p(validator_id),
+            self.public_key(validator_id),
             secret_key,
         )
     }
@@ -347,7 +347,7 @@ impl Sandbox {
                 &propose_hash,
                 locked_round,
             ),
-            self.p(validator_id),
+            self.public_key(validator_id),
             secret_key,
         )
     }
@@ -424,10 +424,6 @@ impl Sandbox {
             .collect()
     }
 
-    pub fn n_validators(&self) -> usize {
-        self.validators().len()
-    }
-
     #[allow(clippy::let_and_return)]
     pub fn time(&self) -> SystemTime {
         let inner = self.inner.borrow();
@@ -480,15 +476,14 @@ impl Sandbox {
         self.inner.borrow_mut().process_events();
     }
 
-    pub fn pop_sent(&self) -> Option<(PublicKey, Message)> {
+    pub fn pop_sent_message(&self) -> Option<(PublicKey, Message)> {
         self.inner.borrow_mut().sent.pop_front()
     }
 
     pub fn send<T: ProtocolMessage>(&self, key: PublicKey, msg: &Signed<T>) {
         let expected_msg = T::into_protocol(msg.clone());
         self.process_events();
-        let send = self.pop_sent();
-        if let Some((real_addr, real_msg)) = send {
+        if let Some((real_addr, real_msg)) = self.pop_sent_message() {
             assert_eq!(expected_msg, real_msg, "Expected to send other message");
             assert_eq!(
                 key, real_addr,
@@ -504,15 +499,14 @@ impl Sandbox {
 
     pub fn send_peers_request(&self) {
         self.process_events();
-        let send = self.pop_sent();
 
-        if let Some((addr, msg)) = send {
+        if let Some((addr, msg)) = self.pop_sent_message() {
             let peers_request =
                 PeersRequest::try_from(msg).expect("Incorrect message. PeersRequest was expected");
 
             let id = self.addresses.iter().position(|ref a| a.public_key == addr);
             if let Some(id) = id {
-                assert_eq!(&self.p(ValidatorId(id as u16)), peers_request.to());
+                assert_eq!(&self.public_key(ValidatorId(id as u16)), peers_request.to());
             } else {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
             }
@@ -551,8 +545,7 @@ impl Sandbox {
         let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
         for _ in 0..expected_set.len() {
-            let send = self.pop_sent();
-            if let Some((real_addr, real_msg)) = send {
+            if let Some((real_addr, real_msg)) = self.pop_sent_message() {
                 assert_eq!(
                     expected_msg,
                     real_msg.signed_message(),
@@ -809,7 +802,7 @@ impl Sandbox {
                 c.pub_addr().parse().expect("Expected resolved address"),
                 time.into(),
                 c.user_agent(),
-                self.s(ValidatorId(0)),
+                self.secret_key(ValidatorId(0)),
             )
         });
         let sandbox = self.restart_uninitialized_with_time(time);
@@ -834,7 +827,7 @@ impl Sandbox {
         let api_channel = mpsc::channel(100);
 
         let address: SocketAddr = self
-            .a(ValidatorId(0))
+            .address(ValidatorId(0))
             .parse()
             .expect("Fail to parse socket address");
         let inner = self.inner.borrow();
@@ -1258,11 +1251,11 @@ mod tests {
         s.send(
             public,
             &s.create_connect(
-                &s.p(ValidatorId(0)),
-                s.a(ValidatorId(0)),
+                &s.public_key(ValidatorId(0)),
+                s.address(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(ValidatorId(0)),
+                s.secret_key(ValidatorId(0)),
             ),
         );
     }
@@ -1282,13 +1275,13 @@ mod tests {
     fn test_sandbox_expected_to_send_but_nothing_happened() {
         let s = timestamping_sandbox();
         s.send(
-            s.p(ValidatorId(1)),
+            s.public_key(ValidatorId(1)),
             &s.create_connect(
-                &s.p(ValidatorId(0)),
-                s.a(ValidatorId(0)),
+                &s.public_key(ValidatorId(0)),
+                s.address(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(ValidatorId(0)),
+                s.secret_key(ValidatorId(0)),
             ),
         );
     }
@@ -1307,19 +1300,19 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,
-            s.a(ValidatorId(2)),
+            s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.send(
-            s.p(ValidatorId(1)),
+            s.public_key(ValidatorId(1)),
             &s.create_connect(
-                &s.p(ValidatorId(0)),
-                s.a(ValidatorId(0)),
+                &s.public_key(ValidatorId(0)),
+                s.address(ValidatorId(0)),
                 s.time().into(),
                 &user_agent::get(),
-                s.s(ValidatorId(0)),
+                s.secret_key(ValidatorId(0)),
             ),
         );
     }
@@ -1338,7 +1331,7 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,
-            s.a(ValidatorId(2)),
+            s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1359,14 +1352,14 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,
-            s.a(ValidatorId(2)),
+            s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.recv(&s.create_connect(
             &public,
-            s.a(ValidatorId(3)),
+            s.address(ValidatorId(3)),
             s.time().into(),
             &user_agent::get(),
             &secret,
@@ -1388,7 +1381,7 @@ mod tests {
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,
-            s.a(ValidatorId(2)),
+            s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent::get(),
             &secret,

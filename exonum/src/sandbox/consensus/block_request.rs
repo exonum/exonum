@@ -49,7 +49,7 @@ fn handle_block_response_tx_in_pool() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -58,7 +58,7 @@ fn handle_block_response_tx_in_pool() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -67,43 +67,43 @@ fn handle_block_response_tx_in_pool() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
     sandbox.recv(&tx);
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -136,7 +136,7 @@ fn handle_block_response_with_unknown_tx() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -145,7 +145,7 @@ fn handle_block_response_with_unknown_tx() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -154,60 +154,60 @@ fn handle_block_response_with_unknown_tx() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_transactions_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         vec![tx.clone()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -239,7 +239,7 @@ fn handle_block_response_with_invalid_txs_order() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -248,7 +248,7 @@ fn handle_block_response_with_invalid_txs_order() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -257,35 +257,35 @@ fn handle_block_response_with_invalid_txs_order() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     // Invalid transactions order.
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx2.hash(), tx1.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(1), Round(1));
@@ -320,7 +320,7 @@ fn handle_block_response_with_invalid_precommits() {
         &propose.hash(),
         &block1.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -329,7 +329,7 @@ fn handle_block_response_with_invalid_precommits() {
         &propose.hash(),
         &block1.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     // Precommit with invalid block hash.
     let precommit_for_other_block = sandbox.create_precommit(
@@ -339,35 +339,35 @@ fn handle_block_response_with_invalid_precommits() {
         &propose.hash(),
         &block2.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block1.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
     sandbox.recv(&tx);
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block1.clone(),
         vec![precommit_1, precommit_2, precommit_for_other_block],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(1), Round(1));
@@ -406,7 +406,7 @@ fn handle_block_response_with_known_transaction() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -415,7 +415,7 @@ fn handle_block_response_with_known_transaction() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -424,60 +424,60 @@ fn handle_block_response_with_known_transaction() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx1.hash(), tx2.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             &[tx2.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_transactions_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         vec![tx2.clone()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -513,7 +513,7 @@ fn handle_block_response_with_all_known_transactions() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -522,7 +522,7 @@ fn handle_block_response_with_all_known_transactions() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -531,42 +531,42 @@ fn handle_block_response_with_all_known_transactions() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx1.hash(), tx2.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -599,10 +599,10 @@ fn received_block_while_there_is_full_propose() {
         .build();
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     let precommit_1 = sandbox.create_precommit(
@@ -612,7 +612,7 @@ fn received_block_while_there_is_full_propose() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -621,7 +621,7 @@ fn received_block_while_there_is_full_propose() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -630,28 +630,28 @@ fn received_block_while_there_is_full_propose() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.recv(&propose);
@@ -659,39 +659,39 @@ fn received_block_while_there_is_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.p(ValidatorId(2)),
+        sandbox.public_key(ValidatorId(2)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(2)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_transactions_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         vec![tx.clone()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -719,10 +719,10 @@ fn received_block_while_there_is_pending_block() {
         .build();
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     let precommit_1 = sandbox.create_precommit(
@@ -732,7 +732,7 @@ fn received_block_while_there_is_pending_block() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -741,7 +741,7 @@ fn received_block_while_there_is_pending_block() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -750,24 +750,24 @@ fn received_block_while_there_is_pending_block() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![
             precommit_1.clone(),
@@ -775,42 +775,42 @@ fn received_block_while_there_is_pending_block() {
             precommit_3.clone(),
         ],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_transactions_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         vec![tx.clone()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -844,17 +844,17 @@ fn transactions_request_to_multiple_nodes() {
         .build();
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(2)),
+        &sandbox.public_key(ValidatorId(2)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
 
     sandbox.recv(&sandbox.create_status(
-        &sandbox.p(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(3)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     let precommit_1 = sandbox.create_precommit(
@@ -864,7 +864,7 @@ fn transactions_request_to_multiple_nodes() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -873,7 +873,7 @@ fn transactions_request_to_multiple_nodes() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -882,64 +882,64 @@ fn transactions_request_to_multiple_nodes() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
 
     sandbox.send(
-        sandbox.p(ValidatorId(2)),
+        sandbox.public_key(ValidatorId(2)),
         &sandbox.create_block_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(2)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(2)),
             Height(1),
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_block_response(
-        &sandbox.p(ValidatorId(3)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(3)),
+        &sandbox.public_key(ValidatorId(0)),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
         &[tx.hash()],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(2)),
+        sandbox.public_key(ValidatorId(2)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(2)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(2)),
             &[tx.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(3)),
         &sandbox.create_transactions_request(
-            &sandbox.p(ValidatorId(0)),
-            &sandbox.p(ValidatorId(3)),
+            &sandbox.public_key(ValidatorId(0)),
+            &sandbox.public_key(ValidatorId(3)),
             &[tx.hash()],
-            sandbox.s(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
 
     sandbox.recv(&sandbox.create_transactions_response(
-        &sandbox.p(ValidatorId(2)),
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(2)),
+        &sandbox.public_key(ValidatorId(0)),
         vec![tx.clone()],
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
 
     sandbox.assert_state(Height(2), Round(1));
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(2),
         &block.hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }

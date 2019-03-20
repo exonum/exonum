@@ -50,7 +50,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
     let precommit_2 = sandbox.create_precommit(
         ValidatorId(2),
@@ -59,7 +59,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     );
     let precommit_3 = sandbox.create_precommit(
         ValidatorId(3),
@@ -68,17 +68,17 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&precommit_1);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(1)),
         &make_request_propose_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.send(
-        sandbox.p(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(1)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
@@ -87,11 +87,11 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
-        sandbox.p(ValidatorId(2)),
+        sandbox.public_key(ValidatorId(2)),
         &make_request_propose_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.send(
-        sandbox.p(ValidatorId(2)),
+        sandbox.public_key(ValidatorId(2)),
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.recv(&propose);
@@ -178,7 +178,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 
     sandbox.recv(&sandbox.create_prevote(
@@ -187,7 +187,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
@@ -197,7 +197,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash())); //only if round > locked round
 
@@ -208,7 +208,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
     sandbox.add_time(Duration::from_millis(0));
@@ -222,7 +222,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
         Round(2),
         &propose.hash(),
         Round(1),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
     sandbox.add_time(Duration::from_millis(0));
 }
@@ -244,7 +244,7 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
         Round(2),
         &empty_hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
 
     // trigger round_timeout
