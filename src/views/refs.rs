@@ -15,7 +15,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    views::{ChangeSet, IndexAddress, View, IndexType, metadata::index_metadata},
+    views::{metadata::index_metadata, ChangeSet, IndexAddress, IndexType, View},
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, Snapshot,
 };
@@ -204,6 +204,7 @@ impl Fork {
         T::get(view).map(|value| RefMut { value })
     }
 
+    ///TODO: add documentation [ECR-2820]
     pub fn insert<I: Into<IndexAddress>, T: IndexAccess, A: AnyObject<T>>(
         &self,
         address: I,
