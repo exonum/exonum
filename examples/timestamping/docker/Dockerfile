@@ -17,10 +17,10 @@ RUN curl -sL https://deb.nodesource.com/setup_8.x | bash \
   && apt-get install -y nodejs
 
 WORKDIR /usr/src
-RUN git clone --branch v0.10.3 https://github.com/exonum/exonum.git \
+RUN git clone --branch v0.11.0 https://github.com/exonum/exonum.git \
   && mv /root/.cargo/bin/* /usr/bin \
   && cd exonum/examples/timestamping/backend \
-  && cargo update && cargo install \
+  && cargo update && cargo install --path . \
   && cd ../frontend && npm install && npm run build
 WORKDIR /usr/src/exonum/examples/timestamping
 COPY launch.sh .
