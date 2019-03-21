@@ -11,6 +11,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `service_name` getter to the `TransactionContext`. (#1274)
 - Added `ProtobufConvert` implementation for byte array with fixed sized (#????)
+- Allowed to use symbol `-` in index names. (#1277)
 
 ## 0.11.0 - 2019-03-15
 

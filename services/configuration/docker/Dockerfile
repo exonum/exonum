@@ -14,10 +14,10 @@ RUN apt-get update \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain=stable
 
 WORKDIR /usr/src
-RUN git clone --branch v0.10.3 https://github.com/exonum/exonum.git \
+RUN git clone --branch v0.11.0 https://github.com/exonum/exonum.git \
   && mv /root/.cargo/bin/* /usr/bin \
   && cd exonum/services/configuration \
-  && cargo update && cargo install --example configuration
+  && cargo update && cargo install --example configuration --path .
 WORKDIR /usr/src/services/configuration
 COPY launch.sh .
 
