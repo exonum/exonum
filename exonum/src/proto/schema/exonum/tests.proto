@@ -96,3 +96,9 @@ message TestProtobufConvertMap {
   map<uint32, Point> point_map = 5;
   map<string, uint64> key_string_map = 6;
 }
+
+message TestFixedArrays {
+  bytes fixed_array_8 = 1;
+  bytes fixed_array_16 = 2;
+  bytes fixed_array_32 = 3;
+}

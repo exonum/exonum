@@ -266,3 +266,37 @@ fn test_struct_with_maps_roundtrip() {
     let struct_encode_round_trip = StructWithMaps::decode(&bytes).unwrap();
     assert_eq!(struct_encode_round_trip, map_struct);
 }
+
+#[derive(Debug, PartialEq, ProtobufConvert)]
+#[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
+struct StructWithFixedArrays {
+    fixed_array_8: [u8; 8],
+    fixed_array_16: [u8; 16],
+    fixed_array_32: [u8; 32],
+}
+
+#[test]
+#[should_panic(expected = "wrong array size: actual 32, expected 64")]
+fn test_fixed_array_pb_convert_invalid_len() {
+    let vec = vec![0u8; 32];
+    <[u8; 32]>::from_pb(vec.clone()).unwrap();
+    <[u8; 64]>::from_pb(vec).unwrap();
+}
+
+#[test]
+fn test_struct_with_fixed_arrays_roundtrip() {
+    let arr_struct = StructWithFixedArrays {
+        fixed_array_8: [1; 8],
+        fixed_array_16: [1; 16],
+        fixed_array_32: [1; 32],
+    };
+
+    let arr_struct_pb = arr_struct.to_pb();
+    let struct_convert_round_trip: StructWithFixedArrays =
+        ProtobufConvert::from_pb(arr_struct_pb).unwrap();
+    assert_eq!(struct_convert_round_trip, arr_struct);
+
+    let bytes = arr_struct.encode().unwrap();
+    let struct_encode_round_trip = StructWithFixedArrays::decode(&bytes).unwrap();
+    assert_eq!(struct_encode_round_trip, arr_struct);
+}
