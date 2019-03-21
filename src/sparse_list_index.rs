@@ -26,7 +26,8 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
     views::{
-        BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
+        AnyObject, BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType,
+        Iter as ViewIter, View,
     },
     BinaryKey, BinaryValue,
 };
@@ -116,6 +117,24 @@ pub struct SparseListIndexKeys<'a> {
 #[derive(Debug)]
 pub struct SparseListIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
+}
+
+impl<T, V> AnyObject<T> for SparseListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::SparseList
+    }
+
+    fn metadata(&self) -> Vec<u8> {
+        self.state.metadata().to_bytes()
+    }
 }
 
 impl<T, V> SparseListIndex<T, V>

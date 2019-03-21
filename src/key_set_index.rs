@@ -21,8 +21,8 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
-    views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
-    BinaryKey,
+    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
+    BinaryKey, BinaryValue,
 };
 
 /// A set of key items.
@@ -33,7 +33,8 @@ use crate::{
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T: IndexAccess, K> {
-    pub base: View<T>,
+    base: View<T>,
+    state: IndexState<T, ()>,
     _k: PhantomData<K>,
 }
 
@@ -48,6 +49,24 @@ pub struct KeySetIndex<T: IndexAccess, K> {
 #[derive(Debug)]
 pub struct KeySetIndexIter<'a, K> {
     base_iter: ViewIter<'a, K, ()>,
+}
+
+impl<T, K> AnyObject<T> for KeySetIndex<T, K>
+where
+    T: IndexAccess,
+    K: BinaryKey,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::KeySet
+    }
+
+    fn metadata(&self) -> Vec<u8> {
+        self.state.metadata().to_bytes()
+    }
 }
 
 impl<T, K> KeySetIndex<T, K>
@@ -75,13 +94,14 @@ where
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, _state) = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::KeySet)
             .index_name(index_name)
             .build::<()>();
 
         Self {
             base,
+            state,
             _k: PhantomData,
         }
     }
@@ -113,14 +133,15 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let (base, _state) = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::KeySet)
             .index_name(family_name)
             .family_id(index_id)
-            .build::<()>();
+            .build();
 
         Self {
             base,
+            state,
             _k: PhantomData,
         }
     }
@@ -129,15 +150,21 @@ where
         IndexBuilder::for_view(view)
             .index_type(IndexType::KeySet)
             .build_existed::<()>()
-            .map(|(base, _state)| Self {
+            .map(|(base, state)| Self {
                 base,
+                state,
                 _k: PhantomData,
             })
     }
 
     pub fn create_from_view(view: View<T>) -> Self {
+        let (base, state) = IndexBuilder::for_view(view)
+            .index_type(IndexType::KeySet)
+            .build();
+
         Self {
-            base: view,
+            base,
+            state,
             _k: PhantomData,
         }
     }

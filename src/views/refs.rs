@@ -15,7 +15,11 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    views::{metadata::index_metadata, ChangeSet, IndexAddress, IndexType, View},
+    db::Change::Put,
+    views::{
+        metadata::{index_metadata, INDEXES_POOL_NAME},
+        ChangeSet, IndexAddress, IndexType, View,
+    },
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, Snapshot,
 };
@@ -23,34 +27,7 @@ use crate::{
 pub trait AnyObject<T: IndexAccess> {
     fn view(self) -> View<T>;
     fn object_type(&self) -> IndexType;
-}
-
-impl<T, V> AnyObject<T> for ListIndex<T, V>
-where
-    T: IndexAccess,
-    V: BinaryValue,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::List
-    }
-}
-
-impl<T, K> AnyObject<T> for KeySetIndex<T, K>
-where
-    T: IndexAccess,
-    K: BinaryKey,
-{
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::KeySet
-    }
+    fn metadata(&self) -> Vec<u8>;
 }
 
 pub trait FromView<T: IndexAccess>
@@ -176,8 +153,8 @@ impl Fork {
     where
         T: FromView<&'a Self>,
     {
-        let mut pool_length = self.pool_length.borrow_mut();
-        let address = IndexAddress::with_root("temp").append_bytes(&pool_length.clone());
+        let mut pool_length = self.pool_length_mut();
+        let address = IndexAddress::with_root("temp").append_bytes(&*pool_length);
         *pool_length += 1;
         let view = View::new(self, address);
         //TODO: don't create redundant metadata
@@ -205,17 +182,29 @@ impl Fork {
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn insert<I: Into<IndexAddress>, T: IndexAccess, A: AnyObject<T>>(
-        &self,
-        address: I,
-        object: A,
-    ) {
+    pub fn insert<I, T, A>(&self, address: I, object: A)
+    where
+        I: Into<IndexAddress>,
+        T: IndexAccess,
+        A: AnyObject<T>,
+    {
         let index_type = object.object_type();
+        let metadata = object.metadata();
         let view = object.view();
-        let (new_address, _state) = index_metadata::<_, u64>(self, &address.into(), index_type);
-        self.working_patch.clear(&view.address);
+        let address = address.into().clone();
 
-        let mut changes = self.working_patch.changes_mut(&new_address);
+        let (new_address, _state) = index_metadata::<_, ()>(self, &address, index_type);
+        self.working_patch().clear(&view.address);
+
+        let mut metadata_changes = self
+            .working_patch()
+            .changes_mut(&IndexAddress::with_root(INDEXES_POOL_NAME));
+
+        metadata_changes
+            .data
+            .insert(address.fully_qualified_name(), Put(metadata));
+
+        let mut changes = self.working_patch().changes_mut(&new_address);
         let view_changes = view.changes.as_ref().unwrap().clone();
 
         changes.data.extend(view_changes.data);
@@ -272,6 +261,13 @@ mod tests {
             let mut index: ListIndex<_, u32> = fork.create_object();
             index.push(1);
             fork.insert("index", index);
+
+            let index: Option<Ref<ListIndex<_, u32>>> = fork.get_object("index");
+            assert!(index.is_some());
+        }
+        {
+            let mut index: RefMut<ListIndex<_, u32>> = fork.get_object_mut("index").unwrap();
+            index.push(2);
         }
 
         db.merge(fork.into_patch()).unwrap();
@@ -280,6 +276,7 @@ mod tests {
         let index: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
 
         assert_eq!(index.get(0), Some(1));
+        assert_eq!(index.get(1), Some(2));
     }
 
     #[test]
@@ -334,8 +331,27 @@ mod tests {
         let index1: Ref<KeySetIndex<_, u32>> = snapshot.get_object("index1").unwrap();
         let index2: Ref<KeySetIndex<_, u32>> = snapshot.get_object("index2").unwrap();
 
-        dbg!(index1.contains(&1));
-        dbg!(index2.contains(&2));
+        assert!(index1.contains(&1));
+        assert!(index2.contains(&2));
+    }
+
+    #[test]
+    fn ref_list_length() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut index: ListIndex<_, u32> = fork.create_object();
+            index.push(1);
+            assert_eq!(index.len(), 1);
+            fork.insert("index", index);
+        }
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = &db.snapshot();
+        let index1: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
+
+        assert_eq!(index1.len(), 1);
     }
 
 }

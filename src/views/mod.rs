@@ -14,7 +14,10 @@
 
 #![warn(missing_docs)]
 
-pub use self::metadata::{BinaryAttribute, IndexState, IndexType};
+pub use self::{
+    metadata::{BinaryAttribute, IndexState, IndexType},
+    refs::AnyObject,
+};
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
@@ -27,6 +30,9 @@ mod metadata;
 mod refs;
 #[cfg(test)]
 mod tests;
+
+/// Separator between the name and the additional bytes in family indexes.
+const INDEX_NAME_SEPARATOR: &[u8] = &[0];
 
 /// Base view struct responsible for accessing indexes.
 // TODO: add documentation [ECR-2820]
@@ -269,6 +275,14 @@ impl IndexAddress {
         Self {
             name,
             bytes: Some(bytes),
+        }
+    }
+
+    pub fn fully_qualified_name(&self) -> Vec<u8> {
+        if let Some(bytes) = self.bytes() {
+            concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
+        } else {
+            concat_keys!(self.name())
         }
     }
 }

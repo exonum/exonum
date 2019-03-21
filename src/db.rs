@@ -32,6 +32,7 @@ use crate::{
     views::{IndexAccess, IndexAddress, View},
     Result,
 };
+use std::cell::RefMut;
 
 /// Finds a prefix immediately following the supplied one.
 pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
@@ -395,8 +396,8 @@ pub enum Change {
 /// [`rollback`]: #method.rollback
 pub struct Fork {
     flushed: FlushedFork,
-    pub working_patch: WorkingPatch,
-    pub pool_length: RefCell<u16>,
+    working_patch: WorkingPatch,
+    pool_length: RefCell<u16>,
 }
 
 struct FlushedFork {
@@ -623,6 +624,15 @@ impl Fork {
     /// Checks if a fork has any unflushed changes.
     pub fn is_dirty(&self) -> bool {
         !self.working_patch.is_empty()
+    }
+
+    ///TODO: add documentation [ECR-2820
+    pub fn working_patch(&self) -> &WorkingPatch {
+        &self.working_patch
+    }
+
+    pub fn pool_length_mut(&self) -> RefMut<u16> {
+        self.pool_length.borrow_mut()
     }
 }
 

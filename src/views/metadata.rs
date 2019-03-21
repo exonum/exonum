@@ -20,12 +20,12 @@ use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{BinaryKey, BinaryValue};
+use crate::BinaryValue;
 
 use super::{IndexAccess, IndexAddress, View};
 
-/// Name of the column family used to store IndexesPool.
-const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
+/// TODO Add documentation. [ECR-2820]
+pub const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
 /// Type of the index stored in `IndexMetadata`.
 /// `IndexType` is used for type checking indexes when they are created/accessed.
@@ -45,8 +45,6 @@ pub enum IndexType {
 
 /// Index state attribute tag.
 const INDEX_STATE_TAG: u32 = 0;
-/// Separator between the name and the additional bytes in family indexes.
-const INDEX_NAME_SEPARATOR: &[u8] = &[0];
 
 /// A type that can be (de)serialized as a metadata value.
 pub trait BinaryAttribute {
@@ -157,16 +155,6 @@ impl<V> IndexMetadata<V> {
     }
 }
 
-impl IndexAddress {
-    fn fully_qualified_name(&self) -> Vec<u8> {
-        if let Some(bytes) = self.bytes() {
-            concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
-        } else {
-            concat_keys!(self.name())
-        }
-    }
-}
-
 /// TODO Add documentation. [ECR-2820]
 //TODO: revert to private
 pub fn index_metadata<T, V>(
@@ -274,7 +262,11 @@ where
         self.cache.get().state
     }
 
-    /// Update stored index metadata.
+    pub fn metadata(&self) -> IndexMetadata<V> {
+        self.cache.get()
+    }
+
+    /// TODO Add documentation. [ECR-2820]
     pub fn set(&mut self, state: V) {
         let mut cache = self.cache.get_mut();
         cache.state = state;
@@ -298,7 +290,10 @@ where
     V: BinaryAttribute + Default + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("IndexState").finish()
+        f.debug_struct("IndexState")
+            .field("index_name", &self.index_name)
+            .field("is_new", &self.is_new)
+            .finish()
     }
 }
 

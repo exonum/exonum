@@ -26,7 +26,7 @@ use exonum_crypto::Hash;
 use self::{key::ProofListKey, proof::ProofOfAbsence};
 use crate::{
     hash::HashTag,
-    views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
+    views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View, AnyObject},
     BinaryKey, BinaryValue, ObjectHash,
 };
 
@@ -61,6 +61,24 @@ pub struct ProofListIndex<T: IndexAccess, V> {
 #[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
     base_iter: ViewIter<'a, ProofListKey, V>,
+}
+
+impl<T, V> AnyObject<T> for ProofListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::ProofList
+    }
+
+    fn metadata(&self) -> Vec<u8> {
+        self.state.metadata().to_bytes()
+    }
 }
 
 impl<T, V> ProofListIndex<T, V>

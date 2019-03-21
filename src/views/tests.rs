@@ -442,8 +442,7 @@ fn multiple_views() {
     }
 }
 
-//TODO: revert test
-#[cfg(test_test)]
+#[cfg(test)]
 #[test]
 fn multiple_indexes() {
     use crate::{ListIndex, MapIndex};

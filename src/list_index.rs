@@ -21,7 +21,8 @@ use std::marker::PhantomData;
 
 use crate::{
     views::{
-        IndexAccess, IndexAddress, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
+        AnyObject, IndexAccess, IndexAddress, IndexBuilder, IndexState, IndexType,
+        Iter as ViewIter, View,
     },
     BinaryKey, BinaryValue,
 };
@@ -37,8 +38,7 @@ use crate::{
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ListIndex<T: IndexAccess, V> {
-    //TODO: revert to private
-    pub base: View<T>,
+    base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
 }
@@ -54,6 +54,24 @@ pub struct ListIndex<T: IndexAccess, V> {
 #[derive(Debug)]
 pub struct ListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
+}
+
+impl<T, V> AnyObject<T> for ListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::List
+    }
+
+    fn metadata(&self) -> Vec<u8> {
+        self.state.metadata().to_bytes()
+    }
 }
 
 impl<T, V> ListIndex<T, V>
@@ -495,8 +513,7 @@ where
     }
 }
 
-//TODO: revert tests
-#[cfg(test_test)]
+#[cfg(test)]
 mod tests {
     use crate::{list_index::ListIndex, views::IndexAccess, Database, Fork, TemporaryDB};
 

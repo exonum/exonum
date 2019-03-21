@@ -33,6 +33,7 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof::{create_multiproof, create_proof},
 };
+use crate::views::AnyObject;
 use crate::{
     views::{
         BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
@@ -101,6 +102,25 @@ pub struct ProofMapIndexKeys<'a, K> {
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
+}
+
+impl<T, K, V> AnyObject<T> for ProofMapIndex<T, K, V>
+where
+    T: IndexAccess,
+    K: BinaryKey + ObjectHash,
+    V: BinaryValue + ObjectHash,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::ProofMap
+    }
+
+    fn metadata(&self) -> Vec<u8> {
+        self.state.metadata().to_bytes()
+    }
 }
 
 /// TODO Clarify documentation. [ECR-2820]

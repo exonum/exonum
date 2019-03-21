@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 use exonum_crypto::Hash;
 
 use super::{
-    views::{IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
+    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, ObjectHash,
 };
 
@@ -36,6 +36,7 @@ use super::{
 #[derive(Debug)]
 pub struct ValueSetIndex<T: IndexAccess, V> {
     base: View<T>,
+    state: IndexState<T, ()>,
     _v: PhantomData<V>,
 }
 
@@ -65,6 +66,24 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: ViewIter<'a, Hash, ()>,
 }
 
+impl<T, V> AnyObject<T> for ValueSetIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryKey,
+{
+    fn view(self) -> View<T> {
+        self.base
+    }
+
+    fn object_type(&self) -> IndexType {
+        IndexType::KeySet
+    }
+
+    fn metadata(&self) -> Vec<u8> {
+        self.state.metadata().to_bytes()
+    }
+}
+
 impl<T, V> ValueSetIndex<T, V>
 where
     T: IndexAccess,
@@ -90,12 +109,13 @@ where
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     /// ```
     pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, _state) = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::ValueSet)
             .index_name(index_name)
             .build::<()>();
         Self {
             base,
+            state,
             _v: PhantomData,
         }
     }
@@ -127,13 +147,14 @@ where
         I: ?Sized,
         S: Into<String>,
     {
-        let (base, _state) = IndexBuilder::new(view)
+        let (base, state) = IndexBuilder::new(view)
             .index_type(IndexType::ValueSet)
             .index_name(family_name)
             .family_id(index_id)
             .build::<()>();
         Self {
             base,
+            state,
             _v: PhantomData,
         }
     }
@@ -142,19 +163,21 @@ where
         IndexBuilder::for_view(view)
             .index_type(IndexType::ValueSet)
             .build_existed::<()>()
-            .map(|(base, _state)| Self {
+            .map(|(base, state)| Self {
                 base,
+                state,
                 _v: PhantomData,
             })
     }
 
     pub fn create_from_view(view: View<T>) -> Self {
-        let (base, _state) = IndexBuilder::for_view(view)
+        let (base, state) = IndexBuilder::for_view(view)
             .index_type(IndexType::ValueSet)
             .build::<()>();
 
         Self {
             base,
+            state,
             _v: PhantomData,
         }
     }
