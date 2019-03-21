@@ -23,7 +23,7 @@ use super::{
 
 #[derive(Default)]
 pub struct DispatcherBuilder {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
 }
 
 impl std::fmt::Debug for DispatcherBuilder {
@@ -33,7 +33,7 @@ impl std::fmt::Debug for DispatcherBuilder {
 }
 
 impl DispatcherBuilder {
-    pub fn with_runtime(mut self, runtime_id: u32, runtime: Box<dyn RuntimeEnvironment>) -> Self {
+    pub fn with_runtime(mut self, runtime_id: u32, runtime: Box<dyn RuntimeEnvironment + Send>) -> Self {
         self.runtimes.insert(runtime_id, runtime);
 
         self
@@ -46,7 +46,7 @@ impl DispatcherBuilder {
 
 #[derive(Default)]
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>,
+    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
     // TODO Is RefCell enough here?
     runtime_lookup: RefCell<HashMap<ServiceInstanceId, u32>>,
 }
@@ -58,7 +58,7 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(runtimes: HashMap<u32, Box<dyn RuntimeEnvironment>>) -> Self {
+    pub fn new(runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>) -> Self {
         Self {
             runtimes,
             runtime_lookup: RefCell::new(Default::default()),

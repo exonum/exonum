@@ -50,7 +50,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, iter, mem, panic,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
@@ -58,6 +58,7 @@ use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use crate::node::ApiSender;
 use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
+use crate::runtime::dispatcher::Dispatcher;
 
 mod block;
 mod genesis;
@@ -81,6 +82,7 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
+    new_dispatcher: Arc<Mutex<Dispatcher>>,
 }
 
 #[derive(Clone)]
@@ -207,6 +209,7 @@ impl Blockchain {
             dispatcher: StaticServiceDispatcher::new(services),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
+            new_dispatcher: Arc::new(Mutex::new(Dispatcher::default())),
         }
     }
 
@@ -662,6 +665,7 @@ impl Clone for Blockchain {
             dispatcher: self.dispatcher.clone(),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),
+            new_dispatcher: Arc::clone(&self.new_dispatcher),
         }
     }
 }
