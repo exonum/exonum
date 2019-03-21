@@ -351,7 +351,13 @@ macro_rules! impl_protobuf_convert_fixed_byte_array {
                 }
 
                 fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-                    ensure!(pb.len() == $arr_len, "wrong array size: actual {}, expected {}", pb.len(), $arr_len);
+                    ensure!(
+                        pb.len() == $arr_len,
+                        "wrong array size: actual {}, expected {}",
+                        pb.len(),
+                        $arr_len
+                    );
+
                     Ok({
                         let mut array = [0; $arr_len];
                         array.copy_from_slice(&pb);
@@ -363,8 +369,10 @@ macro_rules! impl_protobuf_convert_fixed_byte_array {
     };
 }
 
+// We implement array conversion only for most common array sizes that uses
+// for example in cryptography.
 impl_protobuf_convert_fixed_byte_array! {
     8, 16, 24, 32, 40, 48, 56, 64,
     72, 80, 88, 96, 104, 112, 120, 128,
-    256, 512
+    160, 256, 512, 1024, 2048
 }
