@@ -93,7 +93,7 @@ mod tests {
             }
         }));
         let stream = TakeWhileReady::new(stream);
-        let collected: Vec<_> = stream.wait().into_iter().collect();
+        let collected: Vec<_> = stream.wait().collect();
         assert_eq!(collected, vec![Ok(1), Ok(2), Ok(3), Ok(4)]);
     }
 

@@ -224,10 +224,10 @@ fn test_precommit_serde_wrong_signature() {
 
 #[test]
 fn test_raw_transaction_small_size() {
-    assert!(ServiceTransaction::decode(&vec![0; 1]).is_err());
-    assert!(RawTransaction::decode(&vec![0; 1]).is_err());
-    assert!(RawTransaction::decode(&vec![0; 3]).is_err());
-    let tx = RawTransaction::decode(&vec![0; 4]).unwrap();
+    assert!(ServiceTransaction::decode(&[0; 1]).is_err());
+    assert!(RawTransaction::decode(&[0; 1]).is_err());
+    assert!(RawTransaction::decode(&[0; 3]).is_err());
+    let tx = RawTransaction::decode(&[0; 4]).unwrap();
     assert_eq!(tx.service_id, 0);
     assert_eq!(tx.service_transaction.transaction_id, 0);
 }

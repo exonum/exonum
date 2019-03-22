@@ -285,7 +285,6 @@ fn test_probe_advanced() {
             &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
         );
         assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-
         TxReset::sign(&pubkey, &key)
     };
 
@@ -417,141 +416,215 @@ fn test_snapshot_comparison_panic() {
         });
 }
 
+fn create_sample_block(testkit: &mut TestKit) {
+    let height = testkit.height().next().0;
+    if height == 2 || height == 5 {
+        let tx = {
+            let (pubkey, key) = crypto::gen_keypair();
+            TxIncrement::sign(&pubkey, height as u64, &key)
+        };
+        testkit.api().send(tx.clone());
+    }
+    testkit.create_block();
+}
+
 #[test]
-fn test_explorer_blocks() {
+fn test_explorer_blocks_basic() {
     use exonum::api::node::public::explorer::BlocksRange;
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
 
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(0));
-    assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
+    assert_eq!(blocks[0].block.height(), Height(0));
+    assert_eq!(*blocks[0].block.prev_hash(), crypto::Hash::default());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(1));
 
     // Check empty block creation
     testkit.create_block();
 
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].height(), Height(1));
-    assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
-    assert_eq!(blocks[0].tx_count(), 0);
-    assert_eq!(blocks[1].height(), Height(0));
-    assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
+    assert_eq!(blocks[0].block.height(), Height(1));
+    assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.hash());
+    assert_eq!(blocks[0].block.tx_count(), 0);
+    assert_eq!(blocks[1].block.height(), Height(0));
+    assert_eq!(*blocks[1].block.prev_hash(), crypto::Hash::default());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
+}
 
-    let response: BlocksRange = api
+#[test]
+fn test_explorer_blocks_skip_empty_small() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
+
+    let (mut testkit, api) = init_testkit();
+    create_sample_block(&mut testkit);
+
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
-    assert_eq!(blocks.len(), 0);
+    assert!(blocks.is_empty());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
-    };
-    testkit.api().send(tx.clone());
-    testkit.create_block(); // height == 2
+    create_sample_block(&mut testkit);
 
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 3);
-    assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
-    assert_eq!(blocks[0].tx_count(), 1);
-    assert_eq!(*blocks[0].tx_hash(), tx.hash());
+    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.hash());
+    assert_eq!(blocks[0].block.tx_count(), 1);
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(blocks[0].block.height(), Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    testkit.create_block(); // height == 3
-    testkit.create_block(); // height == 4
+    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit);
 
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(blocks[0].block.height(), Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
+}
 
-    // Run a comparable `BlockchainExplorer` method.
-    let heights: Vec<_> = testkit
-        .explorer()
-        .blocks(..)
-        .filter(|block| !block.is_empty())
-        .map(|block| block.height())
-        .collect();
-    assert_eq!(heights, vec![Height(2)]);
+#[test]
+fn test_explorer_blocks_skip_empty() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::sign(&pubkey, 5, &key)
-    };
-    testkit.api().send(tx.clone());
-    testkit.create_block(); // height == 5
+    let (mut testkit, api) = init_testkit();
+    for _ in 0..5 {
+        create_sample_block(&mut testkit);
+    }
 
-    // Check block filtering
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=1&skip_empty_blocks=true")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(5));
+    assert_eq!(blocks[0].block.height(), Height(5));
     assert_eq!(range.start, Height(5));
     assert_eq!(range.end, Height(6));
 
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=3&skip_empty_blocks=true")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].height(), Height(5));
-    assert_eq!(blocks[1].height(), Height(2));
+    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[1].block.height(), Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(6));
+}
+
+#[test]
+fn test_explorer_blocks_bounds() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
+
+    let (mut testkit, api) = init_testkit();
+    for _ in 0..5 {
+        create_sample_block(&mut testkit);
+    }
 
     // Check `latest` param
-    let response: BlocksRange = api
+    let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
         .unwrap();
-    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(blocks[0].block.height(), Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
+
+    // Check `earliest` param
+    let BlocksRange { blocks, range } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&earliest=3")
+        .unwrap();
+    assert_eq!(blocks.len(), 3);
+    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(range.start, Height(3));
+    assert_eq!(range.end, Height(6));
+
+    // Check `earliest` & `latest`
+    let BlocksRange { blocks, range } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&latest=4&earliest=3")
+        .unwrap();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0].block.height(), Height(4));
+    assert_eq!(range.start, Height(3));
+    assert_eq!(range.end, Height(5));
+
+    // Check that `count` takes precedence over `earliest`.
+    let BlocksRange { blocks, range } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=2&latest=4&earliest=1")
+        .unwrap();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0].block.height(), Height(4));
+    assert_eq!(range.start, Height(3));
+    assert_eq!(range.end, Height(5));
+}
+
+#[test]
+fn test_explorer_blocks_loaded_info() {
+    use exonum::api::node::public::explorer::BlocksRange;
+    use exonum::helpers::Height;
+
+    let (mut testkit, api) = init_testkit();
+    testkit.create_blocks_until(Height(6));
+
+    let BlocksRange { blocks, .. } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=4")
+        .unwrap();
+    assert!(blocks
+        .iter()
+        .all(|info| info.time.is_none() && info.precommits.is_none()));
+
+    let BlocksRange { blocks, .. } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=4&add_blocks_time=true")
+        .unwrap();
+    assert!(blocks
+        .iter()
+        .all(|info| info.time.is_some() && info.precommits.is_none()));
+
+    let BlocksRange { blocks, .. } = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=4&add_precommits=true")
+        .unwrap();
+    assert!(blocks
+        .iter()
+        .all(|info| info.time.is_none() && info.precommits.is_some()));
 }
 
 #[test]

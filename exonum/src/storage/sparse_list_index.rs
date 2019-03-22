@@ -17,9 +17,6 @@
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
-// TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
-#![cfg_attr(feature="cargo-clippy", allow(clippy::doc_markdown))]
-
 use byteorder::{BigEndian, ByteOrder};
 
 use std::{borrow::Cow, cell::Cell, marker::PhantomData};
@@ -639,12 +636,13 @@ mod tests {
     use super::SparseListIndex;
     use crate::storage::db::Database;
 
-    const IDX_NAME: &'static str = "idx_name";
+    const IDX_NAME: &str = "idx_name";
 
     fn gen_tempdir_name() -> String {
         thread_rng().sample_iter(&Alphanumeric).take(10).collect()
     }
 
+    #[allow(clippy::cyclomatic_complexity)]
     fn list_index_methods(db: Box<dyn Database>) {
         let mut fork = db.fork();
         let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);

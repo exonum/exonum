@@ -109,9 +109,9 @@ mod list_index {
 
     fn compare_collections(
         list_index: &ListIndex<&mut Fork, i32>,
-        ref_list: &Vec<i32>,
+        ref_list: &[i32],
     ) -> TestCaseResult {
-        prop_assert!(ref_list.iter().map(|v| *v).eq(list_index));
+        prop_assert!(ref_list.iter().cloned().eq(list_index));
         Ok(())
     }
 
@@ -161,9 +161,9 @@ mod proof_list_index {
 
     fn compare_collections(
         list_index: &ProofListIndex<&mut Fork, i32>,
-        ref_list: &Vec<i32>,
+        ref_list: &[i32],
     ) -> TestCaseResult {
-        prop_assert!(ref_list.iter().map(|v| *v).eq(list_index));
+        prop_assert!(ref_list.iter().cloned().eq(list_index));
         Ok(())
     }
 

@@ -19,7 +19,7 @@ use actix_web::{http, ws};
 use chrono::{DateTime, Utc};
 use futures::IntoFuture;
 
-use std::ops::Range;
+use std::ops::{Bound, Range};
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
 
@@ -48,9 +48,7 @@ pub struct BlocksRange {
     /// Exclusive range of blocks.
     pub range: Range<Height>,
     /// Blocks in the range.
-    pub blocks: Vec<Block>,
-    /// Optional median time from the corresponding blocks precommits.
-    pub times: Option<Vec<DateTime<Utc>>>,
+    pub blocks: Vec<BlockInfo>,
 }
 
 /// Information about a block in the blockchain.
@@ -59,11 +57,11 @@ pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
     pub block: Block,
     /// Precommits authorizing the block.
-    pub precommits: Vec<Signed<Precommit>>,
+    pub precommits: Option<Vec<Signed<Precommit>>>,
     /// Hashes of transactions in the block.
-    pub txs: Vec<Hash>,
+    pub txs: Option<Vec<Hash>>,
     /// Median time from the block precommits.
-    pub time: DateTime<Utc>,
+    pub time: Option<DateTime<Utc>>,
 }
 
 /// Blocks in range parameters.
@@ -71,17 +69,30 @@ pub struct BlockInfo {
 pub struct BlocksQuery {
     /// The number of blocks to return. Should not be greater than `MAX_BLOCKS_PER_REQUEST`.
     pub count: usize,
-    /// The maximum height of the returned blocks. The blocks are returned in reverse order,
-    /// starting from the latest and at least up to the `latest` - `count` + 1.
+    /// The maximum height of the returned blocks.
+    ///
+    /// The blocks are returned in reverse order,
+    /// starting from the latest and at least up to the `latest - count + 1`.
     /// The default value is the height of the latest block in the blockchain.
     pub latest: Option<Height>,
+    /// The minimum height of the returned blocks. The default value is `Height(0)` (the genesis
+    /// block).
+    ///
+    /// Note that `earliest` has the least priority compared to `latest` and `count`;
+    /// it can only truncate the list of otherwise returned blocks if some of them have a lesser
+    /// height.
+    pub earliest: Option<Height>,
     /// If true, then only non-empty blocks are returned. The default value is false.
     #[serde(default)]
     pub skip_empty_blocks: bool,
-    /// If true, then `BlocksRange`'s `times` field will contain median time from the
+    /// If true, then the returned `BlocksRange`'s `times` field will contain median time from the
     /// corresponding blocks precommits.
     #[serde(default)]
     pub add_blocks_time: bool,
+    /// If true, then the returned `BlocksRange.precommits` will contain precommits for the
+    /// corresponding returned blocks.
+    #[serde(default)]
+    pub add_precommits: bool,
 }
 
 /// Block query parameters.
@@ -145,40 +156,50 @@ impl ExplorerApi {
             )));
         }
 
-        let (upper, blocks_iter) = if let Some(upper) = query.latest {
-            (upper, explorer.blocks(..upper.next()))
+        let (upper, upper_bound) = if let Some(upper) = query.latest {
+            (upper, Bound::Included(upper))
         } else {
-            (explorer.height(), explorer.blocks(..))
+            (explorer.height(), Bound::Unbounded)
+        };
+        let lower_bound = if let Some(lower) = query.earliest {
+            Bound::Included(lower)
+        } else {
+            Bound::Unbounded
         };
 
-        let mut times = Vec::new();
-
-        let blocks: Vec<_> = blocks_iter
+        let blocks: Vec<_> = explorer
+            .blocks((lower_bound, upper_bound))
             .rev()
             .filter(|block| !query.skip_empty_blocks || !block.is_empty())
             .take(query.count)
-            .inspect(|block| {
-                if query.add_blocks_time {
-                    times.push(median_precommits_time(&block.precommits()));
-                }
+            .map(|block| BlockInfo {
+                txs: None,
+
+                time: if query.add_blocks_time {
+                    Some(median_precommits_time(&block.precommits()))
+                } else {
+                    None
+                },
+
+                precommits: if query.add_precommits {
+                    Some(block.precommits().to_vec())
+                } else {
+                    None
+                },
+
+                block: block.into_header(),
             })
-            .map(|block| block.into_header())
             .collect();
 
         let height = if blocks.len() < query.count {
-            Height(0)
+            query.earliest.unwrap_or(Height(0))
         } else {
-            blocks.last().map_or(Height(0), |block| block.height())
+            blocks.last().map_or(Height(0), |info| info.block.height())
         };
 
         Ok(BlocksRange {
             range: height..upper.next(),
             blocks,
-            times: if query.add_blocks_time {
-                Some(times)
-            } else {
-                None
-            },
         })
     }
 
@@ -279,9 +300,9 @@ impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
     fn from(inner: explorer::BlockInfo<'a>) -> Self {
         Self {
             block: inner.header().clone(),
-            precommits: inner.precommits().to_vec(),
-            txs: inner.transaction_hashes().to_vec(),
-            time: median_precommits_time(&inner.precommits()),
+            precommits: Some(inner.precommits().to_vec()),
+            txs: Some(inner.transaction_hashes().to_vec()),
+            time: Some(median_precommits_time(&inner.precommits())),
         }
     }
 }

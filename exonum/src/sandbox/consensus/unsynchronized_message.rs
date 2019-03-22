@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 #[test]
 fn test_queue_message_from_future_round() {
@@ -31,7 +31,7 @@ fn test_queue_message_from_future_round() {
         Round(2),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.recv(&propose);
@@ -45,7 +45,7 @@ fn test_queue_message_from_future_round() {
         Round(2),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -67,7 +67,7 @@ fn test_queue_prevote_message_from_next_height() {
         Round(1),
         &empty_hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     add_one_height(&sandbox, &sandbox_state);
@@ -103,7 +103,7 @@ fn test_queue_propose_message_from_next_height() {
         Round(2),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     );
 
     sandbox.recv(&future_propose);

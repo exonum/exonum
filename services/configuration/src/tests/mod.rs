@@ -630,7 +630,7 @@ fn test_regression_majority_votes_for_different_proposes() {
     };
     {
         let proposes = [new_cfg1.clone(), new_cfg2.clone()]
-            .into_iter()
+            .iter()
             .map(|cfg| {
                 let validator = &testkit.network().validators()[1];
                 new_tx_config_propose(&validator, cfg.clone())

@@ -39,7 +39,7 @@ pub fn generate_keys_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
     #[cfg(unix)]
-    open_options.mode(0o600);
+    open_options.mode(0o_600);
     let mut file = open_options.open(path.as_ref())?;
     file.write_all(file_content.as_bytes())?;
 
@@ -66,7 +66,7 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
 #[cfg(unix)]
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::verbose_bit_mask))]
 fn validate_file_mode(mode: u32) -> Result<(), Error> {
-    if (mode & 0o077) == 0 {
+    if (mode & 0o_077) == 0 {
         Ok(())
     } else {
         Err(Error::new(ErrorKind::Other, "Wrong file's mode"))
@@ -200,14 +200,14 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_validate_file_mode() {
-        assert!(validate_file_mode(0o100600).is_ok());
-        assert!(validate_file_mode(0o600).is_ok());
-        assert!(validate_file_mode(0o111111).is_err());
-        assert!(validate_file_mode(0o100644).is_err());
-        assert!(validate_file_mode(0o100666).is_err());
-        assert!(validate_file_mode(0o100777).is_err());
-        assert!(validate_file_mode(0o100755).is_err());
-        assert!(validate_file_mode(0o644).is_err());
-        assert!(validate_file_mode(0o666).is_err());
+        assert!(validate_file_mode(0o_100_600).is_ok());
+        assert!(validate_file_mode(0o_600).is_ok());
+        assert!(validate_file_mode(0o_111_111).is_err());
+        assert!(validate_file_mode(0o_100_644).is_err());
+        assert!(validate_file_mode(0o_100_666).is_err());
+        assert!(validate_file_mode(0o_100_777).is_err());
+        assert!(validate_file_mode(0o_100_755).is_err());
+        assert!(validate_file_mode(0o_644).is_err());
+        assert!(validate_file_mode(0o_666).is_err());
     }
 }

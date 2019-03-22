@@ -39,11 +39,12 @@ use serde::ser::{Serialize, Serializer};
 
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
+use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
 use crate::storage::StorageValue;
 
-pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
+pub(crate) use self::helpers::HexStringRepresentation;
 pub use self::{
+    authorization::SignedMessage,
     helpers::{to_hex_string, BinaryForm},
     protocol::*,
 };
@@ -194,14 +195,19 @@ impl<T: ProtocolMessage> Signed<T> {
         &self.payload
     }
 
-    /// Returns reference to the signed message.
+    /// Returns a reference to the signed message.
     pub fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
 
-    /// Returns public key of the message creator.
+    /// Returns a public key of the message creator.
     pub fn author(&self) -> PublicKey {
         self.message.author()
+    }
+
+    /// Returns a signature of the message.
+    pub fn signature(&self) -> Signature {
+        self.message.signature()
     }
 }
 

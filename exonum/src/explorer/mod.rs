@@ -23,7 +23,7 @@ use std::{
     cell::{Ref, RefCell},
     collections::Bound,
     fmt,
-    ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+    ops::{Index, RangeBounds},
     slice,
 };
 
@@ -39,55 +39,17 @@ use crate::storage::{ListProof, Snapshot};
 /// Transaction parsing result.
 type ParseResult = Result<TransactionMessage, failure::Error>;
 
-/// Range of `Height`s.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HeightRange(pub Bound<Height>, pub Bound<Height>);
+/// Ending height of the range (exclusive), given the a priori max height.
+fn end_height(bound: Bound<&Height>, max: Height) -> Height {
+    use std::cmp::min;
 
-impl From<RangeFull> for HeightRange {
-    fn from(_: RangeFull) -> Self {
-        HeightRange(Bound::Unbounded, Bound::Unbounded)
-    }
-}
+    let inner_end = match bound {
+        Bound::Included(height) => height.next(),
+        Bound::Excluded(height) => *height,
+        Bound::Unbounded => max.next(),
+    };
 
-impl From<Range<Height>> for HeightRange {
-    fn from(range: Range<Height>) -> Self {
-        HeightRange(Bound::Included(range.start), Bound::Excluded(range.end))
-    }
-}
-
-impl From<RangeFrom<Height>> for HeightRange {
-    fn from(range: RangeFrom<Height>) -> Self {
-        HeightRange(Bound::Included(range.start), Bound::Unbounded)
-    }
-}
-
-impl From<RangeTo<Height>> for HeightRange {
-    fn from(range: RangeTo<Height>) -> Self {
-        HeightRange(Bound::Unbounded, Bound::Excluded(range.end))
-    }
-}
-
-impl HeightRange {
-    /// Ending height of the range (exclusive), given the a priori max height.
-    fn end_height(&self, max: Height) -> Height {
-        use std::cmp::min;
-
-        let inner_end = match self.1 {
-            Bound::Included(height) => height.next(),
-            Bound::Excluded(height) => height,
-            Bound::Unbounded => max.next(),
-        };
-
-        min(inner_end, max.next())
-    }
-
-    fn start_height(&self) -> Height {
-        match self.0 {
-            Bound::Included(height) => height,
-            Bound::Excluded(height) => height.next(),
-            Bound::Unbounded => Height(0),
-        }
-    }
+    min(inner_end, max.next())
 }
 
 /// Information about a block in the blockchain.
@@ -789,18 +751,21 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Iterates over blocks in the blockchain.
-    pub fn blocks<R: Into<HeightRange>>(&self, heights: R) -> Blocks {
+    pub fn blocks<R: RangeBounds<Height>>(&self, heights: R) -> Blocks {
         use std::cmp::max;
 
-        let heights = heights.into();
         let schema = Schema::new(&self.snapshot);
         let max_height = schema.height();
 
-        let ptr = heights.start_height();
+        let ptr = match heights.start_bound() {
+            Bound::Included(height) => *height,
+            Bound::Excluded(height) => height.next(),
+            Bound::Unbounded => Height(0),
+        };
         Blocks {
             explorer: self,
             ptr,
-            back: max(ptr, heights.end_height(max_height)),
+            back: max(ptr, end_height(heights.end_bound(), max_height)),
         }
     }
 }

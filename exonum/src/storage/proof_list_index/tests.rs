@@ -21,7 +21,7 @@ use super::{hash_one, hash_pair, root_hash, ListProof, ProofListIndex};
 use crate::crypto::{hash, CryptoHash, Hash};
 use crate::storage::Database;
 
-const IDX_NAME: &'static str = "idx_name";
+const IDX_NAME: &str = "idx_name";
 
 fn random_values(len: usize) -> Vec<Vec<u8>> {
     use std::collections::HashSet;
@@ -292,7 +292,7 @@ fn randomly_generate_proofs(db: Box<dyn Database>) {
         };
 
         let json_representation = to_string(&range_proof).unwrap();
-        assert!(json_representation.len() > 0);
+        assert!(!json_representation.is_empty());
         assert_eq!(range_proof, from_str(&json_representation).unwrap());
     }
 }
@@ -457,11 +457,11 @@ fn proof_structure(db: Box<dyn Database>) {
 
     // spell-checker:ignore upup
 
-    let h1 = hash(&vec![0, 1, 2]);
-    let h2 = hash(&vec![1, 2, 3]);
-    let h3 = hash(&vec![2, 3, 4]);
-    let h4 = hash(&vec![3, 4, 5]);
-    let h5 = hash(&vec![4, 5, 6]);
+    let h1 = hash(&[0, 1, 2]);
+    let h2 = hash(&[1, 2, 3]);
+    let h3 = hash(&[2, 3, 4]);
+    let h4 = hash(&[3, 4, 5]);
+    let h5 = hash(&[4, 5, 6]);
     let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
     let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
     let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());

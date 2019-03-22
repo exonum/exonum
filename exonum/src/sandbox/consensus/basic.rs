@@ -25,9 +25,10 @@ use crate::crypto::{gen_keypair_from_seed, CryptoHash, Hash, Seed, HASH_SIZE, SE
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Precommit, Signed};
 use crate::sandbox::{
-    sandbox::{self, timestamping_sandbox},
+    self,
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE, TIMESTAMPING_SERVICE},
+    timestamping_sandbox,
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
@@ -66,10 +67,10 @@ fn test_check_leader() {
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
     sandbox.broadcast(&sandbox.create_status(
-        &sandbox.p(ValidatorId(0)),
+        &sandbox.public_key(ValidatorId(0)),
         Height(1),
         &sandbox.last_block().hash(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 
     sandbox.send_peers_request();
@@ -118,7 +119,7 @@ fn test_reach_actual_round() {
         Round(4),
         &block_at_first_height.clone().hash(),
         &[], // there are no transactions in future propose
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     );
 
     sandbox.assert_state(Height(1), Round(1));
@@ -130,7 +131,7 @@ fn test_reach_actual_round() {
         Round(4),
         &block_at_first_height.clone().hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
 
     sandbox.assert_state(Height(1), Round(4));
@@ -166,7 +167,7 @@ fn test_reach_thirteen_height() {
 
     let target_height = 13;
 
-    for height in 2..target_height + 1 {
+    for height in 2..=target_height {
         add_one_height(&sandbox, &sandbox_state);
         sandbox.assert_state(Height(height), Round(1));
     }
@@ -220,13 +221,12 @@ fn test_retrieve_block_and_precommits() {
 
     let target_height = Height(6);
 
-    for _ in 2..target_height.0 + 1 {
+    for _ in 2..=target_height.0 {
         add_one_height(&sandbox, &sandbox_state)
     }
     sandbox.assert_state(target_height, Round(1));
 
     let bl_proof_option = sandbox.block_and_precommits(target_height.previous());
-    // use serde_json;
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
     let block = block_proof.block;

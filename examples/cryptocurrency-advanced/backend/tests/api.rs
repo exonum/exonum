@@ -239,12 +239,8 @@ impl CryptocurrencyApi {
             .unwrap();
 
         let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
-        let wallet = to_wallet
-            .all_entries()
-            .find(|(ref k, _)| **k == pub_key)
-            .and_then(|tuple| tuple.1)
-            .cloned();
-        wallet
+        let (_, wallet) = to_wallet.all_entries().find(|(&key, _)| key == pub_key)?;
+        wallet.cloned()
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
@@ -269,7 +265,7 @@ impl CryptocurrencyApi {
             .unwrap();
 
         let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
-        assert!(to_wallet.missing_keys().find(|v| **v == pub_key).is_some())
+        assert!(to_wallet.missing_keys().any(|&key| key == pub_key))
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
