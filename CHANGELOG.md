@@ -5,15 +5,40 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking changes
+
+#### exonum
+
+- `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
+  median precommit times in the `time` field within each returned block,
+  rather than in a separate array. (#1278)
+
+### Bug Fixes
+
+#### exonum-testkit
+
+- Fixed `TestKit::add_tx()` method, which previously did not persist transactions. (#1278)
+
 ### Internal improvements
 
 #### exonum
+
+- `explorer/v1/blocks` endpoint supports `add_precommits` param, which supplies
+  each returned block with the `precommits` field. (#1278)
+
+- `explorer/v1/blocks` endpoint allows to specify the lower bound on the returned
+  block height with the `earliest` query param. (#1278)
 
 - Added `ProtobufConvert` implementation for byte array with fixed sizes (#1279)
 
 - Added `service_name` getter to the `TransactionContext`. (#1274)
 
 - Allowed to use symbol `-` in index names. (#1277)
+
+#### exonum-testkit
+
+- Implemented "stopping" and "resuming" a `TestKit`, allowing to emulate node
+  restarts. (#1278)
 
 ## 0.11.0 - 2019-03-15
 
