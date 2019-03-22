@@ -110,14 +110,6 @@ impl Blockchain {
         }
     }
 
-    /// Returns mapping from the service identifier (`u16`) to service (`Box<dyn Service>`) for
-    /// all services.
-    pub fn service_map(&self) -> Arc<HashMap<u16, Box<dyn Service>>> {
-        // self.dispatcher.services()
-
-        unimplemented!()
-    }
-
     /// Creates a read-only snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()

@@ -321,13 +321,16 @@ impl ApiAggregator {
             Self::explorer_api(&blockchain, node_state.clone()),
         );
         // Adds services APIs.
-        inner.extend(blockchain.service_map().iter().map(|(_, service)| {
-            let mut builder = ServiceApiBuilder::with_blockchain(blockchain.clone());
-            service.wire_api(&mut builder);
-            // TODO think about prefixes for non web backends. (ECR-1758)
-            let prefix = format!("services/{}", service.service_name());
-            (prefix, builder)
-        }));
+
+        // TODO Service API not mounted.
+
+        // inner.extend(blockchain.service_map().iter().map(|(_, service)| {
+        //     let mut builder = ServiceApiBuilder::with_blockchain(blockchain.clone());
+        //     service.wire_api(&mut builder);
+        //     // TODO think about prefixes for non web backends. (ECR-1758)
+        //     let prefix = format!("services/{}", service.service_name());
+        //     (prefix, builder)
+        // }));
 
         Self {
             inner,
@@ -374,12 +377,17 @@ impl ApiAggregator {
 
     fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        let node_info = self::node::private::NodeInfo::new(
-            blockchain.service_map().iter().map(|(_, service)| service),
-        );
-        self::node::private::SystemApi::new(node_info, shared_api_state.clone())
-            .wire(builder.private_scope());
-        self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+        
+        // TODO Service API not mounted.
+
+        // let node_info = self::node::private::NodeInfo::new(
+        //     blockchain.service_map().iter().map(|(_, service)| service),
+        // );
+        // self::node::private::SystemApi::new(node_info, shared_api_state.clone())
+        //     .wire(builder.private_scope());
+        // self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+
+
         builder
     }
 }
