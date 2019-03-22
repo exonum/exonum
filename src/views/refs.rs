@@ -23,6 +23,8 @@ use crate::{
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, Snapshot,
 };
+use rand::Rng;
+use uuid::Uuid;
 
 pub trait AnyObject<T: IndexAccess> {
     fn view(self) -> View<T>;
@@ -153,9 +155,12 @@ impl Fork {
     where
         T: FromView<&'a Self>,
     {
-        let mut pool_length = self.pool_length_mut();
-        let address = IndexAddress::with_root("temp").append_bytes(&*pool_length);
-        *pool_length += 1;
+        let mut rng = rand::thread_rng();
+
+        let my_uuid = Uuid::new_v4();
+
+        let mut pool_length = rng.gen::<u64>();
+        let address = IndexAddress::with_root("temp").append_bytes(&my_uuid.into_bytes());
         let view = View::new(self, address);
         //TODO: don't create redundant metadata
         T::create(view)
@@ -250,8 +255,9 @@ mod tests {
     use crate::{
         db::Database,
         views::refs::{ObjectAccess, Ref, RefMut},
-        KeySetIndex, ListIndex, TemporaryDB,
+        KeySetIndex, ListIndex, ProofListIndex, TemporaryDB,
     };
+    use exonum_crypto::{Hash, PublicKey};
 
     #[test]
     fn basic_object_refs() {
@@ -342,7 +348,9 @@ mod tests {
         {
             let mut index: ListIndex<_, u32> = fork.create_object();
             index.push(1);
-            assert_eq!(index.len(), 1);
+
+            let mut index2: ListIndex<_, u32> = fork.create_object();
+            assert_eq!(index2.len(), 0);
             fork.insert("index", index);
         }
 
@@ -352,6 +360,31 @@ mod tests {
         let index1: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
 
         assert_eq!(index1.len(), 1);
+    }
+
+    #[test]
+    fn ref_proof_list() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let owner = PublicKey::zero();
+        {
+            let wallets_history: ProofListIndex<_, Hash> = fork.create_object();
+            let address = ("wallets.history", &owner);
+            fork.insert(address, wallets_history);
+            let mut history: RefMut<ProofListIndex<_, Hash>> =
+                fork.get_object_mut(address).unwrap();
+
+            history.push(Hash::zero());
+        }
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = &db.snapshot();
+        let address = ("wallets.history", &owner);
+
+        let history: Ref<ProofListIndex<_, Hash>> = snapshot.get_object(address).unwrap();
+
+        dbg!(history.get(0));
     }
 
 }

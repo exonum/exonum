@@ -14,7 +14,7 @@
 
 use std::{borrow::Cow, cell::Cell, mem};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
 use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
@@ -224,7 +224,15 @@ impl<T: IndexAccess> IndexesPool<T> {
             state: V::default(),
         };
 
-        self.0.put(index_name, metadata.to_bytes());
+        let index_name = if index_name == &[116, 101, 109, 112] {
+            let mut buf = vec![0u8; 8];
+            LittleEndian::write_u64(&mut buf, 0);
+            buf
+        } else {
+            index_name.to_vec()
+        };
+
+        self.0.put(&index_name, metadata.to_bytes());
         self.set_len(len + 1);
         metadata
     }

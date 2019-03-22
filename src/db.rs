@@ -397,7 +397,6 @@ pub enum Change {
 pub struct Fork {
     flushed: FlushedFork,
     working_patch: WorkingPatch,
-    pool_length: RefCell<u16>,
 }
 
 struct FlushedFork {
@@ -465,7 +464,6 @@ pub trait Database: Send + Sync + 'static {
                 patch: Patch::new(),
             },
             working_patch: WorkingPatch::new(),
-            pool_length: RefCell::new(0),
         }
     }
 
@@ -629,10 +627,6 @@ impl Fork {
     ///TODO: add documentation [ECR-2820
     pub fn working_patch(&self) -> &WorkingPatch {
         &self.working_patch
-    }
-
-    pub fn pool_length_mut(&self) -> RefMut<u16> {
-        self.pool_length.borrow_mut()
     }
 }
 

@@ -26,7 +26,7 @@ use exonum_crypto::Hash;
 use self::{key::ProofListKey, proof::ProofOfAbsence};
 use crate::{
     hash::HashTag,
-    views::{IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View, AnyObject},
+    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, ObjectHash,
 };
 

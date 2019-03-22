@@ -16,7 +16,7 @@
 
 pub use self::{
     metadata::{BinaryAttribute, IndexState, IndexType},
-    refs::AnyObject,
+    refs::{AnyObject, Ref, RefMut},
 };
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
@@ -165,13 +165,14 @@ where
         V: BinaryAttribute + Default + Copy,
     {
         // TODO Think about stricter restrictions for index names. [ECR-2834]
-        assert!(
-            !self.address.name().is_empty(),
-            "Index name must not be empty"
-        );
+        //        assert!(
+        //            !self.address.name().is_empty(),
+        //            "Index name must not be empty"
+        //        );
 
         let (index_address, index_state) =
             metadata::index_metadata(self.index_access, &self.address, self.index_type);
+
         let index_view = View::new(self.index_access, index_address);
 
         (index_view, index_state)

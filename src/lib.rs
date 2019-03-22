@@ -141,7 +141,7 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAccess, IndexBuilder},
+    views::{IndexAccess, IndexBuilder, Ref, RefMut},
 };
 
 /// A specialized `Result` type for I/O operations with storage.

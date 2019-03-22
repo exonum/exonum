@@ -76,7 +76,7 @@ where
     }
 
     fn object_type(&self) -> IndexType {
-        IndexType::KeySet
+        IndexType::ValueSet
     }
 
     fn metadata(&self) -> Vec<u8> {

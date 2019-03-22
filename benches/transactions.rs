@@ -24,7 +24,7 @@ use serde_derive::{Deserialize, Serialize};
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, IndexAccess, ListIndex,
-    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, Ref, RefMut, TemporaryDB,
 };
 
 const SEED: [u8; 16] = [100; 16];
@@ -212,7 +212,7 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let schema = Schema::new(fork);
+        let schema = RefSchema::new(fork);
         schema.transactions().put(&self.object_hash(), *self);
 
         let mut owner_wallet = schema.wallets().get(&self.sender).unwrap_or_default();
@@ -227,13 +227,85 @@ impl Transaction {
     }
 }
 
+struct RefSchema<'a>(&'a Fork);
+
+impl<'a> RefSchema<'a> {
+    fn new(index_access: &'a Fork) -> Self {
+        Self(index_access)
+    }
+
+    fn transactions(&self) -> RefMut<MapIndex<&Fork, Hash, Transaction>> {
+        let transactions: Option<RefMut<MapIndex<_, Hash, Transaction>>> =
+            self.0.get_object_mut("transactions");
+
+        match transactions {
+            Some(transactions) => transactions,
+            _ => {
+                let transactions: MapIndex<_, Hash, Transaction> = self.0.create_object();
+                self.0.insert("transactions", transactions);
+                self.0.get_object_mut("transactions").unwrap()
+            }
+        }
+    }
+
+    fn blocks(&self) -> RefMut<ListIndex<&Fork, Hash>> {
+        let blocks: Option<RefMut<ListIndex<_, Hash>>> = self.0.get_object_mut("blocks");
+
+        match blocks {
+            Some(blocks) => blocks,
+            _ => {
+                let blocks: ListIndex<_, Hash> = self.0.create_object();
+                self.0.insert("blocks", blocks);
+                self.0.get_object_mut("blocks").unwrap()
+            }
+        }
+    }
+
+    fn wallets(&self) -> RefMut<ProofMapIndex<&Fork, PublicKey, Wallet>> {
+        let wallets: Option<RefMut<ProofMapIndex<_, PublicKey, Wallet>>> =
+            self.0.get_object_mut("wallets");
+
+        match wallets {
+            Some(wallets) => wallets,
+            _ => {
+                let wallets: ProofMapIndex<_, PublicKey, Wallet> = self.0.create_object();
+                self.0.insert("wallets", wallets);
+                self.0.get_object_mut("wallets").unwrap()
+            }
+        }
+    }
+
+    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<&Fork, Hash>> {
+        let address = ("wallets.history", owner);
+        let wallets_history: Option<RefMut<ProofListIndex<_, Hash>>> =
+            self.0.get_object_mut(address);
+
+        match wallets_history {
+            Some(wallets_history) => wallets_history,
+            _ => {
+                let wallets_history: ProofListIndex<_, Hash> = self.0.create_object();
+                self.0.insert(address, wallets_history);
+                self.0.get_object_mut(address).unwrap()
+            }
+        }
+    }
+}
+
+impl<'a> RefSchema<'a> {
+    fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
+        let mut history = self.wallets_history(owner);
+        history.push(tx_hash);
+        history.object_hash()
+    }
+}
+
 impl Block {
     fn execute(&self, db: &TemporaryDB) {
         let fork = db.fork();
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        Schema::new(&fork).blocks().push(self.object_hash());
+        RefSchema::new(&fork).blocks().push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
@@ -284,9 +356,10 @@ pub fn bench_transactions(c: &mut Criterion) {
                         block.execute(&db)
                     }
                     // Some fast assertions.
-                    let snapshot = db.snapshot();
-                    let schema = Schema::new(&snapshot);
-                    assert_eq!(schema.blocks().len(), params.blocks as u64);
+                    //                    dbg!("let snapshot = db.fork()");
+                    //                    let snapshot = db.fork();
+                    //                    let schema = RefSchema::new(&snapshot);
+                    //                    assert_eq!(schema.blocks().len(), params.blocks as u64);
                 })
             },
             item_counts,
