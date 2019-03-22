@@ -23,7 +23,6 @@ use crate::{
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, Snapshot,
 };
-use rand::Rng;
 use uuid::Uuid;
 
 pub trait AnyObject<T: IndexAccess> {
@@ -129,9 +128,12 @@ where
     }
 }
 
+///TODO: add documentation [ECR-2820]
 pub trait ObjectAccess: IndexAccess {
+    ///TODO: add documentation [ECR-2820]
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self>;
 
+    ///TODO: add documentation [ECR-2820]
     fn get_object<I, T>(&self, address: I) -> Option<Ref<T>>
     where
         I: Into<IndexAddress>,
@@ -140,9 +142,17 @@ pub trait ObjectAccess: IndexAccess {
         T::get(self.create_view(address)).map(|value| Ref { value })
     }
 
-    fn get_object_mut< T, I>(&self, address: I) -> Option<RefMut<T>>    where
+    ///TODO: add documentation [ECR-2820]
+    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
+    where
         T: FromView<Self>,
         I: Into<IndexAddress>;
+
+    ///TODO: add documentation [ECR-2820]
+    fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
+    where
+        I: Into<IndexAddress>,
+        T: FromView<Self>;
 }
 
 impl ObjectAccess for &Box<dyn Snapshot> {
@@ -152,10 +162,28 @@ impl ObjectAccess for &Box<dyn Snapshot> {
         View::new(self, address)
     }
 
-    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>> where
+    fn get_object_mut<T, I>(&self, _address: I) -> Option<RefMut<T>>
+    where
         T: FromView<Self>,
-        I: Into<IndexAddress> {
+        I: Into<IndexAddress>,
+    {
         unimplemented!()
+    }
+
+    fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
+    where
+        I: Into<IndexAddress>,
+        T: FromView<Self>,
+    {
+        let address = address.into();
+        let object = T::get(self.create_view(address.clone())).map(|value| RefMut { value });
+
+        match object {
+            Some(object) => object,
+            _ => RefMut {
+                value: T::create(self.create_view(address)),
+            },
+        }
     }
 }
 
@@ -165,10 +193,28 @@ impl ObjectAccess for &Fork {
         View::new(self, address)
     }
 
-    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>> where
+    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
+    where
         T: FromView<Self>,
-        I: Into<IndexAddress> {
+        I: Into<IndexAddress>,
+    {
         T::get(self.create_view(address)).map(|value| RefMut { value })
+    }
+
+    fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
+    where
+        I: Into<IndexAddress>,
+        T: FromView<Self>,
+    {
+        let address = address.into();
+        let object = T::get(self.create_view(address.clone())).map(|value| RefMut { value });
+
+        match object {
+            Some(object) => object,
+            _ => RefMut {
+                value: T::create(self.create_view(address)),
+            },
+        }
     }
 }
 
@@ -205,6 +251,7 @@ impl Fork {
         T::get(view).map(|value| RefMut { value })
     }
 
+    ///TODO: add documentation [ECR-2820]
     pub fn get_or_create_object<'a, I, T>(&'a self, address: I) -> RefMut<T>
     where
         I: Into<IndexAddress>,
@@ -400,9 +447,9 @@ mod tests {
 
     struct RefSchema<T: ObjectAccess>(T);
 
-    impl <T:ObjectAccess> RefSchema<T> {
-        fn transactions(&self) -> Option<Ref<ListIndex<T, Hash>>> {
-            self.0.get_object("transactions")
+    impl<T: ObjectAccess> RefSchema<T> {
+        fn transactions(&self) -> RefMut<ListIndex<T, Hash>> {
+            self.0.get_or_create_object("transactions")
         }
     }
 

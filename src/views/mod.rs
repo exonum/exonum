@@ -16,7 +16,7 @@
 
 pub use self::{
     metadata::{BinaryAttribute, IndexState, IndexType},
-    refs::{AnyObject, Ref, RefMut},
+    refs::{AnyObject, ObjectAccess, Ref, RefMut},
 };
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};

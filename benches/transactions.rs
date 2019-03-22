@@ -24,7 +24,7 @@ use serde_derive::{Deserialize, Serialize};
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, IndexAccess, ListIndex,
-    MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, Ref, RefMut, TemporaryDB,
+    MapIndex, ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, Ref, RefMut, TemporaryDB,
 };
 
 const SEED: [u8; 16] = [100; 16];
@@ -227,31 +227,31 @@ impl Transaction {
     }
 }
 
-struct RefSchema<'a>(&'a Fork);
+struct RefSchema<T: ObjectAccess>(T);
 
-impl<'a> RefSchema<'a> {
-    fn new(index_access: &'a Fork) -> Self {
+impl<T: ObjectAccess> RefSchema<T> {
+    fn new(index_access: T) -> Self {
         Self(index_access)
     }
 
-    fn transactions(&self) -> RefMut<MapIndex<&Fork, Hash, Transaction>> {
+    fn transactions(&self) -> RefMut<MapIndex<T, Hash, Transaction>> {
         self.0.get_or_create_object("transactions")
     }
 
-    fn blocks(&self) -> RefMut<ListIndex<&Fork, Hash>> {
+    fn blocks(&self) -> RefMut<ListIndex<T, Hash>> {
         self.0.get_or_create_object("blocks")
     }
 
-    fn wallets(&self) -> RefMut<ProofMapIndex<&Fork, PublicKey, Wallet>> {
+    fn wallets(&self) -> RefMut<ProofMapIndex<T, PublicKey, Wallet>> {
         self.0.get_or_create_object("wallets")
     }
 
-    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<&Fork, Hash>> {
+    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
         self.0.get_or_create_object(("wallets.history", owner))
     }
 }
 
-impl<'a> RefSchema<'a> {
+impl<T: ObjectAccess> RefSchema<T> {
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
         let mut history = self.wallets_history(owner);
         history.push(tx_hash);
@@ -316,7 +316,7 @@ pub fn bench_transactions(c: &mut Criterion) {
                         block.execute(&db)
                     }
                     // Some fast assertions.
-                    let snapshot = db.fork();
+                    let snapshot = db.snapshot();
                     let schema = RefSchema::new(&snapshot);
                     assert_eq!(schema.blocks().len(), params.blocks as u64);
                 })

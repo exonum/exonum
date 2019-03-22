@@ -14,7 +14,7 @@
 
 use std::{borrow::Cow, cell::Cell, mem};
 
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
 use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
