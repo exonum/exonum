@@ -356,10 +356,9 @@ pub fn bench_transactions(c: &mut Criterion) {
                         block.execute(&db)
                     }
                     // Some fast assertions.
-                    //                    dbg!("let snapshot = db.fork()");
-                    //                    let snapshot = db.fork();
-                    //                    let schema = RefSchema::new(&snapshot);
-                    //                    assert_eq!(schema.blocks().len(), params.blocks as u64);
+                    let snapshot = db.fork();
+                    let schema = RefSchema::new(&snapshot);
+                    assert_eq!(schema.blocks().len(), params.blocks as u64);
                 })
             },
             item_counts,
