@@ -224,15 +224,7 @@ impl<T: IndexAccess> IndexesPool<T> {
             state: V::default(),
         };
 
-        let index_name = if index_name == &[116, 101, 109, 112] {
-            let mut buf = vec![0u8; 8];
-            LittleEndian::write_u64(&mut buf, 0);
-            buf
-        } else {
-            index_name.to_vec()
-        };
-
-        self.0.put(&index_name, metadata.to_bytes());
+        self.0.put(index_name, metadata.to_bytes());
         self.set_len(len + 1);
         metadata
     }

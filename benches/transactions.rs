@@ -235,59 +235,19 @@ impl<'a> RefSchema<'a> {
     }
 
     fn transactions(&self) -> RefMut<MapIndex<&Fork, Hash, Transaction>> {
-        let transactions: Option<RefMut<MapIndex<_, Hash, Transaction>>> =
-            self.0.get_object_mut("transactions");
-
-        match transactions {
-            Some(transactions) => transactions,
-            _ => {
-                let transactions: MapIndex<_, Hash, Transaction> = self.0.create_object();
-                self.0.insert("transactions", transactions);
-                self.0.get_object_mut("transactions").unwrap()
-            }
-        }
+        self.0.get_or_create_object("transactions")
     }
 
     fn blocks(&self) -> RefMut<ListIndex<&Fork, Hash>> {
-        let blocks: Option<RefMut<ListIndex<_, Hash>>> = self.0.get_object_mut("blocks");
-
-        match blocks {
-            Some(blocks) => blocks,
-            _ => {
-                let blocks: ListIndex<_, Hash> = self.0.create_object();
-                self.0.insert("blocks", blocks);
-                self.0.get_object_mut("blocks").unwrap()
-            }
-        }
+        self.0.get_or_create_object("blocks")
     }
 
     fn wallets(&self) -> RefMut<ProofMapIndex<&Fork, PublicKey, Wallet>> {
-        let wallets: Option<RefMut<ProofMapIndex<_, PublicKey, Wallet>>> =
-            self.0.get_object_mut("wallets");
-
-        match wallets {
-            Some(wallets) => wallets,
-            _ => {
-                let wallets: ProofMapIndex<_, PublicKey, Wallet> = self.0.create_object();
-                self.0.insert("wallets", wallets);
-                self.0.get_object_mut("wallets").unwrap()
-            }
-        }
+        self.0.get_or_create_object("wallets")
     }
 
     fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<&Fork, Hash>> {
-        let address = ("wallets.history", owner);
-        let wallets_history: Option<RefMut<ProofListIndex<_, Hash>>> =
-            self.0.get_object_mut(address);
-
-        match wallets_history {
-            Some(wallets_history) => wallets_history,
-            _ => {
-                let wallets_history: ProofListIndex<_, Hash> = self.0.create_object();
-                self.0.insert(address, wallets_history);
-                self.0.get_object_mut(address).unwrap()
-            }
-        }
+        self.0.get_or_create_object(("wallets.history", owner))
     }
 }
 

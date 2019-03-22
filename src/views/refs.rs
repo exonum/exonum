@@ -139,6 +139,10 @@ pub trait ObjectAccess: IndexAccess {
     {
         T::get(self.create_view(address)).map(|value| Ref { value })
     }
+
+    fn get_object_mut< T, I>(&self, address: I) -> Option<RefMut<T>>    where
+        T: FromView<Self>,
+        I: Into<IndexAddress>;
 }
 
 impl ObjectAccess for &Box<dyn Snapshot> {
@@ -146,6 +150,25 @@ impl ObjectAccess for &Box<dyn Snapshot> {
     fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self> {
         let address = address.into();
         View::new(self, address)
+    }
+
+    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>> where
+        T: FromView<Self>,
+        I: Into<IndexAddress> {
+        unimplemented!()
+    }
+}
+
+impl ObjectAccess for &Fork {
+    fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self> {
+        let address = address.into();
+        View::new(self, address)
+    }
+
+    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>> where
+        T: FromView<Self>,
+        I: Into<IndexAddress> {
+        T::get(self.create_view(address)).map(|value| RefMut { value })
     }
 }
 
@@ -155,12 +178,8 @@ impl Fork {
     where
         T: FromView<&'a Self>,
     {
-        let mut rng = rand::thread_rng();
-
-        let my_uuid = Uuid::new_v4();
-
-        let mut pool_length = rng.gen::<u64>();
-        let address = IndexAddress::with_root("temp").append_bytes(&my_uuid.into_bytes());
+        let temp_uuid = Uuid::new_v4();
+        let address = IndexAddress::default().append_bytes(&temp_uuid.into_bytes());
         let view = View::new(self, address);
         //TODO: don't create redundant metadata
         T::create(view)
@@ -184,6 +203,23 @@ impl Fork {
     {
         let view = View::new(self, address);
         T::get(view).map(|value| RefMut { value })
+    }
+
+    pub fn get_or_create_object<'a, I, T>(&'a self, address: I) -> RefMut<T>
+    where
+        I: Into<IndexAddress>,
+        T: FromView<&'a Self>,
+    {
+        let address = address.into();
+        let view = View::new(self, address.clone());
+        let object = T::get(view).map(|value| RefMut { value });
+
+        match object {
+            Some(object) => object,
+            _ => RefMut {
+                value: T::create(View::new(self, address)),
+            },
+        }
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -362,29 +398,22 @@ mod tests {
         assert_eq!(index1.len(), 1);
     }
 
-    #[test]
-    fn ref_proof_list() {
-        let db = TemporaryDB::new();
-        let fork = db.fork();
-        let owner = PublicKey::zero();
-        {
-            let wallets_history: ProofListIndex<_, Hash> = fork.create_object();
-            let address = ("wallets.history", &owner);
-            fork.insert(address, wallets_history);
-            let mut history: RefMut<ProofListIndex<_, Hash>> =
-                fork.get_object_mut(address).unwrap();
+    struct RefSchema<T: ObjectAccess>(T);
 
-            history.push(Hash::zero());
+    impl <T:ObjectAccess> RefSchema<T> {
+        fn transactions(&self) -> Option<Ref<ListIndex<T, Hash>>> {
+            self.0.get_object("transactions")
         }
-
-        db.merge(fork.into_patch()).unwrap();
-
-        let snapshot = &db.snapshot();
-        let address = ("wallets.history", &owner);
-
-        let history: Ref<ProofListIndex<_, Hash>> = snapshot.get_object(address).unwrap();
-
-        dbg!(history.get(0));
     }
 
+    #[test]
+    fn schema_use() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        let schema = RefSchema(&fork);
+        let snapshot = db.snapshot();
+        let schema = RefSchema(&snapshot);
+        db.merge(fork.into_patch());
+    }
 }
