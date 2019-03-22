@@ -78,121 +78,10 @@ pub const CORE_SERVICE: u16 = 0;
 /// into a single network.
 pub struct Blockchain {
     db: Arc<dyn Database>,
-    dispatcher: StaticServiceDispatcher,
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
     new_dispatcher: Arc<Mutex<Dispatcher>>,
-}
-
-#[derive(Clone)]
-struct StaticServiceDispatcher {
-    service_map: Arc<HashMap<u16, Box<dyn Service>>>,
-}
-
-impl StaticServiceDispatcher {
-    pub fn new(services: Vec<Box<dyn Service>>) -> Self {
-        let mut service_map = HashMap::new();
-        for service in services {
-            let id = service.service_id();
-            if service_map.contains_key(&id) {
-                panic!(
-                    "Services have already contain service with id={}, please change it.",
-                    id
-                );
-            }
-            service_map.insert(id, service);
-        }
-
-        Self {
-            service_map: Arc::new(service_map),
-        }
-    }
-
-    // TODO clarify if we need this method
-    pub fn services(&self) -> Arc<HashMap<u16, Box<dyn Service>>> {
-        self.service_map.clone()
-    }
-
-    fn service(&self, service_id: u16) -> Result<&Box<dyn Service>, failure::Error> {
-        self.service_map.get(&service_id).ok_or_else(|| {
-            failure::err_msg(format!("Service not found. Service id: {}", service_id))
-        })
-    }
-
-    // TODO Do we need this method? It's only used in `struct Blockchain`.
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        // TODO getting service twice? in execute_transaction and here
-        let service = self.service(raw.service_id())?;
-        service.tx_from_raw(raw)
-    }
-
-    pub fn execute_transaction(
-        &self,
-        raw: Signed<RawTransaction>,
-        fork: &mut Fork,
-    ) -> Result<TransactionResult, failure::Error> {
-        let (tx, raw, service_name) = {
-            let service = self.service(raw.service_id())?;
-
-            let service_name = service.service_name();
-
-            let tx = service
-                .tx_from_raw(raw.payload().clone())
-                .map_err(|error| {
-                    format_err!(
-                        "Service <{}>: {}, tx: {:?}",
-                        service_name,
-                        error,
-                        raw.hash()
-                    )
-                })?;
-            (tx, raw, service_name)
-        };
-
-        fork.checkpoint();
-
-        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            let context = TransactionContext::new(&mut *fork, &raw);
-            tx.execute(context)
-        }));
-
-        let tx_result = TransactionResult(match catch_result {
-            Ok(execution_result) => {
-                match execution_result {
-                    Ok(()) => {
-                        fork.commit();
-                    }
-                    Err(ref e) => {
-                        // Unlike panic, transaction failure isn't that rare, so logging the
-                        // whole transaction body is an overkill: it can be relatively big.
-                        info!(
-                            "Service <{}>: {:?} transaction execution failed: {:?}",
-                            service_name,
-                            raw.hash(),
-                            e
-                        );
-                        fork.rollback();
-                    }
-                }
-                execution_result.map_err(TransactionError::from)
-            }
-            Err(err) => {
-                if err.is::<Error>() {
-                    // Continue panic unwind if the reason is StorageError.
-                    panic::resume_unwind(err);
-                }
-                fork.rollback();
-                error!(
-                    "Service <{}>: {:?} transaction execution panicked: {:?}",
-                    service_name, tx, err
-                );
-                Err(TransactionError::from_panic(&err))
-            }
-        });
-
-        Ok(tx_result)
-    }
 }
 
 impl Blockchain {
@@ -206,7 +95,6 @@ impl Blockchain {
     ) -> Self {
         Self {
             db: storage.into(),
-            dispatcher: StaticServiceDispatcher::new(services),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
             new_dispatcher: Arc::new(Mutex::new(Dispatcher::default())),
@@ -225,7 +113,9 @@ impl Blockchain {
     /// Returns mapping from the service identifier (`u16`) to service (`Box<dyn Service>`) for
     /// all services.
     pub fn service_map(&self) -> Arc<HashMap<u16, Box<dyn Service>>> {
-        self.dispatcher.services()
+        // self.dispatcher.services()
+
+        unimplemented!()
     }
 
     /// Creates a read-only snapshot of the current storage state.
@@ -248,7 +138,9 @@ impl Blockchain {
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         // TODO do we need this method to be public?
         // It's used for checking in consensus.rs and in explorer/mod.rs
-        self.dispatcher.tx_from_raw(raw)
+        // self.dispatcher.tx_from_raw(raw)
+
+        unimplemented!()
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -333,17 +225,21 @@ impl Blockchain {
         let patch = {
             let mut fork = self.fork();
             // Update service tables
-            for (_, service) in self.dispatcher.services().iter() {
-                let cfg = service.initialize(&mut fork);
-                let name = service.service_name();
-                if config_propose.services.contains_key(name) {
-                    panic!(
-                        "Services already contain service with '{}' name, please change it",
-                        name
-                    );
-                }
-                config_propose.services.insert(name.into(), cfg);
-            }
+
+            // TODO service init?
+            // for (_, service) in self.dispatcher.services().iter() {
+            //     let cfg = service.initialize(&mut fork);
+            //     let name = service.service_name();
+            //     if config_propose.services.contains_key(name) {
+            //         panic!(
+            //             "Services already contain service with '{}' name, please change it",
+            //             name
+            //         );
+            //     }
+            //     config_propose.services.insert(name.into(), cfg);
+            // }
+
+
             // Commit actual configuration
             {
                 let mut schema = Schema::new(&mut fork);
@@ -385,12 +281,16 @@ impl Blockchain {
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
-        if !self.dispatcher.services().contains_key(&service_id) {
-            return Err(format_err!(
-                "Unable to broadcast transaction: no service with ID={} found",
-                service_id
-            ));
-        }
+        
+        // TODO check if service exists?
+
+        // if !self.dispatcher.services().contains_key(&service_id) {
+        //     return Err(format_err!(
+        //         "Unable to broadcast transaction: no service with ID={} found",
+        //         service_id
+        //     ));
+        // }
+
         let msg = Message::sign_transaction(
             tx.service_transaction(),
             service_id,
@@ -425,12 +325,15 @@ impl Blockchain {
             }
 
             // Invoke execute method for all services.
-            for service in self.dispatcher.services().values() {
-                // Skip execution for genesis block.
-                if height > Height(0) {
-                    before_commit(service.as_ref(), &mut fork);
-                }
-            }
+
+            // TODO invoke before commit
+
+            // for service in self.dispatcher.services().values() {
+            //     // Skip execution for genesis block.
+            //     if height > Height(0) {
+            //         before_commit(service.as_ref(), &mut fork);
+            //     }
+            // }
 
             // Get tx & state hash.
             let (tx_hash, state_hash) = {
@@ -445,14 +348,16 @@ impl Blockchain {
                         state_hashes.push((key, core_table_hash));
                     }
 
-                    for service in self.dispatcher.services().values() {
-                        let service_id = service.service_id();
-                        let vec_service_state = service.state_hash(&fork);
-                        for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                            let key = Self::service_table_unique_key(service_id, idx);
-                            state_hashes.push((key, service_table_hash));
-                        }
-                    }
+                    // TODO state hashes?
+
+                    // for service in self.dispatcher.services().values() {
+                    //     let service_id = service.service_id();
+                    //     let vec_service_state = service.state_hash(&fork);
+                    //     for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
+                    //         let key = Self::service_table_unique_key(service_id, idx);
+                    //         state_hashes.push((key, service_table_hash));
+                    //     }
+                    // }
 
                     state_hashes
                 };
@@ -515,15 +420,17 @@ impl Blockchain {
             raw
         };
 
-        let tx_result = self.dispatcher.execute_transaction(raw, fork)?;
+        // TODO execute transaction
+        unimplemented!();
+        // let tx_result = self.dispatcher.execute_transaction(raw, fork)?;
 
-        let mut schema = Schema::new(fork);
-        schema.transaction_results_mut().put(&tx_hash, tx_result);
-        schema.commit_transaction(&tx_hash);
-        schema.block_transactions_mut(height).push(tx_hash);
-        let location = TxLocation::new(height, index as u64);
-        schema.transactions_locations_mut().put(&tx_hash, location);
-        Ok(())
+        // let mut schema = Schema::new(fork);
+        // schema.transaction_results_mut().put(&tx_hash, tx_result);
+        // schema.commit_transaction(&tx_hash);
+        // schema.block_transactions_mut(height).push(tx_hash);
+        // let location = TxLocation::new(height, index as u64);
+        // schema.transactions_locations_mut().put(&tx_hash, location);
+        // Ok(())
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
@@ -561,16 +468,19 @@ impl Blockchain {
         self.merge(patch)?;
 
         // Invokes `after_commit` for each service in order of their identifiers
-        for (service_id, service) in self.dispatcher.services().iter() {
-            let context = ServiceContext::new(
-                self.service_keypair.0,
-                self.service_keypair.1.clone(),
-                self.api_sender.clone(),
-                self.fork(),
-                *service_id,
-            );
-            service.after_commit(&context);
-        }
+        
+        // TODO invoke after_commit
+
+        // for (service_id, service) in self.dispatcher.services().iter() {
+        //     let context = ServiceContext::new(
+        //         self.service_keypair.0,
+        //         self.service_keypair.1.clone(),
+        //         self.api_sender.clone(),
+        //         self.fork(),
+        //         *service_id,
+        //     );
+        //     service.after_commit(&context);
+        // }
         Ok(())
     }
 
@@ -662,7 +572,6 @@ impl Clone for Blockchain {
     fn clone(&self) -> Self {
         Self {
             db: Arc::clone(&self.db),
-            dispatcher: self.dispatcher.clone(),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),
             new_dispatcher: Arc::clone(&self.new_dispatcher),
