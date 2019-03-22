@@ -441,9 +441,29 @@ fn test_explorer_blocks_basic() {
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height(), Height(0));
-    assert_eq!(*blocks[0].block.prev_hash(), crypto::Hash::default());
+    assert_eq!(*blocks[0].block.prev_hash(), crypto::Hash::zero());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(1));
+
+    // Check JSON presentation of the block
+    let response: serde_json::Value = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=10")
+        .unwrap();
+    assert_eq!(
+        response,
+        json!({
+            "range": { "start": 0, "end": 1 },
+            "blocks": [{
+                "proposer_id": 0,
+                "height": 0,
+                "tx_count": 0,
+                "prev_hash": crypto::Hash::zero(),
+                "tx_hash": crypto::Hash::zero(),
+                "state_hash": blocks[0].block.state_hash(),
+            }],
+        })
+    );
 
     // Check empty block creation
     testkit.create_block();
@@ -460,6 +480,48 @@ fn test_explorer_blocks_basic() {
     assert_eq!(*blocks[1].block.prev_hash(), crypto::Hash::default());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
+
+    // Check positioning of `precommits` and `block_time` within response.
+    let response: serde_json::Value = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&earliest=1&add_precommits=true")
+        .unwrap();
+    let precommit = testkit.explorer().block(Height(1)).unwrap().precommits()[0].clone();
+    assert_eq!(
+        response,
+        json!({
+            "range": { "start": 1, "end": 2 },
+            "blocks": [{
+                "proposer_id": 0,
+                "height": 1,
+                "tx_count": 0,
+                "prev_hash": blocks[1].block.hash(),
+                "tx_hash": crypto::Hash::zero(),
+                "state_hash": blocks[0].block.state_hash(),
+                "precommits": [precommit],
+            }],
+        })
+    );
+
+    let response: serde_json::Value = api
+        .public(ApiKind::Explorer)
+        .get("v1/blocks?count=10&earliest=1&add_blocks_time=true")
+        .unwrap();
+    assert_eq!(
+        response,
+        json!({
+            "range": { "start": 1, "end": 2 },
+            "blocks": [{
+                "proposer_id": 0,
+                "height": 1,
+                "tx_count": 0,
+                "prev_hash": blocks[1].block.hash(),
+                "tx_hash": crypto::Hash::zero(),
+                "state_hash": blocks[0].block.state_hash(),
+                "time": precommit.time(),
+            }],
+        })
+    );
 }
 
 #[test]

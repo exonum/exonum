@@ -52,15 +52,22 @@ pub struct BlocksRange {
 }
 
 /// Information about a block in the blockchain.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
+    #[serde(flatten)]
     pub block: Block,
+
     /// Precommits authorizing the block.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub precommits: Option<Vec<Signed<Precommit>>>,
+
     /// Hashes of transactions in the block.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub txs: Option<Vec<Hash>>,
+
     /// Median time from the block precommits.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub time: Option<DateTime<Utc>>,
 }
 
