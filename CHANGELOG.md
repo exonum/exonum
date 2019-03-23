@@ -17,7 +17,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-testkit
 
-- Fixed `TestKit::add_tx()` method, which previously did not persist transactions. (#1278)
+- Fixed `TestKit::add_tx()` method, which previously did not persist
+  transactions. (#1278)
 
 ### Internal improvements
 
