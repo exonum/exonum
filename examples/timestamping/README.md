@@ -54,7 +54,7 @@ git clone https://github.com/exonum/exonum
 
 cd exonum/examples/timestamping/backend
 
-cargo install
+cargo install --path .
 ```
 
 Generate blockchain configuration:

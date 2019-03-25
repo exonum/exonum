@@ -56,9 +56,11 @@ service on 4 nodes on the local machine.
 Build the project:
 
 ```sh
-cd examples/cryptocurrency-advanced/backend
+git clone https://github.com/exonum/exonum
 
-cargo install
+cd exonum/examples/cryptocurrency-advanced/backend
+
+cargo install --path .
 ```
 
 Generate template:

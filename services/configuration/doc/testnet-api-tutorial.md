@@ -33,7 +33,11 @@ To build an [example binary](../examples/configuration.rs) of exonum
 blockchain with the single configuration service mounted, run:
 
 ```bash
-cargo install --example configuration
+git clone https://github.com/exonum/exonum
+
+cd exonum/services/configuration
+
+cargo install --example configuration --path .
 ```
 
 `exonum` crate system dependencies and rust toolchain configuration -
