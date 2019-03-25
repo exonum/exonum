@@ -32,7 +32,7 @@ serde = "1.0.10"
 serde_derive = "1.0.64"
 serde_json = "1.0.19"
 erased-serde = "0.3"
-toml = "0.4.10"
+toml = "0.5.0"
 clap = "2.31.2"
 env_logger = "0.6.0"
 atty = "0.2.11"
@@ -54,7 +54,7 @@ snow = { version = "0.5.2", default-features = false }
 rust_decimal = "0.11.2"
 protobuf = { version = "2.4.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
-rpassword = "2.1.0"
+rpassword = "3.0.0"
 zeroize = "0.5.2"
 
 exonum_rocksdb = "0.7.4"
