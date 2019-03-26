@@ -236,7 +236,7 @@ impl Fork {
         T: FromView<&'a Self>,
     {
         let temp_uuid = Uuid::new_v4();
-        let address = IndexAddress::default().append_bytes(&temp_uuid.into_bytes());
+        let address = IndexAddress::with_root("tmp").append_bytes(&temp_uuid.into_bytes());
         //TODO: don't create redundant metadata
         T::create(address, &self)
     }
