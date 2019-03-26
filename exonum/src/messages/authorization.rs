@@ -3,7 +3,7 @@ use hex::{FromHex, ToHex};
 
 use std::fmt;
 
-use super::EMPTY_SIGNED_MESSAGE_SIZE;
+use super::SIGNED_MESSAGE_MIN_SIZE;
 use crate::crypto::{
     self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
     SIGNATURE_LENGTH,
@@ -73,6 +73,12 @@ impl SignedMessage {
     /// Signature of the exonum message.
     pub fn signature(&self) -> &Signature {
         &self.sign
+    }
+
+    /// Signature of the exonum message.
+    #[cfg(test)]
+    pub fn signature_mut(&mut self) -> &mut Signature {
+        &mut self.sign
     }
 
     /// Exonum message

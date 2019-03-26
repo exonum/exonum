@@ -42,17 +42,17 @@ use crate::proto::{
 use crate::storage::{proof_list_index as merkle, StorageValue};
 use protobuf::Message as PbMessage;
 
-/// `SignedMessage` size with zero bytes payload.
+/// Lower bound on the size of the correct `SignedMessage`.
 #[doc(hidden)]
-pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
-    PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>() * 2;
+pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH;
 
+// TODO: Redo with regard to pb.
 /// `Signed<TransactionsResponse>` size without transactions inside.
 #[doc(hidden)]
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
-    EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u8>() * 8;
+    SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u8>() * 8;
 
-pub const PB_VECTOR_HEADER_UPPER_BOUND: usize = mem::size_of::<u8>() * 4;
+pub const PB_VECTOR_HEADER_UPPER_BOUND: usize = mem::size_of::<u8>() * 10;
 
 /// Connect to a node.
 ///

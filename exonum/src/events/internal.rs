@@ -116,7 +116,9 @@ mod tests {
     use std::thread;
 
     use super::*;
-    use crate::crypto::{gen_keypair, Signature};
+    use crate::crypto::{gen_keypair, Hash, Signature};
+    use crate::helpers::Height;
+    use crate::messages::{BinaryForm, Message, Status};
 
     fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);
@@ -145,25 +147,28 @@ mod tests {
         thread.join().unwrap()
     }
 
+    fn get_signed_message() -> SignedMessage {
+        let (pk, sk) = gen_keypair();
+        let msg = Message::concrete(Status::new(Height(0), &Hash::zero()), pk, &sk);
+        msg.signed_message().clone()
+    }
+
     #[test]
     fn verify_msg() {
-        //        let (pk, sk) = gen_keypair();
-        //        let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
-        //
-        //        let expected_event =
-        //            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
-        //        let event = verify_message(tx.raw().to_vec());
-        //        assert_eq!(event, Some(expected_event));
-        unimplemented!()
+        let tx = get_signed_message();
+
+        let expected_event =
+            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
+        let event = verify_message(tx.encode().unwrap());
+        assert_eq!(event, Some(expected_event));
     }
 
     #[test]
     fn verify_incorrect_msg() {
-        //        let (pk, _) = gen_keypair();
-        //        let tx = SignedMessage::new_with_signature(0, 0, &vec![0; 200], pk, Signature::zero());
-        //
-        //        let event = verify_message(tx.raw().to_vec());
-        //        assert_eq!(event, None);
-        unimplemented!()
+        let mut tx = get_signed_message();
+        *tx.signature_mut() = Signature::zero();
+
+        let event = verify_message(tx.encode().unwrap());
+        assert_eq!(event, None);
     }
 }

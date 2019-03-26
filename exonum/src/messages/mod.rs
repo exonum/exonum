@@ -132,6 +132,12 @@ impl<T> Signed<T> {
     pub fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
+
+    /// Returns reference to the signed message.
+    #[cfg(test)]
+    pub fn signed_message_mut(&mut self) -> &mut SignedMessage {
+        &mut self.message
+    }
 }
 
 impl<T> ToHex for Signed<T> {

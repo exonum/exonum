@@ -55,7 +55,7 @@ use crate::storage::{Fork, Snapshot};
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{Signed, RawTransaction};
+/// # use exonum::messages::{Signed, AnyTx};
 /// # use exonum::storage::{Fork, Snapshot};
 ///
 /// // Reused constants
@@ -125,7 +125,7 @@ use crate::storage::{Fork, Snapshot};
 ///         MyServiceSchema::new(snapshot).state_hash()
 ///     }
 ///
-///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+///     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
 ///         let tx = MyTransactions::tx_from_raw(raw)?;
 ///         Ok(tx.into())
 ///     }
