@@ -29,6 +29,7 @@ use crate::{
     views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, ObjectHash,
 };
+use crate::views::IndexAddress;
 
 mod key;
 mod proof;
@@ -187,6 +188,29 @@ where
             state,
             _v: PhantomData,
         }
+    }
+
+    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        let (base, state) = IndexBuilder::from_address(address, access)
+            .index_type(IndexType::ProofList)
+            .build();
+
+        Self {
+            base,
+            state,
+            _v: PhantomData,
+        }
+    }
+
+    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        IndexBuilder::from_address(address, access)
+            .index_type(IndexType::ProofList)
+            .build_existed()
+            .map(|(base, state)| Self {
+                base,
+                state,
+                _v: PhantomData,
+            })
     }
 
     fn has_branch(&self, key: ProofListKey) -> bool {

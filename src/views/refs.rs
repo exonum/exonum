@@ -40,6 +40,9 @@ where
 
     ///TODO: add documentation [ECR-2820]
     fn create(view: View<T>) -> Self;
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self;
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self>;
 }
 
 impl<T, V> FromView<T> for ListIndex<T, V>
@@ -53,6 +56,14 @@ where
 
     fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
+    }
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) ->Option<Self> {
+        Self::get_from(address, access)
     }
 }
 
@@ -68,6 +79,14 @@ where
     fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
+    }
 }
 
 impl<T, K> FromView<T> for KeySetIndex<T, K>
@@ -82,6 +101,14 @@ where
     fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        unimplemented!()
+    }
+
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        unimplemented!()
+    }
 }
 
 impl<T, V> FromView<T> for ProofListIndex<T, V>
@@ -95,6 +122,14 @@ where
 
     fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
+    }
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
     }
 }
 
@@ -111,6 +146,14 @@ where
     fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
     }
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
+    }
 }
 
 impl<T, K, V> FromView<T> for MapIndex<T, K, V>
@@ -125,6 +168,14 @@ where
 
     fn create(view: View<T>) -> Self {
         Self::create_from_view(view)
+    }
+
+    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
     }
 }
 
@@ -181,7 +232,7 @@ impl ObjectAccess for &Box<dyn Snapshot> {
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create(self.create_view(address)),
+                value: T::create_from( address, self),
             },
         }
     }
@@ -207,12 +258,12 @@ impl ObjectAccess for &Fork {
         T: FromView<Self>,
     {
         let address = address.into();
-        let object = T::get(self.create_view(address.clone())).map(|value| RefMut { value });
+        let object = T::get_from(address.clone(), self).map(|value| RefMut { value });
 
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create(self.create_view(address)),
+                value: T::create_from( address, self),
             },
         }
     }
@@ -258,13 +309,12 @@ impl Fork {
         T: FromView<&'a Self>,
     {
         let address = address.into();
-        let view = View::new(self, address.clone());
-        let object = T::get(view).map(|value| RefMut { value });
+        let object = T::get_from(address.clone(), self).map(|value| RefMut { value });
 
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create(View::new(self, address)),
+                value: T::create_from( address, self),
             },
         }
     }
@@ -302,13 +352,13 @@ impl Fork {
 #[derive(Debug)]
 ///TODO: add documentation [ECR-2820]
 pub struct Ref<T> {
-    value: T,
+    pub value: T,
 }
 
 #[derive(Debug)]
 ///TODO: add documentation [ECR-2820]
 pub struct RefMut<T> {
-    value: T,
+    pub value: T,
 }
 
 impl<T> Deref for Ref<T> {

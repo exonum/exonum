@@ -25,6 +25,7 @@ use super::{
     db::{Change, ChangesRef, ForkIter, ViewChanges},
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
+use crate::Changes;
 
 mod metadata;
 mod refs;

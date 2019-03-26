@@ -24,7 +24,7 @@ use super::{
     views::{AnyObject, IndexAccess, IndexBuilder, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue,
 };
-use crate::views::IndexState;
+use crate::views::{IndexState, IndexAddress};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -194,6 +194,31 @@ where
 
     pub fn create_from_view(view: View<T>) -> Self {
         let (base, state) = IndexBuilder::for_view(view)
+            .index_type(IndexType::Map)
+            .build::<()>();
+
+        Self {
+            base,
+            state,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+
+    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        IndexBuilder::from_address(address, access)
+            .index_type(IndexType::Map)
+            .build_existed::<()>()
+            .map(|(base, state)| Self {
+                base,
+                state,
+                _k: PhantomData,
+                _v: PhantomData,
+            })
+    }
+
+    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::Map)
             .build::<()>();
 

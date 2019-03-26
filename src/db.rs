@@ -32,6 +32,7 @@ use crate::{
     views::{IndexAccess, IndexAddress, View},
     Result,
 };
+use core::borrow::Borrow;
 
 /// Finds a prefix immediately following the supplied one.
 pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
@@ -149,7 +150,7 @@ pub struct Patch {
     changes: HashMap<String, Changes>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WorkingPatch {
     changes: RefCell<HashMap<IndexAddress, Option<ViewChanges>>>,
 }

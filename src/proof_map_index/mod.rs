@@ -33,7 +33,7 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof::{create_multiproof, create_proof},
 };
-use crate::views::AnyObject;
+use crate::views::{AnyObject, IndexAddress};
 use crate::{
     views::{
         BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
@@ -290,6 +290,31 @@ where
 
     pub fn create_from_view(view: View<T>) -> Self {
         let (base, state) = IndexBuilder::for_view(view)
+            .index_type(IndexType::ProofMap)
+            .build();
+
+        Self {
+            base,
+            state,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+
+    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        IndexBuilder::from_address(address, access)
+            .index_type(IndexType::ProofMap)
+            .build_existed()
+            .map(|(base, state)| Self {
+                base,
+                state,
+                _k: PhantomData,
+                _v: PhantomData,
+            })
+    }
+
+    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::ProofMap)
             .build();
 
