@@ -705,14 +705,29 @@ impl Precommit {
     }
 }
 
+/// Service id type.
+pub type ServiceInstanceId = u32;
+/// Method id type.
+pub type MethodId = u32;
+
 /// Transaction dispatch info.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[exonum(pb = "proto::CallInfo", crate = "crate")]
 pub struct CallInfo {
     /// Service instance id.
-    pub instance_id: u32,
+    pub instance_id: ServiceInstanceId,
     /// Service method id.
-    pub method_id: u32,
+    pub method_id: MethodId,
+}
+
+impl CallInfo {
+    /// New `CallInfo`.
+    pub fn new(instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+        Self {
+            instance_id,
+            method_id,
+        }
+    }
 }
 
 /// Transaction with dispatch info.
@@ -877,12 +892,10 @@ impl Message {
             ($($pb_enum:path => $message_variant:path, $subclass_variant:path)+) =>
             {
                 Ok(match exonum_msg_enum {
-                $(
-                $pb_enum(m) => $message_variant($subclass_variant(Signed::new(
-                ProtobufConvert::from_pb(m)?,
-                signed,
-                ))),
-                )+
+                    $(
+                        $pb_enum(m) => $message_variant($subclass_variant(Signed::new(
+                                        ProtobufConvert::from_pb(m)?,signed, ))),
+                    )+
                 })
             }
         }

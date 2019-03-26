@@ -16,9 +16,10 @@ use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
-    ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
+use crate::messages::CallInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuntimeIdentifier {
@@ -145,8 +146,9 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{rust::RustArtifactSpec, MethodId};
+    use super::super::rust::RustArtifactSpec;
     use super::*;
+    use crate::messages::{MethodId, ServiceInstanceId};
     use crate::storage::{Database, MemoryDB};
     use semver::Version;
 

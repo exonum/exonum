@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::runtime::{error::ExecutionError, rust::TransactionContext, MethodId};
+use crate::messages::MethodId;
+use crate::runtime::{error::ExecutionError, rust::TransactionContext};
 
 use failure::Error;
 use protobuf::well_known_types::Any;
@@ -51,7 +52,7 @@ macro_rules! service_interface {
             fn _dispatch(
                     &self,
                     ctx: $crate::runtime::rust::TransactionContext,
-                    method: $crate::runtime::MethodId,
+                    method: $crate::messages::MethodId,
                     payload: &[u8]
                 ) -> Result<Result<(), $crate::runtime::error::ExecutionError>, failure::Error> {
 
@@ -81,7 +82,7 @@ macro_rules! impl_service_dispatcher {
         impl $crate::runtime::rust::service::ServiceDispatcher for $struct_name {
             fn call(
                 &self,
-                method: $crate::runtime::MethodId,
+                method: $crate::messages::MethodId,
                 ctx: $crate::runtime::rust::TransactionContext,
                 payload: &[u8],
             ) -> Result<Result<(), $crate::runtime::error::ExecutionError>, failure::Error> {
