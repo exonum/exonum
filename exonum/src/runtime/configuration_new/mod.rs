@@ -31,10 +31,10 @@ mod errors;
 mod schema;
 mod transactions;
 
+use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
 use schema::VotingDecision;
 use transactions::{enough_votes_to_commit, VotingContext};
-use config::ConfigurationServiceConfig;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;

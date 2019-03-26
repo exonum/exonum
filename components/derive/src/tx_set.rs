@@ -113,9 +113,10 @@ fn implement_transaction_set_trait(
     quote! {
         impl #cr::blockchain::TransactionSet for #name {
             fn tx_from_raw(
-                raw: #cr::messages::RawTransaction,
+                raw: #cr::messages::AnyTx,
             ) -> std::result::Result<Self, _FailureError> {
-                let (id, vec) = raw.service_transaction().into_raw_parts();
+                let id = raw.dispatch.method_id as u16;
+                let vec = raw.payload;
                 match id {
                     #( #tx_set_impl )*
                     num => bail!("Tag {} not found for enum {}.", num, stringify!(#name)),

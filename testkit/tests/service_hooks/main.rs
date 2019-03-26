@@ -20,7 +20,7 @@ extern crate exonum_derive;
 // HACK: Silent "dead_code" warning.
 pub use crate::hooks::{AfterCommitService, HandleCommitTransactions, TxAfterCommit, SERVICE_ID};
 
-use exonum::{blockchain::TransactionSet, helpers::Height, messages::Message};
+use exonum::{blockchain::TransactionSet, crypto::CryptoHash, helpers::Height, messages::Message};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;

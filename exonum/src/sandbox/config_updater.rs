@@ -20,7 +20,7 @@ use crate::blockchain::{
 };
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::helpers::Height;
-use crate::messages::{Message, RawTransaction, Signed};
+use crate::messages::{AnyTx, Message, Signed};
 use crate::proto::ProtobufConvert;
 use crate::storage::Snapshot;
 
@@ -38,7 +38,7 @@ impl TxConfig {
         config: &[u8],
         actual_from: Height,
         signer: &SecretKey,
-    ) -> Signed<RawTransaction> {
+    ) -> Signed<AnyTx> {
         let mut msg = TxConfig::new();
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
@@ -78,7 +78,7 @@ impl Service for ConfigUpdateService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::mem;
+
 use super::NodeHandler;
 use crate::blockchain::Schema;
 use crate::messages::{
-    BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
-    TransactionsRequest, TransactionsResponse, RAW_TRANSACTION_HEADER,
-    TRANSACTION_RESPONSE_EMPTY_SIZE,
+    BinaryForm, BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
+    TransactionsRequest, TransactionsResponse, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
+
+const PB_BYTES_SIZE_OVERHEAD: usize = mem::size_of::<u8>() * 4;
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
 // TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)
@@ -71,7 +74,6 @@ impl NodeHandler {
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &Signed<TransactionsRequest>) {
-        use std::mem;
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -83,8 +85,8 @@ impl NodeHandler {
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
-                let raw = tx.signed_message().raw().to_vec();
-                if txs_size + raw.len() + RAW_TRANSACTION_HEADER > unoccupied_message_size {
+                let raw = tx.signed_message().encode().unwrap();
+                if txs_size + raw.len() + PB_BYTES_SIZE_OVERHEAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
                         &msg.author(),
                         mem::replace(&mut txs, vec![]),
@@ -93,7 +95,7 @@ impl NodeHandler {
                     self.send_to_peer(msg.author(), txs_response);
                     txs_size = 0;
                 }
-                txs_size += raw.len() + RAW_TRANSACTION_HEADER;
+                txs_size += raw.len() + PB_BYTES_SIZE_OVERHEAD;
                 txs.push(raw);
             }
         }
@@ -152,7 +154,7 @@ impl NodeHandler {
             block,
             precommits
                 .iter()
-                .map(|p| p.signed_message().raw().to_vec())
+                .map(|p| p.signed_message().encode().unwrap())
                 .collect(),
             &transactions.iter().collect::<Vec<_>>(),
         ));

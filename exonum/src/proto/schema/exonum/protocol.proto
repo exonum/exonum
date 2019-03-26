@@ -93,3 +93,42 @@ message BlockRequest {
   exonum.PublicKey to = 1;
   uint64 height = 2;
 }
+
+
+message CallInfo {
+  uint32 instance_id = 1;
+  uint32 method_id = 2;
+}
+
+message AnyTx {
+  CallInfo dispatch = 1;
+  bytes payload = 2;
+}
+
+message ExonumMessage {
+  oneof message {
+    AnyTx transaction = 1;
+    Connect connect = 2;
+    Status status = 3;
+
+    Precommit precommit = 4;
+    Propose propose = 5;
+    Prevote prevote = 6;
+
+    TransactionsResponse txs_response = 7;
+    BlockResponse block_response = 8;
+
+    ProposeRequest propose_req = 9;
+    TransactionsRequest  txs_req = 10;
+    PrevotesRequest prevotes_req = 11;
+    PeersRequest peers_req = 12;
+    BlockRequest block_req = 13;
+  }
+}
+
+// WARNING: hash(SignedMessage) = hash(exonum_msg || key.bytes || sign.bytes)
+message SignedMessage {
+  bytes exonum_msg = 1;
+  exonum.PublicKey key = 2;
+  exonum.Signature sign = 3;
+}

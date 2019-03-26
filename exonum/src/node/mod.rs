@@ -60,7 +60,7 @@ use crate::helpers::{
     fabric::{NodePrivateConfig, NodePublicConfig},
     user_agent, Height, Milliseconds, Round, ValidatorId,
 };
-use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
+use crate::messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
 use crate::runtime::configuration::Service as ConfigurationService;
 use crate::storage::{Database, DbOptions};
@@ -77,7 +77,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Signed<RawTransaction>),
+    Transaction(Signed<AnyTx>),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -796,7 +796,7 @@ impl ApiSender {
             .map_err(into_failure)
     }
     /// Broadcast transaction to other node.
-    pub fn broadcast_transaction(&self, tx: Signed<RawTransaction>) -> Result<(), Error> {
+    pub fn broadcast_transaction(&self, tx: Signed<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
@@ -1143,7 +1143,7 @@ mod tests {
         }
     }
 
-    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<RawTransaction> {
+    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Signed<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());
         msg.set_msg("Hello, World!".to_owned());
@@ -1165,7 +1165,7 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(SimpleTransactions::tx_from_raw(raw)?.into())
         }
     }

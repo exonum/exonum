@@ -31,7 +31,7 @@ impl NodeHandler {
             Message::Service(Service::Connect(msg)) => self.handle_connect(msg),
             Message::Service(Service::Status(msg)) => self.handle_status(&msg),
             // ignore tx duplication error,
-            Message::Service(Service::RawTransaction(msg)) => drop(self.handle_tx(msg)),
+            Message::Service(Service::AnyTx(msg)) => drop(self.handle_tx(msg)),
             Message::Responses(Responses::BlockResponse(msg)) => {
                 self.handle_block(&msg).log_error()
             }

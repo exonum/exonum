@@ -25,8 +25,8 @@ extern crate serde_json;
 
 use exonum::{
     api::{self, node::public::explorer::TransactionQuery},
-    crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{self, RawTransaction, Signed},
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
+    messages::{self, AnyTx, Signed},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
@@ -228,7 +228,7 @@ impl CryptocurrencyApi {
     /// within the response).
     /// Note that the transaction is not immediately added to the blockchain, but rather is put
     /// to the pool of unconfirmed transactions.
-    fn create_wallet(&self, name: &str) -> (Signed<RawTransaction>, SecretKey) {
+    fn create_wallet(&self, name: &str) -> (Signed<AnyTx>, SecretKey) {
         let (pubkey, key) = crypto::gen_keypair();
         // Create a pre-signed transaction
         let tx = TxCreateWallet::sign(name, &pubkey, &key);
@@ -244,7 +244,7 @@ impl CryptocurrencyApi {
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
-    fn transfer(&self, tx: &Signed<RawTransaction>) {
+    fn transfer(&self, tx: &Signed<AnyTx>) {
         let data = messages::to_hex_string(&tx);
         let tx_info: serde_json::Value = self
             .inner

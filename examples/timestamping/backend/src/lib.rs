@@ -42,7 +42,7 @@ use exonum::{
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric,
-    messages::RawTransaction,
+    messages::AnyTx,
     storage::Snapshot,
 };
 
@@ -69,7 +69,7 @@ impl blockchain::Service for Service {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimeTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

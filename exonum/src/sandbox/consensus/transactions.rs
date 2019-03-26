@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use crate::crypto::{gen_keypair, CryptoHash, Hash};
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
-use crate::messages::{RawTransaction, Signed};
+use crate::messages::{AnyTx, BinaryForm, Signed};
 use crate::node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use crate::sandbox::{
     config_updater::TxConfig,
@@ -48,7 +48,7 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
     sandbox
 }
 
-fn tx_hashes(transactions: &[Signed<RawTransaction>]) -> Vec<Hash> {
+fn tx_hashes(transactions: &[Signed<AnyTx>]) -> Vec<Hash> {
     let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
     hashes.sort();
     hashes
@@ -57,8 +57,8 @@ fn tx_hashes(transactions: &[Signed<RawTransaction>]) -> Vec<Hash> {
 /// sends transactions into pool and returns this transactions in processing order
 fn send_txs_into_pool(
     sandbox: &Sandbox,
-    mut transactions: Vec<Signed<RawTransaction>>,
-) -> Vec<Signed<RawTransaction>> {
+    mut transactions: Vec<Signed<AnyTx>>,
+) -> Vec<Signed<AnyTx>> {
     for tx in &transactions {
         sandbox.recv(tx);
     }
@@ -318,7 +318,7 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use crate::messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
+    use crate::messages::{PB_VECTOR_HEADER_UPPER_BOUND, TRANSACTION_RESPONSE_EMPTY_SIZE};
     use crate::storage::StorageValue;
 
     let sandbox = timestamping_sandbox();
@@ -331,8 +331,10 @@ fn response_size_larger_than_max_message_len() {
     let tx4 = TimestampingTxGenerator::new(DATA_SIZE + 1).next().unwrap();
 
     assert_eq!(
-        tx1.signed_message().raw().len() + tx2.signed_message().raw().len() + 1,
-        tx3.signed_message().raw().len() + tx4.signed_message().raw().len()
+        tx1.signed_message().encode().unwrap().len()
+            + tx2.signed_message().encode().unwrap().len()
+            + 1,
+        tx3.signed_message().encode().unwrap().len() + tx4.signed_message().encode().unwrap().len()
     );
 
     // Create new config. Set the size of the message to a size
@@ -340,10 +342,11 @@ fn response_size_larger_than_max_message_len() {
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
-            + tx1.signed_message().raw().len()
-            + RAW_TRANSACTION_HEADER
-            + tx2.signed_message().raw().len()
-            + RAW_TRANSACTION_HEADER) as u32;
+            + tx1.signed_message().encode().unwrap().len()
+            + PB_VECTOR_HEADER_UPPER_BOUND
+            + tx2.signed_message().encode().unwrap().len()
+            + PB_VECTOR_HEADER_UPPER_BOUND)
+            as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 

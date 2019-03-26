@@ -18,7 +18,7 @@ use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 
 use crate::events::noise::{NoiseWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
-use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
+use crate::messages::{BinaryForm, SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -80,7 +80,7 @@ impl Encoder for MessagesCodec {
     type Error = failure::Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        self.session.encrypt_msg(msg.raw(), buf)?;
+        self.session.encrypt_msg(&msg.encode()?, buf)?;
         Ok(())
     }
 }
@@ -95,7 +95,8 @@ mod test {
     use crate::messages::{SignedMessage, EMPTY_SIGNED_MESSAGE_SIZE};
 
     pub fn raw_message(val: Vec<u8>) -> SignedMessage {
-        SignedMessage::from_vec_unchecked(val)
+        //        SignedMessage::from_vec_unchecked(val)
+        unimplemented!()
     }
 
     #[test]

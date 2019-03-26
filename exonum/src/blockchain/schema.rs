@@ -16,7 +16,7 @@ use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, Transact
 use crate::{
     crypto::{CryptoHash, Hash, PublicKey},
     helpers::{Height, Round},
-    messages::{Connect, Message, Precommit, RawTransaction, Signed},
+    messages::{AnyTx, Connect, Message, Precommit, Signed},
     proto,
     storage::{
         Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex,
@@ -135,7 +135,7 @@ where
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
-    pub fn transactions(&self) -> MapIndex<&T, Hash, Signed<RawTransaction>> {
+    pub fn transactions(&self) -> MapIndex<&T, Hash, Signed<AnyTx>> {
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
@@ -419,7 +419,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, Signed<RawTransaction>> {
+    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, Signed<AnyTx>> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 
@@ -570,7 +570,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// This method increment `transactions_pool_len_index`,
     /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
-    pub fn add_transaction_into_pool(&mut self, tx: Signed<RawTransaction>) {
+    pub fn add_transaction_into_pool(&mut self, tx: Signed<AnyTx>) {
         self.transactions_pool_mut().insert(tx.hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index_mut().set(x + 1);

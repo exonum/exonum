@@ -22,7 +22,6 @@ use std::{collections::HashMap, net::SocketAddr};
 use crate::api::{Error as ApiError, ServiceApiScope, ServiceApiState};
 use crate::blockchain::{Service, SharedNodeState};
 use crate::crypto::PublicKey;
-use crate::messages::PROTOCOL_MAJOR_VERSION;
 use crate::node::{ConnectInfo, ExternalMessage};
 
 /// Short information about the service.
@@ -39,8 +38,6 @@ pub struct ServiceInfo {
 pub struct NodeInfo {
     /// Version of the `exonum` crate.
     pub core_version: Option<String>,
-    /// Version of the Exonum protocol.
-    pub protocol_version: u8,
     /// List of services.
     pub services: Vec<ServiceInfo>,
 }
@@ -54,7 +51,6 @@ impl NodeInfo {
         let core_version = option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned());
         Self {
             core_version,
-            protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
                 .into_iter()
                 .map(|s| ServiceInfo {

@@ -23,7 +23,7 @@ extern crate exonum_testkit;
 
 use exonum::{
     crypto::{self, PublicKey, SecretKey},
-    messages::{RawTransaction, Signed},
+    messages::{AnyTx, Signed},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -220,7 +220,7 @@ fn test_fuzz_transfers() {
     for _ in 0..BLOCKS {
         let n_txs = rng.gen_range(0, MAX_TRANSACTIONS); // number of transactions in the block
 
-        let txs: Vec<Signed<RawTransaction>> = (0..n_txs)
+        let txs: Vec<Signed<AnyTx>> = (0..n_txs)
             .map(|_| {
                 let (sender, receiver) = (
                     keys.choose(&mut rng).unwrap(),
@@ -257,7 +257,7 @@ fn init_testkit() -> TestKit {
 }
 
 /// Creates a wallet with the given name and a random key.
-fn create_wallet(testkit: &mut TestKit, name: &str) -> (Signed<RawTransaction>, SecretKey) {
+fn create_wallet(testkit: &mut TestKit, name: &str) -> (Signed<AnyTx>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     let tx = TxCreateWallet::sign(name, &pubkey, &key);
     testkit.create_block_with_transaction(tx.clone());

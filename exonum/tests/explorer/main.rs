@@ -26,10 +26,10 @@ extern crate pretty_assertions;
 
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
-    crypto::{self, Hash},
+    crypto::{self, CryptoHash, Hash},
     explorer::*,
     helpers::Height,
-    messages::{self, Message, RawTransaction, Signed},
+    messages::{self, AnyTx, Message, Signed},
 };
 
 use crate::blockchain::{
@@ -79,7 +79,10 @@ fn test_explorer_basics() {
         let tx_info = block.transaction(0).unwrap();
         assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
         assert_eq!(tx_info.status(), Ok(()));
-        assert_eq!(tx_info.content().signed_message(), &tx_alice);
+        assert_eq!(
+            tx_info.content().signed_message(),
+            tx_alice.signed_message()
+        );
         assert_eq!(
             tx_info.content().signed_message().hash(),
             block.transaction_hashes()[0]
@@ -88,7 +91,10 @@ fn test_explorer_basics() {
         let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
         assert!(!tx_info.is_in_pool());
         assert!(tx_info.is_committed());
-        assert_eq!(tx_info.content().signed_message(), &tx_alice);
+        assert_eq!(
+            tx_info.content().signed_message(),
+            tx_alice.signed_message()
+        );
 
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => info,
@@ -198,10 +204,13 @@ fn test_explorer_pool_transaction() {
     let tx_info = explorer.transaction(&tx_hash).unwrap();
     assert!(tx_info.is_in_pool());
     assert!(!tx_info.is_committed());
-    assert_eq!(tx_info.content().signed_message(), &tx_alice);
+    assert_eq!(
+        tx_info.content().signed_message(),
+        tx_alice.signed_message()
+    );
 }
 
-fn tx_generator() -> Box<dyn Iterator<Item = Signed<RawTransaction>>> {
+fn tx_generator() -> Box<dyn Iterator<Item = Signed<AnyTx>>> {
     Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
         Message::sign_transaction(

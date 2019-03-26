@@ -18,8 +18,8 @@ use exonum::{
     blockchain::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{Hash, PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+    messages::{AnyTx, Message, Signed},
     storage::{Entry, Fork, Snapshot},
 };
 
@@ -93,7 +93,7 @@ impl TxIncrement {
         Self { by }
     }
 
-    pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(author: &PublicKey, by: u64, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(Self::new(by), SERVICE_ID, *author, key)
     }
 }
@@ -116,7 +116,7 @@ impl Transaction for TxIncrement {
 }
 
 impl TxReset {
-    pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(author: &PublicKey, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(Self {}, SERVICE_ID, *author, key)
     }
 }
@@ -142,7 +142,7 @@ struct CounterApi;
 impl CounterApi {
     fn increment(
         state: &api::ServiceApiState,
-        transaction: Signed<RawTransaction>,
+        transaction: Signed<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
 
@@ -159,7 +159,7 @@ impl CounterApi {
 
     fn reset(
         state: &api::ServiceApiState,
-        transaction: Signed<RawTransaction>,
+        transaction: Signed<AnyTx>,
     ) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
 
@@ -198,7 +198,7 @@ impl Service for CounterService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = CounterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

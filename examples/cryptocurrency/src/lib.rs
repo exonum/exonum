@@ -133,7 +133,7 @@ pub mod transactions {
     use super::service::SERVICE_ID;
     use exonum::{
         crypto::{PublicKey, SecretKey},
-        messages::{Message, RawTransaction, Signed},
+        messages::{AnyTx, Message, Signed},
     };
     /// Transaction type for creating a new wallet.
     ///
@@ -174,7 +174,7 @@ pub mod transactions {
 
     impl TxCreateWallet {
         #[doc(hidden)]
-        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
             Message::sign_transaction(
                 Self {
                     name: name.to_owned(),
@@ -194,7 +194,7 @@ pub mod transactions {
             seed: u64,
             pk: &PublicKey,
             sk: &SecretKey,
-        ) -> Signed<RawTransaction> {
+        ) -> Signed<AnyTx> {
             Message::sign_transaction(
                 Self {
                     to: *to,
@@ -392,7 +392,7 @@ pub mod service {
         api::ServiceApiBuilder,
         blockchain::{Service, Transaction, TransactionSet},
         crypto::Hash,
-        messages::RawTransaction,
+        messages::AnyTx,
         storage::Snapshot,
     };
 
@@ -450,7 +450,7 @@ pub mod service {
         }
 
         // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
             let tx = CurrencyTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

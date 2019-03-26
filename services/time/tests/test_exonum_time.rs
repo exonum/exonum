@@ -20,9 +20,9 @@ extern crate pretty_assertions;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionResult},
-    crypto::{gen_keypair, PublicKey},
+    crypto::{gen_keypair, CryptoHash, PublicKey},
     helpers::{Height, ValidatorId},
-    messages::{RawTransaction, Signed},
+    messages::{AnyTx, Signed},
     storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
@@ -56,7 +56,7 @@ fn assert_storage_times_eq<T: AsRef<dyn Snapshot>>(
 
 fn assert_transaction_result<S: AsRef<dyn Snapshot>>(
     snapshot: S,
-    transaction: &Signed<RawTransaction>,
+    transaction: &Signed<AnyTx>,
     expected_code: u8,
 ) -> Option<String> {
     let result = Schema::new(snapshot)

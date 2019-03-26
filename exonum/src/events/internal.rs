@@ -23,7 +23,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use crate::messages::{Message, SignedMessage};
+use crate::messages::{BinaryForm, Message, SignedMessage};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -50,7 +50,7 @@ impl InternalPart {
         raw: Vec<u8>,
         internal_tx: mpsc::Sender<InternalEvent>,
     ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(|| SignedMessage::from_raw_buffer(raw).and_then(Message::deserialize))
+        future::lazy(move || SignedMessage::decode(&raw).and_then(Message::deserialize))
             .map_err(drop)
             .and_then(|protocol| {
                 let event = future::ok(InternalEvent::MessageVerified(Box::new(protocol)));
@@ -147,21 +147,23 @@ mod tests {
 
     #[test]
     fn verify_msg() {
-        let (pk, sk) = gen_keypair();
-        let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
-
-        let expected_event =
-            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
-        let event = verify_message(tx.raw().to_vec());
-        assert_eq!(event, Some(expected_event));
+        //        let (pk, sk) = gen_keypair();
+        //        let tx = SignedMessage::new(0, 0, &vec![0; 200], pk, &sk);
+        //
+        //        let expected_event =
+        //            InternalEvent::MessageVerified(Box::new(Message::deserialize(tx.clone()).unwrap()));
+        //        let event = verify_message(tx.raw().to_vec());
+        //        assert_eq!(event, Some(expected_event));
+        unimplemented!()
     }
 
     #[test]
     fn verify_incorrect_msg() {
-        let (pk, _) = gen_keypair();
-        let tx = SignedMessage::new_with_signature(0, 0, &vec![0; 200], pk, Signature::zero());
-
-        let event = verify_message(tx.raw().to_vec());
-        assert_eq!(event, None);
+        //        let (pk, _) = gen_keypair();
+        //        let tx = SignedMessage::new_with_signature(0, 0, &vec![0; 200], pk, Signature::zero());
+        //
+        //        let event = verify_message(tx.raw().to_vec());
+        //        assert_eq!(event, None);
+        unimplemented!()
     }
 }
