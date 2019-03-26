@@ -33,8 +33,10 @@
 
 use failure::Error;
 use hex::{FromHex, ToHex};
-use serde::de::{self, Deserialize, Deserializer};
-use serde::ser::{Serialize, Serializer};
+use serde::{
+    de::{self, Deserialize, Deserializer},
+    ser::{Serialize, Serializer},
+};
 
 use std::{borrow::Cow, fmt, ops::Deref};
 

@@ -5,12 +5,12 @@ use std::fmt;
 
 use super::EMPTY_SIGNED_MESSAGE_SIZE;
 use crate::crypto::{
-    self, hash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
+    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
+    SIGNATURE_LENGTH,
 };
 use crate::messages::BinaryForm;
 use crate::proto::{self, ProtobufConvert};
 use crate::storage::StorageValue;
-use exonum_crypto::CryptoHash;
 use protobuf::Message;
 use serde::de::{self, Deserialize, Deserializer};
 use std::borrow::Cow;

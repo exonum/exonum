@@ -18,8 +18,7 @@ use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
 
 use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext};
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::BinaryForm;
-use crate::messages::{CallInfo, ServiceInstanceId};
+use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,

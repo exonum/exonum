@@ -35,10 +35,10 @@ use super::{BinaryForm, ServiceTransaction, Signed, SignedMessage};
 use crate::blockchain;
 use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto;
-use crate::proto::schema::protocol::ExonumMessage_oneof_message as ExonumMessageEnum;
-use crate::proto::ExonumMessage;
-use crate::proto::ProtobufConvert;
+use crate::proto::{
+    self, schema::protocol::ExonumMessage_oneof_message as ExonumMessageEnum, ExonumMessage,
+    ProtobufConvert,
+};
 use crate::storage::{proof_list_index as merkle, StorageValue};
 use protobuf::Message as PbMessage;
 

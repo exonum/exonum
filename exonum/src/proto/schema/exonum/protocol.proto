@@ -94,7 +94,6 @@ message BlockRequest {
   uint64 height = 2;
 }
 
-
 message CallInfo {
   uint32 instance_id = 1;
   uint32 method_id = 2;
@@ -119,7 +118,7 @@ message ExonumMessage {
     BlockResponse block_response = 8;
 
     ProposeRequest propose_req = 9;
-    TransactionsRequest  txs_req = 10;
+    TransactionsRequest txs_req = 10;
     PrevotesRequest prevotes_req = 11;
     PeersRequest peers_req = 12;
     BlockRequest block_req = 13;
