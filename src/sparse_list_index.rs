@@ -24,6 +24,7 @@ use std::{
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
+use crate::views::IndexAddress;
 use crate::{
     views::{
         AnyObject, BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType,
@@ -218,8 +219,8 @@ where
         }
     }
 
-    pub fn get_from_view(view: View<T>) -> Option<Self> {
-        IndexBuilder::for_view(view)
+    pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        IndexBuilder::from_address(address, access)
             .index_type(IndexType::SparseList)
             .build_existed()
             .map(|(base, state)| Self {
@@ -229,8 +230,8 @@ where
             })
     }
 
-    pub fn create_from_view(view: View<T>) -> Self {
-        let (base, state) = IndexBuilder::for_view(view)
+    pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::SparseList)
             .build();
 

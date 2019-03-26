@@ -21,7 +21,7 @@ use crate::{
         ChangeSet, IndexAddress, IndexType, View,
     },
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofListIndex, ProofMapIndex, Snapshot,
+    ProofListIndex, ProofMapIndex, Snapshot, SparseListIndex, ValueSetIndex,
 };
 use uuid::Uuid;
 
@@ -35,14 +35,8 @@ pub trait FromView<T: IndexAccess>
 where
     Self: Sized,
 {
-    ///TODO: add documentation [ECR-2820]
-    fn get(view: View<T>) -> Option<Self>;
-
-    ///TODO: add documentation [ECR-2820]
-    fn create(view: View<T>) -> Self;
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self;
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self>;
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self;
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self>;
 }
 
 impl<T, V> FromView<T> for ListIndex<T, V>
@@ -50,19 +44,11 @@ where
     T: IndexAccess,
     V: BinaryValue,
 {
-    fn get(view: View<T>) -> Option<Self> {
-        Self::get_from_view(view)
-    }
-
-    fn create(view: View<T>) -> Self {
-        Self::create_from_view(view)
-    }
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         Self::create_from(address, access)
     }
 
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) ->Option<Self> {
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         Self::get_from(address, access)
     }
 }
@@ -72,19 +58,11 @@ where
     T: IndexAccess,
     V: BinaryValue + ObjectHash,
 {
-    fn get(view: View<T>) -> Option<Self> {
-        Self::get_from_view(view)
-    }
-
-    fn create(view: View<T>) -> Self {
-        Self::create_from_view(view)
-    }
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         Self::create_from(address, access)
     }
 
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         Self::get_from(address, access)
     }
 }
@@ -94,20 +72,12 @@ where
     T: IndexAccess,
     K: BinaryKey,
 {
-    fn get(view: View<T>) -> Option<Self> {
-        Self::get_from_view(view)
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
     }
 
-    fn create(view: View<T>) -> Self {
-        Self::create_from_view(view)
-    }
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        unimplemented!()
-    }
-
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        unimplemented!()
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
     }
 }
 
@@ -116,19 +86,11 @@ where
     T: IndexAccess,
     V: BinaryValue + ObjectHash,
 {
-    fn get(view: View<T>) -> Option<Self> {
-        Self::get_from_view(view)
-    }
-
-    fn create(view: View<T>) -> Self {
-        Self::create_from_view(view)
-    }
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         Self::create_from(address, access)
     }
 
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         Self::get_from(address, access)
     }
 }
@@ -139,19 +101,11 @@ where
     K: BinaryKey + ObjectHash,
     V: BinaryValue + ObjectHash,
 {
-    fn get(view: View<T>) -> Option<Self> {
-        Self::get_from_view(view)
-    }
-
-    fn create(view: View<T>) -> Self {
-        Self::create_from_view(view)
-    }
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         Self::create_from(address, access)
     }
 
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         Self::get_from(address, access)
     }
 }
@@ -162,19 +116,39 @@ where
     K: BinaryKey,
     V: BinaryValue,
 {
-    fn get(view: View<T>) -> Option<Self> {
-        Self::get_from_view(view)
-    }
-
-    fn create(view: View<T>) -> Self {
-        Self::create_from_view(view)
-    }
-
-    fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         Self::create_from(address, access)
     }
 
-    fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
+    }
+}
+
+impl<T, V> FromView<T> for SparseListIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue,
+{
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
+        Self::get_from(address, access)
+    }
+}
+
+impl<T, V> FromView<T> for ValueSetIndex<T, V>
+where
+    T: IndexAccess,
+    V: BinaryValue + ObjectHash,
+{
+    fn create<I: Into<IndexAddress>>(address: I, access: T) -> Self {
+        Self::create_from(address, access)
+    }
+
+    fn get<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         Self::get_from(address, access)
     }
 }
@@ -182,15 +156,12 @@ where
 ///TODO: add documentation [ECR-2820]
 pub trait ObjectAccess: IndexAccess {
     ///TODO: add documentation [ECR-2820]
-    fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self>;
-
-    ///TODO: add documentation [ECR-2820]
     fn get_object<I, T>(&self, address: I) -> Option<Ref<T>>
     where
         I: Into<IndexAddress>,
         T: FromView<Self>,
     {
-        T::get(self.create_view(address)).map(|value| Ref { value })
+        T::get(address, *self).map(|value| Ref { value })
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -207,12 +178,6 @@ pub trait ObjectAccess: IndexAccess {
 }
 
 impl ObjectAccess for &Box<dyn Snapshot> {
-    //TODO: check if view creation here is redundant
-    fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self> {
-        let address = address.into();
-        View::new(self, address)
-    }
-
     fn get_object_mut<T, I>(&self, _address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
@@ -227,29 +192,24 @@ impl ObjectAccess for &Box<dyn Snapshot> {
         T: FromView<Self>,
     {
         let address = address.into();
-        let object = T::get(self.create_view(address.clone())).map(|value| RefMut { value });
+        let object = T::get(address.clone(), self).map(|value| RefMut { value });
 
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create_from( address, self),
+                value: T::create(address, self),
             },
         }
     }
 }
 
 impl ObjectAccess for &Fork {
-    fn create_view<I: Into<IndexAddress>>(&self, address: I) -> View<Self> {
-        let address = address.into();
-        View::new(self, address)
-    }
-
     fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
         I: Into<IndexAddress>,
     {
-        T::get(self.create_view(address)).map(|value| RefMut { value })
+        T::get(address, self).map(|value| RefMut { value })
     }
 
     fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
@@ -258,12 +218,12 @@ impl ObjectAccess for &Fork {
         T: FromView<Self>,
     {
         let address = address.into();
-        let object = T::get_from(address.clone(), self).map(|value| RefMut { value });
+        let object = T::get(address.clone(), self).map(|value| RefMut { value });
 
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create_from( address, self),
+                value: T::create(address, self),
             },
         }
     }
@@ -277,9 +237,8 @@ impl Fork {
     {
         let temp_uuid = Uuid::new_v4();
         let address = IndexAddress::default().append_bytes(&temp_uuid.into_bytes());
-        let view = View::new(self, address);
         //TODO: don't create redundant metadata
-        T::create(view)
+        T::create(address, &self)
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -288,8 +247,7 @@ impl Fork {
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
     {
-        let view = View::new(self, address);
-        T::get(view).map(|value| Ref { value })
+        T::get(address, self).map(|value| Ref { value })
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -298,8 +256,7 @@ impl Fork {
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
     {
-        let view = View::new(self, address);
-        T::get(view).map(|value| RefMut { value })
+        T::get(address, self).map(|value| RefMut { value })
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -309,12 +266,12 @@ impl Fork {
         T: FromView<&'a Self>,
     {
         let address = address.into();
-        let object = T::get_from(address.clone(), self).map(|value| RefMut { value });
+        let object = T::get(address.clone(), self).map(|value| RefMut { value });
 
         match object {
             Some(object) => object,
             _ => RefMut {
-                value: T::create_from( address, self),
+                value: T::create(address, self),
             },
         }
     }
@@ -352,13 +309,13 @@ impl Fork {
 #[derive(Debug)]
 ///TODO: add documentation [ECR-2820]
 pub struct Ref<T> {
-    pub value: T,
+    value: T,
 }
 
 #[derive(Debug)]
 ///TODO: add documentation [ECR-2820]
 pub struct RefMut<T> {
-    pub value: T,
+    value: T,
 }
 
 impl<T> Deref for Ref<T> {
@@ -388,9 +345,8 @@ mod tests {
     use crate::{
         db::Database,
         views::refs::{ObjectAccess, Ref, RefMut},
-        KeySetIndex, ListIndex, ProofListIndex, TemporaryDB,
+        KeySetIndex, ListIndex, TemporaryDB,
     };
-    use exonum_crypto::{Hash, PublicKey};
 
     #[test]
     fn basic_object_refs() {
@@ -482,7 +438,7 @@ mod tests {
             let mut index: ListIndex<_, u32> = fork.create_object();
             index.push(1);
 
-            let mut index2: ListIndex<_, u32> = fork.create_object();
+            let index2: ListIndex<_, u32> = fork.create_object();
             assert_eq!(index2.len(), 0);
             fork.insert("index", index);
         }
@@ -493,24 +449,5 @@ mod tests {
         let index1: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
 
         assert_eq!(index1.len(), 1);
-    }
-
-    struct RefSchema<T: ObjectAccess>(T);
-
-    impl<T: ObjectAccess> RefSchema<T> {
-        fn transactions(&self) -> RefMut<ListIndex<T, Hash>> {
-            self.0.get_or_create_object("transactions")
-        }
-    }
-
-    #[test]
-    fn schema_use() {
-        let db = TemporaryDB::new();
-        let fork = db.fork();
-
-        let schema = RefSchema(&fork);
-        let snapshot = db.snapshot();
-        let schema = RefSchema(&snapshot);
-        db.merge(fork.into_patch());
     }
 }

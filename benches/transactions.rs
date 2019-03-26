@@ -23,8 +23,8 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, IndexAccess, ListIndex,
-    MapIndex, ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, Ref, RefMut, TemporaryDB,
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, ListIndex, MapIndex,
+    ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
 };
 
 const SEED: [u8; 16] = [100; 16];
@@ -173,38 +173,6 @@ impl BinaryValue for Block {
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
-struct Schema<T: IndexAccess>(T);
-
-impl<T: IndexAccess> Schema<T> {
-    fn new(index_access: T) -> Self {
-        Self(index_access)
-    }
-
-    fn transactions(&self) -> MapIndex<T, Hash, Transaction> {
-        MapIndex::new("transactions", self.0.clone())
-    }
-
-    fn blocks(&self) -> ListIndex<T, Hash> {
-        ListIndex::new("blocks", self.0.clone())
-    }
-
-    fn wallets(&self) -> ProofMapIndex<T, PublicKey, Wallet> {
-        ProofMapIndex::new("wallets", self.0.clone())
-    }
-
-    fn wallets_history(&self, owner: &PublicKey) -> ProofListIndex<T, Hash> {
-        ProofListIndex::new_in_family("wallets.history", owner, self.0.clone())
-    }
-}
-
-impl Schema<&Fork> {
-    fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.wallets_history(owner);
-        history.push(tx_hash);
-        history.object_hash()
     }
 }
 

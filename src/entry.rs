@@ -18,11 +18,11 @@ use std::marker::PhantomData;
 
 use exonum_crypto::Hash;
 
+use crate::views::IndexAddress;
 use crate::{
     views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, View},
     BinaryKey, BinaryValue, ObjectHash,
 };
-use crate::views::IndexAddress;
 
 /// An index that may only contain one element.
 ///
@@ -123,29 +123,6 @@ where
             .index_type(IndexType::Entry)
             .index_name(family_name)
             .family_id(index_id)
-            .build::<()>();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub fn get_from_view(view: View<T>) -> Option<Self> {
-        IndexBuilder::for_view(view)
-            .index_type(IndexType::Entry)
-            .build_existed::<()>()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
-    }
-
-    pub fn create_from_view(view: View<T>) -> Self {
-        let (base, state) = IndexBuilder::for_view(view)
-            .index_type(IndexType::Entry)
             .build::<()>();
 
         Self {

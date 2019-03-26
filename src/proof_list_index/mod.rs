@@ -24,12 +24,12 @@ use std::{
 use exonum_crypto::Hash;
 
 use self::{key::ProofListKey, proof::ProofOfAbsence};
+use crate::views::IndexAddress;
 use crate::{
     hash::HashTag,
     views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
     BinaryKey, BinaryValue, ObjectHash,
 };
-use crate::views::IndexAddress;
 
 mod key;
 mod proof;
