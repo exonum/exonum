@@ -156,7 +156,7 @@ where
 ///TODO: add documentation [ECR-2820]
 pub trait ObjectAccess: IndexAccess {
     ///TODO: add documentation [ECR-2820]
-    fn get_object<I, T>(&self, address: I) -> Option<Ref<T>>
+    fn get_object_existed<I, T>(&self, address: I) -> Option<Ref<T>>
     where
         I: Into<IndexAddress>,
         T: FromView<Self>,
@@ -165,67 +165,46 @@ pub trait ObjectAccess: IndexAccess {
     }
 
     ///TODO: add documentation [ECR-2820]
-    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
+    fn get_object_existed_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
         I: Into<IndexAddress>;
 
     ///TODO: add documentation [ECR-2820]
-    fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
-    where
-        I: Into<IndexAddress>,
-        T: FromView<Self>;
+    fn get_object<I, T>(&self, address: I) -> RefMut<T>
+        where
+            I: Into<IndexAddress>,
+            T: FromView<Self>,
+    {
+        let address = address.into();
+        let object = T::get(address.clone(), *self).map(|value| RefMut { value });
+
+        match object {
+            Some(object) => object,
+            _ => RefMut {
+                value: T::create(address, *self),
+            },
+        }
+    }
 }
 
 impl ObjectAccess for &Box<dyn Snapshot> {
-    fn get_object_mut<T, I>(&self, _address: I) -> Option<RefMut<T>>
+    fn get_object_existed_mut<T, I>(&self, _address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
         I: Into<IndexAddress>,
     {
         unimplemented!()
     }
-
-    fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
-    where
-        I: Into<IndexAddress>,
-        T: FromView<Self>,
-    {
-        let address = address.into();
-        let object = T::get(address.clone(), self).map(|value| RefMut { value });
-
-        match object {
-            Some(object) => object,
-            _ => RefMut {
-                value: T::create(address, self),
-            },
-        }
-    }
 }
 
 impl ObjectAccess for &Fork {
-    fn get_object_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
+    fn get_object_existed_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
         I: Into<IndexAddress>,
     {
         T::get(address, self).map(|value| RefMut { value })
-    }
-
-    fn get_or_create_object<I, T>(&self, address: I) -> RefMut<T>
-    where
-        I: Into<IndexAddress>,
-        T: FromView<Self>,
-    {
-        let address = address.into();
-        let object = T::get(address.clone(), self).map(|value| RefMut { value });
-
-        match object {
-            Some(object) => object,
-            _ => RefMut {
-                value: T::create(address, self),
-            },
-        }
     }
 }
 
@@ -242,7 +221,7 @@ impl Fork {
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn get_object<'a, T, I>(&'a self, address: I) -> Option<Ref<T>>
+    pub fn get_object_existed<'a, T, I>(&'a self, address: I) -> Option<Ref<T>>
     where
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
@@ -251,29 +230,12 @@ impl Fork {
     }
 
     ///TODO: add documentation [ECR-2820]
-    pub fn get_object_mut<'a, T, I>(&'a self, address: I) -> Option<RefMut<T>>
+    pub fn get_object_existed_mut<'a, T, I>(&'a self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<&'a Self>,
         I: Into<IndexAddress>,
     {
         T::get(address, self).map(|value| RefMut { value })
-    }
-
-    ///TODO: add documentation [ECR-2820]
-    pub fn get_or_create_object<'a, I, T>(&'a self, address: I) -> RefMut<T>
-    where
-        I: Into<IndexAddress>,
-        T: FromView<&'a Self>,
-    {
-        let address = address.into();
-        let object = T::get(address.clone(), self).map(|value| RefMut { value });
-
-        match object {
-            Some(object) => object,
-            _ => RefMut {
-                value: T::create(address, self),
-            },
-        }
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -357,18 +319,18 @@ mod tests {
             index.push(1);
             fork.insert("index", index);
 
-            let index: Option<Ref<ListIndex<_, u32>>> = fork.get_object("index");
+            let index: Option<Ref<ListIndex<_, u32>>> = fork.get_object_existed("index");
             assert!(index.is_some());
         }
         {
-            let mut index: RefMut<ListIndex<_, u32>> = fork.get_object_mut("index").unwrap();
+            let mut index: RefMut<ListIndex<_, u32>> = fork.get_object_existed_mut("index").unwrap();
             index.push(2);
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let index: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
+        let index: Ref<ListIndex<_, u32>> = snapshot.get_object_existed("index").unwrap();
 
         assert_eq!(index.get(0), Some(1));
         assert_eq!(index.get(1), Some(2));
@@ -378,7 +340,7 @@ mod tests {
     fn get_non_existent_index() {
         let db = TemporaryDB::new();
         let snapshot = &db.snapshot();
-        let index: Option<Ref<ListIndex<_, u32>>> = snapshot.get_object("index");
+        let index: Option<Ref<ListIndex<_, u32>>> = snapshot.get_object_existed("index");
 
         assert!(index.is_none());
     }
@@ -396,14 +358,14 @@ mod tests {
 
         let fork = db.fork();
         {
-            let mut list: RefMut<ListIndex<_, u32>> = fork.get_object_mut("index").unwrap();
+            let mut list: RefMut<ListIndex<_, u32>> = fork.get_object_existed_mut("index").unwrap();
             list.push(1);
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let list: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
+        let list: Ref<ListIndex<_, u32>> = snapshot.get_object_existed("index").unwrap();
 
         assert_eq!(list.get(0), Some(1));
     }
@@ -423,8 +385,8 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let index1: Ref<KeySetIndex<_, u32>> = snapshot.get_object("index1").unwrap();
-        let index2: Ref<KeySetIndex<_, u32>> = snapshot.get_object("index2").unwrap();
+        let index1: Ref<KeySetIndex<_, u32>> = snapshot.get_object_existed("index1").unwrap();
+        let index2: Ref<KeySetIndex<_, u32>> = snapshot.get_object_existed("index2").unwrap();
 
         assert!(index1.contains(&1));
         assert!(index2.contains(&2));
@@ -446,7 +408,7 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = &db.snapshot();
-        let index1: Ref<ListIndex<_, u32>> = snapshot.get_object("index").unwrap();
+        let index1: Ref<ListIndex<_, u32>> = snapshot.get_object_existed("index").unwrap();
 
         assert_eq!(index1.len(), 1);
     }

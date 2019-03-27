@@ -43,7 +43,7 @@ fn bench_with_object_access<T: ObjectAccess>(object_access: T) {
     for _ in 0..ITEM_COUNT {
         let mut rng = XorShiftRng::from_seed(SEED);
         let index: RefMut<ListIndex<_, u32>> =
-            object_access.get_or_create_object(("index", &rng.next_u32()));
+            object_access.get_object(("index", &rng.next_u32()));
         black_box(index);
     }
 }

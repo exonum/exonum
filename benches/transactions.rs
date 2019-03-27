@@ -198,24 +198,24 @@ impl Transaction {
 struct RefSchema<T: ObjectAccess>(T);
 
 impl<T: ObjectAccess> RefSchema<T> {
-    fn new(index_access: T) -> Self {
-        Self(index_access)
+    fn new(object_access: T) -> Self {
+        Self(object_access)
     }
 
     fn transactions(&self) -> RefMut<MapIndex<T, Hash, Transaction>> {
-        self.0.get_or_create_object("transactions")
+        self.0.get_object("transactions")
     }
 
     fn blocks(&self) -> RefMut<ListIndex<T, Hash>> {
-        self.0.get_or_create_object("blocks")
+        self.0.get_object("blocks")
     }
 
     fn wallets(&self) -> RefMut<ProofMapIndex<T, PublicKey, Wallet>> {
-        self.0.get_or_create_object("wallets")
+        self.0.get_object("wallets")
     }
 
     fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
-        self.0.get_or_create_object(("wallets.history", owner))
+        self.0.get_object(("wallets.history", owner))
     }
 }
 
