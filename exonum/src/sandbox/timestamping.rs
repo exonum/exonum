@@ -21,7 +21,7 @@ use crate::blockchain::{
     ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use crate::messages::{Message, RawTransaction, Signed};
+use crate::messages::{AnyTx, Message, Signed};
 use crate::storage::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
@@ -71,9 +71,9 @@ impl TimestampingTxGenerator {
 }
 
 impl Iterator for TimestampingTxGenerator {
-    type Item = Signed<RawTransaction>;
+    type Item = Signed<AnyTx>;
 
-    fn next(&mut self) -> Option<Signed<RawTransaction>> {
+    fn next(&mut self) -> Option<Signed<AnyTx>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
         let mut buf = TimestampTx::new();
@@ -106,7 +106,7 @@ impl Service for TimestampingService {
         vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimestampingTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

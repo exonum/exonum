@@ -34,7 +34,7 @@
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey, CryptoHash};
 //! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
-//! use exonum::messages::{Signed, RawTransaction, Message};
+//! use exonum::messages::{Signed, AnyTx, Message};
 //! use exonum::storage::{Snapshot, Fork};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
@@ -54,7 +54,7 @@
 //! }
 //!
 //! impl TxTimestamp {
-//!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<RawTransaction> {
+//!    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<AnyTx> {
 //!        let tx = TxTimestamp{ message: msg.to_owned() };
 //!        Message::sign_transaction(tx, SERVICE_ID, *author, key)
 //!    }
@@ -81,7 +81,7 @@
 //!         SERVICE_ID
 //!     }
 //!
-//!     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+//!     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
 //!         let tx = TimestampingTransactions::tx_from_raw(raw)?;
 //!         Ok(tx.into())
 //!     }
@@ -177,10 +177,10 @@ use exonum::{
         ApiAccess,
     },
     blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration},
-    crypto::{self, Hash},
+    crypto::{self, CryptoHash, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{Height, ValidatorId},
-    messages::{RawTransaction, Signed},
+    messages::{AnyTx, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
     storage::{MemoryDB, Patch, Snapshot},
 };
@@ -252,7 +252,7 @@ mod server;
 /// # extern crate exonum_testkit;
 /// # extern crate failure;
 /// # use exonum::blockchain::{Service, Transaction};
-/// # use exonum::messages::RawTransaction;
+/// # use exonum::messages::AnyTx;
 /// # use exonum_testkit::TestKitBuilder;
 /// # pub struct MyService;
 /// # impl Service for MyService {
@@ -265,7 +265,7 @@ mod server;
 /// #    fn service_id(&self) -> u16 {
 /// #        0
 /// #    }
-/// #    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+/// #    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
 /// #        unimplemented!();
 /// #    }
 /// # }
@@ -507,7 +507,7 @@ impl TestKit {
     /// # extern crate failure;
     ///
     /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
-    /// # use exonum::messages::{Signed, RawTransaction, Message};
+    /// # use exonum::messages::{Signed, AnyTx, Message};
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum::crypto::{PublicKey, SecretKey};
     /// #
@@ -524,7 +524,7 @@ impl TestKit {
     /// #    fn service_id(&self) -> u16 {
     /// #        SERVICE_ID
     /// #    }
-    /// #    fn tx_from_raw(&self, raw: RawTransaction) -> FromRawResult {
+    /// #    fn tx_from_raw(&self, raw: AnyTx) -> FromRawResult {
     /// #        let tx = MyServiceTransactions::tx_from_raw(raw)?;
     /// #        Ok(tx.into())
     /// #    }
@@ -542,7 +542,7 @@ impl TestKit {
     /// # }
     ///
     /// # impl MyTransaction {
-    /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<RawTransaction> {
+    /// #    fn sign(author: &PublicKey, msg: &str, key: &SecretKey) -> Signed<AnyTx> {
     /// #        let tx = MyTransaction{ message: msg.to_owned() };
     /// #        Message::sign_transaction(tx, SERVICE_ID, *author, key)
     /// #    }
@@ -585,7 +585,7 @@ impl TestKit {
     /// transactions included into one of previous blocks do not lead to any state changes.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
-        I: IntoIterator<Item = Signed<RawTransaction>>,
+        I: IntoIterator<Item = Signed<AnyTx>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -607,7 +607,7 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe(&mut self, transaction: Signed<RawTransaction>) -> Box<dyn Snapshot> {
+    pub fn probe(&mut self, transaction: Signed<AnyTx>) -> Box<dyn Snapshot> {
         self.probe_all(vec![transaction])
     }
 
@@ -706,7 +706,7 @@ impl TestKit {
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
-        I: IntoIterator<Item = Signed<RawTransaction>>,
+        I: IntoIterator<Item = Signed<AnyTx>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
@@ -748,10 +748,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
-    pub fn create_block_with_transaction(
-        &mut self,
-        tx: Signed<RawTransaction>,
-    ) -> BlockWithTransactions {
+    pub fn create_block_with_transaction(&mut self, tx: Signed<AnyTx>) -> BlockWithTransactions {
         self.create_block_with_transactions(txvec![tx])
     }
 
@@ -803,7 +800,7 @@ impl TestKit {
     }
 
     /// Adds transaction into persistent pool.
-    pub fn add_tx(&mut self, transaction: Signed<RawTransaction>) {
+    pub fn add_tx(&mut self, transaction: Signed<AnyTx>) {
         let mut fork = self.blockchain.fork();
         let mut schema = CoreSchema::new(&mut fork);
         schema.add_transaction_into_pool(transaction)

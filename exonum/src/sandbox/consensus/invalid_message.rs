@@ -15,6 +15,7 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
+use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Message, Propose};
 use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};

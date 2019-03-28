@@ -21,7 +21,7 @@
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Message, Signed},
 };
 
 use super::proto;
@@ -112,7 +112,7 @@ pub enum WalletTransactions {
 
 impl CreateWallet {
     #[doc(hidden)]
-    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(
             Self {
                 name: name.to_owned(),
@@ -132,7 +132,7 @@ impl Transfer {
         amount: u64,
         seed: u64,
         sk: &SecretKey,
-    ) -> Signed<RawTransaction> {
+    ) -> Signed<AnyTx> {
         Message::sign_transaction(
             Self { to, amount, seed },
             CRYPTOCURRENCY_SERVICE_ID,

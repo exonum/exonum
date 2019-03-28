@@ -23,7 +23,10 @@ use std::{
 };
 
 use crate::blockchain::ConsensusConfig;
-use crate::crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use crate::crypto::{
+    gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH,
+    SIGNATURE_LENGTH,
+};
 use crate::events::{
     error::log_error,
     network::{NetworkConfiguration, NetworkPart},
@@ -31,7 +34,7 @@ use crate::events::{
     NetworkEvent, NetworkRequest,
 };
 use crate::helpers::user_agent;
-use crate::messages::{Connect, Message, Signed, SignedMessage};
+use crate::messages::{BinaryForm, Connect, Message, Signed, SignedMessage};
 use crate::node::{
     state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel,
 };
@@ -112,7 +115,9 @@ impl TestHandler {
 
     pub fn wait_for_message(&mut self) -> SignedMessage {
         match self.wait_for_event() {
-            Ok(NetworkEvent::MessageReceived(msg)) => SignedMessage::from_vec_unchecked(msg),
+            Ok(NetworkEvent::MessageReceived(msg)) => {
+                SignedMessage::decode(&msg).expect("Signed message decode")
+            }
             Ok(other) => panic!("Unexpected message received, {:?}", other),
             Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
@@ -204,9 +209,10 @@ pub fn connect_message(
     )
 }
 
-pub fn raw_message(len: usize) -> SignedMessage {
-    let buffer = vec![0u8; len];
-    SignedMessage::from_vec_unchecked(buffer)
+pub fn raw_message(payload_len: usize) -> SignedMessage {
+    let buffer = vec![0u8; payload_len];
+    let (pk, sk) = gen_keypair();
+    SignedMessage::new(&buffer, pk, &sk)
 }
 
 #[derive(Debug, Clone)]
@@ -375,10 +381,11 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let acceptable_message = raw_message(max_message_length);
+    let acceptable_message =
+        raw_message(max_message_length - PUBLIC_KEY_LENGTH - SIGNATURE_LENGTH - 100);
     let too_big_message = raw_message(max_message_length + 1000);
-    assert!(too_big_message.raw().len() > max_message_length);
-    assert!(acceptable_message.raw().len() <= max_message_length);
+    assert!(too_big_message.encode().unwrap().len() > max_message_length);
+    assert!(acceptable_message.encode().unwrap().len() <= max_message_length);
     let mut connect_list = ConnectList::default();
     let mut t1 = ConnectionParams::from_address(first);
     connect_list.add(t1.connect_info.clone());

@@ -17,9 +17,10 @@ use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
-    ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId,
+    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    ServiceInstanceId, RuntimeIdentifier,
 };
+use crate::messages::CallInfo;
 
 #[derive(Default)]
 pub struct DispatcherBuilder {
@@ -143,8 +144,9 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
+    use super::super::rust::RustArtifactSpec;
     use super::*;
-    use crate::runtime::{MethodId, RuntimeIdentifier};
+    use crate::messages::{MethodId, ServiceInstanceId};
     use crate::storage::{Database, MemoryDB};
 
     struct SampleRuntime {

@@ -61,7 +61,7 @@ use crate::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
-    messages::RawTransaction,
+    messages::AnyTx,
     node::State,
     storage::{Fork, Snapshot},
 };
@@ -119,7 +119,7 @@ impl blockchain::Service for Service {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 

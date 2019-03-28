@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
 use crate::helpers::{Height, Milliseconds};
-use crate::messages::EMPTY_SIGNED_MESSAGE_SIZE;
+use crate::messages::SIGNED_MESSAGE_MIN_SIZE;
 use crate::storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
@@ -192,7 +192,7 @@ impl StoredConfiguration {
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
         const MINIMAL_BODY_SIZE: usize = 256;
-        const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + EMPTY_SIGNED_MESSAGE_SIZE) as u32;
+        const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + SIGNED_MESSAGE_MIN_SIZE) as u32;
 
         let config: Self = serde_json::from_slice(serialized)?;
 

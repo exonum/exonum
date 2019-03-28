@@ -27,12 +27,12 @@ pub mod tests;
 
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
-    ArtifactSpec, CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     RuntimeIdentifier, ServiceInstanceId,
 };
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::BinaryForm;
+use crate::messages::{CallInfo, BinaryForm};
 use crate::proto::schema;
 use crate::storage::Fork;
 

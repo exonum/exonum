@@ -31,25 +31,28 @@ use chrono::{DateTime, Utc};
 
 use std::{borrow::Cow, fmt::Debug, mem};
 
-use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
+use super::{BinaryForm, ServiceTransaction, Signed, SignedMessage};
 use crate::blockchain;
 use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto;
+use crate::proto::{
+    self, schema::protocol::ExonumMessage_oneof_message as ExonumMessageEnum, ExonumMessage,
+    ProtobufConvert,
+};
 use crate::storage::{proof_list_index as merkle, StorageValue};
+use protobuf::Message as PbMessage;
 
-/// `SignedMessage` size with zero bytes payload.
+/// Lower bound on the size of the correct `SignedMessage`.
 #[doc(hidden)]
-pub const EMPTY_SIGNED_MESSAGE_SIZE: usize =
-    PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + mem::size_of::<u8>() * 2;
+pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH;
 
+// TODO: Redo with regard to pb.
 /// `Signed<TransactionsResponse>` size without transactions inside.
 #[doc(hidden)]
 pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
-    EMPTY_SIGNED_MESSAGE_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u8>() * 4;
+    SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u8>() * 8;
 
-/// `Signed<RawTransaction>` size with empty transaction inside.
-pub const RAW_TRANSACTION_EMPTY_SIZE: usize = EMPTY_SIGNED_MESSAGE_SIZE + mem::size_of::<u16>() * 2;
+pub const PB_VECTOR_HEADER_UPPER_BOUND: usize = mem::size_of::<u8>() * 10;
 
 /// Connect to a node.
 ///
@@ -691,207 +694,226 @@ impl BlockResponse {
 
 impl Precommit {
     /// Verify precommits signature and return it's safer wrapper
-    pub(crate) fn verify_precommit(buffer: Vec<u8>) -> Result<Signed<Precommit>, ::failure::Error> {
-        let signed = SignedMessage::from_raw_buffer(buffer)?;
-        let protocol = Message::deserialize(signed)?;
-        ProtocolMessage::try_from(protocol)
-            .map_err(|_| format_err!("Couldn't verify precommit from message"))
+    pub(crate) fn verify_precommit(buffer: Vec<u8>) -> Result<Signed<Precommit>, failure::Error> {
+        SignedMessage::decode(&buffer)
+            .and_then(|s| Message::deserialize(s))
+            .and_then(|m| match m {
+                Message::Consensus(Consensus::Precommit(msg)) => Ok(msg),
+                _ => bail!("Wrong message type."),
+            })
+            .map_err(|e| format_err!("Couldn't verify precommit from message: {}", e))
+    }
+}
+
+/// Service id type.
+pub type ServiceInstanceId = u32;
+/// Method id type.
+pub type MethodId = u32;
+
+/// Transaction dispatch info.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::CallInfo", crate = "crate")]
+pub struct CallInfo {
+    /// Service instance id.
+    pub instance_id: ServiceInstanceId,
+    /// Service method id.
+    pub method_id: MethodId,
+}
+
+impl CallInfo {
+    /// New `CallInfo`.
+    pub fn new(instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
+        Self {
+            instance_id,
+            method_id,
+        }
+    }
+}
+
+/// Transaction with dispatch info.
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
+#[exonum(pb = "proto::AnyTx", crate = "crate")]
+pub struct AnyTx {
+    /// Dispatch info.
+    pub dispatch: CallInfo,
+    /// Serialized transaction.
+    pub payload: Vec<u8>,
+}
+
+impl AnyTx {
+    /// Method for compatibility with old transactions.
+    /// Creates equivalent of `RawTransaction`.
+    pub fn as_raw_tx(service_id: u16, tx_id: u16, payload: Vec<u8>) -> Self {
+        Self {
+            dispatch: CallInfo {
+                instance_id: service_id as u32,
+                method_id: tx_id as u32,
+            },
+            payload,
+        }
+    }
+
+    /// Method for compatibility with old transactions.
+    pub fn service_id(&self) -> u16 {
+        self.dispatch.instance_id as u16
+    }
+
+    /// Method for compatibility with old transactions.
+    /// Creates `ServiceTransaction` from `RawTransaction`.
+    pub fn service_transaction(&self) -> ServiceTransaction {
+        ServiceTransaction::from_raw_unchecked(self.dispatch.method_id as u16, self.payload.clone())
     }
 }
 
 /// Full message constraints list.
 #[doc(hidden)]
 pub trait ProtocolMessage: Debug + Clone + BinaryForm {
-    fn message_type() -> (u8, u8);
     /// Trying to convert `Message` to concrete message,
     /// if ok returns message `Signed<Self>` if fails, returns `Message` back.
     fn try_from(p: Message) -> Result<Signed<Self>, Message>;
 
+    /// Create `Message` from concrete signed instance.
     fn into_protocol(this: Signed<Self>) -> Message;
 
-    fn into_message_from_parts(self, sm: SignedMessage) -> Signed<Self>;
+    /// Convert message to protobuf message.
+    fn as_exonum_message(&self) -> ExonumMessage;
 }
 
-/// Implement Exonum message protocol.
-///
-/// Protocol should be described according to format:
-/// ```
-/// /// type of SignedMessage => new name of Message enum.
-/// SignedMessage => Message {
-///       // class ID => class name
-///       0 => Service {
-///            // message = message type ID
-///            RawTransaction = 0,
-///            Connect = 1,
-///            Status = 2,
-///            // ...
-///        },
-///        1 => Consensus {
-///            Precommit = 0,
-///            Propose = 1,
-///            Prevote = 2,
-///        },
-/// }
-/// ```
-///
-/// Each message should implement `Clone` and `Debug`.
-///
-macro_rules! impl_protocol {
-
-    (
-    $(#[$attr:meta])+
-    $signed_message:ident => $protocol_name:ident{
-        $($(#[$attr_class:meta])+
-        $class_num:expr => $class:ident{
-            $(
-                $(#[$attr_type:meta])+
-                $type:ident = $type_num:expr
-            ),+ $(,)*
-        } $(,)*)+
-    }
-    ) => {
-
-        $(
-            #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
-            $(#[$attr_class])+
-            pub enum $class {
-            $(
-                $(#[$attr_type])+
-                $type(Signed<$type>)
-            ),+
-            }
-
-            $(
-
-            impl ProtocolMessage for $type {
-                fn message_type() -> (u8, u8) {
-                    ($class_num, $type_num)
-                }
-
-                fn try_from(p: $protocol_name) -> Result<Signed<Self>, $protocol_name> {
-                    match p {
-                        $protocol_name::$class($class::$type(s)) => Ok(s),
-                        p => Err(p)
-                    }
-                }
-
-                fn into_protocol(this: Signed<Self>) -> $protocol_name {
-                    $protocol_name::$class($class::$type(this))
-                }
-
-                fn into_message_from_parts(self, sm: SignedMessage) -> Signed<Self> {
-                    Signed::new(self, sm)
-                }
-            }
-            )+
-        )+
-
-        #[derive(PartialEq, Eq, Debug, Clone)]
-        $(#[$attr])+
-        pub enum $protocol_name {
-            $(
-             $(#[$attr_class])+
-                $class($class)
-            ),+
-        }
-
-        impl $protocol_name {
-            /// Converts raw `SignedMessage` into concrete `Message` message.
-            /// Returns error if fails.
-            pub fn deserialize(message: SignedMessage) -> Result<Self, failure::Error> {
-                match message.message_class() {
-                    $($class_num =>
-                        match message.message_type() {
-                            $($type_num =>{
-                                let payload = $type::decode(message.payload())?;
-                                let message = Signed::new(payload, message);
-                                Ok($protocol_name::$class($class::$type(message)))
-                            }),+
-                            _ => bail!("Not found message with this type {}", message.message_type())
-                        }
-                    ),+
-                    _ => bail!("Not found message with this class {}", message.message_class())
-                }
-            }
-
-            /// Returns reference to inner `SignedMessage`.
-            pub fn signed_message(&self) -> &SignedMessage {
-                match *self {
-                    $(
-                        $protocol_name::$class(ref c) => {
-                            match *c {
-                                $(
-                                    $class::$type(ref t) => {
-                                        t.signed_message()
-                                    }
-                                ),+
-                            }
-                        }
-                    ),+
-                }
-            }
-        }
-    };
+/// Service messages.
+#[derive(Debug, PartialEq)]
+pub enum Service {
+    /// Transaction message.
+    AnyTx(Signed<AnyTx>),
+    /// Connect message.
+    Connect(Signed<Connect>),
+    /// Status message.
+    Status(Signed<Status>),
 }
 
-impl_protocol! {
-    /// Composition of every exonum protocol messages.
-    /// This messages used in network p2p communications.
-    SignedMessage => Message {
-        /// Exonum basic node messages.
-        0 => Service {
-            /// `RawTransaction` representation.
-            RawTransaction = 0,
-            /// Handshake to other node.
-            Connect = 1,
-            /// `Status` information of other node.
-            Status = 2,
-        },
-        /// Exonum consensus specific node messages.
-        1 => Consensus {
-            /// Consensus `Precommit` message.
-            Precommit = 0,
-            /// Consensus `Propose` message.
-            Propose = 1,
-            /// Consensus `Prevote` message.
-            Prevote = 2,
-        },
-        /// Exonum node responses.
-        2 => Responses {
-            /// Information about transactions, that sent as response to `TransactionsRequest`.
-            TransactionsResponse = 0,
-            /// Information about block, that sent as response to `BlockRequest`.
-            BlockResponse = 1,
-        },
-        /// Exonum node requests.
-        3 => Requests {
-            /// Request of some propose which hash is known.
-            ProposeRequest = 0,
-            /// Request of unknown transactions.
-            TransactionsRequest = 1,
-            /// Request of prevotes for some propose.
-            PrevotesRequest = 2,
-            /// Request of peer exchange.
-            PeersRequest = 3,
-            /// Request of some future block.
-            BlockRequest = 4,
-        },
-
+impl Service {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Service::AnyTx(ref msg) => msg.signed_message(),
+            Service::Connect(ref msg) => msg.signed_message(),
+            Service::Status(ref msg) => msg.signed_message(),
+        }
     }
+}
+
+/// Consensus messages.
+#[derive(Debug, PartialEq)]
+pub enum Consensus {
+    /// Precommit message.
+    Precommit(Signed<Precommit>),
+    /// Propose message.
+    Propose(Signed<Propose>),
+    /// Prevote message.
+    Prevote(Signed<Prevote>),
+}
+
+impl Consensus {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Consensus::Precommit(ref msg) => msg.signed_message(),
+            Consensus::Propose(ref msg) => msg.signed_message(),
+            Consensus::Prevote(ref msg) => msg.signed_message(),
+        }
+    }
+}
+
+/// Response messages.
+#[derive(Debug, PartialEq)]
+pub enum Responses {
+    /// Transactions response message.
+    TransactionsResponse(Signed<TransactionsResponse>),
+    /// Block response message.
+    BlockResponse(Signed<BlockResponse>),
+}
+
+impl Responses {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Responses::TransactionsResponse(ref msg) => msg.signed_message(),
+            Responses::BlockResponse(ref msg) => msg.signed_message(),
+        }
+    }
+}
+
+/// Request messages.
+#[derive(Debug, PartialEq)]
+pub enum Requests {
+    /// Propose request message.
+    ProposeRequest(Signed<ProposeRequest>),
+    /// Transactions request message.
+    TransactionsRequest(Signed<TransactionsRequest>),
+    /// Prevotes request message.
+    PrevotesRequest(Signed<PrevotesRequest>),
+    /// Peers request message.
+    PeersRequest(Signed<PeersRequest>),
+    /// Block request message.
+    BlockRequest(Signed<BlockRequest>),
+}
+
+impl Requests {
+    fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Requests::ProposeRequest(ref msg) => msg.signed_message(),
+            Requests::TransactionsRequest(ref msg) => msg.signed_message(),
+            Requests::PrevotesRequest(ref msg) => msg.signed_message(),
+            Requests::PeersRequest(ref msg) => msg.signed_message(),
+            Requests::BlockRequest(ref msg) => msg.signed_message(),
+        }
+    }
+}
+
+/// Exonum protocol messages.
+#[derive(Debug, PartialEq)]
+pub enum Message {
+    /// Service messages.
+    Service(Service),
+    /// Consensus messages.
+    Consensus(Consensus),
+    /// Responses messages.
+    Responses(Responses),
+    /// Requests messages.
+    Requests(Requests),
 }
 
 impl Message {
-    /// Creates new protocol message.
-    ///
-    /// # Panics
-    ///
-    /// This method can panic on serialization failure.
-    pub fn new<T: ProtocolMessage>(
-        message: T,
-        author: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Message {
-        T::into_protocol(Message::concrete(message, author, secret_key))
+    /// Deserialize message from signed message.
+    pub fn deserialize(signed: SignedMessage) -> Result<Self, failure::Error> {
+        let mut exonum_message_pb = ExonumMessage::new();
+        exonum_message_pb.merge_from_bytes(signed.exonum_message())?;
+        let exonum_msg_enum = match exonum_message_pb.message {
+            Some(msg) => msg,
+            None => bail!("Message is empty"),
+        };
+        macro_rules! pb_enum_to_message {
+            ($($pb_enum:path => $message_variant:path, $subclass_variant:path)+) =>
+            {
+                Ok(match exonum_msg_enum {
+                    $(
+                        $pb_enum(m) => $message_variant($subclass_variant(Signed::new(
+                                        ProtobufConvert::from_pb(m)?,signed, ))),
+                    )+
+                })
+            }
+        }
+        pb_enum_to_message!(
+            ExonumMessageEnum::transaction => Message::Service, Service::AnyTx
+            ExonumMessageEnum::connect => Message::Service, Service::Connect
+            ExonumMessageEnum::status => Message::Service,Service::Status
+            ExonumMessageEnum::precommit => Message::Consensus, Consensus::Precommit
+            ExonumMessageEnum::propose => Message::Consensus, Consensus::Propose
+            ExonumMessageEnum::prevote => Message::Consensus, Consensus::Prevote
+            ExonumMessageEnum::txs_response => Message::Responses, Responses::TransactionsResponse
+            ExonumMessageEnum::block_response => Message::Responses, Responses::BlockResponse
+            ExonumMessageEnum::propose_req => Message::Requests, Requests::ProposeRequest
+            ExonumMessageEnum::txs_req => Message::Requests, Requests::TransactionsRequest
+            ExonumMessageEnum::prevotes_req => Message::Requests, Requests::PrevotesRequest
+            ExonumMessageEnum::peers_req => Message::Requests, Requests::PeersRequest
+            ExonumMessageEnum::block_req => Message::Requests, Requests::BlockRequest
+        )
     }
 
     /// Creates new protocol message.
@@ -905,16 +927,11 @@ impl Message {
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<T> {
-        let value = message.encode().expect("Couldn't serialize data.");
-        let (cls, typ) = T::message_type();
-        let signed = SignedMessage::new(cls, typ, &value, author, secret_key);
-        T::into_message_from_parts(message, signed)
-    }
-
-    /// Checks buffer and return instance of `Message`.
-    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
-        let signed = SignedMessage::from_raw_buffer(buffer)?;
-        Self::deserialize(signed)
+        let value = message
+            .as_exonum_message()
+            .write_to_bytes()
+            .expect("Couldn't serialize data.");
+        Signed::new(message, SignedMessage::new(&value, author, secret_key))
     }
 
     /// Creates a new raw transaction message.
@@ -927,15 +944,108 @@ impl Message {
         service_id: u16,
         public_key: PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<RawTransaction>
+    ) -> Signed<AnyTx>
     where
         T: Into<ServiceTransaction>,
     {
         let set: ServiceTransaction = transaction.into();
-        let raw_tx = RawTransaction::new(service_id, set);
-        Self::concrete(raw_tx, public_key, secret_key)
+        let any_tx = AnyTx::as_raw_tx(service_id, set.transaction_id, set.payload);
+        Self::concrete(any_tx, public_key, secret_key)
+    }
+
+    /// Get inner SignedMessage.
+    pub fn signed_message(&self) -> &SignedMessage {
+        match self {
+            Message::Service(ref msg) => msg.signed_message(),
+            Message::Consensus(ref msg) => msg.signed_message(),
+            Message::Requests(ref msg) => msg.signed_message(),
+            Message::Responses(ref msg) => msg.signed_message(),
+        }
+    }
+
+    /// Checks buffer and return instance of `Message`.
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Message, failure::Error> {
+        let signed = SignedMessage::decode(&buffer)?;
+        Self::deserialize(signed)
     }
 }
+
+macro_rules! impl_protocol_message {
+    ($message_variant:path, $subclass_variant:path, $message:ty, $exonum_msg_field:ident) => {
+        impl ProtocolMessage for $message {
+            fn try_from(p: Message) -> Result<Signed<Self>, Message> {
+                match p {
+                    $message_variant($subclass_variant(signed)) => Ok(signed),
+                    _ => Err(p),
+                }
+            }
+
+            fn into_protocol(this: Signed<Self>) -> Message {
+                $message_variant($subclass_variant(this))
+            }
+
+            fn as_exonum_message(&self) -> ExonumMessage {
+                let mut msg = ExonumMessage::new();
+                msg.$exonum_msg_field(self.to_pb().into());
+                msg
+            }
+        }
+    };
+}
+
+impl_protocol_message!(Message::Service, Service::AnyTx, AnyTx, set_transaction);
+impl_protocol_message!(Message::Service, Service::Connect, Connect, set_connect);
+impl_protocol_message!(Message::Service, Service::Status, Status, set_status);
+impl_protocol_message!(
+    Message::Consensus,
+    Consensus::Precommit,
+    Precommit,
+    set_precommit
+);
+impl_protocol_message!(Message::Consensus, Consensus::Propose, Propose, set_propose);
+impl_protocol_message!(Message::Consensus, Consensus::Prevote, Prevote, set_prevote);
+impl_protocol_message!(
+    Message::Responses,
+    Responses::TransactionsResponse,
+    TransactionsResponse,
+    set_txs_response
+);
+impl_protocol_message!(
+    Message::Responses,
+    Responses::BlockResponse,
+    BlockResponse,
+    set_block_response
+);
+impl_protocol_message!(
+    Message::Requests,
+    Requests::ProposeRequest,
+    ProposeRequest,
+    set_propose_req
+);
+impl_protocol_message!(
+    Message::Requests,
+    Requests::TransactionsRequest,
+    TransactionsRequest,
+    set_txs_req
+);
+impl_protocol_message!(
+    Message::Requests,
+    Requests::PrevotesRequest,
+    PrevotesRequest,
+    set_prevotes_req
+);
+impl_protocol_message!(
+    Message::Requests,
+    Requests::PeersRequest,
+    PeersRequest,
+    set_peers_req
+);
+impl_protocol_message!(
+    Message::Requests,
+    Requests::BlockRequest,
+    BlockRequest,
+    set_block_req
+);
 
 impl Requests {
     /// Returns public key of the message recipient.
@@ -1007,11 +1117,11 @@ impl<T: ProtocolMessage> From<Signed<T>> for Message {
 
 impl StorageValue for Message {
     fn into_bytes(self) -> Vec<u8> {
-        self.signed_message().raw().to_vec()
+        self.signed_message().encode().unwrap()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        let message = SignedMessage::from_vec_unchecked(value.into_owned());
+        let message = SignedMessage::from_bytes(value);
         // TODO: Remove additional deserialization. [ECR-2315]
         Message::deserialize(message).unwrap()
     }

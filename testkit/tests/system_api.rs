@@ -21,7 +21,6 @@ use exonum::{
         public::system::{ConsensusStatus, HealthCheckInfo},
     },
     helpers::user_agent,
-    messages::PROTOCOL_MAJOR_VERSION,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -60,7 +59,6 @@ fn network() {
 
     let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
-    assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
 }
 

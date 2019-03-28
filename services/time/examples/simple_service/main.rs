@@ -26,7 +26,7 @@ use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Message, Signed},
     storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
@@ -90,7 +90,7 @@ impl TxMarker {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<RawTransaction> {
+    ) -> Signed<AnyTx> {
         Message::sign_transaction(TxMarker { mark, time }, SERVICE_ID, *public_key, secret_key)
     }
 }
@@ -127,7 +127,7 @@ impl Service for MarkerService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = MarkerTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

@@ -23,7 +23,7 @@ use crate::blockchain::Block;
 use crate::crypto::{CryptoHash, Hash, HASH_SIZE};
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
 use crate::messages::{
-    Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed,
+    AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Signed,
 };
 use crate::storage::{Database, MemoryDB, ProofListIndex};
 
@@ -254,7 +254,7 @@ pub fn try_add_round_with_transactions(
     Ok(res)
 }
 
-pub fn gen_timestamping_tx() -> Signed<RawTransaction> {
+pub fn gen_timestamping_tx() -> Signed<AnyTx> {
     let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
     tx_gen.next().unwrap()
 }
@@ -271,7 +271,7 @@ pub fn add_one_height_with_transactions<'a, I>(
     txs: I,
 ) -> Vec<Hash>
 where
-    I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+    I: IntoIterator<Item = &'a Signed<AnyTx>>,
 {
     try_add_one_height_with_transactions(sandbox, sandbox_state, txs).unwrap()
 }
@@ -295,14 +295,14 @@ pub fn try_add_one_height_with_transactions<'a, I>(
     txs: I,
 ) -> Result<Vec<Hash>, String>
 where
-    I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+    I: IntoIterator<Item = &'a Signed<AnyTx>>,
 {
     // sort transaction in order accordingly their hashes
     let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[Signed<RawTransaction>] = raw_txs.as_ref();
+    let txs: &[Signed<AnyTx>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
@@ -420,13 +420,13 @@ where
 pub fn add_one_height_with_transactions_from_other_validator(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
-    txs: &[Signed<RawTransaction>],
+    txs: &[Signed<AnyTx>],
 ) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[Signed<RawTransaction>] = raw_txs.as_ref();
+    let txs: &[Signed<AnyTx>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();

@@ -55,7 +55,7 @@ use std::{
 
 use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
+use crate::messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed};
 use crate::node::ApiSender;
 use crate::runtime::{
     dispatcher::{Dispatcher, DispatcherBuilder},
@@ -137,7 +137,7 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    pub fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         // TODO do we need this method to be public?
         // It's used for checking in consensus.rs and in explorer/mod.rs
         // self.dispatcher.tx_from_raw(raw)
@@ -280,7 +280,7 @@ impl Blockchain {
 
     // This method is needed for EJB.
     #[doc(hidden)]
-    pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
+    pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
 
         // TODO check if service exists?

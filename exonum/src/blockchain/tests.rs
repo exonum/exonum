@@ -19,9 +19,9 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use crate::blockchain::{
     Blockchain, ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
 };
-use crate::crypto::{gen_keypair, Hash};
+use crate::crypto::{gen_keypair, CryptoHash, Hash};
 use crate::helpers::{Height, ValidatorId};
-use crate::messages::{Message, RawTransaction};
+use crate::messages::{AnyTx, Message};
 use crate::proto;
 use crate::storage::{Database, Error, Fork, ListIndex, Snapshot};
 
@@ -43,7 +43,7 @@ impl Service for TestService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         Ok(TestServiceTxs::tx_from_raw(raw)?.into())
     }
 }
@@ -284,7 +284,7 @@ impl Service for ServiceGood {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -309,7 +309,7 @@ impl Service for ServicePanic {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 
@@ -333,7 +333,7 @@ impl Service for ServicePanicStorageError {
         vec![]
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         unimplemented!()
     }
 

@@ -31,7 +31,7 @@ use crate::blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorK
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, ValidatorId};
-use crate::messages::{Message, RawTransaction, ServiceTransaction, Signed};
+use crate::messages::{AnyTx, Message, ServiceTransaction, Signed};
 use crate::node::{ApiSender, ConnectInfo, NodeRole, State};
 use crate::storage::{Fork, Snapshot};
 
@@ -55,7 +55,7 @@ use crate::storage::{Fork, Snapshot};
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{Signed, RawTransaction};
+/// # use exonum::messages::{Signed, AnyTx};
 /// # use exonum::storage::{Fork, Snapshot};
 ///
 /// // Reused constants
@@ -125,7 +125,7 @@ use crate::storage::{Fork, Snapshot};
 ///         MyServiceSchema::new(snapshot).state_hash()
 ///     }
 ///
-///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, failure::Error> {
+///     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<Transaction>, failure::Error> {
 ///         let tx = MyTransactions::tx_from_raw(raw)?;
 ///         Ok(tx.into())
 ///     }
@@ -174,7 +174,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// `#[derive(TransactionSet)]` attribute generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error>;
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error>;
 
     /// Invoked for all deployed services during the blockchain initialization
     /// on genesis block creation each time a node is started.
@@ -327,7 +327,7 @@ impl ServiceContext {
 
     /// Broadcast transaction to other nodes in the network.
     /// This transaction should be signed externally.
-    pub fn broadcast_signed_transaction(&self, msg: Signed<RawTransaction>) {
+    pub fn broadcast_signed_transaction(&self, msg: Signed<AnyTx>) {
         if let Err(e) = self.api_sender.broadcast_transaction(msg) {
             error!("Couldn't broadcast transaction {}.", e);
         }

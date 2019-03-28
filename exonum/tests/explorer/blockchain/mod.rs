@@ -21,8 +21,8 @@ use exonum::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
         TransactionContext, TransactionSet,
     },
-    crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
+    messages::{AnyTx, Message, Signed},
     node::ApiSender,
     storage::{MemoryDB, Snapshot},
 };
@@ -105,7 +105,7 @@ impl Service for MyService {
         vec![]
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         ExplorerTransactions::tx_from_raw(raw).map(ExplorerTransactions::into)
     }
 }
@@ -145,7 +145,7 @@ pub fn create_blockchain() -> Blockchain {
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
-pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTransaction>>) {
+pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>>) {
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
