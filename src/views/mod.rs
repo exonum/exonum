@@ -173,7 +173,7 @@ where
         let (index_address, index_state) =
             metadata::index_metadata(self.index_access, &self.address, self.index_type);
 
-        let index_view = View::new_ref(&self.index_access, index_address);
+        let index_view = View::new(self.index_access, index_address);
 
         (index_view, index_state)
     }
@@ -340,16 +340,6 @@ impl<T: IndexAccess> View<T> {
         let changes = index_access.changes(&address);
         Self {
             index_access,
-            changes,
-            address,
-        }
-    }
-
-    pub(super) fn new_ref<I: Into<IndexAddress>>(index_access: &T, address: I) -> Self {
-        let address = address.into();
-        let changes = index_access.changes(&address);
-        Self {
-            index_access: *index_access,
             changes,
             address,
         }

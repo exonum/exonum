@@ -15,15 +15,10 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    db::Change::Put,
-    views::{
-        metadata::{index_metadata, INDEXES_POOL_NAME},
-        ChangeSet, IndexAddress, IndexType, View,
-    },
+    views::{IndexAddress, IndexType, View},
     BinaryKey, BinaryValue, Entry, Fork, IndexAccess, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofListIndex, ProofMapIndex, Snapshot, SparseListIndex, ValueSetIndex,
 };
-use uuid::Uuid;
 
 pub trait AnyObject<T: IndexAccess> {
     fn view(self) -> View<T>;
@@ -168,13 +163,16 @@ pub trait ObjectAccess: IndexAccess {
     fn get_object_existed_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
-        I: Into<IndexAddress>;
+        I: Into<IndexAddress>,
+    {
+        T::get(address, *self).map(|value| RefMut { value })
+    }
 
     ///TODO: add documentation [ECR-2820]
     fn get_object<I, T>(&self, address: I) -> RefMut<T>
-        where
-            I: Into<IndexAddress>,
-            T: FromView<Self>,
+    where
+        I: Into<IndexAddress>,
+        T: FromView<Self>,
     {
         let address = address.into();
         let object = T::get(address.clone(), *self).map(|value| RefMut { value });
@@ -188,36 +186,26 @@ pub trait ObjectAccess: IndexAccess {
     }
 }
 
-impl ObjectAccess for &Box<dyn Snapshot> {
-    fn get_object_existed_mut<T, I>(&self, _address: I) -> Option<RefMut<T>>
-    where
-        T: FromView<Self>,
-        I: Into<IndexAddress>,
-    {
-        unimplemented!()
-    }
-}
+impl ObjectAccess for &Box<dyn Snapshot> {}
 
-impl ObjectAccess for &Fork {
-    fn get_object_existed_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
-    where
-        T: FromView<Self>,
-        I: Into<IndexAddress>,
-    {
-        T::get(address, self).map(|value| RefMut { value })
-    }
-}
+impl ObjectAccess for &Fork {}
 
 impl Fork {
     ///TODO: add documentation [ECR-2820]
-    pub fn create_object<'a, T>(&'a self) -> T
+    pub fn get_object<'a, I, T>(&'a self, address: I) -> RefMut<T>
     where
+        I: Into<IndexAddress>,
         T: FromView<&'a Self>,
     {
-        let temp_uuid = Uuid::new_v4();
-        let address = IndexAddress::with_root("tmp").append_bytes(&temp_uuid.into_bytes());
-        //TODO: don't create redundant metadata
-        T::create(address, &self)
+        let address = address.into();
+        let object = T::get(address.clone(), self).map(|value| RefMut { value });
+
+        match object {
+            Some(object) => object,
+            _ => RefMut {
+                value: T::create(address, self),
+            },
+        }
     }
 
     ///TODO: add documentation [ECR-2820]
@@ -236,35 +224,6 @@ impl Fork {
         I: Into<IndexAddress>,
     {
         T::get(address, self).map(|value| RefMut { value })
-    }
-
-    ///TODO: add documentation [ECR-2820]
-    pub fn insert<I, T, A>(&self, address: I, object: A)
-    where
-        I: Into<IndexAddress>,
-        T: IndexAccess,
-        A: AnyObject<T>,
-    {
-        let index_type = object.object_type();
-        let metadata = object.metadata();
-        let view = object.view();
-        let address = address.into().clone();
-
-        let (new_address, _state) = index_metadata::<_, ()>(self, &address, index_type);
-        self.working_patch().clear(&view.address);
-
-        let mut metadata_changes = self
-            .working_patch()
-            .changes_mut(&IndexAddress::with_root(INDEXES_POOL_NAME));
-
-        metadata_changes
-            .data
-            .insert(address.fully_qualified_name(), Put(metadata));
-
-        let mut changes = self.working_patch().changes_mut(&new_address);
-        let view_changes = view.changes.as_ref().unwrap().clone();
-
-        changes.data.extend(view_changes.data);
     }
 }
 
@@ -307,7 +266,7 @@ mod tests {
     use crate::{
         db::Database,
         views::refs::{ObjectAccess, Ref, RefMut},
-        KeySetIndex, ListIndex, TemporaryDB,
+        ListIndex, TemporaryDB,
     };
 
     #[test]
@@ -315,15 +274,16 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut index: ListIndex<_, u32> = fork.create_object();
+            let mut index: RefMut<ListIndex<_, u32>> = fork.get_object("index");
             index.push(1);
-            fork.insert("index", index);
-
-            let index: Option<Ref<ListIndex<_, u32>>> = fork.get_object_existed("index");
-            assert!(index.is_some());
         }
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
         {
-            let mut index: RefMut<ListIndex<_, u32>> = fork.get_object_existed_mut("index").unwrap();
+            let mut index: RefMut<ListIndex<_, u32>> =
+                fork.get_object_existed_mut("index").unwrap();
             index.push(2);
         }
 
@@ -346,19 +306,18 @@ mod tests {
     }
 
     #[test]
-    fn fork_get_mut() {
+    fn fork_get_object() {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let list: ListIndex<_, u32> = fork.create_object();
-            fork.insert("index", list);
+            let _list: RefMut<ListIndex<_, u32>> = fork.get_object("index");
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let fork = db.fork();
         {
-            let mut list: RefMut<ListIndex<_, u32>> = fork.get_object_existed_mut("index").unwrap();
+            let mut list: RefMut<ListIndex<_, u32>> = fork.get_object("index");
             list.push(1);
         }
 
@@ -368,48 +327,5 @@ mod tests {
         let list: Ref<ListIndex<_, u32>> = snapshot.get_object_existed("index").unwrap();
 
         assert_eq!(list.get(0), Some(1));
-    }
-
-    #[test]
-    fn fork_multiple_insert() {
-        let db = TemporaryDB::new();
-        let fork = db.fork();
-        {
-            let mut index1: KeySetIndex<_, u32> = fork.create_object();
-            let mut index2: KeySetIndex<_, u32> = fork.create_object();
-            index1.insert(1);
-            index2.insert(2);
-            fork.insert("index1", index1);
-            fork.insert("index2", index2);
-        }
-        db.merge(fork.into_patch()).unwrap();
-
-        let snapshot = &db.snapshot();
-        let index1: Ref<KeySetIndex<_, u32>> = snapshot.get_object_existed("index1").unwrap();
-        let index2: Ref<KeySetIndex<_, u32>> = snapshot.get_object_existed("index2").unwrap();
-
-        assert!(index1.contains(&1));
-        assert!(index2.contains(&2));
-    }
-
-    #[test]
-    fn ref_list_length() {
-        let db = TemporaryDB::new();
-        let fork = db.fork();
-        {
-            let mut index: ListIndex<_, u32> = fork.create_object();
-            index.push(1);
-
-            let index2: ListIndex<_, u32> = fork.create_object();
-            assert_eq!(index2.len(), 0);
-            fork.insert("index", index);
-        }
-
-        db.merge(fork.into_patch()).unwrap();
-
-        let snapshot = &db.snapshot();
-        let index1: Ref<ListIndex<_, u32>> = snapshot.get_object_existed("index").unwrap();
-
-        assert_eq!(index1.len(), 1);
     }
 }

@@ -25,7 +25,7 @@ use crate::BinaryValue;
 use super::{IndexAccess, IndexAddress, View};
 
 /// TODO Add documentation. [ECR-2820]
-pub const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
+const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
 /// Type of the index stored in `IndexMetadata`.
 /// `IndexType` is used for type checking indexes when they are created/accessed.
