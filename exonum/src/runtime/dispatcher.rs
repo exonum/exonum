@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
@@ -33,7 +33,11 @@ impl std::fmt::Debug for DispatcherBuilder {
 }
 
 impl DispatcherBuilder {
-    pub fn with_runtime(mut self, runtime_id: u32, runtime: Box<dyn RuntimeEnvironment + Send>) -> Self {
+    pub fn with_runtime(
+        mut self,
+        runtime_id: u32,
+        runtime: Box<dyn RuntimeEnvironment + Send>,
+    ) -> Self {
         self.runtimes.insert(runtime_id, runtime);
 
         self
@@ -66,7 +70,9 @@ impl Dispatcher {
     }
 
     fn notify_service_started(&self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
-        self.runtime_lookup.borrow_mut().insert(service_id, artifact.runtime_id);
+        self.runtime_lookup
+            .borrow_mut()
+            .insert(service_id, artifact.runtime_id);
     }
 }
 
@@ -166,7 +172,11 @@ mod tests {
             }
         }
 
-        fn check_deploy_status(&self, artifact: ArtifactSpec, _: bool) -> Result<DeployStatus, DeployError> {
+        fn check_deploy_status(
+            &self,
+            artifact: ArtifactSpec,
+            _: bool,
+        ) -> Result<DeployStatus, DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(DeployStatus::Deployed)
             } else {

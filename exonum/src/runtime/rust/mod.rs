@@ -39,7 +39,7 @@ use crate::storage::Fork;
 use self::service::Service;
 
 #[derive(Debug, Default)]
-struct RustRuntime {
+pub struct RustRuntime {
     // TODO: think about ways to share runtime.
     inner: RefCell<RustRuntimeInner>,
 }
@@ -59,6 +59,8 @@ impl RustRuntime {
         self.inner.borrow_mut().services.insert(artifact, service);
     }
 }
+
+unsafe impl Send for RustRuntime {}
 
 #[derive(Debug, Default)]
 struct RustRuntimeInner {

@@ -57,8 +57,12 @@ use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Connect, Message, Precommit, ProtocolMessage, RawTransaction, Signed};
 use crate::node::ApiSender;
+use crate::runtime::{
+    dispatcher::{Dispatcher, DispatcherBuilder},
+    rust::RustRuntime,
+    RuntimeIdentifier,
+};
 use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
-use crate::runtime::dispatcher::Dispatcher;
 
 mod block;
 mod genesis;
@@ -81,7 +85,7 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    new_dispatcher: Arc<Mutex<Dispatcher>>,
+    dispatcher: Arc<Mutex<Dispatcher>>,
 }
 
 impl Blockchain {
@@ -93,11 +97,17 @@ impl Blockchain {
         service_secret_key: SecretKey,
         api_sender: ApiSender,
     ) -> Self {
+        let rust_runtime = Box::new(RustRuntime::default());
+
+        let dispatcher = DispatcherBuilder::default()
+            .with_runtime(RuntimeIdentifier::Rust as u32, rust_runtime)
+            .finalize();
+
         Self {
             db: storage.into(),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
-            new_dispatcher: Arc::new(Mutex::new(Dispatcher::default())),
+            dispatcher: Arc::new(Mutex::new(dispatcher)),
         }
     }
 
@@ -231,7 +241,6 @@ impl Blockchain {
             //     config_propose.services.insert(name.into(), cfg);
             // }
 
-
             // Commit actual configuration
             {
                 let mut schema = Schema::new(&mut fork);
@@ -273,7 +282,7 @@ impl Blockchain {
     #[doc(hidden)]
     pub fn broadcast_raw_transaction(&self, tx: RawTransaction) -> Result<(), failure::Error> {
         let service_id = tx.service_id();
-        
+
         // TODO check if service exists?
 
         // if !self.dispatcher.services().contains_key(&service_id) {
@@ -460,7 +469,7 @@ impl Blockchain {
         self.merge(patch)?;
 
         // Invokes `after_commit` for each service in order of their identifiers
-        
+
         // TODO invoke after_commit
 
         // for (service_id, service) in self.dispatcher.services().iter() {
@@ -566,7 +575,7 @@ impl Clone for Blockchain {
             db: Arc::clone(&self.db),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),
-            new_dispatcher: Arc::clone(&self.new_dispatcher),
+            dispatcher: Arc::clone(&self.dispatcher),
         }
     }
 }

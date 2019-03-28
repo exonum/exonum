@@ -377,7 +377,7 @@ impl ApiAggregator {
 
     fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        
+
         // TODO Service API not mounted.
 
         // let node_info = self::node::private::NodeInfo::new(
@@ -386,7 +386,6 @@ impl ApiAggregator {
         // self::node::private::SystemApi::new(node_info, shared_api_state.clone())
         //     .wire(builder.private_scope());
         // self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
-
 
         builder
     }
