@@ -32,7 +32,7 @@ use exonum::{
     blockchain::TransactionErrorType as ErrorType,
     crypto::{self, CryptoHash, PublicKey},
     helpers::Height,
-    messages::{self, RawTransaction, Signed},
+    messages::{self, AnyTx, Signed},
 };
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use hex::FromHex;
@@ -51,7 +51,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn inc_count(api: &TestKitApi, by: u64) -> Signed<RawTransaction> {
+fn inc_count(api: &TestKitApi, by: u64) -> Signed<AnyTx> {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxIncrement::sign(&pubkey, by, &key);

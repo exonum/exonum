@@ -19,9 +19,9 @@ use crate::crypto::{CryptoHash, Hash, PublicKey};
 use crate::events::InternalRequest;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{
-    BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed, SignedMessage,
-    TransactionsRequest, TransactionsResponse,
+    AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, Signed, SignedMessage, TransactionsRequest,
+    TransactionsResponse,
 };
 use crate::node::{NodeHandler, RequestData};
 use crate::storage::Patch;
@@ -529,7 +529,7 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
-    pub fn handle_tx(&mut self, msg: Signed<RawTransaction>) -> Result<(), failure::Error> {
+    pub fn handle_tx(&mut self, msg: Signed<AnyTx>) -> Result<(), failure::Error> {
         let hash = msg.hash();
 
         let snapshot = self.blockchain.snapshot();
@@ -599,7 +599,7 @@ impl NodeHandler {
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
-    pub fn handle_incoming_tx(&mut self, msg: Signed<RawTransaction>) {
+    pub fn handle_incoming_tx(&mut self, msg: Signed<AnyTx>) {
         trace!("Handle incoming transaction");
         match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),

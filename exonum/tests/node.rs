@@ -29,7 +29,7 @@ use exonum::{
     blockchain::{Service, ServiceContext, Transaction},
     crypto::Hash,
     helpers,
-    messages::RawTransaction,
+    messages::AnyTx,
     node::{ApiSender, ExternalMessage, Node},
     storage::{Database, Fork, MemoryDB, Snapshot},
 };
@@ -49,7 +49,7 @@ impl Service for CommitWatcherService {
         Vec::new()
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         unreachable!("An unknown transaction received");
     }
 
@@ -75,7 +75,7 @@ impl Service for InitializeCheckerService {
         Vec::new()
     }
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         unreachable!("An unknown transaction received");
     }
 

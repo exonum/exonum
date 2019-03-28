@@ -19,7 +19,7 @@ use crate::{
         ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction, TransactionContext,
     },
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Message, Signed},
     node::State,
     proto,
     storage::{Fork, Snapshot},
@@ -106,7 +106,7 @@ pub enum ConfigurationTransactions {
 impl ConfigurationTransactions {
     #[doc(hidden)]
     // TODO: pub only for testing.
-    pub fn from_raw(message: Signed<RawTransaction>) -> ConfigurationTransactions {
+    pub fn from_raw(message: Signed<AnyTx>) -> ConfigurationTransactions {
         use crate::blockchain::TransactionSet;
         use std::ops::Deref;
         ConfigurationTransactions::tx_from_raw(message.deref().clone()).unwrap()
@@ -115,21 +115,21 @@ impl ConfigurationTransactions {
 
 impl VoteAgainst {
     /// Create `Signed` for `VoteAgainst` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
     }
 }
 
 impl Vote {
     /// Create `Signed` for `Vote` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(author: &PublicKey, &cfg_hash: &Hash, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(Self { cfg_hash }, SERVICE_ID, *author, key)
     }
 }
 
 impl Propose {
     /// Create `Signed` for `Propose` transaction, signed by provided keys.
-    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(author: &PublicKey, cfg: &str, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(
             Self {
                 cfg: cfg.to_owned(),

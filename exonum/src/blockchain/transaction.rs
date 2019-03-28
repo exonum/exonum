@@ -21,7 +21,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crate::crypto::{CryptoHash, Hash, PublicKey};
-use crate::messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
+use crate::messages::{AnyTx, HexStringRepresentation, Signed, SignedMessage};
 use crate::proto::{self, ProtobufConvert};
 use crate::storage::{Fork, StorageValue};
 
@@ -52,7 +52,7 @@ pub struct TransactionMessage {
     transaction: Option<Box<dyn Transaction>>,
 
     #[serde(with = "HexStringRepresentation")]
-    message: Signed<RawTransaction>,
+    message: Signed<AnyTx>,
 }
 impl ::std::fmt::Debug for TransactionMessage {
     fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
@@ -76,11 +76,11 @@ impl TransactionMessage {
         self.message.signed_message()
     }
     /// Returns `RawTransaction`.
-    pub fn raw_transaction(&self) -> RawTransaction {
+    pub fn raw_transaction(&self) -> AnyTx {
         self.message.payload().clone()
     }
     /// Returns raw transaction message.
-    pub fn message(&self) -> &Signed<RawTransaction> {
+    pub fn message(&self) -> &Signed<AnyTx> {
         &self.message
     }
     /// Returns transaction smart contract.
@@ -90,7 +90,7 @@ impl TransactionMessage {
     }
     /// Create new `TransactionMessage` from raw message.
     pub(crate) fn new(
-        message: Signed<RawTransaction>,
+        message: Signed<AnyTx>,
         transaction: Box<dyn Transaction>,
     ) -> TransactionMessage {
         TransactionMessage {
@@ -185,7 +185,7 @@ pub struct TransactionContext<'a> {
 
 impl<'a> TransactionContext<'a> {
     #[doc(hidden)]
-    pub fn new(fork: &'a mut Fork, raw_message: &Signed<RawTransaction>) -> Self {
+    pub fn new(fork: &'a mut Fork, raw_message: &Signed<AnyTx>) -> Self {
         TransactionContext {
             fork,
             service_id: raw_message.service_id(),
@@ -443,7 +443,7 @@ pub trait TransactionSet:
     Into<Box<dyn Transaction>> + Clone + Serialize + DeserializeOwned
 {
     /// Parses a transaction from this set from a `RawTransaction`.
-    fn tx_from_raw(raw: RawTransaction) -> Result<Self, failure::Error>;
+    fn tx_from_raw(raw: AnyTx) -> Result<Self, failure::Error>;
 }
 
 /// Tries to get a meaningful description from the given panic.
@@ -688,7 +688,7 @@ mod tests {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
             Ok(TestTxs::tx_from_raw(raw)?.into())
         }
     }

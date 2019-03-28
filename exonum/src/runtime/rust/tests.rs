@@ -18,11 +18,10 @@ use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
 
 use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext};
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::BinaryForm;
+use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
-    CallInfo, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId,
+    DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::{well_known_types::Any, Message};

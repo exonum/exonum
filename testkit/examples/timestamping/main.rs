@@ -24,8 +24,8 @@ use exonum::{
     blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey},
+    messages::{AnyTx, Message, Signed},
     storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
@@ -48,7 +48,7 @@ enum TimestampingServiceTransactions {
 }
 
 impl TxTimestamp {
-    fn sign(author: &PublicKey, message: &str, key: &SecretKey) -> Signed<RawTransaction> {
+    fn sign(author: &PublicKey, message: &str, key: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(
             Self {
                 message: message.to_owned(),
@@ -81,7 +81,7 @@ impl Service for TimestampingService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = TimestampingServiceTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

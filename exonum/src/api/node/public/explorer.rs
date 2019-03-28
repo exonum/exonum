@@ -32,10 +32,10 @@ use crate::{
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
     blockchain::{Block, SharedNodeState},
-    crypto::Hash,
+    crypto::{CryptoHash, Hash},
     explorer::{self, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{Message, Precommit, RawTransaction, Signed, SignedMessage},
+    messages::{AnyTx, BinaryForm, Message, Precommit, Signed, SignedMessage},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -214,9 +214,9 @@ impl ExplorerApi {
         use crate::messages::ProtocolMessage;
 
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::from_raw_buffer(buf)?;
+        let signed = SignedMessage::decode(&buf)?;
         let tx_hash = signed.hash();
-        let signed = RawTransaction::try_from(Message::deserialize(signed)?)
+        let signed = AnyTx::try_from(Message::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
         let _ = state
             .sender()

@@ -19,9 +19,9 @@ use exonum::{
     blockchain::{
         ExecutionResult, Service, ServiceContext, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::Hash,
+    crypto::{CryptoHash, Hash},
     helpers::Height,
-    messages::RawTransaction,
+    messages::AnyTx,
     storage::Snapshot,
 };
 
@@ -65,7 +65,7 @@ impl Service for AfterCommitService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = HandleCommitTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

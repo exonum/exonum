@@ -25,12 +25,12 @@ use std::{
 };
 
 use crate::blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-use crate::crypto::{Hash, PublicKey, SecretKey};
+use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use crate::events::network::ConnectedPeerAddr;
 use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
 use crate::messages::{
-    BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
-    RawTransaction, Signed,
+    AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
+    Signed,
 };
 use crate::node::{
     connect_list::{ConnectList, PeerAddress},
@@ -920,7 +920,7 @@ impl State {
     pub fn add_propose<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: Signed<Propose>,
-        transactions: &MapIndex<S, Hash, Signed<RawTransaction>>,
+        transactions: &MapIndex<S, Hash, Signed<AnyTx>>,
         transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
@@ -988,7 +988,7 @@ impl State {
     pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
         &mut self,
         msg: &Signed<BlockResponse>,
-        txs: &MapIndex<S, Hash, Signed<RawTransaction>>,
+        txs: &MapIndex<S, Hash, Signed<AnyTx>>,
         txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());

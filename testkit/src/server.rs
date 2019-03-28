@@ -154,10 +154,10 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 mod tests {
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
-    use exonum::crypto::{gen_keypair, Hash};
+    use exonum::crypto::{gen_keypair, CryptoHash, Hash};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
-    use exonum::messages::{Message, RawTransaction, Signed};
+    use exonum::messages::{AnyTx, Message, Signed};
     use exonum::storage::Snapshot;
 
     use super::{super::proto, *};
@@ -178,7 +178,7 @@ mod tests {
     }
 
     impl TxTimestamp {
-        fn for_str(s: &str) -> Signed<RawTransaction> {
+        fn for_str(s: &str) -> Signed<AnyTx> {
             let (pubkey, key) = gen_keypair();
             Message::sign_transaction(
                 Self {
@@ -215,10 +215,7 @@ mod tests {
                 Vec::new()
             }
 
-            fn tx_from_raw(
-                &self,
-                raw: RawTransaction,
-            ) -> Result<Box<dyn Transaction>, failure::Error> {
+            fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
                 use exonum::blockchain::TransactionSet;
 
                 Any::tx_from_raw(raw).map(Any::into)

@@ -23,10 +23,10 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{Blockchain, Schema, Transaction, TransactionError},
-    crypto,
+    crypto::{self, CryptoHash},
     explorer::*,
     helpers::{Height, ValidatorId},
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Message, Signed},
 };
 
 use crate::blockchain::{
@@ -37,7 +37,7 @@ use crate::blockchain::{
 mod blockchain;
 
 /// Creates a transaction for the mempool.
-pub fn mempool_transaction() -> Signed<RawTransaction> {
+pub fn mempool_transaction() -> Signed<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();

@@ -33,7 +33,7 @@ use crate::blockchain::{
 };
 use crate::crypto::{CryptoHash, Hash};
 use crate::helpers::Height;
-use crate::messages::{Precommit, RawTransaction, Signed};
+use crate::messages::{AnyTx, Precommit, Signed};
 use crate::storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
@@ -661,7 +661,7 @@ impl TransactionInfo {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<dyn Snapshot>,
-    transaction_parser: Box<dyn 'a + Fn(Signed<RawTransaction>) -> ParseResult>,
+    transaction_parser: Box<dyn 'a + Fn(Signed<AnyTx>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {

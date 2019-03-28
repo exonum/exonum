@@ -20,7 +20,7 @@ use exonum::{
     },
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Message, Signed},
     storage::{Fork, MapIndex, Snapshot},
 };
 
@@ -123,7 +123,7 @@ pub(in crate::inflating_cryptocurrency) enum CurrencyTransactions {
 
 impl TxCreateWallet {
     #[doc(hidden)]
-    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
+    pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
         Message::sign_transaction(
             Self {
                 name: name.to_owned(),
@@ -143,7 +143,7 @@ impl TxTransfer {
         seed: u64,
         pk: &PublicKey,
         sc: &SecretKey,
-    ) -> Signed<RawTransaction> {
+    ) -> Signed<AnyTx> {
         Message::sign_transaction(Self { to, amount, seed }, SERVICE_ID, *pk, sc)
     }
 }
@@ -241,7 +241,7 @@ impl Service for CurrencyService {
     }
 
     /// Implement a method to deserialize transactions coming to the node.
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = CurrencyTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }

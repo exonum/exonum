@@ -49,7 +49,7 @@ use exonum::{
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric::{Context, ServiceFactory},
-    messages::RawTransaction,
+    messages::AnyTx,
     storage::{Fork, Snapshot},
 };
 use serde_json::Value;
@@ -108,7 +108,7 @@ impl Service for TimeService {
         SERVICE_ID
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 

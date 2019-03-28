@@ -38,6 +38,7 @@ use crate::events::{
     },
     tests::raw_message,
 };
+use crate::messages::BinaryForm;
 
 #[test]
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -163,7 +164,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let message = raw_message(msg_size);
 
     initiator
-        .encrypt_msg(message.raw(), &mut buffer_msg)
+        .encrypt_msg(&message.encode().unwrap(), &mut buffer_msg)
         .expect(format!("Unable to encrypt message with size {}", msg_size).as_str());
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
@@ -171,7 +172,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let res = responder
         .decrypt_msg(len, &mut buffer_msg)
         .expect(format!("Unable to decrypt message with size {}", msg_size).as_str());
-    assert_eq!(message.raw(), &res);
+    assert_eq!(&message.encode().unwrap(), &res);
 }
 
 fn create_noise_sessions() -> (NoiseWrapper, NoiseWrapper) {

@@ -20,7 +20,7 @@ use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Message, Signed},
     storage::{Fork, Snapshot},
 };
 
@@ -75,7 +75,7 @@ impl TxTime {
         time: DateTime<Utc>,
         public_key: &PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<RawTransaction> {
+    ) -> Signed<AnyTx> {
         Message::sign_transaction(TxTime::new(time), SERVICE_ID, *public_key, secret_key)
     }
 
