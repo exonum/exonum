@@ -10,10 +10,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Now indexes can be accessed via immutable references from `Snapshot` and
     mutable/immutable references from `Fork`.
 
-  - Now it's possible to create root index from `Fork` using method
-    `fork::create_root_object`.
+  - Introduced method `fork::get_object` to get or create object by address.
 
-  - `get` methods of `Fork` and `Snapshot` returns optional references to index.
+  - `get_object_existed` and `get_object_existed_mut` methods of `Fork` and `Snapshot`
+    returns optional references to index.
 
 - Updated `ProofMapIndex` data layout. (#31)
 
