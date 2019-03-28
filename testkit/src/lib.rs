@@ -170,7 +170,7 @@ pub mod proto;
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, net::SocketAddr};
 
 use exonum::{
@@ -388,6 +388,7 @@ pub struct TestKit {
     blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
     events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
+    processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
@@ -433,27 +434,29 @@ impl TestKit {
         );
 
         blockchain.initialize(genesis).unwrap();
+        let processing_lock = Arc::new(Mutex::new(()));
+        let processing_lock_ = Arc::clone(&processing_lock);
 
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
             let mut blockchain = blockchain.clone();
             Box::new(api_channel.1.and_then(move |event| {
+                let guard = processing_lock_.lock().unwrap();
                 let mut fork = blockchain.fork();
-                {
-                    let mut schema = CoreSchema::new(&mut fork);
-                    match event {
-                        ExternalMessage::Transaction(tx) => {
-                            let hash = tx.hash();
-                            if !schema.transactions().contains(&hash) {
-                                schema.add_transaction_into_pool(tx.clone());
-                            }
+                let mut schema = CoreSchema::new(&mut fork);
+                match event {
+                    ExternalMessage::Transaction(tx) => {
+                        let hash = tx.hash();
+                        if !schema.transactions().contains(&hash) {
+                            schema.add_transaction_into_pool(tx.clone());
                         }
-                        ExternalMessage::PeerAdd(_)
-                        | ExternalMessage::Enable(_)
-                        | ExternalMessage::Rebroadcast
-                        | ExternalMessage::Shutdown => { /* Ignored */ }
                     }
+                    ExternalMessage::PeerAdd(_)
+                    | ExternalMessage::Enable(_)
+                    | ExternalMessage::Rebroadcast
+                    | ExternalMessage::Shutdown => { /* Ignored */ }
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
+                drop(guard);
                 Ok(())
             }))
         };
@@ -463,6 +466,7 @@ impl TestKit {
             db_handler,
             api_sender,
             events_stream,
+            processing_lock,
             network,
             cfg_proposal: None,
         }
@@ -648,9 +652,11 @@ impl TestKit {
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
 
+        let guard = self.processing_lock.lock().unwrap();
         self.blockchain
             .commit(&patch, block_hash, precommits.into_iter())
             .unwrap();
+        drop(guard);
 
         self.poll_events();
 
@@ -801,11 +807,6 @@ impl TestKit {
         let schema = CoreSchema::new(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
-        {
-            let blockchain = self.blockchain_mut();
-            let fork = blockchain.fork();
-            blockchain.merge(fork.into_patch()).unwrap();
-        }
         self.do_create_block(&tx_hashes)
     }
 
