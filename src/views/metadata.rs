@@ -24,7 +24,7 @@ use crate::BinaryValue;
 
 use super::{IndexAccess, IndexAddress, View};
 
-/// TODO Add documentation. [ECR-2820]
+/// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
 /// Type of the index stored in `IndexMetadata`.
@@ -155,8 +155,12 @@ impl<V> IndexMetadata<V> {
     }
 }
 
-/// TODO Add documentation. [ECR-2820]
-//TODO: revert to private
+/// Returns index metadata based on provided `index_address` and `index_type`.
+///
+/// Creates new metadata if it doesn't exists.
+///
+/// Input `index_address` is replaced by output `index_address` based on value
+/// taken from indexes pool.
 pub fn index_metadata<T, V>(
     index_access: T,
     index_address: &IndexAddress,
@@ -270,8 +274,7 @@ where
     pub fn set(&mut self, state: V) {
         let mut cache = self.cache.get_mut();
         cache.state = state;
-        View::new(self.index_access, INDEXES_POOL_NAME)
-            .put(&self.index_name, cache.to_bytes());
+        View::new(self.index_access, INDEXES_POOL_NAME).put(&self.index_name, cache.to_bytes());
     }
 
     pub fn is_new(&self) -> bool {

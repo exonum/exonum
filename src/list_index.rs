@@ -174,10 +174,6 @@ where
             })
     }
 
-    pub fn address(&self) -> &IndexAddress {
-        &self.base.address
-    }
-
     /// Returns an element at the indicated position or `None` if the indicated
     /// position is out of bounds.
     ///

@@ -148,9 +148,21 @@ where
     }
 }
 
-///TODO: add documentation [ECR-2820]
+/// Trait used to obtain references to database objects.
 pub trait ObjectAccess: IndexAccess {
-    ///TODO: add documentation [ECR-2820]
+
+    /// Returns immutable reference to existed database object or `None` if
+    /// object with provided `address` is not found.
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, ListIndex, Ref};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let snapshot = &db.snapshot();
+    ///
+    /// let index: Option<Ref<ListIndex<_, u8>>> = snapshot.get_object_existed("index");
+    /// assert!(index.is_none());
+    /// ```
     fn get_object_existed<I, T>(&self, address: I) -> Option<Ref<T>>
     where
         I: Into<IndexAddress>,
@@ -159,7 +171,18 @@ pub trait ObjectAccess: IndexAccess {
         T::get(address, *self).map(|value| Ref { value })
     }
 
-    ///TODO: add documentation [ECR-2820]
+    /// Returns mutable reference to existed database object or `None` if
+    /// object with provided `address` is not found.
+    ///
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, ListIndex, Ref};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    ///
+    /// let index: Option<Ref<ListIndex<_, u8>>> = fork.get_object_existed_mut("index");
+    /// ```
     fn get_object_existed_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<Self>,
@@ -168,7 +191,19 @@ pub trait ObjectAccess: IndexAccess {
         T::get(address, *self).map(|value| RefMut { value })
     }
 
-    ///TODO: add documentation [ECR-2820]
+    /// Returns mutable reference to database object. If object is not exists
+    /// creates it.
+    ///
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, ListIndex, Ref, RefMut};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    ///
+    /// let mut index: RefMut<ListIndex<_, u8>> = fork.get_object("index");
+    /// index.push(1);
+    /// ```
     fn get_object<I, T>(&self, address: I) -> RefMut<T>
     where
         I: Into<IndexAddress>,
@@ -191,7 +226,9 @@ impl ObjectAccess for &Box<dyn Snapshot> {}
 impl ObjectAccess for &Fork {}
 
 impl Fork {
-    ///TODO: add documentation [ECR-2820]
+    /// See: [ObjectAccess::get_object][1].
+    ///
+    /// [1]: trait.ObjectAccess.html#method.get_object
     pub fn get_object<'a, I, T>(&'a self, address: I) -> RefMut<T>
     where
         I: Into<IndexAddress>,
@@ -208,7 +245,9 @@ impl Fork {
         }
     }
 
-    ///TODO: add documentation [ECR-2820]
+    /// See: [ObjectAccess::get_object_existed][1].
+    ///
+    /// [1]: trait.ObjectAccess.html#method.get_object_existed
     pub fn get_object_existed<'a, T, I>(&'a self, address: I) -> Option<Ref<T>>
     where
         T: FromView<&'a Self>,
@@ -217,7 +256,9 @@ impl Fork {
         T::get(address, self).map(|value| Ref { value })
     }
 
-    ///TODO: add documentation [ECR-2820]
+    /// See: [ObjectAccess::get_object_existed_mut][1].
+    ///
+    /// [1]: trait.ObjectAccess.html#method.get_object_existed_mut
     pub fn get_object_existed_mut<'a, T, I>(&'a self, address: I) -> Option<RefMut<T>>
     where
         T: FromView<&'a Self>,
@@ -228,13 +269,14 @@ impl Fork {
 }
 
 #[derive(Debug)]
-///TODO: add documentation [ECR-2820]
+/// Utility trait to provide immutable references to MerkleDB objects.
+/// Similar to `core::cell::Ref`, but with `Deref` implementation.
 pub struct Ref<T> {
     value: T,
 }
 
 #[derive(Debug)]
-///TODO: add documentation [ECR-2820]
+/// Utility trait to provide mutable references to MerkleDB objects.
 pub struct RefMut<T> {
     value: T,
 }

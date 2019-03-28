@@ -34,12 +34,13 @@ mod tests;
 /// Separator between the name and the additional bytes in family indexes.
 const INDEX_NAME_SEPARATOR: &[u8] = &[0];
 
-/// Base view struct responsible for accessing indexes.
-// TODO: add documentation [ECR-2820]
+/// Represents current view on the database by specified `address` and
+/// changes that made after this view was created. `View`
+/// implementation provides interface to work with related `changes`.
 pub struct View<T: IndexAccess> {
-    pub address: IndexAddress,
-    pub index_access: T,
-    pub changes: T::Changes,
+    address: IndexAddress,
+    index_access: T,
+    changes: T::Changes,
 }
 
 impl<T: IndexAccess> fmt::Debug for View<T> {
@@ -50,14 +51,13 @@ impl<T: IndexAccess> fmt::Debug for View<T> {
     }
 }
 
-/// TODO: add documentation [ECR-2820]
+/// Utility trait to provide optional references to `ViewChanges`.
 pub trait ChangeSet {
-    /// TODO: add documentation [ECR-2820]
     fn as_ref(&self) -> Option<&ViewChanges>;
-    /// TODO: add documentation [ECR-2820]
     fn as_mut(&mut self) -> Option<&mut ViewChanges>;
 }
 
+/// No-op implementation used in `Snapshot`.
 impl ChangeSet for () {
     fn as_ref(&self) -> Option<&ViewChanges> {
         None
@@ -76,19 +76,34 @@ impl ChangeSet for ChangesRef<'_> {
     }
 }
 
-/// TODO: add documentation [ECR-2820]
+/// Base trait that allows to access and modify indexes.
 pub trait IndexAccess: Copy {
-    /// TODO: add documentation [ECR-2820]
+    /// Type of the `changes` that will be applied to the database.
+    /// In case of `snapshot` changes is represented by the empty type,
+    /// because `snapshot` is read-only.
     type Changes: ChangeSet;
-    /// TODO: add documentation [ECR-2820]
+    /// Reference to `Snapshot` used in `View` implementation.
     fn snapshot(&self) -> &dyn Snapshot;
-    /// TODO: add documentation [ECR-2820]
+    /// Returns changes related to the specific `address`.
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
-/// Struct responsible for creating indexes from `view` with
-/// specified `address`.
-// TODO: add documentation [ECR-2820]
+/// Struct responsible for creating `view` and `state` for index with
+/// specified `address`. `View` contains changes, `state` contains
+/// metadata.
+///
+/// ```
+/// use exonum_merkledb::{Database, TemporaryDB, IndexBuilder, ListIndex};
+///
+/// let db: Box<Database> = Box::new(TemporaryDB::new());
+/// let fork = db.fork();
+/// {
+///     let (view, _state) = IndexBuilder::new(&fork)
+///         .index_name("index")
+///         .build::<()>();
+/// }
+///
+/// ```
 #[derive(Debug)]
 pub struct IndexBuilder<T> {
     index_access: T,
@@ -100,7 +115,7 @@ impl<T> IndexBuilder<T>
 where
     T: IndexAccess,
 {
-    /// Create index from `view'.
+    /// Creates new index based on provided `index_access'.
     pub fn new(index_access: T) -> Self {
         let address = IndexAddress::default();
         Self {
@@ -110,16 +125,7 @@ where
         }
     }
 
-    ///TODO: add docs
-    pub fn for_view(view: View<T>) -> Self {
-        Self {
-            address: view.address,
-            index_access: view.index_access,
-            index_type: IndexType::default(),
-        }
-    }
-
-    ///TODO: add documentation [ECR-2820]
+    /// Creates new index from provided `address`.
     pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
         Self {
             index_access,
@@ -178,7 +184,7 @@ where
         (index_view, index_state)
     }
 
-    /// Returns index that builds upon specified `view` and `address`.
+    /// Returns index based on specified `view` and `address`.
     ///
     /// # Panics
     ///
@@ -191,7 +197,7 @@ where
         self.create_state()
     }
 
-    ///TODO: add documentation [ECR-2820]
+    /// Similar to `build`, but returns `None` if index is not created yet.
     pub fn build_existed<V>(self) -> Option<(View<T>, IndexState<T, V>)>
     where
         V: BinaryAttribute + Default + Copy,
@@ -206,18 +212,30 @@ where
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
+/// Represents address of the index in the database.
+///
+/// # Examples
+///
+/// ```
+/// use exonum_merkledb::{TemporaryDB, Database, IndexAddress, ListIndex, RefMut};
+///
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let address = ("index", &3);
+/// let index: RefMut<ListIndex<_, u32>> = fork.get_object(address);
+/// ```
 pub struct IndexAddress {
     pub(super) name: String,
     pub(super) bytes: Option<Vec<u8>>,
 }
 
 impl IndexAddress {
-    /// TODO: add documentation [ECR-2820]
+    /// Creates empty `IndexAddress`.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// TODO: add documentation [ECR-2820]
+    /// Creates new `IndexAddress` with specified `root` name.
     pub fn with_root<S: Into<String>>(root: S) -> Self {
         Self {
             name: root.into(),
@@ -225,18 +243,19 @@ impl IndexAddress {
         }
     }
 
-    /// TODO: add documentation [ECR-2820]
+    /// Returns name part of `IndexAddress`.
     pub fn name(&self) -> &str {
         &self.name
     }
 
-    /// TODO: add documentation [ECR-2820]
+    /// Returns bytes part of `IndexAddress`.
     pub fn bytes(&self) -> Option<&[u8]> {
         self.bytes.as_ref().map(Vec::as_slice)
     }
 
-    /// TODO: add documentation [ECR-2820]
-    pub fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
+    /// Returns tuple consists of `name` and `bytes` concatenated with provided `key`.
+    /// This is used to obtain single value(serialised as byte array) from the database.
+    pub(crate) fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
         (
             &self.name,
             match self.bytes {
@@ -249,7 +268,7 @@ impl IndexAddress {
         )
     }
 
-    /// TODO: add documentation [ECR-2820]
+    /// Append name part to `IndexAddress`.
     pub fn append_name<'a, S: Into<Cow<'a, str>>>(self, suffix: S) -> Self {
         let suffix = suffix.into();
         Self {
@@ -264,7 +283,7 @@ impl IndexAddress {
         }
     }
 
-    /// TODO: add documentation [ECR-2820]
+    /// Append bytes part to `IndexAddress`.
     pub fn append_bytes<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
         let name = self.name;
         let bytes = if let Some(bytes) = self.bytes {
@@ -279,6 +298,7 @@ impl IndexAddress {
         }
     }
 
+    /// Full address with separator between name and bytes represented as byte array.
     pub fn fully_qualified_name(&self) -> Vec<u8> {
         if let Some(bytes) = self.bytes() {
             concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
