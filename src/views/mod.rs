@@ -254,7 +254,7 @@ impl IndexAddress {
     }
 
     /// Returns tuple consists of `name` and `bytes` concatenated with provided `key`.
-    /// This is used to obtain single value(serialised as byte array) from the database.
+    /// This is used to obtain single value(serialized as byte array) from the database.
     pub(crate) fn keyed<'a>(&self, key: &'a [u8]) -> (&str, Cow<'a, [u8]>) {
         (
             &self.name,

@@ -623,7 +623,7 @@ impl Fork {
         !self.working_patch.is_empty()
     }
 
-    ///TODO: add documentation [ECR-2820
+    /// Patch containing current changes made in this fork.
     pub fn working_patch(&self) -> &WorkingPatch {
         &self.working_patch
     }

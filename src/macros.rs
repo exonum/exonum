@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// Fast concatenation of byte arrays and/or keys that implements
+/// `BinaryKey` trait.
+///
+/// ```
+/// let prefix = vec![0u8; 10];
+/// let key = PublicKey::zero();
+///
+/// let _result = concat_keys!(prefix, key);
+/// ```
 macro_rules! concat_keys {
     (@capacity $key:expr) => ( $key.size() );
     (@capacity $key:expr, $($tail:expr),+) => (

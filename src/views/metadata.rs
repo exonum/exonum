@@ -88,7 +88,7 @@ impl Default for IndexType {
 }
 
 /// Metadata associated with each index. Contains `identifier`, `index_type` and `state`.
-/// In metadata one can store any arbitrary data serialised as byte array.
+/// In metadata one can store any arbitrary data serialized as byte array.
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V> {
@@ -189,7 +189,7 @@ where
 }
 
 /// Persistent pool used to store indexes metadata in database.
-/// Pool size is used as indentifier of newly created indexes.
+/// Pool size is used as identifier of newly created indexes.
 struct IndexesPool<T: IndexAccess>(View<T>);
 
 impl<T: IndexAccess> IndexesPool<T> {

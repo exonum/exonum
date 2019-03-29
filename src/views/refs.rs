@@ -150,12 +150,11 @@ where
 
 /// Trait used to obtain references to database objects.
 pub trait ObjectAccess: IndexAccess {
-
     /// Returns immutable reference to existed database object or `None` if
     /// object with provided `address` is not found.
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, ListIndex, Ref};
+    /// use exonum_merkledb::{Database, TemporaryDB, ObjectAccess, ListIndex, Ref};
     ///
     /// let db = TemporaryDB::new();
     /// let snapshot = &db.snapshot();
@@ -176,12 +175,12 @@ pub trait ObjectAccess: IndexAccess {
     ///
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, ListIndex, Ref};
+    /// use exonum_merkledb::{Database, TemporaryDB, ListIndex, RefMut};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
     ///
-    /// let index: Option<Ref<ListIndex<_, u8>>> = fork.get_object_existed_mut("index");
+    /// let index: Option<RefMut<ListIndex<_, u8>>> = fork.get_object_existed_mut("index");
     /// ```
     fn get_object_existed_mut<T, I>(&self, address: I) -> Option<RefMut<T>>
     where
@@ -196,7 +195,7 @@ pub trait ObjectAccess: IndexAccess {
     ///
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, ListIndex, Ref, RefMut};
+    /// use exonum_merkledb::{Database, TemporaryDB, ListIndex, Ref, RefMut};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -269,14 +268,14 @@ impl Fork {
 }
 
 #[derive(Debug)]
-/// Utility trait to provide immutable references to MerkleDB objects.
+/// Utility trait to provide immutable references to `MerkleDB` objects.
 /// Similar to `core::cell::Ref`, but with `Deref` implementation.
 pub struct Ref<T> {
     value: T,
 }
 
 #[derive(Debug)]
-/// Utility trait to provide mutable references to MerkleDB objects.
+/// Utility trait to provide mutable references to `MerkleDB` objects.
 pub struct RefMut<T> {
     value: T,
 }
