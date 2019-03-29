@@ -8,7 +8,8 @@ use super::{
 use crate::blockchain::{Block, BlockProof};
 use crate::crypto::{gen_keypair, hash, CryptoHash, PublicKey, SecretKey, Signature};
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::proto;
+use crate::proto::{self, ProtobufConvert};
+use protobuf::Message as PbMessage;
 
 #[test]
 fn test_message_roundtrip() {
@@ -34,6 +35,34 @@ fn test_message_roundtrip() {
             .expect("Message deserialize");
     let msg_roundtrip = Precommit::try_from(msg_enum).expect("Message type");
     assert_eq!(msg, msg_roundtrip)
+}
+
+#[test]
+fn test_signed_message_unusual_protobuf() {
+    let (pub_key, secret_key) = gen_keypair();
+
+    let mut ex_msg = proto::ExonumMessage::new();
+    let precommit_msg = Precommit::new(
+        ValidatorId(123),
+        Height(15),
+        Round(25),
+        &hash(&[1, 2, 3]),
+        &hash(&[3, 2, 1]),
+        Utc::now(),
+    );
+    ex_msg.set_precommit(precommit_msg.to_pb());
+    let mut payload = ex_msg.write_to_bytes().unwrap();
+    // Duplicate pb serialization to create unusual but correct protobuf message.
+    payload.append(&mut payload.clone());
+
+    let signed = SignedMessage::new(&payload, pub_key, &secret_key);
+
+    let signed_bytes = signed.encode().expect("SignedMessage encode");
+    let msg_enum =
+        Message::deserialize(SignedMessage::decode(&signed_bytes).expect("SignedMessage decode."))
+            .expect("Message deserialize");
+    let deserialized_precommit = Precommit::try_from(msg_enum).expect("Message type");
+    assert_eq!(precommit_msg, *deserialized_precommit.payload())
 }
 
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
