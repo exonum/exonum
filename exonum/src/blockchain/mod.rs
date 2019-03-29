@@ -61,6 +61,8 @@ use crate::runtime::{
     dispatcher::{Dispatcher, DispatcherBuilder},
     rust::RustRuntime,
     RuntimeIdentifier,
+    RuntimeContext,
+    RuntimeEnvironment,
 };
 use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
 
@@ -97,6 +99,9 @@ impl Blockchain {
         service_secret_key: SecretKey,
         api_sender: ApiSender,
     ) -> Self {
+
+        // TODO add Configuration service in the runtime.
+
         let rust_runtime = Box::new(RustRuntime::default());
 
         let dispatcher = DispatcherBuilder::default()
@@ -409,29 +414,68 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let raw = {
+        let signed_tx = {
             let schema = Schema::new(&fork);
 
-            let raw = schema.transactions().get(&tx_hash).ok_or_else(|| {
+            let signed_tx = schema.transactions().get(&tx_hash).ok_or_else(|| {
                 failure::err_msg(format!(
                     "BUG: Cannot find transaction in database. tx: {:?}",
                     tx_hash
                 ))
             })?;
-            raw
+            signed_tx
         };
 
-        // TODO execute transaction
-        unimplemented!();
-        // let tx_result = self.dispatcher.execute_transaction(raw, fork)?;
+        fork.checkpoint();
 
-        // let mut schema = Schema::new(fork);
-        // schema.transaction_results_mut().put(&tx_hash, tx_result);
-        // schema.commit_transaction(&tx_hash);
-        // schema.block_transactions_mut(height).push(tx_hash);
-        // let location = TxLocation::new(height, index as u64);
-        // schema.transactions_locations_mut().put(&tx_hash, location);
-        // Ok(())
+
+        let tx = signed_tx.payload();
+
+        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            let author = signed_tx.author();
+            let mut context = RuntimeContext::new(fork, &author, &tx_hash);
+            self.dispatcher.lock().expect("Expected lock on Dispatcher").execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
+        }));
+
+        let tx_result = TransactionResult(match catch_result {
+            Ok(execution_result) => {
+                match execution_result {
+                    Ok(()) => {
+                        fork.commit();
+                    }
+                    Err(ref e) => {
+                        // Unlike panic, transaction failure isn't that rare, so logging the
+                        // whole transaction body is an overkill: it can be relatively big.
+                        info!(
+                            "{:?} transaction execution failed: {:?}",
+                            tx_hash, e
+                        );
+                        fork.rollback();
+                    }
+                }
+                execution_result.map_err(TransactionError::from)
+            }
+            Err(err) => {
+                if err.is::<Error>() {
+                    // Continue panic unwind if the reason is StorageError.
+                    panic::resume_unwind(err);
+                }
+                fork.rollback();
+                error!(
+                    "{:?} transaction execution panicked: {:?}",
+                    tx, err
+                );
+                Err(TransactionError::from_panic(&err))
+            }
+        });
+
+        let mut schema = Schema::new(fork);
+        schema.transaction_results_mut().put(&tx_hash, tx_result);
+        schema.commit_transaction(&tx_hash);
+        schema.block_transactions_mut(height).push(tx_hash);
+        let location = TxLocation::new(height, index as u64);
+        schema.transactions_locations_mut().put(&tx_hash, location);
+        Ok(())
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
