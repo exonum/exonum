@@ -21,8 +21,7 @@ use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
-    DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    RuntimeIdentifier,
+    DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::{well_known_types::Any, Message};

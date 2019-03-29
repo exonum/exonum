@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId, RuntimeIdentifier,
+    RuntimeIdentifier, ServiceInstanceId,
 };
 use crate::messages::CallInfo;
 

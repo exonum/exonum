@@ -32,7 +32,7 @@ use super::{
 };
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{CallInfo, BinaryForm};
+use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
 use crate::storage::Fork;
 

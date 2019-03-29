@@ -60,9 +60,7 @@ use crate::node::ApiSender;
 use crate::runtime::{
     dispatcher::{Dispatcher, DispatcherBuilder},
     rust::RustRuntime,
-    RuntimeIdentifier,
-    RuntimeContext,
-    RuntimeEnvironment,
+    RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
 use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
 
@@ -99,7 +97,6 @@ impl Blockchain {
         service_secret_key: SecretKey,
         api_sender: ApiSender,
     ) -> Self {
-
         // TODO add Configuration service in the runtime.
 
         let rust_runtime = Box::new(RustRuntime::default());
@@ -428,13 +425,15 @@ impl Blockchain {
 
         fork.checkpoint();
 
-
         let tx = signed_tx.payload();
 
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let author = signed_tx.author();
             let mut context = RuntimeContext::new(fork, &author, &tx_hash);
-            self.dispatcher.lock().expect("Expected lock on Dispatcher").execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
+            self.dispatcher
+                .lock()
+                .expect("Expected lock on Dispatcher")
+                .execute(&mut context, tx.dispatch.clone(), tx.payload.as_ref())
         }));
 
         let tx_result = TransactionResult(match catch_result {
@@ -446,10 +445,7 @@ impl Blockchain {
                     Err(ref e) => {
                         // Unlike panic, transaction failure isn't that rare, so logging the
                         // whole transaction body is an overkill: it can be relatively big.
-                        info!(
-                            "{:?} transaction execution failed: {:?}",
-                            tx_hash, e
-                        );
+                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
                         fork.rollback();
                     }
                 }
@@ -461,10 +457,7 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!(
-                    "{:?} transaction execution panicked: {:?}",
-                    tx, err
-                );
+                error!("{:?} transaction execution panicked: {:?}", tx, err);
                 Err(TransactionError::from_panic(&err))
             }
         });
