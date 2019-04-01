@@ -19,7 +19,7 @@ use exonum::{
     blockchain::{
         ExecutionResult, Service, ServiceContext, Transaction, TransactionContext, TransactionSet,
     },
-    crypto::{CryptoHash, Hash},
+    crypto::Hash,
     helpers::Height,
     messages::AnyTx,
     storage::Snapshot,

@@ -18,10 +18,8 @@ use super::NodeHandler;
 use crate::blockchain::Schema;
 use crate::messages::{
     BinaryForm, BlockRequest, BlockResponse, PrevotesRequest, ProposeRequest, Requests, Signed,
-    TransactionsRequest, TransactionsResponse, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    TransactionsRequest, TransactionsResponse, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
 };
-
-const PB_BYTES_SIZE_OVERHEAD: usize = mem::size_of::<u8>() * 4;
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
 // TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)
@@ -79,14 +77,14 @@ impl NodeHandler {
         let schema = Schema::new(&snapshot);
         let mut txs = Vec::new();
         let mut txs_size = 0;
-        let unoccupied_message_size = self.state.config().consensus.max_message_len as usize
-            - TRANSACTION_RESPONSE_EMPTY_SIZE;
+        let unoccupied_message_size =
+            self.state.config().consensus.max_message_len as usize - TX_RES_EMPTY_SIZE;
 
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
                 let raw = tx.signed_message().encode().unwrap();
-                if txs_size + raw.len() + PB_BYTES_SIZE_OVERHEAD > unoccupied_message_size {
+                if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(
                         &msg.author(),
                         mem::replace(&mut txs, vec![]),
@@ -95,7 +93,7 @@ impl NodeHandler {
                     self.send_to_peer(msg.author(), txs_response);
                     txs_size = 0;
                 }
-                txs_size += raw.len() + PB_BYTES_SIZE_OVERHEAD;
+                txs_size += raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD;
                 txs.push(raw);
             }
         }

@@ -146,7 +146,7 @@ mod test {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
 
         let mut bytes: BytesMut = BytesMut::new();
-        initiator.session.encrypt_msg(data, &mut bytes);
+        initiator.session.encrypt_msg(data, &mut bytes).unwrap();
 
         responder.decode(&mut bytes)
     }

@@ -1,22 +1,53 @@
-use chrono::Utc;
-use hex::FromHex;
-
 use super::{
-    BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, ServiceTransaction, Signed,
-    SignedMessage, Status, TransactionsResponse, TRANSACTION_RESPONSE_EMPTY_SIZE,
+    BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, Signed, SignedMessage, Status,
+    TransactionsResponse, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
 };
 use crate::blockchain::{Block, BlockProof};
-use crate::crypto::{gen_keypair, hash, CryptoHash, PublicKey, SecretKey, Signature};
+use crate::crypto::{gen_keypair, hash, CryptoHash, Signature};
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::proto::{self, ProtobufConvert};
+use chrono::Utc;
 use protobuf::Message as PbMessage;
+
+#[test]
+fn test_signed_message_min_size() {
+    let (public_key, secret_key) = gen_keypair();
+    let msg = SignedMessage::new(&[0; 0], public_key, &secret_key);
+    assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.encode().unwrap().len())
+}
+
+#[test]
+fn test_tx_response_empty_size() {
+    let (public_key, secret_key) = gen_keypair();
+    let msg = TransactionsResponse::new(&public_key, vec![]);
+    let msg = Message::concrete(msg, public_key, &secret_key);
+    assert_eq!(TX_RES_EMPTY_SIZE, msg.encode().unwrap().len())
+}
+
+#[test]
+fn test_tx_response_with_txs_size() {
+    let (public_key, secret_key) = gen_keypair();
+    let txs = vec![
+        vec![1u8; 8],
+        vec![2u8; 16],
+        vec![3u8; 64],
+        vec![4u8; 256],
+        vec![5u8; 4096],
+    ];
+    let txs_size = txs.iter().fold(0, |acc, tx| acc + tx.len());
+    let pb_max_overhead = TX_RES_PB_OVERHEAD_PAYLOAD * txs.len();
+
+    let msg = TransactionsResponse::new(&public_key, txs);
+    let msg = Message::concrete(msg, public_key, &secret_key);
+    assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.encode().unwrap().len())
+}
 
 #[test]
 fn test_message_roundtrip() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = Utc::now();
 
-    let mut msg = Message::concrete(
+    let msg = Message::concrete(
         Precommit::new(
             ValidatorId(123),
             Height(15),
@@ -63,22 +94,6 @@ fn test_signed_message_unusual_protobuf() {
             .expect("Message deserialize");
     let deserialized_precommit = Precommit::try_from(msg_enum).expect("Message type");
     assert_eq!(precommit_msg, *deserialized_precommit.payload())
-}
-
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::schema::tests::CreateWallet", crate = "crate")]
-struct CreateWallet {
-    pubkey: PublicKey,
-    name: String,
-}
-
-impl CreateWallet {
-    fn new(&pubkey: &PublicKey, name: &str) -> Self {
-        Self {
-            pubkey,
-            name: name.to_owned(),
-        }
-    }
 }
 
 #[test]
@@ -206,8 +221,6 @@ fn test_precommit_serde_correct() {
 #[test]
 #[should_panic(expected = "Failed to verify signature.")]
 fn test_precommit_serde_wrong_signature() {
-    use crate::crypto::SIGNATURE_LENGTH;
-
     let (pub_key, secret_key) = gen_keypair();
     let ts = Utc::now();
 
@@ -225,7 +238,7 @@ fn test_precommit_serde_wrong_signature() {
     );
     // Break signature.
     {
-        let mut sign = precommit.signed_message_mut().signature_mut();
+        let sign = precommit.signed_message_mut().signature_mut();
         *sign = Signature::zero();
     }
     let precommit_json = serde_json::to_string(&precommit).unwrap();

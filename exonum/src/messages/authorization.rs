@@ -3,11 +3,7 @@ use hex::{FromHex, ToHex};
 
 use std::fmt;
 
-use super::SIGNED_MESSAGE_MIN_SIZE;
-use crate::crypto::{
-    self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature, PUBLIC_KEY_LENGTH,
-    SIGNATURE_LENGTH,
-};
+use crate::crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature};
 use crate::messages::BinaryForm;
 use crate::proto::{self, ProtobufConvert};
 use crate::storage::StorageValue;
@@ -15,17 +11,6 @@ use protobuf::Message;
 use serde::de::{self, Deserialize, Deserializer};
 use std::borrow::Cow;
 
-/// `SignedMessage` can be constructed from a raw byte buffer which must have the following
-/// data layout:
-///
-/// | Position  | Stored data             |
-/// | - - - - - | - - - - - - - - - - - - |
-/// | `0..32`   | author's public key     |
-/// | `32`      | message class           |
-/// | `33`      | message type            |
-/// | `34..N`   | payload                 |
-/// | `N..N+64` | signature               |
-///
 /// `SignedMessage` will verify the size of the buffer and the signature provided in it.
 /// This allows to keep the raw message buffer, but avoid verifying its signature again
 /// as every `SignedMessage` instance is guaranteed to have a correct signature.
@@ -153,11 +138,11 @@ impl<'de> Deserialize<'de> for SignedMessage {
     where
         D: Deserializer<'de>,
     {
-        let deser_msg = SignedMessageDeserializer::deserialize(deserializer)?;
+        let des_msg = SignedMessageDeserializer::deserialize(deserializer)?;
         let msg = SignedMessage {
-            exonum_msg: deser_msg.exonum_msg,
-            key: deser_msg.key,
-            sign: deser_msg.sign,
+            exonum_msg: des_msg.exonum_msg,
+            key: des_msg.key,
+            sign: des_msg.sign,
         };
 
         if msg.verify() {
