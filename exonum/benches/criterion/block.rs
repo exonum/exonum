@@ -40,9 +40,9 @@
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{Blockchain, Schema, Service, Transaction},
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::{RawTransaction, Signed},
+    messages::{AnyTx, Signed},
     node::ApiSender,
     storage::{Database, DbOptions, Patch, RocksDB},
 };
@@ -114,7 +114,7 @@ mod timestamping {
     use exonum::{
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
-        messages::{Message, RawTransaction, Signed},
+        messages::{AnyTx, Message, Signed},
         storage::Snapshot,
     };
     use rand::Rng;
@@ -136,7 +136,7 @@ mod timestamping {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, failure::Error> {
+        fn tx_from_raw(&self, raw: AnyTx) -> Result<BoxedTx, failure::Error> {
             use exonum::blockchain::TransactionSet;
             Ok(TimestampingTransactions::tx_from_raw(raw)?.into())
         }
@@ -162,14 +162,14 @@ mod timestamping {
 
     impl Tx {
         #[doc(hidden)]
-        pub fn sign(pk: &PublicKey, &data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
+        pub fn sign(pk: &PublicKey, &data: &Hash, sk: &SecretKey) -> Signed<AnyTx> {
             Message::sign_transaction(Tx { data }, TIMESTAMPING_SERVICE_ID, *pk, sk)
         }
     }
 
     impl PanickingTx {
         #[doc(hidden)]
-        pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Signed<RawTransaction> {
+        pub fn sign(pk: &PublicKey, data: &Hash, sk: &SecretKey) -> Signed<AnyTx> {
             Message::sign_transaction(
                 PanickingTx { data: *data },
                 TIMESTAMPING_SERVICE_ID,
@@ -191,16 +191,14 @@ mod timestamping {
         }
     }
 
-    pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<RawTransaction>> {
+    pub fn transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             Tx::sign(&pub_key, &i.hash(), &sec_key)
         })
     }
 
-    pub fn panicking_transactions(
-        mut rng: impl Rng,
-    ) -> impl Iterator<Item = Signed<RawTransaction>> {
+    pub fn panicking_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
             PanickingTx::sign(&pub_key, &i.hash(), &sec_key)
@@ -214,7 +212,7 @@ mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{Hash, PublicKey, SecretKey},
-        messages::{Message, RawTransaction, Signed},
+        messages::{AnyTx, Message, Signed},
         storage::{MapIndex, ProofMapIndex, Snapshot},
     };
     use rand::{seq::SliceRandom, Rng};
@@ -241,7 +239,7 @@ mod cryptocurrency {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<BoxedTx, failure::Error> {
+        fn tx_from_raw(&self, raw: AnyTx) -> Result<BoxedTx, failure::Error> {
             use exonum::blockchain::TransactionSet;
             Ok(CryptocurrencyTransactions::tx_from_raw(raw)?.into())
         }
@@ -280,24 +278,14 @@ mod cryptocurrency {
 
     impl Tx {
         #[doc(hidden)]
-        pub fn sign(
-            pk: &PublicKey,
-            to: &PublicKey,
-            seed: u32,
-            sk: &SecretKey,
-        ) -> Signed<RawTransaction> {
+        pub fn sign(pk: &PublicKey, to: &PublicKey, seed: u32, sk: &SecretKey) -> Signed<AnyTx> {
             Message::sign_transaction(Tx { to: *to, seed }, CRYPTOCURRENCY_SERVICE_ID, *pk, sk)
         }
     }
 
     impl SimpleTx {
         #[doc(hidden)]
-        pub fn sign(
-            pk: &PublicKey,
-            to: &PublicKey,
-            seed: u32,
-            sk: &SecretKey,
-        ) -> Signed<RawTransaction> {
+        pub fn sign(pk: &PublicKey, to: &PublicKey, seed: u32, sk: &SecretKey) -> Signed<AnyTx> {
             Message::sign_transaction(
                 SimpleTx { to: *to, seed },
                 CRYPTOCURRENCY_SERVICE_ID,
@@ -309,12 +297,7 @@ mod cryptocurrency {
 
     impl RollbackTx {
         #[doc(hidden)]
-        pub fn sign(
-            pk: &PublicKey,
-            to: &PublicKey,
-            seed: u32,
-            sk: &SecretKey,
-        ) -> Signed<RawTransaction> {
+        pub fn sign(pk: &PublicKey, to: &PublicKey, seed: u32, sk: &SecretKey) -> Signed<AnyTx> {
             Message::sign_transaction(
                 RollbackTx { to: *to, seed },
                 CRYPTOCURRENCY_SERVICE_ID,
@@ -374,9 +357,7 @@ mod cryptocurrency {
         }
     }
 
-    pub fn provable_transactions(
-        mut rng: impl Rng,
-    ) -> impl Iterator<Item = Signed<RawTransaction>> {
+    pub fn provable_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -389,9 +370,7 @@ mod cryptocurrency {
         )
     }
 
-    pub fn unprovable_transactions(
-        mut rng: impl Rng,
-    ) -> impl Iterator<Item = Signed<RawTransaction>> {
+    pub fn unprovable_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -404,9 +383,7 @@ mod cryptocurrency {
         )
     }
 
-    pub fn rollback_transactions(
-        mut rng: impl Rng,
-    ) -> impl Iterator<Item = Signed<RawTransaction>> {
+    pub fn rollback_transactions(mut rng: impl Rng) -> impl Iterator<Item = Signed<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
@@ -421,10 +398,7 @@ mod cryptocurrency {
 }
 
 /// Writes transactions to the pool and returns their hashes.
-fn prepare_txs(
-    blockchain: &mut Blockchain,
-    transactions: Vec<Signed<RawTransaction>>,
-) -> Vec<Hash> {
+fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>>) -> Vec<Hash> {
     let mut fork = blockchain.fork();
 
     let tx_hashes = {
@@ -463,7 +437,7 @@ fn assert_transactions_in_pool(blockchain: &Blockchain, tx_hashes: &[Hash]) {
 
 fn prepare_blockchain(
     blockchain: &mut Blockchain,
-    generator: impl Iterator<Item = Signed<RawTransaction>>,
+    generator: impl Iterator<Item = Signed<AnyTx>>,
     blockchain_height: usize,
     txs_in_block: usize,
 ) {
@@ -488,7 +462,7 @@ fn execute_block_rocksdb(
     criterion: &mut Criterion,
     bench_name: &'static str,
     service: Box<dyn Service>,
-    mut tx_generator: impl Iterator<Item = Signed<RawTransaction>>,
+    mut tx_generator: impl Iterator<Item = Signed<AnyTx>>,
 ) {
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);

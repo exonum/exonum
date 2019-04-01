@@ -32,7 +32,7 @@ use exonum::node::ExternalMessage;
 use exonum::{
     crypto,
     events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::{Message, RawTransaction, ServiceTransaction},
+    messages::{AnyTx, Message},
     node::NodeChannel,
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
@@ -83,14 +83,7 @@ fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
-            let msg = Message::new(
-                RawTransaction::new(
-                    0,
-                    ServiceTransaction::from_raw_unchecked(0, vec![0; tx_size]),
-                ),
-                p,
-                &s,
-            );
+            let msg = Message::concrete(AnyTx::as_raw_tx(0, 0, vec![0; tx_size]), p, &s);
             msg.into_bytes()
         })
         .collect()
