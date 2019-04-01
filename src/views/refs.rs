@@ -150,8 +150,8 @@ where
 
 /// Trait used to obtain references to database objects.
 pub trait ObjectAccess: IndexAccess {
-    /// Returns immutable reference to existed database object or `None` if
-    /// object with provided `address` is not found.
+    /// Returns an immutable reference to an existing database object or `None` if
+    /// the object with provided `address` is not found.
     ///
     /// ```
     /// use exonum_merkledb::{Database, TemporaryDB, ObjectAccess, ListIndex, Ref};
@@ -170,9 +170,8 @@ pub trait ObjectAccess: IndexAccess {
         T::get(address, *self).map(|value| Ref { value })
     }
 
-    /// Returns mutable reference to existed database object or `None` if
-    /// object with provided `address` is not found.
-    ///
+    /// Returns a mutable reference to an existing database object or `None` if
+    /// the object with provided `address` is not found.
     ///
     /// ```
     /// use exonum_merkledb::{Database, TemporaryDB, ListIndex, RefMut};
@@ -190,9 +189,8 @@ pub trait ObjectAccess: IndexAccess {
         T::get(address, *self).map(|value| RefMut { value })
     }
 
-    /// Returns mutable reference to database object. If object is not exists
+    /// Returns a mutable reference to a database object. If the object does not exist, the method
     /// creates it.
-    ///
     ///
     /// ```
     /// use exonum_merkledb::{Database, TemporaryDB, ListIndex, Ref, RefMut};

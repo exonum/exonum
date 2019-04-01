@@ -157,10 +157,10 @@ impl<V> IndexMetadata<V> {
 
 /// Returns index metadata based on provided `index_address` and `index_type`.
 ///
-/// Creates new metadata if it doesn't exists.
+/// Creates new metadata if it does not exist.
 ///
-/// Input `index_address` is replaced by output `index_address` based on value
-/// taken from indexes pool.
+/// Input `index_address` is replaced by output `index_address` based on the value
+/// taken from the indexes pool.
 pub fn index_metadata<T, V>(
     index_access: T,
     index_address: &IndexAddress,
@@ -188,8 +188,8 @@ where
     (index_address, index_state)
 }
 
-/// Persistent pool used to store indexes metadata in database.
-/// Pool size is used as identifier of newly created indexes.
+/// Persistent pool used to store indexes metadata in the database.
+/// Pool size is used as an identifier of newly created indexes.
 struct IndexesPool<T: IndexAccess>(View<T>);
 
 impl<T: IndexAccess> IndexesPool<T> {
@@ -234,7 +234,7 @@ impl<T: IndexAccess> IndexesPool<T> {
     }
 }
 
-/// Wrapper struct to manipulate `IndexMetadata` for index with provided `index_name`.
+/// Wrapper struct to manipulate `IndexMetadata` for an index with provided `index_name`.
 /// Metadata value is cached for faster access.
 pub struct IndexState<T, V>
 where
@@ -266,11 +266,12 @@ where
         self.cache.get().state
     }
 
+    /// Get stored index metadata.
     pub fn metadata(&self) -> IndexMetadata<V> {
         self.cache.get()
     }
 
-    /// TODO Add documentation. [ECR-2820]
+    /// Updates stored index metadata.
     pub fn set(&mut self, state: V) {
         let mut cache = self.cache.get_mut();
         cache.state = state;
@@ -281,7 +282,7 @@ where
         self.is_new
     }
 
-    /// TODO Add documentation. [ECR-2820]
+    /// Clears stored index metadata.
     pub fn clear(&mut self) {
         self.set(V::default());
     }

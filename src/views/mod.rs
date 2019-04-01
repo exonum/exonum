@@ -34,9 +34,9 @@ mod tests;
 /// Separator between the name and the additional bytes in family indexes.
 const INDEX_NAME_SEPARATOR: &[u8] = &[0];
 
-/// Represents current view on the database by specified `address` and
-/// changes that made after this view was created. `View`
-/// implementation provides interface to work with related `changes`.
+/// Represents current view of the database by specified `address` and
+/// changes that took place after that view had been created. `View`
+/// implementation provides an interface to work with related `changes`.
 pub struct View<T: IndexAccess> {
     address: IndexAddress,
     index_access: T,
@@ -84,7 +84,7 @@ pub trait IndexAccess: Copy {
     type Changes: ChangeSet;
     /// Reference to `Snapshot` used in `View` implementation.
     fn snapshot(&self) -> &dyn Snapshot;
-    /// Returns changes related to the specific `address`.
+    /// Returns changes related to specific `address`.
     fn changes(&self, address: &IndexAddress) -> Self::Changes;
 }
 
@@ -115,7 +115,7 @@ impl<T> IndexBuilder<T>
 where
     T: IndexAccess,
 {
-    /// Creates new index based on provided `index_access'.
+    /// Creates a new index based on provided `index_access'.
     pub fn new(index_access: T) -> Self {
         let address = IndexAddress::default();
         Self {
@@ -125,7 +125,7 @@ where
         }
     }
 
-    /// Creates new index from provided `address`.
+    /// Creates a new index from provided `address`.
     pub fn from_address<I: Into<IndexAddress>>(address: I, index_access: T) -> Self {
         Self {
             index_access,
@@ -197,7 +197,7 @@ where
         self.create_state()
     }
 
-    /// Similar to `build`, but returns `None` if index is not created yet.
+    /// Similar to `build`, but returns `None` if index has not been created yet.
     pub fn build_existed<V>(self) -> Option<(View<T>, IndexState<T, V>)>
     where
         V: BinaryAttribute + Default + Copy,
@@ -268,7 +268,7 @@ impl IndexAddress {
         )
     }
 
-    /// Append name part to `IndexAddress`.
+    /// Appends a name part to `IndexAddress`.
     pub fn append_name<'a, S: Into<Cow<'a, str>>>(self, suffix: S) -> Self {
         let suffix = suffix.into();
         Self {
@@ -283,7 +283,7 @@ impl IndexAddress {
         }
     }
 
-    /// Append bytes part to `IndexAddress`.
+    /// Appends a bytes part to `IndexAddress`.
     pub fn append_bytes<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
         let name = self.name;
         let bytes = if let Some(bytes) = self.bytes {
@@ -298,7 +298,7 @@ impl IndexAddress {
         }
     }
 
-    /// Full address with separator between name and bytes represented as byte array.
+    /// Full address with a separator between `name` and `bytes` represented as byte array.
     pub fn fully_qualified_name(&self) -> Vec<u8> {
         if let Some(bytes) = self.bytes() {
             concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
