@@ -21,6 +21,7 @@ use super::{
     RuntimeIdentifier, ServiceInstanceId,
 };
 use crate::messages::CallInfo;
+use crate::storage::Fork;
 
 #[derive(Default)]
 pub struct DispatcherBuilder {
@@ -140,6 +141,13 @@ impl RuntimeEnvironment for Dispatcher {
             ))
         }
     }
+
+    fn before_commit(&self, fork: &mut Fork)
+    {
+        for (_, runtime) in &self.runtimes {
+            runtime.before_commit(fork);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -210,6 +218,11 @@ mod tests {
             } else {
                 Err(ExecutionError::new(0xFF_u8))
             }
+        }
+
+
+        fn before_commit(&self, _: &mut Fork)
+        {
         }
     }
 

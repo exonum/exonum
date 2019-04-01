@@ -17,6 +17,7 @@ use semver::Version;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    panic
 };
 
 #[macro_use]
@@ -34,7 +35,7 @@ use super::{
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
-use crate::storage::Fork;
+use crate::storage::{Fork, Error as StorageError};
 
 use self::service::Service;
 
@@ -161,6 +162,31 @@ impl RuntimeEnvironment for RustRuntime {
             .map_err(|e| {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
             })?
+    }
+
+    fn before_commit(&self, fork: &mut Fork)
+    {
+        let inner = self.inner.borrow();
+
+        for (_, service) in &inner.initialized {
+            fork.checkpoint();
+            match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
+                Ok(..) => fork.commit(),
+                Err(err) => {
+                    if err.is::<StorageError>() {
+                        // Continue panic unwind if the reason is StorageError.
+                        panic::resume_unwind(err);
+                    }
+                    fork.rollback();
+
+                    // TODO add service name
+                    error!(
+                        "Service before_commit failed with error: {:?}",
+                        err
+                    );
+                }
+            }
+        }
     }
 }
 

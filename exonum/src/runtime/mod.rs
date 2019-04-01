@@ -81,6 +81,9 @@ pub trait RuntimeEnvironment {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
+
+    /// Optionally calls `before_commit` for all the services stored in the runtime.
+    fn before_commit(&self, fork: &mut Fork);
 }
 
 #[derive(Debug)]

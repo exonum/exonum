@@ -329,14 +329,12 @@ impl Blockchain {
 
             // Invoke execute method for all services.
 
-            // TODO invoke before commit
+            // Skip execution for genesis block.
+            if height > Height(0) {
+                let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
 
-            // for service in self.dispatcher.services().values() {
-            //     // Skip execution for genesis block.
-            //     if height > Height(0) {
-            //         before_commit(service.as_ref(), &mut fork);
-            //     }
-            // }
+                dispatcher.before_commit(&mut fork);
+            }
 
             // Get tx & state hash.
             let (tx_hash, state_hash) = {
@@ -578,25 +576,6 @@ impl Blockchain {
 
         self.merge(fork.into_patch())
             .expect("Unable to save messages to the consensus cache");
-    }
-}
-
-fn before_commit(service: &dyn Service, fork: &mut Fork) {
-    fork.checkpoint();
-    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
-        Ok(..) => fork.commit(),
-        Err(err) => {
-            if err.is::<Error>() {
-                // Continue panic unwind if the reason is StorageError.
-                panic::resume_unwind(err);
-            }
-            fork.rollback();
-            error!(
-                "{} service before_commit failed with error: {:?}",
-                service.service_name(),
-                err
-            );
-        }
     }
 }
 
