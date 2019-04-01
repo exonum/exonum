@@ -17,7 +17,7 @@ use semver::Version;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
-    panic
+    panic,
 };
 
 #[macro_use]
@@ -35,7 +35,7 @@ use super::{
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
-use crate::storage::{Fork, Error as StorageError};
+use crate::storage::{Error as StorageError, Fork};
 
 use self::service::Service;
 
@@ -164,8 +164,7 @@ impl RuntimeEnvironment for RustRuntime {
             })?
     }
 
-    fn before_commit(&self, fork: &mut Fork)
-    {
+    fn before_commit(&self, fork: &mut Fork) {
         let inner = self.inner.borrow();
 
         for (_, service) in &inner.initialized {
@@ -180,19 +179,15 @@ impl RuntimeEnvironment for RustRuntime {
                     fork.rollback();
 
                     // TODO add service name
-                    error!(
-                        "Service before_commit failed with error: {:?}",
-                        err
-                    );
+                    error!("Service before_commit failed with error: {:?}", err);
                 }
             }
         }
     }
 
-    fn after_commit(&self, fork: &mut Fork)
-    {
+    fn after_commit(&self, fork: &mut Fork) {
         let inner = self.inner.borrow();
-        
+
         for (_, service) in &inner.initialized {
             service.after_commit(fork);
         }
