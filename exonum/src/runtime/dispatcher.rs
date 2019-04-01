@@ -148,6 +148,13 @@ impl RuntimeEnvironment for Dispatcher {
             runtime.before_commit(fork);
         }
     }
+
+    fn after_commit(&self, fork: &mut Fork)
+    {
+        for (_, runtime) in &self.runtimes {
+            runtime.before_commit(fork);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -220,8 +227,11 @@ mod tests {
             }
         }
 
-
         fn before_commit(&self, _: &mut Fork)
+        {
+        }
+
+        fn after_commit(&self, _: &mut Fork)
         {
         }
     }

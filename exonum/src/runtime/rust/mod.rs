@@ -188,6 +188,15 @@ impl RuntimeEnvironment for RustRuntime {
             }
         }
     }
+
+    fn after_commit(&self, fork: &mut Fork)
+    {
+        let inner = self.inner.borrow();
+        
+        for (_, service) in &inner.initialized {
+            service.after_commit(fork);
+        }
+    }
 }
 
 #[derive(Debug)]

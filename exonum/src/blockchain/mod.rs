@@ -505,18 +505,10 @@ impl Blockchain {
 
         // Invokes `after_commit` for each service in order of their identifiers
 
-        // TODO invoke after_commit
+        // TODO Data for after_commit should be different
+        let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
+        dispatcher.after_commit(&mut self.fork());
 
-        // for (service_id, service) in self.dispatcher.services().iter() {
-        //     let context = ServiceContext::new(
-        //         self.service_keypair.0,
-        //         self.service_keypair.1.clone(),
-        //         self.api_sender.clone(),
-        //         self.fork(),
-        //         *service_id,
-        //     );
-        //     service.after_commit(&context);
-        // }
         Ok(())
     }
 

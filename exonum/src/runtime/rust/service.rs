@@ -34,6 +34,8 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
     }
 
     fn before_commit(&self, fork: &mut Fork) {}
+
+    fn after_commit(&self, fork: &mut Fork) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 

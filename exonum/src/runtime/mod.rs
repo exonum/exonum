@@ -82,8 +82,12 @@ pub trait RuntimeEnvironment {
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Optionally calls `before_commit` for all the services stored in the runtime.
+    /// Calls `before_commit` for all the services stored in the runtime.
     fn before_commit(&self, fork: &mut Fork);
+
+    // TODO interface should be re-worked
+    /// Calls `after_commit` for all the services stored in the runtime.
+    fn after_commit(&self, fork: &mut Fork);
 }
 
 #[derive(Debug)]
