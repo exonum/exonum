@@ -389,8 +389,9 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
-/// # use exonum::crypto::{Hash, PublicKey, Signature};
+/// # use exonum::crypto::{Hash, PublicKey, Signature, gen_keypair};
 /// # use exonum::explorer::CommittedTransaction;
+/// # use exonum::messages::{Message, to_hex_string};
 /// # use exonum::helpers::Height;
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
@@ -410,13 +411,11 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # }
 ///
 /// # fn main() {
-/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
-/// #                    ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
-/// #                    46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
-/// #                    ac2800000005000000416c69636574556b9b7172b7072c\
-/// #                    75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
-/// #                    bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
-/// #                    e4e6ba44e284416f0f";
+/// # let message = {
+/// #     let (pk, sk) = gen_keypair();
+/// #     let msg = Message::sign_transaction(CreateWallet{ name: "Alice".to_owned() }, 0, pk, &sk);
+/// #     to_hex_string(&msg)
+/// # };
 /// let json = json!({
 ///     "content": {
 ///         "message": //...
@@ -563,8 +562,9 @@ impl CommittedTransaction {
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
-/// # use exonum::crypto::{PublicKey, Signature};
+/// # use exonum::crypto::{PublicKey, Signature, gen_keypair};
 /// # use exonum::explorer::TransactionInfo;
+/// # use exonum::messages::{Message, to_hex_string};
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 /// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
@@ -583,13 +583,11 @@ impl CommittedTransaction {
 /// # }
 ///
 /// # fn main() {
-/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
-/// #                    ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
-/// #                    46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
-/// #                    ac2800000005000000416c69636574556b9b7172b7072c\
-/// #                    75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
-/// #                    bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
-/// #                    e4e6ba44e284416f0f";
+/// # let message = {
+/// #     let (pk, sk) = gen_keypair();
+/// #     let msg = Message::sign_transaction(CreateWallet{ name: "Alice".to_owned() }, 0, pk, &sk);
+/// #     to_hex_string(&msg)
+/// # };
 ///
 /// let json = json!({
 ///     "type": "in-pool",

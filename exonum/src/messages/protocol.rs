@@ -29,7 +29,7 @@
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 
-use std::{borrow::Cow, fmt::Debug, mem};
+use std::{borrow::Cow, fmt::Debug};
 
 use super::{BinaryForm, ServiceTransaction, Signed, SignedMessage};
 use crate::blockchain;
@@ -43,16 +43,20 @@ use crate::storage::{proof_list_index as merkle, StorageValue};
 use protobuf::Message as PbMessage;
 
 /// Lower bound on the size of the correct `SignedMessage`.
+/// Size of message fields + protobuf overhead.
 #[doc(hidden)]
-pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH;
+pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 8;
 
-// TODO: Redo with regard to pb.
-/// `Signed<TransactionsResponse>` size without transactions inside.
 #[doc(hidden)]
-pub const TRANSACTION_RESPONSE_EMPTY_SIZE: usize =
-    SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH + mem::size_of::<u8>() * 8;
+pub const TX_RES_EMPTY_SIZE: usize = SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH + 8;
 
-pub const PB_VECTOR_HEADER_UPPER_BOUND: usize = mem::size_of::<u8>() * 10;
+/// When we add transaction to TransactionResponse message we will add some overhead
+/// to the message size due to protobuf.
+/// This is higher bound on this overhead.
+/// Tx response message size <= TX_RES_EMPTY_SIZE + (tx1 size + TX_RES_PB_OVERHEAD_PAYLOAD) +
+///                             + (tx2 size + TX_RES_PB_OVERHEAD_PAYLOAD) + ...
+#[doc(hidden)]
+pub const TX_RES_PB_OVERHEAD_PAYLOAD: usize = 8;
 
 /// Connect to a node.
 ///

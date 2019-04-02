@@ -318,7 +318,7 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use crate::messages::{PB_VECTOR_HEADER_UPPER_BOUND, TRANSACTION_RESPONSE_EMPTY_SIZE};
+    use crate::messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD};
     use crate::storage::StorageValue;
 
     let sandbox = timestamping_sandbox();
@@ -338,15 +338,14 @@ fn response_size_larger_than_max_message_len() {
     );
 
     // Create new config. Set the size of the message to a size
-    // that is exactly equal to the message to send the first two transactions.
+    // that is slightly larger than message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.consensus.max_message_len = (TRANSACTION_RESPONSE_EMPTY_SIZE
+        consensus_cfg.consensus.max_message_len = (TX_RES_EMPTY_SIZE
             + tx1.signed_message().encode().unwrap().len()
-            + PB_VECTOR_HEADER_UPPER_BOUND
+            + TX_RES_PB_OVERHEAD_PAYLOAD
             + tx2.signed_message().encode().unwrap().len()
-            + PB_VECTOR_HEADER_UPPER_BOUND)
-            as u32;
+            + TX_RES_PB_OVERHEAD_PAYLOAD) as u32;
         consensus_cfg.actual_from = sandbox.current_height().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
