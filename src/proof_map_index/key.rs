@@ -594,7 +594,7 @@ mod tests {
         let path = ProofPath::from_bytes(&[1; 32]).prefix(3);
         assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
         let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
-        assert_eq!(path, ProofPath::from_bytes(&[0b00_100101; 32]).prefix(6));
+        assert_eq!(path, ProofPath::new(&[0b_0010_0101; 32]).prefix(6));
 
         // Fuzz tests for roundtrip.
         let mut rng = rand::thread_rng();

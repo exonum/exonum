@@ -632,7 +632,7 @@ mod tests {
     const FAMILY_CLEAR_PARAMS: &[(u32, u32, bool)] =
         &[(0, 5, false), (5, 0, false), (1, 7, true), (7, 1, true)];
 
-    const IDX_NAME: &'static str = "idx_name";
+    const IDX_NAME: &str = "idx_name";
 
     #[test]
     fn test_list_index_methods() {
@@ -646,7 +646,7 @@ mod tests {
     fn test_list_index_in_family_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &fork);
+        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &fork);
         list_index_methods(&mut list_index);
     }
 
@@ -662,7 +662,7 @@ mod tests {
     fn test_list_index_in_family_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &fork);
+        let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![1], &fork);
         list_index_iter(&mut list_index);
     }
 

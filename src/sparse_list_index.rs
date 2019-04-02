@@ -670,7 +670,7 @@ mod tests {
     use super::SparseListIndex;
     use crate::{db::Database, TemporaryDB};
 
-    const IDX_NAME: &'static str = "idx_name";
+    const IDX_NAME: &str = "idx_name";
 
     #[test]
     fn test_list_index_methods() {

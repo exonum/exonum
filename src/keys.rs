@@ -416,6 +416,8 @@ mod tests {
     test_storage_key_for_int_type! {fuzz i32, 4 => test_storage_key_for_i32}
     test_storage_key_for_int_type! {fuzz u64, 8 => test_storage_key_for_u64}
     test_storage_key_for_int_type! {fuzz i64, 8 => test_storage_key_for_i64}
+    test_storage_key_for_int_type! {fuzz u128, 16 => test_storage_key_for_u128}
+    test_storage_key_for_int_type! {fuzz i128, 16 => test_storage_key_for_i128}
 
     #[test]
     fn test_signed_int_key_in_index() {
@@ -650,8 +652,8 @@ mod tests {
     fn test_decimal_round_trip() {
         let decimals = [
             Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
-            Decimal::new(9497628354687268, 12),
+            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
+            Decimal::new(9_497_628_354_687_268, 12),
             Decimal::from_str("0").unwrap(),
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];

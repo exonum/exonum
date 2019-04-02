@@ -524,7 +524,7 @@ mod tests {
     use super::super::{Database, TemporaryDB};
     use super::*;
 
-    const IDX_NAME: &'static str = "idx_name";
+    const IDX_NAME: &str = "idx_name";
 
     #[test]
     fn test_str_key() {

@@ -31,6 +31,13 @@ fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     assert_eq!(values, assumed);
 }
 
+fn assert_initial_state<T: IndexAccess>(view: &View<T>) {
+    assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
+    assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
+    assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+    assert_eq!(view.get_bytes(&[4]), None);
+}
+
 fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     let mut fork = db.fork();
     {
@@ -39,17 +46,13 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
         view.put(&vec![2], vec![2]);
         view.put(&vec![3], vec![3]);
 
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_initial_state(&view);
     }
     fork.flush();
 
     {
         let mut view = View::new(&fork, address);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_initial_state(&view);
 
         view.put(&vec![1], vec![10]);
         view.put(&vec![4], vec![40]);
@@ -64,10 +67,7 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
 
     {
         let view = View::new(&fork, address);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
-        assert_eq!(view.get_bytes(&[4]), None);
+        assert_initial_state(&view);
     }
     fork.flush();
 
@@ -87,9 +87,7 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
 
     {
         let view = View::new(&fork, address);
-        assert_eq!(view.get_bytes(&[1]), Some(vec![1]));
-        assert_eq!(view.get_bytes(&[2]), Some(vec![2]));
-        assert_eq!(view.get_bytes(&[3]), Some(vec![3]));
+        assert_initial_state(&view);
         assert_eq!(view.get_bytes(&[4]), None);
     }
 

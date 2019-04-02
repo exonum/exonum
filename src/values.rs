@@ -118,11 +118,13 @@ impl_binary_form_scalar! { u8,  read_u8 }
 impl_binary_form_scalar! { u16, write_u16, read_u16, 2 }
 impl_binary_form_scalar! { u32, write_u32, read_u32, 4 }
 impl_binary_form_scalar! { u64, write_u64, read_u64, 8 }
+impl_binary_form_scalar! { u128, write_u128, read_u128, 16 }
 // Signed scalar types
 impl_binary_form_scalar! { i8,  read_i8 }
 impl_binary_form_scalar! { i16, write_i16, read_i16, 2 }
 impl_binary_form_scalar! { i32, write_i32, read_i32, 4 }
 impl_binary_form_scalar! { i64, write_i64, read_i64, 8 }
+impl_binary_form_scalar! { i128, write_i128, read_i128, 16 }
 
 /// No-op implementation.
 impl BinaryValue for () {
@@ -312,12 +314,14 @@ mod tests {
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u32, u32 }
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u16, u16 }
     impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u64, u64 }
+    impl_test_binary_form_scalar_unsigned! { test_binary_form_round_trip_u128, u128 }
 
     // Impl tests for signed scalar types.
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i8,  i8 }
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i16, i16 }
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i32, i32 }
     impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i64, i64 }
+    impl_test_binary_form_scalar_signed! { test_binary_form_round_trip_i128, i128 }
 
     // Tests for the other types.
 
@@ -378,8 +382,8 @@ mod tests {
     fn test_binary_form_decimal() {
         let values = [
             Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
-            Decimal::new(9497628354687268, 12),
+            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
+            Decimal::new(9_497_628_354_687_268, 12),
             Decimal::from_str("0").unwrap(),
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];

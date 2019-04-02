@@ -33,7 +33,7 @@ use crate::{
     BinaryValue, Database, TemporaryDB,
 };
 
-const IDX_NAME: &'static str = "idx_name";
+const IDX_NAME: &str = "idx_name";
 
 fn random_values(len: usize) -> Vec<Vec<u8>> {
     use std::collections::HashSet;
@@ -497,11 +497,11 @@ fn test_proof_structure() {
 
     // spell-checker:ignore upup
 
-    let h1 = hash_leaf_node(&vec![0, 1, 2]);
-    let h2 = hash_leaf_node(&vec![1, 2, 3]);
-    let h3 = hash_leaf_node(&vec![2, 3, 4]);
-    let h4 = hash_leaf_node(&vec![3, 4, 5]);
-    let h5 = hash_leaf_node(&vec![4, 5, 6]);
+    let h1 = hash_leaf_node(&[0, 1, 2]);
+    let h2 = hash_leaf_node(&[1, 2, 3]);
+    let h3 = hash_leaf_node(&[2, 3, 4]);
+    let h4 = hash_leaf_node(&[3, 4, 5]);
+    let h5 = hash_leaf_node(&[4, 5, 6]);
     let h12 = hash_branch_node(&[h1.as_ref(), h2.as_ref()].concat());
     let h34 = hash_branch_node(&[h3.as_ref(), h4.as_ref()].concat());
     let h1234 = hash_branch_node(&[h12.as_ref(), h34.as_ref()].concat());
