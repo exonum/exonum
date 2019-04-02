@@ -32,7 +32,7 @@ use super::{super::BinaryValue, key::ProofListKey, HashTag};
 /// ```
 ///
 /// In case of a range proof this rule applies to the whole range.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct ProofOfAbsence {
     length: u64,
     merkle_root: Hash,
@@ -56,8 +56,8 @@ impl ProofOfAbsence {
     }
 }
 
-/// An enum that represents a proof of existence for proof list elements.
-#[derive(Debug, PartialEq, Eq)]
+/// An enum that represents a proof of existence for a proof list elements.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListProof<V> {
     /// A branch of proof in which both children contain requested elements.
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
@@ -72,13 +72,16 @@ pub enum ListProof<V> {
 }
 
 /// An error that is returned when the list proof is invalid.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Fail)]
 pub enum ListProofError {
     /// The proof is too short and does not correspond to the height of the tree.
+    #[fail(display = "proof is too short and does not correspond to the height of the tree")]
     UnexpectedLeaf,
     /// The proof is too long and does not correspond to the height of the tree.
+    #[fail(display = "proof is too long and does not correspond to the height of the tree")]
     UnexpectedBranch,
     /// The hash of the proof is not equal to the trusted root hash.
+    #[fail(display = "hash of the proof is not equal to the trusted root hash")]
     UnmatchedRootHash,
 }
 

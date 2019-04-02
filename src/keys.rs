@@ -175,6 +175,7 @@ macro_rules! storage_key_for_ints {
 storage_key_for_ints! {u16, i16, 2, read_u16, write_u16}
 storage_key_for_ints! {u32, i32, 4, read_u32, write_u32}
 storage_key_for_ints! {u64, i64, 8, read_u64, write_u64}
+storage_key_for_ints! {u128, i128, 16, read_u128, write_u128}
 
 macro_rules! storage_key_for_crypto_types {
     ($type:ident, $size:expr) => {
@@ -530,11 +531,11 @@ mod tests {
         let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
             let time1 = Utc.timestamp(
-                rng.gen::<i64>() % (i32::max_value() as i64),
+                rng.gen::<i64>() % i64::from(i32::max_value()),
                 rng.gen::<u32>() % 1_000_000_000,
             );
             let time2 = Utc.timestamp(
-                rng.gen::<i64>() % (i32::max_value() as i64),
+                rng.gen::<i64>() % i64::from(i32::max_value()),
                 rng.gen::<u32>() % 1_000_000_000,
             );
             time1.write(&mut buffer1);

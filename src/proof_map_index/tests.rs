@@ -42,13 +42,12 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
-    let base = base;
 
     let kv_generator = |_| {
         let mut v = vec![0; 8];
 
         // Generate only unique keys
-        let mut k = base.clone();
+        let mut k = base;
         let byte: usize = rng.gen_range(0, 31);
         k[byte] = rng.gen::<u8>();
 
@@ -56,7 +55,7 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
         while exists_keys.contains(&k) {
             rng.fill_bytes(&mut k);
         }
-        exists_keys.insert(k.clone());
+        exists_keys.insert(k);
         (k, v)
     };
 
@@ -560,7 +559,7 @@ where
 fn test_invalid_map_proofs() {
     use self::MapProofError::*;
 
-    let h = hash(&vec![1]);
+    let h = hash(&[1]);
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h)
@@ -1225,7 +1224,7 @@ fn test_fuzz_delete() {
     let mut keys_to_remove = data
         .iter()
         .take(50)
-        .map(|item| item.0.clone())
+        .map(|(key, _)| *key)
         .collect::<Vec<_>>();
 
     keys_to_remove.shuffle(&mut rng);

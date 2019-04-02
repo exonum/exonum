@@ -310,7 +310,7 @@ fn test_randomly_generate_proofs() {
         };
 
         let json_representation = to_string(&range_proof).unwrap();
-        assert!(json_representation.len() > 0);
+        assert!(!json_representation.is_empty());
         assert_eq!(range_proof, from_str(&json_representation).unwrap());
     }
 }
@@ -591,7 +591,7 @@ fn test_same_merkle_root() {
 }
 
 #[derive(Serialize)]
-struct ProofInfo<'a, V: Serialize + 'a> {
+struct ProofInfo<'a, V: Serialize> {
     merkle_root: Hash,
     list_length: u64,
     proof: &'a ListProof<V>,

@@ -144,6 +144,9 @@ pub use self::{
     views::{IndexAccess, IndexAddress, IndexBuilder, ObjectAccess, Ref, RefMut},
 };
 
+#[macro_use]
+extern crate failure;
+
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
