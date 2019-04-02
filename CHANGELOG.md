@@ -36,6 +36,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Allowed to use symbol `-` in index names. (#1277)
 
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
 #### exonum-testkit
 
 - Implemented "stopping" and "resuming" a `TestKit`, allowing to emulate node

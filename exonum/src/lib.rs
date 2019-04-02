@@ -70,8 +70,6 @@ extern crate test;
 
 pub use exonum_crypto as crypto;
 
-use exonum_rocksdb as rocksdb;
-
 pub mod proto;
 #[macro_use]
 pub mod messages;
