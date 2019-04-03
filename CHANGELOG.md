@@ -5,6 +5,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+- Added i128/u128 support for `BinaryKey`, `BinaryValue`. (#36)
+
+- `ListProofError` is now derided from `Fail` trait. (#36)
+
 - New API for getting and creating indexes. (#35)
 
   - Now indexes can be accessed via immutable references from `Snapshot` and
