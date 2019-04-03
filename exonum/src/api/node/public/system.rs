@@ -107,7 +107,7 @@ impl SystemApi {
     ) -> Self {
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
             let blockchain = state.blockchain();
-            let services = blockchan
+            let services = blockchain
                 .service_map()
                 .iter()
                 .map(|(&id, service)| ServiceInfo {
