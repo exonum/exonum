@@ -39,48 +39,6 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
     // TODO: add other hooks such as "on node startup", etc.
 }
 
-// TODO document OR document + rewrite as proc macro on usual trait declaration.
-#[macro_export]
-macro_rules! service_interface {
-    (
-        $v:vis trait $name:ident {
-           $(fn $fun_name:ident(&self, $ctx:ident: TransactionContext, $arg:ident: $arg_ty:ty) -> Result<(), ExecutionError>;)+
-        }
-    ) => {
-        $v trait $name {
-            $(fn $fun_name(
-                        &self,
-                        $ctx: $crate::runtime::rust::TransactionContext,
-                        $arg: $arg_ty
-                  ) -> Result<(), $crate::runtime::error::ExecutionError>;)+
-
-            fn _dispatch(
-                    &self,
-                    ctx: $crate::runtime::rust::TransactionContext,
-                    method: $crate::messages::MethodId,
-                    payload: &[u8]
-                ) -> Result<Result<(), $crate::runtime::error::ExecutionError>, failure::Error> {
-
-                enum_funcs_helper!($($fun_name)+,0);
-                match method {
-                    $(
-                      x if x == $fun_name => {
-                        let arg: $arg_ty = $crate::messages::BinaryForm::decode(payload)?;
-                        Ok(self.$fun_name(ctx, arg))
-                      }
-                    )+
-                    _ => bail!("Method not found"),
-                }
-            }
-        }
-    }
-}
-
-macro_rules! enum_funcs_helper {
-    (, $e:expr) => ();
-    ($head:ident $($tail:ident)*, $e:expr) => (let $head = $e; enum_funcs_helper!($($tail)*, $e+1));
-}
-
 #[macro_export]
 macro_rules! impl_service_dispatcher {
     ($struct_name:ident, $interface:ident) => {

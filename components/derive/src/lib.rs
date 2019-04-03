@@ -17,6 +17,7 @@
 extern crate proc_macro;
 
 mod pb_convert;
+mod service_interface;
 mod tx_set;
 
 use proc_macro::TokenStream;
@@ -81,6 +82,11 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
     tx_set::implement_transaction_set(input)
+}
+
+#[proc_macro_attribute]
+pub fn service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
+    service_interface::impl_service_interface(attr, item)
 }
 
 /// Exonum types should be imported with `crate::` prefix if inside crate
