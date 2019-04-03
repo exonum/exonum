@@ -110,9 +110,9 @@ impl SystemApi {
             let services = blockchan
                 .service_map()
                 .iter()
-                .map(|(id, service)| ServiceInfo {
+                .map(|(&id, service)| ServiceInfo {
                     name: service.service_name().to_string(),
-                    id: *id,
+                    id,
                 })
                 .collect::<Vec<_>>();
             Ok(ServicesResponse { services })
