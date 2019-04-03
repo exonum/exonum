@@ -41,7 +41,7 @@ struct TxB {
     value: u64,
 }
 
-#[service_interface]
+#[service_interface(exonum(crate = "crate"))]
 trait TestService {
     fn method_a(&self, ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
     fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;

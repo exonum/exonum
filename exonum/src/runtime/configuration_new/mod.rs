@@ -44,7 +44,7 @@ pub const SERVICE_ID: u16 = 1;
 /// Configuration service name.
 pub const SERVICE_NAME: &str = "configuration";
 
-#[service_interface]
+#[service_interface(exonum(crate = "crate"))]
 trait ConfigurationService {
     fn propose(
         &self,

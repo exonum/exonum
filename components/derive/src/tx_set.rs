@@ -150,6 +150,11 @@ fn implement_into_boxed_tx(
 
 pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
+    let meta_attrs = input
+        .attrs
+        .iter()
+        .filter_map(|a| a.parse_meta().ok())
+        .collect::<Vec<_>>();
 
     let name = input.ident;
     let mod_name = Ident::new(&format!("tx_set_impl_{}", name), Span::call_site());
@@ -158,7 +163,7 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
         _ => panic!("Only for enums."),
     };
 
-    let cr = super::get_exonum_types_prefix(&input.attrs);
+    let cr = super::get_exonum_types_prefix(&meta_attrs);
     let vars = get_tx_variants(&data);
 
     let tx_set = implement_transaction_set_trait(&name, &vars, &cr);

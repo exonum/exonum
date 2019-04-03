@@ -14,7 +14,10 @@
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{FnArg, Ident, ItemTrait, TraitItem, TraitItemMethod, Type};
+use syn::{
+    parse_macro_input, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, TraitItem,
+    TraitItemMethod, Type,
+};
 
 struct ServiceMethodDescriptor {
     name: Ident,
@@ -22,31 +25,61 @@ struct ServiceMethodDescriptor {
     id: u32,
 }
 
-// TODO: currently it works only inside exonum crate, also refactor is needed.
+fn impl_dispatch_method(methods: &[ServiceMethodDescriptor], cr: &dyn ToTokens) -> impl ToTokens {
+    let match_arms = methods
+        .iter()
+        .map(|ServiceMethodDescriptor { name, arg_type, id }| {
+            quote! {
+                #id => {
+                    let arg: #arg_type = #cr::messages::BinaryForm::decode(payload)?;
+                    Ok(self.#name(ctx,arg))
+                }
+            }
+        });
 
-pub fn impl_service_interface(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let mut trait_item: ItemTrait =
-        syn::parse(item.clone()).expect("service_dispatcher can be used on traits only");
+    quote! {
+        fn _dispatch(
+                &self,
+                ctx: #cr::runtime::rust::TransactionContext,
+                method: #cr::messages::MethodId,
+                payload: &[u8]
+            ) -> Result<Result<(), #cr::runtime::error::ExecutionError>, failure::Error> {
+            match method {
+                #( #match_arms )*
+                _ => bail!("Method not found"),
+            }
+        }
+    }
+}
 
-    let vec_items = trait_item
+pub fn impl_service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut trait_item = parse_macro_input!(item as ItemTrait);
+    let args = parse_macro_input!(attr as AttributeArgs);
+    let meta_attrs = args
+        .into_iter()
+        .filter_map(|a| match a {
+            NestedMeta::Meta(m) => Some(m),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let cr = super::get_exonum_types_prefix(&meta_attrs);
+
+    let methods = trait_item
         .items
         .iter()
-        .filter(|item| {
-            if let TraitItem::Method(_) = item {
-                true
-            } else {
-                false
-            }
+        .filter(|item| match item {
+            TraitItem::Method(_) => true,
+            _ => false,
         })
         .enumerate()
         .map(|(n, item)| {
             let method = match item {
                 TraitItem::Method(m) => m,
-                _ => panic!("Wrong item type."),
+                _ => unreachable!(),
             };
-            let name = method.sig.ident.clone();
-            let mut method_iter = method.sig.decl.inputs.iter();
-            method_iter
+            let mut method_args_iter = method.sig.decl.inputs.iter();
+
+            method_args_iter
                 .next()
                 .and_then(|arg| match arg {
                     FnArg::SelfRef(_) => Some(()),
@@ -54,11 +87,11 @@ pub fn impl_service_interface(_attr: TokenStream, item: TokenStream) -> TokenStr
                 })
                 .expect("Expected &self or &mut self as an argument");
 
-            method_iter
+            method_args_iter
                 .next()
                 .expect("Expected TransactionContext argument");
 
-            let typ = method_iter
+            let arg_type = method_args_iter
                 .next()
                 .map(|arg| match arg {
                     FnArg::Captured(captured) => captured.ty.clone(),
@@ -66,45 +99,24 @@ pub fn impl_service_interface(_attr: TokenStream, item: TokenStream) -> TokenStr
                 })
                 .expect("Expected argument with transaction");
 
-            if method_iter.next().is_some() {
-                panic!("Function should have only one argument");
+            if method_args_iter.next().is_some() {
+                panic!("Function should have only one argument for transaction");
             }
 
             ServiceMethodDescriptor {
-                name,
+                name: method.sig.ident.clone(),
                 id: n as u32,
-                arg_type: typ,
+                arg_type,
             }
         })
         .collect::<Vec<_>>();
 
-    let match_arms = vec_items
-        .iter()
-        .map(|ServiceMethodDescriptor { name, arg_type, id }| {
-            quote! {
-                #id => {
-                    let arg: #arg_type = crate::messages::BinaryForm::decode(payload)?;
-                    Ok(self.#name(ctx,arg))
-                }
-            }
-        });
-
-    let method_code = quote! {
-            fn _dispatch(
-                    &self,
-                    ctx: crate::runtime::rust::TransactionContext,
-                    method: crate::messages::MethodId,
-                    payload: &[u8]
-                ) -> Result<Result<(), crate::runtime::error::ExecutionError>, failure::Error> {
-                match method {
-                    #( #match_arms )*
-                    _ => bail!("Method not found"),
-                }
-            }
+    let dispatch_method: TraitItemMethod = {
+        let method_code = impl_dispatch_method(&methods, &cr).into_token_stream();
+        syn::parse(method_code.into()).expect("Can't parse trait item method")
     };
-    let additional_method: TraitItemMethod =
-        syn::parse(method_code.into()).expect("Can't parse trait item method");
-    trait_item.items.push(TraitItem::Method(additional_method));
+
+    trait_item.items.push(TraitItem::Method(dispatch_method));
 
     trait_item.into_token_stream().into()
 }

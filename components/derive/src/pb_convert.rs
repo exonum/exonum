@@ -15,15 +15,15 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{Attribute, Data, DeriveInput, Lit, Path};
+use syn::{Data, DeriveInput, Lit, Meta, Path};
 
 use super::{
     find_exonum_word_attribute, get_exonum_name_value_attributes, get_exonum_types_prefix,
     PB_CONVERT_ATTRIBUTE, SERDE_PB_CONVERT_ATTRIBUTE,
 };
 
-fn get_protobuf_struct_path(attrs: &[Attribute]) -> Path {
-    let map_attrs = get_exonum_name_value_attributes(attrs);
+fn get_protobuf_struct_path(meta_attrs: &[Meta]) -> Path {
+    let map_attrs = get_exonum_name_value_attributes(meta_attrs);
     let struct_path = map_attrs.into_iter().find_map(|nv| {
         if nv.ident == PB_CONVERT_ATTRIBUTE {
             match nv.lit {
@@ -171,10 +171,15 @@ fn implement_serde_protobuf_convert(name: &Ident) -> proc_macro2::TokenStream {
 
 pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
+    let meta_attrs = input
+        .attrs
+        .iter()
+        .filter_map(|a| a.parse_meta().ok())
+        .collect::<Vec<_>>();
 
     let name = input.ident.clone();
-    let proto_struct_name = get_protobuf_struct_path(&input.attrs);
-    let cr = get_exonum_types_prefix(&input.attrs);
+    let proto_struct_name = get_protobuf_struct_path(&meta_attrs);
+    let cr = get_exonum_types_prefix(&meta_attrs);
 
     let mod_name = Ident::new(&format!("pb_convert_impl_{}", name), Span::call_site());
 
@@ -185,7 +190,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let storage_traits = implement_storage_traits(&name, &cr);
 
     let serde_traits = {
-        let serde_needed = find_exonum_word_attribute(&input.attrs, SERDE_PB_CONVERT_ATTRIBUTE);
+        let serde_needed = find_exonum_word_attribute(&meta_attrs, SERDE_PB_CONVERT_ATTRIBUTE);
         if serde_needed {
             implement_serde_protobuf_convert(&name)
         } else {

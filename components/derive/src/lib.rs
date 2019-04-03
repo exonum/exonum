@@ -22,7 +22,7 @@ mod tx_set;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Attribute, Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
+use syn::{Lit, Meta, MetaList, MetaNameValue, NestedMeta, Path};
 
 // Exonum derive attribute names, used as
 // `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
@@ -91,7 +91,7 @@ pub fn service_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 /// Exonum types should be imported with `crate::` prefix if inside crate
 /// or with `exonum::` when outside.
-fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
+fn get_exonum_types_prefix(attrs: &[Meta]) -> impl quote::ToTokens {
     let map_attrs = get_exonum_name_value_attributes(attrs);
     let crate_path = map_attrs.into_iter().find_map(|nv| match &nv {
         MetaNameValue {
@@ -113,11 +113,7 @@ fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
 }
 
 /// Extract attributes in the form of `#[exonum(name = "value")]`
-fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<Meta> {
-    let exonum_meta = attrs
-        .iter()
-        .find_map(|attr| attr.parse_meta().ok().filter(|m| m.name() == "exonum"));
-
+fn get_exonum_attributes(exonum_meta: Option<Meta>) -> Vec<Meta> {
     match exonum_meta {
         Some(Meta::List(MetaList { nested: list, .. })) => list
             .into_iter()
@@ -131,8 +127,10 @@ fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<Meta> {
     }
 }
 
-fn get_exonum_name_value_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
-    get_exonum_attributes(attrs)
+fn get_exonum_name_value_attributes(meta_attrs: &[Meta]) -> Vec<MetaNameValue> {
+    let exonum_meta = meta_attrs.iter().find(|m| m.name() == "exonum").cloned();
+
+    get_exonum_attributes(exonum_meta)
         .into_iter()
         .filter_map(|meta| match meta {
             Meta::NameValue(name_value) => Some(name_value),
@@ -141,9 +139,13 @@ fn get_exonum_name_value_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
         .collect()
 }
 
-fn find_exonum_word_attribute(attrs: &[Attribute], ident_name: &str) -> bool {
-    get_exonum_attributes(attrs).iter().any(|meta| match meta {
-        Meta::Word(ident) if ident == ident_name => true,
-        _ => false,
-    })
+fn find_exonum_word_attribute(meta_attrs: &[Meta], ident_name: &str) -> bool {
+    let exonum_meta = meta_attrs.iter().find(|m| m.name() == "exonum").cloned();
+
+    get_exonum_attributes(exonum_meta)
+        .iter()
+        .any(|meta| match meta {
+            Meta::Word(ident) if ident == ident_name => true,
+            _ => false,
+        })
 }
