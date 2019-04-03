@@ -36,6 +36,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Allowed to use symbol `-` in index names. (#1277)
 
+- Added a new endpoint `system/v1/services` for displaying information 
+  about available services. (#1288)
+
 #### exonum-testkit
 
 - Implemented "stopping" and "resuming" a `TestKit`, allowing to emulate node

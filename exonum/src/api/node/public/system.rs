@@ -47,6 +47,18 @@ pub struct HealthCheckInfo {
     pub connected_peers: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct ServiceInfo {
+    name: String,
+    id: u16,
+}
+
+/// Services info response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ServicesResponse {
+    services: Vec<ServiceInfo>,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -88,6 +100,26 @@ impl SystemApi {
         self_
     }
 
+    fn handle_list_services_info(
+        self,
+        name: &'static str,
+        api_scope: &mut ServiceApiScope,
+    ) -> Self {
+        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
+            let blockchan = state.blockchain();
+            let services = blockchan
+                .service_map()
+                .iter()
+                .map(|(id, service)| ServiceInfo {
+                    name: service.service_name().to_string(),
+                    id: *id,
+                })
+                .collect::<Vec<_>>();
+            Ok(ServicesResponse { services })
+        });
+        self
+    }
+
     fn get_number_of_connected_peers(&self) -> usize {
         let in_conn = self.shared_api_state.incoming_connections().len();
         let out_conn = self.shared_api_state.outgoing_connections().len();
@@ -112,7 +144,8 @@ impl SystemApi {
     pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         self.handle_mempool_info("v1/mempool", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
-            .handle_user_agent_info("v1/user_agent", api_scope);
+            .handle_user_agent_info("v1/user_agent", api_scope)
+            .handle_list_services_info("v1/services", api_scope);
         api_scope
     }
 }
