@@ -38,7 +38,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
 
-- Added a new endpoint `system/v1/services` for displaying information 
+- Added a new endpoint `system/v1/services` for displaying information
   about available services. (#1288)
   
 #### exonum-testkit
