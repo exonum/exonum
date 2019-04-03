@@ -12,40 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId,
+    RuntimeIdentifier, ServiceInstanceId,
 };
 use crate::messages::CallInfo;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RuntimeIdentifier {
-    Rust,
-    Java,
-}
-
-impl From<ArtifactSpec> for RuntimeIdentifier {
-    fn from(spec: ArtifactSpec) -> Self {
-        match spec {
-            ArtifactSpec::Rust(..) => RuntimeIdentifier::Rust,
-            ArtifactSpec::Java => RuntimeIdentifier::Java,
-        }
-    }
-}
+use crate::storage::Fork;
 
 #[derive(Default)]
-struct DispatcherBuilder {
-    runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
+pub struct DispatcherBuilder {
+    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+}
+
+impl std::fmt::Debug for DispatcherBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "DispatcherBuilder entity")
+    }
 }
 
 impl DispatcherBuilder {
     pub fn with_runtime(
         mut self,
-        runtime_id: RuntimeIdentifier,
-        runtime: Box<dyn RuntimeEnvironment>,
+        runtime_id: u32,
+        runtime: Box<dyn RuntimeEnvironment + Send>,
     ) -> Self {
         self.runtimes.insert(runtime_id, runtime);
 
@@ -58,56 +51,61 @@ impl DispatcherBuilder {
 }
 
 #[derive(Default)]
-struct Dispatcher {
-    runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>,
-    runtime_lookup: HashMap<ServiceInstanceId, RuntimeIdentifier>,
+pub struct Dispatcher {
+    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+    // TODO Is RefCell enough here?
+    runtime_lookup: RefCell<HashMap<ServiceInstanceId, u32>>,
+}
+
+impl std::fmt::Debug for Dispatcher {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Dispatcher entity")
+    }
 }
 
 impl Dispatcher {
-    pub fn new(runtimes: HashMap<RuntimeIdentifier, Box<dyn RuntimeEnvironment>>) -> Self {
+    pub fn new(runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>) -> Self {
         Self {
             runtimes,
-            runtime_lookup: Default::default(),
+            runtime_lookup: RefCell::new(Default::default()),
         }
     }
 
-    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
-        let runtime_id = artifact.into();
-
-        self.runtime_lookup.insert(service_id, runtime_id);
+    fn notify_service_started(&self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
+        self.runtime_lookup
+            .borrow_mut()
+            .insert(service_id, artifact.runtime_id);
     }
 }
 
 impl RuntimeEnvironment for Dispatcher {
     fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        let runtime_id = artifact.clone().into();
-
-        if let Some(runtime) = self.runtimes.get(&runtime_id) {
+        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
             runtime.start_deploy(artifact)
         } else {
             Err(DeployError::WrongRuntime)
         }
     }
 
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-        let runtime_id = artifact.clone().into();
-
-        if let Some(runtime) = self.runtimes.get(&runtime_id) {
-            runtime.check_deploy_status(artifact)
+    fn check_deploy_status(
+        &self,
+        artifact: ArtifactSpec,
+        cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError> {
+        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
+            runtime.check_deploy_status(artifact, cancel_if_not_complete)
         } else {
             Err(DeployError::WrongRuntime)
         }
     }
 
     fn init_service(
-        &mut self,
+        &self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        let runtime_id = artifact.clone().into();
-
-        if let Some(runtime) = self.runtimes.get_mut(&runtime_id) {
+        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
             let result = runtime.init_service(ctx, artifact.clone(), init);
             if result.is_ok() {
                 self.notify_service_started(init.instance_id.clone(), artifact);
@@ -124,7 +122,8 @@ impl RuntimeEnvironment for Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
+        let lookup = self.runtime_lookup.borrow();
+        let runtime_id = lookup.get(&call_info.instance_id);
 
         if runtime_id.is_none() {
             return Err(ExecutionError::with_description(
@@ -142,6 +141,18 @@ impl RuntimeEnvironment for Dispatcher {
             ))
         }
     }
+
+    fn before_commit(&self, fork: &mut Fork) {
+        for (_, runtime) in &self.runtimes {
+            runtime.before_commit(fork);
+        }
+    }
+
+    fn after_commit(&self, fork: &mut Fork) {
+        for (_, runtime) in &self.runtimes {
+            runtime.before_commit(fork);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -150,20 +161,15 @@ mod tests {
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
     use crate::storage::{Database, MemoryDB};
-    use semver::Version;
 
     struct SampleRuntime {
-        pub runtime_type: RuntimeIdentifier,
+        pub runtime_type: u32,
         pub instance_id: ServiceInstanceId,
         pub method_id: MethodId,
     }
 
     impl SampleRuntime {
-        pub fn new(
-            runtime_type: RuntimeIdentifier,
-            instance_id: ServiceInstanceId,
-            method_id: MethodId,
-        ) -> Self {
+        pub fn new(runtime_type: u32, instance_id: ServiceInstanceId, method_id: MethodId) -> Self {
             Self {
                 runtime_type,
                 instance_id,
@@ -174,16 +180,19 @@ mod tests {
 
     impl RuntimeEnvironment for SampleRuntime {
         fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-            let runtime_type: RuntimeIdentifier = artifact.into();
-            if runtime_type == self.runtime_type {
+            if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
                 Err(DeployError::WrongRuntime)
             }
         }
-        fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-            let runtime_type: RuntimeIdentifier = artifact.into();
-            if runtime_type == self.runtime_type {
+
+        fn check_deploy_status(
+            &self,
+            artifact: ArtifactSpec,
+            _: bool,
+        ) -> Result<DeployStatus, DeployError> {
+            if artifact.runtime_id == self.runtime_type {
                 Ok(DeployStatus::Deployed)
             } else {
                 Err(DeployError::WrongRuntime)
@@ -191,13 +200,12 @@ mod tests {
         }
 
         fn init_service(
-            &mut self,
+            &self,
             _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
         ) -> Result<(), InitError> {
-            let runtime_type: RuntimeIdentifier = artifact.into();
-            if runtime_type == self.runtime_type {
+            if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
                 Err(InitError::WrongRuntime)
@@ -216,21 +224,31 @@ mod tests {
                 Err(ExecutionError::new(0xFF_u8))
             }
         }
+
+        fn before_commit(&self, _: &mut Fork) {}
+
+        fn after_commit(&self, _: &mut Fork) {}
     }
 
     #[test]
     fn test_builder() {
-        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust, 0, 0));
+        let runtime_a = Box::new(SampleRuntime::new(RuntimeIdentifier::Rust as u32, 0, 0));
 
-        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java, 1, 0));
+        let runtime_b = Box::new(SampleRuntime::new(RuntimeIdentifier::Java as u32, 1, 0));
 
         let dispatcher = DispatcherBuilder::default()
-            .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
-            .with_runtime(runtime_b.runtime_type.clone(), runtime_b)
+            .with_runtime(runtime_a.runtime_type, runtime_a)
+            .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
-        assert!(dispatcher.runtimes.get(&RuntimeIdentifier::Rust).is_some());
-        assert!(dispatcher.runtimes.get(&RuntimeIdentifier::Java).is_some());
+        assert!(dispatcher
+            .runtimes
+            .get(&(RuntimeIdentifier::Rust as u32))
+            .is_some());
+        assert!(dispatcher
+            .runtimes
+            .get(&(RuntimeIdentifier::Java as u32))
+            .is_some());
     }
 
     #[test]
@@ -244,26 +262,29 @@ mod tests {
         let db = MemoryDB::new();
 
         let runtime_a = Box::new(SampleRuntime::new(
-            RuntimeIdentifier::Rust,
+            RuntimeIdentifier::Rust as u32,
             RUST_SERVICE_ID,
             RUST_METHOD_ID,
         ));
         let runtime_b = Box::new(SampleRuntime::new(
-            RuntimeIdentifier::Java,
+            RuntimeIdentifier::Java as u32,
             JAVA_SERVICE_ID,
             JAVA_METHOD_ID,
         ));
 
-        let mut dispatcher = DispatcherBuilder::default()
-            .with_runtime(runtime_a.runtime_type.clone(), runtime_a)
-            .with_runtime(runtime_b.runtime_type.clone(), runtime_b)
+        let dispatcher = DispatcherBuilder::default()
+            .with_runtime(runtime_a.runtime_type, runtime_a)
+            .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
 
-        let sample_rust_spec = ArtifactSpec::Rust(RustArtifactSpec {
-            name: "artifact".to_owned(),
-            version: Version::new(0, 1, 0),
-        });
-        let sample_java_spec = ArtifactSpec::Java;
+        let sample_rust_spec = ArtifactSpec {
+            runtime_id: RuntimeIdentifier::Rust as u32,
+            raw_spec: Default::default(),
+        };
+        let sample_java_spec = ArtifactSpec {
+            runtime_id: RuntimeIdentifier::Java as u32,
+            raw_spec: Default::default(),
+        };
 
         // Check deploy.
         dispatcher
@@ -276,13 +297,13 @@ mod tests {
         // Check deploy status
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone())
+                .check_deploy_status(sample_rust_spec.clone(), false)
                 .unwrap(),
             DeployStatus::Deployed
         );
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_java_spec.clone())
+                .check_deploy_status(sample_java_spec.clone(), false)
                 .unwrap(),
             DeployStatus::Deployed
         );
@@ -351,12 +372,12 @@ mod tests {
         // Create dispatcher and test data.
         let db = MemoryDB::new();
 
-        let mut dispatcher = DispatcherBuilder::default().finalize();
+        let dispatcher = DispatcherBuilder::default().finalize();
 
-        let sample_rust_spec = ArtifactSpec::Rust(RustArtifactSpec {
-            name: "artifact".to_owned(),
-            version: Version::new(0, 1, 0),
-        });
+        let sample_rust_spec = ArtifactSpec {
+            runtime_id: RuntimeIdentifier::Rust as u32,
+            raw_spec: Default::default(),
+        };
 
         // Check deploy.
         assert_eq!(
@@ -368,7 +389,7 @@ mod tests {
 
         assert_eq!(
             dispatcher
-                .check_deploy_status(sample_rust_spec.clone())
+                .check_deploy_status(sample_rust_spec.clone(), false)
                 .expect_err("check_deploy_status succeed"),
             DeployError::WrongRuntime
         );

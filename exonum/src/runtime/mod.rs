@@ -37,20 +37,20 @@ pub enum DeployStatus {
 
 #[derive(Debug)]
 pub struct InstanceInitData {
-    instance_id: ServiceInstanceId,
-    constructor_data: Any,
-}
-
-#[derive(Debug)]
-pub enum RuntimeIdentifier {
-    Rust,
-    Java,
+    pub instance_id: ServiceInstanceId,
+    pub constructor_data: Any,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum ArtifactSpec {
-    Rust(rust::RustArtifactSpec),
-    Java,
+pub enum RuntimeIdentifier {
+    Rust = 0,
+    Java = 1,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct ArtifactSpec {
+    runtime_id: u32,
+    raw_spec: Vec<u8>,
 }
 
 /// Service runtime environment.
@@ -60,11 +60,15 @@ pub trait RuntimeEnvironment {
     fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
     /// Check deployment status.
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError>;
+    fn check_deploy_status(
+        &self,
+        artifact: ArtifactSpec,
+        cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError>;
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
-        &mut self,
+        &self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
@@ -77,6 +81,13 @@ pub trait RuntimeEnvironment {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
+
+    /// Calls `before_commit` for all the services stored in the runtime.
+    fn before_commit(&self, fork: &mut Fork);
+
+    // TODO interface should be re-worked
+    /// Calls `after_commit` for all the services stored in the runtime.
+    fn after_commit(&self, fork: &mut Fork);
 }
 
 #[derive(Debug)]
@@ -87,7 +98,7 @@ pub struct RuntimeContext<'a> {
 }
 
 impl<'a> RuntimeContext<'a> {
-    fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
+    pub fn new(fork: &'a mut Fork, &author: &PublicKey, &tx_hash: &Hash) -> Self {
         Self {
             fork,
             author,

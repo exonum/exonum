@@ -14,11 +14,14 @@
 
 //! Transaction definitions for the configuration service.
 
+use protobuf::well_known_types::Any;
+
 use crate::{
     blockchain::{Schema as CoreSchema, StoredConfiguration},
     crypto::{CryptoHash, Hash, PublicKey},
     node::State,
     proto,
+    runtime::ArtifactSpec,
     storage::{Fork, Snapshot},
 };
 
@@ -351,4 +354,47 @@ impl VotingContext {
             .propose_data_by_config_hash_mut()
             .put(cfg_hash, propose_data);
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::DeployTx", crate = "crate")]
+pub struct Deploy {
+    pub runtime_id: u32,
+    pub activation_height: u64,
+    pub artifact_spec: Any,
+}
+
+fn artifact_spec_from_any(runtime_id: u32, artifact_spec: &Any) -> ArtifactSpec {
+    ArtifactSpec {
+        runtime_id,
+        raw_spec: artifact_spec.get_value().to_vec(),
+    }
+}
+
+impl Deploy {
+    pub fn get_artifact_spec(&self) -> ArtifactSpec {
+        artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::InitTx", crate = "crate")]
+pub struct Init {
+    pub runtime_id: u32,
+    pub artifact_spec: Any,
+    pub instance_name: String,
+    pub constructor_data: Any,
+}
+
+impl Init {
+    pub fn get_artifact_spec(&self) -> ArtifactSpec {
+        artifact_spec_from_any(self.runtime_id, &self.artifact_spec)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
+#[exonum(pb = "proto::schema::configuration::DeployInitTx", crate = "crate")]
+pub struct DeployInit {
+    pub deploy_tx: Deploy,
+    pub init_tx: Init,
 }

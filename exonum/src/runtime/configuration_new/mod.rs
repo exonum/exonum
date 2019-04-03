@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// use semver::Version;
+use std::cell::RefCell;
 
 use crate::{
     blockchain::Schema as CoreSchema,
@@ -20,9 +20,12 @@ use crate::{
     node::State,
     proto::schema::configuration::ConfigurationServiceInit,
     runtime::{
-        error::{ExecutionError, WRONG_ARG_ERROR},
+        dispatcher::Dispatcher,
+        error::{ExecutionError, InitError, WRONG_ARG_ERROR},
         rust::{service::Service, TransactionContext},
+        DeployStatus, InstanceInitData, RuntimeEnvironment,
     },
+    storage::{Fork, Snapshot},
 };
 use protobuf::well_known_types::Any;
 
@@ -33,7 +36,7 @@ mod transactions;
 
 use config::ConfigurationServiceConfig;
 use errors::Error as ServiceError;
-use schema::VotingDecision;
+use schema::{Schema as ConfigurationSchema, VotingDecision};
 use transactions::{enough_votes_to_commit, VotingContext};
 
 /// Service identifier for the configuration service.
@@ -46,12 +49,41 @@ service_interface! {
         fn propose(&self, ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>;
         fn vote(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
         fn vote_against(&self, ctx: TransactionContext, arg: transactions::VoteAgainst) -> Result<(), ExecutionError>;
+
+        fn deploy(&self, ctx: TransactionContext, arg: transactions::Deploy) -> Result<(), ExecutionError>;
+        fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>;
+        fn deploy_and_init(&self, ctx: TransactionContext, arg: transactions::DeployInit) -> Result<(), ExecutionError>;
     }
 }
 
 #[derive(Debug, Default)]
 pub struct ConfigurationServiceImpl {
     config: ConfigurationServiceConfig,
+    // TODO: Change RefCell to something safer.
+    dispatcher: RefCell<Dispatcher>,
+}
+
+impl ConfigurationServiceImpl {
+    fn assign_service_id(&self, fork: &mut Fork, instance_name: &String) -> Option<u32> {
+        let mut schema = ConfigurationSchema::new(fork);
+        let mut service_ids = schema.service_ids_mut();
+
+        if service_ids.contains(instance_name) {
+            return None;
+        }
+
+        let id = service_ids.iter().count() as u32; // TODO O(n) optimize
+        service_ids.put(instance_name, id);
+
+        Some(id)
+    }
+
+    pub fn get_id_for(&self, snapshot: &dyn Snapshot, instance_name: &String) -> Option<u32> {
+        let schema = ConfigurationSchema::new(snapshot);
+        let service_ids = schema.service_ids();
+
+        service_ids.get(instance_name)
+    }
 }
 
 impl ConfigurationService for ConfigurationServiceImpl {
@@ -121,6 +153,108 @@ impl ConfigurationService for ConfigurationServiceImpl {
             "Put VoteAgainst:{:?} to corresponding cfg votes_by_config_hash table",
             tx
         );
+
+        Ok(())
+    }
+
+    fn deploy(
+        &self,
+        _ctx: TransactionContext,
+        arg: transactions::Deploy,
+    ) -> Result<(), ExecutionError> {
+        let artifact_spec = arg.get_artifact_spec();
+
+        let dispatcher = self.dispatcher.borrow();
+        dispatcher.start_deploy(artifact_spec).map_err(|err| {
+            error!("Service instance deploy failed: {:?}", err);
+            ServiceError::DeployError(err)
+        })?;
+
+        // TODO add result into deployable (to check deploy status in before_commit).
+
+        Ok(())
+    }
+
+    fn init(
+        &self,
+        mut ctx: TransactionContext,
+        arg: transactions::Init,
+    ) -> Result<(), ExecutionError> {
+        let artifact_spec = arg.get_artifact_spec();
+
+        let dispatcher = self.dispatcher.borrow();
+
+        let instance_id = self
+            .assign_service_id(ctx.fork(), &arg.instance_name)
+            .ok_or(ServiceError::ServiceInstanceNameInUse)?;
+
+        let init_data = InstanceInitData {
+            instance_id,
+            constructor_data: arg.constructor_data,
+        };
+
+        dispatcher
+            .init_service(ctx.env_context(), artifact_spec, &init_data)
+            .map_err(|err| {
+                error!("Service instance initialization failed: {:?}", err);
+                ServiceError::InitError(err)
+            })?;
+
+        Ok(())
+    }
+
+    fn deploy_and_init(
+        &self,
+        mut ctx: TransactionContext,
+        arg: transactions::DeployInit,
+    ) -> Result<(), ExecutionError> {
+        // TODO reduce copy-paste.
+
+        // Deploy
+        {
+            let artifact_spec = arg.deploy_tx.get_artifact_spec();
+
+            let dispatcher = self.dispatcher.borrow();
+            dispatcher
+                .start_deploy(artifact_spec.clone())
+                .map_err(|err| {
+                    error!("Service instance deploy failed: {:?}", err);
+                    ServiceError::DeployError(err)
+                })?;
+
+            // Check if service is deployed.
+            let cancel_if_incomplete = true;
+            if dispatcher
+                .check_deploy_status(artifact_spec, cancel_if_incomplete)
+                .map_err(|err| ServiceError::DeployError(err))?
+                != DeployStatus::Deployed
+            {
+                return Err(ServiceError::InitError(InitError::NotDeployed))?;
+            }
+        }
+
+        // Init
+        {
+            let artifact_spec = arg.init_tx.get_artifact_spec();
+
+            let dispatcher = self.dispatcher.borrow();
+
+            let instance_id = self
+                .assign_service_id(ctx.fork(), &arg.init_tx.instance_name)
+                .ok_or(ServiceError::ServiceInstanceNameInUse)?;
+
+            let init_data = InstanceInitData {
+                instance_id,
+                constructor_data: arg.init_tx.constructor_data,
+            };
+
+            dispatcher
+                .init_service(ctx.env_context(), artifact_spec, &init_data)
+                .map_err(|err| {
+                    error!("Service instance initialization failed: {:?}", err);
+                    ServiceError::InitError(err)
+                })?;
+        }
 
         Ok(())
     }

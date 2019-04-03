@@ -17,6 +17,7 @@ use semver::Version;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    panic,
 };
 
 #[macro_use]
@@ -28,27 +29,39 @@ pub mod tests;
 use super::{
     error::{DeployError, ExecutionError, InitError, DISPATCH_ERROR},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    ServiceInstanceId,
+    RuntimeIdentifier, ServiceInstanceId,
 };
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::CallInfo;
+use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
-use crate::storage::Fork;
+use crate::storage::{Error as StorageError, Fork};
 
 use self::service::Service;
 
 #[derive(Debug, Default)]
-struct RustRuntime {
+pub struct RustRuntime {
     // TODO: think about ways to share runtime.
     inner: RefCell<RustRuntimeInner>,
 }
 
 impl RustRuntime {
+    fn get_artifact_spec(&self, artifact: ArtifactSpec) -> Option<RustArtifactSpec> {
+        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
+            return None;
+        }
+
+        let rust_artifact_spec: RustArtifactSpec = BinaryForm::decode(&artifact.raw_spec).ok()?;
+
+        Some(rust_artifact_spec)
+    }
+
     fn add_service(&self, artifact: RustArtifactSpec, service: Box<dyn Service>) {
         self.inner.borrow_mut().services.insert(artifact, service);
     }
 }
+
+unsafe impl Send for RustRuntime {}
 
 #[derive(Debug, Default)]
 struct RustRuntimeInner {
@@ -67,11 +80,9 @@ pub struct RustArtifactSpec {
 
 impl RuntimeEnvironment for RustRuntime {
     fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
-            artifact
-        } else {
-            return Err(DeployError::WrongArtifact);
-        };
+        let artifact = self
+            .get_artifact_spec(artifact)
+            .ok_or(DeployError::WrongArtifact)?;
 
         let mut inner = self.inner.borrow_mut();
 
@@ -85,12 +96,14 @@ impl RuntimeEnvironment for RustRuntime {
         Ok(())
     }
 
-    fn check_deploy_status(&self, artifact: ArtifactSpec) -> Result<DeployStatus, DeployError> {
-        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
-            artifact
-        } else {
-            return Err(DeployError::WrongArtifact);
-        };
+    fn check_deploy_status(
+        &self,
+        artifact: ArtifactSpec,
+        _cancel_if_not_complete: bool,
+    ) -> Result<DeployStatus, DeployError> {
+        let artifact = self
+            .get_artifact_spec(artifact)
+            .ok_or(DeployError::WrongArtifact)?;
 
         let inner = self.inner.borrow();
 
@@ -102,16 +115,14 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn init_service(
-        &mut self,
+        &self,
         context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        let artifact = if let ArtifactSpec::Rust(artifact) = artifact {
-            artifact
-        } else {
-            return Err(InitError::WrongArtifact);
-        };
+        let artifact = self
+            .get_artifact_spec(artifact)
+            .ok_or(InitError::WrongArtifact)?;
 
         let mut inner = self.inner.borrow_mut();
 
@@ -152,6 +163,35 @@ impl RuntimeEnvironment for RustRuntime {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
             })?
     }
+
+    fn before_commit(&self, fork: &mut Fork) {
+        let inner = self.inner.borrow();
+
+        for (_, service) in &inner.initialized {
+            fork.checkpoint();
+            match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
+                Ok(..) => fork.commit(),
+                Err(err) => {
+                    if err.is::<StorageError>() {
+                        // Continue panic unwind if the reason is StorageError.
+                        panic::resume_unwind(err);
+                    }
+                    fork.rollback();
+
+                    // TODO add service name
+                    error!("Service before_commit failed with error: {:?}", err);
+                }
+            }
+        }
+    }
+
+    fn after_commit(&self, fork: &mut Fork) {
+        let inner = self.inner.borrow();
+
+        for (_, service) in &inner.initialized {
+            service.after_commit(fork);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -166,6 +206,10 @@ impl<'a, 'c> TransactionContext<'a, 'c> {
             env_context,
             runtime,
         }
+    }
+
+    pub fn env_context(&mut self) -> &mut RuntimeContext<'c> {
+        self.env_context
     }
 
     pub fn fork(&mut self) -> &mut Fork {

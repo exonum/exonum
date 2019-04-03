@@ -17,7 +17,7 @@
 use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
     proto,
-    storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
+    storage::{Fork, MapIndex, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 
 use std::{borrow::Cow, ops::Deref};
@@ -38,6 +38,7 @@ define_names! {
     PROPOSES => "proposes";
     PROPOSE_HASHES => "propose_hashes";
     VOTES => "votes";
+    SERVICE_IDS => "service_ids";
 }
 
 /// Extended information about a proposal used for the storage.
@@ -218,6 +219,11 @@ where
         ProofListIndex::new(PROPOSE_HASHES, self.view.as_ref())
     }
 
+    /// Returns a table with mapping between service instance names and their identifiers.
+    pub fn service_ids(&self) -> MapIndex<&dyn Snapshot, String, u32> {
+        MapIndex::new(SERVICE_IDS, self.view.as_ref())
+    }
+
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(
@@ -269,5 +275,10 @@ impl<'a> Schema<&'a mut Fork> {
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, MaybeVote> {
         ProofListIndex::new_in_family(VOTES, config_hash, &mut self.view)
+    }
+
+    /// Mutable version of the `service_ids` index.
+    pub(crate) fn service_ids_mut(&mut self) -> MapIndex<&mut Fork, String, u32> {
+        MapIndex::new(SERVICE_IDS, &mut self.view)
     }
 }

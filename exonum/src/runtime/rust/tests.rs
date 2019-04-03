@@ -21,7 +21,7 @@ use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
-    DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
+    DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
 use crate::storage::{Database, Entry, MemoryDB};
 use protobuf::{well_known_types::Any, Message};
@@ -103,16 +103,22 @@ fn test_basic_rust_runtime() {
 
     // Create runtime and service.
     let rust_artifact = get_artifact_spec();
-    let artifact = ArtifactSpec::Rust(rust_artifact.clone());
+    let artifact = ArtifactSpec {
+        runtime_id: RuntimeIdentifier::Rust as u32,
+        raw_spec: BinaryForm::encode(&rust_artifact).expect("Can't encode rust artifact"),
+    };
+
     let service = Box::new(TestServiceImpl);
 
-    let mut runtime = RustRuntime::default();
+    let runtime = RustRuntime::default();
     runtime.add_service(rust_artifact.clone(), service);
 
     // Deploy service
     assert!(runtime.start_deploy(artifact.clone()).is_ok());
     assert_eq!(
-        runtime.check_deploy_status(artifact.clone()).unwrap(),
+        runtime
+            .check_deploy_status(artifact.clone(), false)
+            .unwrap(),
         DeployStatus::Deployed
     );
 

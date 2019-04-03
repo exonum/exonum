@@ -352,3 +352,13 @@ impl ProtobufConvert for Version {
         Ok(pb.take_data().parse()?)
     }
 }
+
+impl ProtobufConvert for well_known_types::Any {
+    type ProtoStruct = well_known_types::Any;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.clone()
+    }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(pb)
+    }
+}

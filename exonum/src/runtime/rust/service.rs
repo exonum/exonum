@@ -14,6 +14,7 @@
 
 use crate::messages::MethodId;
 use crate::runtime::{error::ExecutionError, rust::TransactionContext};
+use crate::storage::Fork;
 
 use failure::Error;
 use protobuf::well_known_types::Any;
@@ -31,6 +32,10 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
     fn initialize(&mut self, _ctx: TransactionContext, _arg: Any) -> Result<(), ExecutionError> {
         Ok(())
     }
+
+    fn before_commit(&self, fork: &mut Fork) {}
+
+    fn after_commit(&self, fork: &mut Fork) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 
