@@ -57,7 +57,7 @@ ctrlc = "3.1.1"
 rpassword = "3.0.0"
 zeroize = "0.5.2"
 
-exonum_rocksdb = "0.7.4"
+rocksdb = "0.12.0"
 exonum_sodiumoxide = { version = "0.0.21", optional = true }
 exonum-crypto = { version = "0.11.0", path = "../components/crypto" }
 exonum-derive = { version = "0.11.0", path = "../components/derive" }
