@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_derive::service_interface;
 use semver::Version;
 
 use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
@@ -40,11 +41,10 @@ struct TxB {
     value: u64,
 }
 
-service_interface! {
-    trait TestService {
-        fn method_a(&self, ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
-        fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
-    }
+#[service_interface(exonum(crate = "crate"))]
+trait TestService {
+    fn method_a(&self, ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError>;
+    fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug)]

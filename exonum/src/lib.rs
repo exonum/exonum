@@ -18,7 +18,7 @@
 
 #![warn(
     missing_debug_implementations,
-    missing_docs,
+//    missing_docs,
     unsafe_code,
     bare_trait_objects
 )]

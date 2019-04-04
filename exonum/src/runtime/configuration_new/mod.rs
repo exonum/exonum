@@ -44,16 +44,35 @@ pub const SERVICE_ID: u16 = 1;
 /// Configuration service name.
 pub const SERVICE_NAME: &str = "configuration";
 
-service_interface! {
-    trait ConfigurationService {
-        fn propose(&self, ctx: TransactionContext, tx: transactions::Propose) -> Result<(), ExecutionError>;
-        fn vote(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
-        fn vote_against(&self, ctx: TransactionContext, arg: transactions::VoteAgainst) -> Result<(), ExecutionError>;
+#[service_interface(exonum(crate = "crate"))]
+trait ConfigurationService {
+    fn propose(
+        &self,
+        ctx: TransactionContext,
+        tx: transactions::Propose,
+    ) -> Result<(), ExecutionError>;
 
-        fn deploy(&self, ctx: TransactionContext, arg: transactions::Deploy) -> Result<(), ExecutionError>;
-        fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>;
-        fn deploy_and_init(&self, ctx: TransactionContext, arg: transactions::DeployInit) -> Result<(), ExecutionError>;
-    }
+    fn vote(&self, ctx: TransactionContext, arg: transactions::Vote) -> Result<(), ExecutionError>;
+
+    fn vote_against(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::VoteAgainst,
+    ) -> Result<(), ExecutionError>;
+
+    fn deploy(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::Deploy,
+    ) -> Result<(), ExecutionError>;
+
+    fn init(&self, ctx: TransactionContext, arg: transactions::Init) -> Result<(), ExecutionError>;
+
+    fn deploy_and_init(
+        &self,
+        ctx: TransactionContext,
+        arg: transactions::DeployInit,
+    ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, Default)]
