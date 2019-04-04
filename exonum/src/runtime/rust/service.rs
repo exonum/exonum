@@ -14,7 +14,8 @@
 
 use crate::messages::MethodId;
 use crate::runtime::{error::ExecutionError, rust::TransactionContext};
-use crate::storage::Fork;
+use crate::storage::{Snapshot, Fork};
+use crate::crypto::Hash;
 
 use failure::Error;
 use protobuf::well_known_types::Any;
@@ -36,6 +37,8 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
     fn before_commit(&self, fork: &mut Fork) {}
 
     fn after_commit(&self, fork: &mut Fork) {}
+
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash>;
     // TODO: add other hooks such as "on node startup", etc.
 }
 

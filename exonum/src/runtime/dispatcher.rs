@@ -157,7 +157,6 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
-    use super::super::rust::RustArtifactSpec;
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
     use crate::storage::{Database, MemoryDB};

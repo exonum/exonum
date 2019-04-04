@@ -24,7 +24,7 @@ use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
-use crate::storage::{Database, Entry, MemoryDB};
+use crate::storage::{Database, Entry, MemoryDB, Snapshot};
 use protobuf::{well_known_types::Any, Message};
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
@@ -87,6 +87,10 @@ impl Service for TestServiceImpl {
         let mut entry = Entry::new("constructor_entry", fork);
         entry.set(arg.take_msg());
         Ok(())
+    }
+
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 
