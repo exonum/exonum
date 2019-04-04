@@ -72,7 +72,9 @@ fn test_explorer_basics() {
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
+        let schema = Schema::new(blockchain.snapshot());
         assert_eq!(explorer.height(), Height(1));
+        assert_eq!(schema.transactions_len(), 1);
         assert!(explorer.block(Height(2)).is_none());
 
         let block = explorer.block(Height(1)).unwrap();
@@ -118,7 +120,9 @@ fn test_explorer_basics() {
     create_block(&mut blockchain, vec![tx_bob.clone(), tx_transfer.clone()]);
 
     let explorer = BlockchainExplorer::new(&blockchain);
+    let schema = Schema::new(blockchain.snapshot());
     assert_eq!(explorer.height(), Height(2));
+    assert_eq!(schema.transactions_len(), 3);
     let block = explorer.block(Height(2)).unwrap();
     assert_eq!(block.len(), 2);
 

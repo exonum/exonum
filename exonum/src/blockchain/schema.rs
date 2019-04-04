@@ -38,6 +38,7 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     TRANSACTION_RESULTS => "transaction_results";
+    TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
     TRANSACTIONS_LOCATIONS => "transactions_locations";
@@ -146,6 +147,17 @@ where
     /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
+    }
+
+    /// Returns an entry that represents count of transactions in the blockchain.
+    pub(crate) fn transactions_len_index(&self) -> Entry<&T, u64> {
+        Entry::new(TRANSACTIONS_LEN, &self.view)
+    }
+
+    /// Returns the number of transactions in the blockchain.
+    pub fn transactions_len(&self) -> u64 {
+        let pool = self.transactions_len_index();
+        pool.get().unwrap_or(0)
     }
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
@@ -432,6 +444,13 @@ impl<'a> Schema<&'a mut Fork> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
+    /// Mutable reference to the [`transactions_len_index`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions_len_index
+    pub(crate) fn transactions_len_index_mut(&mut self) -> Entry<&mut Fork, u64> {
+        Entry::new(TRANSACTIONS_LEN, self.view)
+    }
+
     /// Mutable reference to the [`transactions_pool`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions_pool
@@ -580,6 +599,13 @@ impl<'a> Schema<&'a mut Fork> {
     /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
         self.transactions_pool_mut().remove(hash);
+    }
+
+    /// Updates transaction count of the blockchain.
+    pub fn update_transaction_count(&mut self, count: u64) {
+        let mut len_index = self.transactions_len_index_mut();
+        let new_len = len_index.get().unwrap_or(0) + count;
+        len_index.set(new_len);
     }
 
     /// Removes transaction from the persistent pool.
