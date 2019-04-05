@@ -53,10 +53,7 @@ pub struct InitializedService {
 
 impl InitializedService {
     pub fn new(id: ServiceInstanceId, service: Box<dyn Service>) -> Self {
-        Self {
-            id,
-            service
-        }
+        Self { id, service }
     }
 
     pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
@@ -168,7 +165,10 @@ impl RuntimeEnvironment for RustRuntime {
 
         // TODO: Service should not be removed since we can have 2 instances of 1 artifact.
         let service = inner.services.remove(&artifact).unwrap();
-        inner.initialized.insert(init.instance_id, InitializedService::new(init.instance_id, service));
+        inner.initialized.insert(
+            init.instance_id,
+            InitializedService::new(init.instance_id, service),
+        );
 
         let ctx = TransactionContext::new(context, self);
         inner
@@ -199,12 +199,24 @@ impl RuntimeEnvironment for RustRuntime {
             })?
     }
 
+    fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+        let inner = self.inner.borrow();
+
+        inner
+            .initialized
+            .iter()
+            .map(|(_, service)| service.state_hash(snapshot))
+            .collect()
+    }
+
     fn before_commit(&self, fork: &mut Fork) {
         let inner = self.inner.borrow();
 
         for (_, service) in &inner.initialized {
             fork.checkpoint();
-            match panic::catch_unwind(panic::AssertUnwindSafe(|| service.as_ref().before_commit(fork))) {
+            match panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                service.as_ref().before_commit(fork)
+            })) {
                 Ok(..) => fork.commit(),
                 Err(err) => {
                     if err.is::<StorageError>() {

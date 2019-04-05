@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::crypto::Hash;
 use crate::messages::MethodId;
 use crate::runtime::{error::ExecutionError, rust::TransactionContext};
-use crate::storage::{Snapshot, Fork};
-use crate::crypto::Hash;
+use crate::storage::{Fork, Snapshot};
 
 use failure::Error;
 use protobuf::well_known_types::Any;
