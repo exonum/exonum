@@ -35,7 +35,7 @@ use super::{
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
-use crate::storage::{Error as StorageError, Fork};
+use crate::storage::{Error as StorageError, Fork, Snapshot};
 
 use self::service::Service;
 
@@ -43,6 +43,37 @@ use self::service::Service;
 pub struct RustRuntime {
     // TODO: think about ways to share runtime.
     inner: RefCell<RustRuntimeInner>,
+}
+
+#[derive(Debug)]
+pub struct InitializedService {
+    id: ServiceInstanceId,
+    service: Box<dyn Service>,
+}
+
+impl InitializedService {
+    pub fn new(id: ServiceInstanceId, service: Box<dyn Service>) -> Self {
+        Self {
+            id,
+            service
+        }
+    }
+
+    pub fn state_hash(&self, snapshot: &dyn Snapshot) -> (ServiceInstanceId, Vec<Hash>) {
+        (self.id, self.service.state_hash(snapshot))
+    }
+}
+
+impl AsRef<dyn Service + 'static> for InitializedService {
+    fn as_ref(&self) -> &(dyn Service + 'static) {
+        self.service.as_ref()
+    }
+}
+
+impl AsMut<dyn Service + 'static> for InitializedService {
+    fn as_mut(&mut self) -> &mut (dyn Service + 'static) {
+        self.service.as_mut()
+    }
 }
 
 impl RustRuntime {
@@ -61,6 +92,7 @@ impl RustRuntime {
     }
 }
 
+#[allow(unsafe_code)]
 unsafe impl Send for RustRuntime {}
 
 #[derive(Debug, Default)]
@@ -68,7 +100,7 @@ struct RustRuntimeInner {
     // TODO: Add link to dispatcher
     services: HashMap<RustArtifactSpec, Box<dyn Service>>,
     deployed: HashSet<RustArtifactSpec>,
-    initialized: HashMap<ServiceInstanceId, Box<dyn Service>>,
+    initialized: HashMap<ServiceInstanceId, InitializedService>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert)]
@@ -134,14 +166,16 @@ impl RuntimeEnvironment for RustRuntime {
             return Err(InitError::ServiceIdExists);
         }
 
+        // TODO: Service should not be removed since we can have 2 instances of 1 artifact.
         let service = inner.services.remove(&artifact).unwrap();
-        inner.initialized.insert(init.instance_id, service);
+        inner.initialized.insert(init.instance_id, InitializedService::new(init.instance_id, service));
 
         let ctx = TransactionContext::new(context, self);
         inner
             .initialized
             .get_mut(&init.instance_id)
             .unwrap()
+            .as_mut()
             .initialize(ctx, init.constructor_data.clone())
             .map_err(|e| InitError::ExecutionError(e))
     }
@@ -158,6 +192,7 @@ impl RuntimeEnvironment for RustRuntime {
         let ctx = TransactionContext::new(context, self);
 
         instance
+            .as_ref()
             .call(dispatch.method_id, ctx, payload)
             .map_err(|e| {
                 ExecutionError::with_description(DISPATCH_ERROR, format!("Dispatch error: {}", e))
@@ -169,7 +204,7 @@ impl RuntimeEnvironment for RustRuntime {
 
         for (_, service) in &inner.initialized {
             fork.checkpoint();
-            match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
+            match panic::catch_unwind(panic::AssertUnwindSafe(|| service.as_ref().before_commit(fork))) {
                 Ok(..) => fork.commit(),
                 Err(err) => {
                     if err.is::<StorageError>() {
@@ -189,7 +224,7 @@ impl RuntimeEnvironment for RustRuntime {
         let inner = self.inner.borrow();
 
         for (_, service) in &inner.initialized {
-            service.after_commit(fork);
+            service.as_ref().after_commit(fork);
         }
     }
 }
