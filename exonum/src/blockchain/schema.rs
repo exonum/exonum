@@ -149,7 +149,7 @@ where
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
 
-    /// Returns an entry that represents count of transactions in the blockchain.
+    /// Returns an entry that represents a count of committed transactions in the blockchain.
     pub(crate) fn transactions_len_index(&self) -> Entry<&T, u64> {
         Entry::new(TRANSACTIONS_LEN, &self.view)
     }
