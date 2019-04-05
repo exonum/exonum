@@ -156,6 +156,7 @@ where
 
     /// Returns the number of transactions in the blockchain.
     pub fn transactions_len(&self) -> u64 {
+        // TODO: Change a count of tx logic after replacement storage to MerkleDB. ECR-3087
         let pool = self.transactions_len_index();
         pool.get().unwrap_or(0)
     }
