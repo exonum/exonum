@@ -349,16 +349,16 @@ impl Blockchain {
                         state_hashes.push((key, core_table_hash));
                     }
 
-                    // TODO state hashes?
+                    let dispatcher = self.dispatcher.lock().expect("Expected lock on Dispatcher");
 
-                    // for service in self.dispatcher.services().values() {
-                    //     let service_id = service.service_id();
-                    //     let vec_service_state = service.state_hash(&fork);
-                    //     for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                    //         let key = Self::service_table_unique_key(service_id, idx);
-                    //         state_hashes.push((key, service_table_hash));
-                    //     }
-                    // }
+                    for hashes in dispatcher.state_hashes(&fork) {
+                        let service_id = hashes.0;
+                        let vec_service_state = hashes.1;
+                        for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
+                            let key = Self::service_table_unique_key(service_id as u16, idx);
+                            state_hashes.push((key, service_table_hash));
+                        }
+                    }
 
                     state_hashes
                 };
