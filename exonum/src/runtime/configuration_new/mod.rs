@@ -16,6 +16,7 @@ use std::cell::RefCell;
 
 use crate::{
     blockchain::Schema as CoreSchema,
+    crypto::Hash,
     messages::BinaryForm,
     node::State,
     proto::schema::configuration::ConfigurationServiceInit,
@@ -309,5 +310,9 @@ impl Service for ConfigurationServiceImpl {
         }
 
         Ok(())
+    }
+
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        ConfigurationSchema::new(snapshot).state_hash()
     }
 }

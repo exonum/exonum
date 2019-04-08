@@ -16,8 +16,7 @@ use protobuf::well_known_types::Any;
 
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{CallInfo, ServiceInstanceId};
-use crate::proto::schema;
-use crate::storage::Fork;
+use crate::storage::{Fork, Snapshot};
 
 #[macro_use]
 pub mod rust;
@@ -81,6 +80,9 @@ pub trait RuntimeEnvironment {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
+
+    /// Gets state hashes of the every contained service.
+    fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)>;
 
     /// Calls `before_commit` for all the services stored in the runtime.
     fn before_commit(&self, fork: &mut Fork);

@@ -20,8 +20,9 @@ use super::{
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     RuntimeIdentifier, ServiceInstanceId,
 };
+use crate::crypto::Hash;
 use crate::messages::CallInfo;
-use crate::storage::Fork;
+use crate::storage::{Fork, Snapshot};
 
 #[derive(Default)]
 pub struct DispatcherBuilder {
@@ -142,6 +143,14 @@ impl RuntimeEnvironment for Dispatcher {
         }
     }
 
+    fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+        self.runtimes
+            .iter()
+            .map(|(_, runtime)| runtime.state_hashes(snapshot))
+            .flatten()
+            .collect::<Vec<_>>()
+    }
+
     fn before_commit(&self, fork: &mut Fork) {
         for (_, runtime) in &self.runtimes {
             runtime.before_commit(fork);
@@ -157,7 +166,6 @@ impl RuntimeEnvironment for Dispatcher {
 
 #[cfg(test)]
 mod tests {
-    use super::super::rust::RustArtifactSpec;
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
     use crate::storage::{Database, MemoryDB};
@@ -223,6 +231,10 @@ mod tests {
             } else {
                 Err(ExecutionError::new(0xFF_u8))
             }
+        }
+
+        fn state_hashes(&self, _snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
+            vec![]
         }
 
         fn before_commit(&self, _: &mut Fork) {}
