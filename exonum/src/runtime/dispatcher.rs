@@ -144,13 +144,11 @@ impl RuntimeEnvironment for Dispatcher {
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        let mut hashes = Vec::new();
-
-        for (_, runtime) in &self.runtimes {
-            hashes.append(&mut runtime.state_hashes(snapshot));
-        }
-
-        hashes
+        self.runtimes
+            .iter()
+            .map(|(_, runtime)| runtime.state_hashes(snapshot))
+            .flatten()
+            .collect::<Vec<_>>()
     }
 
     fn before_commit(&self, fork: &mut Fork) {
