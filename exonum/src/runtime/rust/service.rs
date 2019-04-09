@@ -20,6 +20,8 @@ use crate::storage::{Fork, Snapshot};
 use failure::Error;
 use protobuf::well_known_types::Any;
 
+use super::RustArtifactSpec;
+
 pub trait ServiceDispatcher {
     fn call(
         &self,
@@ -40,6 +42,11 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
 
     fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash>;
     // TODO: add other hooks such as "on node startup", etc.
+}
+
+pub trait ServiceFactory: std::fmt::Debug {
+    fn artifact(&self) -> RustArtifactSpec;
+    fn new_instance(&self) -> Box<dyn Service>;
 }
 
 #[macro_export]

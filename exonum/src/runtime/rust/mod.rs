@@ -37,7 +37,7 @@ use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
 use crate::storage::{Error as StorageError, Fork, Snapshot};
 
-use self::service::Service;
+use self::service::{Service, ServiceFactory};
 
 #[derive(Debug, Default)]
 pub struct RustRuntime {
@@ -84,8 +84,11 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    fn add_service(&self, artifact: RustArtifactSpec, service: Box<dyn Service>) {
-        self.inner.borrow_mut().services.insert(artifact, service);
+    fn add_service(&self, service_factory: Box<dyn ServiceFactory>) {
+        self.inner
+            .borrow_mut()
+            .services
+            .insert(service_factory.artifact(), service_factory);
     }
 }
 
@@ -95,7 +98,7 @@ unsafe impl Send for RustRuntime {}
 #[derive(Debug, Default)]
 struct RustRuntimeInner {
     // TODO: Add link to dispatcher
-    services: HashMap<RustArtifactSpec, Box<dyn Service>>,
+    services: HashMap<RustArtifactSpec, Box<dyn ServiceFactory>>,
     deployed: HashSet<RustArtifactSpec>,
     initialized: HashMap<ServiceInstanceId, InitializedService>,
 }
@@ -163,8 +166,7 @@ impl RuntimeEnvironment for RustRuntime {
             return Err(InitError::ServiceIdExists);
         }
 
-        // TODO: Service should not be removed since we can have 2 instances of 1 artifact.
-        let service = inner.services.remove(&artifact).unwrap();
+        let service = inner.services.get(&artifact).unwrap().new_instance();
         inner.initialized.insert(
             init.instance_id,
             InitializedService::new(init.instance_id, service),

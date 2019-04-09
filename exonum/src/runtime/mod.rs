@@ -15,8 +15,10 @@
 use protobuf::well_known_types::Any;
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{CallInfo, ServiceInstanceId};
+use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::storage::{Fork, Snapshot};
+
+use self::rust::RustArtifactSpec;
 
 #[macro_use]
 pub mod rust;
@@ -50,6 +52,15 @@ pub enum RuntimeIdentifier {
 pub struct ArtifactSpec {
     runtime_id: u32,
     raw_spec: Vec<u8>,
+}
+
+impl From<RustArtifactSpec> for ArtifactSpec {
+    fn from(artifact: RustArtifactSpec) -> Self {
+        ArtifactSpec {
+            runtime_id: RuntimeIdentifier::Rust as u32,
+            raw_spec: artifact.encode().unwrap(),
+        }
+    }
 }
 
 /// Service runtime environment.

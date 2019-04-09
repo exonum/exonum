@@ -17,7 +17,10 @@ use semver::Version;
 
 use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
 
-use super::{service::Service, ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext};
+use super::{
+    service::{Service, ServiceFactory},
+    ArtifactSpec, RustArtifactSpec, RustRuntime, TransactionContext,
+};
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::runtime::{
@@ -77,6 +80,7 @@ impl TestService for TestServiceImpl {
 }
 
 impl_service_dispatcher!(TestServiceImpl, TestService);
+
 impl Service for TestServiceImpl {
     fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
         let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
@@ -94,10 +98,19 @@ impl Service for TestServiceImpl {
     }
 }
 
-fn get_artifact_spec() -> RustArtifactSpec {
-    RustArtifactSpec {
-        name: "test_service".to_owned(),
-        version: Version::new(0, 1, 0),
+#[derive(Debug)]
+struct TestServiceFactory;
+
+impl ServiceFactory for TestServiceFactory {
+    fn artifact(&self) -> RustArtifactSpec {
+        RustArtifactSpec {
+            name: "test_service".to_owned(),
+            version: Version::new(0, 1, 0),
+        }
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(TestServiceImpl)
     }
 }
 
@@ -106,16 +119,11 @@ fn test_basic_rust_runtime() {
     let db = MemoryDB::new();
 
     // Create runtime and service.
-    let rust_artifact = get_artifact_spec();
-    let artifact = ArtifactSpec {
-        runtime_id: RuntimeIdentifier::Rust as u32,
-        raw_spec: BinaryForm::encode(&rust_artifact).expect("Can't encode rust artifact"),
-    };
-
-    let service = Box::new(TestServiceImpl);
-
     let runtime = RustRuntime::default();
-    runtime.add_service(rust_artifact.clone(), service);
+
+    let service_factory = Box::new(TestServiceFactory);
+    let artifact: ArtifactSpec = service_factory.artifact().into();
+    runtime.add_service(service_factory);
 
     // Deploy service
     assert!(runtime.start_deploy(artifact.clone()).is_ok());
