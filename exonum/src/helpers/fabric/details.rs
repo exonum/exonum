@@ -469,7 +469,11 @@ impl Command for GenerateNodeConfig {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_positional("COMMON_CONFIG", true, "Path to common config."),
-            Argument::new_positional("OUTPUT_DIR", true, "Path where the node configuration will be saved."),
+            Argument::new_positional(
+                "OUTPUT_DIR",
+                true,
+                "Path where the node configuration will be saved.",
+            ),
             Argument::new_named(
                 PEER_ADDRESS,
                 true,
@@ -533,7 +537,9 @@ impl Command for GenerateNodeConfig {
         let common_config_path = context
             .arg::<String>("COMMON_CONFIG")
             .expect("expected common config path");
-        let output_dir: PathBuf = context.arg("OUTPUT_DIR").expect("expected output directory for the node configuration");
+        let output_dir: PathBuf = context
+            .arg("OUTPUT_DIR")
+            .expect("expected output directory for the node configuration");
         let consensus_key_pass_method: PassInputMethod = context
             .arg::<String>(CONSENSUS_KEY_PASS_METHOD)
             .unwrap_or_default()

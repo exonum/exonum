@@ -1,0 +1,8 @@
+consensus_public_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+consensus_secret_key = "consensus.key.toml"
+external_address = "0.0.0.0:8002"
+listen_address = "0.0.0.0:8002"
+service_public_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
+service_secret_key = "service.key.toml"
+
+[services_secret_configs]

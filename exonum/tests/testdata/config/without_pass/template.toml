@@ -11,4 +11,4 @@ propose_timeout_threshold = 500
 [services_config]
 
 [general_config]
-validators_count = 1
+validators_count = 4

@@ -28,6 +28,7 @@ use exonum::{
     },
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
+use failure::ensure;
 use toml::Value;
 
 use std::{
@@ -39,341 +40,157 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(unix)]
-use std::os::unix::fs::OpenOptionsExt;
-
-const EXONUM_CONSENSUS_PASS: &str = "EXONUM_CONSENSUS_PASS";
-const EXONUM_SERVICE_PASS: &str = "EXONUM_SERVICE_PASS";
-
-const CONFIG_TMP_FOLDER: &str = "/tmp/";
-const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
-
-const GENERATED_TEMPLATE: &str = "template.toml";
-
-const SEC_CONFIG: [&str; 4] = [
-    "config0_sec.toml",
-    "config1_sec.toml",
-    "config2_sec.toml",
-    "config3_sec.toml",
-];
-
-const PUB_CONFIG: [&str; 4] = [
-    "config0_pub.toml",
-    "config1_pub.toml",
-    "config2_pub.toml",
-    "config3_pub.toml",
-];
-
-fn full_tmp_folder(folder: &str) -> String {
-    format!("{}exonum-test-{}/", CONFIG_TMP_FOLDER, folder)
+#[derive(Debug)]
+struct ConfigSpec {
+    expected_template_file: PathBuf,
+    expected_config_dir: PathBuf,
+    output_dir: tempfile::TempDir,
+    validators_count: usize,
 }
 
-fn full_tmp_name(filename: &str, folder: &str) -> String {
-    format!("{}{}", full_tmp_folder(folder), filename)
-}
+impl ConfigSpec {
+    const CONFIG_TESTDATA_FOLDER: &'static str =
+        concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config");
 
-fn full_testdata_name(filename: &str) -> String {
-    format!("{}{}", CONFIG_TESTDATA_FOLDER, filename)
-}
-
-fn touch(path: &str) {
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(path)
-        .unwrap();
-}
-
-fn compare_configs(filename: &str, folder: &str) {
-    let source = full_testdata_name(filename);
-    let destination = full_tmp_name(filename, folder);
-
-    let mut source = File::open(source).unwrap();
-    let mut destination = File::open(destination).unwrap();
-
-    let mut source_buffer = String::new();
-    let mut destination_buffer = String::new();
-
-    let len = source.read_to_string(&mut source_buffer).unwrap();
-    destination.read_to_string(&mut destination_buffer).unwrap();
-
-    assert!(len > 0);
-    let source_toml: toml::Value = toml::de::from_str(&source_buffer).unwrap();
-    let destination_toml: toml::Value = toml::de::from_str(&destination_buffer).unwrap();
-    assert_eq!(source_toml, destination_toml);
-}
-
-fn default_run_with_matches<I, T>(iter: I) -> bool
-where
-    I: IntoIterator<Item = T>,
-    T: Into<OsString> + Clone,
-{
-    let builder = NodeBuilder::new();
-    builder.parse_cmd_string(iter)
-}
-
-fn generate_template(folder: &str) {
-    assert!(!default_run_with_matches(vec![
-        "exonum-config-test",
-        "generate-template",
-        &full_tmp_name(GENERATED_TEMPLATE, folder),
-        "--validators-count",
-        "1",
-    ]));
-}
-
-#[derive(Debug, Clone, Copy)]
-enum IpMode {
-    V4,
-    V6,
-}
-
-fn generate_config(folder: &str, i: usize, mode: IpMode) {
-    let ip = match mode {
-        IpMode::V4 => "127.0.0.1",
-        IpMode::V6 => "::1",
-    };
-    assert!(!default_run_with_matches(vec![
-        "exonum-config-test",
-        "generate-config",
-        &full_testdata_name(GENERATED_TEMPLATE),
-        &full_tmp_name(PUB_CONFIG[i], folder),
-        &full_tmp_name(SEC_CONFIG[i], folder),
-        "-a",
-        ip,
-        "--consensus-path",
-        &full_tmp_name(&format!("consensus{}.toml", i), folder),
-        "--service-path",
-        &full_tmp_name(&format!("service{}.toml", i), folder),
-        "--no-password",
-    ]));
-}
-
-fn finalize_config(folder: &str, config: &str, sec_config: &str, pub_configs: &[&str]) {
-    let pub_config_paths = pub_configs.iter().map(|conf| {
-        override_validators_count(conf, pub_configs.len(), folder);
-        full_tmp_name(conf, folder)
-    });
-
-    let variables = vec![
-        "exonum-config-test".to_owned(),
-        "finalize".to_owned(),
-        full_testdata_name(sec_config),
-        full_tmp_name(config, folder),
-        "-p".to_owned(),
-    ]
-    .iter()
-    .cloned()
-    .chain(pub_config_paths)
-    .collect::<Vec<_>>();
-
-    assert!(!default_run_with_matches(variables));
-}
-
-fn finalize_config_with_validators_count(folder: &str, config: &str, i: usize, count: usize) {
-    let pub_configs = PUB_CONFIG.iter().cloned().take(count).collect::<Vec<_>>();
-    finalize_config(folder, config, SEC_CONFIG[i], pub_configs.as_slice());
-}
-
-fn override_validators_count(config: &str, n: usize, folder: &str) {
-    let res = {
-        let mut contents = String::new();
-        let mut file = File::open(full_testdata_name(config)).unwrap();
-        file.read_to_string(&mut contents)
-            .expect("Read from config file failed");
-
-        let mut value = contents.as_str().parse::<Value>().unwrap();
-        {
-            let count = value
-                .get_mut("common")
-                .unwrap()
-                .get_mut("general_config")
-                .unwrap()
-                .as_table_mut()
-                .unwrap();
-
-            count.insert("validators_count".into(), Value::from(n as u8));
+    fn new(root_dir: impl AsRef<Path>, validators_count: usize) -> Self {
+        let root_dir = root_dir.as_ref();
+        let expected_template_file = root_dir.join("template.toml");
+        let expected_config_dir = root_dir.join("cfg");
+        Self {
+            expected_template_file,
+            expected_config_dir,
+            output_dir: tempfile::tempdir().unwrap(),
+            validators_count: validators_count,
         }
-
-        toml::to_string(&value).unwrap()
-    };
-
-    File::create(full_tmp_name(config, folder))
-        .unwrap()
-        .write_all(res.as_bytes())
-        .expect("Create temp config file is failed");
-}
-
-fn copy_file_to_temp(file: &str, folder: &str) {
-    let mut source_file = fs::File::open(&full_testdata_name(file)).unwrap();
-
-    let mut destination_file = {
-        let mut open_options = OpenOptions::new();
-        open_options.create(true).write(true);
-        #[cfg(unix)]
-        open_options.mode(0o600);
-        open_options.open(&full_tmp_name(file, folder)).unwrap()
-    };
-
-    copy(&mut source_file, &mut destination_file).unwrap();
-}
-
-fn run_node(config: &str, folder: &str) {
-    assert!(default_run_with_matches(vec![
-        "exonum-config-test",
-        "run",
-        "-c",
-        &full_tmp_name(config, folder),
-        "-d",
-        &full_tmp_folder(folder),
-        "--service-key-pass",
-        "env",
-        "--consensus-key-pass",
-        "env",
-    ]));
-}
-
-fn run_dev(folder: &str) {
-    assert!(default_run_with_matches(vec![
-        "exonum-config-test",
-        "run-dev",
-        "-a",
-        &full_tmp_folder(folder),
-    ]));
-}
-
-#[test]
-fn test_generate_template() {
-    let command = "generate-template";
-
-    let result = panic::catch_unwind(|| {
-        generate_template(command);
-        compare_configs(GENERATED_TEMPLATE, command);
-    });
-
-    fs::remove_dir_all(full_tmp_folder(command)).unwrap();
-
-    if let Err(err) = result {
-        panic::resume_unwind(err);
     }
-}
 
-fn test_generate_config(mode: IpMode) {
-    // Important because tests run in parallel, folder names should be different.
-    let command = match mode {
-        IpMode::V4 => "generate-config-ipv4",
-        IpMode::V6 => "generate-config-ipv6",
-    };
-
-    let result = panic::catch_unwind(|| {
-        for i in 0..PUB_CONFIG.len() {
-            generate_config(command, i, mode);
-        }
-    });
-
-    fs::remove_dir_all(full_tmp_folder(command)).unwrap();
-
-    if let Err(err) = result {
-        panic::resume_unwind(err);
+    fn new_without_pass() -> Self {
+        let root_dir = PathBuf::from(Self::CONFIG_TESTDATA_FOLDER).join("without_pass");
+        Self::new(root_dir, 4)
     }
-}
 
-#[test]
-fn test_generate_config_ipv4() {
-    test_generate_config(IpMode::V4);
-}
+    fn new_with_pass() -> Self {
+        let root_dir = PathBuf::from(Self::CONFIG_TESTDATA_FOLDER).join("with_pass");
+        Self::new(root_dir, 1)
+    }
 
-#[test]
-fn test_generate_config_ipv6() {
-    test_generate_config(IpMode::V6);
-}
-
-#[test]
-fn test_generate_full_config_run() {
-    let command = "finalize";
-    let result = panic::catch_unwind(|| {
-        env::set_var(EXONUM_CONSENSUS_PASS, "");
-        env::set_var(EXONUM_SERVICE_PASS, "");
-
-        fs::create_dir_all(full_tmp_name("", command)).expect("Can't create temp folder");
-        for i in 0..PUB_CONFIG.len() {
-            copy_file_to_temp(&format!("consensus{}.toml", i), command);
-            copy_file_to_temp(&format!("service{}.toml", i), command);
-            for n in 0..=PUB_CONFIG.len() {
-                println!("{} {}", i, n);
-                let config = format!("config{}{}.toml", i, n);
-                let result = panic::catch_unwind(|| {
-                    finalize_config_with_validators_count(command, &config, i, n);
-                    compare_configs(&config, command);
-                    run_node(&config, command);
-                });
-
-                // if we trying to create config,
-                // without our config, this is a problem
-                if n <= i || n == 0 {
-                    assert!(result.is_err());
-                } else {
-                    assert!(result.is_ok());
-                }
-            }
+    fn command(&self, name: &str) -> ArgsBuilder {
+        ArgsBuilder {
+            args: vec!["exonum-config-test".into(), name.into()],
         }
+    }
 
-        // Test with password.
-        // Can't move to a separate test because of environment variables race condition.
-        env::set_var(EXONUM_CONSENSUS_PASS, "some passphrase");
-        env::set_var(EXONUM_SERVICE_PASS, "another passphrase");
+    fn output_dir(&self) -> &Path {
+        self.output_dir.as_ref()
+    }
 
-        fs::create_dir_all(full_tmp_name("", command)).expect("Can't create temp folder");
-        copy_file_to_temp("consensus_with_password.toml", command);
-        copy_file_to_temp("service_with_password.toml", command);
+    fn output_template_file(&self) -> PathBuf {
+        self.output_dir.as_ref().join("template.toml")
+    }
 
-        let config = "config_with_password.toml";
-        finalize_config(
-            command,
-            config,
-            "config_with_password_sec.toml",
-            &["config_with_password_pub.toml"],
+    fn output_config_dir(&self, index: usize) -> PathBuf {
+        self.output_dir.as_ref().join("cfg").join(index.to_string())
+    }
+
+    fn output_pub_config(&self, index: usize) -> PathBuf {
+        self.output_config_dir(index).join("pub.toml")
+    }
+
+    fn output_pub_configs(&self) -> Vec<PathBuf> {
+        (0..self.validators_count)
+            .into_iter()
+            .map(|i| self.output_pub_config(i))
+            .collect()
+    }
+
+    fn output_sec_config(&self, index: usize) -> PathBuf {
+        self.output_config_dir(index).join("sec.toml")
+    }
+
+    fn output_node_config(&self, index: usize) -> PathBuf {
+        self.output_config_dir(index).join("node.toml")
+    }
+
+    fn expected_config_dir(&self, index: usize) -> PathBuf {
+        self.expected_config_dir.join(index.to_string())
+    }
+
+    fn expected_node_config(&self, index: usize) -> PathBuf {
+        self.expected_config_dir(index).join("node.toml")
+    }
+
+    fn copy_config_to_output(&self) {
+        eprintln!(
+            "Copying from {:?} to {:?}",
+            self.expected_config_dir, self.output_dir
         );
-        compare_configs(config, command);
-        run_node(&config, command);
-    });
 
-    env::remove_var(EXONUM_CONSENSUS_PASS);
-    env::remove_var(EXONUM_SERVICE_PASS);
-    fs::remove_dir_all(full_tmp_folder(command)).unwrap();
-
-    if let Err(err) = result {
-        panic::resume_unwind(err);
+        fs_extra::dir::copy(
+            &self.expected_config_dir,
+            &self.output_dir,
+            &fs_extra::dir::CopyOptions::new(),
+        )
+        .expect("can't copy config");
+        fs::copy(&self.expected_template_file, &self.output_template_file())
+            .expect("can't copy template");
     }
 }
 
-#[test]
-fn test_run_dev() {
-    let artifacts_dir = "run-dev";
-    let db_dir = format!("{}/{}", artifacts_dir, "db");
-    let full_db_dir = full_tmp_folder(&db_dir);
+#[derive(Debug)]
+struct ArgsBuilder {
+    args: Vec<OsString>,
+}
 
-    // Mock existence of old DB files that are supposed to be cleaned up.
-    fs::create_dir_all(Path::new(&full_db_dir)).expect("Expected db temp folder to be created");
-    let old_db_file = full_tmp_name("1", &db_dir);
+impl ArgsBuilder {
+    fn with_arg(mut self, arg: impl Into<OsString>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
 
-    let result = panic::catch_unwind(|| {
-        touch(&old_db_file);
-        run_dev(artifacts_dir);
+    fn with_args(mut self, args: impl IntoIterator<Item = impl Into<OsString>>) -> Self {
+        for arg in args {
+            self.args.push(arg.into())
+        }
+        self
+    }
 
-        // Test cleaning up.
-        assert!(!Path::new(&old_db_file).exists());
-    });
+    fn with_named_arg(mut self, name: impl Into<OsString>, value: impl Into<OsString>) -> Self {
+        self.args.push(name.into());
+        self.args.push(value.into());
+        self
+    }
 
-    fs::remove_dir_all(full_tmp_folder(artifacts_dir)).unwrap();
-
-    if let Err(err) = result {
-        panic::resume_unwind(err);
+    fn run(self) -> Option<()> {
+        eprintln!(
+            "-> {}",
+            self.args
+                .iter()
+                .map(|s| s.to_str().unwrap())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        if NodeBuilder::new().parse_cmd_string(self.args) {
+            None
+        } else {
+            Some(())
+        }
     }
 }
 
+fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
+    let cfg_1: toml::Value = ConfigFile::load(&path_1).unwrap();
+    let cfg_2: toml::Value = ConfigFile::load(&path_2).unwrap();
+    assert_eq!(
+        cfg_1,
+        cfg_2,
+        "file {:?} doesn't match with {:?}",
+        path_1.as_ref(),
+        path_2.as_ref()
+    );
+}
+
 #[test]
-fn allow_origin_toml() {
+fn test_allow_origin_toml() {
     fn check(text: &str, allow_origin: AllowOrigin) {
         #[derive(Serialize, Deserialize)]
         struct Config {
@@ -397,18 +214,121 @@ fn allow_origin_toml() {
 }
 
 #[test]
+fn test_generate_template_2() {
+    let env = ConfigSpec::new_without_pass();
+    let output_template_file = env.output_template_file();
+    env.command("generate-template")
+        .with_arg(&output_template_file)
+        .with_named_arg("--validators-count", env.validators_count.to_string())
+        .run()
+        .unwrap();
+    assert_config_files_eq(&output_template_file, env.expected_template_file);
+}
+
+#[test]
+fn test_generate_config_relative_pass() {
+    unimplemented!()
+}
+
+#[test]
+fn test_generate_config_ipv4_2() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.output_template_file())
+        .with_arg(&env.output_config_dir(0))
+        .with_named_arg("-a", "127.0.0.1")
+        .with_arg("--no-password")
+        .run()
+        .unwrap()
+}
+
+#[test]
+fn test_generate_config_ipv6_2() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file)
+        .with_arg(&env.output_config_dir(0))
+        .with_named_arg("-a", "::1")
+        .with_arg("--no-password")
+        .run()
+        .unwrap()
+}
+
+#[test]
+fn test_generate_full_config_run_without_pass() {
+    let env = ConfigSpec::new_without_pass();
+    eprintln!("{:#?}", env);
+    env.copy_config_to_output();
+
+    env::set_var("EXONUM_CONSENSUS_PASS", "");
+    env::set_var("EXONUM_SERVICE_PASS", "");
+    for i in 0..env.validators_count {
+        let node_config = env.output_node_config(i);
+        fs::remove_file(&node_config).unwrap();
+        env.command("finalize")
+            .with_arg(env.output_sec_config(i))
+            .with_arg(&node_config)
+            .with_arg("--public-configs")
+            .with_args(env.output_pub_configs())
+            .run()
+            .unwrap();
+        assert_config_files_eq(&node_config, env.expected_node_config(i));
+
+        let feedback = env
+            .command("run")
+            .with_named_arg("-c", &node_config)
+            .with_named_arg("-d", env.output_dir().join("foo"))
+            .with_named_arg("--service-key-pass", "env")
+            .with_named_arg("--consensus-key-pass", "env")
+            .run();
+        assert!(feedback.is_none());
+    }
+}
+
+#[test]
+fn test_generate_full_config_run_with_pass() {
+    let env = ConfigSpec::new_with_pass();
+    env.copy_config_to_output();
+
+    env::set_var("EXONUM_CONSENSUS_PASS", "some passphrase");
+    env::set_var("EXONUM_SERVICE_PASS", "another passphrase");
+    let node_config = env.output_node_config(0);
+    fs::remove_file(&node_config).unwrap();
+    env.command("finalize")
+        .with_arg(env.output_sec_config(0))
+        .with_arg(&node_config)
+        .with_arg("--public-configs")
+        .with_args(env.output_pub_configs())
+        .run()
+        .unwrap();
+    assert_config_files_eq(&node_config, env.expected_node_config(0));
+
+    let feedback = env
+        .command("run")
+        .with_named_arg("-c", &node_config)
+        .with_named_arg("-d", env.output_dir().join("foo"))
+        .with_named_arg("--service-key-pass", "env")
+        .with_named_arg("--consensus-key-pass", "env")
+        .run();
+    assert!(feedback.is_none());
+}
+
+#[test]
+fn test_different_validators_count() {
+    unimplemented!()
+}
+
+#[test]
+fn test_run_dev() {
+    unimplemented!();
+}
+
+#[test]
 fn test_update_config() {
-    const TEST_DIR: &str = "config-update";
-    const TEST_CONFIG_FILE: &str = "config01.toml";
+    let env = ConfigSpec::new_without_pass();
+    env.copy_config_to_output();
 
-    let full_test_dir = full_tmp_folder(TEST_DIR);
-    fs::create_dir_all(Path::new(&full_test_dir))
-        .expect("Expected test temp folder to be created.");
-
-    // Copy test config to the separate file.
-    let config_path = full_tmp_name(TEST_CONFIG_FILE, TEST_DIR);
-    let testdata_path = full_testdata_name(TEST_CONFIG_FILE);
-    fs::copy(testdata_path, config_path.clone()).unwrap();
+    let config_path = env.output_node_config(0);
 
     // Test config update.
     let peer = ConnectInfo {
@@ -421,11 +341,8 @@ fn test_update_config() {
     ConfigManager::update_connect_list(connect_list.clone(), &config_path)
         .expect("Unable to update connect list");
     let config: NodeConfig<PathBuf> =
-        ConfigFile::load(config_path.clone()).expect("Can't load node config file");
+        ConfigFile::load(&config_path).expect("Can't load node config file");
 
     let new_connect_list = config.connect_list;
     assert_eq!(new_connect_list.peers, connect_list.peers);
-
-    // Cleanup.
-    fs::remove_dir_all(Path::new(&full_test_dir)).unwrap();
 }
