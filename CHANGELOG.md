@@ -9,6 +9,24 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Bootstrapping workflow has been simplified (#1292)
+
+  `generate-config` subcommand now uses single `OUTPUT_DIR` instead of set of options.
+  So to generate node config you should write somethink like example bellow.
+
+  ```bash
+  cargo run --bin exonum-timestamping -- generate-template /tmp/exonum/template.toml --validators-count 4
+
+  cargo run --bin exonum-timestamping -- generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/0 --peer-address 0.0.0.0:8000
+  cargo run --bin exonum-timestamping -- generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/1 --peer-address 0.0.0.0:8001
+  cargo run --bin exonum-timestamping -- generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/2 --peer-address 0.0.0.0:8002
+  cargo run --bin exonum-timestamping -- generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/3 --peer-address 0.0.0.0:8003
+
+  cargo run --bin exonum-timestamping -- finalize /tmp/exonum/nodes/0/sec.toml /tmp/exonum/nodes/0/node.toml --public-configs /tmp/exonum/cfg/{0,1,2,3}/pub.toml
+
+  cargo run --bin exonum-timestamping -- run -d /tmp/exonum/db/0 -c /tmp/exonum/nodes/0/node.toml
+  ```
+
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,
   rather than in a separate array. (#1278)

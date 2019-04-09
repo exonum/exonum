@@ -42,19 +42,19 @@ use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use crate::storage::{Database, DbOptions, RocksDB};
 
+const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
+const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
 const DATABASE_PATH: &str = "DATABASE_PATH";
-const PEER_ADDRESS: &str = "PEER_ADDRESS";
 const LISTEN_ADDRESS: &str = "LISTEN_ADDRESS";
+const NO_PASSWORD: &str = "NO_PASSWORD";
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
-const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
+const PEER_ADDRESS: &str = "PEER_ADDRESS";
+const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
 const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
 const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
-const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
-const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
-const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
-const NO_PASSWORD: &str = "NO_PASSWORD";
-const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
+const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const SERVICE_KEY_PASS_METHOD: &str = "SERVICE_KEY_PASS_METHOD";
+const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
 
 /// Run command.
 pub struct Run;
@@ -469,8 +469,7 @@ impl Command for GenerateNodeConfig {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_positional("COMMON_CONFIG", true, "Path to common config."),
-            Argument::new_positional("PUB_CONFIG", true, "Path where save public config."),
-            Argument::new_positional("SEC_CONFIG", true, "Path where save private config."),
+            Argument::new_positional("OUTPUT_DIR", true, "Path where the node configuration will be saved."),
             Argument::new_named(
                 PEER_ADDRESS,
                 true,
@@ -485,22 +484,6 @@ impl Command for GenerateNodeConfig {
                 "Listen address",
                 "l",
                 "listen-address",
-                false,
-            ),
-            Argument::new_named(
-                CONSENSUS_KEY_PATH,
-                false,
-                "Path to the file storing consensus private key (default: ./consensus.toml)",
-                "c",
-                "consensus-path",
-                false,
-            ),
-            Argument::new_named(
-                SERVICE_KEY_PATH,
-                false,
-                "Path to the file storing service private key (default: ./service.toml)",
-                "s",
-                "service-path",
                 false,
             ),
             Argument::new_flag(
@@ -550,20 +533,7 @@ impl Command for GenerateNodeConfig {
         let common_config_path = context
             .arg::<String>("COMMON_CONFIG")
             .expect("expected common config path");
-        let pub_config_path = context
-            .arg::<String>("PUB_CONFIG")
-            .expect("expected public config path");
-        let private_config_path = context
-            .arg::<String>("SEC_CONFIG")
-            .expect("expected secret config path");
-        let consensus_secret_key_path: PathBuf = context
-            .arg::<String>(CONSENSUS_KEY_PATH)
-            .unwrap_or_else(|_| "consensus.toml".into())
-            .into();
-        let service_secret_key_path: PathBuf = context
-            .arg::<String>(SERVICE_KEY_PATH)
-            .unwrap_or_else(|_| "service.toml".into())
-            .into();
+        let output_dir: PathBuf = context.arg("OUTPUT_DIR").expect("expected output directory for the node configuration");
         let consensus_key_pass_method: PassInputMethod = context
             .arg::<String>(CONSENSUS_KEY_PASS_METHOD)
             .unwrap_or_default()
@@ -574,6 +544,11 @@ impl Command for GenerateNodeConfig {
             .unwrap_or_default()
             .parse()
             .expect("expected correct passphrase input method for service key");
+
+        let pub_config_path = output_dir.join("pub.toml");
+        let private_config_path = output_dir.join("sec.toml");
+        let consensus_secret_key_path = output_dir.join("consensus.key.toml");
+        let service_secret_key_path = output_dir.join("service.key.toml");
 
         let addresses = Self::addresses(&context);
         let common: CommonConfigTemplate =
@@ -608,18 +583,15 @@ impl Command for GenerateNodeConfig {
             create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
         };
 
-        let pub_config_dir = Path::new(&pub_config_path)
-            .parent()
-            .expect("Cannot get directory with configuration file");
         let consensus_secret_key = if consensus_secret_key_path.is_absolute() {
             consensus_secret_key_path
         } else {
-            path_relative_from(&consensus_secret_key_path, &pub_config_dir).unwrap()
+            path_relative_from(&consensus_secret_key_path, &output_dir).unwrap()
         };
         let service_secret_key = if service_secret_key_path.is_absolute() {
             service_secret_key_path
         } else {
-            path_relative_from(&service_secret_key_path, &pub_config_dir).unwrap()
+            path_relative_from(&service_secret_key_path, &output_dir).unwrap()
         };
 
         let validator_keys = ValidatorKeys {
