@@ -59,7 +59,7 @@ use crate::messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signe
 use crate::node::ApiSender;
 use crate::runtime::{
     dispatcher::{Dispatcher, DispatcherBuilder},
-    rust::RustRuntime,
+    rust::{service::ServiceFactory, RustRuntime},
     RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
 use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
@@ -92,14 +92,17 @@ impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
     pub fn new<D: Into<Arc<dyn Database>>>(
         storage: D,
-        services: Vec<Box<dyn Service>>,
+        services: Vec<Box<dyn ServiceFactory>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
     ) -> Self {
         // TODO add Configuration service in the runtime.
-
         let rust_runtime = Box::new(RustRuntime::default());
+
+        for s in services.into_iter() {
+            rust_runtime.add_service(s);
+        }
 
         let dispatcher = DispatcherBuilder::default()
             .with_runtime(RuntimeIdentifier::Rust as u32, rust_runtime)

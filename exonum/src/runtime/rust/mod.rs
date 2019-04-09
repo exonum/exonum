@@ -84,7 +84,7 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    fn add_service(&self, service_factory: Box<dyn ServiceFactory>) {
+    pub fn add_service(&self, service_factory: Box<dyn ServiceFactory>) {
         self.inner
             .borrow_mut()
             .services

@@ -46,7 +46,7 @@ use crate::api::{
     ApiAccess, ApiAggregator,
 };
 use crate::blockchain::{
-    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
+    Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState, ValidatorKeys,
 };
 use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
 use crate::events::{
@@ -62,7 +62,9 @@ use crate::helpers::{
 };
 use crate::messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
-use crate::runtime::configuration::Service as ConfigurationService;
+use crate::runtime::{
+    configuration::Service as ConfigurationService, rust::service::ServiceFactory,
+};
 use crate::storage::{Database, DbOptions};
 
 mod basic;
@@ -895,19 +897,18 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new<D: Into<Arc<dyn Database>>>(
         db: D,
-        services: Vec<Box<dyn Service>>,
+        mut services: Vec<Box<dyn ServiceFactory>>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
 
-        // Init configuration service.
-        let configuration_service = ConfigurationService::new(
-            node_cfg.genesis.validator_keys.len(),
-            node_cfg.configuration_service_majority_count,
-        );
-        let mut services = services;
-        services.push(Box::new(configuration_service));
+        //        // Init configuration service.
+        //        let configuration_service = ConfigurationService::new(
+        //            node_cfg.genesis.validator_keys.len(),
+        //            node_cfg.configuration_service_majority_count,
+        //        );
+        //        services.push(Box::new(configuration_service));
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(

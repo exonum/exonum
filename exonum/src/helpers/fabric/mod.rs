@@ -28,7 +28,7 @@ use toml::Value;
 
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::blockchain::Service;
+use crate::runtime::rust::service;
 
 mod builder;
 mod clap_backend;
@@ -349,8 +349,6 @@ pub trait CommandExtension {
 ///
 /// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
-    /// Returns name of the service.
-    fn service_name(&self) -> &str;
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
     fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
@@ -358,5 +356,5 @@ pub trait ServiceFactory: 'static {
     }
 
     /// Creates a new service instance from the context returned by the `Run` command.
-    fn make_service(&mut self, run_context: &Context) -> Box<dyn Service>;
+    fn make_service_builder(&self, run_context: &Context) -> Box<dyn service::ServiceFactory>;
 }
