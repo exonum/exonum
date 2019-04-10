@@ -1,0 +1,25 @@
+# vim files
+*.swp
+# macos files
+*.DS_Store
+
+# cargo
+target
+rls
+Cargo.lock
+
+# Exonum artifact folder
+.exonum
+
+# fuzz testing
+exonum/fuzz/corpus
+exonum/fuzz/artifacts
+
+# node
+node_modules
+npm-debug.log
+
+# IDE files
+.idea
+.vscode
+*.iml

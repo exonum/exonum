@@ -1,0 +1,8 @@
+{
+	"version": "0.1",
+	"language": "en",
+	"dictionaries": ["en_US", "softwareTerms", "exonum"],
+	"dictionaryDefinitions": [
+		{ "name": "exonum", "path": "./exonum-dictionary.txt" }
+	]
+}

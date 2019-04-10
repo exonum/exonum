@@ -1,0 +1,134 @@
+language: rust
+
+addons:
+  apt:
+    sources:
+    - sourceline: 'ppa:maarten-fonville/protobuf'
+    - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
+    packages:
+    - binutils-dev
+    - build-essential
+    - cmake
+    - g++
+    - gcc
+    - libcurl4-openssl-dev
+    - libdw-dev
+    - libelf-dev
+    - libiberty-dev
+    - libprotobuf-dev
+    - libsnappy-dev
+    - libsodium-dev
+    - libssl-dev
+    - pkg-config
+    - protobuf-compiler
+    - unzip
+    - zlib1g-dev
+  homebrew:
+    packages:
+    - rocksdb
+    - snappy
+    - libsodium
+
+rust:
+  # Feel free to bump this version if you need features of newer Rust.
+  # Sync with badge in README.md
+  - 1.33.0
+
+env:
+  global:
+  - DEADLINKS_VERS=0.3.0
+  - SODIUM_VERS=1.0.16
+  - RUSTFLAGS="-D warnings"
+
+matrix:
+  allow_failures:
+  - env: FEATURE=non-fatal-checks
+  fast_finish: true
+
+before_cache:
+  # The build artifacts for tests take a huge amount of space (~1.5 GB), so we trim
+  # them a bit before caching.
+  - |
+    cd $TRAVIS_BUILD_DIR/target/debug
+    rm -rf incremental examples
+    find . -maxdepth 1 -type f -executable -delete
+    find deps -type f -size +20M -delete
+    du -h -d 1 .
+
+cache:
+  cargo: true
+  directories:
+  - node_modules
+
+dist: trusty
+
+before_script:
+  - cargo update
+  - |
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
+      export SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+    fi
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      export ROCKSDB_LIB_DIR=$(brew --prefix)/lib
+      export SNAPPY_LIB_DIR=$(brew --prefix)/lib
+    fi
+
+jobs:
+  include:
+  # Formatting & other lints that do not require compilation
+  - name: lints
+    os: linux
+    install:
+    - rustup component add rustfmt
+    - rustfmt -V
+    - nvm install 8 && nvm use 8
+    - npm install cspell
+    - ./node_modules/.bin/cspell --version
+    - npm install markdownlint-cli
+    - ./node_modules/.bin/markdownlint --version
+    script:
+    - cargo fmt -- --check
+    - find . -not -path "./target/**" -name "*.rs" | xargs ./node_modules/.bin/cspell
+    - find . -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
+    - find . -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
+
+  # Clippy linting
+  - name: clippy
+    os: linux
+    install:
+    - rustup component add clippy
+    - cargo clippy --version
+    script:
+    - cargo clippy --all -- -D warnings
+
+  # Tests
+  - name: linux-tests
+    os: linux
+    script:
+    - cargo test --all
+
+  - name: windows-tests
+    os: windows
+    script:
+    - cargo test --tests
+  
+  - name: osx-tests
+    os: osx
+    script:
+    - cargo test --tests
+
+# Benchmarks
+  - name: linux-benches
+    os: linux
+    script:
+    - cargo bench --all -- --test
+
+  # Non-fatal checks
+  - name: deadlinks
+    os: linux
+    env: FEATURE=non-fatal-checks
+    install:
+    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    script:
+    - cargo doc
+    - cargo deadlinks --dir target/doc/exonum_merkledb
