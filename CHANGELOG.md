@@ -12,7 +12,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Bootstrapping workflow has been simplified (#1292)
 
   `generate-config` subcommand now uses single `OUTPUT_DIR` instead of set of options.
-  So to generate node config you should write somethink like example bellow.
+  So to generate node config you should write something like example bellow.
 
   ```bash
   cargo run --bin exonum-timestamping -- generate-template /tmp/exonum/template.toml --validators-count 4
