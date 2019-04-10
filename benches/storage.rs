@@ -242,7 +242,7 @@ fn proof_map_insert_with_merge(b: &mut Bencher, len: usize) {
     b.iter_with_setup(
         || (TemporaryDB::default(), data.clone()),
         |(db, data)| {
-            let mut fork = db.fork();
+            let fork = db.fork();
             {
                 let mut table = ProofMapIndex::new(NAME, &fork);
                 for item in data {

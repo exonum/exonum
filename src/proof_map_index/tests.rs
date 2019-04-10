@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{borrow::Cow, cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
+use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
 use pretty_assertions::assert_eq;
 use rand::{
@@ -83,22 +83,6 @@ fn generate_random_data_keys<R: Rng>(
     };
 
     (0..len).map(kv_generator).collect::<Vec<_>>()
-}
-
-impl UniqueHash for [u8; 32] {
-    fn hash(&self) -> Hash {
-        Hash::new(*self)
-    }
-}
-
-impl BinaryValue for [u8; 32] {
-    fn to_bytes(&self) -> Vec<u8> {
-        unreachable!();
-    }
-
-    fn from_bytes(_bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        unreachable!();
-    }
 }
 
 #[test]
@@ -1435,6 +1419,7 @@ fn test_tree_with_hashed_key() {
         HashTag::hash_map_node(HashTag::hash_single_entry_map(&key, &h))
     }
 
+    let db = TemporaryDB::default();
     let storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &storage);
 

@@ -19,7 +19,7 @@ use std::borrow::Cow;
 use failure::{self, ensure};
 use smallvec::{smallvec, SmallVec};
 
-use exonum_crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+use exonum_crypto::{self, Hash, HASH_SIZE};
 
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
 use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};

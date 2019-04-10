@@ -18,7 +18,7 @@ use std::{borrow::Cow, io::Read};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use failure::{self, format_err};
+use failure::{self, ensure, format_err};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -387,6 +387,12 @@ mod tests {
             Decimal::from_str("0").unwrap(),
             Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
+        assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    fn test_binary_form_array_hash_size() {
+        let values = [[1; HASH_SIZE]];
         assert_round_trip_eq(&values);
     }
 }

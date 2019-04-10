@@ -14,8 +14,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 use hex::FromHex;
 
-use crate::proof_map_index::ProofPath;
-use crate::BinaryValue;
 use exonum_crypto::{Hash, HashStream, HASH_SIZE};
 
 use crate::{proof_map_index::ProofPath, BinaryValue};

@@ -20,7 +20,7 @@ use failure::{self, format_err};
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use exonum_crypto::{self, CryptoHash, Hash};
+use exonum_crypto::{self, Hash};
 use exonum_merkledb::{
     impl_object_hash_for_binary_value,
     proof_map_index::{BranchNode, ProofPath},
@@ -54,12 +54,12 @@ impl BinaryValue for SimpleData {
         let class = LittleEndian::read_i16(&bytes[2..4]);
         let value = LittleEndian::read_i32(&bytes[4..8]);
         let hash = Hash::from_slice(&bytes[8..40]).unwrap();
-        Self {
+        Ok(Self {
             id,
             class,
             value,
             hash,
-        }
+        })
     }
 }
 
@@ -96,7 +96,7 @@ impl BinaryValue for CursorData {
             class,
             value,
             hash,
-        }
+        })
     }
 }
 
@@ -152,7 +152,7 @@ where
     c.bench_function(
         &format!("encoding/{}/to_bytes", name),
         move |b: &mut Bencher| {
-            b.iter_with_setup(f, |data| black_box(data.into_bytes()));
+            b.iter_with_setup(f, |data| black_box(data.to_bytes()));
         },
     );
     c.bench_function(

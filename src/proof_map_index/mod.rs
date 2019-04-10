@@ -38,7 +38,7 @@ use crate::{
     views::{
         BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View,
     },
-    BinaryKey, BinaryValue, UniqueHash,
+    BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
 
 mod key;
