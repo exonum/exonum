@@ -379,7 +379,7 @@ fn test_finalize_run_with_pass() {
     expected = "The number of validators configs does not match the number of validators keys."
 )]
 fn test_less_validators_count() {
-    let env = ConfigSpec::new_without_pass();
+    let env = ConfigSpec::new_more_validators();
 
     let node_config = env.output_node_config(0);
     env.copy_node_config_to_output(0);
