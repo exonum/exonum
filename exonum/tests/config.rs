@@ -29,6 +29,8 @@ use exonum::{
     node::{ConnectInfo, ConnectListConfig, NodeConfig},
 };
 
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     env,
     ffi::OsString,
@@ -75,6 +77,22 @@ impl ConfigSpec {
         ArgsBuilder {
             args: vec!["exonum-config-test".into(), name.into()],
         }
+    }
+
+    fn copy_node_config_to_output(&self, index: usize) {
+        let src = self.expected_node_config_dir(index);
+        let dest = self.output_node_config_dir(index);
+        fs::create_dir_all(&dest).unwrap();
+
+        [
+            "pub.toml",
+            "sec.toml",
+            "service.key.toml",
+            "consensus.key.toml",
+        ]
+        .iter()
+        .try_for_each(|file| copy_secured(src.join(file), dest.join(file)))
+        .expect("Can't copy file");
     }
 
     fn output_dir(&self) -> PathBuf {
@@ -132,10 +150,6 @@ impl ConfigSpec {
             .map(|i| self.expected_pub_config(i))
             .collect()
     }
-
-    fn expected_sec_config(&self, index: usize) -> PathBuf {
-        self.expected_node_config_dir(index).join("sec.toml")
-    }
 }
 
 #[derive(Debug)]
@@ -187,6 +201,21 @@ fn touch(path: impl AsRef<Path>) {
         .unwrap();
 }
 
+fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<(), failure::Error> {
+    let mut source_file = fs::File::open(&from)?;
+
+    let mut destination_file = {
+        let mut open_options = OpenOptions::new();
+        open_options.create(true).write(true);
+        #[cfg(unix)]
+        open_options.mode(0o600);
+        open_options.open(&to)?
+    };
+
+    std::io::copy(&mut source_file, &mut destination_file)?;
+    Ok(())
+}
+
 fn load_node_config(path: impl AsRef<Path>) -> NodeConfig<PathBuf> {
     ConfigFile::load(path).expect("Can't load node config file")
 }
@@ -207,7 +236,7 @@ fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
 fn assert_node_config_files_eq(actual: impl AsRef<Path>, expected: impl AsRef<Path>) {
     let (actual, expected) = (actual.as_ref(), expected.as_ref());
 
-    let config_dir = expected.parent().unwrap();
+    let config_dir = actual.parent().unwrap();
     let actual = load_node_config(actual);
     let mut expected = load_node_config(expected);
     expected.service_secret_key = config_dir.join(&expected.service_secret_key);
@@ -299,9 +328,10 @@ fn test_finalize_run_without_pass() {
     env::set_var("EXONUM_CONSENSUS_PASS", "");
     env::set_var("EXONUM_SERVICE_PASS", "");
     for i in 0..env.validators_count {
+        env.copy_node_config_to_output(i);
         let node_config = env.output_node_config(i);
         env.command("finalize")
-            .with_arg(env.expected_sec_config(i))
+            .with_arg(env.output_sec_config(i))
             .with_arg(&node_config)
             .with_arg("--public-configs")
             .with_args(env.expected_pub_configs())
@@ -326,9 +356,10 @@ fn test_finalize_run_with_pass() {
 
     env::set_var("EXONUM_CONSENSUS_PASS", "some passphrase");
     env::set_var("EXONUM_SERVICE_PASS", "another passphrase");
+    env.copy_node_config_to_output(0);
     let node_config = env.output_node_config(0);
     env.command("finalize")
-        .with_arg(env.expected_sec_config(0))
+        .with_arg(env.output_sec_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs())
@@ -357,8 +388,9 @@ fn test_less_validators_count() {
     env::set_var("EXONUM_SERVICE_PASS", "");
 
     let node_config = env.output_node_config(0);
+    env.copy_node_config_to_output(0);
     env.command("finalize")
-        .with_arg(env.expected_sec_config(0))
+        .with_arg(env.output_sec_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs().into_iter())
@@ -377,8 +409,9 @@ fn test_more_validators_count() {
     env::set_var("EXONUM_SERVICE_PASS", "");
 
     let node_config = env.output_node_config(0);
+    env.copy_node_config_to_output(0);
     env.command("finalize")
-        .with_arg(env.expected_sec_config(0))
+        .with_arg(env.output_sec_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs())
