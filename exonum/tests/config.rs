@@ -52,7 +52,7 @@ impl ConfigSpec {
         Self {
             expected_root_dir: root_dir.as_ref().to_owned(),
             output_root_dir: tempfile::tempdir().unwrap(),
-            validators_count: validators_count,
+            validators_count,
         }
     }
 
@@ -119,7 +119,6 @@ impl ConfigSpec {
 
     fn expected_pub_configs(&self) -> Vec<PathBuf> {
         (0..self.validators_count)
-            .into_iter()
             .map(|i| self.expected_pub_config(i))
             .collect()
     }
@@ -154,7 +153,7 @@ impl ArgsBuilder {
     }
 
     fn run(self) -> Option<()> {
-        eprintln!(
+        log::trace!(
             "-> {}",
             self.args
                 .iter()
