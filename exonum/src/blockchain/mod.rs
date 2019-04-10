@@ -507,6 +507,7 @@ impl Blockchain {
                 schema
                     .transactions_pool_len_index_mut()
                     .set(txs_count - u64::from(txs_in_block));
+                schema.update_transaction_count(u64::from(txs_in_block));
             }
             fork.into_patch()
         };

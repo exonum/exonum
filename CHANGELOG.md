@@ -12,6 +12,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,
   rather than in a separate array. (#1278)
+  
+- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
+  An additional field in the response of the endpoint was added. The field
+  corresponds to the total number of transactions in the blockchain. (#1289)
 
 ### Bug Fixes
 
