@@ -74,7 +74,7 @@ pub enum NetworkRequest {
     Shutdown,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub struct NetworkConfiguration {
     // TODO: Think more about config parameters. (ECR-162)
     pub max_incoming_connections: usize,

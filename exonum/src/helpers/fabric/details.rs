@@ -25,7 +25,6 @@ use std::{
 };
 
 use super::{
-    super::path_relative_from,
     internal::{CollectedCommand, Command, Feedback},
     keys,
     password::{PassInputMethod, SecretKeyType},
@@ -43,7 +42,6 @@ use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
 use crate::storage::{Database, DbOptions, RocksDB};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
-const CONSENSUS_KEY_PATH: &str = "CONSENSUS_KEY_PATH";
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const LISTEN_ADDRESS: &str = "LISTEN_ADDRESS";
 const NO_PASSWORD: &str = "NO_PASSWORD";
@@ -54,7 +52,6 @@ const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
 const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
 const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const SERVICE_KEY_PASS_METHOD: &str = "SERVICE_KEY_PASS_METHOD";
-const SERVICE_KEY_PATH: &str = "SERVICE_KEY_PATH";
 
 /// Run command.
 pub struct Run;
@@ -222,14 +219,21 @@ impl RunDev {
     }
 
     fn set_config_command_arguments(ctx: &mut Context) {
-        let common_config_path = Self::artifacts_path("common.toml", &ctx);
+        let common_config_path = Self::artifacts_path("template.toml", &ctx);
+        let output_path = Self::artifacts_directory(&ctx).join("cfg");
         let validators_count = "1";
         let peer_addr = "127.0.0.1";
-        let pub_config_path = Self::artifacts_path("public.toml", &ctx);
-        let sec_config_path = Self::artifacts_path("secret.toml", &ctx);
-        let output_config_path = Self::artifacts_path("output.toml", &ctx);
-        let consensus_key_path = Self::artifacts_path("consensus.toml", &ctx);
-        let service_key_path = Self::artifacts_path("service.toml", &ctx);
+        let pub_config_path = output_path
+            .join("pub.toml")
+            .to_str()
+            .expect("Expected correct path")
+            .to_owned();
+        let sec_config_path = output_path
+            .join("sec.toml")
+            .to_str()
+            .expect("Expected correct path")
+            .to_owned();
+        let output_config_path = Self::artifacts_path("node.toml", &ctx);
 
         // Arguments for common config command.
         ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
@@ -237,11 +241,15 @@ impl RunDev {
 
         // Arguments for node config command.
         ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
-        ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
+        ctx.set_arg(
+            "OUTPUT_DIR",
+            output_path
+                .to_str()
+                .expect("Expected correct path")
+                .to_owned(),
+        );
         ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
         ctx.set_arg(PEER_ADDRESS, peer_addr.into());
-        ctx.set_arg(CONSENSUS_KEY_PATH, consensus_key_path);
-        ctx.set_arg(SERVICE_KEY_PATH, service_key_path);
         ctx.set_flag_occurrences(NO_PASSWORD, 1);
 
         // Arguments for finalize config command.
@@ -553,8 +561,10 @@ impl Command for GenerateNodeConfig {
 
         let pub_config_path = output_dir.join("pub.toml");
         let private_config_path = output_dir.join("sec.toml");
-        let consensus_secret_key_path = output_dir.join("consensus.key.toml");
-        let service_secret_key_path = output_dir.join("service.key.toml");
+        let consensus_secret_key_name = "consensus.key.toml";
+        let service_secret_key_name = "service.key.toml";
+        let consensus_secret_key_path = output_dir.join(consensus_secret_key_name);
+        let service_secret_key_path = output_dir.join(service_secret_key_name);
 
         let addresses = Self::addresses(&context);
         let common: CommonConfigTemplate =
@@ -589,17 +599,6 @@ impl Command for GenerateNodeConfig {
             create_secret_key_file(&service_secret_key_path, passphrase.as_bytes())
         };
 
-        let consensus_secret_key = if consensus_secret_key_path.is_absolute() {
-            consensus_secret_key_path
-        } else {
-            path_relative_from(&consensus_secret_key_path, &output_dir).unwrap()
-        };
-        let service_secret_key = if service_secret_key_path.is_absolute() {
-            service_secret_key_path
-        } else {
-            path_relative_from(&service_secret_key_path, &output_dir).unwrap()
-        };
-
         let validator_keys = ValidatorKeys {
             consensus_key: consensus_public_key,
             service_key: service_public_key,
@@ -621,9 +620,9 @@ impl Command for GenerateNodeConfig {
             listen_address: addresses.1,
             external_address: addresses.0.clone(),
             consensus_public_key,
-            consensus_secret_key,
+            consensus_secret_key: consensus_secret_key_name.into(),
             service_public_key,
-            service_secret_key,
+            service_secret_key: service_secret_key_name.into(),
             services_secret_configs: services_secret_configs
                 .expect("services_secret_configs not found after exts call"),
         };
@@ -770,7 +769,11 @@ impl Command for Finalize {
         let private_allow_origin = Self::private_allow_origin(&context);
 
         let secret_config: NodePrivateConfig =
-            ConfigFile::load(secret_config_path).expect("Failed to load key config.");
+            ConfigFile::load(&secret_config_path).expect("Failed to load key config.");
+        let secret_config_dir = PathBuf::from(&secret_config_path)
+            .parent()
+            .unwrap()
+            .to_owned();
         let public_configs: Vec<SharedConfig> = public_configs_path
             .into_iter()
             .map(|path| ConfigFile::load(path).expect("Failed to load validator public config."))
@@ -803,9 +806,9 @@ impl Command for Finalize {
                 external_address: secret_config.external_address,
                 network: Default::default(),
                 consensus_public_key: secret_config.consensus_public_key,
-                consensus_secret_key: secret_config.consensus_secret_key,
+                consensus_secret_key: secret_config_dir.join(&secret_config.consensus_secret_key),
                 service_public_key: secret_config.service_public_key,
-                service_secret_key: secret_config.service_secret_key,
+                service_secret_key: secret_config_dir.join(&secret_config.service_secret_key),
                 genesis,
                 api: NodeApiConfig {
                     public_api_address,

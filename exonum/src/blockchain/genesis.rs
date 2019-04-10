@@ -21,7 +21,7 @@ use super::config::{ConsensusConfig, ValidatorKeys};
 /// data, but does not include transactions.
 ///
 /// `GenesisConfig` includes consensus related configuration and the public keys of validators.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct GenesisConfig {
     /// Consensus configuration.
     pub consensus: ConsensusConfig,
