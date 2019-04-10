@@ -93,6 +93,16 @@ impl ConfigSpec {
         self.output_node_config_dir(index).join("sec.toml")
     }
 
+    fn output_pub_config(&self, index: usize) -> PathBuf {
+        self.output_node_config_dir(index).join("pub.toml")
+    }
+
+    fn output_pub_configs(&self) -> Vec<PathBuf> {
+        (0..self.validators_count)
+            .map(|i| self.output_pub_config(i))
+            .collect()
+    }
+
     fn output_node_config(&self, index: usize) -> PathBuf {
         self.output_node_config_dir(index).join("node.toml")
     }
@@ -374,6 +384,51 @@ fn test_more_validators_count() {
         .with_args(env.expected_pub_configs())
         .run()
         .unwrap();
+}
+
+#[test]
+fn test_full_workflow() {
+    let env = ConfigSpec::new("", 4);
+
+    let output_template_file = env.output_template_file();
+    env.command("generate-template")
+        .with_arg(&output_template_file)
+        .with_named_arg("--validators-count", env.validators_count.to_string())
+        .run()
+        .unwrap();
+
+    for i in 0..env.validators_count {
+        env.command("generate-config")
+            .with_arg(&output_template_file)
+            .with_arg(&env.output_node_config_dir(i))
+            .with_named_arg("-a", format!("0.0.0.0:{}", 8000 + i))
+            .with_named_arg("--service-key-pass", "pass:12345678")
+            .with_named_arg("--consensus-key-pass", "pass:12345678")
+            .run()
+            .unwrap();
+    }
+
+    env::set_var("EXONUM_CONSENSUS_PASS", "12345678");
+    env::set_var("EXONUM_SERVICE_PASS", "12345678");
+    for i in 0..env.validators_count {
+        let node_config = env.output_node_config(i);
+        env.command("finalize")
+            .with_arg(env.output_sec_config(i))
+            .with_arg(&node_config)
+            .with_arg("--public-configs")
+            .with_args(env.output_pub_configs())
+            .run()
+            .unwrap();
+
+        let feedback = env
+            .command("run")
+            .with_named_arg("-c", &node_config)
+            .with_named_arg("-d", env.output_dir().join("foo"))
+            .with_named_arg("--service-key-pass", "env")
+            .with_named_arg("--consensus-key-pass", "env")
+            .run();
+        assert!(feedback.is_none());
+    }
 }
 
 #[test]

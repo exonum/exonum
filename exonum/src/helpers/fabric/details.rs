@@ -770,10 +770,9 @@ impl Command for Finalize {
 
         let secret_config: NodePrivateConfig =
             ConfigFile::load(&secret_config_path).expect("Failed to load key config.");
-        let secret_config_dir = PathBuf::from(&secret_config_path)
-            .parent()
-            .unwrap()
-            .to_owned();
+        let secret_config_dir = std::env::current_dir()
+            .expect("Failed to get current dir")
+            .join(PathBuf::from(&secret_config_path).parent().unwrap());
         let public_configs: Vec<SharedConfig> = public_configs_path
             .into_iter()
             .map(|path| ConfigFile::load(path).expect("Failed to load validator public config."))
