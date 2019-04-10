@@ -324,9 +324,6 @@ fn test_generate_config_ipv6() {
 #[test]
 fn test_finalize_run_without_pass() {
     let env = ConfigSpec::new_without_pass();
-
-    env::set_var("EXONUM_CONSENSUS_PASS", "");
-    env::set_var("EXONUM_SERVICE_PASS", "");
     for i in 0..env.validators_count {
         env.copy_node_config_to_output(i);
         let node_config = env.output_node_config(i);
@@ -343,8 +340,8 @@ fn test_finalize_run_without_pass() {
             .command("run")
             .with_named_arg("-c", &node_config)
             .with_named_arg("-d", env.output_dir().join("foo"))
-            .with_named_arg("--service-key-pass", "env")
-            .with_named_arg("--consensus-key-pass", "env")
+            .with_named_arg("--service-key-pass", "pass:")
+            .with_named_arg("--consensus-key-pass", "pass:")
             .run();
         assert!(feedback.is_none());
     }
@@ -384,9 +381,6 @@ fn test_finalize_run_with_pass() {
 fn test_less_validators_count() {
     let env = ConfigSpec::new_without_pass();
 
-    env::set_var("EXONUM_CONSENSUS_PASS", "");
-    env::set_var("EXONUM_SERVICE_PASS", "");
-
     let node_config = env.output_node_config(0);
     env.copy_node_config_to_output(0);
     env.command("finalize")
@@ -404,9 +398,6 @@ fn test_less_validators_count() {
 )]
 fn test_more_validators_count() {
     let env = ConfigSpec::new_more_validators();
-
-    env::set_var("EXONUM_CONSENSUS_PASS", "");
-    env::set_var("EXONUM_SERVICE_PASS", "");
 
     let node_config = env.output_node_config(0);
     env.copy_node_config_to_output(0);
