@@ -14,13 +14,14 @@
 
 //! Cryptocurrency API.
 
+use exonum_merkledb::{ListProof, MapProof};
+
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof, TransactionMessage},
     crypto::{Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    storage::{ListProof, MapProof},
 };
 
 use crate::{wallet::Wallet, Schema, CRYPTOCURRENCY_SERVICE_ID};
@@ -95,7 +96,7 @@ impl PublicApi {
 
         let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(&query.pub_key);
-            let proof = history.get_range_proof(0, history.len());
+            let proof = history.get_range_proof(0..history.len());
 
             let transactions = history
                 .iter()

@@ -9,9 +9,94 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Module `storage` has been replace by `exonum-merkledb` crate. See related section
+  in changelog for details. (#1293)
+
+- Bootstrapping workflow has been simplified (#1292)
+
+  `generate-config` subcommand now uses single `OUTPUT_DIR` instead of set of options.
+  So to generate node config you should write something like example bellow.
+
+  ```bash
+  cargo run --bin exonum-timestamping -- \
+    generate-template /tmp/exonum/template.toml --validators-count 4
+
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/0 \
+      --peer-address 0.0.0.0:8000
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/1 \
+      --peer-address 0.0.0.0:8001
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/2 \
+      --peer-address 0.0.0.0:8002
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/3 \
+      --peer-address 0.0.0.0:8003
+
+  cargo run --bin exonum-timestamping -- \
+    finalize /tmp/exonum/nodes/0/sec.toml /tmp/exonum/nodes/0/node.toml \
+      --public-configs /tmp/exonum/cfg/{0,1,2,3}/pub.toml
+
+  cargo run --bin exonum-timestamping -- \
+    run -d /tmp/exonum/db/0 -c /tmp/exonum/nodes/0/node.toml
+  ```
+
 - `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
   median precommit times in the `time` field within each returned block,
   rather than in a separate array. (#1278)
+
+- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
+  An additional field in the response of the endpoint was added. The field
+  corresponds to the total number of transactions in the blockchain. (#1289)
+
+#### exonum-merkledb
+
+- Changed storage layout (#1293)
+
+  - Changed indexes metadata layout in the database.
+
+  - Introduced a generic `IndexState` structure that can be used to store global
+    index properties like total number of items.
+
+- Changed `ProofMapIndex` hashing rules for branch nodes and root node.
+  Branch nodes is hashing now with 0x04 prefix, root node with 0x03 (#1293).
+
+- Renamed method `merkle_root` of `ProofMapIndex` and `ProofListIndex` to
+  `object_hash` (#1293).
+
+- Several mutable indexes now can be create from immutable reference to `Fork` (#1293)
+
+- Relaxed trait bounds for the `ProofMapIndex` keys (#1293)
+
+  Now keys should just implement `BinaryKey` trait instead of the
+  `ProofMapKey`, which will be ordered according to their binary
+  representation, as in the `MapIndex`.
+
+- Changed `ProofListIndex` hashing rules for leaf nodes and branch nodes according
+    to the [certificate transparency](https://tools.ietf.org/html/rfc6962#section-2.1)
+    specification. Leaf nodes contain hashes with 0x00 prefix, branch nodes - with
+    0x01. (#1293)
+
+- `StorageValue` and `StorageKey` have been renamed to the `BinaryValue`
+  and `BinaryKey`. (#1293)
+
+  - Added `to_bytes` method to the `BinaryValue` trait which doesn't consume
+    original value instead of the `into_bytes`.
+  - `BinaryKey::write` now returns total number of written bytes.
+  - `CryptoHash` has been replaced by the `ObjectHash`.
+
+- Changed the hash algorithm of the intermediate nodes in `ProofMapIndex`. (#1293)
+
+  `ProofPath` now uses compact binary representation in the `BranchNode`
+  hash calculation.
+
+  Binary representation is `|bits_len|bytes|`, where:
+
+  - **bits_len** - total length of the given `ProofPath` in bits compressed
+    by the `leb128` algorithm
+  - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
+    `(bits_len + 7) / 8` bytes.
 
 ### Bug Fixes
 
@@ -35,6 +120,32 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added `service_name` getter to the `TransactionContext`. (#1274)
 
 - Allowed to use symbol `-` in index names. (#1277)
+
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added a new endpoint `system/v1/services` for displaying information
+  about available services. (#1288)
+
+#### exonum-merkledb
+
+- Updated `ProofMapIndex` data layout. (#1293)
+
+  Path to the root node in merkle patricia tree now has been stored in the index
+  state.
+
+- New API for getting and creating indexes. (#1293)
+
+  - Now indexes can be accessed via immutable references from `Snapshot` and
+    mutable/immutable references from `Fork`.
+
+  - Introduced method `fork::get_object` to get or create object by address.
+
+  - `get_object_existed` and `get_object_existed_mut` methods of `Fork` and `Snapshot`
+    returns optional references to index.
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added a new endpoint `system/v1/services` for displaying information
+  about available services. (#1288)
 
 #### exonum-testkit
 

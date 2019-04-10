@@ -19,7 +19,7 @@ use serde_derive::{Deserialize, Serialize};
 /// Options for the database.
 ///
 /// These parameters apply to the underlying database of Exonum, currently `RocksDB`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct DbOptions {
     /// Number of open files that can be used by the database.
     ///

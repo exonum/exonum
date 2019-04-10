@@ -162,7 +162,7 @@ impl HashTag {
 /// Computes a Merkle root hash for a the given list of hashes.
 ///
 /// If `hashes` are empty then `Hash::zero()` value is returned.
-fn root_hash(hashes: &[Hash]) -> Hash {
+pub fn root_hash(hashes: &[Hash]) -> Hash {
     if hashes.is_empty() {
         return Hash::zero();
     }

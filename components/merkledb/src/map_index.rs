@@ -528,10 +528,9 @@ mod tests {
 
     #[test]
     fn test_str_key() {
+        const KEY: &str = "key_1";
         let db = TemporaryDB::default();
         let fork = db.fork();
-
-        const KEY: &str = "key_1";
 
         let mut index: MapIndex<_, String, _> = MapIndex::new(IDX_NAME, &fork);
         assert_eq!(false, index.contains(KEY));
@@ -545,10 +544,9 @@ mod tests {
 
     #[test]
     fn test_u8_slice_key() {
+        const KEY: &[u8] = &[1, 2, 3];
         let db = TemporaryDB::default();
         let fork = db.fork();
-
-        const KEY: &[u8] = &[1, 2, 3];
 
         let mut index: MapIndex<_, Vec<u8>, _> = MapIndex::new(IDX_NAME, &fork);
         assert_eq!(false, index.contains(KEY));
@@ -566,27 +564,27 @@ mod tests {
         let fork = db.fork();
         let mut map_index = MapIndex::new(IDX_NAME, &fork);
 
-        assert_eq!(map_index.get(&1u8), None);
-        assert!(!map_index.contains(&1u8));
+        assert_eq!(map_index.get(&1_u8), None);
+        assert!(!map_index.contains(&1_u8));
 
-        map_index.put(&1u8, 1u8);
+        map_index.put(&1_u8, 1_u8);
 
-        assert_eq!(map_index.get(&1u8), Some(1u8));
-        assert!(map_index.contains(&1u8));
+        assert_eq!(map_index.get(&1_u8), Some(1_u8));
+        assert!(map_index.contains(&1_u8));
 
-        map_index.remove(&100u8);
+        map_index.remove(&100_u8);
 
-        map_index.remove(&1u8);
+        map_index.remove(&1_u8);
 
-        assert!(!map_index.contains(&1u8));
-        assert_eq!(map_index.get(&1u8), None);
+        assert!(!map_index.contains(&1_u8));
+        assert_eq!(map_index.get(&1_u8), None);
 
-        map_index.put(&2u8, 2u8);
-        map_index.put(&3u8, 3u8);
+        map_index.put(&2_u8, 2_u8);
+        map_index.put(&3_u8, 3_u8);
         map_index.clear();
 
-        assert!(!map_index.contains(&2u8));
-        assert!(!map_index.contains(&3u8));
+        assert!(!map_index.contains(&2_u8));
+        assert!(!map_index.contains(&3_u8));
     }
 
     #[test]
@@ -595,9 +593,9 @@ mod tests {
         let fork = db.fork();
         let mut map_index = MapIndex::new(IDX_NAME, &fork);
 
-        map_index.put(&1u8, 1u8);
-        map_index.put(&2u8, 2u8);
-        map_index.put(&3u8, 3u8);
+        map_index.put(&1_u8, 1_u8);
+        map_index.put(&2_u8, 2_u8);
+        map_index.put(&3_u8, 3_u8);
 
         assert_eq!(
             map_index.iter().collect::<Vec<(u8, u8)>>(),
@@ -647,13 +645,13 @@ mod tests {
             Vec::<u8>::new()
         );
 
-        map_index.remove(&1u8);
+        map_index.remove(&1_u8);
         assert_eq!(
             map_index.iter_from(&0_u8).collect::<Vec<(u8, u8)>>(),
             vec![(2, 2), (3, 3)]
         );
         assert_eq!(
-            map_index.iter_from(&1u8).collect::<Vec<(u8, u8)>>(),
+            map_index.iter_from(&1_u8).collect::<Vec<(u8, u8)>>(),
             vec![(2, 2), (3, 3)]
         );
     }

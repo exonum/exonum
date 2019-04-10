@@ -25,13 +25,14 @@ use std::{
     time::Duration,
 };
 
+use exonum_merkledb::{Database, Fork, Snapshot, TemporaryDB};
+
 use exonum::{
     blockchain::{Service, ServiceContext, Transaction},
     crypto::Hash,
     helpers,
     messages::RawTransaction,
     node::{ApiSender, ExternalMessage, Node},
-    storage::{Database, Fork, MemoryDB, Snapshot},
 };
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
@@ -96,7 +97,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let node = Node::new(MemoryDB::new(), vec![service], node_cfg, None);
+        let node = Node::new(TemporaryDB::new(), vec![service], node_cfg, None);
         let api_tx = node.channel();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || {
@@ -146,7 +147,7 @@ fn test_node_restart_regression() {
         node_thread.join().unwrap();
     };
 
-    let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+    let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
 
     let init_times = Arc::new(Mutex::new(0));

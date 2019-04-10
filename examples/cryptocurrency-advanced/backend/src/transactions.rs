@@ -143,7 +143,7 @@ impl Transfer {
 }
 
 impl Transaction for Transfer {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let from = &context.author();
         let hash = context.tx_hash();
 
@@ -172,7 +172,7 @@ impl Transaction for Transfer {
 }
 
 impl Transaction for Issue {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let pub_key = &context.author();
         let hash = context.tx_hash();
 
@@ -189,7 +189,7 @@ impl Transaction for Issue {
 }
 
 impl Transaction for CreateWallet {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let pub_key = &context.author();
         let hash = context.tx_hash();
 

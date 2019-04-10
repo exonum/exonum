@@ -40,7 +40,6 @@ use serde::ser::{Serialize, Serializer};
 use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
-use crate::storage::StorageValue;
 
 pub(crate) use self::helpers::HexStringRepresentation;
 pub use self::{
@@ -48,6 +47,7 @@ pub use self::{
     helpers::{to_hex_string, BinaryForm},
     protocol::*,
 };
+use exonum_merkledb::BinaryValue;
 
 mod authorization;
 mod helpers;
@@ -266,16 +266,20 @@ impl<T: ProtocolMessage> Deref for Signed<T> {
     }
 }
 
-impl<T: ProtocolMessage> StorageValue for Signed<T> {
+impl<T: ProtocolMessage> BinaryValue for Signed<T> {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.message.raw.clone()
+    }
+
     fn into_bytes(self) -> Vec<u8> {
         self.message.raw
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_vec_unchecked(value.into_owned());
         // TODO: Remove additional deserialization. [ECR-2315]
         let msg = Message::deserialize(message).unwrap();
-        T::try_from(msg).unwrap()
+        Ok(T::try_from(msg).unwrap())
     }
 }
 

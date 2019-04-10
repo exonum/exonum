@@ -215,7 +215,7 @@ fn test_precommit_serde_wrong_signature() {
     {
         let raw_len = precommit.message.raw.len();
         let signature = &mut precommit.message.raw[raw_len - SIGNATURE_LENGTH..];
-        signature.copy_from_slice(&[0u8; SIGNATURE_LENGTH]);
+        signature.copy_from_slice(&[0_u8; SIGNATURE_LENGTH]);
     }
     let precommit_json = serde_json::to_string(&precommit).unwrap();
     let precommit2: Signed<Precommit> = serde_json::from_str(&precommit_json).unwrap();

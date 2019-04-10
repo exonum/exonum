@@ -37,13 +37,14 @@ pub mod proto;
 pub mod schema;
 pub mod transactions;
 
+use exonum_merkledb::Snapshot;
+
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric,
     messages::RawTransaction,
-    storage::Snapshot,
 };
 
 use crate::{api::PublicApi, schema::Schema, transactions::TimeTransactions};

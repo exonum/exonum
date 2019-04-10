@@ -15,7 +15,7 @@
 use crate::blockchain::Blockchain;
 use crate::crypto::{PublicKey, SecretKey};
 use crate::node::ApiSender;
-use crate::storage::Snapshot;
+use exonum_merkledb::Snapshot;
 
 /// Provides the current blockchain state to API handlers.
 ///

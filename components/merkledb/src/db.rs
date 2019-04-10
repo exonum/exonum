@@ -26,11 +26,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use failure::ensure;
-
 use crate::{
     views::{IndexAccess, IndexAddress, View},
-    Result,
+    Error, Result,
 };
 
 /// Finds a prefix immediately following the supplied one.
@@ -398,7 +396,7 @@ pub struct Fork {
     working_patch: WorkingPatch,
 }
 
-struct FlushedFork {
+pub struct FlushedFork {
     snapshot: Box<dyn Snapshot>,
     patch: Patch,
 }
@@ -641,6 +639,12 @@ impl<'a> IndexAccess for &'a Fork {
     }
 }
 
+impl<'a> AsRef<dyn Snapshot> for &'a Fork {
+    fn as_ref(&self) -> &dyn Snapshot {
+        self.snapshot()
+    }
+}
+
 impl AsRef<dyn Snapshot> for dyn Snapshot + 'static {
     fn as_ref(&self) -> &dyn Snapshot {
         self
@@ -790,12 +794,13 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
     {
         let mut view = View::new(&fork, DB_METADATA);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
-            ensure!(
-                saved_version == DB_VERSION,
-                "Database version doesn't match: actual {}, expected {}",
-                saved_version,
-                DB_VERSION
-            );
+            if saved_version != DB_VERSION {
+                return Err(Error::new(format!(
+                    "Database version doesn't match: actual {}, expected {}",
+                    saved_version, DB_VERSION
+                )));
+            }
+
             return Ok(());
         } else {
             view.put(VERSION_NAME, DB_VERSION);

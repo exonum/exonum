@@ -22,9 +22,9 @@
 
 // cspell:ignore proptest
 
-use exonum::storage::{
-    proof_map_index::{ProofMapKey, ProofPath},
-    Database, MapProof, MemoryDB, ProofMapIndex, Snapshot, StorageValue,
+use exonum_merkledb::{
+    proof_map_index::ProofPath, BinaryKey, Database, IndexAccess, MapProof, ProofMapIndex,
+    TemporaryDB,
 };
 use proptest::{prelude::*, test_runner::Config};
 
@@ -38,14 +38,15 @@ use crate::prop::{
     array,
     collection::{btree_map, vec},
 };
+use exonum_merkledb::{BinaryValue, ObjectHash};
 
 const INDEX_NAME: &str = "index";
 
 fn check_map_proof<T, K, V>(proof: MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
 where
-    T: AsRef<dyn Snapshot>,
-    K: ProofMapKey + PartialEq + Debug,
-    V: StorageValue + PartialEq + Debug,
+    T: IndexAccess,
+    K: BinaryKey + ObjectHash + PartialEq + Debug,
+    V: BinaryValue + ObjectHash + PartialEq + Debug,
 {
     let entries = key.map(|key| {
         let value = table.get(&key).unwrap();
@@ -60,7 +61,7 @@ where
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>()
     );
-    assert_eq!(proof.merkle_root(), table.merkle_root());
+    assert_eq!(proof.root_hash(), table.object_hash());
 }
 
 fn check_map_multiproof<T, K, V>(
@@ -68,9 +69,9 @@ fn check_map_multiproof<T, K, V>(
     keys: BTreeSet<K>,
     table: &ProofMapIndex<T, K, V>,
 ) where
-    T: AsRef<dyn Snapshot>,
-    K: ProofMapKey + Clone + PartialEq + Debug,
-    V: StorageValue + Clone + PartialEq + Debug,
+    T: IndexAccess,
+    K: BinaryKey + ObjectHash + Clone + PartialEq + Debug,
+    V: BinaryValue + ObjectHash + Clone + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -102,7 +103,7 @@ fn check_map_multiproof<T, K, V>(
         proof.all_entries().collect::<Vec<_>>(),
         unchecked_proof.all_entries_unchecked().collect::<Vec<_>>()
     );
-    assert_eq!(proof.merkle_root(), table.merkle_root());
+    assert_eq!(proof.root_hash(), table.object_hash());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys().collect::<Vec<_>>();
         actual_keys
@@ -133,11 +134,11 @@ where
 }
 
 // Converts raw data to a database.
-fn data_to_db(data: BTreeMap<[u8; 32], u64>) -> MemoryDB {
-    let db = MemoryDB::new();
-    let mut fork = db.fork();
+fn data_to_db(data: BTreeMap<[u8; 32], u64>) -> TemporaryDB {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
     {
-        let mut table = ProofMapIndex::new(INDEX_NAME, &mut fork);
+        let mut table = ProofMapIndex::new(INDEX_NAME, &fork);
         for (key, value) in data {
             table.put(&key, value);
         }
@@ -159,8 +160,9 @@ macro_rules! proof_map_tests {
                         (*data.keys().nth(index).unwrap(), data_to_db(data))
                     })
             ) {
+                let snapshot = db.snapshot();
                 let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, db.snapshot());
+                    ProofMapIndex::new(INDEX_NAME, &snapshot);
                 let proof = table.get_proof(key);
                 check_map_proof(proof, Some(key), &table);
             }
@@ -171,8 +173,9 @@ macro_rules! proof_map_tests {
                 ref db in index_data($bytes, $sizes).prop_map(data_to_db),
                 key in array::uniform32($bytes)
             ) {
+                let snapshot = db.snapshot();
                 let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, db.snapshot());
+                    ProofMapIndex::new(INDEX_NAME, &snapshot);
                 prop_assume!(!table.contains(&key));
 
                 let proof = table.get_proof(key);
@@ -194,8 +197,9 @@ macro_rules! proof_map_tests {
                         (keys, data_to_db(data))
                     })
             ) {
+                            let snapshot = db.snapshot();
                 let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, db.snapshot());
+                    ProofMapIndex::new(INDEX_NAME, &snapshot);
                 let proof = table.get_multiproof(keys.clone());
 
                 let unique_keys: BTreeSet<_> = keys.iter().cloned().collect();
@@ -207,8 +211,9 @@ macro_rules! proof_map_tests {
                 ref db in index_data($bytes, $sizes).prop_map(data_to_db),
                 ref keys in vec(array::uniform32($bytes), 20)
             ) {
+                                            let snapshot = db.snapshot();
                 let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, db.snapshot());
+                    ProofMapIndex::new(INDEX_NAME, &snapshot);
                 prop_assume!(keys.iter().all(|key| !table.contains(key)));
 
                 let proof = table.get_multiproof(keys.clone());
@@ -232,8 +237,9 @@ macro_rules! proof_map_tests {
                     }),
                 ref absent_keys in vec(array::uniform32($bytes), 20)
             ) {
+                                        let snapshot = db.snapshot();
                 let table: ProofMapIndex<_, [u8; 32], u64> =
-                    ProofMapIndex::new(INDEX_NAME, db.snapshot());
+                    ProofMapIndex::new(INDEX_NAME, &snapshot);
 
                 let mut all_keys = keys.clone();
                 all_keys.extend_from_slice(absent_keys);

@@ -27,6 +27,7 @@
 //! extern crate failure;
 //!
 //! use serde_json::Value;
+//! use std::borrow::Cow;
 //!
 //! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionContext,
@@ -35,7 +36,7 @@
 //! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
 //! use exonum::messages::{Signed, RawTransaction, Message};
-//! use exonum::storage::{Snapshot, Fork};
+//! use exonum_merkledb::{Snapshot, Fork};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! // Simple service implementation.
@@ -139,10 +140,10 @@
 //! ```
 
 #![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
+missing_debug_implementations,
+missing_docs,
+unsafe_code,
+bare_trait_objects
 )]
 
 #[cfg_attr(test, macro_use)]
@@ -170,8 +171,10 @@ pub mod proto;
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, net::SocketAddr};
+
+use exonum_merkledb::{Database, Patch, Snapshot, TemporaryDB};
 
 use exonum::{
     api::{
@@ -184,7 +187,6 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{RawTransaction, Signed},
     node::{ApiSender, ExternalMessage, State as NodeState},
-    storage::{Database, MemoryDB, Patch, Snapshot},
 };
 
 use crate::checkpoint_db::{CheckpointDb, CheckpointDbHandler};
@@ -261,7 +263,7 @@ mod server;
 /// #    fn service_name(&self) -> &str {
 /// #        "documentation"
 /// #    }
-/// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+/// #    fn state_hash(&self, _: &exonum_merkledb::Snapshot) -> Vec<exonum::crypto::Hash> {
 /// #        Vec::new()
 /// #    }
 /// #    fn service_id(&self) -> u16 {
@@ -343,8 +345,8 @@ impl TestKitBuilder {
 
     /// Adds a service to the testkit.
     pub fn with_service<S>(mut self, service: S) -> Self
-    where
-        S: Into<Box<dyn Service>>,
+        where
+            S: Into<Box<dyn Service>>,
     {
         self.services.push(service.into());
         self
@@ -366,7 +368,7 @@ impl TestKitBuilder {
         let network =
             TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1));
         let genesis = network.genesis_config();
-        TestKit::assemble(MemoryDB::new(), self.services, network, genesis)
+        TestKit::assemble(TemporaryDB::new(), self.services, network, genesis)
     }
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by
@@ -386,8 +388,9 @@ impl TestKitBuilder {
 /// (with no real network setup).
 pub struct TestKit {
     blockchain: Blockchain,
-    db_handler: CheckpointDbHandler<MemoryDB>,
+    db_handler: CheckpointDbHandler<TemporaryDB>,
     events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
+    processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
@@ -406,14 +409,14 @@ impl fmt::Debug for TestKit {
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given service.
     pub fn for_service<S>(service: S) -> Self
-    where
-        S: Into<Box<dyn Service>>,
+        where
+            S: Into<Box<dyn Service>>,
     {
         TestKitBuilder::validator().with_service(service).create()
     }
 
     fn assemble(
-        database: MemoryDB,
+        database: TemporaryDB,
         services: Vec<Box<dyn Service>>,
         network: TestNetwork,
         genesis: GenesisConfig,
@@ -433,27 +436,29 @@ impl TestKit {
         );
 
         blockchain.initialize(genesis).unwrap();
+        let processing_lock = Arc::new(Mutex::new(()));
+        let processing_lock_ = Arc::clone(&processing_lock);
 
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
             let mut blockchain = blockchain.clone();
             Box::new(api_channel.1.and_then(move |event| {
-                let mut fork = blockchain.fork();
-                {
-                    let mut schema = CoreSchema::new(&mut fork);
-                    match event {
-                        ExternalMessage::Transaction(tx) => {
-                            let hash = tx.hash();
-                            if !schema.transactions().contains(&hash) {
-                                schema.add_transaction_into_pool(tx.clone());
-                            }
+                let guard = processing_lock_.lock().unwrap();
+                let fork = blockchain.fork();
+                let mut schema = CoreSchema::new(&fork);
+                match event {
+                    ExternalMessage::Transaction(tx) => {
+                        let hash = tx.hash();
+                        if !schema.transactions().contains(&hash) {
+                            schema.add_transaction_into_pool(tx.clone());
                         }
-                        ExternalMessage::PeerAdd(_)
-                        | ExternalMessage::Enable(_)
-                        | ExternalMessage::Rebroadcast
-                        | ExternalMessage::Shutdown => { /* Ignored */ }
                     }
+                    ExternalMessage::PeerAdd(_)
+                    | ExternalMessage::Enable(_)
+                    | ExternalMessage::Rebroadcast
+                    | ExternalMessage::Shutdown => { /* Ignored */ }
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
+                drop(guard);
                 Ok(())
             }))
         };
@@ -463,6 +468,7 @@ impl TestKit {
             db_handler,
             api_sender,
             events_stream,
+            processing_lock,
             network,
             cfg_proposal: None,
         }
@@ -512,6 +518,7 @@ impl TestKit {
     /// # #[macro_use] extern crate serde_derive;
     /// # #[macro_use] extern crate exonum_testkit;
     /// # extern crate failure;
+    /// use std::borrow::Cow;
     ///
     /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
     /// # use exonum::messages::{Signed, RawTransaction, Message};
@@ -525,7 +532,7 @@ impl TestKit {
     /// #    fn service_name(&self) -> &str {
     /// #        "documentation"
     /// #    }
-    /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+    /// #    fn state_hash(&self, _: &exonum_merkledb::Snapshot) -> Vec<exonum::crypto::Hash> {
     /// #        Vec::new()
     /// #    }
     /// #    fn service_id(&self) -> u16 {
@@ -591,13 +598,14 @@ impl TestKit {
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
-    where
-        I: IntoIterator<Item = Signed<RawTransaction>>,
+        where
+            I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
-        let schema = CoreSchema::new(self.snapshot());
+        let snapshot = self.snapshot();
+        let schema = CoreSchema::new(&snapshot);
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
             !schema.transactions().contains(&tx.hash())
                 || schema.transactions_pool().contains(&tx.hash())
@@ -648,9 +656,11 @@ impl TestKit {
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
 
+        let guard = self.processing_lock.lock().unwrap();
         self.blockchain
             .commit(&patch, block_hash, precommits.into_iter())
             .unwrap();
+        drop(guard);
 
         self.poll_events();
 
@@ -663,7 +673,6 @@ impl TestKit {
     /// with `commit_configuration_change`.
     fn update_configuration(&mut self, new_block_height: Height) -> Option<Patch> {
         use crate::ConfigurationProposalState::*;
-
         let actual_from = new_block_height.next();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
@@ -671,8 +680,8 @@ impl TestKit {
                     // Commit configuration proposal
                     let stored = cfg_proposal.stored_configuration().clone();
 
-                    let mut fork = self.blockchain.fork();
-                    CoreSchema::new(&mut fork).commit_configuration(stored);
+                    let fork = self.blockchain.fork();
+                    CoreSchema::new(&fork).commit_configuration(stored);
                     self.cfg_proposal = Some(Committed(cfg_proposal));
 
                     return Some(fork.into_patch());
@@ -712,14 +721,14 @@ impl TestKit {
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
-    where
-        I: IntoIterator<Item = Signed<RawTransaction>>,
+        where
+            I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
-            let mut fork = blockchain.fork();
+            let fork = blockchain.fork();
             let hashes = {
-                let mut schema = CoreSchema::new(&mut fork);
+                let mut schema = CoreSchema::new(&fork);
 
                 txs.into_iter()
                     .map(|tx| {
@@ -801,19 +810,14 @@ impl TestKit {
         let schema = CoreSchema::new(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
-        {
-            let blockchain = self.blockchain_mut();
-            let fork = blockchain.fork();
-            blockchain.merge(fork.into_patch()).unwrap();
-        }
         self.do_create_block(&tx_hashes)
     }
 
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Signed<RawTransaction>) {
-        let mut fork = self.blockchain.fork();
+        let fork = self.blockchain.fork();
         {
-            let mut schema = CoreSchema::new(&mut fork);
+            let mut schema = CoreSchema::new(&fork);
             schema.add_transaction_into_pool(transaction);
         }
         self.blockchain
@@ -1048,9 +1052,10 @@ impl TestKit {
 ///
 /// ```
 /// # use exonum::{
-/// #   blockchain::{Service, Transaction, ServiceContext}, storage::{Snapshot, Fork},
+/// #   blockchain::{Service, Transaction, ServiceContext},
 /// #   helpers::Height, messages::RawTransaction, crypto::Hash,
 /// # };
+/// # use exonum_merkledb::{Fork, Snapshot};
 /// # use exonum_testkit::TestKit;
 /// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 /// // Service with internal state modified by a custom `after_commit` hook.
@@ -1100,7 +1105,7 @@ impl TestKit {
 /// ```
 #[derive(Debug)]
 pub struct StoppedTestKit {
-    db: MemoryDB,
+    db: TemporaryDB,
     network: TestNetwork,
     cfg_proposal: Option<ConfigurationProposalState>,
 }
@@ -1113,7 +1118,8 @@ impl StoppedTestKit {
 
     /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
-        CoreSchema::new(self.snapshot()).height()
+        let snapshot = self.snapshot();
+        CoreSchema::new(&snapshot).height()
     }
 
     /// Returns the reference to test network.
@@ -1127,7 +1133,8 @@ impl StoppedTestKit {
     /// the `TestKit` (which is also what may happen with real Exonum apps).
     pub fn resume(self, services: Vec<Box<dyn Service>>) -> TestKit {
         let genesis = {
-            let schema = CoreSchema::new(self.db.snapshot());
+            let snapshot = self.db.snapshot();
+            let schema = CoreSchema::new(&snapshot);
             GenesisConfig::new(
                 schema
                     .configuration_by_height(Height(0))

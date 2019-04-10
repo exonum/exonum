@@ -355,7 +355,8 @@ fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 }
 
 impl<T: IndexAccess> View<T> {
-    pub(super) fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
+    ///TODO: add documentation
+    pub fn new<I: Into<IndexAddress>>(index_access: T, address: I) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);
         Self {

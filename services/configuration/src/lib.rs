@@ -88,6 +88,8 @@ pub use crate::{
 
 use serde_json::{to_value, Value};
 
+use exonum_merkledb::{Fork, Snapshot};
+
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
@@ -95,7 +97,6 @@ use exonum::{
     helpers::fabric::{self, keys, Command, CommandExtension, CommandName, Context},
     messages::RawTransaction,
     node::State,
-    storage::{Fork, Snapshot},
 };
 
 use crate::{

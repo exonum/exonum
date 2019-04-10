@@ -19,8 +19,9 @@ use super::{
     timestamping_sandbox,
 };
 use crate::blockchain::Block;
-use crate::crypto::{CryptoHash, Hash};
+use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
+use exonum_merkledb::HashTag;
 
 #[test]
 fn test_send_propose_and_prevote() {
@@ -99,7 +100,7 @@ fn test_get_lock_and_send_precommit() {
         Height(1),
         0,
         &sandbox.last_hash(),
-        &Hash::zero(),
+        &HashTag::empty_list_hash(),
         &sandbox.last_state_hash(),
     );
 
@@ -159,7 +160,7 @@ fn test_commit() {
         Height(1),
         0,
         &sandbox.last_hash(),
-        &Hash::zero(),
+        &HashTag::empty_list_hash(),
         &sandbox.last_state_hash(),
     );
 

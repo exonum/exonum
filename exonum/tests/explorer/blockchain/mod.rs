@@ -24,8 +24,9 @@ use exonum::{
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
     node::ApiSender,
-    storage::{MemoryDB, Snapshot},
 };
+
+use exonum_merkledb::{Snapshot, TemporaryDB};
 
 pub const SERVICE_ID: u16 = 0;
 
@@ -126,7 +127,7 @@ pub fn create_blockchain() -> Blockchain {
 
     let api_channel = mpsc::channel(10);
     let mut blockchain = Blockchain::new(
-        MemoryDB::new(),
+        TemporaryDB::new(),
         vec![MyService.into()],
         service_keys.0,
         service_keys.1,
@@ -153,9 +154,9 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
     let tx_hashes: Vec<_> = transactions.iter().map(|tx| tx.hash()).collect();
     let height = blockchain.last_block().height().next();
 
-    let mut fork = blockchain.fork();
+    let fork = blockchain.fork();
     {
-        let mut schema = Schema::new(&mut fork);
+        let mut schema = Schema::new(&fork);
         for tx in transactions {
             schema.add_transaction_into_pool(tx.clone())
         }

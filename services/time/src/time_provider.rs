@@ -62,7 +62,7 @@ impl TimeProvider for SystemTimeProvider {
 ///
 /// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
-/// let schema = TimeSchema::new(snapshot);
+/// let schema = TimeSchema::new(&snapshot);
 /// assert_eq!(
 ///     Some(Utc.timestamp(15, 0)),
 ///     schema.time().get().map(|time| time)

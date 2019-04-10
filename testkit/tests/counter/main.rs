@@ -27,6 +27,8 @@ extern crate serde_json;
 #[macro_use]
 extern crate exonum_derive;
 
+use exonum_merkledb::HashTag;
+
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
     blockchain::TransactionErrorType as ErrorType,
@@ -459,7 +461,7 @@ fn test_explorer_blocks_basic() {
                 "height": 0,
                 "tx_count": 0,
                 "prev_hash": crypto::Hash::zero(),
-                "tx_hash": crypto::Hash::zero(),
+                "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash(),
             }],
         })
@@ -496,7 +498,7 @@ fn test_explorer_blocks_basic() {
                 "height": 1,
                 "tx_count": 0,
                 "prev_hash": blocks[1].block.hash(),
-                "tx_hash": crypto::Hash::zero(),
+                "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash(),
                 "precommits": [precommit],
             }],
@@ -516,7 +518,7 @@ fn test_explorer_blocks_basic() {
                 "height": 1,
                 "tx_count": 0,
                 "prev_hash": blocks[1].block.hash(),
-                "tx_hash": crypto::Hash::zero(),
+                "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash(),
                 "time": precommit.time(),
             }],
@@ -722,7 +724,7 @@ fn test_explorer_single_block() {
         let block = explorer.block(Height(1)).unwrap();
         assert_eq!(block.height(), Height(1));
         assert_eq!(block.len(), 1);
-        assert_eq!(*block.header().tx_hash(), tx.hash());
+        assert_eq!(*block.header().tx_hash(), HashTag::hash_list(&[tx.hash()]));
         assert_eq!(&*block.transaction_hashes(), &[tx.hash()]);
 
         let mut validators = HashSet::new();

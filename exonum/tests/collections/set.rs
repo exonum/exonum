@@ -25,7 +25,7 @@ use std::collections::HashSet;
 use std::hash::Hash;
 
 use super::ACTIONS_MAX_LEN;
-use exonum::storage::{Fork, KeySetIndex, ValueSetIndex};
+use exonum_merkledb::{Fork, KeySetIndex, ValueSetIndex};
 
 #[derive(Debug, Clone)]
 enum SetAction<V> {
@@ -67,8 +67,8 @@ where
 mod key_set_index {
     use super::*;
 
-    impl<'a> Modifier<KeySetIndex<&'a mut Fork, u8>> for SetAction<u8> {
-        fn modify(self, set: &mut KeySetIndex<&'a mut Fork, u8>) {
+    impl<'a> Modifier<KeySetIndex<&'a Fork, u8>> for SetAction<u8> {
+        fn modify(self, set: &mut KeySetIndex<&'a Fork, u8>) {
             match self {
                 SetAction::Put(k) => {
                     set.insert(k);
@@ -85,7 +85,7 @@ mod key_set_index {
     }
 
     fn compare_collections(
-        key_set_index: &KeySetIndex<&mut Fork, u8>,
+        key_set_index: &KeySetIndex<&Fork, u8>,
         ref_set: &HashSet<u8>,
     ) -> TestCaseResult {
         for k in ref_set {
@@ -108,8 +108,8 @@ mod key_set_index {
 mod value_set_index {
     use super::*;
 
-    impl<'a> Modifier<ValueSetIndex<&'a mut Fork, u8>> for SetAction<u8> {
-        fn modify(self, set: &mut ValueSetIndex<&'a mut Fork, u8>) {
+    impl<'a> Modifier<ValueSetIndex<&'a Fork, u8>> for SetAction<u8> {
+        fn modify(self, set: &mut ValueSetIndex<&'a Fork, u8>) {
             match self {
                 SetAction::Put(k) => {
                     set.insert(k);
@@ -126,7 +126,7 @@ mod value_set_index {
     }
 
     fn compare_collections(
-        value_set_index: &ValueSetIndex<&mut Fork, u8>,
+        value_set_index: &ValueSetIndex<&Fork, u8>,
         ref_set: &HashSet<u8>,
     ) -> TestCaseResult {
         for k in ref_set {

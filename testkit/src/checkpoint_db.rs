@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
+use exonum_merkledb::{Database, Patch, Result as StorageResult, Snapshot, View};
 
 use std::sync::{Arc, RwLock};
 
@@ -140,17 +140,19 @@ impl<T: Database> CheckpointDbInner<T> {
         // are updated atomically.
         let snapshot = self.db.snapshot();
         self.db.merge(patch.clone())?;
-        let mut rev_fork = self.db.fork();
+        let rev_fork = self.db.fork();
 
         // Reverse a patch to get a backup patch.
         for (name, changes) in patch {
+            let mut view = View::new(&rev_fork, name.clone());
+
             for (key, _) in changes {
                 match snapshot.get(&name, &key) {
                     Some(value) => {
-                        rev_fork.put(&name, key, value);
+                        view.put(&key, value);
                     }
                     None => {
-                        rev_fork.remove(&name, key);
+                        view.remove(&key);
                     }
                 }
             }
@@ -182,7 +184,7 @@ impl<T: Database> CheckpointDbInner<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exonum::storage::{Change, MemoryDB};
+    use exonum_merkledb::{Change, TemporaryDB};
 
     // Same as `Change`, but with trait implementations required for `Patch` comparison.
     #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
@@ -238,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_backup_stack() {
-        let db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
 
         assert_eq!(stack_len(&db), 0);
@@ -256,11 +258,14 @@ mod tests {
 
     #[test]
     fn test_backup() {
-        let db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
         handler.checkpoint();
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![2]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -273,10 +278,15 @@ mod tests {
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
 
         handler.checkpoint();
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![3]);
-        fork.put("bar", vec![1], vec![4]);
-        fork.put("bar2", vec![5], vec![6]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![3]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![4]);
+            let mut view = View::new(&fork, "bar2");
+            view.put(&vec![5], vec![6]);
+        }
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -304,18 +314,25 @@ mod tests {
     #[test]
     #[allow(clippy::cyclomatic_complexity)]
     fn test_rollback() {
-        let db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![2]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
         db.merge(fork.into_patch()).unwrap();
 
         // Both checkpoints are on purpose.
         handler.checkpoint();
         handler.checkpoint();
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![3]);
-        fork.put("bar", vec![1], vec![4]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![3]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![4]);
+        }
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -341,9 +358,12 @@ mod tests {
 
         // Check that DB continues working as usual after a rollback.
         handler.checkpoint();
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![4]);
-        fork.put("foo", vec![0, 0], vec![255]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![4]);
+            view.put(&vec![0, 0], vec![255]);
+        }
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -356,8 +376,11 @@ mod tests {
         assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
         assert_eq!(snapshot.get("foo", &[0, 0]), Some(vec![255]));
 
-        let mut fork = db.fork();
-        fork.put("bar", vec![1], vec![254]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![254]);
+        }
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -397,12 +420,15 @@ mod tests {
 
     #[test]
     fn test_handler() {
-        let db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
 
         handler.checkpoint();
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![2]);
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
@@ -415,7 +441,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_extra_rollback() {
-        let db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
 
         handler.checkpoint();

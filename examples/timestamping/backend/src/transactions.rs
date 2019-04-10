@@ -70,16 +70,16 @@ impl TxTimestamp {
 }
 
 impl Transaction for TxTimestamp {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let tx_hash = context.tx_hash();
-        let time = TimeSchema::new(&context.fork())
+        let time = TimeSchema::new(context.fork())
             .time()
             .get()
             .expect("Can't get the time");
 
         let hash = &self.content.content_hash;
 
-        let mut schema = Schema::new(context.fork());
+        let schema = Schema::new(context.fork());
         if let Some(_entry) = schema.timestamps().get(hash) {
             Err(Error::HashAlreadyExists)?;
         }

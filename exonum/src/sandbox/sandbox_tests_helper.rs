@@ -25,7 +25,7 @@ use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
 use crate::messages::{
     Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, RawTransaction, Signed,
 };
-use crate::storage::{Database, MemoryDB, ProofListIndex};
+use exonum_merkledb::{Database, HashTag, ObjectHash, ProofListIndex, TemporaryDB};
 
 pub type TimestampingSandbox = Sandbox;
 
@@ -100,7 +100,7 @@ impl<'a> BlockBuilder<'a> {
             self.height.unwrap_or_else(|| self.sandbox.current_height()),
             self.tx_count.unwrap_or(0),
             &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
-            &self.tx_hash.unwrap_or_else(Hash::zero),
+            &self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
             &self
                 .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
@@ -203,10 +203,10 @@ pub fn empty_hash() -> Hash {
 }
 
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
-    let mut fork = MemoryDB::new().fork();
-    let mut hashes = ProofListIndex::new("name", &mut fork);
+    let fork = TemporaryDB::new().fork();
+    let mut hashes = ProofListIndex::new("name", &fork);
     hashes.extend(txs.iter().cloned());
-    hashes.merkle_root()
+    hashes.object_hash()
 }
 
 pub fn add_round_with_transactions(

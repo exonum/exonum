@@ -11,11 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use exonum_merkledb::TemporaryDB;
 
 use exonum::{
     blockchain::{GenesisConfig, ValidatorKeys},
     node::{Node, NodeApiConfig, NodeConfig},
-    storage::MemoryDB,
 };
 use exonum_cryptocurrency::service::CurrencyService;
 
@@ -60,7 +60,7 @@ fn main() {
 
     println!("Creating in-memory database...");
     let node = Node::new(
-        MemoryDB::new(),
+        TemporaryDB::new(),
         vec![Box::new(CurrencyService)],
         node_config(),
         None,

@@ -559,7 +559,7 @@ mod tests {
     }
 
     fn list_index_iter(list_index: &mut ListIndex<&Fork, u8>) {
-        list_index.extend(vec![1u8, 2, 3]);
+        list_index.extend(vec![1_u8, 2, 3]);
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
 
@@ -572,15 +572,16 @@ mod tests {
     }
 
     fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
-        assert_ne!(x, y);
-        let mut fork = db.fork();
-
         fn list<T>(index: u32, view: T) -> ListIndex<T, String>
         where
             T: IndexAccess,
         {
             ListIndex::new_in_family("family", &index, view)
         }
+
+        assert_ne!(x, y);
+
+        let mut fork = db.fork();
 
         // Write data to both indexes.
         {

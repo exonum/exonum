@@ -11,13 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use exonum_merkledb::BinaryValue;
 
 use exonum::{
     blockchain::{Schema, StoredConfiguration},
     crypto::{hash, CryptoHash, Hash, HASH_SIZE},
     helpers::{Height, ValidatorId},
     messages::{RawTransaction, Signed},
-    storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 

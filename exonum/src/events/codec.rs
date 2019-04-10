@@ -120,7 +120,7 @@ mod test {
     fn decode_message_eof() {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
 
-        let data = vec![1u8; EMPTY_SIGNED_MESSAGE_SIZE + 10];
+        let data = vec![1_u8; EMPTY_SIGNED_MESSAGE_SIZE + 10];
         let raw = raw_message(data.clone());
 
         let mut bytes: BytesMut = BytesMut::new();

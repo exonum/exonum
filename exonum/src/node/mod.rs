@@ -62,7 +62,7 @@ use crate::helpers::{
 };
 use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
-use crate::storage::{Database, DbOptions};
+use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
 mod connect_list;
@@ -162,7 +162,7 @@ pub struct ListenerConfig {
 }
 
 /// An api configuration options.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeApiConfig {
     /// Timeout to update api state.
     pub state_update_timeout: usize,
@@ -195,7 +195,7 @@ impl Default for NodeApiConfig {
 }
 
 /// Events pool capacities.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EventsPoolCapacity {
     /// Maximum number of queued outgoing network messages.
     pub network_requests_capacity: usize,
@@ -219,7 +219,7 @@ impl Default for EventsPoolCapacity {
 }
 
 /// Memory pool configuration parameters.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
@@ -235,7 +235,7 @@ impl Default for MemoryPoolConfig {
 }
 
 /// Configuration for the `Node`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeConfig<T = SecretKey> {
     /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
@@ -1115,7 +1115,7 @@ mod tests {
     use crate::events::EventHandler;
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
-    use crate::storage::{Database, MemoryDB, Snapshot};
+    use exonum_merkledb::{Database, Snapshot, TemporaryDB};
 
     const SERVICE_ID: u16 = 0;
 
@@ -1162,7 +1162,7 @@ mod tests {
     fn test_duplicated_transaction() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![Box::new(TestService) as Box<dyn Service>];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
@@ -1195,7 +1195,7 @@ mod tests {
     fn test_transaction_without_service() {
         let (p_key, s_key) = gen_keypair();
 
-        let db = Arc::from(Box::new(MemoryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 

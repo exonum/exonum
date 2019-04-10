@@ -15,12 +15,10 @@
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use exonum::{
-    crypto::Hash,
-    storage::{
-        proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, ProofListIndex,
-        ProofMapIndex, RocksDB,
-    },
+use exonum::crypto::Hash;
+use exonum_merkledb::{
+    proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions, ObjectHash,
+    ProofListIndex, ProofMapIndex, RocksDB,
 };
 use rand::{Rng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -71,8 +69,8 @@ fn proof_list_append(b: &mut Bencher, db: &dyn Database, len: usize) {
 
     b.iter_with_setup(
         || db.fork(),
-        |mut storage| {
-            let mut table = ProofListIndex::new(NAME, &mut storage);
+        |storage| {
+            let mut table = ProofListIndex::new(NAME, &storage);
             assert!(table.is_empty());
             for item in &data {
                 table.push(item.clone());
@@ -85,8 +83,8 @@ fn proof_map_insert_without_merge(b: &mut Bencher, db: &dyn Database, len: usize
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || db.fork(),
-        |mut storage| {
-            let mut table = ProofMapIndex::new(NAME, &mut storage);
+        |storage| {
+            let mut table = ProofMapIndex::new(NAME, &storage);
             assert!(table.keys().next().is_none());
             for item in &data {
                 table.put(&item.0, item.1.clone());
@@ -99,18 +97,17 @@ fn proof_map_insert_with_merge(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || {
-            let mut fork = db.fork();
+            let fork = db.fork();
             {
-                let mut table: ProofMapIndex<_, Hash, Vec<u8>> =
-                    ProofMapIndex::new(NAME, &mut fork);
+                let mut table: ProofMapIndex<_, Hash, Vec<u8>> = ProofMapIndex::new(NAME, &fork);
                 table.clear();
             }
             db.merge(fork.into_patch()).unwrap();
         },
         |_| {
-            let mut fork = db.fork();
+            let fork = db.fork();
             {
-                let mut table = ProofMapIndex::new(NAME, &mut fork);
+                let mut table = ProofMapIndex::new(NAME, &fork);
                 assert!(table.keys().next().is_none());
                 for item in &data {
                     table.put(&item.0, item.1.clone());
@@ -123,13 +120,13 @@ fn proof_map_insert_with_merge(b: &mut Bencher, db: &dyn Database, len: usize) {
 
 fn proof_map_index_build_proofs(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
-    let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(NAME, &mut storage);
+    let storage = db.fork();
+    let mut table = ProofMapIndex::new(NAME, &storage);
 
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
-    let table_merkle_root = table.merkle_root();
+    let table_merkle_root = table.object_hash();
     let mut proofs = Vec::with_capacity(data.len());
 
     b.iter(|| {
@@ -140,26 +137,26 @@ fn proof_map_index_build_proofs(b: &mut Bencher, db: &dyn Database, len: usize) 
     for (i, proof) in proofs.into_iter().enumerate() {
         let checked_proof = proof.check().unwrap();
         assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
-        assert_eq!(checked_proof.merkle_root(), table_merkle_root);
+        assert_eq!(checked_proof.root_hash(), table_merkle_root);
     }
 }
 
 fn proof_map_index_verify_proofs(b: &mut Bencher, db: &dyn Database, len: usize) {
     let data = generate_random_kv(len);
-    let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(NAME, &mut storage);
+    let storage = db.fork();
+    let mut table = ProofMapIndex::new(NAME, &storage);
 
     for item in &data {
         table.put(&item.0, item.1.clone());
     }
-    let table_merkle_root = table.merkle_root();
+    let table_merkle_root = table.object_hash();
     let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
 
     b.iter(|| {
         for (i, proof) in proofs.iter().enumerate() {
             let checked_proof = proof.clone().check().unwrap();
             assert_eq!(*checked_proof.entries().next().unwrap().1, data[i].1);
-            assert_eq!(checked_proof.merkle_root(), table_merkle_root);
+            assert_eq!(checked_proof.root_hash(), table_merkle_root);
         }
     });
 }

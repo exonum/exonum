@@ -94,9 +94,9 @@ fn test_map_methods() {
     assert_eq!(index.get(&[1; 32]), None);
     assert!(!index.contains(&[1; 32]));
 
-    index.put(&[1; 32], 1u8);
+    index.put(&[1; 32], 1_u8);
 
-    assert_eq!(index.get(&[1; 32]), Some(1u8));
+    assert_eq!(index.get(&[1; 32]), Some(1_u8));
     assert!(index.contains(&[1; 32]));
 
     index.remove(&[1; 32]);
@@ -104,8 +104,8 @@ fn test_map_methods() {
     assert!(!index.contains(&[1; 32]));
     assert_eq!(index.get(&[1; 32]), None);
 
-    index.put(&[2; 32], 2u8);
-    index.put(&[3; 32], 3u8);
+    index.put(&[2; 32], 2_u8);
+    index.put(&[3; 32], 3_u8);
     index.clear();
 
     assert!(!index.contains(&[2; 32]));
@@ -467,14 +467,14 @@ fn check_map_multiproof<K, V>(
 
 const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
-fn check_proofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
+fn check_proofs_for_data<K, V>(db: &dyn Database, data: &[(K, V)], nonexisting_keys: &[K])
 where
     K: BinaryKey + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &storage);
-    for &(ref key, ref value) in &data {
+    for &(ref key, ref value) in data {
         table.put(key, value.clone());
     }
 
@@ -495,20 +495,20 @@ where
     for key in nonexisting_keys {
         if !table.contains(&key) {
             // The check is largely redundant, but better be here anyway
-            let proof = table.get_proof(key);
+            let proof = table.get_proof(key.clone());
             check_map_proof(proof, None, &table);
         }
     }
 }
 
-fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
+fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: &[(K, V)], nonexisting_keys: &[K])
 where
     K: BinaryKey + ObjectHash + Clone + Ord + PartialEq + StdHash + Debug + Serialize,
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize,
 {
     let storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &storage);
-    for &(ref key, ref value) in &data {
+    for &(ref key, ref value) in data {
         table.put(key, value.clone());
     }
 
@@ -697,22 +697,22 @@ fn test_build_proof_in_complex_tree() {
     let proof = table.get_proof([128; 32]);
     assert_eq!(
         proof.proof_unchecked(),
-        vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&vec![2]))]
+        vec![(ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2]))]
     );
     check_map_proof(proof, Some([128; 32]), &table);
 
     let proof = table.get_proof([32; 32]);
     assert_eq!(
         proof.proof_unchecked(),
-        vec![(ProofPath::new(&[128; 32]), HashTag::hash_leaf(&vec![1]))]
+        vec![(ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1]))]
     );
     check_map_proof(proof, Some([32; 32]), &table);
 
     // Key left of all keys in the tree
     let proof = table.get_proof([0; 32]);
     let exp_proof = vec![
-        (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&vec![1])),
-        (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&vec![2])),
+        (ProofPath::new(&[128; 32]), HashTag::hash_leaf(&[1])),
+        (ProofPath::new(&[32; 32]), HashTag::hash_leaf(&[2])),
     ];
     assert_eq!(proof.proof_unchecked(), exp_proof);
     check_map_proof(proof, None, &table);
@@ -1094,7 +1094,7 @@ fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
                 .flat_map(|(key, val)| vec![hash(&key), hash(&val)])
                 .collect();
 
-        check_proofs_for_data(&db, data, nonexisting_keys);
+        check_proofs_for_data(&db, &data, &nonexisting_keys);
     }
 }
 
@@ -1115,7 +1115,7 @@ fn test_fuzz_insert_build_proofs() {
                 .map(|(key, _)| key)
                 .collect();
 
-        check_proofs_for_data(&db, data, nonexisting_keys);
+        check_proofs_for_data(&db, &data, &nonexisting_keys);
     }
 }
 
@@ -1136,14 +1136,14 @@ fn test_fuzz_insert_build_multiproofs() {
                 .map(|(key, _)| key)
                 .collect();
 
-        check_multiproofs_for_data(&db, data, nonexisting_keys);
+        check_multiproofs_for_data(&db, &data, &nonexisting_keys);
     }
 }
 
 #[test]
 fn test_fuzz_delete_build_proofs() {
-    let db = TemporaryDB::default();
     const SAMPLE_SIZE: usize = 200;
+    let db = TemporaryDB::default();
 
     let mut rng = XorShiftRng::from_seed(rand::random());
     let mut exists_keys = HashSet::default();
@@ -1288,9 +1288,9 @@ fn test_iter() {
     let k3 = [3; 32];
     let k4 = [4; 32];
 
-    map_index.put(&k1, 1u8);
-    map_index.put(&k2, 2u8);
-    map_index.put(&k3, 3u8);
+    map_index.put(&k1, 1_u8);
+    map_index.put(&k2, 2_u8);
+    map_index.put(&k3, 3_u8);
 
     assert_eq!(
         map_index.iter().collect::<Vec<([u8; 32], u8)>>(),
@@ -1449,7 +1449,7 @@ fn test_tree_with_hashed_key() {
         proof.proof_unchecked(),
         vec![(
             ProofPath::new(&Point::new(3, 4)),
-            HashTag::hash_leaf(&vec![2, 3, 4])
+            HashTag::hash_leaf(&[2, 3, 4])
         )]
     );
     let proof = proof.check().unwrap();
@@ -1468,9 +1468,6 @@ fn test_tree_with_hashed_key() {
     assert_eq!(table.get(&other_key), Some(vec![1, 2, 3]));
     assert_eq!(
         table.object_hash(),
-        hash_isolated_node(
-            &ProofPath::new(&other_key),
-            &HashTag::hash_leaf(&vec![1, 2, 3])
-        )
+        hash_isolated_node(&ProofPath::new(&other_key), &HashTag::hash_leaf(&[1, 2, 3]))
     );
 }

@@ -36,7 +36,7 @@ use crate::node::{
     connect_list::{ConnectList, PeerAddress},
     ConnectInfo,
 };
-use crate::storage::{KeySetIndex, MapIndex, Patch, Snapshot};
+use exonum_merkledb::{IndexAccess, KeySetIndex, MapIndex, Patch};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 
@@ -917,7 +917,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose<S: AsRef<dyn Snapshot>>(
+    pub fn add_propose<S: IndexAccess>(
         &mut self,
         msg: Signed<Propose>,
         transactions: &MapIndex<S, Hash, Signed<RawTransaction>>,
@@ -985,7 +985,7 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
-    pub fn create_incomplete_block<S: AsRef<dyn Snapshot>>(
+    pub fn create_incomplete_block<S: IndexAccess>(
         &mut self,
         msg: &Signed<BlockResponse>,
         txs: &MapIndex<S, Hash, Signed<RawTransaction>>,

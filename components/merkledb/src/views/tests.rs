@@ -19,7 +19,7 @@ use crate::{
 };
 
 const IDX_NAME: &str = "idx_name";
-const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1u8, 2, 3] as &[u8]);
+const PREFIXED_IDX: (&str, &[u8]) = ("idx", &[1_u8, 2, 3] as &[u8]);
 
 fn assert_iter<T: IndexAccess>(view: &View<T>, from: u8, assumed: &[(u8, u8)]) {
     let mut iter = view.iter_bytes(&[from]);
@@ -38,7 +38,7 @@ fn assert_initial_state<T: IndexAccess>(view: &View<T>) {
     assert_eq!(view.get_bytes(&[4]), None);
 }
 
-fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
+fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: &T, address: I) {
     let mut fork = db.fork();
     {
         let mut view = View::new(&fork, address);
@@ -103,9 +103,9 @@ fn _changelog<T: Database, I: Into<IndexAddress> + Copy>(db: T, address: I) {
     assert_eq!(view.get_bytes(&[4]), None);
 }
 
-fn _views_in_same_family<T: Database>(db: T) {
-    const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
+fn _views_in_same_family<T: Database>(db: &T) {
+    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
+    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
 
     let mut fork = db.fork();
     {
@@ -158,7 +158,7 @@ fn _views_in_same_family<T: Database>(db: T) {
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
 }
 
-fn _two_mutable_borrows<T, I>(db: T, address: I)
+fn _two_mutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -171,7 +171,7 @@ where
     assert_eq!(view2.get_bytes(&[0]), None);
 }
 
-fn _mutable_and_immutable_borrows<T, I>(db: T, address: I)
+fn _mutable_and_immutable_borrows<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -184,7 +184,7 @@ where
     assert_eq!(view2.get_bytes(&[0]), None);
 }
 
-fn _clear_view<T, I>(db: T, address: I)
+fn _clear_view<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -247,7 +247,7 @@ where
     assert_iter(&view, 4, &[(4, 0)]);
 }
 
-fn _fork_iter<T, I>(db: T, address: I)
+fn _fork_iter<T, I>(db: &T, address: I)
 where
     T: Database,
     I: Into<IndexAddress> + Copy,
@@ -373,22 +373,22 @@ fn test_database_check_incorrect_version() {
 
 #[test]
 fn fork_iter() {
-    _fork_iter(TemporaryDB::new(), IDX_NAME);
+    _fork_iter(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn fork_iter_prefixed() {
-    _fork_iter(TemporaryDB::new(), PREFIXED_IDX);
+    _fork_iter(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn changelog() {
-    _changelog(TemporaryDB::new(), IDX_NAME);
+    _changelog(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn changelog_prefixed() {
-    _changelog(TemporaryDB::new(), PREFIXED_IDX);
+    _changelog(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
@@ -482,9 +482,10 @@ fn multiple_indexes() {
 
 #[test]
 fn views_in_same_family() {
+    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
+    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+
     let db = TemporaryDB::new();
-    const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
 
     let mut fork = db.fork();
     {
@@ -541,14 +542,14 @@ fn views_in_same_family() {
 fn rollbacks_for_indexes_in_same_family() {
     use crate::ProofListIndex;
 
-    let db = TemporaryDB::new();
-
     fn indexes(fork: &Fork) -> (ProofListIndex<&Fork, i64>, ProofListIndex<&Fork, i64>) {
         let list1 = ProofListIndex::new_in_family("foo", &1, fork);
         let list2 = ProofListIndex::new_in_family("foo", &2, fork);
 
         (list1, list2)
     }
+
+    let db = TemporaryDB::new();
 
     let mut fork = db.fork();
     {
@@ -590,19 +591,31 @@ fn rollbacks_for_indexes_in_same_family() {
 
 #[test]
 fn clear_view() {
-    _clear_view(TemporaryDB::new(), IDX_NAME);
+    _clear_view(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 fn clear_prefixed_view() {
-    _clear_view(TemporaryDB::new(), PREFIXED_IDX);
+    _clear_view(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 fn clear_sibling_views() {
+    const IDX_1: (&str, &[u8]) = ("foo", &[1_u8, 2] as &[u8]);
+    const IDX_2: (&str, &[u8]) = ("foo", &[1_u8, 3] as &[u8]);
+
+    fn assert_view_states<I: IndexAccess + Copy>(db_view: I) {
+        let view1 = View::new(db_view, IDX_1);
+        let view2 = View::new(db_view, IDX_2);
+
+        assert_eq!(view1.get_bytes(&[1]), None);
+        assert_eq!(view1.get_bytes(&[0]), Some(vec![5]));
+        assert_eq!(view2.get_bytes(&[0]), Some(vec![3]));
+        assert_iter(&view1, 1, &[(3, 6)]);
+        assert_iter(&view2, 1, &[(2, 4)]);
+    }
+
     let db = TemporaryDB::new();
-    const IDX_1: (&str, &[u8]) = ("foo", &[1u8, 2] as &[u8]);
-    const IDX_2: (&str, &[u8]) = ("foo", &[1u8, 3] as &[u8]);
 
     let fork = db.fork();
     {
@@ -624,17 +637,6 @@ fn clear_sibling_views() {
     }
     db.merge(fork.into_patch()).unwrap();
 
-    fn assert_view_states<I: IndexAccess + Copy>(db_view: I) {
-        let view1 = View::new(db_view, IDX_1);
-        let view2 = View::new(db_view, IDX_2);
-
-        assert_eq!(view1.get_bytes(&[1]), None);
-        assert_eq!(view1.get_bytes(&[0]), Some(vec![5]));
-        assert_eq!(view2.get_bytes(&[0]), Some(vec![3]));
-        assert_iter(&view1, 1, &[(3, 6)]);
-        assert_iter(&view2, 1, &[(2, 4)]);
-    }
-
     assert_view_states(&db.snapshot());
 
     let fork = db.fork();
@@ -655,25 +657,25 @@ fn clear_sibling_views() {
 #[test]
 #[should_panic]
 fn two_mutable_borrows() {
-    _two_mutable_borrows(TemporaryDB::new(), IDX_NAME);
+    _two_mutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn two_mutable_prefixed_borrows() {
-    _two_mutable_borrows(TemporaryDB::new(), PREFIXED_IDX);
+    _two_mutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_borrows() {
-    _mutable_and_immutable_borrows(TemporaryDB::new(), IDX_NAME);
+    _mutable_and_immutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
 #[should_panic]
 fn mutable_and_immutable_prefixed_borrows() {
-    _mutable_and_immutable_borrows(TemporaryDB::new(), PREFIXED_IDX);
+    _mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
@@ -811,10 +813,12 @@ fn test_metadata_index_family_incorrect() {
 //TODO: fix test [ECR-2869]
 fn multiple_patch() {
     use crate::ListIndex;
-    let db = TemporaryDB::new();
+
     fn list_index<View: IndexAccess>(view: View) -> ListIndex<View, u64> {
         ListIndex::new("list_index", view)
     }
+
+    let db = TemporaryDB::new();
     // create first patch
     let patch1 = {
         let fork = db.fork();

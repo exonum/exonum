@@ -78,7 +78,7 @@ but we have several additional conventions:
   ```rust
   // Import type:
   use std::path::Path;
-  
+
   // Use it:
   let path = Path::new("...");
   ```

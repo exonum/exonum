@@ -159,10 +159,6 @@ impl BinaryValue for Vec<u8> {
         self.clone()
     }
 
-    fn into_bytes(self) -> Vec<u8> {
-        self
-    }
-
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Ok(bytes.into_owned())
     }
@@ -171,10 +167,6 @@ impl BinaryValue for Vec<u8> {
 impl BinaryValue for String {
     fn to_bytes(&self) -> Vec<u8> {
         self.as_bytes().to_owned()
-    }
-
-    fn into_bytes(self) -> Vec<u8> {
-        Self::into_bytes(self)
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {

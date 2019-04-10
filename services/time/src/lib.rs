@@ -44,13 +44,14 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
+use exonum_merkledb::{Fork, Snapshot};
+
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric::{Context, ServiceFactory},
     messages::RawTransaction,
-    storage::{Fork, Snapshot},
 };
 use serde_json::Value;
 

@@ -11,5 +11,6 @@ members = [
     "components/build",
     "components/crypto",
     "components/derive",
+    "components/merkledb",
 ]
 exclude = [ "exonum/fuzz" ]

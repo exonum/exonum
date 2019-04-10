@@ -79,7 +79,7 @@ impl EventHandler for MessagesHandler {
 }
 
 fn gen_messages(count: usize, tx_size: usize) -> Vec<Vec<u8>> {
-    use exonum::storage::StorageValue;
+    use exonum_merkledb::BinaryValue;
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {

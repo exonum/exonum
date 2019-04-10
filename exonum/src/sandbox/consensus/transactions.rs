@@ -23,6 +23,7 @@ use crate::helpers::{Height, Milliseconds, Round, ValidatorId};
 use crate::messages::{RawTransaction, Signed};
 use crate::node::state::TRANSACTIONS_REQUEST_TIMEOUT;
 use crate::sandbox::{
+    compute_tx_hash,
     config_updater::TxConfig,
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
@@ -134,7 +135,7 @@ fn tx_pool_size_overflow() {
     let block = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(2))
         .with_height(Height(1))
-        .with_tx_hash(&tx1.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx1.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone()]))
         .with_prev_hash(&sandbox.last_hash())
         .build();
@@ -319,7 +320,7 @@ fn incorrect_tx_in_request() {
 #[test]
 fn response_size_larger_than_max_message_len() {
     use crate::messages::{RAW_TRANSACTION_HEADER, TRANSACTION_RESPONSE_EMPTY_SIZE};
-    use crate::storage::StorageValue;
+    use exonum_merkledb::BinaryValue;
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -444,7 +445,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
 
     let block = BlockBuilder::new(&sandbox)
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .build();
 
     let precommit_1 = sandbox.create_precommit(

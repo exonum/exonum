@@ -118,7 +118,7 @@ fn test_iter() {
     let fork = db.fork();
     let mut list_index = ProofListIndex::new(IDX_NAME, &fork);
 
-    list_index.extend(vec![1u8, 2, 3]);
+    list_index.extend(vec![1_u8, 2, 3]);
 
     assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
     assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
@@ -135,16 +135,16 @@ fn test_list_index_proof() {
     let fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &fork);
 
-    let h0 = HashTag::hash_leaf(&2u64.to_bytes());
-    let h1 = HashTag::hash_leaf(&4u64.to_bytes());
-    let h2 = HashTag::hash_leaf(&6u64.to_bytes());
+    let h0 = HashTag::hash_leaf(&2_u64.to_bytes());
+    let h1 = HashTag::hash_leaf(&4_u64.to_bytes());
+    let h2 = HashTag::hash_leaf(&6_u64.to_bytes());
     let h01 = HashTag::hash_node(&h0, &h1);
     let h22 = HashTag::hash_single_node(&h2);
     let h012 = HashTag::hash_node(&h01, &h22);
 
     assert_eq!(index.object_hash(), HashTag::empty_list_hash());
 
-    index.push(2u64);
+    index.push(2_u64);
 
     assert_eq!(index.object_hash(), HashTag::hash_list_node(1, h0));
     assert_eq!(index.get_proof(0), Leaf(2));
@@ -156,7 +156,7 @@ fn test_list_index_proof() {
         [(0, &2)]
     );
 
-    index.push(4u64);
+    index.push(4_u64);
     assert_eq!(index.object_hash(), HashTag::hash_list_node(2, h01));
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
     assert_eq!(
@@ -187,7 +187,7 @@ fn test_list_index_proof() {
         [(0, &2), (1, &4)]
     );
 
-    index.push(6u64);
+    index.push(6_u64);
     assert_eq!(index.object_hash(), HashTag::hash_list_node(3, h012));
     assert_eq!(
         index.get_proof(0),
@@ -324,6 +324,7 @@ fn hash_branch_node(value: &[u8]) -> Hash {
 }
 
 #[test]
+#[allow(clippy::range_plus_one)]
 fn test_index_and_proof_roots() {
     let db = TemporaryDB::default();
     let fork = db.fork();
@@ -703,13 +704,10 @@ fn assert_proof_of_absence<V: BinaryValue + ObjectHash + Debug>(
     assert!(validation_result.is_ok());
     assert!(validation_result.unwrap().is_empty());
 
-    match proof {
-        ListProof::Absent(proof) => {
-            let actual_hash = HashTag::hash_list_node(proof.length(), proof.merkle_root());
-            assert_eq!(expected_hash, actual_hash);
-        }
-        _ => {
-            panic!("Unexpected proof {:?}", proof);
-        }
+    if let ListProof::Absent(proof) = proof {
+        let actual_hash = HashTag::hash_list_node(proof.length(), proof.merkle_root());
+        assert_eq!(expected_hash, actual_hash);
+    } else {
+        panic!("Unexpected proof {:?}", proof);
     }
 }

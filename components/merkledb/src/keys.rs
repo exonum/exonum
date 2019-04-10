@@ -349,6 +349,7 @@ mod tests {
     macro_rules! test_storage_key_for_int_type {
         (full $type:ident, $size:expr => $test_name:ident) => {
             #[test]
+            #[allow(clippy::replace_consts)]
             fn $test_name() {
                 use std::iter::once;
 
@@ -470,7 +471,7 @@ mod tests {
             }
 
             fn read(buffer: &[u8]) -> Self {
-                QuirkyI32Key(BigEndian::read_i32(buffer))
+                Self(BigEndian::read_i32(buffer))
             }
         }
 
@@ -593,7 +594,7 @@ mod tests {
     #[test]
     fn test_str_key() {
         let values = ["eee", "hello world", ""];
-        for val in values.iter() {
+        for val in &values {
             let mut buffer = get_buffer(*val);
             val.write(&mut buffer);
             let new_val = str::read(&buffer);

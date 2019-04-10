@@ -205,7 +205,7 @@ pub fn connect_message(
 }
 
 pub fn raw_message(len: usize) -> SignedMessage {
-    let buffer = vec![0u8; len];
+    let buffer = vec![0_u8; len];
     SignedMessage::from_vec_unchecked(buffer)
 }
 

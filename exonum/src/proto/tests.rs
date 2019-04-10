@@ -278,7 +278,7 @@ struct StructWithFixedArrays {
 #[test]
 #[should_panic(expected = "wrong array size: actual 32, expected 64")]
 fn test_fixed_array_pb_convert_invalid_len() {
-    let vec = vec![0u8; 32];
+    let vec = vec![0_u8; 32];
     <[u8; 32]>::from_pb(vec.clone()).unwrap();
     <[u8; 64]>::from_pb(vec).unwrap();
 }

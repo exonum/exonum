@@ -18,6 +18,7 @@ use tempfile::TempDir;
 
 use super::rocksdb::RocksDB;
 use crate::{Database, DbOptions, Patch, Result, Snapshot};
+use std::sync::Arc;
 
 /// Wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.
@@ -57,5 +58,12 @@ impl Database for TemporaryDB {
 impl Default for TemporaryDB {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[allow(clippy::use_self)]
+impl From<TemporaryDB> for Arc<dyn Database> {
+    fn from(db: TemporaryDB) -> Self {
+        Arc::new(db)
     }
 }

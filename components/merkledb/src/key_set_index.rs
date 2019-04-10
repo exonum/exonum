@@ -346,11 +346,11 @@ mod tests {
 
     #[test]
     fn str_key() {
+        const KEY: &str = "key_1";
         let db = TemporaryDB::new();
         let fork = db.fork();
-        let mut index: KeySetIndex<_, String> = KeySetIndex::new(INDEX_NAME, &fork);
 
-        const KEY: &str = "key_1";
+        let mut index: KeySetIndex<_, String> = KeySetIndex::new(INDEX_NAME, &fork);
 
         assert_eq!(false, index.contains(KEY));
 
@@ -363,10 +363,9 @@ mod tests {
 
     #[test]
     fn u8_slice_key() {
+        const KEY: &[u8] = &[1, 2, 3];
         let db = TemporaryDB::new();
         let fork = db.fork();
-
-        const KEY: &[u8] = &[1, 2, 3];
 
         let mut index: KeySetIndex<_, Vec<u8>> = KeySetIndex::new(INDEX_NAME, &fork);
         assert_eq!(false, index.contains(KEY));

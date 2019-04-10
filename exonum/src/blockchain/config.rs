@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, HashSet};
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
 use crate::helpers::{Height, Milliseconds};
 use crate::messages::EMPTY_SIGNED_MESSAGE_SIZE;
-use crate::storage::StorageValue;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -252,13 +252,15 @@ impl CryptoHash for StoredConfiguration {
     }
 }
 
-impl StorageValue for StoredConfiguration {
-    fn into_bytes(self) -> Vec<u8> {
+impl_object_hash_for_binary_value! { StoredConfiguration }
+
+impl BinaryValue for StoredConfiguration {
+    fn to_bytes(&self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }
 
-    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        Self::try_deserialize(v.as_ref()).unwrap()
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::try_deserialize(v.as_ref()).map_err(|e| e.into())
     }
 }
 

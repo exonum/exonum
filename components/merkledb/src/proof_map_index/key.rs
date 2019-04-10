@@ -428,7 +428,7 @@ mod tests {
 
     impl ProofPath {
         fn compressed(&self) -> SmallVec<[u8; 64]> {
-            let mut buf = smallvec![0u8; 64];
+            let mut buf = smallvec![0_u8; 64];
             let bytes_written = self.write_compressed(&mut buf);
             buf.truncate(bytes_written);
             buf
@@ -440,8 +440,8 @@ mod tests {
             let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
             debug_assert!(bits_len <= KEY_SIZE * 8);
 
-            let mut raw = [0u8; PROOF_PATH_SIZE];
-            reader
+            let mut raw = [0_u8; PROOF_PATH_SIZE];
+            let _read = reader
                 .read(&mut raw[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE])
                 .unwrap();
             if bits_len == KEY_SIZE * 8 {
@@ -507,7 +507,7 @@ mod tests {
             assert_eq!(key2, key);
             // Trims insignificant bits in the last byte.
             let trimmed_key = {
-                let mut buf = vec![0u8; PROOF_PATH_SIZE];
+                let mut buf = vec![0_u8; PROOF_PATH_SIZE];
                 key.write(&mut buf);
                 ProofPath::read(&buf)
             };
@@ -667,7 +667,7 @@ mod tests {
         assert_eq!(key2, key);
         // Trims insignificant bits in the last byte.
         let trimmed_key = {
-            let mut buf = vec![0u8; PROOF_PATH_SIZE];
+            let mut buf = vec![0_u8; PROOF_PATH_SIZE];
             key.write(&mut buf);
             let mut key = ProofPath::read(&buf);
             key.start = 5;
@@ -764,6 +764,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::shadow_unrelated)]
     fn test_proof_path_common_prefix_len() {
         let b1 = ProofPath::from_inner(*b"\x01abcd0000000000000000000000000000\x00");
         let b2 = ProofPath::from_inner(*b"\x01abef0000000000000000000000000000\x00");

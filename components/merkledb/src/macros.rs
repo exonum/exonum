@@ -16,7 +16,7 @@
 /// `BinaryKey` trait.
 ///
 /// ```
-/// let prefix = vec![0u8; 10];
+/// let prefix = vec![0_u8; 10];
 /// let key = PublicKey::zero();
 ///
 /// let _result = concat_keys!(prefix, key);

@@ -19,7 +19,7 @@ use std::time::Duration;
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox};
 
 /// HANDLE block response
 
@@ -38,7 +38,7 @@ fn handle_block_response_tx_in_pool() {
     let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -125,7 +125,7 @@ fn handle_block_response_with_unknown_tx() {
     let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -594,7 +594,7 @@ fn received_block_while_there_is_full_propose() {
         .build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -714,7 +714,7 @@ fn received_block_while_there_is_pending_block() {
     let propose = ProposeBuilder::new(&sandbox).build();
 
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
