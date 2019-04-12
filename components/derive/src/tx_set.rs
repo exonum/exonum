@@ -15,59 +15,116 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{Data, DataEnum, DeriveInput, Fields, Type};
+use syn::{Attribute, Data, DataEnum, DeriveInput, Fields, Lit, MetaNameValue, Type, Variant};
 
-struct Variant {
+use std::collections::HashSet;
+
+use crate::get_exonum_name_value_attributes;
+
+struct ParsedVariant {
     id: u16,
     ident: Ident,
     typ: Type,
 }
 
-fn get_tx_variants(data: &DataEnum) -> Vec<Variant> {
+fn get_tx_variants(data: &DataEnum) -> Vec<ParsedVariant> {
     if data.variants.is_empty() {
         panic!("TransactionSet enum should not be empty");
     }
 
+    let mut next_id = 0;
+    let mut message_ids = HashSet::new();
     data.variants
         .iter()
-        .enumerate()
-        .map(|(n, v)| {
-            let mut fields = match &v.fields {
-                Fields::Unnamed(f) => f.unnamed.iter(),
-                _ => panic!("Only unnamed fields are supported for TransactionSet enum"),
+        .map(|variant| {
+            let mut fields = match &variant.fields {
+                Fields::Unnamed(field) => field.unnamed.iter(),
+                _ => panic!("Only unnamed fields are supported for `TransactionSet` enum."),
             };
             if fields.len() != 1 {
-                panic!("TransactionSet enum variant should have one field inside.");
+                panic!("Each `TransactionSet` enum variant should have one field inside.");
             }
             let field = fields.next().unwrap();
-            Variant {
-                id: n as u16,
-                ident: v.ident.clone(),
+
+            let message_id = get_message_id(&variant).unwrap_or(next_id);
+            next_id = message_id + 1;
+            if message_ids.contains(&message_id) {
+                panic!("Duplicate message identifier: {}", message_id);
+            }
+            message_ids.insert(message_id);
+
+            ParsedVariant {
+                id: message_id,
+                ident: variant.ident.clone(),
                 typ: field.ty.clone(),
             }
         })
         .collect()
 }
 
-fn implement_conversions_for_transactions(
-    name: &Ident,
-    variants: &[Variant],
-    cr: &dyn quote::ToTokens,
-) -> impl quote::ToTokens {
-    let conversions = variants.iter().map(|Variant { ident, typ, .. }| {
-        quote! {
-          impl From<#typ> for #name {
-               fn from(tx: #typ) -> Self {
-                     #name::#ident(tx)
-               }
-          }
+fn get_message_id(variant: &Variant) -> Option<u16> {
+    let literal = get_exonum_name_value_attributes(&variant.attrs)
+        .iter()
+        .filter_map(|MetaNameValue { ident, lit, .. }| {
+            if ident == "message_id" {
+                Some(lit)
+            } else {
+                None
+            }
+        })
+        .cloned()
+        .next()?;
 
-          impl Into<#cr::messages::ServiceTransaction> for #typ {
-              fn into(self) -> #cr::messages::ServiceTransaction {
-                  let set: #name = self.into();
-                  set.into()
-              }
-          }
+    Some(match literal {
+        Lit::Int(int_value) => {
+            if int_value.value() > u16::max_value() as u64 {
+                panic!(
+                    "Specified value is too large; expected value in range 0..={}",
+                    u16::max_value()
+                );
+            }
+            int_value.value() as u16
+        }
+        Lit::Str(str_value) => str_value
+            .value()
+            .parse()
+            .expect("Cannot parse `message_id` expression"),
+        _ => panic!("Invalid `message_id` specification, should be a `u16` constant"),
+    })
+}
+
+fn implement_conversions_for_enum(
+    name: &Ident,
+    variants: &[ParsedVariant],
+) -> impl quote::ToTokens {
+    let conversions = variants.iter().map(|ParsedVariant { ident, typ, .. }| {
+        quote! {
+            impl From<#typ> for #name {
+                fn from(tx: #typ) -> Self {
+                    #name::#ident(tx)
+                }
+            }
+        }
+    });
+
+    quote! {
+        #(#conversions)*
+    }
+}
+
+fn implement_conversions_for_variants(
+    name: &Ident,
+    variants: &[ParsedVariant],
+    crate_name: &impl quote::ToTokens,
+) -> impl quote::ToTokens {
+    let conversions = variants.iter().map(|ParsedVariant { typ, .. }| {
+        quote! {
+            impl From<#typ> for #crate_name::messages::ServiceTransaction {
+                fn from(value: #typ) -> Self {
+                    let set: #name = value.into();
+                    set.into()
+                }
+            }
         }
     });
 
@@ -78,19 +135,19 @@ fn implement_conversions_for_transactions(
 
 fn implement_into_service_tx(
     name: &Ident,
-    variants: &[Variant],
-    cr: &dyn quote::ToTokens,
+    variants: &[ParsedVariant],
+    cr: &impl quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|Variant { id, ident, .. }| {
+    let tx_set_impl = variants.iter().map(|ParsedVariant { id, ident, .. }| {
         quote! {
             #name::#ident(ref tx) => (#id, tx.encode().unwrap()),
         }
     });
 
     quote! {
-        impl Into<#cr::messages::ServiceTransaction> for #name {
-            fn into(self) -> #cr::messages::ServiceTransaction {
-                let (id, vec) = match self {
+        impl From<#name> for #cr::messages::ServiceTransaction {
+            fn from(value: #name) -> Self {
+                let (id, vec) = match value {
                     #( #tx_set_impl )*
                 };
                 #cr::messages::ServiceTransaction::from_raw_unchecked(id, vec)
@@ -101,10 +158,10 @@ fn implement_into_service_tx(
 
 fn implement_transaction_set_trait(
     name: &Ident,
-    variants: &[Variant],
-    cr: &dyn quote::ToTokens,
+    variants: &[ParsedVariant],
+    cr: &impl quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|Variant { id, ident, typ }| {
+    let tx_set_impl = variants.iter().map(|ParsedVariant { id, ident, typ }| {
         quote! {
             #id => Ok(#name::#ident(#typ::decode(&vec)?)),
         }
@@ -127,23 +184,50 @@ fn implement_transaction_set_trait(
 
 fn implement_into_boxed_tx(
     name: &Ident,
-    variants: &[Variant],
-    cr: &dyn quote::ToTokens,
+    variants: &[ParsedVariant],
+    cr: &impl quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|Variant { ident, .. }| {
+    let tx_set_impl = variants.iter().map(|ParsedVariant { ident, .. }| {
         quote! {
             #name::#ident(tx) => Box::new(tx),
         }
     });
 
     quote! {
-        impl Into<Box<dyn #cr::blockchain::Transaction>> for #name {
-            fn into(self) -> Box<dyn #cr::blockchain::Transaction> {
-                match self {
+        impl From<#name> for Box<dyn #cr::blockchain::Transaction> {
+            fn from(value: #name) -> Self {
+                match value {
                     #( #tx_set_impl )*
                 }
             }
         }
+    }
+}
+
+fn should_convert_variants(attrs: &[Attribute]) -> bool {
+    let value = get_exonum_name_value_attributes(attrs)
+        .iter()
+        .filter_map(|MetaNameValue { ident, lit, .. }| {
+            if ident == "convert_variants" {
+                Some(lit)
+            } else {
+                None
+            }
+        })
+        .cloned()
+        .next();
+    if let Some(value) = value {
+        match value {
+            Lit::Bool(bool_value) => bool_value.value,
+            Lit::Str(str_value) => str_value
+                .value()
+                .parse()
+                .expect("Cannot parse `convert_variants` value from string"),
+            _ => panic!("Invalid value type for `convert_variants` attribute"),
+        }
+    } else {
+        // Default value is `true`.
+        true
     }
 }
 
@@ -153,17 +237,27 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
     let name = input.ident;
     let mod_name = Ident::new(&format!("tx_set_impl_{}", name), Span::call_site());
     let data = match input.data {
-        Data::Enum(x) => x,
+        Data::Enum(enum_data) => enum_data,
         _ => panic!("Only for enums."),
     };
 
-    let cr = super::get_exonum_types_prefix(&input.attrs);
+    let crate_name = super::get_exonum_types_prefix(&input.attrs);
     let vars = get_tx_variants(&data);
+    let convert_variants = should_convert_variants(&input.attrs);
 
-    let tx_set = implement_transaction_set_trait(&name, &vars, &cr);
-    let conversions = implement_conversions_for_transactions(&name, &vars, &cr);
-    let into_service_tx = implement_into_service_tx(&name, &vars, &cr);
-    let into_boxed_tx = implement_into_boxed_tx(&name, &vars, &cr);
+    let tx_set = implement_transaction_set_trait(&name, &vars, &crate_name);
+    let conversions = implement_conversions_for_enum(&name, &vars);
+    let variant_conversions = if convert_variants {
+        Some(implement_conversions_for_variants(
+            &name,
+            &vars,
+            &crate_name,
+        ))
+    } else {
+        None
+    };
+    let into_service_tx = implement_into_service_tx(&name, &vars, &crate_name);
+    let into_boxed_tx = implement_into_boxed_tx(&name, &vars, &crate_name);
 
     let expanded = quote! {
         mod #mod_name{
@@ -171,9 +265,10 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
 
             use super::*;
             use self::_failure::{bail, Error as _FailureError};
-            use #cr::messages::BinaryForm as _BinaryForm;
+            use #crate_name::messages::BinaryForm as _BinaryForm;
 
             #conversions
+            #variant_conversions
             #tx_set
             #into_service_tx
             #into_boxed_tx
@@ -181,4 +276,94 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
     };
 
     expanded.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_quote;
+
+    #[test]
+    fn get_message_id_works() {
+        let transaction_set: DeriveInput = parse_quote! {
+            pub enum Transactions {
+                Issue(Issue),
+
+                #[exonum(other_attribute = "foo")]
+                Transfer(Transfer),
+
+                /// Doc comment.
+                #[exonum(message_id = 5, other_attribute = "bar")]
+                Lock(Lock),
+
+                /// Another doc comment.
+                #[serde(name = "unlocking")]
+                #[exonum(message_id = "10")]
+                Unlock(Unlock),
+            }
+        };
+        let transaction_set = match transaction_set.data {
+            Data::Enum(enum_data) => enum_data,
+            _ => unreachable!(),
+        };
+
+        assert!(get_message_id(&transaction_set.variants[0]).is_none());
+        assert!(get_message_id(&transaction_set.variants[1]).is_none());
+        assert_eq!(get_message_id(&transaction_set.variants[2]), Some(5));
+        assert_eq!(get_message_id(&transaction_set.variants[3]), Some(10));
+    }
+
+    #[test]
+    fn message_ids_assign_automatically() {
+        let transaction_set: DeriveInput = parse_quote! {
+            pub enum Transactions {
+                Issue(Issue),
+                Transfer(Transfer),
+
+                #[exonum(message_id = 10)]
+                Lock(Lock),
+                Unlock(Unlock),
+            }
+        };
+        let transaction_set = match transaction_set.data {
+            Data::Enum(enum_data) => enum_data,
+            _ => unreachable!(),
+        };
+
+        let variants = get_tx_variants(&transaction_set);
+        assert_eq!(variants.len(), 4);
+        assert_eq!(variants[0].id, 0);
+        assert_eq!(variants[1].id, 1);
+        assert_eq!(variants[2].id, 10);
+        assert_eq!(variants[3].id, 11);
+    }
+
+    #[test]
+    fn should_convert_variants_works() {
+        let transaction_set: DeriveInput = parse_quote! {
+            pub enum Transactions {
+                Issue(Issue),
+                Transfer(Transfer),
+            }
+        };
+        assert!(should_convert_variants(&transaction_set.attrs));
+
+        let transaction_set: DeriveInput = parse_quote! {
+            #[exonum(convert_variants = "false")]
+            pub enum Transactions {
+                Issue(Issue),
+                Transfer(Transfer),
+            }
+        };
+        assert!(!should_convert_variants(&transaction_set.attrs));
+
+        let transaction_set: DeriveInput = parse_quote! {
+            #[exonum(convert_variants = false)]
+            pub enum Transactions {
+                Issue(Issue),
+                Transfer(Transfer),
+            }
+        };
+        assert!(!should_convert_variants(&transaction_set.attrs));
+    }
 }
