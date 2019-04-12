@@ -85,9 +85,9 @@ fn get_message_id(variant: &Variant) -> Option<u16> {
 
     Some(match literal {
         Lit::Int(int_value) => {
-            if int_value.value() > u16::max_value() as u64 {
+            if int_value.value() > u64::from(u16::max_value()) {
                 panic!(
-                    "Specified value is too large; expected value in range 0..={}",
+                    "Specified `message_id` is too large; expected value in range 0..={}",
                     u16::max_value()
                 );
             }
@@ -106,7 +106,11 @@ fn extract_boxed_type(ty: &Type) -> Option<Type> {
         AngleBracketedGenericArguments as Args, GenericArgument, Path, PathArguments, TypePath,
     };
 
-    if let Type::Path(TypePath { path: Path { segments, .. }, .. }) = ty {
+    if let Type::Path(TypePath {
+        path: Path { segments, .. },
+        ..
+    }) = ty
+    {
         if segments.len() == 1 && segments[0].ident == "Box" {
             if let PathArguments::AngleBracketed(Args { ref args, .. }) = segments[0].arguments {
                 if args.len() == 1 {

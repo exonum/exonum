@@ -42,6 +42,7 @@ deserializes
 deserializing
 DESTDIR
 diffie
+discriminants
 doctests
 emsp
 Exonum
