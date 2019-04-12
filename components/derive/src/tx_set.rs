@@ -25,6 +25,13 @@ struct ParsedVariant {
     id: u16,
     ident: Ident,
     typ: Type,
+    unboxed_type: Option<Type>,
+}
+
+impl ParsedVariant {
+    fn source_type(&self) -> &Type {
+        self.unboxed_type.as_ref().unwrap_or(&self.typ)
+    }
 }
 
 fn get_tx_variants(data: &DataEnum) -> Vec<ParsedVariant> {
@@ -57,6 +64,7 @@ fn get_tx_variants(data: &DataEnum) -> Vec<ParsedVariant> {
                 id: message_id,
                 ident: variant.ident.clone(),
                 typ: field.ty.clone(),
+                unboxed_type: extract_boxed_type(&field.ty),
             }
         })
         .collect()
@@ -93,15 +101,42 @@ fn get_message_id(variant: &Variant) -> Option<u16> {
     })
 }
 
+fn extract_boxed_type(ty: &Type) -> Option<Type> {
+    use syn::{
+        AngleBracketedGenericArguments as Args, GenericArgument, Path, PathArguments, TypePath,
+    };
+
+    if let Type::Path(TypePath { path: Path { segments, .. }, .. }) = ty {
+        if segments.len() == 1 && segments[0].ident == "Box" {
+            if let PathArguments::AngleBracketed(Args { ref args, .. }) = segments[0].arguments {
+                if args.len() == 1 {
+                    if let GenericArgument::Type(ref inner_ty) = args[0] {
+                        return Some(inner_ty.clone());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 fn implement_conversions_for_enum(
     name: &Ident,
     variants: &[ParsedVariant],
 ) -> impl quote::ToTokens {
-    let conversions = variants.iter().map(|ParsedVariant { ident, typ, .. }| {
+    let conversions = variants.iter().map(|variant| {
+        let ident = &variant.ident;
+        let source_type = variant.source_type();
+        let constructed_variant = if variant.unboxed_type.is_some() {
+            quote!(#name::#ident(Box::new(value)))
+        } else {
+            quote!(#name::#ident(value))
+        };
+
         quote! {
-            impl From<#typ> for #name {
-                fn from(tx: #typ) -> Self {
-                    #name::#ident(tx)
+            impl From<#source_type> for #name {
+                fn from(value: #source_type) -> Self {
+                    #constructed_variant
                 }
             }
         }
@@ -117,11 +152,12 @@ fn implement_conversions_for_variants(
     variants: &[ParsedVariant],
     crate_name: &impl quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let conversions = variants.iter().map(|ParsedVariant { typ, .. }| {
+    let conversions = variants.iter().map(|variant| {
+        let source_type = variant.source_type();
         quote! {
-            impl From<#typ> for #crate_name::messages::ServiceTransaction {
-                fn from(value: #typ) -> Self {
-                    let set: #name = value.into();
+            impl From<#source_type> for #crate_name::messages::ServiceTransaction {
+                fn from(value: #source_type) -> Self {
+                    let set: #name = #name::from(value);
                     set.into()
                 }
             }
@@ -161,9 +197,11 @@ fn implement_transaction_set_trait(
     variants: &[ParsedVariant],
     cr: &impl quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|ParsedVariant { id, ident, typ }| {
+    let tx_set_impl = variants.iter().map(|variant| {
+        let id = variant.id;
+        let source_type = variant.source_type();
         quote! {
-            #id => Ok(#name::#ident(#typ::decode(&vec)?)),
+            #id => #source_type::decode(&vec).map(#name::from),
         }
     });
 
@@ -187,9 +225,12 @@ fn implement_into_boxed_tx(
     variants: &[ParsedVariant],
     cr: &impl quote::ToTokens,
 ) -> impl quote::ToTokens {
-    let tx_set_impl = variants.iter().map(|ParsedVariant { ident, .. }| {
-        quote! {
-            #name::#ident(tx) => Box::new(tx),
+    let tx_set_impl = variants.iter().map(|variant| {
+        let ident = &variant.ident;
+        if variant.unboxed_type.is_some() {
+            quote!(#name::#ident(tx) => tx as Box<dyn #cr::blockchain::Transaction>)
+        } else {
+            quote!(#name::#ident(tx) => Box::new(tx))
         }
     });
 
@@ -197,7 +238,7 @@ fn implement_into_boxed_tx(
         impl From<#name> for Box<dyn #cr::blockchain::Transaction> {
             fn from(value: #name) -> Self {
                 match value {
-                    #( #tx_set_impl )*
+                    #( #tx_set_impl, )*
                 }
             }
         }
@@ -365,5 +406,15 @@ mod tests {
             }
         };
         assert!(!should_convert_variants(&transaction_set.attrs));
+    }
+
+    #[test]
+    fn extract_boxed_type_works() {
+        let ty: Type = parse_quote!(Box<Foo>);
+        assert_eq!(extract_boxed_type(&ty).unwrap(), parse_quote!(Foo));
+        let ty: Type = parse_quote!(Foo);
+        assert!(extract_boxed_type(&ty).is_none());
+        let ty: Type = parse_quote!(Box<Foo, Bar>);
+        assert!(extract_boxed_type(&ty).is_none());
     }
 }
