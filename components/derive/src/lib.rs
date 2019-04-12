@@ -88,21 +88,23 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// ## Conversions for variants
 ///
 /// ```text
-/// #[exonum(convert_variants = "value")]
+/// #[exonum(convert_variants = value)]
 /// ```
 ///
-/// Optional. `value` is `bool` determining if the macro should derive conversions into
-/// `ServiceTransaction` for enum variants. Switching derivation off is useful (or even necessary)
+/// Optional. `value` is `bool` or string convertible to `bool` determining if the macro
+/// should derive conversions into `ServiceTransaction` for enum variants.
+/// Switching derivation off is useful (or even necessary)
 /// if the same variant is used in several `TransactionSet`s, or is external to the crate
 /// where `TransactionSet` is defined.
 ///
 /// ## Message IDs for variants
 ///
 /// ```text
-/// #[exonum(message_id = "value")]
+/// #[exonum(message_id = value)]
 /// ```
 ///
-/// Optional; specified on variants. Acts like discriminants in Rust enums:
+/// Optional; specified on variants. `value` is a `u16` value, or a string convertible to a `u16`
+/// value. Assignment of IDs acts like discriminants in Rust enums:
 ///
 /// - By default, `message_id`s are assigned from zero and increase by 1 for each variant.
 /// - If a `message_id` is specified for a variant, but not specified on the following variants,
@@ -115,7 +117,6 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum_derive::*;
 /// use serde_derive::*;
-///
 /// # mod proto {
 /// #    pub type Issue = exonum::proto::Hash;
 /// #    pub type Transfer = exonum::proto::Hash;
@@ -124,23 +125,21 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 /// #[exonum(pb = "proto::Issue")]
 /// pub struct Issue { /* ... */ }
-///
 /// impl Transaction for Issue {
-///     fn execute(&self, context: TransactionContext) -> ExecutionResult {
-///           // ...
-/// #         Ok(())
-///     }
+///     // ...
+/// #   fn execute(&self, context: TransactionContext) -> ExecutionResult {
+/// #       Ok(())
+/// #   }
 /// }
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 /// #[exonum(pb = "proto::Transfer")]
 /// pub struct Transfer { /* ... */ }
-///
 /// impl Transaction for Transfer {
-///     fn execute(&self, context: TransactionContext) -> ExecutionResult {
-///           // ...
+///     // ...
+/// #   fn execute(&self, context: TransactionContext) -> ExecutionResult {
 /// #         Ok(())
-///     }
+/// #   }
 /// }
 ///
 /// /// Transactions of some service.
@@ -162,6 +161,37 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 ///     // Other transactions...
 /// }
 /// # fn main() {}
+/// ```
+///
+/// It is possible to box variants in order to reduce their stack size:
+///
+/// ```
+/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
+/// # use exonum_derive::*;
+/// use serde_derive::*;
+/// # mod proto {
+/// #    pub type Issue = exonum::proto::Hash;
+/// #    pub type Transfer = exonum::proto::Hash;
+/// # }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+/// #[exonum(pb = "proto::Issue")]
+/// pub struct Issue { /* a lot of fields */ }
+/// # impl Transaction for Issue {
+/// #   fn execute(&self, context: TransactionContext) -> ExecutionResult {
+/// #         Ok(())
+/// #   }
+/// # }
+///
+/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
+/// pub enum Transactions {
+///     Issue(Box<Issue>),
+///     // other variants...
+/// }
+///
+/// # fn main () {
+/// let tx: Transactions = Issue { /* ... */ }.into();
+/// # }
 /// ```
 #[proc_macro_derive(TransactionSet, attributes(exonum))]
 pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
