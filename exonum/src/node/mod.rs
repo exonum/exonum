@@ -162,7 +162,7 @@ pub struct ListenerConfig {
 }
 
 /// An api configuration options.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeApiConfig {
     /// Timeout to update api state.
     pub state_update_timeout: usize,
@@ -195,7 +195,7 @@ impl Default for NodeApiConfig {
 }
 
 /// Events pool capacities.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EventsPoolCapacity {
     /// Maximum number of queued outgoing network messages.
     pub network_requests_capacity: usize,
@@ -219,7 +219,7 @@ impl Default for EventsPoolCapacity {
 }
 
 /// Memory pool configuration parameters.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
@@ -235,7 +235,7 @@ impl Default for MemoryPoolConfig {
 }
 
 /// Configuration for the `Node`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeConfig<T = SecretKey> {
     /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,

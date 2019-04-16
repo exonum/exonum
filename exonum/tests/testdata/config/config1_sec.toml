@@ -1,8 +1,0 @@
-consensus_public_key = "8b284e3a0c749d6fc69c995add66128b1bc9a319d5d2db42ba0049a2a1955b1b"
-consensus_secret_key = "consensus1.toml"
-listen_address = "0.0.0.0:6333"
-external_address = "127.0.0.1:6333"
-service_public_key = "48799487c3acdb515608b42966803f64b7eef7b3c0260b1c8cf20bcd3fcd6b1f"
-service_secret_key = "service1.toml"
-
-[services_secret_configs]

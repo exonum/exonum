@@ -1,0 +1,14 @@
+[consensus_config]
+max_message_len = 1048576
+peers_timeout = 10000
+first_round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+min_propose_timeout = 10
+max_propose_timeout = 200
+propose_timeout_threshold = 500
+
+[services_config]
+
+[general_config]
+validators_count = 4
