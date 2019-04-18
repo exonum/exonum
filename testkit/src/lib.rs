@@ -304,7 +304,8 @@ impl fmt::Debug for TestKitBuilder {
                 &self
                     .services
                     .iter()
-                    .map(|x| x.service_name())
+                    .map(AsRef::as_ref)
+                    .map(Service::service_name)
                     .collect::<Vec<_>>(),
             )
             .field("logger", &self.logger)

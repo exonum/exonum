@@ -51,7 +51,7 @@ impl NodeInfo {
     where
         I: IntoIterator<Item = &'a Box<dyn Service>>,
     {
-        let core_version = option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned());
+        let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
         Self {
             core_version,
             protocol_version: PROTOCOL_MAJOR_VERSION,
