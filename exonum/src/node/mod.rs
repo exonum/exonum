@@ -1116,6 +1116,8 @@ mod tests {
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
     use exonum_merkledb::{Database, Snapshot, TemporaryDB};
+    use crate::messages::BinaryForm;
+    use protobuf::{Message as ProtobufMessage};
 
     const SERVICE_ID: u16 = 0;
 
@@ -1123,6 +1125,18 @@ mod tests {
     #[exonum(crate = "crate")]
     enum SimpleTransactions {
         TxSimple(TxSimple),
+    }
+
+    impl BinaryForm for TxSimple {
+        fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+            self.write_to_bytes().map_err(Error::from)
+        }
+
+        fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+            let mut pb = Self::new();
+            pb.merge_from_bytes(buffer)?;
+            Ok(pb)
+        }
     }
 
     impl Transaction for TxSimple {

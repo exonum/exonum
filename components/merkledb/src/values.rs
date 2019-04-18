@@ -14,6 +14,8 @@
 
 //! A definition of `BinaryValue` trait and implementations for common types.
 
+use protobuf::Message;
+
 use std::{borrow::Cow, io::Read};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};

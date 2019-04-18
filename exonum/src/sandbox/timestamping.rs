@@ -21,8 +21,9 @@ use crate::blockchain::{
     ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use crate::messages::{Message, RawTransaction, Signed};
+use crate::messages::{Message, RawTransaction, Signed, BinaryForm};
 use exonum_merkledb::Snapshot;
+use protobuf::{Message as PbMessage};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;
@@ -36,6 +37,18 @@ pub enum TimestampingTransactions {
 impl Transaction for TimestampTx {
     fn execute(&self, _: TransactionContext) -> ExecutionResult {
         Ok(())
+    }
+}
+
+impl BinaryForm for TimestampTx {
+    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+        self.write_to_bytes().map_err(failure::Error::from)
+    }
+
+    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+        let mut pb = Self::new();
+        pb.merge_from_bytes(buffer)?;
+        Ok(pb)
     }
 }
 

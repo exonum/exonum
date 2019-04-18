@@ -93,20 +93,20 @@ pub trait ProtobufConvert: Sized {
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error>;
 }
 
-impl<T> BinaryForm for T
-where
-    T: Message,
-{
-    fn encode(&self) -> Result<Vec<u8>, Error> {
-        self.write_to_bytes().map_err(Error::from)
-    }
-
-    fn decode(buffer: &[u8]) -> Result<Self, Error> {
-        let mut pb = Self::new();
-        pb.merge_from_bytes(buffer)?;
-        Ok(pb)
-    }
-}
+//impl<T> BinaryForm for T
+//where
+//    T: Message,
+//{
+//    fn encode(&self) -> Result<Vec<u8>, Error> {
+//        self.write_to_bytes().map_err(Error::from)
+//    }
+//
+//    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+//        let mut pb = Self::new();
+//        pb.merge_from_bytes(buffer)?;
+//        Ok(pb)
+//    }
+//}
 
 impl ProtobufConvert for crypto::Hash {
     type ProtoStruct = Hash;

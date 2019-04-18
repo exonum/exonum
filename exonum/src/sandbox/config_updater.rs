@@ -20,9 +20,10 @@ use crate::blockchain::{
 };
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::helpers::Height;
-use crate::messages::{Message, RawTransaction, Signed};
+use crate::messages::{Message, RawTransaction, Signed, BinaryForm};
 use crate::proto::ProtobufConvert;
 use exonum_merkledb::Snapshot;
+use protobuf::{Message as PbMessage};
 
 pub const CONFIG_SERVICE: u16 = 1;
 
@@ -62,6 +63,18 @@ impl Transaction for TxConfig {
         schema
             .commit_configuration(StoredConfiguration::try_deserialize(self.get_config()).unwrap());
         Ok(())
+    }
+}
+
+impl BinaryForm for TxConfig {
+    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+        self.write_to_bytes().map_err(failure::Error::from)
+    }
+
+    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+        let mut pb = Self::new();
+        pb.merge_from_bytes(buffer)?;
+        Ok(pb)
     }
 }
 

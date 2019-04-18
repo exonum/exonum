@@ -1174,10 +1174,11 @@ mod tests {
     use super::*;
     use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crate::crypto::{gen_keypair_from_seed, Seed};
-    use crate::messages::RawTransaction;
+    use crate::messages::{RawTransaction, BinaryForm};
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use exonum_merkledb::Snapshot;
+    use protobuf::{Message as PbMessage};
 
     const SERVICE_ID: u16 = 1;
 
@@ -1193,6 +1194,18 @@ mod tests {
             let mut payload_tx = TxAfterCommit::new();
             payload_tx.set_height(height.0);
             Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
+        }
+    }
+
+    impl BinaryForm for TxAfterCommit {
+        fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+            self.write_to_bytes().map_err(failure::Error::from)
+        }
+
+        fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+            let mut pb = Self::new();
+            pb.merge_from_bytes(buffer)?;
+            Ok(pb)
         }
     }
 
