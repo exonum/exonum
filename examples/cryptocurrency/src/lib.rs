@@ -25,11 +25,13 @@
 
 #![deny(
     missing_debug_implementations,
-    missing_docs,
+//    missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
 
+#[macro_use]
+extern crate exonum;
 #[macro_use]
 extern crate exonum_derive;
 #[macro_use]
@@ -130,7 +132,7 @@ pub mod schema {
 /// Transactions.
 pub mod transactions {
     use super::proto;
-    use super::service::SERVICE_ID;
+    //    use super::service::SERVICE_ID;
     use exonum::{
         crypto::{PublicKey, SecretKey},
         messages::{AnyTx, Message, Signed},
@@ -163,50 +165,50 @@ pub mod transactions {
         pub seed: u64,
     }
 
-    /// Transaction group.
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    pub enum CurrencyTransactions {
-        /// Create wallet transaction.
-        CreateWallet(TxCreateWallet),
-        /// Transfer tokens transaction.
-        Transfer(TxTransfer),
-    }
-
-    impl TxCreateWallet {
-        #[doc(hidden)]
-        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
-            Message::sign_transaction(
-                Self {
-                    name: name.to_owned(),
-                },
-                SERVICE_ID,
-                *pk,
-                sk,
-            )
-        }
-    }
-
-    impl TxTransfer {
-        #[doc(hidden)]
-        pub fn sign(
-            to: &PublicKey,
-            amount: u64,
-            seed: u64,
-            pk: &PublicKey,
-            sk: &SecretKey,
-        ) -> Signed<AnyTx> {
-            Message::sign_transaction(
-                Self {
-                    to: *to,
-                    amount,
-                    seed,
-                },
-                SERVICE_ID,
-                *pk,
-                sk,
-            )
-        }
-    }
+    //    /// Transaction group.
+    //    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
+    //    pub enum CurrencyTransactions {
+    //        /// Create wallet transaction.
+    //        CreateWallet(TxCreateWallet),
+    //        /// Transfer tokens transaction.
+    //        Transfer(TxTransfer),
+    //    }
+    //
+    //    impl TxCreateWallet {
+    //        #[doc(hidden)]
+    //        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
+    //            Message::sign_transaction(
+    //                Self {
+    //                    name: name.to_owned(),
+    //                },
+    //                SERVICE_ID,
+    //                *pk,
+    //                sk,
+    //            )
+    //        }
+    //    }
+    //
+    //    impl TxTransfer {
+    //        #[doc(hidden)]
+    //        pub fn sign(
+    //            to: &PublicKey,
+    //            amount: u64,
+    //            seed: u64,
+    //            pk: &PublicKey,
+    //            sk: &SecretKey,
+    //        ) -> Signed<AnyTx> {
+    //            Message::sign_transaction(
+    //                Self {
+    //                    to: *to,
+    //                    amount,
+    //                    seed,
+    //                },
+    //                SERVICE_ID,
+    //                *pk,
+    //                sk,
+    //            )
+    //        }
+    //    }
 }
 
 /// Contract errors.
@@ -262,27 +264,43 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
+    use exonum::blockchain::ExecutionResult;
+    use exonum::runtime::configuration_new::DeployInit;
+    use exonum::runtime::rust::{
+        service::{GenesisInitBuilder, Service, ServiceFactory},
+        RustArtifactSpec, TransactionContext,
+    };
 
     use crate::{
         errors::Error,
         schema::{CurrencySchema, Wallet},
         transactions::{TxCreateWallet, TxTransfer},
     };
+    use exonum::runtime::RuntimeIdentifier::Rust;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
 
-    impl Transaction for TxCreateWallet {
-        /// If a wallet with the specified public key is not registered, then creates a new wallet
-        /// with the specified public key and name, and an initial balance of 100.
-        /// Otherwise, performs no op.
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    #[service_interface]
+    pub trait Cryptocurrency {
+        fn create_wallet(&self, ctx: TransactionContext, arg: TxCreateWallet) -> ExecutionResult;
+        fn transfer(&self, ctx: TransactionContext, arg: TxTransfer) -> ExecutionResult;
+    }
+
+    #[derive(Debug)]
+    pub struct CryptocurrencyServiceImpl;
+
+    impl Cryptocurrency for CryptocurrencyServiceImpl {
+        fn create_wallet(
+            &self,
+            mut context: TransactionContext,
+            arg: TxCreateWallet,
+        ) -> ExecutionResult {
             let author = context.author();
             let view = context.fork();
             let mut schema = CurrencySchema::new(view);
             if schema.wallet(&author).is_none() {
-                let wallet = Wallet::new(&author, &self.name, INIT_BALANCE);
+                let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
                 schema.wallets_mut().put(&author, wallet);
                 Ok(())
@@ -290,20 +308,12 @@ pub mod contracts {
                 Err(Error::WalletAlreadyExists)?
             }
         }
-    }
 
-    impl Transaction for TxTransfer {
-        /// Retrieves two wallets to apply the transfer; they should be previously registered
-        /// with the help of [`TxCreateWallet`] transactions. Checks the sender's
-        /// balance and applies changes to the balances of the wallets if the sender's balance
-        /// is sufficient. Otherwise, performs no op.
-        ///
-        /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        fn transfer(&self, mut context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
             let author = context.author();
             let view = context.fork();
 
-            if author == self.to {
+            if author == arg.to {
                 Err(Error::SenderSameAsReceiver)?
             }
 
@@ -314,159 +324,98 @@ pub mod contracts {
                 None => Err(Error::SenderNotFound)?,
             };
 
-            let receiver = match schema.wallet(&self.to) {
+            let receiver = match schema.wallet(&arg.to) {
                 Some(val) => val,
                 None => Err(Error::ReceiverNotFound)?,
             };
 
-            let amount = self.amount;
+            let amount = arg.amount;
             if sender.balance >= amount {
                 let sender = sender.decrease(amount);
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
                 let mut wallets = schema.wallets_mut();
                 wallets.put(&author, sender);
-                wallets.put(&self.to, receiver);
+                wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
                 Err(Error::InsufficientCurrencyAmount)?
             }
         }
     }
-}
 
-/// REST API.
-pub mod api {
-    use exonum::{
-        api::{self, ServiceApiBuilder, ServiceApiState},
-        crypto::PublicKey,
-    };
+    impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
 
-    use crate::schema::{CurrencySchema, Wallet};
+    impl Service for CryptocurrencyServiceImpl {}
 
-    /// Public service API description.
-    #[derive(Debug, Clone)]
-    pub struct CryptocurrencyApi;
-
-    /// The structure describes the query parameters for the `get_wallet` endpoint.
-    #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-    pub struct WalletQuery {
-        /// Public key of the queried wallet.
-        pub pub_key: PublicKey,
-    }
-
-    impl CryptocurrencyApi {
-        /// Endpoint for getting a single wallet.
-        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
-            let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(snapshot);
-            schema
-                .wallet(&query.pub_key)
-                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
-        }
-
-        /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
-            let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(snapshot);
-            let idx = schema.wallets();
-            let wallets = idx.values().collect();
-            Ok(wallets)
-        }
-
-        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
-        /// endpoints.
-        pub fn wire(builder: &mut ServiceApiBuilder) {
-            // Binds handlers to specific routes.
-            builder
-                .public_scope()
-                .endpoint("v1/wallet", Self::get_wallet)
-                .endpoint("v1/wallets", Self::get_wallets);
-        }
-    }
-}
-
-/// Service declaration.
-pub mod service {
-    use exonum::{
-        api::ServiceApiBuilder,
-        blockchain::{Service, Transaction, TransactionSet},
-        crypto::Hash,
-        messages::AnyTx,
-        storage::Snapshot,
-    };
-
-    use crate::{api::CryptocurrencyApi, transactions::CurrencyTransactions};
-
-    /// Service ID for the `Service` trait.
-    pub const SERVICE_ID: u16 = 1;
-
-    /// Demo cryptocurrency service.
-    ///
-    /// See [the crate documentation](index.html) for context.
-    ///
-    /// # Public REST API
-    ///
-    /// In all APIs, the request body (if applicable) and response are JSON-encoded.
-    ///
-    /// ## Retrieve single wallet
-    ///
-    /// GET `api/services/cryptocurrency/v1/wallet/?pub_key={hash}`
-    ///
-    /// Returns information about a wallet with the specified public key (hex-encoded).
-    /// If a wallet with the specified pubkey is not in the storage, returns a string
-    /// `"Wallet not found"` with the HTTP 404 status.
-    ///
-    /// ## Dump wallets
-    ///
-    /// GET `api/services/cryptocurrency/v1/wallets`
-    ///
-    /// Returns an array of all wallets in the storage.
-    ///
-    /// ## Transactions endpoint
-    ///
-    /// POST `api/explorer/v1/transactions`
-    ///
-    /// Accepts a [`TxTransfer`] and [`TxCreateWallet`] transaction from an external client.
-    /// Transaction should be serialized into protobuf binary form and placed into signed
-    /// transaction message according to specification, endpoint accepts hex of this signed
-    /// transaction message as an object: `{ "tx_body": <hex> }`.
-    ///
-    /// Returns the hex-encoded hash of the transaction
-    /// encumbered in an object: `{ "tx_hash": <hash> }`.
-    ///
-    /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
-    /// [`TxTransfer`]: ../transactions/struct.TxTransfer.html
     #[derive(Debug)]
-    pub struct CurrencyService;
+    pub struct ServiceFactoryImpl;
 
-    impl Service for CurrencyService {
-        fn service_name(&self) -> &'static str {
-            "cryptocurrency"
+    impl ServiceFactory for ServiceFactoryImpl {
+        fn artifact(&self) -> RustArtifactSpec {
+            RustArtifactSpec::new("cryptocurrency", 0, 1, 0)
         }
 
-        fn service_id(&self) -> u16 {
-            SERVICE_ID
+        fn new_instance(&self) -> Box<dyn Service> {
+            Box::new(CryptocurrencyServiceImpl)
         }
 
-        // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-            let tx = CurrencyTransactions::tx_from_raw(raw)?;
-            Ok(tx.into())
-        }
-
-        // Hashes for the service tables that will be included into the state hash.
-        // To simplify things, we don't have [Merkelized tables][merkle] in the service storage
-        // for now, so we return an empty vector.
-        //
-        // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            vec![]
-        }
-
-        // Links the service api implementation to the Exonum.
-        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-            CryptocurrencyApi::wire(builder);
+        fn genesis_init_info(&self) -> Vec<DeployInit> {
+            vec![
+            //                GenesisInitBuilder::no_init_tx(self.artifact(), "coin-1").finalize(),
+            //                GenesisInitBuilder::no_init_tx(self.artifact(), "coin-2").finalize(),
+                        ]
         }
     }
 }
+//
+///// REST API.
+//pub mod api {
+//    use exonum::{
+//        api::{self, ServiceApiBuilder, ServiceApiState},
+//        crypto::PublicKey,
+//    };
+//
+//    use crate::schema::{CurrencySchema, Wallet};
+//
+//    /// Public service API description.
+//    #[derive(Debug, Clone)]
+//    pub struct CryptocurrencyApi;
+//
+//    /// The structure describes the query parameters for the `get_wallet` endpoint.
+//    #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+//    pub struct WalletQuery {
+//        /// Public key of the queried wallet.
+//        pub pub_key: PublicKey,
+//    }
+//
+//    impl CryptocurrencyApi {
+//        /// Endpoint for getting a single wallet.
+//        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
+//            let snapshot = state.snapshot();
+//            let schema = CurrencySchema::new(snapshot);
+//            schema
+//                .wallet(&query.pub_key)
+//                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
+//        }
+//
+//        /// Endpoint for dumping all wallets from the storage.
+//        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
+//            let snapshot = state.snapshot();
+//            let schema = CurrencySchema::new(snapshot);
+//            let idx = schema.wallets();
+//            let wallets = idx.values().collect();
+//            Ok(wallets)
+//        }
+//
+//        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
+//        /// endpoints.
+//        pub fn wire(builder: &mut ServiceApiBuilder) {
+//            // Binds handlers to specific routes.
+//            builder
+//                .public_scope()
+//                .endpoint("v1/wallet", Self::get_wallet)
+//                .endpoint("v1/wallets", Self::get_wallets);
+//        }
+//    }
+//}
