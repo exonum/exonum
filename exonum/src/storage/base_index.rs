@@ -194,7 +194,7 @@ where
         let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&self.name, &iter_prefix),
-            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
+            base_prefix_len: self.index_id.as_ref().map_or(0, Vec::len),
             index_id: iter_prefix,
             ended: false,
             _k: PhantomData,
@@ -216,7 +216,7 @@ where
         let iter_from = self.prefixed_key(from);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&self.name, &iter_from),
-            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
+            base_prefix_len: self.index_id.as_ref().map_or(0, Vec::len),
             index_id: iter_prefix,
             ended: false,
             _k: PhantomData,

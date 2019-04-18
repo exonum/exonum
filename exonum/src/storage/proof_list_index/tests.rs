@@ -494,13 +494,13 @@ fn proof_structure(db: Box<dyn Database>) {
             if let ListProof::Left(_, right_hash3) = unboxed_proof {
                 assert!(right_hash3.is_none());
             } else {
-                assert!(false);
+                panic!("Expected ListProof::Left variant");
             }
         } else {
-            assert!(false);
+            panic!("Expected ListProof::Left variant");
         }
     } else {
-        assert!(false);
+        panic!("Expected ListProof::Right variant");
     }
 }
 

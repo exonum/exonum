@@ -252,7 +252,7 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(|x| x.serialize()).collect(),
+                precommits.into_iter().map(Signed::serialize).collect(),
                 tx_hashes,
             ),
             *public_key,
@@ -410,7 +410,7 @@ impl Sandbox {
         I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(|x| x.serialize()).collect()),
+            TransactionsResponse::new(to, txs.into_iter().map(Signed::serialize).collect()),
             *author,
             secret_key,
         )
@@ -1043,7 +1043,7 @@ fn sandbox_with_services_uninitialized(
         .map(gen_primitive_socket_addr)
         .collect::<Vec<_>>();
 
-    let str_addresses: Vec<String> = addresses.iter().map(|ref a| a.to_string()).collect();
+    let str_addresses: Vec<String> = addresses.iter().map(ToString::to_string).collect();
 
     let connect_infos: Vec<_> = validators
         .iter()

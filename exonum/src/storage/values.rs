@@ -418,7 +418,7 @@ mod tests {
     fn string_round_trip() {
         let values: Vec<_> = ["", "e", "2", "hello"]
             .iter()
-            .map(|v| v.to_string())
+            .map(ToString::to_string)
             .collect();
 
         assert_round_trip_eq(&values);

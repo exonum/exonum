@@ -494,7 +494,7 @@ impl State {
 
     /// Returns validator id of the node if it is a validator. Returns `None` otherwise.
     pub fn validator_id(&self) -> Option<ValidatorId> {
-        self.validator_state.as_ref().map(|s| s.id())
+        self.validator_state.as_ref().map(ValidatorState::id)
     }
 
     /// Updates the validator id. If there hasn't been `ValidatorState` for that id, then a new

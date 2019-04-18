@@ -572,7 +572,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(|p| p.author());
+            let it = self.state.peers().values().map(Signed::author);
             let it = it.chain(
                 self.state()
                     .connect_list()
