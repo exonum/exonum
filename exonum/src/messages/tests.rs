@@ -1,8 +1,10 @@
+use std::borrow::Cow;
+
 use chrono::Utc;
 use hex::FromHex;
 
 use super::{
-    BinaryForm, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
+    BinaryValue, BlockResponse, Message, Precommit, ProtocolMessage, RawTransaction,
     ServiceTransaction, Signed, SignedMessage, Status, TransactionsResponse,
     RAW_TRANSACTION_EMPTY_SIZE, TRANSACTION_RESPONSE_EMPTY_SIZE,
 };
@@ -55,7 +57,7 @@ fn test_known_transaction() {
     .unwrap();
     let data = CreateWallet::new(&pk, "test_wallet");
 
-    let set = ServiceTransaction::from_raw_unchecked(0, data.encode().unwrap());
+    let set = ServiceTransaction::from_raw_unchecked(0, data.to_bytes());
     let msg = RawTransaction::new(128, set);
     let msg = Message::concrete(msg, pk, &sk);
     SignedMessage::from_raw_buffer(hex::decode(res).unwrap()).unwrap();
@@ -224,10 +226,10 @@ fn test_precommit_serde_wrong_signature() {
 
 #[test]
 fn test_raw_transaction_small_size() {
-    assert!(ServiceTransaction::decode(&[0; 1]).is_err());
-    assert!(RawTransaction::decode(&[0; 1]).is_err());
-    assert!(RawTransaction::decode(&[0; 3]).is_err());
-    let tx = RawTransaction::decode(&[0; 4]).unwrap();
+    assert!(ServiceTransaction::from_bytes(Cow::from(&vec![0_u8; 1])).is_err());
+    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 2])).is_err());
+    assert!(RawTransaction::from_bytes(Cow::from(&vec![0_u8; 3])).is_err());
+    let tx = RawTransaction::from_bytes(Cow::from(&vec![0_u8; 4])).unwrap();
     assert_eq!(tx.service_id, 0);
     assert_eq!(tx.service_transaction.transaction_id, 0);
 }

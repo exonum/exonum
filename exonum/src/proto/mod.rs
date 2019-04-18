@@ -72,13 +72,12 @@ mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
-use protobuf::{well_known_types, Message};
+use protobuf::{well_known_types};
 
 use std::collections::HashMap;
 
 use crate::crypto;
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::BinaryForm;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
@@ -92,21 +91,6 @@ pub trait ProtobufConvert: Sized {
     /// ProtoStruct -> Struct
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error>;
 }
-
-//impl<T> BinaryForm for T
-//where
-//    T: Message,
-//{
-//    fn encode(&self) -> Result<Vec<u8>, Error> {
-//        self.write_to_bytes().map_err(Error::from)
-//    }
-//
-//    fn decode(buffer: &[u8]) -> Result<Self, Error> {
-//        let mut pb = Self::new();
-//        pb.merge_from_bytes(buffer)?;
-//        Ok(pb)
-//    }
-//}
 
 impl ProtobufConvert for crypto::Hash {
     type ProtoStruct = Hash;

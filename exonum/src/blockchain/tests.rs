@@ -16,6 +16,8 @@
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
+use std::borrow::Cow;
+
 use crate::blockchain::{
     Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionContext,
     TransactionSet,
@@ -163,6 +165,7 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 }
 
 mod transactions_tests {
+    use std::borrow::Cow;
     use super::TEST_SERVICE_ID;
     use crate::blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crate::crypto::gen_keypair;

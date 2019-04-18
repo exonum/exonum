@@ -6,13 +6,23 @@ use std::fmt::Display;
 use super::Signed;
 
 /// Helper trait to define serialization format.
-pub trait BinaryForm: Sized {
-    /// Converts transaction into serialized form.
-    fn encode(&self) -> Result<Vec<u8>, failure::Error>;
+//pub trait BinaryValue: Sized {
+//    /// Converts transaction into serialized form.
+//    fn to_bytes(&self) -> Result<Vec<u8>, failure::Error>;
+//
+//    /// Converts a serialized byte array into a transaction.
+//    fn from_bytes(buffer: &[u8]) -> Result<Self, failure::Error>;
+//}
 
-    /// Converts a serialized byte array into a transaction.
-    fn decode(buffer: &[u8]) -> Result<Self, failure::Error>;
-}
+//fn to_bytes(&self) -> Vec<u8>;
+///// Consumes and serializes the given value to the vector of bytes.
+///// This method is faster with the wrapped values,
+///// thus if you wouldn't use value after serialization use it.
+//fn into_bytes(self) -> Vec<u8> {
+//    self.to_bytes()
+//}
+///// Deserializes the value from the given bytes array.
+//fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error>;
 
 /// Uses `ToHex`/`FromHex` to serialize arbitrary type `T` as
 /// hexadecimal string rather than real Serde::serialize.

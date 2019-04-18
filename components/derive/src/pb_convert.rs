@@ -97,23 +97,6 @@ fn implement_protobuf_convert_trait(
     }
 }
 
-fn implement_binary_form(name: &Ident, cr: &dyn quote::ToTokens) -> impl quote::ToTokens {
-    quote! {
-        impl #cr::messages::BinaryForm for #name {
-
-            fn encode(&self) -> std::result::Result<Vec<u8>, _FailureError> {
-                self.to_pb().write_to_bytes().map_err(_FailureError::from)
-            }
-
-            fn decode(buffer: &[u8]) -> std::result::Result<Self, _FailureError> {
-                let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-                pb.merge_from_bytes(buffer)?;
-                Self::from_pb(pb)
-            }
-        }
-    }
-}
-
 fn implement_storage_traits(name: &Ident, cr: &dyn quote::ToTokens) -> impl quote::ToTokens {
     quote! {
         impl #cr::crypto::CryptoHash for #name {
@@ -134,7 +117,7 @@ fn implement_storage_traits(name: &Ident, cr: &dyn quote::ToTokens) -> impl quot
         impl exonum_merkledb::BinaryValue for #name {
             fn to_bytes(&self) -> Vec<u8> {
                 self.to_pb().write_to_bytes().expect(&format!(
-                    "Failed to serialize in StorageValue for {}",
+                    "Failed to serialize in BinaryValue for {}",
                     stringify!(#name)
                 ))
             }
@@ -185,7 +168,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let field_names = get_field_names(&input);
     let protobuf_convert =
         implement_protobuf_convert_trait(&name, &proto_struct_name, &field_names);
-    let binary_form = implement_binary_form(&name, &cr);
+//    let binary_form = implement_binary_form(&name, &cr);
     let storage_traits = implement_storage_traits(&name, &cr);
 
     let serde_traits = {
@@ -209,7 +192,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
             use #cr::proto::ProtobufConvert;
 
             #protobuf_convert
-            #binary_form
+//            #binary_form
             #storage_traits
             #serde_traits
         }

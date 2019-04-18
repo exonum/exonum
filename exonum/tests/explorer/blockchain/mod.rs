@@ -16,6 +16,8 @@
 
 use futures::sync::mpsc;
 
+use std::borrow::Cow;
+
 use exonum::{
     blockchain::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,

@@ -44,7 +44,7 @@ use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
 pub(crate) use self::helpers::HexStringRepresentation;
 pub use self::{
     authorization::SignedMessage,
-    helpers::{to_hex_string, BinaryForm},
+    helpers::{to_hex_string},
     protocol::*,
 };
 use exonum_merkledb::BinaryValue;
@@ -112,23 +112,22 @@ impl RawTransaction {
     }
 }
 
-impl BinaryForm for RawTransaction {
-    fn encode(&self) -> Result<Vec<u8>, Error> {
+impl BinaryValue for RawTransaction {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
-        let value = self.service_transaction.encode()?;
+        let value = self.service_transaction.to_bytes();
         buffer.extend_from_slice(&value);
-        Ok(buffer)
+        buffer
     }
 
-    /// Converts a serialized byte array into a transaction.
-    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
         ensure!(
-            buffer.len() >= mem::size_of::<u16>(),
+            bytes.len() >= mem::size_of::<u16>(),
             "Buffer too short in RawTransaction deserialization."
         );
-        let service_id = LittleEndian::read_u16(&buffer[0..2]);
-        let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
+        let service_id = LittleEndian::read_u16(&bytes[0..2]);
+        let service_transaction = ServiceTransaction::from_bytes(Cow::from(&bytes[2..]))?;
         Ok(RawTransaction {
             service_id,
             service_transaction,
@@ -136,27 +135,73 @@ impl BinaryForm for RawTransaction {
     }
 }
 
-impl BinaryForm for ServiceTransaction {
-    fn encode(&self) -> Result<Vec<u8>, Error> {
+//impl BinaryForm for RawTransaction {
+//    fn encode(&self) -> Result<Vec<u8>, Error> {
+//        let mut buffer = vec![0; mem::size_of::<u16>()];
+//        LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
+//        let value = self.service_transaction.encode()?;
+//        buffer.extend_from_slice(&value);
+//        Ok(buffer)
+//    }
+//
+//    /// Converts a serialized byte array into a transaction.
+//    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+//        ensure!(
+//            buffer.len() >= mem::size_of::<u16>(),
+//            "Buffer too short in RawTransaction deserialization."
+//        );
+//        let service_id = LittleEndian::read_u16(&buffer[0..2]);
+//        let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
+//        Ok(RawTransaction {
+//            service_id,
+//            service_transaction,
+//        })
+//    }
+//}
+
+impl BinaryValue for ServiceTransaction {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
         buffer.extend_from_slice(&self.payload);
-        Ok(buffer)
+        buffer
     }
 
-    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
         ensure!(
-            buffer.len() >= mem::size_of::<u16>(),
+            bytes.len() >= mem::size_of::<u16>(),
             "Buffer too short in ServiceTransaction deserialization."
         );
-        let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
-        let payload = buffer[2..].to_vec();
+        let transaction_id = LittleEndian::read_u16(&bytes[0..2]);
+        let payload = bytes[2..].to_vec();
         Ok(ServiceTransaction {
             transaction_id,
             payload,
         })
     }
 }
+
+//impl BinaryForm for ServiceTransaction {
+//    fn encode(&self) -> Result<Vec<u8>, Error> {
+//        let mut buffer = vec![0; mem::size_of::<u16>()];
+//        LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
+//        buffer.extend_from_slice(&self.payload);
+//        Ok(buffer)
+//    }
+//
+//    fn decode(buffer: &[u8]) -> Result<Self, Error> {
+//        ensure!(
+//            buffer.len() >= mem::size_of::<u16>(),
+//            "Buffer too short in ServiceTransaction deserialization."
+//        );
+//        let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
+//        let payload = buffer[2..].to_vec();
+//        Ok(ServiceTransaction {
+//            transaction_id,
+//            payload,
+//        })
+//    }
+//}
 
 /// Wraps a `Payload` together with the corresponding `SignedMessage`.
 ///

@@ -1107,6 +1107,8 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::*;
     use crate::blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
@@ -1115,8 +1117,7 @@ mod tests {
     use crate::events::EventHandler;
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
-    use exonum_merkledb::{Database, Snapshot, TemporaryDB};
-    use crate::messages::BinaryForm;
+    use exonum_merkledb::{Database, Snapshot, TemporaryDB, impl_binary_value_for_message, BinaryValue};
     use protobuf::{Message as ProtobufMessage};
 
     const SERVICE_ID: u16 = 0;
@@ -1127,17 +1128,19 @@ mod tests {
         TxSimple(TxSimple),
     }
 
-    impl BinaryForm for TxSimple {
-        fn encode(&self) -> Result<Vec<u8>, failure::Error> {
-            self.write_to_bytes().map_err(Error::from)
-        }
+    impl_binary_value_for_message! { TxSimple }
 
-        fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
-            let mut pb = Self::new();
-            pb.merge_from_bytes(buffer)?;
-            Ok(pb)
-        }
-    }
+//    impl BinaryForm for TxSimple {
+//        fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+//            self.write_to_bytes().map_err(Error::from)
+//        }
+//
+//        fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+//            let mut pb = Self::new();
+//            pb.merge_from_bytes(buffer)?;
+//            Ok(pb)
+//        }
+//    }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::borrow::Cow;
+
 pub use crate::proto::schema::tests::TxConfig;
 
 use crate::blockchain::{
@@ -20,9 +22,9 @@ use crate::blockchain::{
 };
 use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::helpers::Height;
-use crate::messages::{Message, RawTransaction, Signed, BinaryForm};
+use crate::messages::{Message, RawTransaction, Signed};
 use crate::proto::ProtobufConvert;
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{Snapshot, impl_binary_value_for_message, BinaryValue};
 use protobuf::{Message as PbMessage};
 
 pub const CONFIG_SERVICE: u16 = 1;
@@ -66,17 +68,19 @@ impl Transaction for TxConfig {
     }
 }
 
-impl BinaryForm for TxConfig {
-    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
-        self.write_to_bytes().map_err(failure::Error::from)
-    }
-
-    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
-        let mut pb = Self::new();
-        pb.merge_from_bytes(buffer)?;
-        Ok(pb)
-    }
-}
+impl_binary_value_for_message! { TxConfig }
+//
+//impl BinaryForm for TxConfig {
+//    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+//        self.write_to_bytes().map_err(failure::Error::from)
+//    }
+//
+//    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+//        let mut pb = Self::new();
+//        pb.merge_from_bytes(buffer)?;
+//        Ok(pb)
+//    }
+//}
 
 impl Service for ConfigUpdateService {
     fn service_name(&self) -> &str {
