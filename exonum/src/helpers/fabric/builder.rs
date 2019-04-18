@@ -23,7 +23,6 @@ use std::{
 use super::{
     clap_backend::ClapBackend,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, Run, RunDev},
-    info::Info,
     internal::{CollectedCommand, Command, Feedback},
     keys,
     maintenance::Maintenance,
@@ -31,7 +30,6 @@ use super::{
     CommandName, Context, ServiceFactory,
 };
 
-use crate::blockchain::Service;
 use crate::node::{ExternalMessage, Node};
 
 /// `NodeBuilder` is a high level object,
@@ -99,7 +97,7 @@ impl NodeBuilder {
     }
 
     /// Runs application.
-    pub fn run(mut self) {
+    pub fn run(self) {
         // This should be moved into `commands` method, but services list can be obtained only here.
         {
             // TODO Info command

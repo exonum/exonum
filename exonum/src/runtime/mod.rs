@@ -67,7 +67,7 @@ impl From<RustArtifactSpec> for ArtifactSpec {
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait RuntimeEnvironment {
     /// Start artifact deploy.
-    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
     /// Check deployment status.
     fn check_deploy_status(
@@ -78,7 +78,7 @@ pub trait RuntimeEnvironment {
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
@@ -101,6 +101,8 @@ pub trait RuntimeEnvironment {
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(&self, fork: &mut Fork);
+
+    fn genesis_init(&self, ctx: &mut Fork) -> Result<(), failure::Error>;
 }
 
 #[derive(Debug)]

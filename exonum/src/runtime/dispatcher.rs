@@ -12,50 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin};
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    RuntimeIdentifier, ServiceInstanceId,
+    ServiceInstanceId,
 };
-use crate::crypto::Hash;
-use crate::messages::CallInfo;
-use crate::storage::{Fork, Snapshot};
+use crate::{
+    crypto::Hash,
+    messages::CallInfo,
+    storage::{Fork, Snapshot},
+};
 
-#[derive(Default)]
-pub struct DispatcherBuilder {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
-}
-
-impl std::fmt::Debug for DispatcherBuilder {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "DispatcherBuilder entity")
-    }
-}
-
-impl DispatcherBuilder {
-    pub fn with_runtime(
-        mut self,
-        runtime_id: u32,
-        runtime: Box<dyn RuntimeEnvironment + Send>,
-    ) -> Self {
-        self.runtimes.insert(runtime_id, runtime);
-
-        self
-    }
-
-    pub fn finalize(self) -> Dispatcher {
-        Dispatcher::new(self.runtimes)
-    }
-}
-
-#[derive(Default)]
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
     // TODO Is RefCell enough here?
-    runtime_lookup: RefCell<HashMap<ServiceInstanceId, u32>>,
+    runtime_lookup: HashMap<ServiceInstanceId, u32>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -65,23 +38,34 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>) -> Self {
-        Self {
-            runtimes,
-            runtime_lookup: RefCell::new(Default::default()),
-        }
+    pub fn new() -> Pin<Box<Self>> {
+        Pin::new(Box::new(Self {
+            runtimes: Default::default(),
+            runtime_lookup: Default::default(),
+        }))
     }
 
-    fn notify_service_started(&self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
-        self.runtime_lookup
-            .borrow_mut()
-            .insert(service_id, artifact.runtime_id);
+    pub fn new_with_runtimes(
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+    ) -> Pin<Box<Self>> {
+        Pin::new(Box::new(Self {
+            runtimes,
+            runtime_lookup: Default::default(),
+        }))
+    }
+
+    pub fn add_runtime(&mut self, id: u32, runtime: Box<dyn RuntimeEnvironment + Send>) {
+        self.runtimes.insert(id, runtime);
+    }
+
+    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
+        self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
 }
 
 impl RuntimeEnvironment for Dispatcher {
-    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
+    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.start_deploy(artifact)
         } else {
             Err(DeployError::WrongRuntime)
@@ -101,12 +85,12 @@ impl RuntimeEnvironment for Dispatcher {
     }
 
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
+        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             let result = runtime.init_service(ctx, artifact.clone(), init);
             if result.is_ok() {
                 self.notify_service_started(init.instance_id.clone(), artifact);
@@ -123,8 +107,7 @@ impl RuntimeEnvironment for Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let lookup = self.runtime_lookup.borrow();
-        let runtime_id = lookup.get(&call_info.instance_id);
+        let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
 
         if runtime_id.is_none() {
             return Err(ExecutionError::with_description(
@@ -161,6 +144,13 @@ impl RuntimeEnvironment for Dispatcher {
         for (_, runtime) in &self.runtimes {
             runtime.before_commit(fork);
         }
+    }
+
+    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
+        self.runtimes
+            .iter()
+            .map(|(_, v)| v.genesis_init(fork))
+            .collect()
     }
 }
 

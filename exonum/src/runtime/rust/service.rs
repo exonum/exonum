@@ -13,14 +13,18 @@
 // limitations under the License.
 
 use crate::crypto::Hash;
-use crate::messages::MethodId;
-use crate::runtime::{error::ExecutionError, rust::TransactionContext};
+use crate::messages::{BinaryForm, MethodId};
+use crate::runtime::{
+    configuration_new::DeployInit, error::ExecutionError, rust::TransactionContext,
+    RuntimeIdentifier,
+};
 use crate::storage::{Fork, Snapshot};
 
 use failure::Error;
 use protobuf::well_known_types::Any;
 
 use super::RustArtifactSpec;
+use crate::runtime::configuration_new::{Deploy, Init};
 
 pub trait ServiceDispatcher {
     fn call(
@@ -36,17 +40,72 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
         Ok(())
     }
 
-    fn before_commit(&self, fork: &mut Fork) {}
+    fn before_commit(&self, _fork: &mut Fork) {}
 
-    fn after_commit(&self, fork: &mut Fork) {}
+    fn after_commit(&self, _fork: &mut Fork) {}
 
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash>;
+    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
+    }
     // TODO: add other hooks such as "on node startup", etc.
 }
 
 pub trait ServiceFactory: std::fmt::Debug {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
+    fn genesis_init_info(&self) -> Vec<DeployInit> {
+        Vec::new()
+    }
+}
+
+#[derive(Debug)]
+pub struct GenesisInitBuilder {
+    artifact: RustArtifactSpec,
+    service_name: String,
+    service_constructor: Any,
+}
+
+impl GenesisInitBuilder {
+    pub fn with_init_tx(
+        artifact: RustArtifactSpec,
+        service_name: &str,
+        init_tx: impl BinaryForm,
+    ) -> Self {
+        Self {
+            artifact,
+            service_name: service_name.to_owned(),
+            service_constructor: {
+                let mut any = Any::new();
+                any.set_value(init_tx.encode().unwrap());
+                any
+            },
+        }
+    }
+
+    pub fn no_init_tx(artifact: RustArtifactSpec, service_name: &str) -> Self {
+        Self {
+            artifact,
+            service_name: service_name.to_owned(),
+            service_constructor: Any::new(),
+        }
+    }
+
+    pub fn finalize(self) -> DeployInit {
+        let deploy_tx = Deploy {
+            runtime_id: RuntimeIdentifier::Rust as u32,
+            activation_height: 0,
+            artifact_spec: self.artifact.into_pb_any(),
+        };
+
+        let init_tx = Init {
+            runtime_id: RuntimeIdentifier::Rust as u32,
+            artifact_spec: self.artifact.into_pb_any(),
+            instance_name: self.service_name,
+            constructor_data: self.service_constructor,
+        };
+
+        DeployInit { deploy_tx, init_tx }
+    }
 }
 
 #[macro_export]

@@ -62,9 +62,7 @@ use crate::helpers::{
 };
 use crate::messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage};
 use crate::node::state::SharedConnectList;
-use crate::runtime::{
-    configuration::Service as ConfigurationService, rust::service::ServiceFactory,
-};
+use crate::runtime::rust::service::ServiceFactory;
 use crate::storage::{Database, DbOptions};
 
 mod basic;
@@ -270,8 +268,6 @@ pub struct NodeConfig<T = SecretKey> {
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
-    /// Configuration Service majority count.
-    pub configuration_service_majority_count: Option<u16>,
 }
 
 impl NodeConfig<PathBuf> {
@@ -315,7 +311,7 @@ impl NodeConfig<PathBuf> {
             database: self.database,
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
-            configuration_service_majority_count: self.configuration_service_majority_count,
+            //            configuration_service_majority_count: self.configuration_service_majority_count,
         }
     }
 }
@@ -897,18 +893,11 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new<D: Into<Arc<dyn Database>>>(
         db: D,
-        mut services: Vec<Box<dyn ServiceFactory>>,
+        services: Vec<Box<dyn ServiceFactory>>,
         node_cfg: NodeConfig,
         config_file_path: Option<String>,
     ) -> Self {
         crypto::init();
-
-        //        // Init configuration service.
-        //        let configuration_service = ConfigurationService::new(
-        //            node_cfg.genesis.validator_keys.len(),
-        //            node_cfg.configuration_service_majority_count,
-        //        );
-        //        services.push(Box::new(configuration_service));
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
