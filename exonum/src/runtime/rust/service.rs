@@ -53,19 +53,19 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
 pub trait ServiceFactory: std::fmt::Debug {
     fn artifact(&self) -> RustArtifactSpec;
     fn new_instance(&self) -> Box<dyn Service>;
-    fn genesis_init_info(&self) -> Vec<DeployInit> {
+    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
         Vec::new()
     }
 }
 
 #[derive(Debug)]
-pub struct GenesisInitBuilder {
+pub struct GenesisInitInfo {
     artifact: RustArtifactSpec,
     service_name: String,
     service_constructor: Any,
 }
 
-impl GenesisInitBuilder {
+impl GenesisInitInfo {
     pub fn with_init_tx(
         artifact: RustArtifactSpec,
         service_name: &str,
@@ -90,21 +90,21 @@ impl GenesisInitBuilder {
         }
     }
 
-    pub fn finalize(self) -> DeployInit {
-        let deploy_tx = Deploy {
+    pub fn get_deploy_tx(&self) -> Deploy {
+        Deploy {
             runtime_id: RuntimeIdentifier::Rust as u32,
             activation_height: 0,
             artifact_spec: self.artifact.into_pb_any(),
-        };
+        }
+    }
 
-        let init_tx = Init {
+    pub fn get_init_tx(&self) -> Init {
+        Init {
             runtime_id: RuntimeIdentifier::Rust as u32,
             artifact_spec: self.artifact.into_pb_any(),
-            instance_name: self.service_name,
-            constructor_data: self.service_constructor,
-        };
-
-        DeployInit { deploy_tx, init_tx }
+            instance_name: self.service_name.clone(),
+            constructor_data: self.service_constructor.clone(),
+        }
     }
 }
 

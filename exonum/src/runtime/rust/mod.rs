@@ -32,12 +32,12 @@ use super::{
 };
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{AnyTx, BinaryForm, CallInfo};
+use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
 use crate::storage::{Error as StorageError, Fork, Snapshot};
 
 use self::service::{Service, ServiceFactory};
-use crate::runtime::configuration_new;
+use crate::runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID};
 use crate::runtime::dispatcher::Dispatcher;
 use protobuf::well_known_types::Any as PbAny;
 
@@ -276,25 +276,35 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
-        let txs = self
-            .inner
-            .services
-            .iter()
-            .fold(Vec::new(), |mut txs: Vec<_>, (_, s)| {
-                txs.extend(s.genesis_init_info().into_iter().map(|dep_init| AnyTx {
-                    dispatch: CallInfo {
-                        instance_id: configuration_new::SERVICE_ID,
-                        method_id: configuration_new::DEPLOY_INIT_METHOD_ID,
-                    },
-                    payload: dep_init.encode().unwrap(),
-                }));
-                txs
-            });
+        let (deploy_txs, init_txs) = self.inner.services.iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut deploy_txs, mut init_txs), (_, s)| {
+                let init_info = s.genesis_init_info();
+                if !init_info.is_empty() {
+                    deploy_txs.push(init_info[0].get_deploy_tx());
+                }
+                init_txs.extend(init_info.into_iter().map(|i| i.get_init_tx()));
+                (deploy_txs, init_txs)
+            },
+        );
 
-        for tx in txs.into_iter() {
-            let mut ctx = RuntimeContext::new(fork, &PublicKey::zero(), &Hash::zero());
+        let mut ctx = RuntimeContext::new(fork, &PublicKey::zero(), &Hash::zero());
+        for deploy_tx in deploy_txs.into_iter() {
             self.get_dispatcher()
-                .execute(&mut ctx, tx.dispatch, &tx.payload)
+                .execute(
+                    &mut ctx,
+                    CallInfo::new(SERVICE_ID, DEPLOY_METHOD_ID),
+                    &deploy_tx.encode().unwrap(),
+                )
+                .map_err(|e| format_err!("Rust runtime genesis deploy error: {:?}", e))?
+        }
+        for init_tx in init_txs.into_iter() {
+            self.get_dispatcher()
+                .execute(
+                    &mut ctx,
+                    CallInfo::new(SERVICE_ID, INIT_METHOD_ID),
+                    &init_tx.encode().unwrap(),
+                )
                 .map_err(|e| format_err!("Rust runtime genesis init error: {:?}", e))?
         }
         Ok(())

@@ -267,7 +267,7 @@ pub mod contracts {
     use exonum::blockchain::ExecutionResult;
     use exonum::runtime::configuration_new::DeployInit;
     use exonum::runtime::rust::{
-        service::{GenesisInitBuilder, Service, ServiceFactory},
+        service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
     };
 
@@ -360,11 +360,11 @@ pub mod contracts {
             Box::new(CryptocurrencyServiceImpl)
         }
 
-        fn genesis_init_info(&self) -> Vec<DeployInit> {
+        fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
             vec![
-            //                GenesisInitBuilder::no_init_tx(self.artifact(), "coin-1").finalize(),
-            //                GenesisInitBuilder::no_init_tx(self.artifact(), "coin-2").finalize(),
-                        ]
+                GenesisInitInfo::no_init_tx(self.artifact(), "coin-1"),
+                GenesisInitInfo::no_init_tx(self.artifact(), "coin-2"),
+            ]
         }
     }
 }

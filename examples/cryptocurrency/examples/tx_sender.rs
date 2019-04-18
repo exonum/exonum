@@ -17,7 +17,7 @@ fn encode_signed_tx<T: BinaryForm>(
 ) -> serde_json::Value {
     let any_tx = AnyTx {
         dispatch: CallInfo {
-            instance_id: 0,
+            instance_id: 1,
             method_id,
         },
         payload: tx.encode().unwrap(),
@@ -33,7 +33,8 @@ fn send_tx(tx: serde_json::Value, client: &reqwest::Client) {
         .json(&tx)
         .send()
         .map(|res| println!("res status: {}", res.status()))
-        .unwrap_or(eprintln!("Failed to send request."));
+        .map_err(|e| eprintln!("Failed to send request: {}", e))
+        .unwrap_or_default();
 }
 
 fn main() {
