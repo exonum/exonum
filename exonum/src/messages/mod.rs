@@ -42,11 +42,7 @@ use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
 
 pub(crate) use self::helpers::HexStringRepresentation;
-pub use self::{
-    authorization::SignedMessage,
-    helpers::{to_hex_string},
-    protocol::*,
-};
+pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*};
 use exonum_merkledb::BinaryValue;
 
 mod authorization;

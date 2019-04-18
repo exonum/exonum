@@ -24,10 +24,13 @@ use exonum::{
 };
 use exonum_merkledb::Snapshot;
 
-use std::{borrow::Cow, sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-}};
+use std::{
+    borrow::Cow,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 
 pub const SERVICE_ID: u16 = 512;
 

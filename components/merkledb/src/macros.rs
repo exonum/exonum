@@ -76,4 +76,3 @@ macro_rules! impl_binary_value_for_message {
         )*
     };
 }
-

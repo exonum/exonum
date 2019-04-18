@@ -354,6 +354,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # use exonum::crypto::{Hash, PublicKey, Signature};
 /// # use exonum::explorer::CommittedTransaction;
 /// # use exonum::helpers::Height;
+/// use std::borrow::Cow;
 ///
 /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 /// #[exonum(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
@@ -521,6 +522,7 @@ impl CommittedTransaction {
 ///
 /// ```
 /// # extern crate exonum;
+/// use std::borrow::Cow;
 /// # #[macro_use] extern crate exonum_derive;
 /// # #[macro_use] extern crate serde_json;
 /// # #[macro_use] extern crate serde_derive;

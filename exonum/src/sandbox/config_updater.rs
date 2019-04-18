@@ -24,8 +24,8 @@ use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::helpers::Height;
 use crate::messages::{Message, RawTransaction, Signed};
 use crate::proto::ProtobufConvert;
-use exonum_merkledb::{Snapshot, impl_binary_value_for_message, BinaryValue};
-use protobuf::{Message as PbMessage};
+use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+use protobuf::Message as PbMessage;
 
 pub const CONFIG_SERVICE: u16 = 1;
 

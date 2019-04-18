@@ -1171,15 +1171,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
     use super::*;
     use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crate::crypto::{gen_keypair_from_seed, Seed};
-    use crate::messages::{RawTransaction};
+    use crate::messages::RawTransaction;
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use exonum_merkledb::{BinaryValue, impl_binary_value_for_message, Snapshot};
-    use protobuf::{Message as PbMessage};
+    use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
+    use protobuf::Message as PbMessage;
+    use std::borrow::Cow;
 
     const SERVICE_ID: u16 = 1;
 

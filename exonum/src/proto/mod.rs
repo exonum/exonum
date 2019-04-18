@@ -72,7 +72,7 @@ mod tests;
 
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
-use protobuf::{well_known_types};
+use protobuf::well_known_types;
 
 use std::collections::HashMap;
 

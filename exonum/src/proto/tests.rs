@@ -17,10 +17,10 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use std::{borrow::Cow, collections::HashMap};
 
-use exonum_merkledb::BinaryValue;
 use super::schema;
 use super::ProtobufConvert;
 use crate::crypto::{self, Hash, PublicKey, Signature};
+use exonum_merkledb::BinaryValue;
 
 #[test]
 fn test_hash_pb_convert() {

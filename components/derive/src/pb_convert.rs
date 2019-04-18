@@ -168,7 +168,7 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     let field_names = get_field_names(&input);
     let protobuf_convert =
         implement_protobuf_convert_trait(&name, &proto_struct_name, &field_names);
-//    let binary_form = implement_binary_form(&name, &cr);
+    //    let binary_form = implement_binary_form(&name, &cr);
     let storage_traits = implement_storage_traits(&name, &cr);
 
     let serde_traits = {
@@ -181,22 +181,22 @@ pub fn implement_protobuf_convert(input: TokenStream) -> TokenStream {
     };
 
     let expanded = quote! {
-        mod #mod_name {
-            extern crate protobuf as _protobuf_crate;
-            extern crate failure as _failure;
+            mod #mod_name {
+                extern crate protobuf as _protobuf_crate;
+                extern crate failure as _failure;
 
-            use super::*;
+                use super::*;
 
-            use self::_protobuf_crate::Message as _ProtobufMessage;
-            use self::_failure::{bail, Error as _FailureError};
-            use #cr::proto::ProtobufConvert;
+                use self::_protobuf_crate::Message as _ProtobufMessage;
+                use self::_failure::{bail, Error as _FailureError};
+                use #cr::proto::ProtobufConvert;
 
-            #protobuf_convert
-//            #binary_form
-            #storage_traits
-            #serde_traits
-        }
-    };
+                #protobuf_convert
+    //            #binary_form
+                #storage_traits
+                #serde_traits
+            }
+        };
 
     expanded.into()
 }

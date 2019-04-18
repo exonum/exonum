@@ -53,7 +53,7 @@ use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use tempdir::TempDir;
 
-use std::{iter, borrow::Cow};
+use std::{borrow::Cow, iter};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -111,7 +111,6 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> (Hash, P
 }
 
 mod timestamping {
-    use std::borrow::Cow;
     use super::{gen_keypair_from_rng, BoxedTx};
     use crate::proto;
     use exonum::{
@@ -121,6 +120,7 @@ mod timestamping {
     };
     use exonum_merkledb::Snapshot;
     use rand::Rng;
+    use std::borrow::Cow;
 
     const TIMESTAMPING_SERVICE_ID: u16 = 1;
 
@@ -212,7 +212,6 @@ mod timestamping {
 }
 
 mod cryptocurrency {
-    use std::borrow::Cow;
     use super::{gen_keypair_from_rng, BoxedTx};
     use crate::proto;
     use exonum::{
@@ -222,6 +221,7 @@ mod cryptocurrency {
     };
     use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
     use rand::{seq::SliceRandom, Rng};
+    use std::borrow::Cow;
 
     const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 

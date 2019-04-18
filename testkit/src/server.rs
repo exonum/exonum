@@ -156,7 +156,6 @@ pub fn create_testkit_api_aggregator(testkit: &Arc<RwLock<TestKit>>) -> ApiAggre
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Cow;
     use exonum::api;
     use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionContext};
     use exonum::crypto::{gen_keypair, Hash};
@@ -164,6 +163,7 @@ mod tests {
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction, Signed};
     use exonum_merkledb::Snapshot;
+    use std::borrow::Cow;
 
     use super::{super::proto, *};
     use crate::{TestKitApi, TestKitBuilder};

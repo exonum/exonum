@@ -1117,8 +1117,10 @@ mod tests {
     use crate::events::EventHandler;
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
-    use exonum_merkledb::{Database, Snapshot, TemporaryDB, impl_binary_value_for_message, BinaryValue};
-    use protobuf::{Message as ProtobufMessage};
+    use exonum_merkledb::{
+        impl_binary_value_for_message, BinaryValue, Database, Snapshot, TemporaryDB,
+    };
+    use protobuf::Message as ProtobufMessage;
 
     const SERVICE_ID: u16 = 0;
 
@@ -1130,17 +1132,17 @@ mod tests {
 
     impl_binary_value_for_message! { TxSimple }
 
-//    impl BinaryForm for TxSimple {
-//        fn encode(&self) -> Result<Vec<u8>, failure::Error> {
-//            self.write_to_bytes().map_err(Error::from)
-//        }
-//
-//        fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
-//            let mut pb = Self::new();
-//            pb.merge_from_bytes(buffer)?;
-//            Ok(pb)
-//        }
-//    }
+    //    impl BinaryForm for TxSimple {
+    //        fn encode(&self) -> Result<Vec<u8>, failure::Error> {
+    //            self.write_to_bytes().map_err(Error::from)
+    //        }
+    //
+    //        fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
+    //            let mut pb = Self::new();
+    //            pb.merge_from_bytes(buffer)?;
+    //            Ok(pb)
+    //        }
+    //    }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

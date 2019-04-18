@@ -165,12 +165,12 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 }
 
 mod transactions_tests {
-    use std::borrow::Cow;
     use super::TEST_SERVICE_ID;
     use crate::blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
     use crate::crypto::gen_keypair;
     use crate::messages::Message;
     use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
+    use std::borrow::Cow;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
