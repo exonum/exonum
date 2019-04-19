@@ -289,7 +289,9 @@ pub struct TestKitBuilder {
     logger: bool,
 }
 
+
 impl fmt::Debug for TestKitBuilder {
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::redundant_closure))]
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("TestKitBuilder")
             .field(
@@ -304,8 +306,7 @@ impl fmt::Debug for TestKitBuilder {
                 &self
                     .services
                     .iter()
-                    .map(AsRef::as_ref)
-                    .map(Service::service_name)
+                    .map(|service| service.service_name())
                     .collect::<Vec<_>>(),
             )
             .field("logger", &self.logger)
