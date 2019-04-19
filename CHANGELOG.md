@@ -50,6 +50,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   An additional field in the response of the endpoint was added. The field
   corresponds to the total number of transactions in the blockchain. (#1289)
 
+- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
+  An additional field in the response of the endpoint was added. The field
+  corresponds to the total number of transactions in the blockchain. (#1289)
+
 #### exonum-merkledb
 
 - Changed storage layout (#1293)
