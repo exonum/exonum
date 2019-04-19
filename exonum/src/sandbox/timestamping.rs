@@ -44,18 +44,6 @@ impl Transaction for TimestampTx {
 
 impl_binary_value_for_message! { TimestampTx }
 
-//impl BinaryForm for TimestampTx {
-//    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
-//        self.write_to_bytes().map_err(failure::Error::from)
-//    }
-//
-//    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
-//        let mut pb = Self::new();
-//        pb.merge_from_bytes(buffer)?;
-//        Ok(pb)
-//    }
-//}
-
 #[derive(Default)]
 pub struct TimestampingService {}
 

@@ -131,30 +131,6 @@ impl BinaryValue for RawTransaction {
     }
 }
 
-//impl BinaryForm for RawTransaction {
-//    fn encode(&self) -> Result<Vec<u8>, Error> {
-//        let mut buffer = vec![0; mem::size_of::<u16>()];
-//        LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
-//        let value = self.service_transaction.encode()?;
-//        buffer.extend_from_slice(&value);
-//        Ok(buffer)
-//    }
-//
-//    /// Converts a serialized byte array into a transaction.
-//    fn decode(buffer: &[u8]) -> Result<Self, Error> {
-//        ensure!(
-//            buffer.len() >= mem::size_of::<u16>(),
-//            "Buffer too short in RawTransaction deserialization."
-//        );
-//        let service_id = LittleEndian::read_u16(&buffer[0..2]);
-//        let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
-//        Ok(RawTransaction {
-//            service_id,
-//            service_transaction,
-//        })
-//    }
-//}
-
 impl BinaryValue for ServiceTransaction {
     fn to_bytes(&self) -> Vec<u8> {
         let mut buffer = vec![0; mem::size_of::<u16>()];
@@ -176,28 +152,6 @@ impl BinaryValue for ServiceTransaction {
         })
     }
 }
-
-//impl BinaryForm for ServiceTransaction {
-//    fn encode(&self) -> Result<Vec<u8>, Error> {
-//        let mut buffer = vec![0; mem::size_of::<u16>()];
-//        LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
-//        buffer.extend_from_slice(&self.payload);
-//        Ok(buffer)
-//    }
-//
-//    fn decode(buffer: &[u8]) -> Result<Self, Error> {
-//        ensure!(
-//            buffer.len() >= mem::size_of::<u16>(),
-//            "Buffer too short in ServiceTransaction deserialization."
-//        );
-//        let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
-//        let payload = buffer[2..].to_vec();
-//        Ok(ServiceTransaction {
-//            transaction_id,
-//            payload,
-//        })
-//    }
-//}
 
 /// Wraps a `Payload` together with the corresponding `SignedMessage`.
 ///

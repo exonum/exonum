@@ -69,18 +69,6 @@ impl Transaction for TxConfig {
 }
 
 impl_binary_value_for_message! { TxConfig }
-//
-//impl BinaryForm for TxConfig {
-//    fn encode(&self) -> Result<Vec<u8>, failure::Error> {
-//        self.write_to_bytes().map_err(failure::Error::from)
-//    }
-//
-//    fn decode(buffer: &[u8]) -> Result<Self, failure::Error> {
-//        let mut pb = Self::new();
-//        pb.merge_from_bytes(buffer)?;
-//        Ok(pb)
-//    }
-//}
 
 impl Service for ConfigUpdateService {
     fn service_name(&self) -> &str {
