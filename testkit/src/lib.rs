@@ -140,10 +140,10 @@
 //! ```
 
 #![deny(
-missing_debug_implementations,
-missing_docs,
-unsafe_code,
-bare_trait_objects
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
 )]
 
 #[cfg_attr(test, macro_use)]
@@ -345,8 +345,8 @@ impl TestKitBuilder {
 
     /// Adds a service to the testkit.
     pub fn with_service<S>(mut self, service: S) -> Self
-        where
-            S: Into<Box<dyn Service>>,
+    where
+        S: Into<Box<dyn Service>>,
     {
         self.services.push(service.into());
         self
@@ -409,8 +409,8 @@ impl fmt::Debug for TestKit {
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given service.
     pub fn for_service<S>(service: S) -> Self
-        where
-            S: Into<Box<dyn Service>>,
+    where
+        S: Into<Box<dyn Service>>,
     {
         TestKitBuilder::validator().with_service(service).create()
     }
@@ -598,8 +598,8 @@ impl TestKit {
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
-        where
-            I: IntoIterator<Item = Signed<RawTransaction>>,
+    where
+        I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         self.poll_events();
         // Filter out already committed transactions; otherwise,
@@ -721,8 +721,8 @@ impl TestKit {
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
-        where
-            I: IntoIterator<Item = Signed<RawTransaction>>,
+    where
+        I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         let tx_hashes: Vec<_> = {
             let blockchain = self.blockchain_mut();
