@@ -53,7 +53,7 @@ use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 use tempdir::TempDir;
 
-use std::{borrow::Cow, iter};
+use std::iter;
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
