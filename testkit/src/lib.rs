@@ -287,7 +287,6 @@ pub struct TestKitBuilder {
     logger: bool,
 }
 
-
 impl fmt::Debug for TestKitBuilder {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::redundant_closure))]
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
