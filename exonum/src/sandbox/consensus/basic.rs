@@ -187,7 +187,7 @@ fn test_query_state_hash() {
 
         let proof_configs = sandbox.get_proof_to_service_table(CORE_SERVICE, 0);
         let proof = proof_configs.check().unwrap();
-        assert_eq!(proof.merkle_root(), state_hash);
+        assert_eq!(proof.root_hash(), state_hash);
         assert_ne!(configs_rh, Hash::zero());
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
@@ -196,7 +196,7 @@ fn test_query_state_hash() {
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
         let proof = proof_configs.check().unwrap();
-        assert_eq!(proof.merkle_root(), state_hash);
+        assert_eq!(proof.root_hash(), state_hash);
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
             vec![(&timestamp_t1_key, &Hash::new([127; HASH_SIZE]))]
@@ -204,7 +204,7 @@ fn test_query_state_hash() {
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
         let proof = proof_configs.check().unwrap();
-        assert_eq!(proof.merkle_root(), state_hash);
+        assert_eq!(proof.root_hash(), state_hash);
         assert_eq!(
             proof.entries().collect::<Vec<_>>(),
             vec![(&timestamp_t2_key, &Hash::new([128; HASH_SIZE]))]

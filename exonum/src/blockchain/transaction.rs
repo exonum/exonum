@@ -23,7 +23,7 @@ use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 use crate::crypto::{CryptoHash, Hash, PublicKey};
 use crate::messages::{HexStringRepresentation, RawTransaction, Signed, SignedMessage};
 use crate::proto::{self, ProtobufConvert};
-use crate::storage::{Fork, StorageValue};
+use exonum_merkledb::{BinaryValue, Fork, ObjectHash};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::cast_lossless))]
@@ -142,7 +142,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
     /// #
     /// use exonum::blockchain::{Transaction, ExecutionResult, TransactionContext};
     /// use exonum::crypto::PublicKey;
-    /// use exonum::storage::Fork;
+    /// use exonum_merkledb::Fork;
     ///
     /// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
     /// #[exonum(pb = "exonum::proto::schema::doc_tests::MyTransaction")]
@@ -177,7 +177,7 @@ pub trait Transaction: ::std::fmt::Debug + Send + 'static + ::erased_serde::Seri
 /// Wrapper around database and tx hash.
 #[derive(Debug)]
 pub struct TransactionContext<'a> {
-    fork: &'a mut Fork,
+    fork: &'a Fork,
     service_id: u16,
     service_name: &'a str,
     tx_hash: Hash,
@@ -187,7 +187,7 @@ pub struct TransactionContext<'a> {
 impl<'a> TransactionContext<'a> {
     #[doc(hidden)]
     pub fn new(
-        fork: &'a mut Fork,
+        fork: &'a Fork,
         service_name: &'a str,
         raw_message: &Signed<RawTransaction>,
     ) -> Self {
@@ -201,7 +201,7 @@ impl<'a> TransactionContext<'a> {
     }
 
     /// Returns fork of current blockchain state.
-    pub fn fork(&mut self) -> &mut Fork {
+    pub fn fork(&self) -> &Fork {
         self.fork
     }
 
@@ -293,11 +293,11 @@ pub enum TransactionErrorType {
 /// transaction is successful or not.
 ///
 /// ```
-/// # use exonum::storage::{MemoryDB, Database};
+/// # use exonum_merkledb::{TemporaryDB, Database};
 /// # use exonum::crypto::Hash;
 /// use exonum::blockchain::Schema;
 ///
-/// # let db = MemoryDB::new();
+/// # let db = TemporaryDB::new();
 /// # let snapshot = db.snapshot();
 /// # let transaction_hash = Hash::zero();
 /// let schema = Schema::new(&snapshot);
@@ -424,21 +424,23 @@ impl ProtobufConvert for TransactionResult {
     }
 }
 
-impl StorageValue for TransactionResult {
-    fn into_bytes(self) -> Vec<u8> {
+impl BinaryValue for TransactionResult {
+    fn to_bytes(&self) -> Vec<u8> {
         self.to_pb()
             .write_to_bytes()
             .expect("Failed to serialize TransactionResult to protobuf.")
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
         block
             .merge_from_bytes(bytes.as_ref())
             .expect("Failed to parse TransactionResult from protobuf.");
-        ProtobufConvert::from_pb(block).expect("Failed to convert TransactionResult from protobuf.")
+        ProtobufConvert::from_pb(block)
     }
 }
+
+impl_object_hash_for_binary_value! { TransactionResult }
 
 fn status_as_u16(status: &TransactionResult) -> u16 {
     match (*status).0 {
@@ -488,7 +490,7 @@ mod tests {
     use crate::messages::Message;
     use crate::node::ApiSender;
     use crate::proto;
-    use crate::storage::{Database, Entry, MemoryDB, Snapshot};
+    use exonum_merkledb::{Database, Entry, Snapshot, TemporaryDB};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 
@@ -587,7 +589,8 @@ mod tests {
 
         for result in &results {
             let bytes = result.clone().into_bytes();
-            let new_result = TransactionResult::from_bytes(Cow::Borrowed(&bytes));
+            let new_result = TransactionResult::from_bytes(Cow::Borrowed(&bytes))
+                .expect("Error while deserializing value");
             assert_eq!(*result, new_result);
         }
     }
@@ -607,7 +610,7 @@ mod tests {
 
         let (pk, sec_key) = crypto::gen_keypair();
         let mut blockchain = create_blockchain();
-        let db = Box::new(MemoryDB::new());
+        let db = TemporaryDB::new();
 
         for (index, status) in statuses.iter().enumerate() {
             let index = index as u64;
@@ -622,9 +625,9 @@ mod tests {
             );
             let hash = transaction.hash();
             {
-                let mut fork = blockchain.fork();
+                let fork = blockchain.fork();
                 {
-                    let mut schema = Schema::new(&mut fork);
+                    let mut schema = Schema::new(&fork);
                     schema.add_transaction_into_pool(transaction.clone());
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
@@ -634,8 +637,8 @@ mod tests {
 
             db.merge(patch).unwrap();
 
-            let mut fork = db.fork();
-            let entry = create_entry(&mut fork);
+            let fork = db.fork();
+            let entry = create_entry(&fork);
             if status.is_err() {
                 assert_eq!(None, entry.get());
             } else {
@@ -680,7 +683,7 @@ mod tests {
         let service_keypair = crypto::gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
-            MemoryDB::new(),
+            TemporaryDB::new(),
             vec![Box::new(TxResultService) as Box<dyn Service>],
             service_keypair.0,
             service_keypair.1,
@@ -721,14 +724,14 @@ mod tests {
     }
 
     impl Transaction for TxResult {
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        fn execute(&self, context: TransactionContext) -> ExecutionResult {
             let mut entry = create_entry(context.fork());
             entry.set(self.value);
             EXECUTION_STATUS.lock().unwrap().clone()
         }
     }
 
-    fn create_entry(fork: &mut Fork) -> Entry<&mut Fork, u64> {
+    fn create_entry(fork: &Fork) -> Entry<&Fork, u64> {
         Entry::new("transaction_status_test", fork)
     }
 }

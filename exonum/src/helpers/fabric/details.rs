@@ -39,7 +39,7 @@ use crate::blockchain::{config::ValidatorKeys, GenesisConfig};
 use crate::crypto::{generate_keys_file, PublicKey};
 use crate::helpers::{config::ConfigFile, ZeroizeOnDrop};
 use crate::node::{ConnectListConfig, NodeApiConfig, NodeConfig};
-use crate::storage::{Database, DbOptions, RocksDB};
+use exonum_merkledb::{Database, DbOptions, RocksDB};
 
 const CONSENSUS_KEY_PASS_METHOD: &str = "CONSENSUS_KEY_PASS_METHOD";
 const DATABASE_PATH: &str = "DATABASE_PATH";

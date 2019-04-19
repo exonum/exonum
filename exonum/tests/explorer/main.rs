@@ -72,7 +72,8 @@ fn test_explorer_basics() {
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
-        let schema = Schema::new(blockchain.snapshot());
+        let snapshot = blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         assert_eq!(explorer.height(), Height(1));
         assert_eq!(schema.transactions_len(), 1);
         assert!(explorer.block(Height(2)).is_none());
@@ -120,7 +121,8 @@ fn test_explorer_basics() {
     create_block(&mut blockchain, vec![tx_bob.clone(), tx_transfer.clone()]);
 
     let explorer = BlockchainExplorer::new(&blockchain);
-    let schema = Schema::new(blockchain.snapshot());
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
     assert_eq!(explorer.height(), Height(2));
     assert_eq!(schema.transactions_len(), 3);
     let block = explorer.block(Height(2)).unwrap();
@@ -192,9 +194,9 @@ fn test_explorer_pool_transaction() {
         assert!(explorer.transaction(&tx_hash).is_none());
     }
 
-    let mut fork = blockchain.fork();
+    let fork = blockchain.fork();
     {
-        let mut schema = Schema::new(&mut fork);
+        let mut schema = Schema::new(&fork);
         schema.add_transaction_into_pool(tx_alice.clone());
     }
     blockchain.merge(fork.into_patch()).unwrap();
@@ -462,9 +464,9 @@ fn test_transaction_info_roundtrip() {
     let mut blockchain = create_blockchain();
     let tx = tx_generator().next().unwrap();
 
-    let mut fork = blockchain.fork();
+    let fork = blockchain.fork();
     {
-        let mut schema = Schema::new(&mut fork);
+        let mut schema = Schema::new(&fork);
         schema.add_transaction_into_pool(tx.clone());
     }
     blockchain.merge(fork.into_patch()).unwrap();

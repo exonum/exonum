@@ -20,6 +20,7 @@ circle-ci = { repository = "exonum/exonum" }
 chrono = { version = "0.4.6", features = ["serde"] }
 exonum = { version = "0.11.0", path = "../../exonum" }
 exonum-derive = { version = "0.11.0", path = "../../components/derive" }
+exonum-merkledb = { version = "0.10.0", path = "../../components/merkledb" }
 failure = "0.1.5"
 serde = "1.0.10"
 serde_derive = "1.0.10"

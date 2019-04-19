@@ -13,12 +13,12 @@
 // limitations under the License.
 
 //! REST API.
+use exonum_merkledb::MapProof;
 
 use exonum::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     blockchain::{self, BlockProof},
     crypto::Hash,
-    storage::MapProof,
 };
 
 use crate::{

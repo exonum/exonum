@@ -162,7 +162,7 @@ mod tests {
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction, Signed};
-    use exonum::storage::Snapshot;
+    use exonum_merkledb::Snapshot;
 
     use super::{super::proto, *};
     use crate::{TestKitApi, TestKitBuilder};

@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox};
 
 #[test]
 fn test_queue_message_from_future_round() {
@@ -93,7 +93,7 @@ fn test_queue_propose_message_from_next_height() {
 
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(0))
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 

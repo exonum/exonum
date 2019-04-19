@@ -18,7 +18,7 @@ use crate::blockchain::Schema;
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, ValidatorId};
 use crate::sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox};
-use crate::storage::StorageValue;
+use exonum_merkledb::BinaryValue;
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus

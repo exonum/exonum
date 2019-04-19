@@ -16,10 +16,10 @@
 
 use super::proto;
 use chrono::{DateTime, Utc};
-use exonum::{
-    crypto::Hash,
-    storage::{Fork, ProofMapIndex, Snapshot},
-};
+
+use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex};
+
+use exonum::crypto::Hash;
 
 /// Stores content's hash and some metadata about it.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
@@ -82,27 +82,20 @@ impl<T> Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
 {
     /// Returns the `ProofMapIndex` of timestamps.
-    pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
-        ProofMapIndex::new("timestamping.timestamps", &self.view)
+    pub fn timestamps(&self) -> ProofMapIndex<T, Hash, TimestampEntry> {
+        ProofMapIndex::new("timestamping.timestamps", self.view)
     }
 
     /// Returns the state hash of the timestamping service.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.timestamps().merkle_root()]
-    }
-}
-
-impl<'a> Schema<&'a mut Fork> {
-    /// Returns the mutable `ProofMapIndex` of timestamps.
-    pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
-        ProofMapIndex::new("timestamping.timestamps", &mut self.view)
+        vec![self.timestamps().object_hash()]
     }
 
     /// Adds the timestamp entry to the database.
-    pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
+    pub fn add_timestamp(&self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp.clone();
         let content_hash = &timestamp.content_hash;
 
@@ -112,6 +105,6 @@ impl<'a> Schema<&'a mut Fork> {
         }
 
         // Add timestamp
-        self.timestamps_mut().put(content_hash, timestamp_entry);
+        self.timestamps().put(content_hash, timestamp_entry);
     }
 }

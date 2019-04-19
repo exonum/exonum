@@ -22,7 +22,7 @@ use crate::blockchain::{
 };
 use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
 use crate::messages::{Message, RawTransaction, Signed};
-use crate::storage::Snapshot;
+use exonum_merkledb::Snapshot;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const DATA_SIZE: usize = 64;

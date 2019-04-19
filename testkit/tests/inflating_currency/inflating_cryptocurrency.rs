@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use exonum_merkledb::{IndexAccess, MapIndex, Snapshot};
 
 use exonum::{
     api,
@@ -21,7 +22,6 @@ use exonum::{
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::{Message, RawTransaction, Signed},
-    storage::{Fork, MapIndex, Snapshot},
 };
 
 use super::proto;
@@ -76,24 +76,20 @@ pub struct CurrencySchema<S> {
     view: S,
 }
 
-impl<S: AsRef<dyn Snapshot>> CurrencySchema<S> {
-    pub fn new(view: S) -> Self {
+impl<T: IndexAccess> CurrencySchema<T> {
+    /// Creates a new schema instance.
+    pub fn new(view: T) -> Self {
         CurrencySchema { view }
     }
 
-    pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
-        MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
+    /// Returns an immutable version of the wallets table.
+    pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
+        MapIndex::new("cryptocurrency.wallets", self.view)
     }
 
-    /// Get a separate wallet from the storage.
+    /// Gets a specific wallet from the storage.
     pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets().get(pub_key)
-    }
-}
-
-impl<'a> CurrencySchema<&'a mut Fork> {
-    pub fn wallets_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-        MapIndex::new("cryptocurrency.wallets", self.view)
     }
 }
 
@@ -152,14 +148,14 @@ impl TxTransfer {
 
 impl Transaction for TxCreateWallet {
     /// Apply logic to the storage when executing the transaction.
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
         let author = tc.author();
         let view = tc.fork();
-        let height = CoreSchema::new(&view).height();
-        let mut schema = CurrencySchema { view };
+        let height = CoreSchema::new(view).height();
+        let schema = CurrencySchema { view };
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &self.name, INIT_BALANCE, height.0);
-            schema.wallets_mut().put(&author, wallet);
+            schema.wallets().put(&author, wallet);
         }
         Ok(())
     }
@@ -168,14 +164,14 @@ impl Transaction for TxCreateWallet {
 impl Transaction for TxTransfer {
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
         let author = tc.author();
         if author == self.to {
             Err(ExecutionError::new(0))?
         }
         let view = tc.fork();
-        let height = CoreSchema::new(&view).height();
-        let mut schema = CurrencySchema { view };
+        let height = CoreSchema::new(view).height();
+        let schema = CurrencySchema { view };
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&self.to);
         if let (Some(sender), Some(receiver)) = (sender, receiver) {
@@ -183,7 +179,7 @@ impl Transaction for TxTransfer {
             if sender.actual_balance(height) >= amount {
                 let sender = sender.decrease(amount, height);
                 let receiver = receiver.increase(amount, height);
-                let mut wallets = schema.wallets_mut();
+                let mut wallets = schema.wallets();
                 wallets.put(&author, sender);
                 wallets.put(&self.to, receiver);
             }

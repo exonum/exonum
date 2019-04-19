@@ -34,7 +34,7 @@ use crate::blockchain::{
 use crate::crypto::{CryptoHash, Hash};
 use crate::helpers::Height;
 use crate::messages::{Precommit, RawTransaction, Signed};
-use crate::storage::{ListProof, Snapshot};
+use exonum_merkledb::{ListProof, Snapshot};
 
 /// Transaction parsing result.
 type ParseResult = Result<TransactionMessage, failure::Error>;
@@ -334,7 +334,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// [`Transaction`]: ../blockchain/trait.Transaction.html
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
-/// [`ListProof`]: ../storage/enum.ListProof.html
+/// [`ListProof`]: ../../exonum_merkledb/enum.ListProof.html
 /// [`Hash`]: ../../exonum_crypto/struct.Hash.html
 /// [`TransactionResult`]: ../blockchain/struct.TransactionResult.html
 /// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
@@ -620,7 +620,7 @@ impl TransactionInfo {
 /// The explorer wraps a specific [`Snapshot`] of the blockchain state; that is,
 /// all calls to the methods of an explorer instance are guaranteed to be consistent.
 ///
-/// [`Snapshot`]: ../storage/trait.Snapshot.html
+/// [`Snapshot`]: ../../exonum_merkledb/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<dyn Snapshot>,
     transaction_parser: Box<dyn 'a + Fn(Signed<RawTransaction>) -> ParseResult>,

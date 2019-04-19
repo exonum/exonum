@@ -19,7 +19,7 @@ use std::time::Duration;
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::node::state::PROPOSE_REQUEST_TIMEOUT;
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox};
 
 /// HANDLE ROUND TIMEOUT:
 /// - Ignore if height and round are not the same
@@ -39,7 +39,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
 
     // this block with transactions should be in real
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 

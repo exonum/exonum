@@ -92,6 +92,8 @@ jobs:
     - touch target/doc/exonum_configuration/enum.Option.html
     - touch target/std/string/struct.String.html
     - touch target/std/primitive.usize.html
+    # https://github.com/deadlinks/cargo-deadlinks/issues/37
+    - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
 
   # Run kcov.

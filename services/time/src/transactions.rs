@@ -17,11 +17,13 @@
 #![allow(bare_trait_objects)]
 
 use chrono::{DateTime, Utc};
+
+use exonum_merkledb::{Fork, Snapshot};
+
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Schema, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
     messages::{Message, RawTransaction, Signed},
-    storage::{Fork, Snapshot},
 };
 
 use super::{proto, SERVICE_ID};
@@ -84,7 +86,7 @@ impl TxTime {
         snapshot: &dyn Snapshot,
         author: &PublicKey,
     ) -> ExecutionResult {
-        let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
+        let keys = Schema::new(snapshot).actual_configuration().validator_keys;
         let signed = keys.iter().any(|k| k.service_key == *author);
         if !signed {
             Err(Error::UnknownSender)?
@@ -93,22 +95,23 @@ impl TxTime {
         }
     }
 
-    fn update_validator_time(&self, fork: &mut Fork, author: &PublicKey) -> ExecutionResult {
-        let mut schema = TimeSchema::new(fork);
-        match schema.validators_times().get(author) {
+    fn update_validator_time(&self, fork: &Fork, author: &PublicKey) -> ExecutionResult {
+        let schema = TimeSchema::new(fork);
+        let mut validators_times = schema.validators_times();
+        match validators_times.get(author) {
             // The validator time in the storage should be less than in the transaction.
             Some(time) if time >= self.time => Err(Error::ValidatorTimeIsGreater)?,
             // Write the time for the validator.
             _ => {
-                schema.validators_times_mut().put(author, self.time);
+                validators_times.put(author, self.time);
                 Ok(())
             }
         }
     }
 
-    fn update_consolidated_time(fork: &mut Fork) {
-        let keys = Schema::new(&fork).actual_configuration().validator_keys;
-        let mut schema = TimeSchema::new(fork);
+    fn update_consolidated_time(fork: &Fork) {
+        let keys = Schema::new(fork).actual_configuration().validator_keys;
+        let schema = TimeSchema::new(fork);
 
         // Find all known times for the validators.
         let validator_times = {
@@ -132,21 +135,22 @@ impl TxTime {
             return;
         }
 
-        match schema.time().get() {
+        let mut time = schema.time();
+        match time.get() {
             // Selected time should be greater than the time in the storage.
             Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
                 return;
             }
             _ => {
                 // Change the time in the storage.
-                schema.time_mut().set(validator_times[max_byzantine_nodes]);
+                time.set(validator_times[max_byzantine_nodes]);
             }
         }
     }
 }
 
 impl Transaction for TxTime {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let author = context.author();
         let view = context.fork();
         self.check_signed_by_validator(view.as_ref(), &author)?;

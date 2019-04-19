@@ -29,7 +29,7 @@ use crate::messages::{PrevotesRequest, ProtocolMessage, TransactionsRequest};
 use crate::node::state::{
     PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
-use crate::sandbox::{self, sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{self, compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox};
 
 /// check scenario:
 /// HANDLE FULL PROPOSE
@@ -425,7 +425,7 @@ fn lock_to_propose_and_send_prevote() {
         .with_tx_hashes(&[tx.hash()])
         .build();
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -634,7 +634,7 @@ fn handle_precommit_positive_scenario_commit() {
         .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -1013,7 +1013,7 @@ fn commit_using_unknown_propose_with_precommits() {
 
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -1300,7 +1300,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(ValidatorId(0))
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 
@@ -1438,7 +1438,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     // precommits with this block would be received if transaction will be received
     let block = BlockBuilder::new(&sandbox)
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
-        .with_tx_hash(&tx.hash())
+        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
         .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
         .build();
 

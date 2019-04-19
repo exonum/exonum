@@ -20,6 +20,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use zeroize::Zeroize;
 
 use crate::crypto::{CryptoHash, Hash};
+use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryValue, ObjectHash};
+use std::borrow::Cow;
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -237,6 +239,20 @@ impl Round {
         }
     }
 }
+
+impl BinaryValue for Round {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Ok(Round(
+            <u32 as BinaryValue>::from_bytes(value).expect("Error while deserializing value"),
+        ))
+    }
+}
+
+impl_object_hash_for_binary_value! { Round }
 
 /// Validators identifier.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

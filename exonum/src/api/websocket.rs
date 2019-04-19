@@ -89,7 +89,7 @@ impl Handler<Broadcast> for Server {
 
     fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
         let snapshot = self.service_api_state.snapshot();
-        let schema = Schema::new(snapshot);
+        let schema = Schema::new(&snapshot);
         let block_header = schema.blocks().get(&block_hash);
         let block_header_json = serde_json::to_value(block_header).unwrap().to_string();
         for address in self.subscribers.values() {

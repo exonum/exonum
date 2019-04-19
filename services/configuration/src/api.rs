@@ -17,8 +17,9 @@ use exonum::{
     blockchain::{Schema as CoreSchema, StoredConfiguration},
     crypto::{CryptoHash, Hash},
     helpers::Height,
-    storage::StorageValue,
 };
+
+use exonum_merkledb::BinaryValue;
 
 use super::{Propose, ProposeData, Schema, Vote, VoteAgainst, VotingDecision};
 
@@ -94,7 +95,8 @@ impl FilterQuery {
 
 impl PublicApi {
     fn config_with_proofs(state: &ServiceApiState, config: StoredConfiguration) -> ConfigHashInfo {
-        let propose = Schema::new(state.snapshot())
+        let snapshot = state.snapshot();
+        let propose = Schema::new(&snapshot)
             .propose(&config.hash())
             .map(|p| p.hash());
         let votes = Self::votes_for_propose(state, &config.hash());
@@ -107,7 +109,8 @@ impl PublicApi {
     }
 
     fn votes_for_propose(state: &ServiceApiState, config_hash: &Hash) -> VotesInfo {
-        let schema = Schema::new(state.snapshot());
+        let snapshot = state.snapshot();
+        let schema = Schema::new(&snapshot);
         if schema.propose_data_by_config_hash().contains(config_hash) {
             Some(schema.votes(config_hash))
         } else {
@@ -117,7 +120,8 @@ impl PublicApi {
 
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn proposed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ProposeHashInfo> {
-        let schema = Schema::new(state.snapshot());
+        let snapshot = state.snapshot();
+        let schema = Schema::new(&snapshot);
         let index = schema.config_hash_by_ordinal();
         let proposes_by_hash = schema.propose_data_by_config_hash();
 
@@ -131,9 +135,10 @@ impl PublicApi {
                 (cfg_hash, propose_data)
             })
             .filter(|&(_, ref propose_data)| {
-                let cfg = <StoredConfiguration as StorageValue>::from_bytes(
+                let cfg = <StoredConfiguration as BinaryValue>::from_bytes(
                     propose_data.tx_propose.cfg.as_bytes().into(),
-                );
+                )
+                .expect("Error while deserializing value");
                 filter.matches(&cfg)
             })
             .map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
@@ -143,7 +148,8 @@ impl PublicApi {
 
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::let_and_return))]
     fn committed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ConfigHashInfo> {
-        let core_schema = CoreSchema::new(state.snapshot());
+        let snapshot = state.snapshot();
+        let core_schema = CoreSchema::new(&snapshot);
         let actual_from = core_schema.configs_actual_from();
         let configs = core_schema.configs();
 
@@ -165,7 +171,7 @@ impl PublicApi {
     }
 
     fn handle_actual_config(state: &ServiceApiState, _query: ()) -> api::Result<ConfigHashInfo> {
-        let config = CoreSchema::new(state.snapshot()).actual_configuration();
+        let config = CoreSchema::new(&state.snapshot()).actual_configuration();
         Ok(Self::config_with_proofs(state, config))
     }
 
@@ -173,7 +179,7 @@ impl PublicApi {
         state: &ServiceApiState,
         _query: (),
     ) -> api::Result<Option<ConfigHashInfo>> {
-        Ok(CoreSchema::new(state.snapshot())
+        Ok(CoreSchema::new(&state.snapshot())
             .following_configuration()
             .map(|cfg| Self::config_with_proofs(state, cfg)))
     }

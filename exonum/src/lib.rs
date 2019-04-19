@@ -53,6 +53,8 @@ extern crate exonum_derive;
 #[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
+extern crate exonum_merkledb;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;
@@ -82,7 +84,7 @@ pub mod api;
 pub mod events;
 pub mod explorer;
 pub mod node;
-pub mod storage;
 
+//TODO: revert sandbox
 #[cfg(test)]
 mod sandbox;

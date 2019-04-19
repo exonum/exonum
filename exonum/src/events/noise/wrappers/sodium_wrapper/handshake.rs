@@ -18,6 +18,8 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::net::SocketAddr;
 
+use exonum_merkledb::BinaryValue;
+
 use super::wrapper::NoiseWrapper;
 use crate::{
     crypto::{
@@ -30,7 +32,6 @@ use crate::{
     },
     messages::{Connect, Signed},
     node::state::SharedConnectList,
-    storage::StorageValue,
 };
 
 /// Params needed to establish secured connection using Noise Protocol.

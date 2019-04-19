@@ -25,6 +25,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
+
 use crate::{
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -50,7 +52,6 @@ use crate::{
         config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
         timestamping::TimestampingService,
     },
-    storage::{MapProof, MemoryDB},
 };
 
 mod config_updater;
@@ -660,9 +661,9 @@ impl Sandbox {
         let (hashes, recover, patch) = {
             let mut hashes = Vec::new();
             let mut recover = BTreeSet::new();
-            let mut fork = blockchain.fork();
+            let fork = blockchain.fork();
             {
-                let mut schema = Schema::new(&mut fork);
+                let mut schema = Schema::new(&fork);
                 for raw in txs {
                     let hash = raw.hash();
                     hashes.push(hash);
@@ -684,9 +685,9 @@ impl Sandbox {
             fork
         };
         let patch = {
-            let mut fork = blockchain.fork();
+            let fork = blockchain.fork();
             {
-                let mut schema = Schema::new(&mut fork);
+                let mut schema = Schema::new(&fork);
                 for hash in recover {
                     schema.reject_transaction(&hash).unwrap();
                 }
@@ -711,7 +712,7 @@ impl Sandbox {
     pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().merkle_root()
+        schema.configs().object_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
@@ -741,7 +742,8 @@ impl Sandbox {
 
     #[allow(clippy::let_and_return)]
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let schema = Schema::new(self.blockchain_ref().snapshot());
+        let snapshot = self.blockchain_ref().snapshot();
+        let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
         let vec = idx.iter().collect();
         vec
@@ -776,7 +778,7 @@ impl Sandbox {
 
     pub fn assert_pool_len(&self, expected: u64) {
         let view = self.blockchain_ref().snapshot();
-        let schema = Schema::new(view);
+        let schema = Schema::new(&view);
         assert_eq!(expected, schema.transactions_pool_len());
     }
 
@@ -1056,7 +1058,7 @@ fn sandbox_with_services_uninitialized(
         .collect();
 
     let api_channel = mpsc::channel(100);
-    let db = MemoryDB::new();
+    let db = TemporaryDB::new();
     let mut blockchain = Blockchain::new(
         db,
         services,
@@ -1159,6 +1161,14 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     ])
 }
 
+pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
+where
+    I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+{
+    let txs = txs.into_iter().map(|tx| tx.hash()).collect::<Vec<Hash>>();
+    HashTag::hash_list(&txs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1167,7 +1177,7 @@ mod tests {
     use crate::messages::RawTransaction;
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
-    use crate::storage::Snapshot;
+    use exonum_merkledb::Snapshot;
 
     const SERVICE_ID: u16 = 1;
 

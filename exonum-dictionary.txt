@@ -5,6 +5,7 @@ atomicity
 backend
 backends
 bigint
+bincode
 bitfury
 bitvec
 blockchain
@@ -21,7 +22,7 @@ clonned
 codecov
 compat
 concat
-CORS
+consts
 Cors
 cors
 counterintuitive
@@ -29,6 +30,7 @@ cryptocurrency
 cryptographically
 ctrlc
 cyclomatic
+datetime
 deadlinks
 decodable
 deque
@@ -70,8 +72,10 @@ markdownlint
 memlimit
 memorydb
 mempool
+metadada
 Merkelized
 Merkle
+merkledb
 middlewares
 millis
 mkdir
@@ -100,6 +104,7 @@ precommitters
 prevote
 prevoters
 prevotes
+prevotes
 println
 proptest
 proto
@@ -123,6 +128,7 @@ rocksdb
 roughtime
 roundtrip
 rpassword
+rposition
 rtype
 runtimes
 rustfmt
@@ -135,6 +141,7 @@ serializable
 serialize
 serializer
 signum
+smallvec
 socketaddr
 sodiumoxide
 stringify
@@ -143,6 +150,7 @@ structfield
 structs
 subcommand
 subcommands
+subprefix
 subsec
 supermajority
 supervisorctl
@@ -150,6 +158,7 @@ supervisord
 symm
 tempdir
 tempfile
+TemporaryDB
 terminfo
 testdata
 testkit
@@ -165,6 +174,7 @@ toolchain
 txvec
 tymethod
 unboxed
+unflushed
 unreceived
 unsync
 untagged
@@ -180,3 +190,4 @@ writeln
 xorshift
 xsalsa
 zeroize
+xsalsa
