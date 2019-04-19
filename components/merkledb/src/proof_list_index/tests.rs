@@ -537,13 +537,13 @@ fn test_proof_structure() {
             if let ListProof::Left(_, right_hash3) = unboxed_proof {
                 assert!(right_hash3.is_none());
             } else {
-                assert!(false);
+                panic!("Expected ListProof::Left variant");
             }
         } else {
-            assert!(false);
+            panic!("Expected ListProof::Left variant");
         }
     } else {
-        assert!(false);
+        panic!("Expected ListProof::Right variant");
     }
 }
 
