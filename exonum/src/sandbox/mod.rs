@@ -253,7 +253,7 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(|x| x.serialize()).collect(),
+                precommits.into_iter().map(Signed::serialize).collect(),
                 tx_hashes,
             ),
             *public_key,
@@ -411,7 +411,7 @@ impl Sandbox {
         I: IntoIterator<Item = Signed<RawTransaction>>,
     {
         Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(|x| x.serialize()).collect()),
+            TransactionsResponse::new(to, txs.into_iter().map(Signed::serialize).collect()),
             *author,
             secret_key,
         )
@@ -1045,7 +1045,7 @@ fn sandbox_with_services_uninitialized(
         .map(gen_primitive_socket_addr)
         .collect::<Vec<_>>();
 
-    let str_addresses: Vec<String> = addresses.iter().map(|ref a| a.to_string()).collect();
+    let str_addresses: Vec<String> = addresses.iter().map(ToString::to_string).collect();
 
     let connect_infos: Vec<_> = validators
         .iter()
@@ -1165,7 +1165,7 @@ pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
 where
     I: IntoIterator<Item = &'a Signed<RawTransaction>>,
 {
-    let txs = txs.into_iter().map(|tx| tx.hash()).collect::<Vec<Hash>>();
+    let txs = txs.into_iter().map(Signed::hash).collect::<Vec<Hash>>();
     HashTag::hash_list(&txs)
 }
 
@@ -1205,12 +1205,12 @@ mod tests {
     struct AfterCommitService;
 
     impl Service for AfterCommitService {
-        fn service_name(&self) -> &str {
-            "after_commit"
-        }
-
         fn service_id(&self) -> u16 {
             SERVICE_ID
+        }
+
+        fn service_name(&self) -> &str {
+            "after_commit"
         }
 
         fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {

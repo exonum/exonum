@@ -260,7 +260,7 @@ impl BinaryValue for StoredConfiguration {
     }
 
     fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
-        Self::try_deserialize(v.as_ref()).map_err(|e| e.into())
+        Self::try_deserialize(v.as_ref()).map_err(Into::into)
     }
 }
 
