@@ -50,7 +50,7 @@ fn timestamping_sandbox_with_threshold() -> Sandbox {
 }
 
 fn tx_hashes(transactions: &[Signed<RawTransaction>]) -> Vec<Hash> {
-    let mut hashes = transactions.iter().map(|tx| tx.hash()).collect::<Vec<_>>();
+    let mut hashes = transactions.iter().map(Signed::hash).collect::<Vec<_>>();
     hashes.sort();
     hashes
 }

@@ -160,7 +160,7 @@ fn enough_votes_to_commit(snapshot: &Fork, cfg_hash: &Hash) -> bool {
 
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
-    let votes_count = votes.iter().filter(|vote| vote.is_consent()).count();
+    let votes_count = votes.iter().filter(MaybeVote::is_consent).count();
 
     let config: ConfigurationServiceConfig = get_service_config(&actual_config);
 

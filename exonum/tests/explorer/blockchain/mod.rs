@@ -153,7 +153,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<RawTra
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
 
-    let tx_hashes: Vec<_> = transactions.iter().map(|tx| tx.hash()).collect();
+    let tx_hashes: Vec<_> = transactions.iter().map(Signed::hash).collect();
     let height = blockchain.last_block().height().next();
 
     let fork = blockchain.fork();

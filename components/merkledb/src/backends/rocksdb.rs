@@ -74,7 +74,7 @@ impl RocksDB {
     pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> crate::Result<Self> {
         let inner = {
             if let Ok(names) = rocksdb::DB::list_cf(&RocksDbOptions::default(), &path) {
-                let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
+                let cf_names = names.iter().map(String::as_str).collect::<Vec<_>>();
                 rocksdb::DB::open_cf(&options.into(), path, cf_names)?
             } else {
                 rocksdb::DB::open(&options.into(), path)?

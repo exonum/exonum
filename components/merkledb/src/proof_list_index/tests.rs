@@ -129,6 +129,7 @@ fn test_iter() {
     );
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_lines))]
 #[test]
 fn test_list_index_proof() {
     let db = TemporaryDB::default();

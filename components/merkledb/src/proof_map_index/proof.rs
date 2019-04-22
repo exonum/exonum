@@ -453,7 +453,7 @@ impl<K, V> MapProof<K, V> {
     /// Retrieves references to keys that the proof shows as missing from the map.
     /// This method does not perform any integrity checks of the proof.
     pub fn missing_keys_unchecked(&self) -> impl Iterator<Item = &K> {
-        self.entries.iter().filter_map(|e| e.as_missing())
+        self.entries.iter().filter_map(OptionalEntry::as_missing)
     }
 
     /// Retrieves references to existing and non-existing entries in the proof.
