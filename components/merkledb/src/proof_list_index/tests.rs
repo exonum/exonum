@@ -129,6 +129,7 @@ fn test_iter() {
     );
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_lines))]
 #[test]
 fn test_list_index_proof() {
     let db = TemporaryDB::default();
@@ -537,13 +538,13 @@ fn test_proof_structure() {
             if let ListProof::Left(_, right_hash3) = unboxed_proof {
                 assert!(right_hash3.is_none());
             } else {
-                assert!(false);
+                panic!("Expected ListProof::Left branch");
             }
         } else {
-            assert!(false);
+            panic!("Expected ListProof::Left branch");
         }
     } else {
-        assert!(false);
+        panic!("Expected ListProof::Right branch");
     }
 }
 

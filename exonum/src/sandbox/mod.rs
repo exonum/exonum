@@ -1165,7 +1165,7 @@ pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
 where
     I: IntoIterator<Item = &'a Signed<RawTransaction>>,
 {
-    let txs = txs.into_iter().map(|tx| tx.hash()).collect::<Vec<Hash>>();
+    let txs = txs.into_iter().map(Signed::hash).collect::<Vec<Hash>>();
     HashTag::hash_list(&txs)
 }
 
@@ -1205,12 +1205,12 @@ mod tests {
     struct AfterCommitService;
 
     impl Service for AfterCommitService {
-        fn service_name(&self) -> &str {
-            "after_commit"
-        }
-
         fn service_id(&self) -> u16 {
             SERVICE_ID
+        }
+
+        fn service_name(&self) -> &str {
+            "after_commit"
         }
 
         fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {

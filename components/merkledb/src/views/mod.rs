@@ -417,10 +417,7 @@ impl<T: IndexAccess> View<T> {
             .as_ref()
             .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
 
-        let is_empty = self
-            .changes
-            .as_ref()
-            .map_or(false, |changes| changes.is_empty());
+        let is_empty = self.changes.as_ref().map_or(false, ViewChanges::is_empty);
 
         if is_empty {
             // Ignore all changes from the snapshot
