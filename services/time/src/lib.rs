@@ -96,6 +96,10 @@ impl TimeService {
 }
 
 impl Service for TimeService {
+    fn service_id(&self) -> u16 {
+        SERVICE_ID
+    }
+
     fn service_name(&self) -> &str {
         SERVICE_NAME
     }
@@ -105,15 +109,11 @@ impl Service for TimeService {
         schema.state_hash()
     }
 
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
         TimeTransactions::tx_from_raw(raw).map(Into::into)
     }
 
-    fn initialize(&self, _fork: &mut Fork) -> Value {
+    fn initialize(&self, _fork: &Fork) -> Value {
         Value::Null
     }
 

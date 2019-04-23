@@ -80,7 +80,7 @@ impl Service for InitializeCheckerService {
         unreachable!("An unknown transaction received");
     }
 
-    fn initialize(&self, _fork: &mut Fork) -> Value {
+    fn initialize(&self, _fork: &Fork) -> Value {
         *self.0.lock().unwrap() += 1;
         Value::Null
     }

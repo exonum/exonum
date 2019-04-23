@@ -181,7 +181,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [doc:global_cfg]: https://exonum.com/doc/version/latest/architecture/services/#global-configuration
     /// [`&mut Fork`]: https://exonum.com/doc/version/latest/architecture/storage/#forks
-    fn initialize(&self, fork: &mut Fork) -> Value {
+    fn initialize(&self, fork: &Fork) -> Value {
         Value::Null
     }
 
