@@ -143,7 +143,7 @@ impl blockchain::Service for Service {
         ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 
-    fn initialize(&self, _fork: &mut Fork) -> Value {
+    fn initialize(&self, _fork: &Fork) -> Value {
         to_value(self.config.clone()).unwrap()
     }
 

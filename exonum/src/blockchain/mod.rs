@@ -206,10 +206,10 @@ impl Blockchain {
         };
 
         let patch = {
-            let mut fork = self.fork();
+            let fork = self.fork();
             // Update service tables
             for (_, service) in self.service_map.iter() {
-                let cfg = service.initialize(&mut fork);
+                let cfg = service.initialize(&fork);
                 let name = service.service_name();
                 if config_propose.services.contains_key(name) {
                     panic!(
