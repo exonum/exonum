@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use exonum_merkledb::BinaryValue;
 
 #[macro_use]
 extern crate assert_matches;
@@ -24,7 +25,6 @@ use exonum::{
     crypto::{hash, CryptoHash, Hash, HASH_SIZE},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
-    storage::StorageValue,
 };
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
@@ -616,7 +616,7 @@ fn test_regression_majority_votes_for_different_proposes() {
     };
     {
         let proposes = [new_cfg1.clone(), new_cfg2.clone()]
-            .into_iter()
+            .iter()
             .map(|cfg| {
                 let validator = &testkit.network().validators()[1];
                 new_tx_config_propose(&validator, cfg.clone())

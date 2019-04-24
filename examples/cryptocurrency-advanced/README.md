@@ -5,7 +5,7 @@ The extended version of the
 implementing data proofs. This project demonstrates how to bootstrap your own
 cryptocurrency with [Exonum blockchain](https://github.com/exonum/exonum).
 
-See [the documentation](https://exonum.com/doc/get-started/data-proofs/)
+See [the documentation](https://exonum.com/doc/version/latest/get-started/data-proofs/)
 for a detailed step-by-step guide how to approach this example.
 
 ![Cryptocurrency demo](Screenshot.png)
@@ -56,9 +56,11 @@ service on 4 nodes on the local machine.
 Build the project:
 
 ```sh
-cd examples/cryptocurrency-advanced/backend
+git clone https://github.com/exonum/exonum
 
-cargo install
+cd exonum/examples/cryptocurrency-advanced/backend
+
+cargo install --path .
 ```
 
 Generate template:
@@ -74,13 +76,13 @@ exonum-cryptocurrency-advanced generate-template example/common.toml --validator
 Generate public and secrets keys for each node:
 
 ```sh
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
+exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331 -c example/consensus_1.toml -s example/service_1.toml -n
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
+exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332 -c example/consensus_2.toml -s example/service_2.toml -n
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
+exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333 -c example/consensus_3.toml -s example/service_3.toml -n
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
+exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334 -c example/consensus_4.toml -s example/service_4.toml -n
 ```
 
 Finalize configs:
@@ -98,13 +100,13 @@ exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8203 --priv
 Run nodes:
 
 ```sh
-exonum-cryptocurrency-advanced run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
+exonum-cryptocurrency-advanced run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
+exonum-cryptocurrency-advanced run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201 --consensus-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
+exonum-cryptocurrency-advanced run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202 --consensus-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
+exonum-cryptocurrency-advanced run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203 --consensus-key-pass pass --service-key-pass pass
 ```
 
 <!-- markdownlint-enable MD013 -->

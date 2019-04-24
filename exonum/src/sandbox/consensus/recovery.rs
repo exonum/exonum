@@ -20,10 +20,7 @@ use std::time::Duration;
 use crate::crypto::CryptoHash;
 use crate::helpers::{user_agent, Height, Round, ValidatorId};
 use crate::node;
-use crate::sandbox::{
-    sandbox::{timestamping_sandbox, SandboxBuilder},
-    sandbox_tests_helper::*,
-};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
 
 #[test]
 fn test_disable_and_enable() {
@@ -138,7 +135,7 @@ fn should_not_vote_after_node_restart() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     ));
     sandbox.assert_lock(NOT_LOCKED, None); // Do not lock if <2/3 prevotes
 
@@ -148,7 +145,7 @@ fn should_not_vote_after_node_restart() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 
@@ -159,7 +156,7 @@ fn should_not_vote_after_node_restart() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(Round(1), Some(propose.hash()));
@@ -207,7 +204,7 @@ fn should_save_precommit_to_consensus_cache() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
@@ -217,7 +214,7 @@ fn should_save_precommit_to_consensus_cache() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
     sandbox.assert_lock(Round(1), Some(propose.hash()));
 
@@ -228,7 +225,7 @@ fn should_save_precommit_to_consensus_cache() {
         &propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     );
 
     sandbox.broadcast(&precommit);
@@ -252,7 +249,7 @@ fn should_save_precommit_to_consensus_cache() {
         &propose.hash(),
         &block.hash(),
         sandbox_restarted.time().into(),
-        sandbox_restarted.s(ValidatorId(1)),
+        sandbox_restarted.secret_key(ValidatorId(1)),
     ));
 
     sandbox_restarted.recv(&sandbox_restarted.create_precommit(
@@ -262,7 +259,7 @@ fn should_save_precommit_to_consensus_cache() {
         &propose.hash(),
         &block.hash(),
         sandbox_restarted.time().into(),
-        sandbox_restarted.s(ValidatorId(2)),
+        sandbox_restarted.secret_key(ValidatorId(2)),
     ));
 
     sandbox_restarted.assert_state(Height(2), Round(1));
@@ -294,7 +291,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(1),
         &first_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     ));
     sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
 
@@ -304,7 +301,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(1),
         &first_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
     sandbox.assert_lock(Round(1), Some(first_propose.hash()));
 
@@ -315,7 +312,7 @@ fn test_recover_consensus_messages_in_other_round() {
         &first_propose.hash(),
         &block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     );
 
     sandbox.broadcast(&first_precommit);
@@ -331,7 +328,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(2),
         first_prevote.propose_hash(),
         Round(1),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     );
     sandbox.broadcast(&first_updated_prevote);
 
@@ -346,7 +343,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(2),
         &second_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     ));
 
     sandbox.recv(&sandbox.create_prevote(
@@ -355,7 +352,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(2),
         &second_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(2)),
+        sandbox.secret_key(ValidatorId(2)),
     ));
 
     sandbox.assert_lock(Round(1), Some(first_propose.hash()));
@@ -366,7 +363,7 @@ fn test_recover_consensus_messages_in_other_round() {
         Round(2),
         &second_propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(3)),
+        sandbox.secret_key(ValidatorId(3)),
     ));
 
     sandbox.assert_lock(Round(2), Some(second_propose.hash()));
@@ -378,7 +375,7 @@ fn test_recover_consensus_messages_in_other_round() {
         &second_propose.hash(),
         &second_block.hash(),
         sandbox.time().into(),
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     );
     sandbox.broadcast(&second_precommit);
 
@@ -397,7 +394,7 @@ fn test_recover_consensus_messages_in_other_round() {
         first_precommit.propose_hash(),
         first_precommit.block_hash(),
         sandbox_new.time().into(),
-        sandbox_new.s(ValidatorId(0)),
+        sandbox_new.secret_key(ValidatorId(0)),
     );
     sandbox_new.broadcast(&first_precommit_new_time);
     sandbox_new.broadcast(&first_updated_prevote);
@@ -418,28 +415,44 @@ fn should_restore_peers_after_restart() {
         .build();
 
     let (v0, v1) = (ValidatorId(0), ValidatorId(1));
-    let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
-    let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
+    let public_key0 = sandbox.public_key(v0);
+    let secret_key0 = sandbox.secret_key(v0).clone();
+    let address0 = sandbox.address(v0);
+    let public_key1 = sandbox.public_key(v1);
+    let secret_key1 = sandbox.secret_key(v1).clone();
+    let address1 = sandbox.address(v1);
 
     let time = sandbox.time();
-    let connect_from_0 = sandbox.create_connect(&p0, a0, time.into(), &user_agent::get(), &s0);
-    let connect_from_1 = sandbox.create_connect(&p1, a1, time.into(), &user_agent::get(), &s1);
-    let peers_request = sandbox.create_peers_request(&p1, &p0, &s1);
+    let connect_from_0 = sandbox.create_connect(
+        &public_key0,
+        address0,
+        time.into(),
+        &user_agent::get(),
+        &secret_key0,
+    );
+    let connect_from_1 = sandbox.create_connect(
+        &public_key1,
+        address1,
+        time.into(),
+        &user_agent::get(),
+        &secret_key1,
+    );
+    let peers_request = sandbox.create_peers_request(&public_key1, &public_key0, &secret_key1);
 
     // check that peers are absent
     sandbox.recv(&peers_request);
 
     // receive a `Connect` message and the respond on it
     sandbox.recv(&connect_from_1);
-    sandbox.send(p1, &connect_from_0);
+    sandbox.send(public_key1, &connect_from_0);
 
     // restart the node
     let sandbox_restarted = sandbox.restart_uninitialized();
 
     // check that the node is connecting with the peer
-    sandbox_restarted.send(p1, &connect_from_0);
+    sandbox_restarted.send(public_key1, &connect_from_0);
 
     // check that the peer is restored
     sandbox_restarted.recv(&peers_request);
-    sandbox_restarted.send(p1, &connect_from_1);
+    sandbox_restarted.send(public_key1, &connect_from_1);
 }

@@ -123,22 +123,26 @@ fn implement_storage_traits(name: &Ident, cr: &dyn quote::ToTokens) -> impl quot
             }
         }
 
+        impl exonum_merkledb::ObjectHash for #name {
+             fn object_hash(&self) -> #cr::crypto::Hash {
+                let v = self.to_pb().write_to_bytes().unwrap();
+                #cr::crypto::hash(&v)
+             }
+        }
+
         // This trait assumes that we work with trusted data so we can unwrap here.
-        impl #cr::storage::StorageValue for #name {
-            fn into_bytes(self) -> Vec<u8> {
+        impl exonum_merkledb::BinaryValue for #name {
+            fn to_bytes(&self) -> Vec<u8> {
                 self.to_pb().write_to_bytes().expect(&format!(
                     "Failed to serialize in StorageValue for {}",
                     stringify!(#name)
                 ))
             }
 
-            fn from_bytes(value: std::borrow::Cow<[u8]>) -> Self {
+            fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
                 let mut block = <Self as ProtobufConvert>::ProtoStruct::new();
-                block.merge_from_bytes(value.as_ref()).unwrap();
-                ProtobufConvert::from_pb(block).expect(&format!(
-                    "Failed to deserialize in StorageValue for {}",
-                    stringify!(#name)
-                ))
+                block.merge_from_bytes(value.as_ref())?;
+                ProtobufConvert::from_pb(block)
             }
         }
     }

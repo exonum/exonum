@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-
 use super::proto;
 use exonum::{
     blockchain::{
@@ -22,7 +21,12 @@ use exonum::{
     crypto::Hash,
     helpers::Height,
     messages::AnyTx,
-    storage::Snapshot,
+};
+use exonum_merkledb::Snapshot;
+
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
 };
 
 pub const SERVICE_ID: u16 = 512;
@@ -50,9 +54,26 @@ impl Transaction for TxAfterCommit {
     }
 }
 
-pub struct AfterCommitService;
+#[derive(Clone, Default)]
+pub struct AfterCommitService {
+    counter: Arc<AtomicUsize>,
+}
+
+impl AfterCommitService {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn counter(&self) -> usize {
+        self.counter.load(Ordering::SeqCst)
+    }
+}
 
 impl Service for AfterCommitService {
+    fn service_id(&self) -> u16 {
+        SERVICE_ID
+    }
+
     fn service_name(&self) -> &str {
         "after_commit"
     }
@@ -61,16 +82,13 @@ impl Service for AfterCommitService {
         Vec::new()
     }
 
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         let tx = HandleCommitTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
 
     fn after_commit(&self, context: &ServiceContext) {
+        self.counter.fetch_add(1, Ordering::SeqCst);
         let tx = TxAfterCommit::new(context.height());
         context.broadcast_transaction(tx);
     }

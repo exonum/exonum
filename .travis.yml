@@ -15,7 +15,7 @@ addons:
     - sourceline: 'ppa:maarten-fonville/protobuf'
     - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
     - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/16.04/prod xenial main'
-      key_url: https://packages.microsoft.com/keys/microsoft.asc    
+      key_url: https://packages.microsoft.com/keys/microsoft.asc
     packages:
     - binutils-dev
     - build-essential
@@ -38,7 +38,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.32.0
+  - 1.34.0
 
 cache:
   directories:
@@ -92,6 +92,8 @@ jobs:
     - touch target/doc/exonum_configuration/enum.Option.html
     - touch target/std/string/struct.String.html
     - touch target/std/primitive.usize.html
+    # https://github.com/deadlinks/cargo-deadlinks/issues/37
+    - touch target/doc/enum.HashTag.html
     - cargo deadlinks --dir target/doc
 
   # Run kcov.
@@ -135,11 +137,10 @@ jobs:
     - rustup component add clippy
     - cargo clippy --version
     script:
-    - cargo clippy --all -- -D warnings
+    - cargo clippy --all --tests --examples -- -D warnings
 
   # Benchmarks (compilation only).
   - name: benchmarks
-    rust: nightly-2018-12-30
     script:
     - RUST_LOG=off cargo check --benches --features "long_benchmarks"
 

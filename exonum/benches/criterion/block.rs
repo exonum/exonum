@@ -38,13 +38,15 @@
 //!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
+
+use exonum_merkledb::{Database, DbOptions, Patch, RocksDB};
+
 use exonum::{
     blockchain::{Blockchain, Schema, Service, Transaction},
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
     node::ApiSender,
-    storage::{Database, DbOptions, Patch, RocksDB},
 };
 use futures::sync::mpsc;
 use rand::{Rng, SeedableRng};
@@ -115,8 +117,8 @@ mod timestamping {
         blockchain::{ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{CryptoHash, Hash, PublicKey, SecretKey},
         messages::{AnyTx, Message, Signed},
-        storage::Snapshot,
     };
+    use exonum_merkledb::Snapshot;
     use rand::Rng;
 
     const TIMESTAMPING_SERVICE_ID: u16 = 1;
@@ -213,8 +215,8 @@ mod cryptocurrency {
         blockchain::{ExecutionError, ExecutionResult, Service, Transaction, TransactionContext},
         crypto::{Hash, PublicKey, SecretKey},
         messages::{AnyTx, Message, Signed},
-        storage::{MapIndex, ProofMapIndex, Snapshot},
     };
+    use exonum_merkledb::{MapIndex, ProofMapIndex, Snapshot};
     use rand::{seq::SliceRandom, Rng};
 
     const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
@@ -308,7 +310,7 @@ mod cryptocurrency {
     }
 
     impl Transaction for Tx {
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        fn execute(&self, context: TransactionContext) -> ExecutionResult {
             let from = context.author();
             let mut index = ProofMapIndex::new("provable_balances", context.fork());
 
@@ -322,7 +324,7 @@ mod cryptocurrency {
     }
 
     impl Transaction for SimpleTx {
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        fn execute(&self, context: TransactionContext) -> ExecutionResult {
             let from = context.author();
 
             let mut index = MapIndex::new("balances", context.fork());
@@ -337,7 +339,7 @@ mod cryptocurrency {
     }
 
     impl Transaction for RollbackTx {
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+        fn execute(&self, context: TransactionContext) -> ExecutionResult {
             let from = context.author();
 
             let mut index = MapIndex::new("balances", context.fork());
@@ -399,10 +401,10 @@ mod cryptocurrency {
 
 /// Writes transactions to the pool and returns their hashes.
 fn prepare_txs(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>>) -> Vec<Hash> {
-    let mut fork = blockchain.fork();
+    let fork = blockchain.fork();
 
     let tx_hashes = {
-        let mut schema = Schema::new(&mut fork);
+        let mut schema = Schema::new(&fork);
 
         // In the case of the block within `Bencher::iter()`, some transactions
         // may already be present in the pool. We don't particularly care about this.

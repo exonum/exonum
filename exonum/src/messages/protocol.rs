@@ -39,7 +39,7 @@ use crate::proto::{
     self, schema::protocol::ExonumMessage_oneof_message as ExonumMessageEnum, ExonumMessage,
     ProtobufConvert,
 };
-use crate::storage::{proof_list_index as merkle, StorageValue};
+use exonum_merkledb::{BinaryValue, HashTag};
 use protobuf::Message as PbMessage;
 
 /// Lower bound on the size of the correct `SignedMessage`.
@@ -692,7 +692,20 @@ impl BlockRequest {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
-        *self.block().tx_hash() == merkle::root_hash(self.transactions())
+        //        let tx_hash = schema.block_transactions(height).object_hash();
+        // HashTag::hash_list_node(self.len(), self.merkle_root())
+
+        //        let list_hash =
+        //            HashTag::hash_list_node(self.transactions().len() as u64, *self.block().tx_hash());
+
+        let res = *self.block().tx_hash() == HashTag::hash_list(self.transactions());
+
+        println!("block {:?}", self.block());
+        //        println!("list_hash {:?}", list_hash);
+        println!("tx_hash {:?}", *self.block().tx_hash());
+        println!("hash_list {:?}", HashTag::hash_list(self.transactions()));
+        println!("verify_tx_hash: res {}", res);
+        res
     }
 }
 
@@ -1119,15 +1132,15 @@ impl<T: ProtocolMessage> From<Signed<T>> for Message {
     }
 }
 
-impl StorageValue for Message {
-    fn into_bytes(self) -> Vec<u8> {
+impl BinaryValue for Message {
+    fn to_bytes(&self) -> Vec<u8> {
         self.signed_message().encode().unwrap()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value);
         // TODO: Remove additional deserialization. [ECR-2315]
-        Message::deserialize(message).unwrap()
+        Message::deserialize(message)
     }
 }
 

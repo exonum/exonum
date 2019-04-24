@@ -12,8 +12,8 @@ important types, modules and functions in the code, to allow new contributors to
 dive into Exonum quickly. It is assumed that the reader is familiar with core
 concepts of Exonum, such as [services] and [transactions].
 
-[services]: https://exonum.com/doc/architecture/services/
-[transactions]: https://exonum.com/doc/architecture/transactions/
+[services]: https://exonum.com/doc/version/latest/architecture/services/
+[transactions]: https://exonum.com/doc/version/latest/architecture/transactions/
 
 ## Code organization
 

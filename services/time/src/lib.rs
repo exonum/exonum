@@ -17,7 +17,7 @@
 //! See [the Exonum documentation][docs:time] for a high-level overview of the service,
 //! in particular, its design rationale and the proof of correctness.
 //!
-//! [docs:time]: https://exonum.com/doc/advanced/time
+//! [docs:time]: https://exonum.com/doc/version/latest/advanced/time
 
 #![deny(
     missing_debug_implementations,
@@ -44,13 +44,14 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
+use exonum_merkledb::{Fork, Snapshot};
+
 use exonum::{
     api::ServiceApiBuilder,
     blockchain::{Service, ServiceContext, Transaction, TransactionSet},
     crypto::Hash,
     helpers::fabric::{Context, ServiceFactory},
     messages::AnyTx,
-    storage::{Fork, Snapshot},
 };
 use serde_json::Value;
 

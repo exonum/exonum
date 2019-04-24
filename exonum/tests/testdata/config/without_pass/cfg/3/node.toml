@@ -1,0 +1,62 @@
+consensus_public_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
+consensus_secret_key = "consensus.key.toml"
+external_address = "0.0.0.0:8003"
+listen_address = "0.0.0.0:8003"
+service_public_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
+service_secret_key = "service.key.toml"
+
+[api]
+state_update_timeout = 10000
+[[connect_list.peers]]
+address = "0.0.0.0:8002"
+public_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+
+[[connect_list.peers]]
+address = "0.0.0.0:8000"
+public_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
+
+[[connect_list.peers]]
+address = "0.0.0.0:8001"
+public_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
+
+[database]
+create_if_missing = true
+[[genesis.validator_keys]]
+consensus_key = "009e1c4ed2f62308c7dbc38c0f88927235556810f6bb70fafaf3684f6d7d7b7b"
+service_key = "e681592c729493af18a46c0fae182bcea41f0ea8a92807e65ccb83201801cfde"
+
+[[genesis.validator_keys]]
+consensus_key = "3b27439519ca4d28de698367d0a5bcc3cc33912e671c6dc952dafac2df1ffb07"
+service_key = "e4ed73397172b26b3488494ede7e606e4967e75b0875811a49f4487ee71dc6ce"
+
+[[genesis.validator_keys]]
+consensus_key = "9225b1ae91dafc0f25162ec203e1eb094848fe79184d4f0b9ab6ee0da51f4517"
+service_key = "993751f974949f07f962d40814fa691cbac74a0a433ee209da4c272b35176fbf"
+
+[[genesis.validator_keys]]
+consensus_key = "faa0b61e5ba0be4836ce8400dbfc44cfd1c3eb363ec93a7a8a89bf1d21dcef8b"
+service_key = "f4fc481e910d79027fbadb200a1e79435319d2c781d114a0b9687b3babaa2ccf"
+
+[genesis.consensus]
+first_round_timeout = 3000
+max_message_len = 1048576
+max_propose_timeout = 200
+min_propose_timeout = 10
+peers_timeout = 10000
+propose_timeout_threshold = 500
+status_timeout = 5000
+txs_block_limit = 1000
+[mempool.events_pool_capacity]
+api_requests_capacity = 1024
+internal_events_capacity = 128
+network_events_capacity = 512
+network_requests_capacity = 512
+
+[network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
+
+[services_configs]

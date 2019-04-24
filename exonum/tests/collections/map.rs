@@ -17,13 +17,15 @@
 //! Property testing for map index and proof map index as a rust collection.
 
 use modifier::Modifier;
-use proptest::{collection::vec, num, strategy, strategy::Strategy, test_runner::TestCaseResult};
+use proptest::{
+    collection::vec, num, prelude::*, strategy, strategy::Strategy, test_runner::TestCaseResult,
+};
 
 use std::collections::HashMap;
 use std::hash::Hash;
 
 use super::ACTIONS_MAX_LEN;
-use exonum::storage::{Fork, MapIndex, ProofMapIndex, StorageValue};
+use exonum_merkledb::{Fork, MapIndex, ProofMapIndex};
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {
@@ -57,12 +59,13 @@ where
 
 mod map_index {
     use super::*;
+    use exonum_merkledb::BinaryValue;
 
-    impl<'a, V> Modifier<MapIndex<&'a mut Fork, u8, V>> for MapAction<u8, V>
+    impl<'a, V> Modifier<MapIndex<&'a Fork, u8, V>> for MapAction<u8, V>
     where
-        V: StorageValue,
+        V: BinaryValue,
     {
-        fn modify(self, map: &mut MapIndex<&'a mut Fork, u8, V>) {
+        fn modify(self, map: &mut MapIndex<&'a Fork, u8, V>) {
             match self {
                 MapAction::Put(k, v) => {
                     map.put(&k, v);
@@ -79,7 +82,7 @@ mod map_index {
     }
 
     fn compare_collections(
-        map_index: &MapIndex<&mut Fork, u8, i32>,
+        map_index: &MapIndex<&Fork, u8, i32>,
         ref_map: &HashMap<u8, i32>,
     ) -> TestCaseResult {
         for k in ref_map.keys() {
@@ -105,12 +108,13 @@ mod map_index {
 
 mod proof_map_index {
     use super::*;
+    use exonum_merkledb::{BinaryValue, ObjectHash};
 
-    impl<'a, V> Modifier<ProofMapIndex<&'a mut Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
+    impl<'a, V> Modifier<ProofMapIndex<&'a Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
     where
-        V: StorageValue,
+        V: BinaryValue + ObjectHash,
     {
-        fn modify(self, map: &mut ProofMapIndex<&mut Fork, [u8; 32], V>) {
+        fn modify(self, map: &mut ProofMapIndex<&Fork, [u8; 32], V>) {
             match self {
                 MapAction::Put(k, v) => {
                     map.put(&k, v);
@@ -127,7 +131,7 @@ mod proof_map_index {
     }
 
     fn compare_collections(
-        map_index: &ProofMapIndex<&mut Fork, [u8; 32], i32>,
+        map_index: &ProofMapIndex<&Fork, [u8; 32], i32>,
         ref_map: &HashMap<[u8; 32], i32>,
     ) -> TestCaseResult {
         for k in ref_map.keys() {

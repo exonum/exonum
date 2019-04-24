@@ -117,7 +117,7 @@ impl NodeHandler {
     /// Broadcasts all transactions from the pool to other validators.
     pub(crate) fn handle_rebroadcast(&mut self) {
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(snapshot);
+        let schema = Schema::new(&snapshot);
         let pool = schema.transactions_pool();
         for tx_hash in pool.iter() {
             self.broadcast(

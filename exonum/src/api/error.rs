@@ -20,15 +20,13 @@
 
 use std::io;
 
-use crate::storage;
-
 /// List of possible API errors.
 #[derive(Fail, Debug)]
 pub enum Error {
     /// Storage error. This type includes errors related to the database, caused
     /// by, for example, serialization issues.
     #[fail(display = "Storage error: {}", _0)]
-    Storage(#[cause] storage::Error),
+    Storage(#[cause] failure::Error),
 
     /// Input/output error. This type includes errors related to files that are not
     /// a part of the Exonum storage.
@@ -66,8 +64,8 @@ impl From<failure::Error> for Error {
     }
 }
 
-impl From<storage::Error> for Error {
-    fn from(e: storage::Error) -> Self {
-        Error::Storage(e)
-    }
-}
+//impl From<storage::Error> for Error {
+//    fn from(e: storage::Error) -> Self {
+//        Error::Storage(e)
+//    }
+//}

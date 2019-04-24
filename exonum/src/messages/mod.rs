@@ -40,14 +40,15 @@ use serde::{
 
 use std::{borrow::Cow, fmt, ops::Deref};
 
-use crate::crypto::{CryptoHash, Hash, PublicKey};
-use crate::storage::StorageValue;
+use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
 
-pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
+pub(crate) use self::helpers::HexStringRepresentation;
 pub use self::{
+    authorization::SignedMessage,
     helpers::{to_hex_string, BinaryForm},
     protocol::*,
 };
+use exonum_merkledb::BinaryValue;
 
 mod authorization;
 mod helpers;
@@ -128,7 +129,7 @@ impl<T> Signed<T> {
         &self.payload
     }
 
-    /// Returns reference to the signed message.
+    /// Returns a reference to the signed message.
     pub fn signed_message(&self) -> &SignedMessage {
         &self.message
     }
@@ -137,6 +138,11 @@ impl<T> Signed<T> {
     #[cfg(test)]
     pub fn signed_message_mut(&mut self) -> &mut SignedMessage {
         &mut self.message
+
+    /// Returns a signature of the message.
+    pub fn signature(&self) -> Signature {
+        self.message.signature()
+    }
     }
 }
 
@@ -186,15 +192,19 @@ impl<T> Deref for Signed<T> {
     }
 }
 
-impl<T: ProtocolMessage> StorageValue for Signed<T> {
+impl<T: ProtocolMessage> BinaryValue for Signed<T> {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.message.raw.clone()
+    }
+
     fn into_bytes(self) -> Vec<u8> {
         self.encode().unwrap()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let message = SignedMessage::from_bytes(value);
         let msg = Message::deserialize(message).unwrap();
-        T::try_from(msg).unwrap()
+        Ok(T::try_from(msg).unwrap())
     }
 }
 

@@ -17,13 +17,14 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
+use exonum_merkledb::{IndexAccess, Snapshot};
+
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionResult},
     crypto::{gen_keypair, CryptoHash, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Signed},
-    storage::Snapshot,
 };
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 use exonum_time::{
@@ -33,7 +34,7 @@ use exonum_time::{
 
 use std::{collections::HashMap, iter::FromIterator};
 
-fn assert_storage_times_eq<T: AsRef<dyn Snapshot>>(
+fn assert_storage_times_eq<T: IndexAccess>(
     snapshot: T,
     validators: &[TestNode],
     expected_current_time: Option<DateTime<Utc>>,
@@ -54,7 +55,7 @@ fn assert_storage_times_eq<T: AsRef<dyn Snapshot>>(
     }
 }
 
-fn assert_transaction_result<S: AsRef<dyn Snapshot>>(
+fn assert_transaction_result<S: IndexAccess>(
     snapshot: S,
     transaction: &Signed<AnyTx>,
     expected_code: u8,
@@ -88,7 +89,7 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time is None.
 
-    assert_storage_times_eq(testkit.snapshot(), &validators, None, &[None, None, None]);
+    assert_storage_times_eq(&testkit.snapshot(), &validators, None, &[None, None, None]);
 
     // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
@@ -105,7 +106,7 @@ fn test_exonum_time_service_with_3_validators() {
     testkit.create_block_with_transactions(txvec![tx0]);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time0),
         &[Some(time0), None, None],
@@ -127,7 +128,7 @@ fn test_exonum_time_service_with_3_validators() {
     testkit.create_block_with_transactions(txvec![tx1]);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time1),
         &[Some(time0), Some(time1), None],
@@ -152,7 +153,7 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time is None.
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         None,
         &[None, None, None, None],
@@ -173,7 +174,7 @@ fn test_exonum_time_service_with_4_validators() {
     testkit.create_block_with_transactions(txvec![tx0]);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         None,
         &[Some(time0), None, None, None],
@@ -195,7 +196,7 @@ fn test_exonum_time_service_with_4_validators() {
     testkit.create_block_with_transactions(txvec![tx1]);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         None,
         &[Some(time0), Some(time1), None, None],
@@ -217,7 +218,7 @@ fn test_exonum_time_service_with_4_validators() {
     testkit.create_block_with_transactions(txvec![tx2]);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time1),
         &[Some(time0), Some(time1), Some(time2), None],
@@ -239,7 +240,7 @@ fn test_exonum_time_service_with_4_validators() {
     testkit.create_block_with_transactions(txvec![tx3]);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time2),
         &[Some(time0), Some(time1), Some(time2), Some(time3)],
@@ -256,7 +257,7 @@ fn test_exonum_time_service_with_7_validators() {
     let validators = testkit.network().validators().to_vec();
     let mut validators_times = vec![None; 7];
 
-    assert_storage_times_eq(testkit.snapshot(), &validators, None, &validators_times);
+    assert_storage_times_eq(&testkit.snapshot(), &validators, None, &validators_times);
 
     let time = Utc::now();
     let times = (0..7)
@@ -279,7 +280,7 @@ fn test_exonum_time_service_with_7_validators() {
         };
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
-            Schema::new(testkit.snapshot())
+            Schema::new(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.hash()),
             Some(TransactionResult(Ok(())))
@@ -288,7 +289,7 @@ fn test_exonum_time_service_with_7_validators() {
         validators_times[i] = Some(times[i]);
 
         assert_storage_times_eq(
-            testkit.snapshot(),
+            &testkit.snapshot(),
             &validators,
             expected_storage_times[i],
             &validators_times,
@@ -306,7 +307,7 @@ fn test_mock_provider() {
     let validators = testkit.network().validators().to_vec();
     let assert_storage_times = |snapshot: Box<dyn Snapshot>| {
         assert_storage_times_eq(
-            snapshot,
+            &snapshot,
             &validators,
             Some(mock_provider.time()),
             &[Some(mock_provider.time())],
@@ -332,7 +333,7 @@ fn test_mock_provider() {
     assert_eq!(Utc.timestamp(30, 0), mock_provider.time());
     testkit.create_blocks_until(Height(8));
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(Utc.timestamp(70, 0)),
         &[Some(Utc.timestamp(70, 0))],
@@ -364,7 +365,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let (pub_key_1, sec_key_1) = validators[0].service_keypair();
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
+    let schema = TimeSchema::new(&snapshot);
 
     assert!(schema.time().get().is_some());
     assert!(schema.validators_times().get(pub_key_0).is_some());
@@ -379,7 +380,7 @@ fn test_selected_time_less_than_time_in_storage() {
         let tx = { TxTime::sign(time_tx, pub_key_1, sec_key_1) };
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
-            Schema::new(testkit.snapshot())
+            Schema::new(&testkit.snapshot())
                 .transaction_results()
                 .get(&tx.hash()),
             Some(TransactionResult(Ok(())))
@@ -387,7 +388,7 @@ fn test_selected_time_less_than_time_in_storage() {
     }
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
+    let schema = TimeSchema::new(&snapshot);
     assert!(schema.time().get().is_some());
     assert!(schema.validators_times().get(pub_key_0).is_some());
     assert!(schema.validators_times().get(pub_key_1).is_some());
@@ -407,10 +408,10 @@ fn test_creating_transaction_is_not_validator() {
     let (pub_key, sec_key) = gen_keypair();
     let tx = TxTime::sign(Utc::now(), &pub_key, &sec_key);
     testkit.create_block_with_transactions(txvec![tx.clone()]);
-    assert_transaction_result(testkit.snapshot(), &tx, Error::UnknownSender as u8);
+    assert_transaction_result(&testkit.snapshot(), &tx, Error::UnknownSender as u8);
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
+    let schema = TimeSchema::new(&snapshot);
     assert!(schema.time().get().is_none());
     assert!(schema.validators_times().get(&pub_key).is_none());
 }
@@ -430,14 +431,14 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 
     testkit.create_block_with_transactions(txvec![tx0.clone()]);
     assert_eq!(
-        Schema::new(testkit.snapshot())
+        Schema::new(&testkit.snapshot())
             .transaction_results()
             .get(&tx0.hash()),
         Some(TransactionResult(Ok(())))
     );
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
+    let schema = TimeSchema::new(&snapshot);
 
     assert_eq!(schema.time().get(), Some(time0));
     assert_eq!(schema.validators_times().get(pub_key), Some(time0));
@@ -447,13 +448,13 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 
     testkit.create_block_with_transactions(txvec![tx1.clone()]);
     assert_transaction_result(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &tx1,
         Error::ValidatorTimeIsGreater as u8,
     );
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
+    let schema = TimeSchema::new(&snapshot);
 
     assert_eq!(schema.time().get(), Some(time0));
     assert_eq!(schema.validators_times().get(pub_key), Some(time0));

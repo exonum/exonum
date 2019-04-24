@@ -20,9 +20,11 @@ use crate::helpers::user_agent;
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub struct MemPoolInfo {
+pub struct StatsInfo {
     /// Total number of uncommitted transactions.
-    pub size: u64,
+    pub tx_pool_size: u64,
+    /// Total number of transactions in the blockchain.
+    pub tx_count: u64,
 }
 
 /// Information about whether it is possible to achieve the consensus between
@@ -47,6 +49,18 @@ pub struct HealthCheckInfo {
     pub connected_peers: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct ServiceInfo {
+    name: String,
+    id: u16,
+}
+
+/// Services info response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ServicesResponse {
+    services: Vec<ServiceInfo>,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -59,12 +73,13 @@ impl SystemApi {
         Self { shared_api_state }
     }
 
-    fn handle_mempool_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_stats_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
             let snapshot = state.snapshot();
             let schema = Schema::new(&snapshot);
-            Ok(MemPoolInfo {
-                size: schema.transactions_pool_len(),
+            Ok(StatsInfo {
+                tx_pool_size: schema.transactions_pool_len(),
+                tx_count: schema.transactions_len(),
             })
         });
         self
@@ -86,6 +101,26 @@ impl SystemApi {
             })
         });
         self_
+    }
+
+    fn handle_list_services_info(
+        self,
+        name: &'static str,
+        api_scope: &mut ServiceApiScope,
+    ) -> Self {
+        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
+            let blockchain = state.blockchain();
+            let services = blockchain
+                .service_map()
+                .iter()
+                .map(|(&id, service)| ServiceInfo {
+                    name: service.service_name().to_string(),
+                    id,
+                })
+                .collect::<Vec<_>>();
+            Ok(ServicesResponse { services })
+        });
+        self
     }
 
     fn get_number_of_connected_peers(&self) -> usize {
@@ -110,9 +145,10 @@ impl SystemApi {
 
     /// Adds public system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
-        self.handle_mempool_info("v1/mempool", api_scope)
+        self.handle_stats_info("v1/stats", api_scope)
             .handle_healthcheck_info("v1/healthcheck", api_scope)
-            .handle_user_agent_info("v1/user_agent", api_scope);
+            .handle_user_agent_info("v1/user_agent", api_scope)
+            .handle_list_services_info("v1/services", api_scope);
         api_scope
     }
 }

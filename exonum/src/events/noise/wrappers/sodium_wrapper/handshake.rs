@@ -18,6 +18,8 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::net::SocketAddr;
 
+use exonum_merkledb::BinaryValue;
+
 use super::wrapper::NoiseWrapper;
 use crate::{
     crypto::{
@@ -30,7 +32,6 @@ use crate::{
     },
     messages::{Connect, Signed},
     node::state::SharedConnectList,
-    storage::StorageValue,
 };
 
 /// Params needed to establish secured connection using Noise Protocol.
@@ -117,7 +118,7 @@ impl NoiseHandshake {
         msg: &[u8],
     ) -> impl Future<Item = (S, Self), Error = failure::Error> {
         done(self.noise.write_handshake_msg(msg))
-            .map_err(|e| e.into())
+            .map_err(Into::into)
             .and_then(|buf| HandshakeRawMessage(buf).write(stream))
             .map(move |(stream, _)| (stream, self))
     }

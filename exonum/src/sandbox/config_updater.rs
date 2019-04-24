@@ -22,7 +22,7 @@ use crate::crypto::{Hash, PublicKey, SecretKey};
 use crate::helpers::Height;
 use crate::messages::{AnyTx, Message, Signed};
 use crate::proto::ProtobufConvert;
-use crate::storage::Snapshot;
+use exonum_merkledb::Snapshot;
 
 pub const CONFIG_SERVICE: u16 = 1;
 
@@ -57,7 +57,7 @@ impl ConfigUpdateService {
 }
 
 impl Transaction for TxConfig {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
         let mut schema = Schema::new(tc.fork());
         schema
             .commit_configuration(StoredConfiguration::try_deserialize(self.get_config()).unwrap());
