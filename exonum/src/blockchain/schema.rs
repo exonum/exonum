@@ -444,13 +444,6 @@ impl<T: IndexAccess> Schema<T> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
-    //    /// Mutable reference to the [`transactions_len_index`][1] index.
-    //    ///
-    //    /// [1]: struct.Schema.html#method.transactions_len_index
-    //    pub(crate) fn transactions_len_index_mut(&mut self) -> Entry<T, u64> {
-    //        Entry::new(TRANSACTIONS_LEN, self.view)
-    //    }
-
     /// Mutable reference to the [`transactions_pool`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions_pool

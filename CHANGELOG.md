@@ -9,6 +9,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Signatures of methods `Service::initialize` and `Service::before_commit` has been
+  changed. Now they take immutable reference to `Fork` instead of mutable. (#1293)
+
 - Module `storage` has been replace by `exonum-merkledb` crate. See related section
   in changelog for details. (#1293)
 
