@@ -49,3 +49,6 @@ harness = false
 
 [features]
 long_benchmarks = []
+
+[[example]]
+name = "blockchain"

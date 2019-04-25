@@ -31,7 +31,6 @@ Include `exonum-merkledb` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.11.0"
 exonum-merkledb = "0.11.0"
 
 ```
@@ -75,8 +74,8 @@ if let ListProof::Absent(_proof) = list.get_proof(1) {
 ```
 
 ## Further Reading
-
-[MerkleDB description in Exonum docs](https://exonum.com/doc/version/latest/architecture/storage/)
+- [Blockchain example](examples/blockchain.rs)
+- [MerkleDB description in Exonum docs](https://exonum.com/doc/version/latest/architecture/storage/)
 
 ## License
 
