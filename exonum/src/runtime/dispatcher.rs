@@ -22,7 +22,7 @@ use super::{
 };
 use crate::crypto::Hash;
 use crate::messages::CallInfo;
-use crate::storage::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 
 #[derive(Default)]
 pub struct DispatcherBuilder {
@@ -168,7 +168,7 @@ impl RuntimeEnvironment for Dispatcher {
 mod tests {
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
-    use crate::storage::{Database, MemoryDB};
+    use exonum_merkledb::{Database, TemporaryDB};
 
     struct SampleRuntime {
         pub runtime_type: u32,
@@ -271,7 +271,7 @@ mod tests {
         const JAVA_METHOD_ID: MethodId = 1;
 
         // Create dispatcher and test data.
-        let db = MemoryDB::new();
+        let db = TemporaryDB::new();
 
         let runtime_a = Box::new(SampleRuntime::new(
             RuntimeIdentifier::Rust as u32,
@@ -382,7 +382,7 @@ mod tests {
         const RUST_METHOD_ID: MethodId = 0;
 
         // Create dispatcher and test data.
-        let db = MemoryDB::new();
+        let db = TemporaryDB::new();
 
         let dispatcher = DispatcherBuilder::default().finalize();
 

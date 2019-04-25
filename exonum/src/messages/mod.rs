@@ -138,11 +138,11 @@ impl<T> Signed<T> {
     #[cfg(test)]
     pub fn signed_message_mut(&mut self) -> &mut SignedMessage {
         &mut self.message
+    }
 
     /// Returns a signature of the message.
     pub fn signature(&self) -> Signature {
         self.message.signature()
-    }
     }
 }
 

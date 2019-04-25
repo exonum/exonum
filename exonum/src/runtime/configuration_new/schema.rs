@@ -17,8 +17,9 @@
 use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
     proto,
-    storage::{Fork, MapIndex, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
+
+use exonum_merkledb::{Fork, MapIndex, ProofListIndex, ProofMapIndex, Snapshot, BinaryValue};
 
 use std::{borrow::Cow, ops::Deref};
 
@@ -78,7 +79,7 @@ pub enum VotingDecision {
 
 impl CryptoHash for VotingDecision {
     fn hash(&self) -> Hash {
-        let res = StorageValue::into_bytes(*self);
+        let res = BinaryValue::into_bytes(*self);
         res.hash()
     }
 }
@@ -93,7 +94,7 @@ impl VotingDecision {
     }
 }
 
-impl StorageValue for VotingDecision {
+impl BinaryValue for VotingDecision {
     fn into_bytes(self) -> Vec<u8> {
         let (tag, mut res) = match self {
             VotingDecision::Yea(vote) => (YEA_TAG, vote.into_bytes()),
@@ -173,7 +174,7 @@ impl CryptoHash for MaybeVote {
     }
 }
 
-impl StorageValue for MaybeVote {
+impl BinaryValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
             Some(v) => v.into_bytes(),

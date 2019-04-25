@@ -22,8 +22,8 @@ use crate::{
     node::State,
     proto,
     runtime::ArtifactSpec,
-    storage::{Fork, Snapshot},
 };
+use exonum_merkledb::{Fork, Snapshot};
 
 use super::{
     config::ConfigurationServiceConfig,
@@ -161,7 +161,7 @@ impl Propose {
         author: PublicKey,
     ) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use self::ServiceError::*;
-        use crate::storage::StorageValue;
+        use exonum_merkledb::BinaryValue;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
@@ -314,7 +314,7 @@ impl VotingContext {
     }
 
     pub fn save(&self, fork: &mut Fork) {
-        use crate::storage::StorageValue;
+        use exonum_merkledb::BinaryValue;
 
         let cfg_hash = &self.cfg_hash;
         let propose_data: ProposeData = Schema::new(fork.as_ref())

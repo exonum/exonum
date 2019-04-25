@@ -189,7 +189,7 @@ impl<'a> TransactionContext<'a> {
     pub fn new(
         fork: &'a Fork,
         service_name: &'a str,
-        raw_message: &Signed<RawTransaction>,
+        raw_message: &Signed<AnyTx>,
     ) -> Self {
         TransactionContext {
             fork,

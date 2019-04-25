@@ -26,8 +26,8 @@ use crate::{
         rust::{service::Service, TransactionContext},
         DeployStatus, InstanceInitData, RuntimeEnvironment,
     },
-    storage::{Fork, Snapshot},
 };
+use exonum_merkledb::{Fork, Snapshot};
 use protobuf::well_known_types::Any;
 
 mod config;

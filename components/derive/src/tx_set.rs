@@ -71,7 +71,13 @@ fn get_tx_variants(data: &DataEnum) -> Vec<ParsedVariant> {
 }
 
 fn get_message_id(variant: &Variant) -> Option<u16> {
-    let literal = get_exonum_name_value_attributes(&variant.attrs)
+    let meta_attrs = variant
+        .attrs
+        .iter()
+        .filter_map(|a| a.parse_meta().ok())
+        .collect::<Vec<_>>();
+
+    let literal = get_exonum_name_value_attributes(&meta_attrs)
         .iter()
         .filter_map(|MetaNameValue { ident, lit, .. }| {
             if ident == "message_id" {
@@ -251,7 +257,12 @@ fn implement_into_boxed_tx(
 }
 
 fn should_convert_variants(attrs: &[Attribute]) -> bool {
-    let value = get_exonum_name_value_attributes(attrs)
+    let meta_attrs = attrs
+        .iter()
+        .filter_map(|a| a.parse_meta().ok())
+        .collect::<Vec<_>>();
+
+    let value = get_exonum_name_value_attributes(&meta_attrs)
         .iter()
         .filter_map(|MetaNameValue { ident, lit, .. }| {
             if ident == "convert_variants" {

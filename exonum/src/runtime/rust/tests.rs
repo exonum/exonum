@@ -24,7 +24,7 @@ use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
-use crate::storage::{Database, Entry, MemoryDB, Snapshot};
+use exonum_merkledb::{Database, Entry, TemporaryDB, Snapshot};
 use protobuf::{well_known_types::Any, Message};
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
@@ -103,7 +103,7 @@ fn get_artifact_spec() -> RustArtifactSpec {
 
 #[test]
 fn test_basic_rust_runtime() {
-    let db = MemoryDB::new();
+    let db = TemporaryDB::new();
 
     // Create runtime and service.
     let rust_artifact = get_artifact_spec();

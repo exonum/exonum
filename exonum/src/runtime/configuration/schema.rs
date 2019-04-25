@@ -16,14 +16,14 @@
 use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
     proto,
-    storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
 use exonum_merkledb::{
     impl_object_hash_for_binary_value, BinaryValue, IndexAccess, ObjectHash, ProofListIndex,
     ProofMapIndex,
 };
 
-use exonum::crypto::{self, CryptoHash, Hash, HASH_SIZE};
+
+// use exonum_merkledb::{Fork, ProofListIndex, ProofMapIndex, Snapshot, BinaryValue};
 
 use std::{borrow::Cow, ops::Deref};
 
@@ -187,7 +187,7 @@ impl BinaryValue for MaybeVote {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        if NO_VOTE_BYTES.eq(bytes.as_ref()) {
+        let res = if NO_VOTE_BYTES.eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
             MaybeVote::some(

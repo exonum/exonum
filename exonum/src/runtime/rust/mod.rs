@@ -35,7 +35,7 @@ use super::{
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
-use crate::storage::{Error as StorageError, Fork, Snapshot};
+use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 
 use self::service::Service;
 
