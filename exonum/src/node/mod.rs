@@ -1107,6 +1107,8 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use super::*;
     use crate::blockchain::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
@@ -1115,7 +1117,10 @@ mod tests {
     use crate::events::EventHandler;
     use crate::helpers;
     use crate::proto::{schema::tests::TxSimple, ProtobufConvert};
-    use exonum_merkledb::{Database, Snapshot, TemporaryDB};
+    use exonum_merkledb::{
+        impl_binary_value_for_message, BinaryValue, Database, Snapshot, TemporaryDB,
+    };
+    use protobuf::Message as ProtobufMessage;
 
     const SERVICE_ID: u16 = 0;
 
@@ -1124,6 +1129,8 @@ mod tests {
     enum SimpleTransactions {
         TxSimple(TxSimple),
     }
+
+    impl_binary_value_for_message! { TxSimple }
 
     impl Transaction for TxSimple {
         fn execute(&self, _: TransactionContext) -> ExecutionResult {

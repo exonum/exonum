@@ -53,6 +53,7 @@ use exonum_merkledb::{Fork, Snapshot};
 /// #[macro_use] extern crate serde_derive;
 /// # extern crate failure;
 /// // Exports from `exonum` crate skipped
+/// use std::borrow::Cow;
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, TransactionContext};
 /// # use exonum::crypto::Hash;
 /// # use exonum::messages::{Signed, RawTransaction};

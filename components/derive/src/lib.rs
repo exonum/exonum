@@ -114,6 +114,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// # Examples
 ///
 /// ```
+/// use std::borrow::Cow;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum_derive::*;
 /// use serde_derive::*;
@@ -166,6 +167,7 @@ pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
 /// It is possible to box variants in order to reduce their stack size:
 ///
 /// ```
+/// use std::borrow::Cow;
 /// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
 /// # use exonum_derive::*;
 /// use serde_derive::*;

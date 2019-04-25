@@ -15,12 +15,12 @@
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use super::schema;
 use super::ProtobufConvert;
 use crate::crypto::{self, Hash, PublicKey, Signature};
-use crate::messages::BinaryForm;
+use exonum_merkledb::BinaryValue;
 
 #[test]
 fn test_hash_pb_convert() {
@@ -132,8 +132,8 @@ fn test_simple_struct_round_trip() {
     let point_convert_round_trip: Point = ProtobufConvert::from_pb(point_pb).unwrap();
     assert_eq!(point_convert_round_trip, point);
 
-    let bytes = point.encode().unwrap();
-    let point_encode_round_trip = Point::decode(&bytes).unwrap();
+    let bytes = point.to_bytes();
+    let point_encode_round_trip = Point::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(point_encode_round_trip, point);
 }
 
@@ -191,8 +191,8 @@ fn test_scalar_struct_round_trip() {
         ProtobufConvert::from_pb(scalar_struct_pb).unwrap();
     assert_eq!(struct_convert_round_trip, scalar_struct);
 
-    let bytes = scalar_struct.encode().unwrap();
-    let struct_encode_round_trip = StructWithScalarTypes::decode(&bytes).unwrap();
+    let bytes = scalar_struct.to_bytes();
+    let struct_encode_round_trip = StructWithScalarTypes::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
@@ -221,8 +221,8 @@ fn test_repeated_struct_round_trip() {
         ProtobufConvert::from_pb(rep_struct_pb).unwrap();
     assert_eq!(struct_convert_round_trip, rep_struct);
 
-    let bytes = rep_struct.encode().unwrap();
-    let struct_encode_round_trip = StructWithRepeatedTypes::decode(&bytes).unwrap();
+    let bytes = rep_struct.to_bytes();
+    let struct_encode_round_trip = StructWithRepeatedTypes::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, rep_struct);
 }
 
@@ -262,8 +262,8 @@ fn test_struct_with_maps_roundtrip() {
         ProtobufConvert::from_pb(map_struct_pb).unwrap();
     assert_eq!(struct_convert_round_trip, map_struct);
 
-    let bytes = map_struct.encode().unwrap();
-    let struct_encode_round_trip = StructWithMaps::decode(&bytes).unwrap();
+    let bytes = map_struct.to_bytes();
+    let struct_encode_round_trip = StructWithMaps::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
@@ -296,7 +296,7 @@ fn test_struct_with_fixed_arrays_roundtrip() {
         ProtobufConvert::from_pb(arr_struct_pb).unwrap();
     assert_eq!(struct_convert_round_trip, arr_struct);
 
-    let bytes = arr_struct.encode().unwrap();
-    let struct_encode_round_trip = StructWithFixedArrays::decode(&bytes).unwrap();
+    let bytes = arr_struct.to_bytes();
+    let struct_encode_round_trip = StructWithFixedArrays::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, arr_struct);
 }
