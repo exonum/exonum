@@ -79,7 +79,7 @@ pub trait BinaryValue: Sized {
 
 impl_object_hash_for_binary_value! { (), bool, Vec<u8>, String, PublicKey, DateTime<Utc>, Uuid, Decimal }
 
-macro_rules! impl_binary_form_scalar {
+macro_rules! impl_binary_value_scalar {
     ($type:tt, $read:ident) => {
         #[allow(clippy::use_self)]
         impl BinaryValue for $type {
@@ -114,17 +114,17 @@ macro_rules! impl_binary_form_scalar {
 }
 
 // Unsigned scalar types
-impl_binary_form_scalar! { u8,  read_u8 }
-impl_binary_form_scalar! { u16, write_u16, read_u16, 2 }
-impl_binary_form_scalar! { u32, write_u32, read_u32, 4 }
-impl_binary_form_scalar! { u64, write_u64, read_u64, 8 }
-impl_binary_form_scalar! { u128, write_u128, read_u128, 16 }
+impl_binary_value_scalar! { u8,  read_u8 }
+impl_binary_value_scalar! { u16, write_u16, read_u16, 2 }
+impl_binary_value_scalar! { u32, write_u32, read_u32, 4 }
+impl_binary_value_scalar! { u64, write_u64, read_u64, 8 }
+impl_binary_value_scalar! { u128, write_u128, read_u128, 16 }
 // Signed scalar types
-impl_binary_form_scalar! { i8,  read_i8 }
-impl_binary_form_scalar! { i16, write_i16, read_i16, 2 }
-impl_binary_form_scalar! { i32, write_i32, read_i32, 4 }
-impl_binary_form_scalar! { i64, write_i64, read_i64, 8 }
-impl_binary_form_scalar! { i128, write_i128, read_i128, 16 }
+impl_binary_value_scalar! { i8,  read_i8 }
+impl_binary_value_scalar! { i16, write_i16, read_i16, 2 }
+impl_binary_value_scalar! { i32, write_i32, read_i32, 4 }
+impl_binary_value_scalar! { i64, write_i64, read_i64, 8 }
+impl_binary_value_scalar! { i128, write_i128, read_i128, 16 }
 
 /// No-op implementation.
 impl BinaryValue for () {

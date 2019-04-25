@@ -31,7 +31,7 @@ use chrono::{DateTime, Utc};
 
 use std::{borrow::Cow, fmt::Debug, mem};
 
-use super::{BinaryForm, RawTransaction, ServiceTransaction, Signed, SignedMessage};
+use super::{RawTransaction, ServiceTransaction, Signed, SignedMessage};
 use crate::blockchain;
 use crate::crypto::{CryptoHash, Hash, PublicKey, SecretKey, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use crate::helpers::{Height, Round, ValidatorId};
@@ -714,7 +714,7 @@ impl Precommit {
 
 /// Full message constraints list.
 #[doc(hidden)]
-pub trait ProtocolMessage: Debug + Clone + BinaryForm {
+pub trait ProtocolMessage: Debug + Clone + BinaryValue {
     fn message_type() -> (u8, u8);
     /// Trying to convert `Message` to concrete message,
     /// if ok returns message `Signed<Self>` if fails, returns `Message` back.
@@ -816,7 +816,7 @@ macro_rules! impl_protocol {
                     $($class_num =>
                         match message.message_type() {
                             $($type_num =>{
-                                let payload = $type::decode(message.payload())?;
+                                let payload = $type::from_bytes(Cow::from(message.payload()))?;
                                 let message = Signed::new(payload, message);
                                 Ok($protocol_name::$class($class::$type(message)))
                             }),+
@@ -918,7 +918,7 @@ impl Message {
         author: PublicKey,
         secret_key: &SecretKey,
     ) -> Signed<T> {
-        let value = message.encode().expect("Couldn't serialize data.");
+        let value = message.to_bytes();
         let (cls, typ) = T::message_type();
         let signed = SignedMessage::new(cls, typ, &value, author, secret_key);
         T::into_message_from_parts(message, signed)

@@ -180,7 +180,7 @@ fn implement_into_service_tx(
 ) -> impl quote::ToTokens {
     let tx_set_impl = variants.iter().map(|ParsedVariant { id, ident, .. }| {
         quote! {
-            #name::#ident(ref tx) => (#id, tx.encode().unwrap()),
+            #name::#ident(ref tx) => (#id, tx.to_bytes()),
         }
     });
 
@@ -205,7 +205,7 @@ fn implement_transaction_set_trait(
         let id = variant.id;
         let source_type = variant.source_type();
         quote! {
-            #id => #source_type::decode(&vec).map(#name::from),
+            #id => #source_type::from_bytes(Cow::from(&vec)).map(#name::from),
         }
     });
 
@@ -310,7 +310,7 @@ pub fn implement_transaction_set(input: TokenStream) -> TokenStream {
 
             use super::*;
             use self::_failure::{bail, Error as _FailureError};
-            use #crate_name::messages::BinaryForm as _BinaryForm;
+            use exonum_merkledb::BinaryValue as _BinaryValue;
 
             #conversions
             #variant_conversions

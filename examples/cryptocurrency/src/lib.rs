@@ -119,6 +119,8 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
+    use std::borrow::Cow;
+
     use super::proto;
     use super::service::SERVICE_ID;
     use exonum::{

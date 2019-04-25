@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! Sample counter service.
+use std::borrow::Cow;
+
 use exonum_merkledb::{Entry, IndexAccess, Snapshot};
 
 use exonum::{
