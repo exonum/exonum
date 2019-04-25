@@ -46,7 +46,7 @@ Currently only one database backend is supported - RockDB.
 use std::path::Path;
 use exonum_merkledb::{ProofListIndex, Database, ListProof, DbOptions, RocksDB};
 
-let db_options = DbOptions::default();§
+let db_options = DbOptions::default();
 let db = RocksDB::open(&Path::new("db"), &db_options).unwrap();
 let list_name = "list";
 
