@@ -1,13 +1,12 @@
 use serde_derive::{Deserialize, Serialize};
-use std::borrow::Cow;
+
+use std::borrow::{AsRef, Cow, ToString};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
     impl_object_hash_for_binary_value, BinaryValue, Database, Fork, ListIndex, MapIndex,
     ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
 };
-use std::convert::AsRef;
-use std::string::ToString;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
 struct Wallet {
