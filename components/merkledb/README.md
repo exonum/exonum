@@ -2,11 +2,11 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![Docs.rs](https://docs.rs/exonum-merkledb/badge.svg)](https://docs.rs/exonum-merkledb)
-![rust 1.33.0+ required](https://img.shields.io/badge/rust-1.33.0+-blue.svg?label=Required%20Rust)
+![rust 1.34.0+ required](https://img.shields.io/badge/rust-1.33.0+-blue.svg?label=Required%20Rust)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/components/merkledb/blob/master/LICENSE)
 
-Exonum-merkledb is a persistent storage implementation based on RocksDB and
-provides APIs to work with merkelized data structures.
+Exonum-MerkleDB is a persistent storage implementation based on RocksDB
+which provides APIs to work with merkelized data structures.
 
 ## Available database objects
 
@@ -60,7 +60,7 @@ let mut list: ProofListIndex<_, u8> = ProofListIndex::new(list_name, &fork);
 
 ```
 
-After adding elements to object you can obtain cryptographic proofs for their
+After adding elements to the object you can obtain cryptographic proofs for their
 existence or absence.
 
 ```rust
