@@ -407,8 +407,6 @@ impl Blockchain {
             (tx, raw, service_name)
         };
 
-        fork.flush();
-
         let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
             let context = TransactionContext::new(&*fork, service_name, &raw);
             tx.execute(context)
@@ -416,19 +414,14 @@ impl Blockchain {
 
         let tx_result = TransactionResult(match catch_result {
             Ok(execution_result) => {
-                match execution_result {
-                    Ok(()) => {
-                        fork.flush();
-                    }
-                    Err(ref e) => {
-                        // Unlike panic, transaction failure isn't that rare, so logging the
-                        // whole transaction body is an overkill: it can be relatively big.
-                        info!(
-                            "Service <{}>: {:?} transaction execution failed: {:?}",
-                            service_name, tx_hash, e
-                        );
-                        fork.rollback();
-                    }
+                if let Err(ref e) = execution_result {
+                    // Unlike panic, transaction failure isn't that rare, so logging the
+                    // whole transaction body is an overkill: it can be relatively big.
+                    info!(
+                        "Service <{}>: {:?} transaction execution failed: {:?}",
+                        service_name, tx_hash, e
+                    );
+                    fork.rollback();
                 }
                 execution_result.map_err(TransactionError::from)
             }
@@ -453,6 +446,7 @@ impl Blockchain {
         schema.block_transactions_mut(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations_mut().put(&tx_hash, location);
+        fork.flush();
         Ok(())
     }
 

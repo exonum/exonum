@@ -21,6 +21,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
+use std::borrow::Cow;
+
 use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex, Snapshot};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
