@@ -379,7 +379,7 @@ mod memorydb_tests {
 
     fn create_blockchain() -> Blockchain {
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             TemporaryDB::new(),
             vec![Box::new(super::TestService) as Box<dyn Service>],
@@ -391,7 +391,7 @@ mod memorydb_tests {
 
     fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             TemporaryDB::new(),
             vec![service],
@@ -458,7 +458,7 @@ mod rocksdb_tests {
     fn create_blockchain(path: &Path) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             db,
             vec![Box::new(super::TestService) as Box<dyn Service>],
@@ -471,7 +471,7 @@ mod rocksdb_tests {
     fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
         let db = create_database(path);
         let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(1);
+        let api_channel = mpsc::unbounded();
         Blockchain::new(
             db,
             vec![service],
