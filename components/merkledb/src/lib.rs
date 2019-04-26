@@ -68,16 +68,16 @@
 //!
 //! - [`Entry`] is a specific index that stores only one value. Useful for global values, such as
 //!   configuration. Similar to a combination of [`Box`] and [`Option`].
-//! - [`ListIndex`] is a list of items stored in the sequential order. Similar to [`Vec`].
-//! - [`SparseListIndex`] is a list of items stored in the sequential order. Similar to `ListIndex`,
+//! - [`ListIndex`] is a list of items stored in a sequential order. Similar to [`Vec`].
+//! - [`SparseListIndex`] is a list of items stored in a sequential order. Similar to `ListIndex`,
 //!   but may contain indices without elements.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`].
 //! - [`ProofListIndex`] is a Merkelized version of `ListIndex` that supports cryptographic
 //!   proofs of existence and is implemented as a Merkle tree.
 //! - [`ProofMapIndex`] is a Merkelized version of `MapIndex` that supports cryptographic
 //!   proofs of existence and is implemented as a binary Merkle Patricia tree.
-//! - [`KeySetIndex`] and [`ValueSetIndex`] is a set of items, similar to [`BTreeSet`] and
-//!   [`HashSet`].
+//! - [`KeySetIndex`] and [`ValueSetIndex`] are sets of items, similar to [`BTreeSet`] and
+//!   [`HashSet`] accordingly.
 //!
 //! [`Database`]: trait.Database.html
 //! [`RocksDB`]: struct.RocksDB.html

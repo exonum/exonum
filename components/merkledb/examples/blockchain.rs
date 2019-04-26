@@ -1,6 +1,6 @@
 use serde_derive::{Deserialize, Serialize};
 
-use std::borrow::{AsRef, Cow, ToString};
+use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_merkledb::{
@@ -143,7 +143,7 @@ fn main() {
     let alice = create_user("Alice");
     let bob = create_user("Bob");
 
-    // Create transaction that transfers money from Alice to Bob.
+    // Creates a transaction that transfers money from Alice to Bob.
     let transaction = Transaction {
         sender: alice,
         receiver: bob,
@@ -154,14 +154,14 @@ fn main() {
         transactions: vec![transaction],
     };
 
-    // Execute block to persist our tiny blockchain's state in MerkleDB.
+    // Executes a block to persist our state of the blockchain in MerkleDB.
     block.execute(&db);
 
-    // Get snapshot of the current database state.
+    // Gets a snapshot of the current database state.
     let snapshot = db.snapshot();
     let schema = Schema::new(&snapshot);
 
-    // Check that our users have specified amount of money.
+    // Checks that our users have the specified amount of money.
     let wallets = schema.wallets();
     let alice_wallet = wallets.get(&alice).unwrap();
     let bob_wallet = wallets.get(&bob).unwrap();
@@ -169,7 +169,7 @@ fn main() {
     assert_eq!(alice_wallet.outgoing, 100);
     assert_eq!(bob_wallet.incoming, 100);
 
-    // Get and check proof of existence of alice wallet in the blockchain.
+    // Gets and checks a proof of existence of Alice's wallet in the blockchain.
     let proof = wallets.get_proof(alice);
     let checked_proof = proof.check().unwrap();
     assert_eq!(

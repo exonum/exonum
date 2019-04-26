@@ -8,22 +8,22 @@
 Exonum MerkleDB is a persistent storage implementation based on RocksDB
 which provides APIs to work with merkelized data structures.
 
-## Available database objects
+## Available Database Objects
 
 - `Entry` is a specific index that stores only one value. Useful for global
   values, such as configuration. Similar to a combination of `Box` and
   `Option`.
-- `ListIndex` is a list of items stored in the sequential order. Similar to
+- `ListIndex` is a list of items stored in a sequential order. Similar to
   `Vec`.
-- `SparseListIndex` is a list of items stored in the sequential order. Similar
+- `SparseListIndex` is a list of items stored in a sequential order. Similar
   to `ListIndex`, but may contain indices without elements.
 - `MapIndex` is a map of keys and values. Similar to `BTreeMap`.
 - `ProofListIndex` is a Merkelized version of `ListIndex` that supports
   cryptographic proofs of existence and is implemented as a Merkle tree.
 - `ProofMapIndex` is a Merkelized version of `MapIndex` that supports cryptographic
   proofs of existence and is implemented as a binary Merkle Patricia tree.
-- `KeySetIndex` and `ValueSetIndex` is a set of items, similar to `BTreeSet` and
-  `HashSet`.
+- `KeySetIndex` and `ValueSetIndex` are sets of items, similar to `BTreeSet` and
+  `HashSet` accordingly.
 
 ## Usage
 
@@ -74,6 +74,7 @@ if let ListProof::Absent(_proof) = list.get_proof(1) {
 ```
 
 ## Further Reading
+
 - [Blockchain example](examples/blockchain.rs)
 - [MerkleDB description in Exonum docs](https://exonum.com/doc/version/latest/architecture/storage/)
 
