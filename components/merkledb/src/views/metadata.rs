@@ -172,7 +172,7 @@ where
 {
     let index_name = index_address.fully_qualified_name();
 
-    let mut pool = IndexesPool::new(index_access);
+    let mut pool = IndexesPool::new(index_access.clone());
     let (metadata, is_new) = if let Some(metadata) = pool.index_metadata(&index_name) {
         assert_eq!(
             metadata.index_type, index_type,
@@ -275,7 +275,8 @@ where
     pub fn set(&mut self, state: V) {
         let mut cache = self.cache.get_mut();
         cache.state = state;
-        View::new(self.index_access, INDEXES_POOL_NAME).put(&self.index_name, cache.to_bytes());
+        View::new(self.index_access.clone(), INDEXES_POOL_NAME)
+            .put(&self.index_name, cache.to_bytes());
     }
 
     pub fn is_new(&self) -> bool {

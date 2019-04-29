@@ -11,14 +11,14 @@ where
     T: IndexAccess,
     F: Fn(T),
 {
-    b.iter(|| benchmark(index_access))
+    b.iter(|| benchmark(index_access.clone()))
 }
 
 fn bench_with_index_access<T: IndexAccess>(index_access: T) {
     for _ in 0..ITEM_COUNT {
         let mut rng = XorShiftRng::from_seed(SEED);
         let index: ListIndex<_, u32> =
-            ListIndex::new_in_family("index", &rng.next_u32(), index_access);
+            ListIndex::new_in_family("index", &rng.next_u32(), index_access.clone());
         black_box(index);
     }
 }

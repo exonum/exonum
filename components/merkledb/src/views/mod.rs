@@ -19,7 +19,7 @@ pub use self::{
     refs::{AnyObject, ObjectAccess, Ref, RefMut},
 };
 
-use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
+use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData, ops::Deref};
 
 use super::{
     db::{Change, ChangesRef, ForkIter, ViewChanges},
@@ -77,7 +77,7 @@ impl ChangeSet for ChangesRef<'_> {
 }
 
 /// Base trait that allows to access and modify indexes.
-pub trait IndexAccess: Copy {
+pub trait IndexAccess: Clone {
     /// Type of the `changes` that will be applied to the database.
     /// In case of `snapshot` changes is represented by the empty type,
     /// because `snapshot` is read-only.
@@ -177,7 +177,7 @@ where
         );
 
         let (index_address, index_state) =
-            metadata::index_metadata(self.index_access, &self.address, self.index_type);
+            metadata::index_metadata(self.index_access.clone(), &self.address, self.index_type);
 
         let index_view = View::new(self.index_access, index_address);
 
@@ -320,7 +320,7 @@ impl From<String> for IndexAddress {
     }
 }
 
-/// TODO should we have this impl in public interface? ECR-2834
+// TODO should we have this impl in public interface? ECR-2834
 impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     fn from((name, key): (&'a str, &'a K)) -> Self {
         Self {
@@ -330,14 +330,19 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
     }
 }
 
-impl<'a> IndexAccess for &'a dyn Snapshot {
+impl<T> IndexAccess for T
+where
+    T: Deref<Target = dyn Snapshot> + Clone,
+{
     type Changes = ();
 
     fn snapshot(&self) -> &dyn Snapshot {
-        *self
+        self.deref()
     }
 
-    fn changes(&self, _: &IndexAddress) -> Self::Changes {}
+    fn changes(&self, _address: &IndexAddress) -> Self::Changes {
+        ()
+    }
 }
 
 impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
