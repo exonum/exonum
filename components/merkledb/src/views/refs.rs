@@ -222,6 +222,8 @@ impl ObjectAccess for &Box<dyn Snapshot> {}
 
 impl ObjectAccess for &Fork {}
 
+impl<T> ObjectAccess for T where T: Deref<Target = dyn Snapshot> + Clone {}
+
 impl Fork {
     /// See: [ObjectAccess::get_object][1].
     ///
