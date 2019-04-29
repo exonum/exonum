@@ -639,9 +639,9 @@ impl<'a> IndexAccess for &'a Fork {
     }
 }
 
-impl<'a> AsRef<dyn Snapshot> for &'a Fork {
+impl AsRef<dyn Snapshot> for Fork {
     fn as_ref(&self) -> &dyn Snapshot {
-        self.snapshot()
+        &self.flushed
     }
 }
 
