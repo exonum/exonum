@@ -340,9 +340,7 @@ where
         self.deref()
     }
 
-    fn changes(&self, _address: &IndexAddress) -> Self::Changes {
-        ()
-    }
+    fn changes(&self, _address: &IndexAddress) -> Self::Changes {}
 }
 
 impl<'a> IndexAccess for &'a Box<dyn Snapshot> {
