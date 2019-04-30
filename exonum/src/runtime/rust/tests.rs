@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_derive::service_interface;
+use futures::sync::mpsc;
 use semver::Version;
 
 use crate::proto::schema::tests::{TestServiceInit, TestServiceTx};
@@ -23,6 +24,7 @@ use super::{
 };
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
+use crate::runtime::dispatcher::Dispatcher;
 use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
@@ -118,8 +120,9 @@ impl ServiceFactory for TestServiceFactory {
 fn test_basic_rust_runtime() {
     let db = MemoryDB::new();
 
+    let mut dispatcher = Dispatcher::new(mpsc::channel(0).0);
     // Create runtime and service.
-    let runtime = RustRuntime::default();
+    let mut runtime = RustRuntime::new(&mut dispatcher);
 
     let service_factory = Box::new(TestServiceFactory);
     let artifact: ArtifactSpec = service_factory.artifact().into();

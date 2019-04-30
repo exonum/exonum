@@ -182,7 +182,36 @@ impl RuntimeEnvironment for Dispatcher {
 mod tests {
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
+    use crate::runtime::RuntimeIdentifier;
     use crate::storage::{Database, MemoryDB};
+
+    #[derive(Default)]
+    pub struct DispatcherBuilder {
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+    }
+
+    impl std::fmt::Debug for DispatcherBuilder {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.debug_struct("DispatcherBuilder").finish()
+        }
+    }
+
+    impl DispatcherBuilder {
+        pub fn with_runtime(
+            mut self,
+            runtime_id: u32,
+            runtime: Box<dyn RuntimeEnvironment + Send>,
+        ) -> Self {
+            self.runtimes.insert(runtime_id, runtime);
+
+            self
+        }
+
+        pub fn finalize(self) -> Pin<Box<Dispatcher>> {
+            let request_tx = mpsc::channel(0).0;
+            Dispatcher::new_with_runtimes(self.runtimes, request_tx)
+        }
+    }
 
     struct SampleRuntime {
         pub runtime_type: u32,
@@ -201,7 +230,7 @@ mod tests {
     }
 
     impl RuntimeEnvironment for SampleRuntime {
-        fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
@@ -222,7 +251,7 @@ mod tests {
         }
 
         fn init_service(
-            &self,
+            &mut self,
             _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
@@ -298,7 +327,7 @@ mod tests {
             JAVA_METHOD_ID,
         ));
 
-        let dispatcher = DispatcherBuilder::default()
+        let mut dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
@@ -398,7 +427,7 @@ mod tests {
         // Create dispatcher and test data.
         let db = MemoryDB::new();
 
-        let dispatcher = DispatcherBuilder::default().finalize();
+        let mut dispatcher = DispatcherBuilder::default().finalize();
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
