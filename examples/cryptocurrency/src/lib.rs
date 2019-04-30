@@ -134,6 +134,7 @@ pub mod transactions {
     use super::proto;
     //    use super::service::SERVICE_ID;
     use exonum::{
+        api::ServiceApiBuilder,
         crypto::{PublicKey, SecretKey},
         messages::{AnyTx, Message, Signed},
     };
@@ -264,6 +265,7 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
+    use exonum::api::ServiceApiBuilder;
     use exonum::blockchain::ExecutionResult;
     use exonum::runtime::configuration_new::DeployInit;
     use exonum::runtime::rust::{
@@ -271,6 +273,7 @@ pub mod contracts {
         RustArtifactSpec, TransactionContext,
     };
 
+    use crate::api::CryptocurrencyApi;
     use crate::{
         errors::Error,
         schema::{CurrencySchema, Wallet},
@@ -346,14 +349,22 @@ pub mod contracts {
 
     impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
 
-    impl Service for CryptocurrencyServiceImpl {}
+    impl Service for CryptocurrencyServiceImpl {
+        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+            CryptocurrencyApi::wire(builder);
+        }
+    }
+
+    pub fn artifact_spec() -> RustArtifactSpec {
+        RustArtifactSpec::new("cryptocurrency", 0, 1, 0)
+    }
 
     #[derive(Debug)]
     pub struct ServiceFactoryImpl;
 
     impl ServiceFactory for ServiceFactoryImpl {
         fn artifact(&self) -> RustArtifactSpec {
-            RustArtifactSpec::new("cryptocurrency", 0, 1, 0)
+            artifact_spec()
         }
 
         fn new_instance(&self) -> Box<dyn Service> {
@@ -370,52 +381,52 @@ pub mod contracts {
 }
 //
 ///// REST API.
-//pub mod api {
-//    use exonum::{
-//        api::{self, ServiceApiBuilder, ServiceApiState},
-//        crypto::PublicKey,
-//    };
-//
-//    use crate::schema::{CurrencySchema, Wallet};
-//
-//    /// Public service API description.
-//    #[derive(Debug, Clone)]
-//    pub struct CryptocurrencyApi;
-//
-//    /// The structure describes the query parameters for the `get_wallet` endpoint.
-//    #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-//    pub struct WalletQuery {
-//        /// Public key of the queried wallet.
-//        pub pub_key: PublicKey,
-//    }
-//
-//    impl CryptocurrencyApi {
-//        /// Endpoint for getting a single wallet.
-//        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
-//            let snapshot = state.snapshot();
-//            let schema = CurrencySchema::new(snapshot);
-//            schema
-//                .wallet(&query.pub_key)
-//                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
-//        }
-//
-//        /// Endpoint for dumping all wallets from the storage.
-//        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
-//            let snapshot = state.snapshot();
-//            let schema = CurrencySchema::new(snapshot);
-//            let idx = schema.wallets();
-//            let wallets = idx.values().collect();
-//            Ok(wallets)
-//        }
-//
-//        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
-//        /// endpoints.
-//        pub fn wire(builder: &mut ServiceApiBuilder) {
-//            // Binds handlers to specific routes.
-//            builder
-//                .public_scope()
-//                .endpoint("v1/wallet", Self::get_wallet)
-//                .endpoint("v1/wallets", Self::get_wallets);
-//        }
-//    }
-//}
+pub mod api {
+    use exonum::{
+        api::{self, ServiceApiBuilder, ServiceApiState},
+        crypto::PublicKey,
+    };
+
+    use crate::schema::{CurrencySchema, Wallet};
+
+    /// Public service API description.
+    #[derive(Debug, Clone)]
+    pub struct CryptocurrencyApi;
+
+    /// The structure describes the query parameters for the `get_wallet` endpoint.
+    #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+    pub struct WalletQuery {
+        /// Public key of the queried wallet.
+        pub pub_key: PublicKey,
+    }
+
+    impl CryptocurrencyApi {
+        /// Endpoint for getting a single wallet.
+        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
+            let snapshot = state.snapshot();
+            let schema = CurrencySchema::new(snapshot);
+            schema
+                .wallet(&query.pub_key)
+                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
+        }
+
+        /// Endpoint for dumping all wallets from the storage.
+        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
+            let snapshot = state.snapshot();
+            let schema = CurrencySchema::new(snapshot);
+            let idx = schema.wallets();
+            let wallets = idx.values().collect();
+            Ok(wallets)
+        }
+
+        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
+        /// endpoints.
+        pub fn wire(builder: &mut ServiceApiBuilder) {
+            // Binds handlers to specific routes.
+            builder
+                .public_scope()
+                .endpoint("v1/wallet", Self::get_wallet)
+                .endpoint("v1/wallets", Self::get_wallets);
+        }
+    }
+}

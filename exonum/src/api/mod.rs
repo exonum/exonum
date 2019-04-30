@@ -27,9 +27,11 @@ use self::{backends::actix, node::public::ExplorerApi};
 use crate::blockchain::{Blockchain, SharedNodeState};
 use crate::crypto::PublicKey;
 use crate::node::ApiSender;
+use crate::runtime::RuntimeEnvironment;
 
 pub mod backends;
 pub mod error;
+pub mod manager;
 pub mod node;
 mod state;
 pub(crate) mod websocket;
@@ -267,6 +269,10 @@ impl ServiceApiBuilder {
         self.blockchain()
             .map(|blockchain| blockchain.service_keypair.0)
     }
+
+    pub fn set_blockchain(&mut self, blockchain: Blockchain) {
+        self.blockchain = Some(blockchain);
+    }
 }
 
 /// Exonum API access level, either private or public.
@@ -320,18 +326,6 @@ impl ApiAggregator {
             "explorer".to_owned(),
             Self::explorer_api(&blockchain, node_state.clone()),
         );
-        // Adds services APIs.
-
-        // TODO Service API not mounted.
-
-        // inner.extend(blockchain.service_map().iter().map(|(_, service)| {
-        //     let mut builder = ServiceApiBuilder::with_blockchain(blockchain.clone());
-        //     service.wire_api(&mut builder);
-        //     // TODO think about prefixes for non web backends. (ECR-1758)
-        //     let prefix = format!("services/{}", service.service_name());
-        //     (prefix, builder)
-        // }));
-
         Self {
             inner,
             blockchain,
@@ -346,14 +340,28 @@ impl ApiAggregator {
 
     /// Extends the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
+        let mut inner = self.inner.clone();
+
+        let blockchain = self.blockchain.clone();
+        let dispatcher = self.blockchain.dispatcher.lock().expect("Dispatcher lock");
+        inner.extend(
+            dispatcher
+                .get_services_api()
+                .into_iter()
+                .map(|(name, mut builder)| {
+                    builder.set_blockchain(blockchain.clone());
+                    (format!("services/{}", name), builder)
+                }),
+        );
+
         match access {
             ApiAccess::Public => backend.extend(
-                self.inner
+                inner
                     .iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
             ),
             ApiAccess::Private => backend.extend(
-                self.inner
+                inner
                     .iter()
                     .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
             ),
@@ -375,10 +383,13 @@ impl ApiAggregator {
         builder
     }
 
-    fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
-        let mut builder = ServiceApiBuilder::new();
+    fn system_api(
+        _blockchain: &Blockchain,
+        _shared_api_state: SharedNodeState,
+    ) -> ServiceApiBuilder {
+        let builder = ServiceApiBuilder::new();
 
-        // TODO Service API not mounted.
+        // TODO Update NodeInfo endpoint.
 
         // let node_info = self::node::private::NodeInfo::new(
         //     blockchain.service_map().iter().map(|(_, service)| service),

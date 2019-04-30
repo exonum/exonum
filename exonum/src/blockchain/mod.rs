@@ -30,7 +30,6 @@
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
-
 pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
@@ -46,6 +45,7 @@ pub use self::{
 pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
+use futures::sync::mpsc;
 use protobuf::well_known_types::Any;
 
 use std::{
@@ -56,6 +56,7 @@ use std::{
 };
 
 use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::events::InternalRequest;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{AnyTx, BinaryForm, Connect, Message, Precommit, ProtocolMessage, Signed};
 use crate::node::ApiSender;
@@ -89,7 +90,7 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    dispatcher: Arc<Mutex<Pin<Box<Dispatcher>>>>,
+    pub dispatcher: Arc<Mutex<Pin<Box<Dispatcher>>>>,
 }
 
 impl Blockchain {
@@ -100,8 +101,9 @@ impl Blockchain {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
+        internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        let mut dispatcher = Dispatcher::new();
+        let mut dispatcher = Dispatcher::new(internal_req_sender);
         let mut rust_runtime = RustRuntime::new(&mut dispatcher);
 
         ConfigurationServiceFactory::add_to_rust_runtime(&mut dispatcher, &mut rust_runtime);

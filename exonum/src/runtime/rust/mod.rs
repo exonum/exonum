@@ -37,6 +37,7 @@ use crate::proto::schema;
 use crate::storage::{Error as StorageError, Fork, Snapshot};
 
 use self::service::{Service, ServiceFactory};
+use crate::api::ServiceApiBuilder;
 use crate::runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID};
 use crate::runtime::dispatcher::Dispatcher;
 use protobuf::well_known_types::Any as PbAny;
@@ -198,7 +199,7 @@ impl RuntimeEnvironment for RustRuntime {
             return Err(InitError::ServiceIdExists);
         }
 
-        let mut service = {
+        let service = {
             let mut service = self.inner.services.get(&artifact).unwrap().new_instance();
             let ctx = TransactionContext::new(context, self);
             service
@@ -308,6 +309,18 @@ impl RuntimeEnvironment for RustRuntime {
                 .map_err(|e| format_err!("Rust runtime genesis init error: {:?}", e))?
         }
         Ok(())
+    }
+
+    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+        self.inner
+            .initialized
+            .iter()
+            .map(|(id, service)| {
+                let mut builder = ServiceApiBuilder::new();
+                service.as_ref().wire_api(&mut builder);
+                (format!("{}", id), builder)
+            })
+            .collect()
     }
 }
 

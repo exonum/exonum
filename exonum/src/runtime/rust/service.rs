@@ -14,16 +14,14 @@
 
 use crate::crypto::Hash;
 use crate::messages::{BinaryForm, MethodId};
-use crate::runtime::{
-    configuration_new::DeployInit, error::ExecutionError, rust::TransactionContext,
-    RuntimeIdentifier,
-};
+use crate::runtime::{error::ExecutionError, rust::TransactionContext, RuntimeIdentifier};
 use crate::storage::{Fork, Snapshot};
 
 use failure::Error;
 use protobuf::well_known_types::Any;
 
 use super::RustArtifactSpec;
+use crate::api::ServiceApiBuilder;
 use crate::runtime::configuration_new::{Deploy, Init};
 
 pub trait ServiceDispatcher {
@@ -47,6 +45,8 @@ pub trait Service: ServiceDispatcher + std::fmt::Debug {
     fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         vec![]
     }
+
+    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
     // TODO: add other hooks such as "on node startup", etc.
 }
 

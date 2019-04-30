@@ -42,7 +42,9 @@ use std::{
 };
 
 use crate::api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
+    backends::actix::{
+        AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
+    },
     ApiAccess, ApiAggregator,
 };
 use crate::blockchain::{
@@ -138,6 +140,8 @@ pub struct NodeHandler {
     config_manager: Option<ConfigManager>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
+    /// Actix web API runtime.
+    api_runtime: SystemRuntime,
 }
 
 /// Service configuration.
@@ -442,6 +446,7 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
         config_file_path: Option<String>,
+        api_runtime_config: SystemRuntimeConfig,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -494,6 +499,9 @@ impl NodeHandler {
             None => None,
         };
 
+        let api_runtime =
+            SystemRuntime::new(api_runtime_config).expect("Failed to start api_runtime.");
+
         Self {
             blockchain,
             api_state,
@@ -505,6 +513,7 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
+            api_runtime,
         }
     }
 
@@ -906,6 +915,7 @@ impl Node {
             node_cfg.service_public_key,
             node_cfg.service_secret_key.clone(),
             ApiSender::new(channel.api_requests.0.clone()),
+            channel.internal_requests.0.clone(),
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
@@ -930,6 +940,42 @@ impl Node {
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
+
+        let api_cfg = node_cfg.api.clone();
+        let actix_runtime_config = SystemRuntimeConfig {
+            api_runtimes: {
+                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
+                    let app_config = move |app: App| -> App {
+                        let cors = Cors::from(allow_origin.clone());
+                        app.middleware(cors)
+                    };
+                    Arc::new(app_config)
+                };
+
+                let public_api_handler = api_cfg
+                    .public_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Public,
+                        app_config: api_cfg.public_allow_origin.clone().map(into_app_config),
+                    })
+                    .into_iter();
+                let private_api_handler = api_cfg
+                    .private_api_address
+                    .map(|listen_address| ApiRuntimeConfig {
+                        listen_address,
+                        access: ApiAccess::Private,
+                        app_config: api_cfg.private_allow_origin.clone().map(into_app_config),
+                    })
+                    .into_iter();
+                // Collects API handlers.
+                public_api_handler
+                    .chain(private_api_handler)
+                    .collect::<Vec<_>>()
+            },
+            api_aggregator: ApiAggregator::new(blockchain.clone(), api_state.clone()),
+        };
+
         let handler = NodeHandler::new(
             blockchain,
             &node_cfg.external_address,
@@ -938,9 +984,10 @@ impl Node {
             config,
             api_state,
             config_file_path,
+            actix_runtime_config,
         );
         Self {
-            api_options: node_cfg.api,
+            api_options: api_cfg,
             handler,
             channel,
             network_config,
@@ -990,54 +1037,6 @@ impl Node {
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
-        // Runs actix-web api.
-        let actix_api_runtime = SystemRuntimeConfig {
-            api_runtimes: {
-                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
-                    let app_config = move |app: App| -> App {
-                        let cors = Cors::from(allow_origin.clone());
-                        app.middleware(cors)
-                    };
-                    Arc::new(app_config)
-                };
-
-                let public_api_handler = self
-                    .api_options
-                    .public_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
-                        listen_address,
-                        access: ApiAccess::Public,
-                        app_config: self
-                            .api_options
-                            .public_allow_origin
-                            .clone()
-                            .map(into_app_config),
-                    })
-                    .into_iter();
-                let private_api_handler = self
-                    .api_options
-                    .private_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
-                        listen_address,
-                        access: ApiAccess::Private,
-                        app_config: self
-                            .api_options
-                            .private_allow_origin
-                            .clone()
-                            .map(into_app_config),
-                    })
-                    .into_iter();
-                // Collects API handlers.
-                public_api_handler
-                    .chain(private_api_handler)
-                    .collect::<Vec<_>>()
-            },
-            api_aggregator: ApiAggregator::new(
-                self.handler.blockchain.clone(),
-                self.handler.api_state.clone(),
-            ),
-        }
-        .start()?;
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
@@ -1048,9 +1047,6 @@ impl Node {
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-
-        // Stops actix web runtime.
-        actix_api_runtime.stop()?;
 
         info!("Exonum node stopped");
         Ok(())

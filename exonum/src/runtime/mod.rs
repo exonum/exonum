@@ -28,6 +28,7 @@ pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
 
+use crate::api::ServiceApiBuilder;
 use error::{DeployError, ExecutionError, InitError};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -103,6 +104,8 @@ pub trait RuntimeEnvironment {
     fn after_commit(&self, fork: &mut Fork);
 
     fn genesis_init(&self, ctx: &mut Fork) -> Result<(), failure::Error>;
+
+    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)>;
 }
 
 #[derive(Debug)]

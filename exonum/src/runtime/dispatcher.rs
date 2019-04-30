@@ -19,16 +19,20 @@ use super::{
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
     ServiceInstanceId,
 };
+use crate::api::ServiceApiBuilder;
+use crate::events::InternalRequest;
 use crate::{
     crypto::Hash,
     messages::CallInfo,
     storage::{Fork, Snapshot},
 };
+use futures::{future::Future, sink::Sink, sync::mpsc};
 
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
     // TODO Is RefCell enough here?
     runtime_lookup: HashMap<ServiceInstanceId, u32>,
+    inner_requests_tx: mpsc::Sender<InternalRequest>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -38,19 +42,22 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new() -> Pin<Box<Self>> {
+    pub fn new(request_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
         Pin::new(Box::new(Self {
             runtimes: Default::default(),
             runtime_lookup: Default::default(),
+            inner_requests_tx: request_tx,
         }))
     }
 
     pub fn new_with_runtimes(
         runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+        request_tx: mpsc::Sender<InternalRequest>,
     ) -> Pin<Box<Self>> {
         Pin::new(Box::new(Self {
             runtimes,
             runtime_lookup: Default::default(),
+            inner_requests_tx: request_tx,
         }))
     }
 
@@ -95,6 +102,14 @@ impl RuntimeEnvironment for Dispatcher {
             if result.is_ok() {
                 self.notify_service_started(init.instance_id.clone(), artifact);
             }
+
+            let _ = self
+                .inner_requests_tx
+                .clone()
+                .send(InternalRequest::RestartApi)
+                .wait()
+                .map_err(|e| error!("Failed to request API restart: {}", e));
+
             result
         } else {
             Err(InitError::WrongRuntime)
@@ -151,6 +166,15 @@ impl RuntimeEnvironment for Dispatcher {
             .iter()
             .map(|(_, v)| v.genesis_init(fork))
             .collect()
+    }
+
+    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+        self.runtimes
+            .iter()
+            .fold(Vec::new(), |mut api, (_, runtime)| {
+                api.append(&mut runtime.get_services_api());
+                api
+            })
     }
 }
 
