@@ -40,7 +40,7 @@ use self::service::{Service, ServiceFactory};
 use crate::api::ServiceApiBuilder;
 use crate::runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID};
 use crate::runtime::dispatcher::Dispatcher;
-use protobuf::well_known_types::Any as PbAny;
+use protobuf::well_known_types::Any;
 
 #[derive(Debug)]
 pub struct RustRuntime {
@@ -138,8 +138,8 @@ impl RustArtifactSpec {
         }
     }
 
-    pub fn into_pb_any(&self) -> PbAny {
-        let mut any = PbAny::new();
+    pub fn into_pb_any(&self) -> Any {
+        let mut any = Any::new();
         any.set_value(self.encode().unwrap());
         any
     }

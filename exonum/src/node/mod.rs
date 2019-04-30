@@ -315,7 +315,6 @@ impl NodeConfig<PathBuf> {
             database: self.database,
             connect_list: self.connect_list,
             thread_pool_size: self.thread_pool_size,
-            //            configuration_service_majority_count: self.configuration_service_majority_count,
         }
     }
 }

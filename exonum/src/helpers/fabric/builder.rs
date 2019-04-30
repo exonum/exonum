@@ -100,15 +100,7 @@ impl NodeBuilder {
     pub fn run(self) {
         // This should be moved into `commands` method, but services list can be obtained only here.
         {
-            // TODO Info command
-            //            let services: Vec<_> = self
-            //                .service_factories
-            //                .iter()
-            //                .map(|f| f.service_name().to_owned())
-            //                .collect();
-            //            let info: Box<dyn Command> = Box::new(Info::new(services));
-            //            self.commands
-            //                .insert(info.name(), CollectedCommand::new(info));
+            // TODO Implement info command. (used to show services info from command line).
         }
 
         let old_hook = panic::take_hook();

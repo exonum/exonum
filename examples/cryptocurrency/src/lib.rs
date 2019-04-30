@@ -165,51 +165,6 @@ pub mod transactions {
         /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
         pub seed: u64,
     }
-
-    //    /// Transaction group.
-    //    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    //    pub enum CurrencyTransactions {
-    //        /// Create wallet transaction.
-    //        CreateWallet(TxCreateWallet),
-    //        /// Transfer tokens transaction.
-    //        Transfer(TxTransfer),
-    //    }
-    //
-    //    impl TxCreateWallet {
-    //        #[doc(hidden)]
-    //        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<AnyTx> {
-    //            Message::sign_transaction(
-    //                Self {
-    //                    name: name.to_owned(),
-    //                },
-    //                SERVICE_ID,
-    //                *pk,
-    //                sk,
-    //            )
-    //        }
-    //    }
-    //
-    //    impl TxTransfer {
-    //        #[doc(hidden)]
-    //        pub fn sign(
-    //            to: &PublicKey,
-    //            amount: u64,
-    //            seed: u64,
-    //            pk: &PublicKey,
-    //            sk: &SecretKey,
-    //        ) -> Signed<AnyTx> {
-    //            Message::sign_transaction(
-    //                Self {
-    //                    to: *to,
-    //                    amount,
-    //                    seed,
-    //                },
-    //                SERVICE_ID,
-    //                *pk,
-    //                sk,
-    //            )
-    //        }
-    //    }
 }
 
 /// Contract errors.

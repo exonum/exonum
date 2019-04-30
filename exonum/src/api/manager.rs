@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module responsible for actix web API restart after new service is deployed.
+//! Module responsible for actix web API management after new service is deployed.
 
 use crate::api::backends::actix::{create_app, ApiRuntimeConfig};
 use actix::prelude::*;
@@ -25,7 +25,7 @@ use crate::api::ApiAggregator;
 use futures::Future;
 use std::collections::HashMap;
 
-/// Actor responsible for API restart.
+/// Actor responsible for API management.
 pub struct ApiManager {
     runtime_config: SystemRuntimeConfig,
     api_runtime_addresses: HashMap<Addr<Server>, ApiRuntimeConfig>,
