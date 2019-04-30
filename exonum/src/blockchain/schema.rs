@@ -137,7 +137,7 @@ where
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
-    pub fn transactions(&self) -> MapIndex<&T, Hash, Signed<AnyTx>> {
+    pub fn transactions(&self) -> MapIndex<T, Hash, Signed<AnyTx>> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 

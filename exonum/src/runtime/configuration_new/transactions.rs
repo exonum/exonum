@@ -23,7 +23,7 @@ use crate::{
     proto,
     runtime::ArtifactSpec,
 };
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot, ObjectHash};
 
 use super::{
     config::ConfigurationServiceConfig,
@@ -175,7 +175,7 @@ impl Propose {
             StoredConfiguration::try_deserialize(self.cfg.as_bytes()).map_err(InvalidConfig)?;
         self.check_config_candidate(&config_candidate, snapshot)?;
 
-        let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into());
+        let cfg = StoredConfiguration::from_bytes(self.cfg.as_bytes().into()).expect("Can't deserialize stored configuration");
         let cfg_hash = CryptoHash::hash(&cfg);
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             return Err(AlreadyProposed(old_propose));
@@ -222,8 +222,8 @@ impl Propose {
     }
 
     /// Saves this proposal to the service schema.
-    pub fn save(&self, fork: &mut Fork, cfg: &StoredConfiguration, cfg_hash: Hash) {
-        let prev_cfg = CoreSchema::new(fork.as_ref())
+    pub fn save(&self, fork: &Fork, cfg: &StoredConfiguration, cfg_hash: Hash) {
+        let prev_cfg = CoreSchema::new(fork)
             .configs()
             .get(&cfg.previous_cfg_hash)
             .unwrap();
@@ -234,7 +234,7 @@ impl Propose {
         let mut schema = Schema::new(fork);
 
         let propose_data = {
-            let mut votes_table = schema.votes_by_config_hash_mut(&cfg_hash);
+            let mut votes_table = schema.votes_by_config_hash(&cfg_hash);
             debug_assert!(votes_table.is_empty());
 
             let num_validators = prev_cfg.validator_keys.len();
@@ -244,18 +244,18 @@ impl Propose {
 
             ProposeData::new(
                 self.clone(),
-                &votes_table.merkle_root(),
+                &votes_table.object_hash(),
                 num_validators as u64,
             )
         };
 
         {
-            let mut propose_data_table = schema.propose_data_by_config_hash_mut();
+            let mut propose_data_table = schema.propose_data_by_config_hash();
             debug_assert!(propose_data_table.get(&cfg_hash).is_none());
             propose_data_table.put(&cfg_hash, propose_data);
         }
 
-        schema.config_hash_by_ordinal_mut().push(cfg_hash);
+        schema.config_hash_by_ordinal().push(cfg_hash);
     }
 }
 
@@ -313,18 +313,18 @@ impl VotingContext {
         Ok(parsed)
     }
 
-    pub fn save(&self, fork: &mut Fork) {
+    pub fn save(&self, fork: &Fork) {
         use exonum_merkledb::BinaryValue;
 
         let cfg_hash = &self.cfg_hash;
-        let propose_data: ProposeData = Schema::new(fork.as_ref())
+        let propose_data: ProposeData = Schema::new(fork)
             .propose_data_by_config_hash()
             .get(&self.cfg_hash)
             .unwrap();
 
         let propose = propose_data.tx_propose.clone();
         let prev_cfg_hash =
-            StoredConfiguration::from_bytes(propose.cfg.as_bytes().into()).previous_cfg_hash;
+            StoredConfiguration::from_bytes(propose.cfg.as_bytes().into()).expect("Wrong stored configuration").previous_cfg_hash;
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
             .get(&prev_cfg_hash)
@@ -341,17 +341,17 @@ impl VotingContext {
         let mut schema = Schema::new(fork);
 
         let propose_data = {
-            let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
+            let mut votes = schema.votes_by_config_hash(cfg_hash);
             votes.set(validator_id as u64, self.decision.into());
             ProposeData::new(
                 propose_data.tx_propose,
-                &votes.merkle_root(),
+                &votes.object_hash(),
                 propose_data.num_validators,
             )
         };
 
         schema
-            .propose_data_by_config_hash_mut()
+            .propose_data_by_config_hash()
             .put(cfg_hash, propose_data);
     }
 }

@@ -108,18 +108,20 @@ impl SystemApi {
         name: &'static str,
         api_scope: &mut ServiceApiScope,
     ) -> Self {
-        api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-            let blockchain = state.blockchain();
-            let services = blockchain
-                .service_map()
-                .iter()
-                .map(|(&id, service)| ServiceInfo {
-                    name: service.service_name().to_string(),
-                    id,
-                })
-                .collect::<Vec<_>>();
-            Ok(ServicesResponse { services })
-        });
+        // TODO rewrite this method with new API.
+
+        // api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
+        //     let blockchain = state.blockchain();
+        //     let services = blockchain
+        //         .service_map()
+        //         .iter()
+        //         .map(|(&id, service)| ServiceInfo {
+        //             name: service.service_name().to_string(),
+        //             id,
+        //         })
+        //         .collect::<Vec<_>>();
+        //     Ok(ServicesResponse { services })
+        // });
         self
     }
 

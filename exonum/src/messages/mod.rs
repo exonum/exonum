@@ -40,7 +40,7 @@ use serde::{
 
 use std::{borrow::Cow, fmt, ops::Deref};
 
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
+use crate::crypto::{CryptoHash, Hash, PublicKey, Signature};
 
 pub(crate) use self::helpers::HexStringRepresentation;
 pub use self::{
@@ -142,7 +142,7 @@ impl<T> Signed<T> {
 
     /// Returns a signature of the message.
     pub fn signature(&self) -> Signature {
-        self.message.signature()
+        self.message.signature().clone()
     }
 }
 
@@ -194,7 +194,7 @@ impl<T> Deref for Signed<T> {
 
 impl<T: ProtocolMessage> BinaryValue for Signed<T> {
     fn to_bytes(&self) -> Vec<u8> {
-        self.message.raw.clone()
+        self.message.exonum_message().to_vec()
     }
 
     fn into_bytes(self) -> Vec<u8> {
@@ -202,7 +202,7 @@ impl<T: ProtocolMessage> BinaryValue for Signed<T> {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let message = SignedMessage::from_bytes(value);
+        let message = SignedMessage::from_bytes(value)?;
         let msg = Message::deserialize(message).unwrap();
         Ok(T::try_from(msg).unwrap())
     }

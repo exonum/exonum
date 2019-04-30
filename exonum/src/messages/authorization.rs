@@ -104,14 +104,14 @@ impl BinaryForm for SignedMessage {
 }
 
 impl BinaryValue for SignedMessage {
-    fn into_bytes(self) -> Vec<u8> {
+    fn to_bytes(&self) -> Vec<u8> {
         self.encode().unwrap()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-        pb.merge_from_bytes(&value).unwrap();
-        Self::from_pb_no_verify(pb).unwrap()
+        pb.merge_from_bytes(&value)?;
+        Self::from_pb_no_verify(pb)
     }
 }
 

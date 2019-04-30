@@ -32,15 +32,15 @@ use crate::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
         SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
     },
-    crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    crypto::{gen_keypair, gen_keypair_from_seed, Hash, CryptoHash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
+        BlockRequest, BlockResponse, BinaryForm, Connect, Message, PeersRequest, Precommit, Prevote,
+        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, AnyTx, Signed,
         SignedMessage, Status, TransactionsRequest, TransactionsResponse,
     },
     node::{
@@ -134,7 +134,7 @@ impl SandboxInner {
                     InternalRequest::Shutdown => unimplemented!(),
                     InternalRequest::VerifyMessage(message) => {
                         let protocol =
-                            Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
+                            Message::deserialize(SignedMessage::decode(&message).unwrap())
                                 .unwrap();
                         self.handler.handle_event(
                             InternalEvent::MessageVerified(Box::new(protocol)).into(),
@@ -253,7 +253,7 @@ impl Sandbox {
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(Signed::serialize).collect(),
+                precommits.into_iter().map(|p| p.signed_message().encode().unwrap()).collect(),
                 tx_hashes,
             ),
             *public_key,
@@ -408,10 +408,10 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Signed<TransactionsResponse>
     where
-        I: IntoIterator<Item = Signed<RawTransaction>>,
+        I: IntoIterator<Item = Signed<AnyTx>>,
     {
         Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(Signed::serialize).collect()),
+            TransactionsResponse::new(to, txs.into_iter().map(|p| p.signed_message().encode().unwrap()).collect()),
             *author,
             secret_key,
         )
@@ -462,7 +462,7 @@ impl Sandbox {
 
     pub fn recv<T: ProtocolMessage>(&self, msg: &Signed<T>) {
         self.check_unexpected_message();
-        let event = NetworkEvent::MessageReceived(msg.clone().serialize());
+        let event = NetworkEvent::MessageReceived(msg.clone().encode().unwrap());
         self.inner.borrow_mut().handle_event(event);
     }
 
@@ -627,9 +627,9 @@ impl Sandbox {
         *self.last_block().state_hash()
     }
 
-    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<RawTransaction>>
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<AnyTx>>
     where
-        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+        I: IntoIterator<Item = &'a Signed<AnyTx>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain_ref().snapshot();
@@ -654,7 +654,7 @@ impl Sandbox {
     /// Extracts state_hash from the fake block.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
-        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+        I: IntoIterator<Item = &'a Signed<AnyTx>>,
     {
         let height = self.current_height();
         let mut blockchain = self.blockchain_mut();
@@ -1163,7 +1163,7 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 
 pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
 where
-    I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+    I: IntoIterator<Item = &'a Signed<AnyTx>>,
 {
     let txs = txs.into_iter().map(Signed::hash).collect::<Vec<Hash>>();
     HashTag::hash_list(&txs)
@@ -1174,7 +1174,7 @@ mod tests {
     use super::*;
     use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
     use crate::crypto::{gen_keypair_from_seed, Seed};
-    use crate::messages::RawTransaction;
+    use crate::messages::AnyTx;
     use crate::proto::schema::tests::TxAfterCommit;
     use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use exonum_merkledb::Snapshot;
@@ -1188,7 +1188,7 @@ mod tests {
     }
 
     impl TxAfterCommit {
-        pub fn new_with_height(height: Height) -> Signed<RawTransaction> {
+        pub fn new_with_height(height: Height) -> Signed<AnyTx> {
             let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
             let mut payload_tx = TxAfterCommit::new();
             payload_tx.set_height(height.0);
@@ -1217,7 +1217,7 @@ mod tests {
             Vec::new()
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
+        fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
             let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }

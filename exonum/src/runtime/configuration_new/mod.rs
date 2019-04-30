@@ -27,7 +27,7 @@ use crate::{
         DeployStatus, InstanceInitData, RuntimeEnvironment,
     },
 };
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot, IndexAccess};
 use protobuf::well_known_types::Any;
 
 mod config;
@@ -84,9 +84,9 @@ pub struct ConfigurationServiceImpl {
 }
 
 impl ConfigurationServiceImpl {
-    fn assign_service_id(&self, fork: &mut Fork, instance_name: &String) -> Option<u32> {
+    fn assign_service_id(&self, fork: &Fork, instance_name: &String) -> Option<u32> {
         let mut schema = ConfigurationSchema::new(fork);
-        let mut service_ids = schema.service_ids_mut();
+        let mut service_ids = schema.service_ids();
 
         if service_ids.contains(instance_name) {
             return None;
@@ -109,12 +109,12 @@ impl ConfigurationServiceImpl {
 impl ConfigurationService for ConfigurationServiceImpl {
     fn propose(
         &self,
-        mut ctx: TransactionContext,
+        ctx: TransactionContext,
         tx: transactions::Propose,
     ) -> Result<(), ExecutionError> {
         let author = ctx.author();
         let fork = ctx.fork();
-        let (cfg, cfg_hash) = tx.precheck(fork.as_ref(), author).map_err(|err| {
+        let (cfg, cfg_hash) = tx.precheck(fork.snapshot(), author).map_err(|err| {
             error!("Discarding propose {:?}: {}", self, err);
             err
         })?;
@@ -126,7 +126,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
     fn vote(
         &self,
-        mut ctx: TransactionContext,
+        ctx: TransactionContext,
         tx: transactions::Vote,
     ) -> Result<(), ExecutionError> {
         let author = ctx.author();
@@ -135,7 +135,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         let decision = VotingDecision::Yea(tx_hash);
 
         let vote = VotingContext::new(decision, author, tx.cfg_hash);
-        let parsed_config = vote.precheck(fork.as_ref()).map_err(|err| {
+        let parsed_config = vote.precheck(fork.snapshot()).map_err(|err| {
             error!("Discarding vote {:?}: {}", tx, err);
             err
         })?;
@@ -146,7 +146,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
             tx
         );
 
-        if enough_votes_to_commit(fork.as_ref(), &tx.cfg_hash) {
+        if enough_votes_to_commit(fork.snapshot(), &tx.cfg_hash) {
             CoreSchema::new(fork).commit_configuration(parsed_config);
         }
         Ok(())
@@ -154,7 +154,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
 
     fn vote_against(
         &self,
-        mut ctx: TransactionContext,
+        ctx: TransactionContext,
         tx: transactions::VoteAgainst,
     ) -> Result<(), ExecutionError> {
         let author = ctx.author();
@@ -163,7 +163,7 @@ impl ConfigurationService for ConfigurationServiceImpl {
         let decision = VotingDecision::Nay(tx_hash);
 
         let vote_against = VotingContext::new(decision, author, tx.cfg_hash);
-        vote_against.precheck(fork.as_ref()).map_err(|err| {
+        vote_against.precheck(fork.snapshot()).map_err(|err| {
             error!("Discarding vote against {:?}: {}", tx, err);
             err
         })?;
@@ -291,7 +291,7 @@ impl Service for ConfigurationServiceImpl {
         if arg.is_custom_majority_count {
             let fork = ctx.fork();
             // Assuming that Service::initialize is called after genesis block is created.
-            let actual_config = CoreSchema::new(&fork).actual_configuration();
+            let actual_config = CoreSchema::new(fork).actual_configuration();
             let validators_count = actual_config.validator_keys.len();
             let majority_count = arg.majority_count as u16;
 

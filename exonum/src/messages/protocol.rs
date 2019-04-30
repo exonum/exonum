@@ -1138,7 +1138,7 @@ impl BinaryValue for Message {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let message = SignedMessage::from_bytes(value);
+        let message = SignedMessage::from_bytes(value)?;
         // TODO: Remove additional deserialization. [ECR-2315]
         Message::deserialize(message)
     }
