@@ -59,10 +59,7 @@ impl Maintenance {
         let config = Self::node_config(context);
         let db = Self::database(context, &config.database);
         let fork = db.fork();
-        {
-            let schema = Schema::new(&fork);
-            schema.consensus_messages_cache_mut().clear();
-        }
+        Schema::new(&fork).consensus_messages_cache().clear();
         db.merge_sync(fork.into_patch()).expect("Can't clear cache");
 
         info!("Cache cleared successfully");

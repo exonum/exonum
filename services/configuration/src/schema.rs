@@ -202,7 +202,7 @@ impl_object_hash_for_binary_value! { MaybeVote }
 /// Database schema used by the configuration service.
 #[derive(Debug)]
 pub struct Schema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T> Schema<T>
@@ -210,8 +210,8 @@ where
     T: IndexAccess,
 {
     /// Creates a new schema.
-    pub fn new(snapshot: T) -> Schema<T> {
-        Schema { view: snapshot }
+    pub fn new(access: T) -> Schema<T> {
+        Schema { access }
     }
 
     /// Returns propose information indexed by the hash of the configuration corresponding
@@ -220,18 +220,18 @@ where
     /// Consult [the crate-level docs](index.html) for details how hashes of the configuration
     /// are calculated.
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<T, Hash, ProposeData> {
-        ProofMapIndex::new(PROPOSES, self.view)
+        ProofMapIndex::new(PROPOSES, self.access.clone())
     }
 
     /// Returns a table of hashes of proposed configurations in the commit order.
     pub fn config_hash_by_ordinal(&self) -> ProofListIndex<T, Hash> {
-        ProofListIndex::new(PROPOSE_HASHES, self.view)
+        ProofListIndex::new(PROPOSE_HASHES, self.access.clone())
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<T, MaybeVote> {
-        ProofListIndex::new_in_family(VOTES, config_hash, self.view)
+        ProofListIndex::new_in_family(VOTES, config_hash, self.access.clone())
     }
 
     /// Returns a `Propose` transaction with a particular configuration hash.

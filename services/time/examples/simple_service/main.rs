@@ -45,18 +45,18 @@ const SERVICE_NAME: &str = "marker";
 /// Marker service database schema.
 #[derive(Debug)]
 pub struct MarkerSchema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T: IndexAccess> MarkerSchema<T> {
     /// Constructs schema for the given `snapshot`.
-    pub fn new(view: T) -> Self {
-        MarkerSchema { view }
+    pub fn new(access: T) -> Self {
+        MarkerSchema { access }
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
     pub fn marks(&self) -> ProofMapIndex<T, PublicKey, i32> {
-        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view)
+        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.access.clone())
     }
 
     /// Returns hashes for stored table.

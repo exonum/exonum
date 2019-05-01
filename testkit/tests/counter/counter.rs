@@ -45,7 +45,7 @@ impl<T: IndexAccess> CounterSchema<T> {
     }
 
     fn entry(&self) -> Entry<T, u64> {
-        Entry::new("counter.count", self.view)
+        Entry::new("counter.count", self.view.clone())
     }
 
     pub fn count(&self) -> Option<u64> {

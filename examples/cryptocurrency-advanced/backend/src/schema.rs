@@ -23,12 +23,12 @@ use crate::{wallet::Wallet, INITIAL_BALANCE};
 /// Database schema for the cryptocurrency.
 #[derive(Debug)]
 pub struct Schema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T> AsMut<T> for Schema<T> {
     fn as_mut(&mut self) -> &mut T {
-        &mut self.view
+        &mut self.access
     }
 }
 
@@ -37,18 +37,22 @@ where
     T: IndexAccess,
 {
     /// Creates a new schema from the database view.
-    pub fn new(view: T) -> Self {
-        Schema { view }
+    pub fn new(access: T) -> Self {
+        Schema { access }
     }
 
     /// Returns `ProofMapIndex` with wallets.
     pub fn wallets(&self) -> ProofMapIndex<T, PublicKey, Wallet> {
-        ProofMapIndex::new("cryptocurrency.wallets", self.view)
+        ProofMapIndex::new("cryptocurrency.wallets", self.access.clone())
     }
 
     /// Returns history of the wallet with the given public key.
     pub fn wallet_history(&self, public_key: &PublicKey) -> ProofListIndex<T, Hash> {
-        ProofListIndex::new_in_family("cryptocurrency.wallet_history", public_key, self.view)
+        ProofListIndex::new_in_family(
+            "cryptocurrency.wallet_history",
+            public_key,
+            self.access.clone(),
+        )
     }
 
     /// Returns wallet for the given public key.

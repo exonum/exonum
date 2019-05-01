@@ -86,7 +86,7 @@ impl<T: IndexAccess> CurrencySchema<T> {
 
     /// Returns an immutable version of the wallets table.
     pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-        MapIndex::new("cryptocurrency.wallets", self.view)
+        MapIndex::new("cryptocurrency.wallets", self.view.clone())
     }
 
     /// Gets a specific wallet from the storage.
