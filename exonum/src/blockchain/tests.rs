@@ -376,24 +376,30 @@ mod memorydb_tests {
     fn create_blockchain() -> Blockchain {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
+        let internal_sender = mpsc::channel(1).0;
         Blockchain::new(
             MemoryDB::new(),
-            vec![Box::new(super::TestService) as Box<dyn Service>],
+            //            vec![Box::new(super::TestService) as Box<dyn Service>],  // TODO: use new service API.
+            Vec::new(),
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            internal_sender,
         )
     }
 
     fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
+        let internal_sender = mpsc::channel(1).0;
         Blockchain::new(
             MemoryDB::new(),
-            vec![service],
+            //            vec![service],  // TODO: use new service API.
+            Vec::new(),
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            internal_sender,
         )
     }
 
@@ -455,12 +461,15 @@ mod rocksdb_tests {
         let db = create_database(path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
+        let internal_sender = mpsc::channel(1).0;
         Blockchain::new(
             db,
-            vec![Box::new(super::TestService) as Box<dyn Service>],
+            //            vec![Box::new(super::TestService) as Box<dyn Service>],
+            Vec::new(), // TODO: use new service API.
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            internal_sender,
         )
     }
 
@@ -468,12 +477,15 @@ mod rocksdb_tests {
         let db = create_database(path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
+        let internal_sender = mpsc::channel(1).0;
         Blockchain::new(
             db,
-            vec![service],
+            //            vec![service],
+            Vec::new(), // TODO: use new service API.
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            internal_sender,
         )
     }
 

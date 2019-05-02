@@ -12,50 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin};
 
 use super::{
     error::{DeployError, ExecutionError, InitError, WRONG_RUNTIME},
     ArtifactSpec, DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment,
-    RuntimeIdentifier, ServiceInstanceId,
+    ServiceInstanceId,
 };
-use crate::crypto::Hash;
-use crate::messages::CallInfo;
-use crate::storage::{Fork, Snapshot};
+use crate::api::ServiceApiBuilder;
+use crate::events::InternalRequest;
+use crate::{
+    crypto::Hash,
+    messages::CallInfo,
+    storage::{Fork, Snapshot},
+};
+use futures::{future::Future, sink::Sink, sync::mpsc};
 
-#[derive(Default)]
-pub struct DispatcherBuilder {
-    runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
-}
-
-impl std::fmt::Debug for DispatcherBuilder {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "DispatcherBuilder entity")
-    }
-}
-
-impl DispatcherBuilder {
-    pub fn with_runtime(
-        mut self,
-        runtime_id: u32,
-        runtime: Box<dyn RuntimeEnvironment + Send>,
-    ) -> Self {
-        self.runtimes.insert(runtime_id, runtime);
-
-        self
-    }
-
-    pub fn finalize(self) -> Dispatcher {
-        Dispatcher::new(self.runtimes)
-    }
-}
-
-#[derive(Default)]
 pub struct Dispatcher {
     runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
     // TODO Is RefCell enough here?
-    runtime_lookup: RefCell<HashMap<ServiceInstanceId, u32>>,
+    runtime_lookup: HashMap<ServiceInstanceId, u32>,
+    inner_requests_tx: mpsc::Sender<InternalRequest>,
 }
 
 impl std::fmt::Debug for Dispatcher {
@@ -65,23 +42,37 @@ impl std::fmt::Debug for Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>) -> Self {
-        Self {
-            runtimes,
-            runtime_lookup: RefCell::new(Default::default()),
-        }
+    pub fn new(request_tx: mpsc::Sender<InternalRequest>) -> Pin<Box<Self>> {
+        Pin::new(Box::new(Self {
+            runtimes: Default::default(),
+            runtime_lookup: Default::default(),
+            inner_requests_tx: request_tx,
+        }))
     }
 
-    fn notify_service_started(&self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
-        self.runtime_lookup
-            .borrow_mut()
-            .insert(service_id, artifact.runtime_id);
+    pub fn new_with_runtimes(
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+        request_tx: mpsc::Sender<InternalRequest>,
+    ) -> Pin<Box<Self>> {
+        Pin::new(Box::new(Self {
+            runtimes,
+            runtime_lookup: Default::default(),
+            inner_requests_tx: request_tx,
+        }))
+    }
+
+    pub fn add_runtime(&mut self, id: u32, runtime: Box<dyn RuntimeEnvironment + Send>) {
+        self.runtimes.insert(id, runtime);
+    }
+
+    fn notify_service_started(&mut self, service_id: ServiceInstanceId, artifact: ArtifactSpec) {
+        self.runtime_lookup.insert(service_id, artifact.runtime_id);
     }
 }
 
 impl RuntimeEnvironment for Dispatcher {
-    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
-        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
+    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             runtime.start_deploy(artifact)
         } else {
             Err(DeployError::WrongRuntime)
@@ -101,16 +92,24 @@ impl RuntimeEnvironment for Dispatcher {
     }
 
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
     ) -> Result<(), InitError> {
-        if let Some(runtime) = self.runtimes.get(&artifact.runtime_id) {
+        if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             let result = runtime.init_service(ctx, artifact.clone(), init);
             if result.is_ok() {
                 self.notify_service_started(init.instance_id.clone(), artifact);
             }
+
+            let _ = self
+                .inner_requests_tx
+                .clone()
+                .send(InternalRequest::RestartApi)
+                .wait()
+                .map_err(|e| error!("Failed to request API restart: {}", e));
+
             result
         } else {
             Err(InitError::WrongRuntime)
@@ -123,8 +122,7 @@ impl RuntimeEnvironment for Dispatcher {
         call_info: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let lookup = self.runtime_lookup.borrow();
-        let runtime_id = lookup.get(&call_info.instance_id);
+        let runtime_id = self.runtime_lookup.get(&call_info.instance_id);
 
         if runtime_id.is_none() {
             return Err(ExecutionError::with_description(
@@ -162,13 +160,58 @@ impl RuntimeEnvironment for Dispatcher {
             runtime.before_commit(fork);
         }
     }
+
+    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
+        self.runtimes
+            .iter()
+            .map(|(_, v)| v.genesis_init(fork))
+            .collect()
+    }
+
+    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+        self.runtimes
+            .iter()
+            .fold(Vec::new(), |mut api, (_, runtime)| {
+                api.append(&mut runtime.get_services_api());
+                api
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::messages::{MethodId, ServiceInstanceId};
+    use crate::runtime::RuntimeIdentifier;
     use crate::storage::{Database, MemoryDB};
+
+    #[derive(Default)]
+    pub struct DispatcherBuilder {
+        runtimes: HashMap<u32, Box<dyn RuntimeEnvironment + Send>>,
+    }
+
+    impl std::fmt::Debug for DispatcherBuilder {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.debug_struct("DispatcherBuilder").finish()
+        }
+    }
+
+    impl DispatcherBuilder {
+        pub fn with_runtime(
+            mut self,
+            runtime_id: u32,
+            runtime: Box<dyn RuntimeEnvironment + Send>,
+        ) -> Self {
+            self.runtimes.insert(runtime_id, runtime);
+
+            self
+        }
+
+        pub fn finalize(self) -> Pin<Box<Dispatcher>> {
+            let request_tx = mpsc::channel(0).0;
+            Dispatcher::new_with_runtimes(self.runtimes, request_tx)
+        }
+    }
 
     struct SampleRuntime {
         pub runtime_type: u32,
@@ -187,7 +230,7 @@ mod tests {
     }
 
     impl RuntimeEnvironment for SampleRuntime {
-        fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+        fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
             if artifact.runtime_id == self.runtime_type {
                 Ok(())
             } else {
@@ -208,7 +251,7 @@ mod tests {
         }
 
         fn init_service(
-            &self,
+            &mut self,
             _: &mut RuntimeContext,
             artifact: ArtifactSpec,
             _: &InstanceInitData,
@@ -284,7 +327,7 @@ mod tests {
             JAVA_METHOD_ID,
         ));
 
-        let dispatcher = DispatcherBuilder::default()
+        let mut dispatcher = DispatcherBuilder::default()
             .with_runtime(runtime_a.runtime_type, runtime_a)
             .with_runtime(runtime_b.runtime_type, runtime_b)
             .finalize();
@@ -384,7 +427,7 @@ mod tests {
         // Create dispatcher and test data.
         let db = MemoryDB::new();
 
-        let dispatcher = DispatcherBuilder::default().finalize();
+        let mut dispatcher = DispatcherBuilder::default().finalize();
 
         let sample_rust_spec = ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,

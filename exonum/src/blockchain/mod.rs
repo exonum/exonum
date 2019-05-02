@@ -30,7 +30,6 @@
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
-
 pub use self::{
     block::{Block, BlockProof},
     config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
@@ -46,21 +45,27 @@ pub use self::{
 pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
+use futures::sync::mpsc;
+use protobuf::well_known_types::Any;
 
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, iter, mem, panic,
+    pin::Pin,
     sync::{Arc, Mutex},
 };
 
 use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crate::events::InternalRequest;
 use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed};
+use crate::messages::{AnyTx, BinaryForm, Connect, Message, Precommit, ProtocolMessage, Signed};
 use crate::node::ApiSender;
+use crate::runtime::configuration_new::ConfigurationServiceFactory;
 use crate::runtime::{
-    dispatcher::{Dispatcher, DispatcherBuilder},
-    rust::RustRuntime,
-    RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+    configuration_new::{self as configuration, ConfigurationServiceInit},
+    dispatcher::Dispatcher,
+    rust::{service::ServiceFactory, RustRuntime},
+    InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
 use crate::storage::{self, Database, Error, Fork, Patch, Snapshot};
 
@@ -85,25 +90,29 @@ pub struct Blockchain {
     #[doc(hidden)]
     pub service_keypair: (PublicKey, SecretKey),
     pub(crate) api_sender: ApiSender,
-    dispatcher: Arc<Mutex<Dispatcher>>,
+    pub dispatcher: Arc<Mutex<Pin<Box<Dispatcher>>>>,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
     pub fn new<D: Into<Arc<dyn Database>>>(
         storage: D,
-        services: Vec<Box<dyn Service>>,
+        services: Vec<Box<dyn ServiceFactory>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
+        internal_req_sender: mpsc::Sender<InternalRequest>,
     ) -> Self {
-        // TODO add Configuration service in the runtime.
+        let mut dispatcher = Dispatcher::new(internal_req_sender);
+        let mut rust_runtime = RustRuntime::new(&mut dispatcher);
 
-        let rust_runtime = Box::new(RustRuntime::default());
+        ConfigurationServiceFactory::add_to_rust_runtime(&mut dispatcher, &mut rust_runtime);
 
-        let dispatcher = DispatcherBuilder::default()
-            .with_runtime(RuntimeIdentifier::Rust as u32, rust_runtime)
-            .finalize();
+        for s in services.into_iter() {
+            rust_runtime.add_service(s);
+        }
+
+        dispatcher.add_runtime(RuntimeIdentifier::Rust as u32, Box::new(rust_runtime));
 
         Self {
             db: storage.into(),
@@ -139,7 +148,7 @@ impl Blockchain {
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
-    pub fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
+    pub fn tx_from_raw(&self, _raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
         // TODO do we need this method to be public?
         // It's used for checking in consensus.rs and in explorer/mod.rs
         // self.dispatcher.tx_from_raw(raw)
@@ -218,7 +227,7 @@ impl Blockchain {
 
     /// Creates and commits the genesis block with the given genesis configuration.
     fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
-        let mut config_propose = StoredConfiguration {
+        let config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: Height::zero(),
             validator_keys: cfg.validator_keys,
@@ -228,20 +237,43 @@ impl Blockchain {
 
         let patch = {
             let mut fork = self.fork();
+            let mut ctx = RuntimeContext::new(&mut fork, &PublicKey::zero(), &Hash::zero());
             // Update service tables
 
-            // TODO service init?
-            // for (_, service) in self.dispatcher.services().iter() {
-            //     let cfg = service.initialize(&mut fork);
-            //     let name = service.service_name();
-            //     if config_propose.services.contains_key(name) {
-            //         panic!(
-            //             "Services already contain service with '{}' name, please change it",
-            //             name
-            //         );
-            //     }
-            //     config_propose.services.insert(name.into(), cfg);
-            // }
+            let config_init_data = {
+                let mut config_init = ConfigurationServiceInit::new();
+                if let Some(majority_count) = config_propose
+                    .consensus
+                    .configuration_service_majority_count
+                {
+                    config_init.set_is_custom_majority_count(true);
+                    config_init.set_majority_count(majority_count as u32);
+                }
+                let mut constructor_data = Any::new();
+                constructor_data.set_value(config_init.encode().unwrap());
+                InstanceInitData {
+                    instance_id: configuration::SERVICE_ID,
+                    constructor_data,
+                }
+            };
+
+            {
+                let mut dispatcher = self.dispatcher.lock().expect("dispatcher lock");
+                dispatcher
+                    .start_deploy(configuration::artifact_spec().into())
+                    .expect("Config service deploy");
+                dispatcher
+                    .init_service(
+                        &mut ctx,
+                        configuration::artifact_spec().into(),
+                        &config_init_data,
+                    )
+                    .expect("Config service init");
+
+                dispatcher
+                    .genesis_init(&mut fork)
+                    .expect("Services init error");
+            }
 
             // Commit actual configuration
             {

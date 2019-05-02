@@ -665,12 +665,15 @@ mod tests {
     fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
         let api_channel = mpsc::channel(1);
+        let internal_sender = mpsc::channel(1).0;
         Blockchain::new(
             MemoryDB::new(),
-            vec![Box::new(TxResultService) as Box<dyn Service>],
+            //            vec![Box::new(TxResultService) as Box<dyn Service>],
+            Vec::new(), // TODO: use new service API.
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            internal_sender,
         )
     }
 

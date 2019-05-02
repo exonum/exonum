@@ -15,8 +15,10 @@
 use protobuf::well_known_types::Any;
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{CallInfo, ServiceInstanceId};
+use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
 use crate::storage::{Fork, Snapshot};
+
+use self::rust::RustArtifactSpec;
 
 #[macro_use]
 pub mod rust;
@@ -26,6 +28,7 @@ pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
 
+use crate::api::ServiceApiBuilder;
 use error::{DeployError, ExecutionError, InitError};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -52,11 +55,20 @@ pub struct ArtifactSpec {
     raw_spec: Vec<u8>,
 }
 
+impl From<RustArtifactSpec> for ArtifactSpec {
+    fn from(artifact: RustArtifactSpec) -> Self {
+        ArtifactSpec {
+            runtime_id: RuntimeIdentifier::Rust as u32,
+            raw_spec: artifact.encode().unwrap(),
+        }
+    }
+}
+
 /// Service runtime environment.
 /// It does not assign id to services/interfaces, ids are given to runtime from outside.
 pub trait RuntimeEnvironment {
     /// Start artifact deploy.
-    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError>;
+    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError>;
 
     /// Check deployment status.
     fn check_deploy_status(
@@ -67,7 +79,7 @@ pub trait RuntimeEnvironment {
 
     /// Init artifact with given ID and constructor parameters.
     fn init_service(
-        &self,
+        &mut self,
         ctx: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
@@ -90,6 +102,14 @@ pub trait RuntimeEnvironment {
     // TODO interface should be re-worked
     /// Calls `after_commit` for all the services stored in the runtime.
     fn after_commit(&self, fork: &mut Fork);
+
+    fn genesis_init(&self, _ctx: &mut Fork) -> Result<(), failure::Error> {
+        Ok(())
+    }
+
+    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+        Vec::new()
+    }
 }
 
 #[derive(Debug)]

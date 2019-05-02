@@ -17,7 +17,7 @@ use exonum::{
     node::{Node, NodeApiConfig, NodeConfig},
     storage::MemoryDB,
 };
-use exonum_cryptocurrency::service::CurrencyService;
+use exonum_cryptocurrency::contracts::ServiceFactoryImpl;
 
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
@@ -52,7 +52,6 @@ fn node_config() -> NodeConfig {
         services_configs: Default::default(),
         database: Default::default(),
         thread_pool_size: Default::default(),
-        configuration_service_majority_count: Default::default(),
     }
 }
 
@@ -62,7 +61,7 @@ fn main() {
     println!("Creating in-memory database...");
     let node = Node::new(
         MemoryDB::new(),
-        vec![Box::new(CurrencyService)],
+        vec![Box::new(ServiceFactoryImpl)],
         node_config(),
         None,
     );

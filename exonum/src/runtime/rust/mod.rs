@@ -15,7 +15,6 @@
 use semver::Version;
 
 use std::{
-    cell::RefCell,
     collections::{HashMap, HashSet},
     panic,
 };
@@ -37,12 +36,25 @@ use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
 use crate::storage::{Error as StorageError, Fork, Snapshot};
 
-use self::service::Service;
+use self::service::{Service, ServiceFactory};
+use crate::api::ServiceApiBuilder;
+use crate::runtime::configuration_new::{DEPLOY_METHOD_ID, INIT_METHOD_ID, SERVICE_ID};
+use crate::runtime::dispatcher::Dispatcher;
+use protobuf::well_known_types::Any;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RustRuntime {
-    // TODO: think about ways to share runtime.
-    inner: RefCell<RustRuntimeInner>,
+    inner: RustRuntimeInner,
+    dispatcher: *mut Dispatcher,
+}
+
+impl RustRuntime {
+    pub fn new(dispatcher: &mut Dispatcher) -> Self {
+        Self {
+            inner: Default::default(),
+            dispatcher: &mut *dispatcher,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -84,8 +96,19 @@ impl RustRuntime {
         Some(rust_artifact_spec)
     }
 
-    fn add_service(&self, artifact: RustArtifactSpec, service: Box<dyn Service>) {
-        self.inner.borrow_mut().services.insert(artifact, service);
+    pub fn add_service(&mut self, service_factory: Box<dyn ServiceFactory>) {
+        self.inner
+            .services
+            .insert(service_factory.artifact(), service_factory);
+    }
+
+    #[allow(unsafe_code)]
+    fn get_dispatcher(&self) -> &Dispatcher {
+        unsafe {
+            self.dispatcher
+                .as_ref()
+                .expect("*mut Dispatcher dereference.")
+        }
     }
 }
 
@@ -95,7 +118,7 @@ unsafe impl Send for RustRuntime {}
 #[derive(Debug, Default)]
 struct RustRuntimeInner {
     // TODO: Add link to dispatcher
-    services: HashMap<RustArtifactSpec, Box<dyn Service>>,
+    services: HashMap<RustArtifactSpec, Box<dyn ServiceFactory>>,
     deployed: HashSet<RustArtifactSpec>,
     initialized: HashMap<ServiceInstanceId, InitializedService>,
 }
@@ -107,13 +130,28 @@ pub struct RustArtifactSpec {
     pub version: Version,
 }
 
+impl RustArtifactSpec {
+    pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
+        Self {
+            name: name.to_owned(),
+            version: Version::new(major, minor, patch),
+        }
+    }
+
+    pub fn into_pb_any(&self) -> Any {
+        let mut any = Any::new();
+        any.set_value(self.encode().unwrap());
+        any
+    }
+}
+
 impl RuntimeEnvironment for RustRuntime {
-    fn start_deploy(&self, artifact: ArtifactSpec) -> Result<(), DeployError> {
+    fn start_deploy(&mut self, artifact: ArtifactSpec) -> Result<(), DeployError> {
         let artifact = self
             .get_artifact_spec(artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
-        let mut inner = self.inner.borrow_mut();
+        let inner = &mut self.inner;
 
         if !inner.services.contains_key(&artifact) {
             return Err(DeployError::FailedToDeploy);
@@ -134,7 +172,7 @@ impl RuntimeEnvironment for RustRuntime {
             .get_artifact_spec(artifact)
             .ok_or(DeployError::WrongArtifact)?;
 
-        let inner = self.inner.borrow();
+        let inner = &self.inner;
 
         if inner.deployed.contains(&artifact) {
             Ok(DeployStatus::Deployed)
@@ -144,7 +182,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn init_service(
-        &self,
+        &mut self,
         context: &mut RuntimeContext,
         artifact: ArtifactSpec,
         init: &InstanceInitData,
@@ -153,31 +191,29 @@ impl RuntimeEnvironment for RustRuntime {
             .get_artifact_spec(artifact)
             .ok_or(InitError::WrongArtifact)?;
 
-        let mut inner = self.inner.borrow_mut();
-
-        if !inner.deployed.contains(&artifact) {
+        if !self.inner.deployed.contains(&artifact) {
             return Err(InitError::NotDeployed);
         }
 
-        if inner.initialized.contains_key(&init.instance_id) {
+        if self.inner.initialized.contains_key(&init.instance_id) {
             return Err(InitError::ServiceIdExists);
         }
 
-        // TODO: Service should not be removed since we can have 2 instances of 1 artifact.
-        let service = inner.services.remove(&artifact).unwrap();
-        inner.initialized.insert(
+        let service = {
+            let mut service = self.inner.services.get(&artifact).unwrap().new_instance();
+            let ctx = TransactionContext::new(context, self);
+            service
+                .initialize(ctx, init.constructor_data.clone())
+                .map_err(|e| InitError::ExecutionError(e))?;
+            service
+        };
+
+        self.inner.initialized.insert(
             init.instance_id,
             InitializedService::new(init.instance_id, service),
         );
 
-        let ctx = TransactionContext::new(context, self);
-        inner
-            .initialized
-            .get_mut(&init.instance_id)
-            .unwrap()
-            .as_mut()
-            .initialize(ctx, init.constructor_data.clone())
-            .map_err(|e| InitError::ExecutionError(e))
+        Ok(())
     }
 
     fn execute(
@@ -186,7 +222,7 @@ impl RuntimeEnvironment for RustRuntime {
         dispatch: CallInfo,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
-        let inner = self.inner.borrow();
+        let inner = &self.inner;
         let instance = inner.initialized.get(&dispatch.instance_id).unwrap();
 
         let ctx = TransactionContext::new(context, self);
@@ -200,7 +236,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> Vec<(ServiceInstanceId, Vec<Hash>)> {
-        let inner = self.inner.borrow();
+        let inner = &self.inner;
 
         inner
             .initialized
@@ -210,7 +246,7 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn before_commit(&self, fork: &mut Fork) {
-        let inner = self.inner.borrow();
+        let inner = &self.inner;
 
         for (_, service) in &inner.initialized {
             fork.checkpoint();
@@ -233,11 +269,58 @@ impl RuntimeEnvironment for RustRuntime {
     }
 
     fn after_commit(&self, fork: &mut Fork) {
-        let inner = self.inner.borrow();
+        let inner = &self.inner;
 
         for (_, service) in &inner.initialized {
             service.as_ref().after_commit(fork);
         }
+    }
+
+    fn genesis_init(&self, fork: &mut Fork) -> Result<(), failure::Error> {
+        let (deploy_txs, init_txs) = self.inner.services.iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut deploy_txs, mut init_txs), (_, s)| {
+                let init_info = s.genesis_init_info();
+                if !init_info.is_empty() {
+                    deploy_txs.push(init_info[0].get_deploy_tx());
+                }
+                init_txs.extend(init_info.into_iter().map(|i| i.get_init_tx()));
+                (deploy_txs, init_txs)
+            },
+        );
+
+        let mut ctx = RuntimeContext::new(fork, &PublicKey::zero(), &Hash::zero());
+        for deploy_tx in deploy_txs.into_iter() {
+            self.get_dispatcher()
+                .execute(
+                    &mut ctx,
+                    CallInfo::new(SERVICE_ID, DEPLOY_METHOD_ID),
+                    &deploy_tx.encode().unwrap(),
+                )
+                .map_err(|e| format_err!("Rust runtime genesis deploy error: {:?}", e))?
+        }
+        for init_tx in init_txs.into_iter() {
+            self.get_dispatcher()
+                .execute(
+                    &mut ctx,
+                    CallInfo::new(SERVICE_ID, INIT_METHOD_ID),
+                    &init_tx.encode().unwrap(),
+                )
+                .map_err(|e| format_err!("Rust runtime genesis init error: {:?}", e))?
+        }
+        Ok(())
+    }
+
+    fn get_services_api(&self) -> Vec<(String, ServiceApiBuilder)> {
+        self.inner
+            .initialized
+            .iter()
+            .map(|(id, service)| {
+                let mut builder = ServiceApiBuilder::new();
+                service.as_ref().wire_api(&mut builder);
+                (format!("{}", id), builder)
+            })
+            .collect()
     }
 }
 

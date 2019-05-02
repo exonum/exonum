@@ -125,12 +125,15 @@ pub fn create_blockchain() -> Blockchain {
     let service_keys = crypto::gen_keypair();
 
     let api_channel = mpsc::channel(10);
+    let internal_sender = mpsc::channel(10).0;
     let mut blockchain = Blockchain::new(
         MemoryDB::new(),
-        vec![MyService.into()],
+        //        vec![MyService.into()],
+        Vec::new(), // TODO: use new service API.
         service_keys.0,
         service_keys.1,
         ApiSender(api_channel.0),
+        internal_sender,
     );
 
     let keys = ValidatorKeys {
