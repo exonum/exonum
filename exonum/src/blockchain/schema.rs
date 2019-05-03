@@ -123,7 +123,7 @@ impl TxLocation {
 /// committed transactions.
 #[derive(Debug)]
 pub struct Schema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T> Schema<T>
@@ -131,14 +131,14 @@ where
     T: IndexAccess,
 {
     /// Constructs information schema for the given `snapshot`.
-    pub fn new(snapshot: T) -> Self {
-        Self { view: snapshot }
+    pub fn new(access: T) -> Self {
+        Self { access }
     }
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
     pub fn transactions(&self) -> MapIndex<T, Hash, Signed<RawTransaction>> {
-        MapIndex::new(TRANSACTIONS, self.view)
+        MapIndex::new(TRANSACTIONS, self.access.clone())
     }
 
     /// Returns a table that represents a map with a key-value pair of a transaction
@@ -147,12 +147,12 @@ where
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, TransactionResult> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
+        ProofMapIndex::new(TRANSACTION_RESULTS, self.access.clone())
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
     pub(crate) fn transactions_len_index(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_LEN, self.view)
+        Entry::new(TRANSACTIONS_LEN, self.access.clone())
     }
 
     /// Returns the number of transactions in the blockchain.
@@ -164,12 +164,12 @@ where
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
     pub fn transactions_pool(&self) -> KeySetIndex<T, Hash> {
-        KeySetIndex::new(TRANSACTIONS_POOL, self.view)
+        KeySetIndex::new(TRANSACTIONS_POOL, self.access.clone())
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
     pub(crate) fn transactions_pool_len_index(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_POOL_LEN, self.view)
+        Entry::new(TRANSACTIONS_POOL_LEN, self.access.clone())
     }
 
     /// Returns the number of transactions in the pool.
@@ -181,41 +181,41 @@ where
     /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
     pub fn transactions_locations(&self) -> MapIndex<T, Hash, TxLocation> {
-        MapIndex::new(TRANSACTIONS_LOCATIONS, self.view)
+        MapIndex::new(TRANSACTIONS_LOCATIONS, self.access.clone())
     }
 
     /// Returns a table that stores a block object for every block height.
     pub fn blocks(&self) -> MapIndex<T, Hash, Block> {
-        MapIndex::new(BLOCKS, self.view)
+        MapIndex::new(BLOCKS, self.access.clone())
     }
 
     /// Returns a table that keeps block hashes for corresponding block heights.
     pub fn block_hashes_by_height(&self) -> ListIndex<T, Hash> {
-        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.view)
+        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.access.clone())
     }
 
     /// Returns a table that keeps a list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.view)
+        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.access.clone())
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Signed<Precommit>> {
-        ListIndex::new_in_family(PRECOMMITS, hash, self.view)
+        ListIndex::new_in_family(PRECOMMITS, hash, self.access.clone())
     }
 
     /// Returns a table that represents a map with a key-value pair of a
     /// configuration hash and contents.
     pub fn configs(&self) -> ProofMapIndex<T, Hash, StoredConfiguration> {
         // configs patricia merkle tree <block height> json
-        ProofMapIndex::new(CONFIGS, self.view)
+        ProofMapIndex::new(CONFIGS, self.access.clone())
     }
 
     /// Returns an auxiliary table that keeps hash references to configurations in
     /// the increasing order of their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<T, ConfigReference> {
-        ListIndex::new(CONFIGS_ACTUAL_FROM, self.view)
+        ListIndex::new(CONFIGS_ACTUAL_FROM, self.access.clone())
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -234,25 +234,25 @@ where
     /// Core tables participate in the resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, Hash, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.view)
+        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
     }
 
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn peers_cache(&self) -> MapIndex<T, PublicKey, Signed<Connect>> {
-        MapIndex::new(PEERS_CACHE, self.view)
+        MapIndex::new(PEERS_CACHE, self.access.clone())
     }
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T, Message> {
-        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
+        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.access.clone())
     }
 
     /// Returns the saved value of the consensus round. Returns the first round
     /// if it has not been saved.
     pub(crate) fn consensus_round(&self) -> Round {
-        Entry::new(CONSENSUS_ROUND, self.view)
+        Entry::new(CONSENSUS_ROUND, self.access.clone())
             .get()
             .unwrap_or_else(Round::first)
     }
@@ -408,130 +408,9 @@ where
         sum_table.get_proof(key)
     }
 
-    fn find_configurations_index_by_height(&self, height: Height) -> u64 {
-        let actual_from = self.configs_actual_from();
-        for i in (0..actual_from.len()).rev() {
-            if actual_from.get(i).unwrap().actual_from() <= height {
-                return i as u64;
-            }
-        }
-        panic!(
-            "Couldn't not find any config for height {}, \
-             that means that genesis block was created incorrectly.",
-            height
-        )
-    }
-
-    /// Returns the next height of the blockchain.
-    /// Its value is equal to "height of the latest committed block" + 1.
-    fn next_height(&self) -> Height {
-        Height(self.block_hashes_by_height().len())
-    }
-}
-
-impl<T: IndexAccess> Schema<T> {
-    /// Mutable reference to the [`transactions`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.transactions
-    pub(crate) fn transactions_mut(&self) -> MapIndex<T, Hash, Signed<RawTransaction>> {
-        MapIndex::new(TRANSACTIONS, self.view)
-    }
-
-    /// Mutable reference to the [`transaction_results`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.transaction_results
-    pub(crate) fn transaction_results_mut(&self) -> ProofMapIndex<T, Hash, TransactionResult> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
-    }
-
-    /// Mutable reference to the [`transactions_pool`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.transactions_pool
-    fn transactions_pool_mut(&self) -> KeySetIndex<T, Hash> {
-        KeySetIndex::new(TRANSACTIONS_POOL, self.view)
-    }
-
-    /// Mutable reference to the [`transactions_pool_len_index`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.transactions_pool_len_index
-    pub(crate) fn transactions_pool_len_index_mut(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_POOL_LEN, self.view)
-    }
-
-    /// Mutable reference to the [`transactions_locations`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.transactions_locations
-    pub(crate) fn transactions_locations_mut(&self) -> MapIndex<T, Hash, TxLocation> {
-        MapIndex::new(TRANSACTIONS_LOCATIONS, self.view)
-    }
-
-    /// Mutable reference to the [`blocks][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.blocks
-    pub(crate) fn blocks_mut(&self) -> MapIndex<T, Hash, Block> {
-        MapIndex::new(BLOCKS, self.view)
-    }
-
-    /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
-    pub(crate) fn block_hashes_by_height_mut(&self) -> ListIndex<T, Hash> {
-        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.view)
-    }
-
-    /// Mutable reference to the [`block_transactions`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.block_transactions
-    pub(crate) fn block_transactions_mut(&self, height: Height) -> ProofListIndex<T, Hash> {
-        let height: u64 = height.into();
-        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.view)
-    }
-
-    /// Mutable reference to the [`precommits`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.precommits
-    pub(crate) fn precommits_mut(&self, hash: &Hash) -> ListIndex<T, Signed<Precommit>> {
-        ListIndex::new_in_family(PRECOMMITS, hash, self.view)
-    }
-
-    /// Mutable reference to the [`configs`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.configs
-    pub(crate) fn configs_mut(&self) -> ProofMapIndex<T, Hash, StoredConfiguration> {
-        ProofMapIndex::new(CONFIGS, self.view)
-    }
-
-    /// Mutable reference to the [`configs_actual_from`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.configs_actual_from
-    pub(crate) fn configs_actual_from_mut(&self) -> ListIndex<T, ConfigReference> {
-        ListIndex::new(CONFIGS_ACTUAL_FROM, self.view)
-    }
-
-    /// Mutable reference to the [`state_hash_aggregator`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.state_hash_aggregator
-    pub(crate) fn state_hash_aggregator_mut(&self) -> ProofMapIndex<T, Hash, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.view)
-    }
-
-    /// Mutable reference to the [`peers_cache`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.peers_cache
-    pub(crate) fn peers_cache_mut(&self) -> MapIndex<T, PublicKey, Signed<Connect>> {
-        MapIndex::new(PEERS_CACHE, self.view)
-    }
-
-    /// Mutable reference to the [`consensus_messages_cache`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.consensus_messages
-    pub(crate) fn consensus_messages_cache_mut(&self) -> ListIndex<T, Message> {
-        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
-    }
-
     /// Saves the given consensus round value into the storage.
-    pub(crate) fn set_consensus_round(&self, round: Round) {
-        let mut entry: Entry<T, _> = Entry::new(CONSENSUS_ROUND, self.view);
+    pub(crate) fn set_consensus_round(&mut self, round: Round) {
+        let mut entry: Entry<T, _> = Entry::new(CONSENSUS_ROUND, self.access.clone());
         entry.set(round);
     }
 
@@ -566,10 +445,10 @@ impl<T: IndexAccess> Schema<T> {
         );
 
         let cfg_hash = config_data.hash();
-        self.configs_mut().put(&cfg_hash, config_data);
+        self.configs().put(&cfg_hash, config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
-        self.configs_actual_from_mut().push(cfg_ref);
+        self.configs_actual_from().push(cfg_ref);
     }
 
     /// Adds transaction into the persistent pool.
@@ -577,19 +456,19 @@ impl<T: IndexAccess> Schema<T> {
     /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Signed<RawTransaction>) {
-        self.transactions_pool_mut().insert(tx.hash());
+        self.transactions_pool().insert(tx.hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
-        self.transactions_pool_len_index_mut().set(x + 1);
-        self.transactions_mut().put(&tx.hash(), tx);
+        self.transactions_pool_len_index().set(x + 1);
+        self.transactions().put(&tx.hash(), tx);
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
-        self.transactions_pool_mut().remove(hash);
+        self.transactions_pool().remove(hash);
     }
 
     /// Updates transaction count of the blockchain.
-    pub fn update_transaction_count(&self, count: u64) {
+    pub fn update_transaction_count(&mut self, count: u64) {
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
@@ -598,16 +477,36 @@ impl<T: IndexAccess> Schema<T> {
     /// Removes transaction from the persistent pool.
     #[cfg(test)]
     pub(crate) fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
-        let contains = self.transactions_pool_mut().contains(hash);
-        self.transactions_pool_mut().remove(hash);
-        self.transactions_mut().remove(hash);
+        let contains = self.transactions_pool().contains(hash);
+        self.transactions_pool().remove(hash);
+        self.transactions().remove(hash);
 
         if contains {
             let x = self.transactions_pool_len_index().get().unwrap();
-            self.transactions_pool_len_index_mut().set(x - 1);
+            self.transactions_pool_len_index().set(x - 1);
             Ok(())
         } else {
             Err(())
         }
+    }
+
+    fn find_configurations_index_by_height(&self, height: Height) -> u64 {
+        let actual_from = self.configs_actual_from();
+        for i in (0..actual_from.len()).rev() {
+            if actual_from.get(i).unwrap().actual_from() <= height {
+                return i as u64;
+            }
+        }
+        panic!(
+            "Couldn't not find any config for height {}, \
+             that means that genesis block was created incorrectly.",
+            height
+        )
+    }
+
+    /// Returns the next height of the blockchain.
+    /// Its value is equal to "height of the latest committed block" + 1.
+    fn next_height(&self) -> Height {
+        Height(self.block_hashes_by_height().len())
     }
 }

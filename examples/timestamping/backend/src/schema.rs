@@ -70,13 +70,13 @@ impl TimestampEntry {
 /// Timestamping database schema.
 #[derive(Debug)]
 pub struct Schema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T> Schema<T> {
     /// Creates a new schema from the database view.
-    pub fn new(snapshot: T) -> Self {
-        Schema { view: snapshot }
+    pub fn new(access: T) -> Self {
+        Schema { access }
     }
 }
 
@@ -86,7 +86,7 @@ where
 {
     /// Returns the `ProofMapIndex` of timestamps.
     pub fn timestamps(&self) -> ProofMapIndex<T, Hash, TimestampEntry> {
-        ProofMapIndex::new("timestamping.timestamps", self.view)
+        ProofMapIndex::new("timestamping.timestamps", self.access.clone())
     }
 
     /// Returns the state hash of the timestamping service.

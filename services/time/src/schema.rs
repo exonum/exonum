@@ -20,23 +20,23 @@ use exonum_merkledb::{Entry, IndexAccess, ObjectHash, ProofMapIndex};
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
 pub struct TimeSchema<T> {
-    view: T,
+    access: T,
 }
 
 impl<T: IndexAccess> TimeSchema<T> {
     /// Constructs schema for the given `snapshot`.
-    pub fn new(view: T) -> Self {
-        TimeSchema { view }
+    pub fn new(access: T) -> Self {
+        TimeSchema { access }
     }
 
     /// Returns the table that stores `DateTime` for every validator.
     pub fn validators_times(&self) -> ProofMapIndex<T, PublicKey, DateTime<Utc>> {
-        ProofMapIndex::new("exonum_time.validators_times", self.view)
+        ProofMapIndex::new("exonum_time.validators_times", self.access.clone())
     }
 
     /// Returns stored time.
     pub fn time(&self) -> Entry<T, DateTime<Utc>> {
-        Entry::new("exonum_time.time", self.view)
+        Entry::new("exonum_time.time", self.access.clone())
     }
 
     /// Returns hashes for stored tables.

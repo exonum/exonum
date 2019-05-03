@@ -91,7 +91,7 @@ pub mod schema {
     /// Schema of the key-value storage used by the demo cryptocurrency service.
     #[derive(Debug)]
     pub struct CurrencySchema<T> {
-        view: T,
+        access: T,
     }
 
     /// Declare the layout of data managed by the service. An instance of [`MapIndex`] is used
@@ -101,13 +101,13 @@ pub mod schema {
     /// [`Wallet`]: struct.Wallet.html
     impl<T: IndexAccess> CurrencySchema<T> {
         /// Creates a new schema instance.
-        pub fn new(view: T) -> Self {
-            CurrencySchema { view }
+        pub fn new(access: T) -> Self {
+            CurrencySchema { access }
         }
 
         /// Returns an immutable version of the wallets table.
         pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
-            MapIndex::new("cryptocurrency.wallets", self.view)
+            MapIndex::new("cryptocurrency.wallets", self.access.clone())
         }
 
         /// Gets a specific wallet from the storage.
