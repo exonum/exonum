@@ -36,9 +36,9 @@ exonum-merkledb = "0.11.0"
 ```
 
 If you need only to read the data you can create `Snapshot`. Objects
-created from `Snapshot` provides read-only access to storage data.
-To modify data you need to create object based on `Fork`.
-`Fork` and `Snapshot` can be obtained from `Database` object.
+created from `Snapshot` provide a read-only access to the storage data.
+To modify data you need to create an object based on `Fork`.
+`Fork` and `Snapshot` can be obtained from the `Database` object.
 Currently only one database backend is supported - RockDB.
 
 ```rust

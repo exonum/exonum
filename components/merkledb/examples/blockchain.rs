@@ -128,18 +128,18 @@ fn create_user(name: &str) -> PublicKey {
 }
 
 fn main() {
-    // Create database instance in /tmp dir. It will be removed when db object
-    // gets out of scope.
+    // Creates a database instance in the /tmp dir. It will be
+    // removed when the DB object gets out of scope.
     let db = TemporaryDB::new();
 
-    // Create empty genesis block.
+    // Creates an empty genesis block.
     let genesis = Block {
         prev_block: Hash::zero(),
         transactions: Vec::new(),
     };
     genesis.execute(&db);
 
-    // Create user keys based on user names.
+    // Creates user keys based on user names.
     let alice = create_user("Alice");
     let bob = create_user("Bob");
 
