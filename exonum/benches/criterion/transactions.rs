@@ -18,7 +18,12 @@ const SAMPLE_SIZE: usize = 20;
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
+use futures::{
+    stream,
+    sync::mpsc::{Sender, UnboundedSender},
+    sync::oneshot,
+    Future, Sink,
+};
 use tokio_core::reactor::Core;
 
 use std::{
@@ -129,7 +134,7 @@ struct MessageVerifier {
     tx_handler: MessagesHandlerRef,
     network_thread: JoinHandle<()>,
     handler_thread: JoinHandle<()>,
-    api_sender: Option<Sender<ExternalMessage>>,
+    api_sender: Option<UnboundedSender<ExternalMessage>>,
     network_sender: Option<Sender<NetworkEvent>>,
 }
 
