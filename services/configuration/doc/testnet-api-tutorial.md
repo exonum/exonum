@@ -1,19 +1,23 @@
-# Configuration service tutorial
+# Configuration Service Tutorial
 
-## Running testnet
+The present tutorial provides instructions on how to configure an Exonum
+blockchain with the help of the Configuration Service.
+
+## Running a Testnet
 
 ### Using Docker
 
 <!-- spell-checker:ignore vitvakatu -->
 
-Simply run the following command to configure and launch testnet with 4 nodes:
+To automatically configure and launch a testnet with 4 nodes simply run the
+following command:
 
 ```bash
 docker run -p 8000-8007:8000-8007 \
 exonumhub/exonum-configuration-service:example 4
 ```
 
-Docker will automatically pull image from the repository and run 4 nodes with
+Docker will automatically pull an image from the repository and run 4 nodes with
 public endpoints at `127.0.0.1:8000`, ..., `127.0.0.1:8003` and
 private ones at `127.0.0.1:8004`, ..., `127.0.0.1:8007`.
 
@@ -23,14 +27,15 @@ You can also use helper [script](../docker/example-start.sh):
 ./docker/example-start.sh <number of nodes>
 ```
 
-To stop docker container, use `docker stop <container id>` command.
+To stop the docker container, use `docker stop <container id>` command.
 
 ### Manually
 
-#### Build example binary
+#### Build an Example Binary
 
-To build an [example binary](../examples/configuration.rs) of exonum
-blockchain with the single configuration service mounted, run:
+To build an [example binary](../examples/configuration.rs) of the Exonum
+blockchain with the single configuration service mounted on it, run the
+following command:
 
 ```bash
 git clone https://github.com/exonum/exonum
@@ -40,19 +45,26 @@ cd exonum/services/configuration
 cargo install --example configuration --path .
 ```
 
-`exonum` crate system dependencies and rust toolchain configuration -
-[exonum install instructions](https://exonum.com/doc/version/latest/get-started/install/).
+- `--example` is a name of the mounted service
+- `--path` is a route to the service configuration files.
 
-#### Generate configs
+You can find information on the required `exonum` crate system dependencies and
+Rust toolchain configuration in the
+[Exonum Installation Guide](https://exonum.com/doc/version/latest/get-started/install/).
 
-Generate template:
+#### Generate Configs
+
+To generate a project template that will be applied by 4 validators run the
+following command:
 
 ```sh
 mkdir example
 configuration generate-template example/common.toml --validators-count 4
 ```
 
-Generate templates of nodes configurations:
+- `--validators-count` is a number of validators in the network.
+
+To generate the templates of the configurations of the nodes, do the following:
 <!-- markdownlint-disable MD013 -->
 
 ```sh
@@ -65,7 +77,10 @@ configuration generate-config example/common.toml  example/pub_3.toml example/se
 configuration generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334 -c example/consensus_4.toml -s example/service_4.toml -n
 ```
 
-Finalize generation of nodes configurations:
+- `--peer-address` is an address of the current node used by other peers to
+  connect to each other.
+
+The command below will finalize generation of the configurations of the nodes:
 
 ```sh
 configuration finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
@@ -77,7 +92,14 @@ configuration finalize --public-api-address 0.0.0.0:8202 --private-api-address 0
 configuration finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 ```
 
-#### Run nodes
+- `--public-api-address` is for Exonum [public HTTP API endpoints](#public-endpoints)
+- `--private-api-address` is for Exonum [private HTTP API endpoints](#private-endpoints)
+- `--public-configs` is a list of files with public configs of all the network
+  nodes.
+
+#### Run Nodes
+
+To run the network, use the following commands:
 
 ```sh
 configuration run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
@@ -91,14 +113,14 @@ configuration run --node-config example/node_4_cfg.toml --db-path example/db4 --
 
 <!-- markdownlint-enable MD013 -->
 
-##### Parameters
+- `--node-config` is a path to the node configuration
+- `--db-path` is a path to the database
+- `--consensus-key-pass` is a password to the file with the consensus key of the
+  node
+- `--service-key-pass` is a password to the file with the service key of the
+  node
 
-- `--public-api-address` is for Exonum [public http api endpoints](#public-endpoints)
-- `--private-api-address` is for Exonum [private http api endpoints](#private-endpoints)
-- `--node-config` path to the node config
-- `--db-path` path to the database
-
-## Global variable service http api
+## Configuration Service REST API
 
 All `hash`es, `public-key`s and `signature`s in tables are hexadecimal strings.
 `config-body` is a valid json, corresponding to [exonum config] serialization.
