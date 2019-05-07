@@ -122,12 +122,8 @@ pub mod schema {
 /// Transactions.
 pub mod transactions {
     use super::proto;
-    //    use super::service::SERVICE_ID;
-    use exonum::{
-        api::ServiceApiBuilder,
-        crypto::{PublicKey, SecretKey},
-        messages::{AnyTx, Message, Signed},
-    };
+    use exonum::crypto::PublicKey;
+    
     /// Transaction type for creating a new wallet.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
@@ -212,7 +208,6 @@ pub mod errors {
 pub mod contracts {
     use exonum::api::ServiceApiBuilder;
     use exonum::blockchain::ExecutionResult;
-    use exonum::runtime::configuration_new::DeployInit;
     use exonum::runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
@@ -224,7 +219,6 @@ pub mod contracts {
         schema::{CurrencySchema, Wallet},
         transactions::{TxCreateWallet, TxTransfer},
     };
-    use exonum::runtime::RuntimeIdentifier::Rust;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -241,7 +235,7 @@ pub mod contracts {
     impl Cryptocurrency for CryptocurrencyServiceImpl {
         fn create_wallet(
             &self,
-            mut context: TransactionContext,
+            context: TransactionContext,
             arg: TxCreateWallet,
         ) -> ExecutionResult {
             let author = context.author();
@@ -257,7 +251,7 @@ pub mod contracts {
             }
         }
 
-        fn transfer(&self, mut context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
+        fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
             let author = context.author();
             let view = context.fork();
 
@@ -375,5 +369,3 @@ pub mod api {
         }
     }
 }
-
-    use exonum_merkledb::Snapshot;
