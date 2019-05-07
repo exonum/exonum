@@ -31,6 +31,8 @@ use super::{
     config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
     timestamping::TimestampingService,
 };
+use crate::api::backends::actix::SystemRuntimeConfig;
+use crate::api::ApiAggregator;
 use crate::{
     blockchain::{
         Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -135,6 +137,9 @@ impl SandboxInner {
                         self.handler.handle_event(
                             InternalEvent::MessageVerified(Box::new(protocol)).into(),
                         );
+                    }
+                    InternalRequest::RestartApi => {
+                        self.handler.handle_event(InternalEvent::RestartApi.into())
                     }
                 }
             }
@@ -869,6 +874,11 @@ impl Sandbox {
             shared_time: SharedTime::new(Mutex::new(time)),
         };
 
+        let api_runtime_config = SystemRuntimeConfig {
+            api_runtimes: Vec::new(),
+            api_aggregator: ApiAggregator::new(blockchain.clone(), inner.handler.api_state.clone()),
+        };
+
         let mut handler = NodeHandler::new(
             blockchain,
             &address.to_string(),
@@ -877,6 +887,7 @@ impl Sandbox {
             config,
             inner.handler.api_state.clone(),
             None,
+            api_runtime_config,
         );
         handler.initialize();
 
@@ -978,6 +989,7 @@ impl SandboxBuilder {
                 min_propose_timeout: PROPOSE_TIMEOUT,
                 max_propose_timeout: PROPOSE_TIMEOUT,
                 propose_timeout_threshold: std::u32::MAX,
+                configuration_service_majority_count: None,
             },
         }
     }
@@ -1060,12 +1072,16 @@ fn sandbox_with_services_uninitialized(
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
+    let internal_channel = mpsc::channel(100);
+
     let mut blockchain = Blockchain::new(
         db,
-        services,
+        //        services,
+        Vec::new(), // TODO: use new service API.
         service_keys[0].0,
         service_keys[0].1.clone(),
         ApiSender::new(api_channel.0.clone()),
+        internal_channel.0.clone(),
     );
 
     let genesis = GenesisConfig::new_with_consensus(
@@ -1109,11 +1125,16 @@ fn sandbox_with_services_uninitialized(
     let shared_time = Arc::clone(&system_state.shared_time);
 
     let network_channel = mpsc::channel(100);
-    let internal_channel = mpsc::channel(100);
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone().wait(),
         internal_requests: internal_channel.0.clone().wait(),
         api_requests: api_channel.0.clone().wait(),
+    };
+
+    let shared_node_state = SharedNodeState::new(5000);
+    let api_runtime_config = SystemRuntimeConfig {
+        api_runtimes: Vec::new(),
+        api_aggregator: ApiAggregator::new(blockchain.clone(), shared_node_state.clone()),
     };
 
     let mut handler = NodeHandler::new(
@@ -1122,8 +1143,9 @@ fn sandbox_with_services_uninitialized(
         node_sender,
         Box::new(system_state),
         config.clone(),
-        SharedNodeState::new(5000),
+        shared_node_state,
         None,
+        api_runtime_config,
     );
     handler.initialize();
 

@@ -23,7 +23,6 @@ use std::{
 use super::{
     clap_backend::ClapBackend,
     details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, Run, RunDev},
-    info::Info,
     internal::{CollectedCommand, Command, Feedback},
     keys,
     maintenance::Maintenance,
@@ -31,7 +30,6 @@ use super::{
     CommandName, Context, ServiceFactory,
 };
 
-use crate::blockchain::Service;
 use crate::node::{ExternalMessage, Node};
 
 /// `NodeBuilder` is a high level object,
@@ -99,17 +97,10 @@ impl NodeBuilder {
     }
 
     /// Runs application.
-    pub fn run(mut self) {
+    pub fn run(self) {
         // This should be moved into `commands` method, but services list can be obtained only here.
         {
-            let services: Vec<_> = self
-                .service_factories
-                .iter()
-                .map(|f| f.service_name().to_owned())
-                .collect();
-            let info: Box<dyn Command> = Box::new(Info::new(services));
-            self.commands
-                .insert(info.name(), CollectedCommand::new(info));
+            // TODO Implement info command. (used to show services info from command line).
         }
 
         let old_hook = panic::take_hook();
@@ -151,10 +142,10 @@ impl NodeBuilder {
             .get(keys::NODE_CONFIG)
             .expect("could not find node_config");
         let db = Run::db_helper(ctx, &config.database);
-        let services: Vec<Box<dyn Service>> = self
+        let services: Vec<_> = self
             .service_factories
             .into_iter()
-            .map(|mut factory| factory.make_service(ctx))
+            .map(|f| f.make_service_builder(ctx))
             .collect();
 
         let config = {

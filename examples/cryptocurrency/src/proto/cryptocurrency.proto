@@ -43,3 +43,5 @@ message TxTransfer {
   // Auxiliary number to guarantee non-idempotence of transactions.
   uint64 seed = 3;
 }
+
+message ConstructorData {}

@@ -38,6 +38,7 @@ impl NodeHandler {
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
             InternalEvent::MessageVerified(msg) => self.handle_message(*msg),
+            InternalEvent::RestartApi => self.api_runtime.restart(),
         }
     }
 

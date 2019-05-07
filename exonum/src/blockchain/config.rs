@@ -121,6 +121,9 @@ pub struct ConsensusConfig {
     /// in a block if the transaction pool is almost empty, and create blocks faster when there are
     /// enough transactions in the pool.
     pub propose_timeout_threshold: u32,
+
+    /// Configuration Service majority count.
+    pub configuration_service_majority_count: Option<u16>,
 }
 
 impl ConsensusConfig {
@@ -176,6 +179,7 @@ impl Default for ConsensusConfig {
             min_propose_timeout: 10,
             max_propose_timeout: 200,
             propose_timeout_threshold: 500,
+            configuration_service_majority_count: None,
         }
     }
 }

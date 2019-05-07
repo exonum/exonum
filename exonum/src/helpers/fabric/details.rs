@@ -821,7 +821,6 @@ impl Command for Finalize {
                 database: Default::default(),
                 connect_list,
                 thread_pool_size: Default::default(),
-                configuration_service_majority_count: Default::default(),
             }
         };
 

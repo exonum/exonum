@@ -19,12 +19,9 @@
 
 pub use actix_web::middleware::cors::Cors;
 
-use actix::{Addr, System};
-use actix_net::server::Server;
+use actix::{Actor, Addr, System};
 use actix_web::{
-    error::ResponseError,
-    server::{HttpServer, StopServer},
-    AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
+    error::ResponseError, AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
 };
 use futures::{Future, IntoFuture};
 use serde::{
@@ -41,6 +38,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+use crate::api::manager::{ApiManager, RestartServer};
 use crate::api::{
     error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
     Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
@@ -296,7 +294,7 @@ impl fmt::Debug for ApiRuntimeConfig {
 }
 
 /// Configuration parameters for the actix system runtime.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SystemRuntimeConfig {
     /// Active API runtimes.
     pub api_runtimes: Vec<ApiRuntimeConfig>,
@@ -308,7 +306,7 @@ pub struct SystemRuntimeConfig {
 pub struct SystemRuntime {
     system_thread: JoinHandle<result::Result<(), failure::Error>>,
     system: System,
-    api_runtime_addresses: Vec<Addr<Server>>,
+    api_manager: Addr<ApiManager>,
 }
 
 impl SystemRuntimeConfig {
@@ -320,36 +318,18 @@ impl SystemRuntimeConfig {
 
 impl SystemRuntime {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_ret_no_self))]
-    fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
+    pub(crate) fn new(config: SystemRuntimeConfig) -> result::Result<Self, failure::Error> {
         // Creates a system thread.
         let (system_tx, system_rx) = mpsc::channel();
         let (api_runtime_tx, api_runtime_rx) = mpsc::channel();
-        let api_runtimes = config.api_runtimes.clone();
         let system_thread = thread::spawn(move || -> result::Result<(), failure::Error> {
             let system = System::new("http-server");
 
-            let aggregator = config.api_aggregator.clone();
-            trace!(
-                "Create actix system runtime with api: {:#?}",
-                aggregator.inner
-            );
-            let api_handlers = config.api_runtimes.into_iter().map(|runtime_config| {
-                debug!("Runtime: {:?}", runtime_config);
-                let access = runtime_config.access;
-                let listen_address = runtime_config.listen_address;
-                info!("Starting {} web api on {}", access, listen_address);
+            let api_manager = ApiManager::new(config).start();
 
-                let aggregator = aggregator.clone();
-                HttpServer::new(move || create_app(&aggregator, runtime_config.clone()))
-                    .disable_signals()
-                    .bind(listen_address)
-                    .map(HttpServer::start)
-            });
             // Sends addresses to the control thread.
             system_tx.send(System::current())?;
-            for api_handler in api_handlers {
-                api_runtime_tx.send(api_handler?)?;
-            }
+            api_runtime_tx.send(api_manager)?;
             // Starts actix-web runtime.
             let code = system.run();
 
@@ -365,39 +345,19 @@ impl SystemRuntime {
         let system = system_rx
             .recv()
             .map_err(|_| format_err!("Unable to receive actix system handle"))?;
-        let api_runtime_addresses = {
-            let mut api_runtime_addresses = Vec::new();
-            for api_runtime in api_runtimes {
-                let api_runtime_address = api_runtime_rx.recv().map_err(|_| {
-                    format_err!(
-                        "Unable to receive actix api system address for api: listen_addr {}, scope {}",
-                        api_runtime.listen_address,
-                        api_runtime.access,
-                    )
-                })?;
-                api_runtime_addresses.push(api_runtime_address);
-            }
-            api_runtime_addresses
-        };
+        let api_manager = api_runtime_rx
+            .recv()
+            .map_err(|e| format_err!("Unable to receive api manager address: {}", e))?;
 
         Ok(Self {
             system_thread,
             system,
-            api_runtime_addresses,
+            api_manager,
         })
     }
 
     /// Stops the actix system runtime along with all web runtimes.
     pub fn stop(self) -> result::Result<(), failure::Error> {
-        // Stop all actix web servers.
-        for api_runtime_address in self.api_runtime_addresses {
-            api_runtime_address
-                .send(StopServer { graceful: true })
-                .wait()?
-                .map_err(|_| {
-                    format_err!("Unable to send `StopServer` message to web api handler")
-                })?;
-        }
         // Stop actix system runtime.
         self.system.stop();
         self.system_thread.join().map_err(|e| {
@@ -406,6 +366,11 @@ impl SystemRuntime {
                 e
             )
         })?
+    }
+
+    /// Restart actix web-api servers.
+    pub fn restart(&self) {
+        self.api_manager.do_send(RestartServer);
     }
 }
 
