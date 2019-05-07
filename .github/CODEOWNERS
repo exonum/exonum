@@ -2,20 +2,23 @@
 * @aleksuss @alekseysidorov
 
 # Javascript specific changes:
-*.js @aleksuss @boguslavsky
+*.js @aleksuss @qvantor
 
 # Cryptography:
-crypto/* @aleksuss @alekseysidorov @pavel-mukhanov @ilammy @slowli
+components/crypto/* @aleksuss @alekseysidorov @pavel-mukhanov @slowli
+
+# MerkleDB storage:
+components/merkledb/* @aleksuss @alekseysidorov @pavel-mukhanov
 
 # Cryptocurrency examples:
-examples/cryptocurrency/* @aleksuss @alekseysidorov @vitvakatu @ilammy
-examples/cryptocurrency-advanced/* @aleksuss @alekseysidorov @vitvakatu @ilammy
+examples/cryptocurrency/* @aleksuss @alekseysidorov @popzxc
+examples/cryptocurrency-advanced/* @aleksuss @alekseysidorov @popzxc
 
 # Timestamping:
-examples/timestamping/* @aleksuss @alekseysidorov @ozkriff @vitvakatu
+examples/timestamping/* @aleksuss @alekseysidorov @ozkriff @popzxc
 
 # Configuration service:
-services/configuration/* @aleksuss @alekseysidorov @ilammy @slowli
+services/configuration/* @aleksuss @alekseysidorov @popzxc
 
 # Time-oracle service:
 services/time/* @aleksuss @alekseysidorov @slowli
@@ -24,16 +27,16 @@ services/time/* @aleksuss @alekseysidorov @slowli
 testkit/* @aleksuss @alekseysidorov @slowli
 
 # Benchmarks:
-exonum/benches/* @aleksuss @alekseysidorov @ilammy @andreyluchin
+exonum/benches/* @aleksuss @alekseysidorov @popzxc
 
 # Web api:
-exonum/src/api/* @aleksuss @alekseysidorov @ilammy @andreyluchin
+exonum/src/api/* @aleksuss @alekseysidorov @popzxc
 
 # Encoding:
-exonum/src/encoding/* @aleksuss @alekseysidorov @dvush
+exonum/src/encoding/* @aleksuss @alekseysidorov @popzxc
 
 # Events:
-exonum/src/events/* @aleksuss @alekseysidorov @andreyluchin @ilammy @pavel-mukhanov @dvush
+exonum/src/events/* @aleksuss @alekseysidorov @pavel-mukhanov @popzxc
 
 # Node (consensus):
-exonum/src/node/* @aleksuss @alekseysidorov @slowli
+exonum/src/node/* @aleksuss @alekseysidorov @slowli @popzxc
