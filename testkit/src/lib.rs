@@ -422,57 +422,60 @@ impl TestKit {
         network: TestNetwork,
         genesis: GenesisConfig,
     ) -> Self {
-        let api_channel = mpsc::channel(1_000);
-        let api_sender = ApiSender::new(api_channel.0.clone());
+        // TODO rework testkit
+        unimplemented!();
 
-        let db = CheckpointDb::new(database);
-        let db_handler = db.handler();
+        // let api_channel = mpsc::channel(1_000);
+        // let api_sender = ApiSender::new(api_channel.0.clone());
 
-        let mut blockchain = Blockchain::new(
-            db,
-            services,
-            *network.us().service_keypair().0,
-            network.us().service_keypair().1.clone(),
-            api_sender.clone(),
-        );
+        // let db = CheckpointDb::new(database);
+        // let db_handler = db.handler();
 
-        blockchain.initialize(genesis).unwrap();
-        let processing_lock = Arc::new(Mutex::new(()));
-        let processing_lock_ = Arc::clone(&processing_lock);
+        // let mut blockchain = Blockchain::new(
+        //     db,
+        //     services,
+        //     *network.us().service_keypair().0,
+        //     network.us().service_keypair().1.clone(),
+        //     api_sender.clone(),
+        // );
 
-        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
-            let mut blockchain = blockchain.clone();
-            Box::new(api_channel.1.and_then(move |event| {
-                let guard = processing_lock_.lock().unwrap();
-                let fork = blockchain.fork();
-                let mut schema = CoreSchema::new(&fork);
-                match event {
-                    ExternalMessage::Transaction(tx) => {
-                        let hash = tx.hash();
-                        if !schema.transactions().contains(&hash) {
-                            schema.add_transaction_into_pool(tx.clone());
-                        }
-                    }
-                    ExternalMessage::PeerAdd(_)
-                    | ExternalMessage::Enable(_)
-                    | ExternalMessage::Rebroadcast
-                    | ExternalMessage::Shutdown => { /* Ignored */ }
-                }
-                blockchain.merge(fork.into_patch()).unwrap();
-                drop(guard);
-                Ok(())
-            }))
-        };
+        // blockchain.initialize(genesis).unwrap();
+        // let processing_lock = Arc::new(Mutex::new(()));
+        // let processing_lock_ = Arc::clone(&processing_lock);
 
-        TestKit {
-            blockchain,
-            db_handler,
-            api_sender,
-            events_stream,
-            processing_lock,
-            network,
-            cfg_proposal: None,
-        }
+        // let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> = {
+        //     let mut blockchain = blockchain.clone();
+        //     Box::new(api_channel.1.and_then(move |event| {
+        //         let guard = processing_lock_.lock().unwrap();
+        //         let fork = blockchain.fork();
+        //         let mut schema = CoreSchema::new(&fork);
+        //         match event {
+        //             ExternalMessage::Transaction(tx) => {
+        //                 let hash = tx.hash();
+        //                 if !schema.transactions().contains(&hash) {
+        //                     schema.add_transaction_into_pool(tx.clone());
+        //                 }
+        //             }
+        //             ExternalMessage::PeerAdd(_)
+        //             | ExternalMessage::Enable(_)
+        //             | ExternalMessage::Rebroadcast
+        //             | ExternalMessage::Shutdown => { /* Ignored */ }
+        //         }
+        //         blockchain.merge(fork.into_patch()).unwrap();
+        //         drop(guard);
+        //         Ok(())
+        //     }))
+        // };
+
+        // TestKit {
+        //     blockchain,
+        //     db_handler,
+        //     api_sender,
+        //     events_stream,
+        //     processing_lock,
+        //     network,
+        //     cfg_proposal: None,
+        // }
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
