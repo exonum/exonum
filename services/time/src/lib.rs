@@ -21,7 +21,7 @@
 
 #![deny(
     missing_debug_implementations,
-    missing_docs,
+    // missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
@@ -32,6 +32,8 @@ extern crate failure;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
+#[macro_use]
+extern crate exonum;
 
 /// Node API.
 pub mod api;
@@ -48,9 +50,13 @@ use exonum_merkledb::{Fork, Snapshot};
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{Service, ServiceContext, Transaction, TransactionSet},
+    blockchain::{ServiceContext, Transaction, TransactionSet, ExecutionResult, ExecutionError},
     crypto::Hash,
-    helpers::fabric::{Context, ServiceFactory},
+    helpers::fabric::{self, Context},
+    runtime::rust::{
+        service::{GenesisInitInfo, Service, ServiceFactory},
+        RustArtifactSpec, TransactionContext,
+    },
     messages::AnyTx,
 };
 use serde_json::Value;
@@ -58,7 +64,7 @@ use serde_json::Value;
 use crate::{
     schema::TimeSchema,
     time_provider::{SystemTimeProvider, TimeProvider},
-    transactions::*,
+    transactions::TxTime,
 };
 
 /// Time service id.
@@ -66,82 +72,186 @@ pub const SERVICE_ID: u16 = 4;
 /// Time service name.
 pub const SERVICE_NAME: &str = "exonum_time";
 
+
+#[service_interface]
+pub trait Time {
+    fn time(&self, ctx: TransactionContext, arg: TxTime) -> ExecutionResult;
+}
+
 /// Define the service.
 #[derive(Debug)]
-pub struct TimeService {
+pub struct TimeServiceImpl {
     /// Current time.
     time: Box<dyn TimeProvider>,
 }
 
-impl Default for TimeService {
-    fn default() -> TimeService {
-        TimeService {
+impl Default for TimeServiceImpl {
+    fn default() -> TimeServiceImpl {
+        TimeServiceImpl {
             time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
         }
     }
 }
 
-impl TimeService {
+impl TimeServiceImpl {
     /// Create a new `TimeService`.
-    pub fn new() -> TimeService {
-        TimeService::default()
+    pub fn new() -> TimeServiceImpl {
+        TimeServiceImpl::default()
     }
 
-    /// Create a new `TimeService` with time provider `T`.
-    pub fn with_provider<T: Into<Box<dyn TimeProvider>>>(time_provider: T) -> TimeService {
-        TimeService {
-            time: time_provider.into(),
-        }
+    // TODO there is no way to provide provider for now.
+    // It should be configurable through the configuration service.
+}
+
+impl Time for TimeServiceImpl {
+    fn time(
+        &self,
+        context: TransactionContext,
+        arg: TxTime,
+    ) -> ExecutionResult {
+        let author = context.author();
+        let view = context.fork();
+        arg.check_signed_by_validator(view.as_ref(), &author)?;
+        arg.update_validator_time(view, &author)?;
+        TxTime::update_consolidated_time(view);
+        Ok(())
     }
 }
 
-impl Service for TimeService {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
+impl_service_dispatcher!(TimeServiceImpl, Time);
 
+impl Service for TimeServiceImpl {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::PublicApi::wire(builder);
+        api::PrivateApi::wire(builder);
+    }
+    
     fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let schema = TimeSchema::new(snapshot);
         schema.state_hash()
     }
 
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        TimeTransactions::tx_from_raw(raw).map(Into::into)
-    }
-
-    fn initialize(&self, _fork: &mut Fork) -> Value {
-        Value::Null
-    }
-
     /// Creates transaction after commit of the block.
-    fn after_commit(&self, context: &ServiceContext) {
+    fn after_commit(&self, fork: &mut Fork) {
         // The transaction must be created by the validator.
-        if context.validator_id().is_none() {
-            return;
-        }
-        context.broadcast_transaction(TxTime::new(self.time.current_time()));
-    }
 
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
-        api::PrivateApi::wire(builder);
+        // TODO can't implement after_commit via fork
+        unimplemented!();
+        // if context.validator_id().is_none() {
+        //     return;
+        // }
+        // context.broadcast_transaction(TxTime::new(self.time.current_time()));
     }
 }
 
-/// A time service creator for the `NodeBuilder`.
+pub fn artifact_spec() -> RustArtifactSpec {
+    RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
+}
+
+#[derive(Debug)]
+pub struct ServiceFactoryImpl;
+
+impl ServiceFactory for ServiceFactoryImpl {
+    fn artifact(&self) -> RustArtifactSpec {
+        artifact_spec()
+    }
+
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(TimeServiceImpl::new())
+    }
+
+    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
+        vec![]
+    }
+}
+
+/// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
 pub struct TimeServiceFactory;
 
-impl ServiceFactory for TimeServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
-        Box::new(TimeService::new())
+impl fabric::ServiceFactory for TimeServiceFactory {
+    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn ServiceFactory> {
+        Box::new(ServiceFactoryImpl)
     }
 }
+
+
+// /// Define the service.
+// #[derive(Debug)]
+// pub struct TimeService {
+//     /// Current time.
+//     time: Box<dyn TimeProvider>,
+// }
+
+// impl Default for TimeService {
+//     fn default() -> TimeService {
+//         TimeService {
+//             time: Box::new(SystemTimeProvider) as Box<dyn TimeProvider>,
+//         }
+//     }
+// }
+
+// impl TimeService {
+//     /// Create a new `TimeService`.
+//     pub fn new() -> TimeService {
+//         TimeService::default()
+//     }
+
+//     /// Create a new `TimeService` with time provider `T`.
+//     pub fn with_provider<T: Into<Box<dyn TimeProvider>>>(time_provider: T) -> TimeService {
+//         TimeService {
+//             time: time_provider.into(),
+//         }
+//     }
+// }
+
+// impl Service for TimeService {
+//     fn service_name(&self) -> &str {
+//         SERVICE_NAME
+//     }
+
+//     fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+//         let schema = TimeSchema::new(snapshot);
+//         schema.state_hash()
+//     }
+
+//     fn service_id(&self) -> u16 {
+//         SERVICE_ID
+//     }
+
+//     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
+//         TimeTransactions::tx_from_raw(raw).map(Into::into)
+//     }
+
+//     fn initialize(&self, _fork: &mut Fork) -> Value {
+//         Value::Null
+//     }
+
+//     /// Creates transaction after commit of the block.
+//     fn after_commit(&self, context: &ServiceContext) {
+//         // The transaction must be created by the validator.
+//         if context.validator_id().is_none() {
+//             return;
+//         }
+//         context.broadcast_transaction(TxTime::new(self.time.current_time()));
+//     }
+
+//     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+//         api::PublicApi::wire(builder);
+//         api::PrivateApi::wire(builder);
+//     }
+// }
+
+// /// A time service creator for the `NodeBuilder`.
+// #[derive(Debug)]
+// pub struct TimeServiceFactory;
+
+// impl ServiceFactory for TimeServiceFactory {
+//     fn service_name(&self) -> &str {
+//         SERVICE_NAME
+//     }
+
+//     fn make_service(&mut self, _: &Context) -> Box<dyn Service> {
+//         Box::new(TimeService::new())
+//     }
+// }
