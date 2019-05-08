@@ -16,7 +16,7 @@
 
 #![deny(
     missing_debug_implementations,
-    missing_docs,
+    // missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
@@ -27,6 +27,8 @@ extern crate exonum_derive;
 extern crate failure;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate exonum;
 
 pub use crate::schema::Schema;
 
@@ -40,13 +42,18 @@ use exonum_merkledb::Snapshot;
 
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
+    blockchain::{self, Transaction, TransactionSet, ExecutionResult, ExecutionError},
     crypto::Hash,
     helpers::fabric::{self, Context},
     messages::AnyTx,
+    runtime::rust::{
+        service::{GenesisInitInfo, Service, ServiceFactory},
+        RustArtifactSpec, TransactionContext,
+    },
 };
 
-use crate::transactions::WalletTransactions;
+use crate::transactions::{Issue, Transfer, CreateWallet, Error, ERROR_SENDER_SAME_AS_RECEIVER};
+use crate::api::PublicApi as CryptocurrencyApi;
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
@@ -55,43 +62,151 @@ const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
 const INITIAL_BALANCE: u64 = 100;
 
-/// Exonum `Service` implementation.
-#[derive(Default, Debug)]
-pub struct Service;
+#[service_interface]
+pub trait Cryptocurrency {
+    fn transfer(&self, ctx: TransactionContext, arg: Transfer) -> ExecutionResult;
+    fn issue(&self, ctx: TransactionContext, arg: Issue) -> ExecutionResult;
+    fn create_wallet(&self, ctx: TransactionContext, arg: CreateWallet) -> ExecutionResult;
+}
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        CRYPTOCURRENCY_SERVICE_ID
+#[derive(Debug)]
+pub struct CryptocurrencyServiceImpl;
+
+impl Cryptocurrency for CryptocurrencyServiceImpl {
+    fn transfer(
+        &self,
+        context: TransactionContext,
+        arg: Transfer,
+    ) -> ExecutionResult {
+        let from = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.fork());
+
+        let to = &arg.to;
+        let amount = arg.amount;
+
+        if from == to {
+            return Err(ExecutionError::new(ERROR_SENDER_SAME_AS_RECEIVER));
+        }
+
+        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
+
+        let receiver = schema.wallet(to).ok_or(Error::ReceiverNotFound)?;
+
+        if sender.balance < amount {
+            Err(Error::InsufficientCurrencyAmount)?
+        }
+
+        schema.decrease_wallet_balance(sender, amount, &hash);
+        schema.increase_wallet_balance(receiver, amount, &hash);
+
+        Ok(())
     }
 
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
+    fn issue(
+        &self,
+        context: TransactionContext,
+        arg: Issue,
+    ) -> ExecutionResult {
+        let pub_key = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.fork());
+
+        if let Some(wallet) = schema.wallet(pub_key) {
+            let amount = arg.amount;
+            schema.increase_wallet_balance(wallet, amount, &hash);
+            Ok(())
+        } else {
+            Err(Error::ReceiverNotFound)?
+        }
     }
 
-    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(view);
-        schema.state_hash()
+
+    fn create_wallet(
+        &self,
+        context: TransactionContext,
+        arg: CreateWallet,
+    ) -> ExecutionResult {
+        let pub_key = &context.author();
+        let hash = context.tx_hash();
+
+        let mut schema = Schema::new(context.fork());
+
+        if schema.wallet(pub_key).is_none() {
+            let name = &arg.name;
+            schema.create_wallet(pub_key, name, &hash);
+            Ok(())
+        } else {
+            Err(Error::WalletAlreadyExists)?
+        }
     }
 
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        WalletTransactions::tx_from_raw(raw).map(Into::into)
-    }
+}
 
+impl_service_dispatcher!(CryptocurrencyServiceImpl, Cryptocurrency);
+
+impl Service for CryptocurrencyServiceImpl {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
+        CryptocurrencyApi::wire(builder);
     }
 }
 
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct ServiceFactory;
+pub fn artifact_spec() -> RustArtifactSpec {
+    RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
+}
 
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
+#[derive(Debug)]
+pub struct ServiceFactoryImpl;
+
+impl ServiceFactory for ServiceFactoryImpl {
+    fn artifact(&self) -> RustArtifactSpec {
+        artifact_spec()
     }
 
-    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service)
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(CryptocurrencyServiceImpl)
+    }
+
+    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
+        vec![]
+    }
+}
+
+// /// Exonum `Service` implementation.
+// #[derive(Default, Debug)]
+// pub struct Service;
+
+// impl blockchain::Service for Service {
+//     fn service_id(&self) -> u16 {
+//         CRYPTOCURRENCY_SERVICE_ID
+//     }
+
+//     fn service_name(&self) -> &str {
+//         SERVICE_NAME
+//     }
+
+//     fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
+//         let schema = Schema::new(view);
+//         schema.state_hash()
+//     }
+
+//     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
+//         WalletTransactions::tx_from_raw(raw).map(Into::into)
+//     }
+
+//     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+//         api::PublicApi::wire(builder);
+//     }
+// }
+
+/// A configuration service creator for the `NodeBuilder`.
+#[derive(Debug)]
+pub struct CryptocurrencyServiceFactory;
+
+impl fabric::ServiceFactory for CryptocurrencyServiceFactory {
+    fn make_service_builder(&self, run_context: &Context) -> Box<dyn ServiceFactory> {
+        Box::new(ServiceFactoryImpl)
     }
 }
