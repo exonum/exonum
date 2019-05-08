@@ -21,10 +21,13 @@ pub use self::{
     proof::{CheckedMapProof, MapProof, MapProofError},
 };
 
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+
 use std::{
     fmt,
     io::{Read, Write},
     marker::PhantomData,
+    mem::size_of,
 };
 
 use exonum_crypto::Hash;
@@ -47,6 +50,8 @@ mod proof;
 #[cfg(test)]
 mod tests;
 
+const LEN_SIZE: usize = size_of::<u64>();
+
 /// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
 ///
@@ -58,7 +63,7 @@ mod tests;
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 pub struct ProofMapIndex<T: IndexAccess, K, V> {
     base: View<T>,
-    state: IndexState<T, Option<ProofPath>>,
+    state: IndexState<T, ProofMapState>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -152,6 +157,56 @@ impl<T: BinaryKey> ValuePath for T {
 
     fn from_value_path(buffer: &[u8]) -> Self::Owned {
         Self::read(&buffer[1..])
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+struct ProofMapState {
+    len: u64,
+    proof_path: Option<ProofPath>,
+}
+
+impl ProofMapState {
+    fn new(len: u64, proof_path: Option<ProofPath>) -> Self {
+        Self { len, proof_path }
+    }
+
+    fn update_len(&mut self, len: u64) {
+        self.len = len;
+    }
+}
+
+impl BinaryAttribute for ProofMapState {
+    fn size(&self) -> usize {
+        let path_size = match self.proof_path {
+            Some(path) => path.size(),
+            None => 0,
+        };
+
+        path_size + LEN_SIZE
+    }
+
+    fn write<W: Write>(&self, buffer: &mut W) {
+        buffer.write_u64::<LittleEndian>(self.len).unwrap();
+
+        if let Some(path) = self.proof_path {
+            let mut tmp = [0_u8; PROOF_PATH_SIZE];
+            path.write(&mut tmp);
+            buffer.write_all(&tmp).unwrap();
+        }
+    }
+
+    fn read<R: Read>(buffer: &mut R) -> Self {
+        let mut tmp = [0_u8; PROOF_PATH_SIZE];
+        let len = buffer.read_u64::<LittleEndian>().unwrap();
+
+        let proof_path = match buffer.read(&mut tmp).unwrap() {
+            0 => None,
+            PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
+            other => panic!("Unexpected attribute length: {}", other),
+        };
+
+        Self { len, proof_path }
     }
 }
 
@@ -302,7 +357,7 @@ where
     }
 
     fn get_root_path(&self) -> Option<ProofPath> {
-        self.state.get()
+        self.state.get().proof_path
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node)> {
@@ -597,8 +652,9 @@ where
         self.base.remove(&key.to_value_path());
     }
 
-    fn update_root_path(&mut self, path: Option<ProofPath>) {
-        self.state.set(path)
+    fn update_state(&mut self, len: u64, proof_path: Option<ProofPath>) {
+        let metadata = ProofMapState::new(len, proof_path);
+        self.state.set(metadata);
     }
 
     // Inserts a new node of the current branch and returns the updated hash
@@ -791,7 +847,7 @@ where
                 proof_path
             }
         };
-        self.update_root_path(Some(root_path));
+        self.update_state(self.len() + 1, Some(root_path));
     }
 
     /// Removes a key from the proof map.
@@ -821,7 +877,7 @@ where
             Some((prefix, Node::Leaf(_))) => {
                 if proof_path == prefix {
                     self.remove_leaf(&proof_path, key);
-                    self.update_root_path(None);
+                    self.update_state(0, None);
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
@@ -833,12 +889,14 @@ where
                         RemoveAction::Leaf => {
                             // After removing one of leaves second child becomes a new root.
                             self.base.remove(&prefix);
-                            self.update_root_path(Some(branch.child_path(!suffix_path.bit(0))));
+                            let child_path = Some(branch.child_path(!suffix_path.bit(0)));
+                            self.update_state(self.len() - 1, child_path);
                         }
                         RemoveAction::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             self.base.put(&prefix, branch);
+                            self.set_len(self.len() - 1);
                         }
                         RemoveAction::UpdateHash(hash) => {
                             branch.set_child_hash(suffix_path.bit(0), &hash);
@@ -883,6 +941,31 @@ where
     pub fn clear(&mut self) {
         self.base.clear();
         self.state.clear();
+    }
+
+    /// Returns the number of elements in the proof map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new("index", &fork);
+    /// assert_eq!(0, index.len());
+    ///
+    /// index.put(&1, 10);
+    /// assert_eq!(1, index.len());
+    /// ```
+    pub fn len(&self) -> u64 {
+        self.state.get().len
+    }
+
+    fn set_len(&mut self, len: u64) {
+        let mut metadata = self.state.get();
+        metadata.update_len(len);
+        self.state.set(metadata);
     }
 }
 

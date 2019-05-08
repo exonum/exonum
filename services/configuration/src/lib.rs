@@ -163,7 +163,6 @@ impl fabric::ServiceFactory for ServiceFactory {
     }
 
     fn command(&mut self, command: CommandName) -> Option<Box<dyn CommandExtension>> {
-        use exonum::helpers::fabric;
         Some(match command {
             v if v == fabric::GenerateCommonConfig.name() => Box::new(GenerateCommonConfig),
             v if v == fabric::Finalize.name() => Box::new(Finalize),

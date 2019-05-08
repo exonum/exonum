@@ -36,7 +36,7 @@ use crate::views::{IndexAddress, IndexState};
 #[derive(Debug)]
 pub struct MapIndex<T: IndexAccess, K, V> {
     base: View<T>,
-    state: IndexState<T, ()>,
+    state: IndexState<T, u64>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -128,7 +128,7 @@ where
         let (base, state) = IndexBuilder::new(index_access)
             .index_type(IndexType::Map)
             .index_name(index_name)
-            .build::<()>();
+            .build();
 
         Self {
             base,
@@ -170,7 +170,7 @@ where
             .index_type(IndexType::Map)
             .index_name(family_name)
             .family_id(index_id)
-            .build::<()>();
+            .build();
 
         Self {
             base,
@@ -183,7 +183,7 @@ where
     pub fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
         IndexBuilder::from_address(address, access)
             .index_type(IndexType::Map)
-            .build_existed::<()>()
+            .build_existed()
             .map(|(base, state)| Self {
                 base,
                 state,
@@ -195,7 +195,7 @@ where
     pub fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
         let (base, state) = IndexBuilder::from_address(address, access)
             .index_type(IndexType::Map)
-            .build::<()>();
+            .build();
 
         Self {
             base,
@@ -417,6 +417,7 @@ where
     /// assert!(index.contains(&1));
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value);
+        self.set_len(self.len() + 1);
     }
 
     /// Removes a key from a map.
@@ -442,6 +443,7 @@ where
         Q: BinaryKey + ?Sized,
     {
         self.base.remove(key);
+        self.set_len(self.len().saturating_sub(1));
     }
 
     /// Clears a map, removing all entries.
@@ -468,6 +470,31 @@ where
     /// assert!(!index.contains(&1));
     pub fn clear(&mut self) {
         self.base.clear();
+        self.state.clear();
+    }
+
+    /// Returns the number of elements in the map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, MapIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = MapIndex::new("index", &fork);
+    /// assert_eq!(0, index.len());
+    ///
+    /// index.put(&1, 10);
+    ///
+    /// assert_eq!(1, index.len());
+    /// ```
+    pub fn len(&self) -> u64 {
+        self.state.get()
+    }
+
+    fn set_len(&mut self, len: u64) {
+        self.state.set(len)
     }
 }
 
@@ -565,11 +592,13 @@ mod tests {
         let mut map_index = MapIndex::new(IDX_NAME, &fork);
 
         assert_eq!(map_index.get(&1_u8), None);
+        assert_eq!(map_index.len(), 0);
         assert!(!map_index.contains(&1_u8));
 
         map_index.put(&1_u8, 1_u8);
 
         assert_eq!(map_index.get(&1_u8), Some(1_u8));
+        assert_eq!(map_index.len(), 1);
         assert!(map_index.contains(&1_u8));
 
         map_index.remove(&100_u8);
@@ -578,6 +607,7 @@ mod tests {
 
         assert!(!map_index.contains(&1_u8));
         assert_eq!(map_index.get(&1_u8), None);
+        assert_eq!(map_index.len(), 0);
 
         map_index.put(&2_u8, 2_u8);
         map_index.put(&3_u8, 3_u8);
@@ -585,6 +615,7 @@ mod tests {
 
         assert!(!map_index.contains(&2_u8));
         assert!(!map_index.contains(&3_u8));
+        assert_eq!(map_index.len(), 0);
     }
 
     #[test]
