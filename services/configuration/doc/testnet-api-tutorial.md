@@ -34,7 +34,7 @@ To stop the docker container, use `docker stop <container id>` command.
 #### Build an Example Binary
 
 To build an [example binary](../examples/configuration.rs) of the Exonum
-blockchain with the single configuration service mounted on it, run the
+blockchain manually and mount a single configuration service on it, run the
 following command:
 
 ```bash
@@ -122,103 +122,17 @@ configuration run --node-config example/node_4_cfg.toml --db-path example/db4 --
 
 ## Configuration Service REST API
 
-All `hash`es, `public-key`s and `signature`s in tables are hexadecimal strings.
-`config-body` is a valid json, corresponding to [exonum config] serialization.
+Configuration Service allows modifying the [global configuration][system-configuration]
+by the means of proposing a new configuration and voting for proposed
+configurations among the validators.
 
-### Public endpoints
+See the detailed description of the business logic behind the service in our
+[documentation][configuration-updater].
 
-#### Configurations' structure
+The service operates via REST API and provides a set of public and private
+endpoints. The mentioned [documentation][rest-api] will provide you with the
+full list of available endpoints, applied data types and examples of responses.
 
-This config is called *actual* config.
-
-1. Only single config may be scheduled to become next config at any moment of
-   time. This config is called *following* config.
-
-1. For any current config, its *following* config will have `actual_from`
-   greater than the `actual_from` of current config.
-
-1. For any current config, its *following* config will have `previous_cfg_hash`
-   equal to hash of current config.
-
-1. Any config propose gets scheduled to become the *following* config only if
-   it gets **2/3+1** supermajority of votes of `validators` of *actual* config.
-   Thus, which entities can determine what the *following* config will be is
-   specified in the contents of *actual* config.
-
-[Examples](response-samples.md#public-response-samples)
-
-<!-- markdownlint-disable MD013 MD033 -->
-| Endpoint                                                                                                            | HTTP method   | Description                                                                                                                                                                                                                                                        | Query parameters                                                                                                                                                                                                                                                                                            | Response template                                                                                                                                                                                                                                                   |
-| -------------                                                                                                       | ------------- | ------------                                                                                                                                                                                                                                                       | ------------------                                                                                                                                                                                                                                                                                          | ------------------                                                                                                                                                                                                                                                  |
-| `/api/services/configuration/v1/configs/actual`                                                                     | GET           | Lookup actual config                                                                                                                                                                                                                                               | None                                                                                                                                                                                                                                                                                                        | {<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **config-hash**<br> }                                                                                                                                                                                      |
-| `/api/services/configuration/v1/configs/following`                                                                  | GET           | Lookup already scheduled following config which hasn't yet taken effect.<br> `null` if no config is scheduled                                                                                                                                                      | None                                                                                                                                                                                                                                                                                                        | {<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **config-hash**<br> }                                                                                                                                                                                      |
-| `/api/services/configuration/v1/configs?hash=<config-hash>`                                                         | GET           | Lookup config by config hash.<br> If no propose was submitted for a config (genesis config) - "propose" is `null`. <br> If only propose is present, then "committed\_config" is `null`.<br> "propose" key has json-object values, that match **propose-template**. | `<config-hash>` - hash of looked up config.                                                                                                                                                                                                                                                                 | {<br> &emsp;"committed\_config": **config\_body**,<br> &emsp;"propose": {<br> &emsp;&emsp;"num\_validators": **integer**,<br> &emsp;&emsp;"tx\_propose": **propose_transaction_body**, <br> &emsp;"votes\_history\_hash": **vote-history-hash**<br> &emsp;}<br> }        |
-| `/api/services/configuration/v1/configs/votes?hash=<config-hash>`                                                   | GET           | Lookup votes for a config propose by config hash.<br> If a vote from validator is absent, `null` returned at the corresponding index in json array. If the config is absent altogether, `null` is returned instead of the array.                                                                                                                | `<config-hash>` - hash of looked up config.                                                                                                                                                                                                                                                                 | [<br> &emsp;&emsp;**vote_for_propose_transaction_body**,<br> &emsp;&emsp;**null**,<br> &emsp;&emsp;...<br> ]                                                                                                                       |
-| `/api/services/configuration/v1/configs/committed?previous_cfg_hash=<config-hash>&actual_from=<lowest-actual-from>` | GET           | Lookup all committed configs in commit order.                                                                                                                                                                                                                      | `<previous_cfg_hash>` and `<lowest_actual_from>` are optional filtering parameters.<br> **config-body** is included in response if its *previous\_cfg\_hash* field equals the corresponding parameter. <br>It's included if its *actual\_from* field is greater or equal than corresponding parameter.      | [<br> &emsp;{<br> &emsp;&emsp;"config": **config-body**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;{<br> &emsp;&emsp;"config": **config-body**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;...<br> ]                       |
-| `/api/services/configuration/v1/configs/proposed?previous_cfg_hash=<config-hash>&actual_from=<lowest-actual-from>`  | GET           | Lookup all proposed configs in commit order.<br>                                                                                                                                                                                                                   | `<previous_cfg_hash>` and `<lowest_actual_from>` are optional filtering parameters.<br> **propose-template** is included in response if its *previous\_cfg\_hash* field equals the corresponding parameter. <br>It's included if its *actual\_from* field is greater or equal than corresponding parameter. | [<br> &emsp;{<br> &emsp;&emsp;"propose-data": **propose-template**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;{<br> &emsp;&emsp;"propose-data": **propose-template**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;...<br> ] |
-<!-- markdownlint-enable MD013 MD033 -->
-
-### Private endpoints
-
-Posting a new config can be performed by any validator maintainer via private
-endpoint.
-
-#### Propose and vote transactions restrictions
-
-- Propose transactions will only get submitted and executed with state change
-  if all of the following conditions take place:
-
-    1. new config body constitutes a valid json string and corresponds to
-       [StoredConfiguration][exonum config] format.
-
-    1. `previous_cfg_hash` in proposed config body equals to hash of *actual*
-       config.
-
-    1. `actual_from` in proposed config body is greater than *current height*.
-       *current height* is determined as the height of the last
-       committed block + 1. This is important to obtain a sequential view of
-       configs commit history. And, more important, the linear view of history
-       of votes which conditioned scheduling of a config.
-
-    1. a *following* config isn't  already present.
-
-    1. *actual* config contains the node-sender public key in the `validators`
-       field array, as specified in `from` field of the propose transaction.
-       The `from` field is determined by the public key of the node which
-       `postpropose` endpoint is accessed for signing the transaction on
-       maintainer's behalf.
-
-    1. propose of config, which evaluates to the same hash, hasn't already
-       been submitted.
-
-- Vote transactions will only get submitted and executed with state change if
-  all of the following conditions take place:
-
-    1. the vote transaction references a config propose with known config hash.
-
-    1. a *following* config isn't  already present.
-
-    1. *actual* config contains the node-sender's public key in `validators`
-       field, as specified in `from` field of vote transaction. The `from`
-       field is determined by public key of node whose `postvote` endpoint is
-       accessed for signing the transaction on the maintainer's behalf.
-
-    1. `previous_cfg_hash` in the config propose, which is referenced by
-       vote transaction, is equal to hash of *actual* config.
-
-    1. `actual_from` in the config propose, which is referenced by vote
-       transaction, is greater than *current height*.
-
-    1. no vote from the same node public key has been submitted previously.
-
-[Examples](response-samples.md#private-endpoints-response-samples)
-
-<!-- markdownlint-disable MD013 MD033 -->
-| Endpoint                                             | HTTP method   | Description                                       | Response template                                                                                 |
-| -------------                                        | ------------- | ------------                                      | ------------------                                                                                |
-| `/api/services/configuration/v1/configs/postpropose` | POST          | Post proposed config body                         | {<br> &emsp;"cfg\_hash": **configuration-hash**,<br> &emsp;"tx\_hash": **transaction-hash**<br> } |
-| `/api/services/configuration/v1/configs/postvote`    | POST          | Vote for a configuration having specific hash     | {<br> &emsp;"tx\_hash": **transaction-hash**<br> }                                                |
-| `/api/services/configuration/v1/configs/postagainst` | POST          | Vote against a configuration having specific hash | {<br> &emsp;"tx\_hash": **transaction-hash**<br> }                                                |
-<!-- markdownlint-enable MD013 MD033 -->
-
-[exonum config]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
+[configuration-updater]: https://exonum.com/doc/version/latest/advanced/configuration-updater/
+[system-configuration]: https://exonum.com/doc/version/latest/architecture/configuration/
+[rest-api]: https://exonum.com/doc/version/latest/advanced/configuration-updater/#rest-api
