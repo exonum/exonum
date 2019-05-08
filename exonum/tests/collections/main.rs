@@ -14,17 +14,14 @@
 
 //! Tests that compare exonum collections and corresponding rust types using proptest.
 
-#[macro_use]
-extern crate proptest;
-
 macro_rules! proptest_compare_collections {
     ($name:ident, $collection:ident, $reference:ident, $action:ident) => {
         proptest! {
             #[test]
             fn $name(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN)) {
-                use exonum::storage::{Database, MemoryDB};
+                use exonum_merkledb::{Database, TemporaryDB};
 
-                let db = MemoryDB::new();
+                let db = TemporaryDB::new();
 
                 let mut fork = db.fork();
                 let mut reference = $reference::new();
@@ -36,7 +33,7 @@ macro_rules! proptest_compare_collections {
                             fork = db.fork();
                         }
                         _ => {
-                            let mut collection = $collection::new("test", &mut fork);
+                            let mut collection = $collection::new("test", &fork);
                             action.clone().modify(&mut collection);
                             action.clone().modify(&mut reference);
                             compare_collections(&collection, &reference)?;
@@ -45,8 +42,8 @@ macro_rules! proptest_compare_collections {
                 }
                 db.merge(fork.into_patch()).unwrap();
 
-                let mut fork = db.fork();
-                let collection = $collection::new("test", &mut fork);
+                let fork = db.fork();
+                let collection = $collection::new("test", &fork);
                 compare_collections(&collection, &reference)?;
             }
         }

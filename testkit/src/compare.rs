@@ -14,7 +14,7 @@
 
 //! Routines for comparison between 2 states.
 
-use exonum::storage::Snapshot;
+use exonum_merkledb::Snapshot;
 
 /// Facilitation of comparison between 2 states.
 #[derive(Debug)]

@@ -18,7 +18,7 @@
 use crate::crypto::CryptoHash;
 use crate::helpers::{Height, Round, ValidatorId};
 use crate::messages::{Message, Propose};
-use crate::sandbox::{sandbox::timestamping_sandbox, sandbox_tests_helper::*};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 /// HANDLE message
 /// - verify signature
@@ -35,7 +35,7 @@ fn test_ignore_message_with_incorrect_signature() {
         Round(1),
         &sandbox.last_hash(),
         &[],
-        sandbox.s(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
 
     sandbox.recv(&propose);
@@ -55,8 +55,8 @@ fn test_ignore_message_with_incorrect_validator_id() {
             &sandbox.last_hash(),
             &[],
         ),
-        sandbox.p(ValidatorId(1)),
-        sandbox.s(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.secret_key(ValidatorId(1)),
     );
 
     sandbox.recv(&propose);
@@ -102,7 +102,7 @@ fn handle_propose_with_incorrect_time() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 
@@ -137,6 +137,6 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
         Round(1),
         &propose.hash(),
         NOT_LOCKED,
-        sandbox.s(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }

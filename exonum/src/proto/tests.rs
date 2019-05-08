@@ -103,7 +103,7 @@ fn test_signature_wrong_pb_convert() {
 
 #[test]
 fn test_bitvec_pb_convert() {
-    let bv = BitVec::from_bytes(&[0b10100000, 0b00010010]);
+    let bv = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
 
     let pb_bv = bv.to_pb();
     let pb_round_trip: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
@@ -168,7 +168,7 @@ fn test_scalar_struct_round_trip() {
     let scalar_struct = StructWithScalarTypes {
         key: PublicKey::from_slice(&[8; crypto::PUBLIC_KEY_LENGTH]).unwrap(),
         hash: Hash::from_slice(&[7; crypto::HASH_SIZE]).unwrap(),
-        bit_vec: BitVec::from_bytes(&[0b10100000, 0b00010010]),
+        bit_vec: BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]),
         time: Utc.ymd(2018, 1, 26).and_hms_micro(18, 30, 9, 453_829),
         unsigned_32: u32::max_value(),
         unsigned_64: u64::max_value(),
@@ -277,4 +277,38 @@ fn test_version_pb_convert() {
 
     let version_round_trip: Version = ProtobufConvert::from_pb(pb_version).unwrap();
     assert_eq!(version_round_trip, version);
+}
+ 
+#[derive(Debug, PartialEq, ProtobufConvert)]
+#[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
+struct StructWithFixedArrays {
+    fixed_array_8: [u8; 8],
+    fixed_array_16: [u8; 16],
+    fixed_array_32: [u8; 32],
+}
+
+#[test]
+#[should_panic(expected = "wrong array size: actual 32, expected 64")]
+fn test_fixed_array_pb_convert_invalid_len() {
+    let vec = vec![0_u8; 32];
+    <[u8; 32]>::from_pb(vec.clone()).unwrap();
+    <[u8; 64]>::from_pb(vec).unwrap();
+}
+
+#[test]
+fn test_struct_with_fixed_arrays_roundtrip() {
+    let arr_struct = StructWithFixedArrays {
+        fixed_array_8: [1; 8],
+        fixed_array_16: [1; 16],
+        fixed_array_32: [1; 32],
+    };
+
+    let arr_struct_pb = arr_struct.to_pb();
+    let struct_convert_round_trip: StructWithFixedArrays =
+        ProtobufConvert::from_pb(arr_struct_pb).unwrap();
+    assert_eq!(struct_convert_round_trip, arr_struct);
+
+    let bytes = arr_struct.encode().unwrap();
+    let struct_encode_round_trip = StructWithFixedArrays::decode(&bytes).unwrap();
+    assert_eq!(struct_encode_round_trip, arr_struct);
 }

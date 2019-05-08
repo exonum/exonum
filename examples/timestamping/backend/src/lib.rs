@@ -18,13 +18,15 @@
 
 #![deny(
     missing_debug_implementations,
-    missing_docs,
+    // missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
 
 #[macro_use]
 extern crate exonum_derive;
+#[macro_use]
+extern crate exonum;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -37,58 +39,101 @@ pub mod proto;
 pub mod schema;
 pub mod transactions;
 
+use exonum_merkledb::Snapshot;
+
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
+    blockchain::ExecutionResult,
     crypto::Hash,
     helpers::fabric,
-    messages::AnyTx,
-    storage::Snapshot,
+    runtime::rust::{
+        service::{GenesisInitInfo, Service, ServiceFactory},
+        RustArtifactSpec, TransactionContext,
+    },
 };
+use exonum_time::schema::TimeSchema;
 
-use crate::{api::PublicApi, schema::Schema, transactions::TimeTransactions};
+use crate::{api::PublicApi as TimestampingApi, schema::{Schema, TimestampEntry}, transactions::{TxTimestamp, Error}, };
 
 const TIMESTAMPING_SERVICE: u16 = 130;
 const SERVICE_NAME: &str = "timestamping";
 
-/// Exonum `Service` implementation.
-#[derive(Debug, Default)]
-pub struct Service;
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        TIMESTAMPING_SERVICE
+#[service_interface]
+pub trait Timestamping {
+    fn timestamp(&self, ctx: TransactionContext, arg: TxTimestamp) -> ExecutionResult;
+}
+
+#[derive(Debug)]
+pub struct TimestampingServiceImpl;
+
+impl Timestamping for TimestampingServiceImpl {
+    fn timestamp(
+        &self,
+        context: TransactionContext,
+        arg: TxTimestamp,
+    ) -> ExecutionResult {
+        let tx_hash = context.tx_hash();
+        let time = TimeSchema::new(context.fork())
+            .time()
+            .get()
+            .expect("Can't get the time");
+
+        let hash = &arg.content.content_hash;
+
+        let schema = Schema::new(context.fork());
+        if let Some(_entry) = schema.timestamps().get(hash) {
+            Err(Error::HashAlreadyExists)?;
+        }
+
+        trace!("Timestamp added: {:?}", arg);
+        let entry = TimestampEntry::new(arg.content.clone(), &tx_hash, time);
+        schema.add_timestamp(entry);
+
+        Ok(())
+    }
+}
+
+impl_service_dispatcher!(TimestampingServiceImpl, Timestamping);
+
+impl Service for TimestampingServiceImpl {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        TimestampingApi::wire(builder);
     }
 
-    fn service_name(&self) -> &'static str {
-        SERVICE_NAME
-    }
-
-    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(view);
+    fn state_hash(&self, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let schema = Schema::new(snapshot);
         schema.state_hash()
     }
+}
 
-    fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = TimeTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
+pub fn artifact_spec() -> RustArtifactSpec {
+    RustArtifactSpec::new(SERVICE_NAME, 0, 1, 0)
+}
+
+#[derive(Debug)]
+pub struct ServiceFactoryImpl;
+
+impl ServiceFactory for ServiceFactoryImpl {
+    fn artifact(&self) -> RustArtifactSpec {
+        artifact_spec()
     }
 
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        PublicApi::wire(builder);
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(TimestampingServiceImpl)
+    }
+
+    fn genesis_init_info(&self) -> Vec<GenesisInitInfo> {
+        vec![]
     }
 }
 
 /// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug, Clone, Copy)]
-pub struct ServiceFactory;
+#[derive(Debug)]
+pub struct TimestampingServiceFactory;
 
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service)
+impl fabric::ServiceFactory for TimestampingServiceFactory {
+    fn make_service_builder(&self, _run_context: &fabric::Context) -> Box<dyn ServiceFactory> {
+        Box::new(ServiceFactoryImpl)
     }
 }

@@ -20,7 +20,7 @@
 //! for use in production.
 //!
 //! [exonum]: https://github.com/exonum/exonum
-//! [docs]: https://exonum.com/doc/get-started/create-service
+//! [docs]: https://exonum.com/doc/version/latest/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
 #![deny(
@@ -43,17 +43,16 @@ pub mod proto;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::{
-        crypto::PublicKey,
-        storage::{Fork, MapIndex, Snapshot},
-    };
+    use exonum_merkledb::{IndexAccess, MapIndex};
+
+    use exonum::crypto::PublicKey;
 
     use super::proto;
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
     //
-    // [1]: https://exonum.com/doc/architecture/serialization
+    // [1]: https://exonum.com/doc/version/latest/architecture/serialization
     /// Wallet struct used to persist data within the service.
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "proto::Wallet")]
@@ -100,17 +99,17 @@ pub mod schema {
     /// Declare the layout of data managed by the service. An instance of [`MapIndex`] is used
     /// to keep wallets in the storage. Index values are serialized [`Wallet`] structs.
     ///
-    /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
+    /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
     /// [`Wallet`]: struct.Wallet.html
-    impl<T: AsRef<dyn Snapshot>> CurrencySchema<T> {
+    impl<T: IndexAccess> CurrencySchema<T> {
         /// Creates a new schema instance.
         pub fn new(view: T) -> Self {
             CurrencySchema { view }
         }
 
         /// Returns an immutable version of the wallets table.
-        pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
-            MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
+        pub fn wallets(&self) -> MapIndex<T, PublicKey, Wallet> {
+            MapIndex::new("cryptocurrency.wallets", self.view)
         }
 
         /// Gets a specific wallet from the storage.
@@ -118,26 +117,13 @@ pub mod schema {
             self.wallets().get(pub_key)
         }
     }
-
-    /// A mutable version of the schema with an additional method to persist wallets
-    /// to the storage.
-    impl<'a> CurrencySchema<&'a mut Fork> {
-        /// Returns a mutable version of the wallets table.
-        pub fn wallets_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-            MapIndex::new("cryptocurrency.wallets", &mut self.view)
-        }
-    }
 }
 
 /// Transactions.
 pub mod transactions {
     use super::proto;
-    //    use super::service::SERVICE_ID;
-    use exonum::{
-        api::ServiceApiBuilder,
-        crypto::{PublicKey, SecretKey},
-        messages::{AnyTx, Message, Signed},
-    };
+    use exonum::crypto::PublicKey;
+    
     /// Transaction type for creating a new wallet.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
@@ -222,7 +208,6 @@ pub mod errors {
 pub mod contracts {
     use exonum::api::ServiceApiBuilder;
     use exonum::blockchain::ExecutionResult;
-    use exonum::runtime::configuration_new::DeployInit;
     use exonum::runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
@@ -234,7 +219,6 @@ pub mod contracts {
         schema::{CurrencySchema, Wallet},
         transactions::{TxCreateWallet, TxTransfer},
     };
-    use exonum::runtime::RuntimeIdentifier::Rust;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -251,23 +235,23 @@ pub mod contracts {
     impl Cryptocurrency for CryptocurrencyServiceImpl {
         fn create_wallet(
             &self,
-            mut context: TransactionContext,
+            context: TransactionContext,
             arg: TxCreateWallet,
         ) -> ExecutionResult {
             let author = context.author();
             let view = context.fork();
-            let mut schema = CurrencySchema::new(view);
+            let schema = CurrencySchema::new(view);
             if schema.wallet(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
                 println!("Create the wallet: {:?}", wallet);
-                schema.wallets_mut().put(&author, wallet);
+                schema.wallets().put(&author, wallet);
                 Ok(())
             } else {
                 Err(Error::WalletAlreadyExists)?
             }
         }
 
-        fn transfer(&self, mut context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
+        fn transfer(&self, context: TransactionContext, arg: TxTransfer) -> ExecutionResult {
             let author = context.author();
             let view = context.fork();
 
@@ -275,7 +259,7 @@ pub mod contracts {
                 Err(Error::SenderSameAsReceiver)?
             }
 
-            let mut schema = CurrencySchema::new(view);
+            let schema = CurrencySchema::new(view);
 
             let sender = match schema.wallet(&author) {
                 Some(val) => val,
@@ -292,7 +276,7 @@ pub mod contracts {
                 let sender = sender.decrease(amount);
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
-                let mut wallets = schema.wallets_mut();
+                let mut wallets = schema.wallets();
                 wallets.put(&author, sender);
                 wallets.put(&arg.to, receiver);
                 Ok(())
@@ -359,7 +343,7 @@ pub mod api {
         /// Endpoint for getting a single wallet.
         pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
             let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(snapshot);
+            let schema = CurrencySchema::new(&snapshot);
             schema
                 .wallet(&query.pub_key)
                 .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
@@ -368,7 +352,7 @@ pub mod api {
         /// Endpoint for dumping all wallets from the storage.
         pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
             let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(snapshot);
+            let schema = CurrencySchema::new(&snapshot);
             let idx = schema.wallets();
             let wallets = idx.values().collect();
             Ok(wallets)

@@ -23,7 +23,7 @@ use super::{
 use crate::blockchain::Schema;
 use crate::helpers::config::ConfigFile;
 use crate::node::NodeConfig;
-use crate::storage::{Database, DbOptions, RocksDB};
+use exonum_merkledb::{Database, DbOptions, RocksDB};
 
 // Context entry for the path to the node config.
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
@@ -58,9 +58,9 @@ impl Maintenance {
 
         let config = Self::node_config(context);
         let db = Self::database(context, &config.database);
-        let mut fork = db.fork();
+        let fork = db.fork();
         {
-            let mut schema = Schema::new(&mut fork);
+            let schema = Schema::new(&fork);
             schema.consensus_messages_cache_mut().clear();
         }
         db.merge_sync(fork.into_patch()).expect("Can't clear cache");

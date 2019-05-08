@@ -21,13 +21,14 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum_derive;
 
+use exonum_merkledb::{IndexAccess, ObjectHash, ProofMapIndex, Snapshot};
+
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::{ExecutionResult, Service, Transaction, TransactionContext, TransactionSet},
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Message, Signed},
-    storage::{Fork, ProofMapIndex, Snapshot},
 };
 use exonum_testkit::TestKitBuilder;
 use exonum_time::{schema::TimeSchema, time_provider::MockTimeProvider, TimeService};
@@ -45,29 +46,20 @@ pub struct MarkerSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<dyn Snapshot>> MarkerSchema<T> {
+impl<T: IndexAccess> MarkerSchema<T> {
     /// Constructs schema for the given `snapshot`.
     pub fn new(view: T) -> Self {
         MarkerSchema { view }
     }
 
     /// Returns the table mapping `i32` value to public keys authoring marker transactions.
-    pub fn marks(&self) -> ProofMapIndex<&dyn Snapshot, PublicKey, i32> {
-        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view.as_ref())
+    pub fn marks(&self) -> ProofMapIndex<T, PublicKey, i32> {
+        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view)
     }
 
     /// Returns hashes for stored table.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks().merkle_root()]
-    }
-}
-
-impl<'a> MarkerSchema<&'a mut Fork> {
-    /// Mutable reference to the ['marks'][1] index.
-    ///
-    /// [1]: struct.MarkerSchema.html#method.marks
-    pub fn marks_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, i32> {
-        ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view)
+        vec![self.marks().object_hash()]
     }
 }
 
@@ -96,14 +88,14 @@ impl TxMarker {
 }
 
 impl Transaction for TxMarker {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
+    fn execute(&self, context: TransactionContext) -> ExecutionResult {
         let author = context.author();
         let view = context.fork();
-        let time = TimeSchema::new(&view).time().get();
+        let time = TimeSchema::new(view).time().get();
         match time {
             Some(current_time) if current_time <= self.time => {
-                let mut schema = MarkerSchema::new(view);
-                schema.marks_mut().put(&author, self.mark);
+                let schema = MarkerSchema::new(view);
+                schema.marks().put(&author, self.mark);
             }
             _ => {}
         }
@@ -170,7 +162,7 @@ fn main() {
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(snapshot);
+    let schema = MarkerSchema::new(&snapshot);
     assert_eq!(schema.marks().get(&keypair1.0), Some(1));
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
@@ -179,6 +171,6 @@ fn main() {
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(snapshot);
+    let schema = MarkerSchema::new(&snapshot);
     assert_eq!(schema.marks().get(&keypair3.0), Some(4));
 }

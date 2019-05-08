@@ -15,7 +15,7 @@
 use crate::crypto::Hash;
 use crate::messages::{BinaryForm, MethodId};
 use crate::runtime::{error::ExecutionError, rust::TransactionContext, RuntimeIdentifier};
-use crate::storage::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 
 use failure::Error;
 use protobuf::well_known_types::Any;

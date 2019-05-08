@@ -280,7 +280,7 @@ where
 {
     type ProtoStruct = Vec<T::ProtoStruct>;
     fn to_pb(&self) -> Self::ProtoStruct {
-        self.iter().map(|v| v.to_pb()).collect()
+        self.iter().map(ProtobufConvert::to_pb).collect()
     }
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         pb.into_iter()
@@ -361,4 +361,41 @@ impl ProtobufConvert for well_known_types::Any {
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Ok(pb)
     }
+}
+macro_rules! impl_protobuf_convert_fixed_byte_array {
+    ( $( $arr_len:expr ),* ) => {
+        $(
+            /// Special case for fixed sized arrays.
+            impl ProtobufConvert for [u8; $arr_len] {
+                type ProtoStruct = Vec<u8>;
+
+                fn to_pb(&self) -> Self::ProtoStruct {
+                    self.to_vec()
+                }
+
+                fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+                    ensure!(
+                        pb.len() == $arr_len,
+                        "wrong array size: actual {}, expected {}",
+                        pb.len(),
+                        $arr_len
+                    );
+
+                    Ok({
+                        let mut array = [0; $arr_len];
+                        array.copy_from_slice(&pb);
+                        array
+                    })
+                }
+            }
+        )*
+    };
+}
+
+// We implement array conversion only for most common array sizes that uses
+// for example in cryptography.
+impl_protobuf_convert_fixed_byte_array! {
+    8, 16, 24, 32, 40, 48, 56, 64,
+    72, 80, 88, 96, 104, 112, 120, 128,
+    160, 256, 512, 1024, 2048
 }

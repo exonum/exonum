@@ -17,8 +17,9 @@
 use crate::{
     crypto::{self, CryptoHash, Hash, HASH_SIZE},
     proto,
-    storage::{Fork, MapIndex, ProofListIndex, ProofMapIndex, Snapshot, StorageValue},
 };
+
+use exonum_merkledb::{IndexAccess, ObjectHash, MapIndex, ProofListIndex, ProofMapIndex, Snapshot, BinaryValue};
 
 use std::{borrow::Cow, ops::Deref};
 
@@ -78,7 +79,7 @@ pub enum VotingDecision {
 
 impl CryptoHash for VotingDecision {
     fn hash(&self) -> Hash {
-        let res = StorageValue::into_bytes(*self);
+        let res = BinaryValue::into_bytes(*self);
         res.hash()
     }
 }
@@ -93,8 +94,8 @@ impl VotingDecision {
     }
 }
 
-impl StorageValue for VotingDecision {
-    fn into_bytes(self) -> Vec<u8> {
+impl BinaryValue for VotingDecision {
+    fn to_bytes(&self) -> Vec<u8> {
         let (tag, mut res) = match self {
             VotingDecision::Yea(vote) => (YEA_TAG, vote.into_bytes()),
             VotingDecision::Nay(vote_against) => (NAY_TAG, vote_against.into_bytes()),
@@ -103,15 +104,17 @@ impl StorageValue for VotingDecision {
         res
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         assert_eq!(bytes.len(), HASH_SIZE + 1);
         let tag = bytes[HASH_SIZE];
         let raw_hash = Hash::from_slice(&bytes[0..HASH_SIZE]).unwrap();
-        match tag {
+        let res = match tag {
             YEA_TAG => VotingDecision::Yea(raw_hash),
             NAY_TAG => VotingDecision::Nay(raw_hash),
             _ => panic!("invalid voting tag: {}", tag),
-        }
+        };
+
+        Ok(res)
     }
 }
 
@@ -173,20 +176,28 @@ impl CryptoHash for MaybeVote {
     }
 }
 
-impl StorageValue for MaybeVote {
-    fn into_bytes(self) -> Vec<u8> {
+impl ObjectHash for MaybeVote {
+    fn object_hash(&self) -> Hash {
+        self.hash()
+    }
+}
+
+impl BinaryValue for MaybeVote {
+    fn to_bytes(&self) -> Vec<u8> {
         match self.0 {
             Some(v) => v.into_bytes(),
             None => NO_VOTE_BYTES.to_vec(),
         }
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        if NO_VOTE_BYTES.eq(bytes.as_ref()) {
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let res = if NO_VOTE_BYTES.eq(bytes.as_ref()) {
             MaybeVote::none()
         } else {
-            MaybeVote::some(VotingDecision::from_bytes(bytes))
-        }
+            MaybeVote::some(VotingDecision::from_bytes(bytes)?)
+        };
+
+        Ok(res)
     }
 }
 
@@ -198,7 +209,7 @@ pub struct Schema<T> {
 
 impl<T> Schema<T>
 where
-    T: AsRef<dyn Snapshot>,
+    T: IndexAccess,
 {
     /// Creates a new schema.
     pub fn new(snapshot: T) -> Schema<T> {
@@ -210,18 +221,18 @@ where
     ///
     /// Consult [the crate-level docs](index.html) for details how hashes of the configuration
     /// are calculated.
-    pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&dyn Snapshot, Hash, ProposeData> {
-        ProofMapIndex::new(PROPOSES, self.view.as_ref())
+    pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<T, Hash, ProposeData> {
+        ProofMapIndex::new(PROPOSES, self.view)
     }
 
     /// Returns a table of hashes of proposed configurations in the commit order.
-    pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&dyn Snapshot, Hash> {
-        ProofListIndex::new(PROPOSE_HASHES, self.view.as_ref())
+    pub fn config_hash_by_ordinal(&self) -> ProofListIndex<T, Hash> {
+        ProofListIndex::new(PROPOSE_HASHES, self.view)
     }
 
     /// Returns a table with mapping between service instance names and their identifiers.
-    pub fn service_ids(&self) -> MapIndex<&dyn Snapshot, String, u32> {
-        MapIndex::new(SERVICE_IDS, self.view.as_ref())
+    pub fn service_ids(&self) -> MapIndex<T, String, u32> {
+        MapIndex::new(SERVICE_IDS, self.view)
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced
@@ -229,8 +240,8 @@ where
     pub fn votes_by_config_hash(
         &self,
         config_hash: &Hash,
-    ) -> ProofListIndex<&dyn Snapshot, MaybeVote> {
-        ProofListIndex::new_in_family(VOTES, config_hash, self.view.as_ref())
+    ) -> ProofListIndex<T, MaybeVote> {
+        ProofListIndex::new_in_family(VOTES, config_hash, self.view)
     }
 
     /// Returns a `Propose` transaction with a particular configuration hash.
@@ -250,35 +261,8 @@ where
     /// Returns state hash values used by the configuration service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.propose_data_by_config_hash().merkle_root(),
-            self.config_hash_by_ordinal().merkle_root(),
+            self.propose_data_by_config_hash().object_hash(),
+            self.config_hash_by_ordinal().object_hash(),
         ]
-    }
-}
-
-impl<'a> Schema<&'a mut Fork> {
-    /// Mutable version of the `propose_data_by_config_hash` index.
-    pub(crate) fn propose_data_by_config_hash_mut(
-        &mut self,
-    ) -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
-        ProofMapIndex::new(PROPOSES, &mut self.view)
-    }
-
-    /// Mutable version of the `config_hash_by_ordinal` index.
-    pub(crate) fn config_hash_by_ordinal_mut(&mut self) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new(PROPOSE_HASHES, &mut self.view)
-    }
-
-    /// Mutable version of the `votes_by_config_hash` index.
-    pub(crate) fn votes_by_config_hash_mut(
-        &mut self,
-        config_hash: &Hash,
-    ) -> ProofListIndex<&mut Fork, MaybeVote> {
-        ProofListIndex::new_in_family(VOTES, config_hash, &mut self.view)
-    }
-
-    /// Mutable version of the `service_ids` index.
-    pub(crate) fn service_ids_mut(&mut self) -> MapIndex<&mut Fork, String, u32> {
-        MapIndex::new(SERVICE_IDS, &mut self.view)
     }
 }

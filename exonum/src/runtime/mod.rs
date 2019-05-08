@@ -16,7 +16,7 @@ use protobuf::well_known_types::Any;
 
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
-use crate::storage::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Snapshot};
 
 use self::rust::RustArtifactSpec;
 

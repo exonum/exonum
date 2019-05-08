@@ -182,7 +182,8 @@ impl ServiceApiScope {
 /// impl MyApi {
 ///     // Immutable handler, which returns a hash of the block at the given height.
 ///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
-///         let schema = Schema::new(state.snapshot());
+///         let snapshot = state.snapshot();
+///         let schema = Schema::new(&snapshot);
 ///         Ok(schema.block_hashes_by_height()
 ///             .get(query.block_height)
 ///             .map(|hash| BlockInfo { hash })
@@ -203,9 +204,9 @@ impl ServiceApiScope {
 ///     // You may also create asynchronous handlers for long requests.
 ///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
 ///      -> api::FutureResult<Option<Hash>> {
-///         let blockchain = state.blockchain().clone();
+///         let blockchain = state.blockchain().clone().snapshot();
 ///         Box::new(futures::lazy(move || {
-///             let schema = Schema::new(blockchain.snapshot());
+///             let schema = Schema::new(&blockchain);
 ///             Ok(schema.block_hashes_by_height().get(query.block_height))
 ///         }))
 ///     }

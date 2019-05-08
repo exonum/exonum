@@ -29,7 +29,7 @@ use crate::runtime::{
     error::{ExecutionError, WRONG_ARG_ERROR},
     DeployStatus, InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
 };
-use crate::storage::{Database, Entry, MemoryDB, Snapshot};
+use exonum_merkledb::{Database, Entry, TemporaryDB, Fork, Snapshot};
 use protobuf::{well_known_types::Any, Message};
 
 const SERVICE_INSTANCE_ID: ServiceInstanceId = 2;
@@ -57,9 +57,11 @@ pub struct TestServiceImpl;
 
 impl TestService for TestServiceImpl {
     fn method_a(&self, mut ctx: TransactionContext, arg: TxA) -> Result<(), ExecutionError> {
-        let fork = ctx.fork();
-        let mut entry = Entry::new("method_a_entry", fork);
-        entry.set(arg.value);
+        {
+            let fork = ctx.fork() as &Fork;
+            let mut entry = Entry::new("method_a_entry", fork);
+            entry.set(arg.value);
+        }
 
         // Test calling one service from another.
         // TODO: It should be improved to support service auth in the future.
@@ -73,8 +75,8 @@ impl TestService for TestServiceImpl {
         Ok(())
     }
 
-    fn method_b(&self, mut ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
-        let fork = ctx.fork();
+    fn method_b(&self, ctx: TransactionContext, arg: TxB) -> Result<(), ExecutionError> {
+        let fork = ctx.fork() as &Fork;
         let mut entry = Entry::new("method_b_entry", fork);
         entry.set(arg.value);
         Ok(())
@@ -84,12 +86,12 @@ impl TestService for TestServiceImpl {
 impl_service_dispatcher!(TestServiceImpl, TestService);
 
 impl Service for TestServiceImpl {
-    fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
+    fn initialize(&mut self, ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
         let mut arg: TestServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
             ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
         })?;
 
-        let fork = ctx.fork();
+        let fork = ctx.fork() as &Fork;
         let mut entry = Entry::new("constructor_entry", fork);
         entry.set(arg.take_msg());
         Ok(())
@@ -118,7 +120,7 @@ impl ServiceFactory for TestServiceFactory {
 
 #[test]
 fn test_basic_rust_runtime() {
-    let db = MemoryDB::new();
+    let db = TemporaryDB::new();
 
     let mut dispatcher = Dispatcher::new(mpsc::channel(0).0);
     // Create runtime and service.
@@ -159,8 +161,10 @@ fn test_basic_rust_runtime() {
             .init_service(&mut context, artifact.clone(), &init_data)
             .unwrap();
 
-        let entry = Entry::new("constructor_entry", &fork);
-        assert_eq!(entry.get(), Some("constructor_message".to_owned()));
+        {
+            let entry = Entry::new("constructor_entry", &fork);
+            assert_eq!(entry.get(), Some("constructor_message".to_owned()));
+        }
 
         db.merge(fork.into_patch()).unwrap();
     }
@@ -179,10 +183,14 @@ fn test_basic_rust_runtime() {
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();
 
-        let entry = Entry::new("method_a_entry", &fork);
-        assert_eq!(entry.get(), Some(ARG_A_VALUE));
-        let entry = Entry::new("method_b_entry", &fork);
-        assert_eq!(entry.get(), Some(ARG_A_VALUE));
+        {
+            let entry = Entry::new("method_a_entry", &fork);
+            assert_eq!(entry.get(), Some(ARG_A_VALUE));
+        }
+        {
+            let entry = Entry::new("method_b_entry", &fork);
+            assert_eq!(entry.get(), Some(ARG_A_VALUE));
+        }
 
         db.merge(fork.into_patch()).unwrap();
     }
@@ -200,8 +208,10 @@ fn test_basic_rust_runtime() {
             .execute(&mut context, dispatch_info, &payload)
             .unwrap();
 
-        let entry = Entry::new("method_b_entry", &fork);
-        assert_eq!(entry.get(), Some(ARG_B_VALUE));
+        {
+            let entry = Entry::new("method_b_entry", &fork);
+            assert_eq!(entry.get(), Some(ARG_B_VALUE));
+        }
 
         db.merge(fork.into_patch()).unwrap();
     }

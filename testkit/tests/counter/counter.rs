@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! Sample counter service.
+use exonum_merkledb::{Entry, IndexAccess, Snapshot};
+
 use exonum::{
     api,
     blockchain::{
@@ -20,7 +22,6 @@ use exonum::{
     },
     crypto::{CryptoHash, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Message, Signed},
-    storage::{Entry, Fork, Snapshot},
 };
 
 use super::proto;
@@ -36,23 +37,17 @@ pub struct CounterSchema<T> {
     view: T,
 }
 
-impl<T: AsRef<dyn Snapshot>> CounterSchema<T> {
+impl<T: IndexAccess> CounterSchema<T> {
     pub fn new(view: T) -> Self {
         CounterSchema { view }
     }
 
-    fn entry(&self) -> Entry<&dyn Snapshot, u64> {
-        Entry::new("counter.count", self.view.as_ref())
+    fn entry(&self) -> Entry<T, u64> {
+        Entry::new("counter.count", self.view)
     }
 
     pub fn count(&self) -> Option<u64> {
         self.entry().get()
-    }
-}
-
-impl<'a> CounterSchema<&'a mut Fork> {
-    fn entry_mut(&mut self) -> Entry<&mut Fork, u64> {
-        Entry::new("counter.count", self.view)
     }
 
     fn inc_count(&mut self, inc: u64) -> u64 {
@@ -61,12 +56,12 @@ impl<'a> CounterSchema<&'a mut Fork> {
             .unwrap_or(0)
             .checked_add(inc)
             .expect("attempt to add with overflow");
-        self.entry_mut().set(count);
+        self.entry().set(count);
         count
     }
 
     fn set_count(&mut self, count: u64) {
-        self.entry_mut().set(count);
+        self.entry().set(count);
     }
 }
 
@@ -101,7 +96,7 @@ impl TxIncrement {
 impl Transaction for TxIncrement {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
         if self.by == 0 {
             Err(ExecutionError::with_description(
                 0,
@@ -122,7 +117,7 @@ impl TxReset {
 }
 
 impl Transaction for TxReset {
-    fn execute(&self, mut tc: TransactionContext) -> ExecutionResult {
+    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
         let mut schema = CounterSchema::new(tc.fork());
         schema.set_count(0);
         Ok(())

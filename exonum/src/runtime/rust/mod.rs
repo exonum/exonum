@@ -34,7 +34,7 @@ use super::{
 use crate::crypto::{Hash, PublicKey};
 use crate::messages::{BinaryForm, CallInfo};
 use crate::proto::schema;
-use crate::storage::{Error as StorageError, Fork, Snapshot};
+use exonum_merkledb::{Error as StorageError, Fork, Snapshot};
 
 use self::service::{Service, ServiceFactory};
 use crate::api::ServiceApiBuilder;
@@ -249,11 +249,10 @@ impl RuntimeEnvironment for RustRuntime {
         let inner = &self.inner;
 
         for (_, service) in &inner.initialized {
-            fork.checkpoint();
             match panic::catch_unwind(panic::AssertUnwindSafe(|| {
                 service.as_ref().before_commit(fork)
             })) {
-                Ok(..) => fork.commit(),
+                Ok(..) => fork.flush(),
                 Err(err) => {
                     if err.is::<StorageError>() {
                         // Continue panic unwind if the reason is StorageError.
@@ -342,7 +341,7 @@ impl<'a, 'c> TransactionContext<'a, 'c> {
         self.env_context
     }
 
-    pub fn fork(&mut self) -> &mut Fork {
+    pub fn fork(&self) -> &Fork {
         self.env_context.fork
     }
 

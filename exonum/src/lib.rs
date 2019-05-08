@@ -33,7 +33,7 @@
           // `filter(..).map(..)` often looks more shorter and readable.
           clippy::filter_map,
           // Next lints produce too much noise/false positives.
-          clippy::stutter, clippy::similar_names,
+          clippy::module_name_repetitions, clippy::similar_names,
           // Variant name ends with the enum name. Similar behavior to similar_names.
           clippy::pub_enum_variant_names,
           // Next lints allowed due to false positive.
@@ -56,6 +56,8 @@ extern crate exonum_derive;
 #[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[macro_use]
+extern crate exonum_merkledb;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate log;
@@ -70,8 +72,6 @@ extern crate test;
 
 pub use exonum_crypto as crypto;
 
-use exonum_rocksdb as rocksdb;
-
 pub mod proto;
 #[macro_use]
 pub mod messages;
@@ -85,7 +85,7 @@ pub mod events;
 pub mod explorer;
 pub mod node;
 pub mod runtime;
-pub mod storage;
 
+//TODO: revert sandbox
 #[cfg(test)]
 mod sandbox;

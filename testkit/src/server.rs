@@ -29,11 +29,15 @@ struct CreateBlockQuery {
     tx_hashes: Option<Vec<Hash>>,
 }
 
+/// Testkit status, returned by the corresponding API endpoint.
 #[derive(Debug, Serialize, Deserialize)]
-struct TestKitStatus {
-    height: Height,
-    configuration: TestNetworkConfiguration,
-    next_configuration: Option<TestNetworkConfiguration>,
+pub struct TestKitStatus {
+    /// Current blockchain height.
+    pub height: Height,
+    /// Currently active network configuration.
+    pub configuration: TestNetworkConfiguration,
+    /// Scheduled network configuration (if any).
+    pub next_configuration: Option<TestNetworkConfiguration>,
 }
 
 #[derive(Debug, Clone)]
@@ -158,7 +162,7 @@ mod tests {
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{AnyTx, Message, Signed};
-    use exonum::storage::Snapshot;
+    use exonum_merkledb::Snapshot;
 
     use super::{super::proto, *};
     use crate::{TestKitApi, TestKitBuilder};

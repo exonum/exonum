@@ -6,7 +6,8 @@ use std::fmt;
 use crate::crypto::{self, hash, CryptoHash, Hash, PublicKey, SecretKey, Signature};
 use crate::messages::BinaryForm;
 use crate::proto::{self, ProtobufConvert};
-use crate::storage::StorageValue;
+
+use exonum_merkledb::BinaryValue;
 use protobuf::Message;
 use serde::de::{self, Deserialize, Deserializer};
 use std::borrow::Cow;
@@ -102,15 +103,15 @@ impl BinaryForm for SignedMessage {
     }
 }
 
-impl StorageValue for SignedMessage {
-    fn into_bytes(self) -> Vec<u8> {
+impl BinaryValue for SignedMessage {
+    fn to_bytes(&self) -> Vec<u8> {
         self.encode().unwrap()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
-        pb.merge_from_bytes(&value).unwrap();
-        Self::from_pb_no_verify(pb).unwrap()
+        pb.merge_from_bytes(&value)?;
+        Self::from_pb_no_verify(pb)
     }
 }
 

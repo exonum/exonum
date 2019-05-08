@@ -24,7 +24,7 @@ use crate::messages::{
     TransactionsResponse,
 };
 use crate::node::{NodeHandler, RequestData};
-use crate::storage::Patch;
+use exonum_merkledb::Patch;
 
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
@@ -113,7 +113,7 @@ impl NodeHandler {
         trace!("Handle propose");
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(snapshot);
+        let schema = Schema::new(&snapshot);
         //TODO: Remove this match after errors refactor. (ECR-979)
         let has_unknown_txs = match self.state.add_propose(
             msg.clone(),
@@ -205,7 +205,7 @@ impl NodeHandler {
         let block_hash = block.hash();
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(snapshot);
+            let schema = Schema::new(&snapshot);
             let has_unknown_txs = self
                 .state
                 .create_incomplete_block(&msg, &schema.transactions(), &schema.transactions_pool())
@@ -544,9 +544,9 @@ impl NodeHandler {
         //     bail!("Received malicious transaction.")
         // }
 
-        let mut fork = self.blockchain.fork();
+        let fork = self.blockchain.fork();
         {
-            let mut schema = Schema::new(&mut fork);
+            let mut schema = Schema::new(&fork);
             schema.add_transaction_into_pool(msg);
         }
         self.blockchain

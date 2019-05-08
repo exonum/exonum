@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_cryptocurrency::service::CurrencyService;
+// use exonum_cryptocurrency::service::CurrencyService;
 use exonum_testkit::TestKitBuilder;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
 
+    // TODO Fix testkit work
+
     TestKitBuilder::validator()
-        .with_service(CurrencyService)
+        // .with_service(CurrencyService)
         .serve(
             "0.0.0.0:8000".parse().unwrap(),
             "0.0.0.0:9000".parse().unwrap(),

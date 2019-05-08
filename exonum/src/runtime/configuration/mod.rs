@@ -35,7 +35,7 @@
 //! 3. Use `crate::crypto::hash()` on the obtained bytes.
 //!
 //! [sc]: https://docs.rs/exonum/0.10.3/exonum/blockchain/config/struct.StoredConfiguration.html
-//! [docs:config]: https://exonum.com/doc/advanced/configuration-updater/
+//! [docs:config]: https://exonum.com/doc/version/latest/advanced/configuration-updater/
 //!
 //! # Examples
 //!
@@ -57,13 +57,14 @@ pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use serde_json::{to_value, Value};
 
+use exonum_merkledb::{Fork, Snapshot};
 use crate::{
+
     api::ServiceApiBuilder,
     blockchain::{self, Transaction, TransactionSet},
     crypto::Hash,
     messages::AnyTx,
     node::State,
-    storage::{Fork, Snapshot},
 };
 
 use config::ConfigurationServiceConfig;

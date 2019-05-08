@@ -223,7 +223,7 @@ impl Context {
             match arg.argument_type {
                 ArgumentType::Named(detail) if detail.multiple && arg.takes_value => {
                     if let Some(values) = matches.values_of(&arg.name) {
-                        let values: Vec<String> = values.map(|e| e.to_owned()).collect();
+                        let values: Vec<String> = values.map(ToOwned::to_owned).collect();
                         if context
                             .multiple_args
                             .insert(arg.name.to_owned(), values)

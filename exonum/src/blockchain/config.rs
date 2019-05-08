@@ -29,7 +29,7 @@ use std::collections::{BTreeMap, HashSet};
 use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
 use crate::helpers::{Height, Milliseconds};
 use crate::messages::SIGNED_MESSAGE_MIN_SIZE;
-use crate::storage::StorageValue;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -76,13 +76,13 @@ pub struct StoredConfiguration {
 /// which can later be edited as required.
 /// The parameters in this configuration should be the same for all nodes in the network and can
 /// be changed using the
-/// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
+/// [configuration update service](https://exonum.com/doc/version/latest/advanced/configuration-updater/).
 ///
 /// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
 /// to slow down block generation,hence consume less disk space, these values can be increased.
 ///
 /// For additional information on the Exonum consensus algorithm, refer to
-/// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
+/// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
     /// Interval between first two rounds. This interval defines the time that passes
@@ -256,13 +256,15 @@ impl CryptoHash for StoredConfiguration {
     }
 }
 
-impl StorageValue for StoredConfiguration {
-    fn into_bytes(self) -> Vec<u8> {
+impl_object_hash_for_binary_value! { StoredConfiguration }
+
+impl BinaryValue for StoredConfiguration {
+    fn to_bytes(&self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }
 
-    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        Self::try_deserialize(v.as_ref()).unwrap()
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+        Self::try_deserialize(v.as_ref()).map_err(Into::into)
     }
 }
 
