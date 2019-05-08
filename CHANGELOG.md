@@ -58,10 +58,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   An additional field in the response of the endpoint was added. The field
   corresponds to the total number of transactions in the blockchain. (#1289)
 
-- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
-  An additional field in the response of the endpoint was added. The field
-  corresponds to the total number of transactions in the blockchain. (#1289)
-
 #### exonum-merkledb
 
 - Changed storage layout (#1293)
@@ -140,9 +136,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - A channel for api requests has been changed to unbounded. (#1308)
 
-- Added a new endpoint `system/v1/services` for displaying information
-  about available services. (#1288)
-
 #### exonum-merkledb
 
 - Updated `ProofMapIndex` data layout. (#1293)
@@ -159,9 +152,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - `get_object_existed` and `get_object_existed_mut` methods of `Fork` and `Snapshot`
     returns optional references to index.
+
 - `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
 
-- Added `len` method to `MapIndex` and `ProofMapIndex`. (#)
+- Added `len` method to `MapIndex` and `ProofMapIndex`. (#1312)
 
 #### exonum-testkit
 
