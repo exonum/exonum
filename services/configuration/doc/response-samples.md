@@ -228,6 +228,7 @@
       }
     }'  http://127.0.0.1:8010/api/v1/configs/postpropose
     ```
+
     ```json
     {
       "cfg_hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a",
@@ -242,6 +243,7 @@
         "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a"
       }' http://127.0.0.1:8011/api/services/configuration/v1/configs/postvote
     ```
+
     ```javascript
     {
       "tx_hash": "3e057783ff4bcb5f180625838d6cfb6317a161ea7024fb35372c1ce722dfc066"
@@ -255,6 +257,7 @@
         "hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a"
       }' http://127.0.0.1:8012/api/services/configuration/v1/configs/postagainst
     ```
+
     ```javascript
     {
       "tx_hash": "3e057783ff4bcb5f180625838d6cfb6317a161ea7024fb35372c1ce722dfc066"
