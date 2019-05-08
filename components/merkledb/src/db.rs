@@ -372,7 +372,7 @@ pub enum Change {
 ///
 /// `Fork` also supports checkpoints ([`flush`] and
 /// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
-/// a runtime error). Checkpoint is created automatically after calling `flush` method.
+/// a runtime error). Checkpoint is created automatically after calling the `flush` method.
 ///
 /// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
 /// writing data. Thus, `&mut Fork` is used as a storage view for creating
@@ -564,15 +564,16 @@ impl Snapshot for FlushedFork {
 }
 
 impl Fork {
-    /// Finalizes all changes that was made after previous execution of itself.
-    /// If no `flush` method was called before, finalizes all changes that was
-    /// made after creation of `Fork`. In other words creates checkpoint.
+    /// Finalizes all changes that were made after previous execution of the `flush` method.
+    /// If no `flush` method had been called before, finalizes all changes that were
+    /// made after creation of `Fork`.
     pub fn flush(&mut self) {
         let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
         working_patch.merge_into(&mut self.flushed.patch);
     }
 
-    /// Rolls back all changes that was made after the latest execution of `flush`.
+    /// Rolls back all changes that that were made after the latest execution
+    /// of the `flush` method.
     pub fn rollback(&mut self) {
         self.working_patch = WorkingPatch::new();
     }
