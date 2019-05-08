@@ -137,6 +137,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added a new endpoint `system/v1/services` for displaying information
   about available services. (#1288)
+  
+- A channel for api requests has been changed to unbounded. (#1308)
 
 #### exonum-merkledb
 

@@ -73,7 +73,6 @@ impl SignedMessage {
             buffer.len()
         );
         let signed = SignedMessage { raw: buffer };
-
         let pk = signed.author();
         let signature = signed.signature();
 

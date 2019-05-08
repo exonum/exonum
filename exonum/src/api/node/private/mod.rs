@@ -162,7 +162,7 @@ impl SystemApi {
     fn handle_peer_add(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         api_scope.endpoint_mut(
             name,
-            move |state: &ServiceApiState, connect_info: ConnectInfo| {
+            move |state: &ServiceApiState, connect_info: ConnectInfo| -> Result<(), ApiError> {
                 state
                     .sender()
                     .peer_add(connect_info)
@@ -200,7 +200,7 @@ impl SystemApi {
         let self_ = self.clone();
         api_scope.endpoint_mut(
             name,
-            move |state: &ServiceApiState, query: ConsensusEnabledQuery| {
+            move |state: &ServiceApiState, query: ConsensusEnabledQuery| -> Result<(), ApiError> {
                 state
                     .sender()
                     .send_external_message(ExternalMessage::Enable(query.enabled))
@@ -211,22 +211,28 @@ impl SystemApi {
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint_mut(name, move |state: &ServiceApiState, _query: ()| {
-            state
-                .sender()
-                .send_external_message(ExternalMessage::Shutdown)
-                .map_err(ApiError::from)
-        });
+        api_scope.endpoint_mut(
+            name,
+            move |state: &ServiceApiState, _query: ()| -> Result<(), ApiError> {
+                state
+                    .sender()
+                    .send_external_message(ExternalMessage::Shutdown)
+                    .map_err(ApiError::from)
+            },
+        );
         self
     }
 
     fn handle_rebroadcast(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint_mut(name, move |state: &ServiceApiState, _query: ()| {
-            state
-                .sender()
-                .send_external_message(ExternalMessage::Rebroadcast)
-                .map_err(ApiError::from)
-        });
+        api_scope.endpoint_mut(
+            name,
+            move |state: &ServiceApiState, _query: ()| -> Result<(), ApiError> {
+                state
+                    .sender()
+                    .send_external_message(ExternalMessage::Rebroadcast)
+                    .map_err(ApiError::from)
+            },
+        );
         self
     }
 }
