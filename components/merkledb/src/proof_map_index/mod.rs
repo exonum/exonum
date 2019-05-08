@@ -210,32 +210,6 @@ impl BinaryAttribute for ProofMapState {
     }
 }
 
-impl BinaryAttribute for Option<ProofPath> {
-    fn size(&self) -> usize {
-        match self {
-            Some(path) => path.size(),
-            None => 0,
-        }
-    }
-
-    fn write<W: Write>(&self, buffer: &mut W) {
-        if let Some(path) = self {
-            let mut tmp = [0_u8; PROOF_PATH_SIZE];
-            path.write(&mut tmp);
-            buffer.write_all(&tmp).unwrap();
-        }
-    }
-
-    fn read<R: Read>(buffer: &mut R) -> Self {
-        let mut tmp = [0_u8; PROOF_PATH_SIZE];
-        match buffer.read(&mut tmp).unwrap() {
-            0 => None,
-            PROOF_PATH_SIZE => Some(ProofPath::read(&tmp)),
-            other => panic!("Unexpected attribute length: {}", other),
-        }
-    }
-}
-
 impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: IndexAccess,
