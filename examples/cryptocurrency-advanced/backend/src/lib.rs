@@ -38,14 +38,10 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum_merkledb::Snapshot;
-
 use exonum::{
     api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet, ExecutionResult, ExecutionError},
-    crypto::Hash,
+    blockchain::{ExecutionResult, ExecutionError},
     helpers::fabric::{self, Context},
-    messages::AnyTx,
     runtime::rust::{
         service::{GenesisInitInfo, Service, ServiceFactory},
         RustArtifactSpec, TransactionContext,
@@ -174,39 +170,12 @@ impl ServiceFactory for ServiceFactoryImpl {
     }
 }
 
-// /// Exonum `Service` implementation.
-// #[derive(Default, Debug)]
-// pub struct Service;
-
-// impl blockchain::Service for Service {
-//     fn service_id(&self) -> u16 {
-//         CRYPTOCURRENCY_SERVICE_ID
-//     }
-
-//     fn service_name(&self) -> &str {
-//         SERVICE_NAME
-//     }
-
-//     fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-//         let schema = Schema::new(view);
-//         schema.state_hash()
-//     }
-
-//     fn tx_from_raw(&self, raw: AnyTx) -> Result<Box<dyn Transaction>, failure::Error> {
-//         WalletTransactions::tx_from_raw(raw).map(Into::into)
-//     }
-
-//     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-//         api::PublicApi::wire(builder);
-//     }
-// }
-
 /// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
 pub struct CryptocurrencyServiceFactory;
 
 impl fabric::ServiceFactory for CryptocurrencyServiceFactory {
-    fn make_service_builder(&self, run_context: &Context) -> Box<dyn ServiceFactory> {
+    fn make_service_builder(&self, _run_context: &Context) -> Box<dyn ServiceFactory> {
         Box::new(ServiceFactoryImpl)
     }
 }
