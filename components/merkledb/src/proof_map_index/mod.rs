@@ -936,6 +936,26 @@ where
         self.state.get().len
     }
 
+    /// Returns `true` if the proof map contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{TemporaryDB, Database, ProofMapIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let name = "name";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, &fork);
+    /// assert!(index.is_empty());
+    ///
+    /// index.put(&0, 10);
+    /// assert!(!index.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     fn set_len(&mut self, len: u64) {
         let mut metadata = self.state.get();
         metadata.update_len(len);
