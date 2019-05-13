@@ -572,7 +572,7 @@ impl Fork {
         working_patch.merge_into(&mut self.flushed.patch);
     }
 
-    /// Rolls back all changes that that were made after the latest execution
+    /// Rolls back all changes that were made after the latest execution
     /// of the `flush` method.
     pub fn rollback(&mut self) {
         self.working_patch = WorkingPatch::new();
