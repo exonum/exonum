@@ -685,20 +685,7 @@ impl BlockRequest {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
-        //        let tx_hash = schema.block_transactions(height).object_hash();
-        // HashTag::hash_list_node(self.len(), self.merkle_root())
-
-        //        let list_hash =
-        //            HashTag::hash_list_node(self.transactions().len() as u64, *self.block().tx_hash());
-
-        let res = *self.block().tx_hash() == HashTag::hash_list(self.transactions());
-
-        println!("block {:?}", self.block());
-        //        println!("list_hash {:?}", list_hash);
-        println!("tx_hash {:?}", *self.block().tx_hash());
-        println!("hash_list {:?}", HashTag::hash_list(self.transactions()));
-        println!("verify_tx_hash: res {}", res);
-        res
+        *self.block().tx_hash() == HashTag::hash_list(self.transactions())
     }
 }
 
