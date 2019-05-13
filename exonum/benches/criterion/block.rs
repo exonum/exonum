@@ -86,7 +86,7 @@ fn create_blockchain(db: impl Database, services: Vec<Box<dyn Service>>) -> Bloc
     };
     use std::sync::Arc;
 
-    let dummy_channel = mpsc::channel(1);
+    let dummy_channel = mpsc::unbounded();
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let mut blockchain = Blockchain::new(
         Arc::new(db) as Arc<dyn Database>,

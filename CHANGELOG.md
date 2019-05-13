@@ -137,6 +137,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added a new endpoint `system/v1/services` for displaying information
   about available services. (#1288)
+  
+- A channel for api requests has been changed to unbounded. (#1308)
 
 #### exonum-merkledb
 
@@ -534,6 +536,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Remove old dependencies on `iron` and its companions `bodyparser`, `router`
     and others.
   - Simplify the API handlers as follows:
+  
     ```rust
     fn my_handler(state: &ServiceApiState, query: MyQueryType)
     -> Result<MyResponse, ApiError>
@@ -541,6 +544,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
       // ...
     }
     ```
+  
     where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
     implements `Serialize` trait.
   - Replace old methods `public_api_handler` and `private_api_handler` of
