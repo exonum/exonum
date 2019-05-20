@@ -81,7 +81,8 @@ configuration generate-config example/common.toml  example/pub_4.toml example/se
   connect to each other.
 
 Note that in case of copying files with consensus and service keys to the other machines, you must change the access permissions of these files for every machine.
-For example: 
+For example:
+
 ```sh
 sudo chmod 600 consensus_1.toml
 sudo chmod 600 service_1.toml
