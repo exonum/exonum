@@ -79,6 +79,14 @@ exonum-timestamping generate-config example/common.toml  example/pub_3.toml exam
 exonum-timestamping generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334 -c example/consensus_4.toml -s example/service_4.toml -n
 ```
 
+Note that in case of copying files with consensus and service keys to the other machines, you must change the access permissions of these files for every machine.
+For example:
+
+```sh
+sudo chmod 600 consensus_1.toml
+sudo chmod 600 service_1.toml
+```
+
 Finalize generation of nodes configurations:
 
 ```sh
