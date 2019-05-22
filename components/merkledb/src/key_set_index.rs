@@ -327,7 +327,7 @@ where
     /// let mut index = KeySetIndex::new("index", &fork);
     /// assert_eq!(0, index.len());
     ///
-    /// index.put(&1, 10);
+    /// index.insert(10);
     ///
     /// assert_eq!(1, index.len());
     /// ```
@@ -348,7 +348,7 @@ where
     /// let mut index = KeySetIndex::new(name, &fork);
     /// assert!(index.is_empty());
     ///
-    /// index.put(&0, 10);
+    /// index.insert(10);
     /// assert!(!index.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
