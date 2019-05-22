@@ -16,7 +16,6 @@ use std::fmt::Debug;
 
 use hex::FromHex;
 use rand::{thread_rng, Rng, RngCore};
-use serde::ser::Serialize;
 use serde_derive::Serialize;
 use serde_json::{from_str, to_string};
 
