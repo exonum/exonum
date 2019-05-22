@@ -157,6 +157,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `len` method to `MapIndex` and `ProofMapIndex`. (#1312)
 
+- Added `len` method to `KeySetIndex` and `ValueSetIndex`. (#1318)
+
 #### exonum-testkit
 
 - Implemented "stopping" and "resuming" a `TestKit`, allowing to emulate node
