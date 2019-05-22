@@ -635,7 +635,7 @@ mod tests {
 
         assert!(!map_index.contains(&2_u8));
         assert!(!map_index.contains(&3_u8));
-        assert_eq!(map_index.len(), 0);
+        assert!(map_index.is_empty());
     }
 
     #[test]

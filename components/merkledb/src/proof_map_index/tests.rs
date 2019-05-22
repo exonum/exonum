@@ -119,7 +119,7 @@ fn test_map_methods() {
 
     assert!(!index.contains(&[2; 32]));
     assert!(!index.contains(&[3; 32]));
-    assert_eq!(index.len(), 0);
+    assert!(index.is_empty());
 }
 
 #[test]
