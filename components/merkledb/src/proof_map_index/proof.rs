@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use failure::Fail;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::Deserialize, Deserializer, ser::Serialize, Serializer};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::Hash;
