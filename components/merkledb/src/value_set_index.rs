@@ -339,8 +339,10 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn insert(&mut self, item: V) {
-        self.base.put(&item.object_hash(), item);
-        self.set_len(self.len() + 1);
+        if !self.contains(&item) {
+            self.base.put(&item.object_hash(), item);
+            self.set_len(self.len() + 1);
+        }
     }
 
     /// Removes a value from the set.
@@ -386,8 +388,10 @@ where
     /// index.remove_by_hash(&data_hash);
     /// assert!(!index.contains_by_hash(&data_hash));
     pub fn remove_by_hash(&mut self, hash: &Hash) {
-        self.base.remove(hash);
-        self.set_len(self.len().saturating_sub(1));
+        if self.base.contains(hash) {
+            self.base.remove(hash);
+            self.set_len(self.len().saturating_sub(1));
+        }
     }
 
     /// Clears the set, removing all values.
@@ -508,11 +512,15 @@ mod tests {
         assert!(!index.contains(&1_u8));
         assert!(!index.contains_by_hash(&1_u8.object_hash()));
         assert_eq!(index.len(), 0);
+        assert!(index.is_empty());
 
         index.insert(1_u8);
+        assert!(!index.is_empty());
         assert_eq!(index.len(), 1);
         assert!(index.contains(&1_u8));
         assert!(index.contains_by_hash(&1_u8.object_hash()));
+        index.insert(1_u8);
+        assert_eq!(index.len(), 1);
 
         index.insert(2_u8);
         assert_eq!(index.len(), 2);
@@ -522,6 +530,8 @@ mod tests {
 
         assert_eq!(index.len(), 1);
         assert!(!index.contains(&1_u8));
+        index.remove_by_hash(&hash);
+        assert_eq!(index.len(), 1);
 
         index.clear();
         assert!(index.is_empty());

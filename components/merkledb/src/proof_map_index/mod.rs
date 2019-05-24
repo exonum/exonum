@@ -764,6 +764,11 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
+        let length = if self.contains(key) {
+            self.len()
+        } else {
+            self.len() + 1
+        };
         let proof_path = ProofPath::new(key);
         let root_path = match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
@@ -821,7 +826,8 @@ where
                 proof_path
             }
         };
-        self.update_state(self.len() + 1, Some(root_path));
+
+        self.update_state(length, Some(root_path));
     }
 
     /// Removes a key from the proof map.

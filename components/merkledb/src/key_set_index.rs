@@ -256,8 +256,10 @@ where
     /// ```
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub fn insert(&mut self, item: K) {
-        self.base.put(&item, ());
-        self.set_len(self.len() + 1);
+        if !self.contains(&item) {
+            self.base.put(&item, ());
+            self.set_len(self.len() + 1);
+        }
     }
 
     /// Removes a key from the set.
@@ -283,8 +285,10 @@ where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,
     {
-        self.base.remove(item);
-        self.set_len(self.len().saturating_sub(1));
+        if self.contains(item) {
+            self.base.remove(item);
+            self.set_len(self.len().saturating_sub(1));
+        }
     }
 
     /// Clears the set, removing all values.
@@ -431,20 +435,27 @@ mod tests {
         let mut index = KeySetIndex::new(INDEX_NAME, &fork);
 
         assert!(!index.contains(&1_u8));
+        assert!(index.is_empty());
         assert_eq!(index.len(), 0);
 
         index.insert(1_u8);
         assert_eq!(index.len(), 1);
+        assert!(!index.is_empty());
         assert!(index.contains(&1_u8));
 
+        index.insert(2_u8);
+        assert_eq!(index.len(), 2);
         index.insert(2_u8);
         assert_eq!(index.len(), 2);
 
         let key = index.iter().next().unwrap();
         index.remove(&key);
-
         assert_eq!(index.len(), 1);
         assert!(!index.contains(&1_u8));
+        index.remove(&key);
+        assert_eq!(index.len(), 1);
+        index.remove(&key);
+        assert_eq!(index.len(), 1);
 
         index.clear();
         assert!(index.is_empty());

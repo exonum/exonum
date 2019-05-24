@@ -416,8 +416,10 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     pub fn put(&mut self, key: &K, value: V) {
+        if !self.contains(key) {
+            self.set_len(self.len() + 1);
+        }
         self.base.put(key, value);
-        self.set_len(self.len() + 1);
     }
 
     /// Removes a key from a map.
@@ -442,8 +444,10 @@ where
         K: Borrow<Q>,
         Q: BinaryKey + ?Sized,
     {
-        self.base.remove(key);
-        self.set_len(self.len().saturating_sub(1));
+        if self.contains(key) {
+            self.base.remove(key);
+            self.set_len(self.len().saturating_sub(1));
+        }
     }
 
     /// Clears a map, removing all entries.
@@ -612,22 +616,31 @@ mod tests {
         let mut map_index = MapIndex::new(IDX_NAME, &fork);
 
         assert_eq!(map_index.get(&1_u8), None);
+        assert!(map_index.is_empty());
         assert_eq!(map_index.len(), 0);
         assert!(!map_index.contains(&1_u8));
 
         map_index.put(&1_u8, 1_u8);
 
         assert_eq!(map_index.get(&1_u8), Some(1_u8));
+        assert!(!map_index.is_empty());
         assert_eq!(map_index.len(), 1);
         assert!(map_index.contains(&1_u8));
 
-        map_index.remove(&100_u8);
+        map_index.put(&1_u8, 2_u8);
+        assert_eq!(map_index.len(), 1);
+        assert!(map_index.contains(&1_u8));
 
+        map_index.put(&2_u8, 2_u8);
+        map_index.remove(&100_u8);
         map_index.remove(&1_u8);
+        assert_eq!(map_index.len(), 1);
+        map_index.remove(&1_u8);
+        assert_eq!(map_index.len(), 1);
 
         assert!(!map_index.contains(&1_u8));
         assert_eq!(map_index.get(&1_u8), None);
-        assert_eq!(map_index.len(), 0);
+        assert_eq!(map_index.len(), 1);
 
         map_index.put(&2_u8, 2_u8);
         map_index.put(&3_u8, 3_u8);

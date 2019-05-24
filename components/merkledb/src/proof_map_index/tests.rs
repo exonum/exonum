@@ -101,6 +101,11 @@ fn test_map_methods() {
     assert!(index.contains(&[1; 32]));
     assert_eq!(index.len(), 1);
 
+    index.put(&[1; 32], 1_u8);
+    assert_eq!(index.len(), 1);
+    index.put(&[1; 32], 2_u8);
+    assert_eq!(index.len(), 1);
+
     index.remove(&[1; 32]);
 
     assert!(!index.contains(&[1; 32]));
@@ -111,8 +116,10 @@ fn test_map_methods() {
     index.put(&[2; 32], 2_u8);
     index.put(&[3; 32], 3_u8);
 
-    index.remove(&[3; 32]);
     index.remove(&[2; 32]);
+    index.remove(&[3; 32]);
+    assert_eq!(index.len(), 1);
+    index.remove(&[3; 32]);
     assert_eq!(index.len(), 1);
 
     index.clear();
