@@ -55,7 +55,7 @@ rust_decimal = "1.0"
 protobuf = { version = "2.6.0", features = ["with-serde"] }
 ctrlc = "3.1.1"
 rpassword = "3.0.0"
-zeroize = "0.7.0"
+zeroize = "0.8.0"
 
 rocksdb = "0.12.0"
 exonum_sodiumoxide = { version = "0.0.22", optional = true }
