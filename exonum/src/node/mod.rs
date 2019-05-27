@@ -25,6 +25,7 @@ pub use self::{
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
+use exonum_merkledb::{Database, DbOptions};
 use failure::Error;
 use futures::{sync::mpsc, Sink};
 use tokio_core::reactor::Core;
@@ -41,29 +42,32 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::api::{
-    backends::actix::{AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig},
-    ApiAccess, ApiAggregator,
+use crate::{
+    api::{
+        backends::actix::{
+            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntime, SystemRuntimeConfig,
+        },
+        ApiAccess, ApiAggregator,
+    },
+    blockchain::{
+        Blockchain, ConsensusConfig, GenesisConfig, Schema, SharedNodeState, ValidatorKeys,
+    },
+    crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey},
+    events::{
+        error::{into_failure, LogError},
+        noise::HandshakeParams,
+        HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
+        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, UnboundedSyncSender,
+    },
+    helpers::{
+        config::ConfigManager,
+        fabric::{NodePrivateConfig, NodePublicConfig},
+        user_agent, Height, Milliseconds, Round, ValidatorId,
+    },
+    messages::{AnyTx, Connect, Message, ProtocolMessage, Signed, SignedMessage},
+    node::state::SharedConnectList,
+    runtime::rust::service::ServiceFactory,
 };
-use crate::blockchain::{
-    Blockchain, ConsensusConfig, GenesisConfig, Schema, Service, SharedNodeState, ValidatorKeys,
-};
-use crate::crypto::{self, read_keys_from_file, CryptoHash, Hash, PublicKey, SecretKey};
-use crate::events::{
-    error::{into_failure, LogError},
-    noise::HandshakeParams,
-    HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, UnboundedSyncSender,
-};
-use crate::helpers::{
-    config::ConfigManager,
-    fabric::{NodePrivateConfig, NodePublicConfig},
-    user_agent, Height, Milliseconds, Round, ValidatorId,
-};
-use crate::messages::{Connect, Message, ProtocolMessage, RawTransaction, Signed, SignedMessage};
-use crate::node::state::SharedConnectList;
-use crate::runtime::rust::service::ServiceFactory;
-use exonum_merkledb::{Database, DbOptions};
 
 mod basic;
 mod connect_list;

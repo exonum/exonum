@@ -15,9 +15,8 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use exonum_merkledb::{Fork, Snapshot};
-
 use actix::Addr;
+use exonum_merkledb::{Fork, Snapshot};
 use serde_json::Value;
 
 use std::{
@@ -33,7 +32,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{Height, Milliseconds, ValidatorId},
-    messages::{Message, RawTransaction, ServiceTransaction, Signed},
+    messages::{AnyTx, Message, ServiceTransaction, Signed},
     node::{ApiSender, ConnectInfo, NodeRole, State},
 };
 

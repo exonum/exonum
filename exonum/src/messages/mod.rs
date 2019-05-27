@@ -31,37 +31,28 @@
 //!              (drop)                           (drop)
 //! ```
 
-use byteorder::{ByteOrder, LittleEndian};
+pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*};
+pub use exonum_merkledb::BinaryValue;
+
+use exonum_merkledb::ObjectHash;
 use failure::Error;
 use hex::{FromHex, ToHex};
-use serde::de::{self, Deserialize, Deserializer};
-use serde::ser::{Serialize, Serializer};
+use serde::{
+    de::{self, Deserialize, Deserializer},
+    ser::{Serialize, Serializer},
+};
 
-use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
+use std::{borrow::Cow, fmt, ops::Deref};
 
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey, Signature};
+use crate::crypto::{Hash, PublicKey, Signature};
 
 pub(crate) use self::helpers::HexStringRepresentation;
-pub use self::{authorization::SignedMessage, helpers::to_hex_string, protocol::*};
-use exonum_merkledb::BinaryValue;
 
 mod authorization;
 mod helpers;
 mod protocol;
 #[cfg(test)]
 mod tests;
-
-/// Version of the protocol. Different versions are incompatible.
-pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
-pub(crate) const RAW_TRANSACTION_HEADER: usize = mem::size_of::<u16>() * 2;
-
-/// Transaction raw buffer.
-/// This struct is used to transfer transactions in network.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct RawTransaction {
-    service_id: u16,
-    service_transaction: ServiceTransaction,
-}
 
 /// Concrete raw transaction transaction inside `TransactionSet`.
 /// This type is used inside `#[derive(TransactionSet)]`
@@ -87,69 +78,12 @@ impl ServiceTransaction {
     }
 }
 
-impl RawTransaction {
-    /// Creates a new instance of RawTransaction.
-    // `pub` because new used in benches.
-    pub fn new(service_id: u16, service_transaction: ServiceTransaction) -> RawTransaction {
-        RawTransaction {
-            service_id,
-            service_transaction,
-        }
-    }
-
-    /// Returns the user defined data that should be used for deserialization.
-    pub fn service_transaction(self) -> ServiceTransaction {
-        self.service_transaction
-    }
-
-    /// Returns `service_id` specified for current transaction.
-    pub fn service_id(&self) -> u16 {
-        self.service_id
-    }
-}
-
-impl BinaryValue for RawTransaction {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut buffer = vec![0; mem::size_of::<u16>()];
-        LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
-        let value = self.service_transaction.to_bytes();
-        buffer.extend_from_slice(&value);
-        buffer
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
-        ensure!(
-            bytes.len() >= mem::size_of::<u16>(),
-            "Buffer too short in RawTransaction deserialization."
-        );
-        let service_id = LittleEndian::read_u16(&bytes[0..2]);
-        let service_transaction = ServiceTransaction::from_bytes(Cow::from(&bytes[2..]))?;
-        Ok(RawTransaction {
-            service_id,
-            service_transaction,
-        })
-    }
-}
-
-impl BinaryValue for ServiceTransaction {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut buffer = vec![0; mem::size_of::<u16>()];
-        LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
-        buffer.extend_from_slice(&self.payload);
-        buffer
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, Error> {
-        ensure!(
-            bytes.len() >= mem::size_of::<u16>(),
-            "Buffer too short in ServiceTransaction deserialization."
-        );
-        let transaction_id = LittleEndian::read_u16(&bytes[0..2]);
-        let payload = bytes[2..].to_vec();
-        Ok(ServiceTransaction {
-            transaction_id,
-            payload,
-        })
+impl fmt::Debug for ServiceTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Transaction")
+            .field("message_id", &self.transaction_id)
+            .field("payload_len", &self.payload.len())
+            .finish()
     }
 }
 
@@ -169,20 +103,23 @@ pub struct Signed<T> {
     message: SignedMessage,
 }
 
-impl<T: ProtocolMessage> Signed<T> {
+impl<T> Signed<T> {
     /// Creates a new instance of the message.
     pub(in crate::messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
         Signed { payload, message }
     }
+}
 
-    /// Returns hash of the full message.
-    pub fn hash(&self) -> Hash {
-        hash(self.message.raw())
+impl<T: ProtocolMessage> ObjectHash for Signed<T> {
+    fn object_hash(&self) -> Hash {
+        self.message.object_hash()
     }
+}
 
-    /// Returns a serialized buffer.
-    pub fn serialize(self) -> Vec<u8> {
-        self.message.raw
+impl<T> Signed<T> {
+    /// Returns public key of the message creator.
+    pub fn author(&self) -> PublicKey {
+        *self.message.key()
     }
 
     /// Returns reference to the payload.
@@ -195,33 +132,25 @@ impl<T: ProtocolMessage> Signed<T> {
         &self.message
     }
 
-    /// Returns a public key of the message creator.
-    pub fn author(&self) -> PublicKey {
-        self.message.author()
+    /// Returns reference to the signed message.
+    #[cfg(test)]
+    pub fn signed_message_mut(&mut self) -> &mut SignedMessage {
+        &mut self.message
     }
 
     /// Returns a signature of the message.
     pub fn signature(&self) -> Signature {
-        self.message.signature()
-    }
-}
-
-impl fmt::Debug for ServiceTransaction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Transaction")
-            .field("message_id", &self.transaction_id)
-            .field("payload_len", &self.payload.len())
-            .finish()
+        self.message.signature().clone()
     }
 }
 
 impl<T> ToHex for Signed<T> {
     fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.raw().write_hex(w)
+        self.message.write_hex(w)
     }
 
     fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.raw().write_hex_upper(w)
+        self.message.write_hex_upper(w)
     }
 }
 
@@ -230,7 +159,7 @@ impl<X: ProtocolMessage> FromHex for Signed<X> {
 
     fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
         let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = Message::deserialize(SignedMessage::from_raw_buffer(bytes)?)?;
+        let protocol = Message::deserialize(SignedMessage::from_bytes(bytes.into())?)?;
         ProtocolMessage::try_from(protocol)
             .map_err(|_| format_err!("Couldn't deserialize message."))
     }
@@ -254,7 +183,7 @@ impl<T> From<Signed<T>> for SignedMessage {
     }
 }
 
-impl<T: ProtocolMessage> Deref for Signed<T> {
+impl<T> Deref for Signed<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.payload
@@ -263,30 +192,13 @@ impl<T: ProtocolMessage> Deref for Signed<T> {
 
 impl<T: ProtocolMessage> BinaryValue for Signed<T> {
     fn to_bytes(&self) -> Vec<u8> {
-        self.message.raw.clone()
-    }
-
-    fn into_bytes(self) -> Vec<u8> {
-        self.message.raw
+        self.message.exonum_message().to_vec()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let message = SignedMessage::from_vec_unchecked(value.into_owned());
-        // TODO: Remove additional deserialization. [ECR-2315]
+        let message = SignedMessage::from_bytes(value)?;
         let msg = Message::deserialize(message).unwrap();
         Ok(T::try_from(msg).unwrap())
-    }
-}
-
-impl<T: ProtocolMessage> CryptoHash for Signed<T> {
-    fn hash(&self) -> Hash {
-        self.hash()
-    }
-}
-
-impl PartialEq<Signed<RawTransaction>> for SignedMessage {
-    fn eq(&self, other: &Signed<RawTransaction>) -> bool {
-        self.eq(other.signed_message())
     }
 }
 

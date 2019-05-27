@@ -5,6 +5,8 @@ use std::fmt::Display;
 
 use super::Signed;
 
+// TODO use hex-buffer-serde [ECR-3222]
+
 /// Uses `ToHex`/`FromHex` to serialize arbitrary type `T` as
 /// hexadecimal string rather than real Serde::serialize.
 pub(crate) struct HexStringRepresentation;

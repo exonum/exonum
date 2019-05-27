@@ -23,7 +23,7 @@ use exonum::{
         ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{Hash, PublicKey, SecretKey},
-    messages::{Message, AnyTx, Signed},
+    messages::{AnyTx, Message, Signed},
 };
 
 use super::proto;

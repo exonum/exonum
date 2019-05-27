@@ -46,6 +46,10 @@ pub use self::{
 pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
+use exonum_merkledb::{
+    BinaryValue, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
+    Result as StorageResult, Snapshot,
+};
 use futures::sync::mpsc;
 use protobuf::well_known_types::Any;
 
@@ -56,21 +60,19 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use crate::events::InternalRequest;
-use crate::helpers::{Height, Round, ValidatorId};
-use crate::messages::{AnyTx, BinaryForm, Connect, Message, Precommit, ProtocolMessage, Signed};
-use crate::node::ApiSender;
-use crate::runtime::configuration_new::ConfigurationServiceFactory;
-use crate::runtime::{
-    configuration_new::{self as configuration, ConfigurationServiceInit},
-    dispatcher::Dispatcher,
-    rust::{service::ServiceFactory, RustRuntime},
-    InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
-};
-use exonum_merkledb::{
-    self, Database, Error as StorageError, Fork, IndexAccess, ObjectHash, Patch,
-    Result as StorageResult, Snapshot,
+use crate::{
+    crypto::{self, CryptoHash, Hash, PublicKey, SecretKey},
+    events::InternalRequest,
+    helpers::{Height, Round, ValidatorId},
+    messages::{AnyTx, Connect, Message, Precommit, ProtocolMessage, Signed},
+    node::ApiSender,
+    runtime::configuration_new::ConfigurationServiceFactory,
+    runtime::{
+        configuration_new::{self as configuration, ConfigurationServiceInit},
+        dispatcher::Dispatcher,
+        rust::{service::ServiceFactory, RustRuntime},
+        InstanceInitData, RuntimeContext, RuntimeEnvironment, RuntimeIdentifier,
+    },
 };
 
 mod block;
@@ -133,12 +135,6 @@ impl Blockchain {
             api_sender,
             ..self.clone()
         }
-    }
-
-    /// Returns mapping from the service identifier (`u16`) to service (`Box<dyn Service>`) for
-    /// all services.
-    pub fn service_map(&self) -> &Arc<HashMap<u16, Box<dyn Service>>> {
-        &self.service_map
     }
 
     /// Creates a read-only snapshot of the current storage state.
@@ -222,16 +218,16 @@ impl Blockchain {
             // Update service tables
 
             let config_init_data = {
-                let mut config_init = ConfigurationServiceInit::new();
+                let mut config_init = ConfigurationServiceInit::default();
                 if let Some(majority_count) = config_propose
                     .consensus
                     .configuration_service_majority_count
                 {
-                    config_init.set_is_custom_majority_count(true);
-                    config_init.set_majority_count(majority_count as u32);
+                    config_init.is_custom_majority_count = true;
+                    config_init.majority_count = majority_count as u32;
                 }
                 let mut constructor_data = Any::new();
-                constructor_data.set_value(config_init.encode().unwrap());
+                constructor_data.set_value(config_init.into_bytes());
                 InstanceInitData {
                     instance_id: configuration::SERVICE_ID,
                     constructor_data,
@@ -379,7 +375,7 @@ impl Blockchain {
                 let schema = Schema::new(&fork);
 
                 let state_hash = {
-                    let mut sum_table = schema.state_hash_aggregator_mut();
+                    let mut sum_table = schema.state_hash_aggregator();
                     for (key, hash) in state_hashes {
                         sum_table.put(&key, hash)
                     }
@@ -405,9 +401,9 @@ impl Blockchain {
             let block_hash = block.hash();
             // Update height.
             let schema = Schema::new(&fork);
-            schema.block_hashes_by_height_mut().push(block_hash);
+            schema.block_hashes_by_height().push(block_hash);
             // Save block.
-            schema.blocks_mut().put(&block_hash, block);
+            schema.blocks().put(&block_hash, block);
 
             block_hash
         };

@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::transactions::{Deploy, DeployInit, Init};
-pub use crate::proto::schema::configuration::ConfigurationServiceInit;
+pub use self::transactions::{ConfigurationServiceInit, Deploy, DeployInit, Init};
+
+use exonum_merkledb::{BinaryValue, Fork, IndexAccess, Snapshot};
+use protobuf::well_known_types::Any;
 
 use crate::{
     blockchain::Schema as CoreSchema,
     crypto::Hash,
-    messages::BinaryForm,
     node::State,
     runtime::{
         dispatcher::Dispatcher,
@@ -30,8 +31,6 @@ use crate::{
         DeployStatus, InstanceInitData, RuntimeEnvironment,
     },
 };
-use exonum_merkledb::{Fork, IndexAccess, Snapshot};
-use protobuf::well_known_types::Any;
 
 mod config;
 mod errors;
@@ -312,9 +311,10 @@ impl_service_dispatcher!(ConfigurationServiceImpl, ConfigurationService);
 
 impl Service for ConfigurationServiceImpl {
     fn initialize(&mut self, mut ctx: TransactionContext, arg: Any) -> Result<(), ExecutionError> {
-        let arg: ConfigurationServiceInit = BinaryForm::decode(arg.get_value()).map_err(|e| {
-            ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
-        })?;
+        let arg: ConfigurationServiceInit = BinaryValue::from_bytes(arg.get_value().into())
+            .map_err(|e| {
+                ExecutionError::with_description(WRONG_ARG_ERROR, format!("Wrong argument: {}", e))
+            })?;
 
         if arg.is_custom_majority_count {
             let fork = ctx.fork();

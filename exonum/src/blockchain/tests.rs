@@ -14,19 +14,19 @@
 
 #![allow(dead_code, unsafe_code)]
 
+use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, ObjectHash, Snapshot};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
-use std::borrow::Cow;
-
-use crate::blockchain::{
-    Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionContext,
-    TransactionSet,
+use crate::{
+    blockchain::{
+        Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
+        TransactionContext, TransactionSet,
+    },
+    crypto::{gen_keypair, Hash},
+    helpers::{Height, ValidatorId},
+    messages::{AnyTx, Message},
+    proto,
 };
-use crate::crypto::{gen_keypair, Hash};
-use crate::helpers::{Height, ValidatorId};
-use crate::messages::{AnyTx, Message};
-use crate::proto;
-use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -109,7 +109,11 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (_, patch) = blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
-        &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
+        &[
+            tx_ok1.object_hash(),
+            tx_failed.object_hash(),
+            tx_ok2.object_hash(),
+        ],
     );
 
     blockchain.merge(patch).unwrap();
@@ -117,15 +121,15 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
 
     let schema = Schema::new(&snapshot);
     assert_eq!(
-        schema.transactions().get(&tx_ok1.hash()),
+        schema.transactions().get(&tx_ok1.object_hash()),
         Some(tx_ok1.clone())
     );
     assert_eq!(
-        schema.transactions().get(&tx_ok2.hash()),
+        schema.transactions().get(&tx_ok2.object_hash()),
         Some(tx_ok2.clone())
     );
     assert_eq!(
-        schema.transactions().get(&tx_failed.hash()),
+        schema.transactions().get(&tx_failed.object_hash()),
         Some(tx_failed.clone())
     );
 
@@ -160,17 +164,23 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
     blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
-        &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
+        &[
+            tx_ok1.object_hash(),
+            tx_storage_error.object_hash(),
+            tx_ok2.object_hash(),
+        ],
     );
 }
 
 mod transactions_tests {
+    use crate::{
+        blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet},
+        crypto::gen_keypair,
+        messages::Message,
+        proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB},
+    };
+
     use super::TEST_SERVICE_ID;
-    use crate::blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
-    use crate::crypto::gen_keypair;
-    use crate::messages::Message;
-    use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
-    use std::borrow::Cow;
 
     #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
     #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
@@ -380,6 +390,8 @@ mod memorydb_tests {
     fn create_blockchain() -> Blockchain {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::unbounded();
+        let internal_sender = mpsc::channel(1).0;
+
         Blockchain::new(
             TemporaryDB::new(),
             //            vec![Box::new(super::TestService) as Box<dyn Service>],  // TODO: use new service API.
@@ -394,6 +406,8 @@ mod memorydb_tests {
     fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::unbounded();
+        let internal_sender = mpsc::channel(1).0;
+
         Blockchain::new(
             TemporaryDB::new(),
             //            vec![service],  // TODO: use new service API.
@@ -463,6 +477,8 @@ mod rocksdb_tests {
         let db = create_database(path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::unbounded();
+        let internal_sender = mpsc::channel(1).0;
+
         Blockchain::new(
             db,
             //            vec![Box::new(super::TestService) as Box<dyn Service>],
@@ -478,6 +494,8 @@ mod rocksdb_tests {
         let db = create_database(path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::unbounded();
+        let internal_sender = mpsc::channel(1).0;
+
         Blockchain::new(
             db,
             //            vec![service],

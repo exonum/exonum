@@ -27,7 +27,7 @@ use exonum::{
         ExecutionResult, Schema, Service, Transaction, TransactionContext, TransactionSet,
     },
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
-    messages::{Message, AnyTx, Signed},
+    messages::{AnyTx, Message, Signed},
 };
 use exonum_merkledb::Snapshot;
 use exonum_testkit::{ApiKind, TestKitBuilder};

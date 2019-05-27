@@ -26,11 +26,12 @@ extern crate pretty_assertions;
 
 use exonum::{
     blockchain::{Schema, TransactionErrorType, TransactionSet, TxLocation},
-    crypto::{self, CryptoHash, Hash},
+    crypto::{self, Hash},
     explorer::*,
     helpers::Height,
     messages::{self, AnyTx, Message, Signed},
 };
+use exonum_merkledb::ObjectHash;
 
 use crate::blockchain::{
     create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
@@ -63,7 +64,7 @@ fn test_explorer_basics() {
         let block = explorer.block(Height(0)).unwrap();
         assert_eq!(block.len(), 0);
         assert!(block.transaction(0).is_none());
-        assert!(explorer.transaction(&tx_alice.hash()).is_none());
+        assert!(explorer.transaction(&tx_alice.object_hash()).is_none());
     }
 
     // Block #1: Alice's transaction.
@@ -88,11 +89,11 @@ fn test_explorer_basics() {
             tx_alice.signed_message()
         );
         assert_eq!(
-            tx_info.content().signed_message().hash(),
+            tx_info.content().signed_message().object_hash(),
             block.transaction_hashes()[0]
         );
 
-        let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
+        let tx_info = explorer.transaction(&tx_alice.object_hash()).unwrap();
         assert!(!tx_info.is_in_pool());
         assert!(tx_info.is_committed());
         assert_eq!(
@@ -193,7 +194,7 @@ fn test_explorer_pool_transaction() {
         pk_alice,
         &key_alice,
     );
-    let tx_hash = tx_alice.hash();
+    let tx_hash = tx_alice.object_hash();
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
@@ -399,9 +400,12 @@ fn test_transaction_iterator() {
     let failed_tx_hashes: Vec<_> = block
         .iter()
         .filter(|tx| tx.status().is_err())
-        .map(|tx| tx.content().signed_message().hash())
+        .map(|tx| tx.content().signed_message().object_hash())
         .collect();
-    assert_eq!(failed_tx_hashes, vec![tx_bob.hash(), tx_transfer.hash()]);
+    assert_eq!(
+        failed_tx_hashes,
+        vec![tx_bob.object_hash(), tx_transfer.object_hash()]
+    );
 
     let create_wallet_positions: Vec<_> = block
         .iter()
@@ -481,7 +485,7 @@ fn test_transaction_info_roundtrip() {
     blockchain.merge(fork.into_patch()).unwrap();
 
     let explorer = BlockchainExplorer::new(&blockchain);
-    let info: TransactionInfo = explorer.transaction(&tx.hash()).unwrap();
+    let info: TransactionInfo = explorer.transaction(&tx.object_hash()).unwrap();
     let json = serde_json::to_value(&info).unwrap();
     let info: TransactionInfo = serde_json::from_value(json).unwrap();
 

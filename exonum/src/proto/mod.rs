@@ -59,11 +59,14 @@
 //! }
 //! ```
 
-pub use self::schema::blockchain::{Block, ConfigReference, TransactionResult, TxLocation};
-pub use self::schema::helpers::{BitVec, Hash, PublicKey, Signature};
-pub use self::schema::protocol::{
-    BlockRequest, BlockResponse, Connect, PeersRequest, Precommit, Prevote, PrevotesRequest,
-    Propose, ProposeRequest, Status, TransactionsRequest, TransactionsResponse,
+pub use self::schema::{
+    blockchain::{Block, ConfigReference, TransactionResult, TxLocation},
+    helpers::{BitVec, Hash, PublicKey, Signature},
+    protocol::{
+        AnyTx, BlockRequest, BlockResponse, CallInfo, Connect, ExonumMessage, PeersRequest,
+        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status,
+        TransactionsRequest, TransactionsResponse,
+    },
 };
 
 pub mod schema;
@@ -73,11 +76,14 @@ mod tests;
 use chrono::{DateTime, TimeZone, Utc};
 use failure::Error;
 use protobuf::well_known_types;
+use semver::Version;
 
 use std::collections::HashMap;
 
-use crate::crypto;
-use crate::helpers::{Height, Round, ValidatorId};
+use crate::{
+    crypto,
+    helpers::{Height, Round, ValidatorId},
+};
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct
@@ -224,6 +230,28 @@ impl ProtobufConvert for ValidatorId {
             "u32 is our of range for valid ValidatorId"
         );
         Ok(ValidatorId(pb as u16))
+    }
+}
+
+impl ProtobufConvert for Version {
+    type ProtoStruct = self::schema::runtime::Version;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        pb.set_data(self.to_string());
+        pb
+    }
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(pb.take_data().parse()?)
+    }
+}
+
+impl ProtobufConvert for well_known_types::Any {
+    type ProtoStruct = well_known_types::Any;
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.clone()
+    }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        Ok(pb)
     }
 }
 

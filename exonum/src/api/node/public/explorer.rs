@@ -17,11 +17,14 @@
 use actix::Arbiter;
 use actix_web::{http, ws};
 use chrono::{DateTime, Utc};
+use exonum_merkledb::ObjectHash;
 use futures::IntoFuture;
 
-use std::ops::{Bound, Range};
-use std::sync::{Arc, Mutex};
-use std::time::UNIX_EPOCH;
+use std::{
+    ops::{Bound, Range},
+    sync::{Arc, Mutex},
+    time::UNIX_EPOCH,
+};
 
 use crate::{
     api::{
@@ -32,10 +35,11 @@ use crate::{
         Error as ApiError, ServiceApiBackend, ServiceApiScope, ServiceApiState,
     },
     blockchain::{Block, SharedNodeState},
-    crypto::{CryptoHash, Hash},
+    crypto::Hash,
+    events::error::into_failure,
     explorer::{self, BlockchainExplorer, TransactionInfo},
     helpers::Height,
-    messages::{AnyTx, BinaryForm, Message, Precommit, Signed, SignedMessage},
+    messages::{AnyTx, BinaryValue, Message, Precommit, ProtocolMessage, Signed, SignedMessage},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -238,12 +242,9 @@ impl ExplorerApi {
         state: &ServiceApiState,
         query: TransactionHex,
     ) -> Result<TransactionResponse, ApiError> {
-        use crate::events::error::into_failure;
-        use crate::messages::ProtocolMessage;
-
         let buf: Vec<u8> = ::hex::decode(query.tx_body).map_err(into_failure)?;
-        let signed = SignedMessage::decode(&buf)?;
-        let tx_hash = signed.hash();
+        let signed = SignedMessage::from_bytes(buf.into())?;
+        let tx_hash = signed.object_hash();
         let signed = AnyTx::try_from(Message::deserialize(signed)?)
             .map_err(|_| format_err!("Couldn't deserialize transaction message."))?;
         let _ = state

@@ -19,12 +19,9 @@
 
 pub use actix_web::middleware::cors::Cors;
 
-use actix::{Addr, System};
-use actix_net::server::Server;
+use actix::{Actor, Addr, System};
 use actix_web::{
-    error::ResponseError,
-    server::{HttpServer, StopServer},
-    AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
+    error::ResponseError, AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
 };
 use futures::{Future, IntoFuture};
 use serde::{
@@ -41,10 +38,11 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::api::manager::{ApiManager, RestartServer};
 use crate::api::{
-    error::Error as ApiError, ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable,
-    Mutable, NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
+    error::Error as ApiError,
+    manager::{ApiManager, RestartServer},
+    ApiAccess, ApiAggregator, ExtendApiBackend, FutureResult, Immutable, Mutable, NamedWith,
+    Result, ServiceApiBackend, ServiceApiScope, ServiceApiState,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.

@@ -16,19 +16,17 @@
 
 use futures::sync::mpsc;
 
-use std::borrow::Cow;
-
 use exonum::{
     blockchain::{
         Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction,
         TransactionContext, TransactionSet,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    messages::{Message, AnyTx, Signed},
+    messages::{AnyTx, Message, Signed},
     node::ApiSender,
 };
 
-use exonum_merkledb::{Snapshot, TemporaryDB};
+use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
 
 pub const SERVICE_ID: u16 = 0;
 
@@ -128,6 +126,7 @@ pub fn create_blockchain() -> Blockchain {
     let service_keys = crypto::gen_keypair();
 
     let api_channel = mpsc::unbounded();
+    let internal_sender = mpsc::channel(1).0;
     let mut blockchain = Blockchain::new(
         TemporaryDB::new(),
         //        vec![MyService.into()],
@@ -155,7 +154,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>
     use exonum::messages::{Precommit, Propose};
     use std::time::SystemTime;
 
-    let tx_hashes: Vec<_> = transactions.iter().map(Signed::hash).collect();
+    let tx_hashes: Vec<_> = transactions.iter().map(Signed::object_hash).collect();
     let height = blockchain.last_block().height().next();
 
     let fork = blockchain.fork();
@@ -186,7 +185,7 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Signed<AnyTx>
             ValidatorId(0),
             propose.height(),
             propose.round(),
-            &propose.hash(),
+            &propose.object_hash(),
             &block_hash,
             SystemTime::now().into(),
         ),

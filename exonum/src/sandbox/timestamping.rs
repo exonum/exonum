@@ -23,7 +23,7 @@ use crate::blockchain::{
     ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
 };
 use crate::crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE};
-use crate::messages::{Message, AnyTx, Signed};
+use crate::messages::{AnyTx, Message, Signed};
 use exonum_merkledb::{impl_binary_value_for_message, BinaryValue, Snapshot};
 use protobuf::Message as PbMessage;
 

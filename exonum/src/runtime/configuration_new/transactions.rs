@@ -14,6 +14,7 @@
 
 //! Transaction definitions for the configuration service.
 
+use exonum_merkledb::{Fork, ObjectHash, Snapshot};
 use protobuf::well_known_types::Any;
 
 use crate::{
@@ -23,7 +24,6 @@ use crate::{
     proto,
     runtime::ArtifactSpec,
 };
-use exonum_merkledb::{Fork, ObjectHash, Snapshot};
 
 use super::{
     config::ConfigurationServiceConfig,
@@ -89,6 +89,18 @@ pub struct VoteAgainst {
     ///
     /// See [crate docs](index.html) for more details on how the hash is calculated.
     pub cfg_hash: Hash,
+}
+
+// TODO Implement more convenient wrapper [ECR-3222]
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, Default)]
+#[exonum(
+    pb = "proto::schema::configuration::ConfigurationServiceInit",
+    crate = "crate"
+)]
+pub struct ConfigurationServiceInit {
+    pub is_custom_majority_count: bool,
+    pub majority_count: u32,
 }
 
 // TODO implement sign for transactions

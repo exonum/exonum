@@ -17,13 +17,14 @@ use exonum_merkledb::{
     ProofMapIndex,
 };
 
-use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crate::{
     crypto::{CryptoHash, Hash, PublicKey},
     helpers::{Height, Round},
-    messages::{Connect, Message, Precommit, RawTransaction, Signed},
+    messages::{AnyTx, Connect, Message, Precommit, Signed},
     proto,
 };
+
+use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -137,7 +138,7 @@ where
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
-    pub fn transactions(&self) -> MapIndex<T, Hash, Signed<RawTransaction>> {
+    pub fn transactions(&self) -> MapIndex<T, Hash, Signed<AnyTx>> {
         MapIndex::new(TRANSACTIONS, self.access.clone())
     }
 
@@ -455,7 +456,7 @@ where
     /// This method increment `transactions_pool_len_index`,
     /// be sure to decrement it when transaction committed.
     #[doc(hidden)]
-    pub fn add_transaction_into_pool(&mut self, tx: Signed<RawTransaction>) {
+    pub fn add_transaction_into_pool(&mut self, tx: Signed<AnyTx>) {
         self.transactions_pool().insert(tx.hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);

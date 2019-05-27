@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+
 use protobuf::well_known_types::Any;
 
 use crate::crypto::{Hash, PublicKey};
-use crate::messages::{BinaryForm, CallInfo, ServiceInstanceId};
-use exonum_merkledb::{Fork, Snapshot};
+use crate::messages::{CallInfo, ServiceInstanceId};
 
 use self::rust::RustArtifactSpec;
 
 #[macro_use]
 pub mod rust;
 
-pub mod configuration;
 pub mod configuration_new;
 pub mod dispatcher;
 pub mod error;
@@ -59,7 +59,7 @@ impl From<RustArtifactSpec> for ArtifactSpec {
     fn from(artifact: RustArtifactSpec) -> Self {
         ArtifactSpec {
             runtime_id: RuntimeIdentifier::Rust as u32,
-            raw_spec: artifact.encode().unwrap(),
+            raw_spec: artifact.into_bytes(),
         }
     }
 }
